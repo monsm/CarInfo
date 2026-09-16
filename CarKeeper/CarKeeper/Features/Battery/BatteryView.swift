@@ -11,7 +11,8 @@ struct BatteryView: View {
         ScrollView {
             VStack(spacing: Theme.cardSpacing) {
                 let cache = store.caches
-                if let b = batteryModel(cache), let e = VM.energy(cache, store.car) {
+                let b = batteryModel(cache)
+                let e = VM.energy(cache, store.car)
                     // SOC Hero
                     VStack(spacing: 10) {
                         ZStack {
@@ -193,7 +194,6 @@ struct BatteryView: View {
                             }
                         }
                     }
-                }
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 32)

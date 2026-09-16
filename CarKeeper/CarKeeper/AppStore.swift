@@ -55,60 +55,39 @@ final class AppStore: @unchecked Sendable {
 
     func fetchCore() async {
         guard !carId.isEmpty else { return }
-        let api = APIClient.shared
-        var patch: [String: Any?] = [:]
-        // 并行拉取各数据源，单个失败不影响其它（全局重试已在 API 层兜底网络抖动）。
-        let results = await gather(carId: carId, api: api, includeMessages: false, includeCheck: false)
-        for (k, v) in results { patch[k] = v }
-        saveCache(patch)
+        let results = await gather(carId: carId, includeMessages: false, includeCheck: false)
+        saveCache(results)
     }
 
     func fetchVehicleData() async {
         guard !carId.isEmpty else { return }
-        let api = APIClient.shared
-        var patch: [String: Any?] = [:]
-        let results = await gather(carId: carId, api: api, includeMessages: true, includeCheck: true)
-        for (k, v) in results { patch[k] = v }
-        saveCache(patch)
+        let results = await gather(carId: carId, includeMessages: true, includeCheck: true)
+        saveCache(results)
     }
 
     /// 并行拉取多个数据源。使用 withTaskGroup，子任务失败单独吞掉，
-    /// 返回成功的那些键值对。`includeMessages`/`includeCheck` 控制是否拉全部。
-    private func gather(carId: String, api: APIClient,
-                        includeMessages: Bool, includeCheck: Bool) async -> [String: [String: Any]?] {
-        await withTaskGroup(of: (String, [String: Any]?).self) { group in
+    /// 返回成功的那些键值对（统一装进 [String: Any?]）。`includeMessages`/`includeCheck` 控制是否拉全部。
+    private func gather(carId: String, includeMessages: Bool, includeCheck: Bool) async -> [String: Any?] {
+        await withTaskGroup(of: (String, Any?).self) { group in
+            let api = APIClient.shared
             group.addTask { ("charge", try? await api.getCharge(carId: carId)) }
             group.addTask { ("pm25", try? await api.getCarPm25(carId: carId)) }
             group.addTask { ("location", try? await api.getLocation(carId: carId)) }
             group.addTask { ("control", try? await api.getControl(carId: carId)) }
             if includeMessages {
-                group.addTask { ("messages", try? await api.getMessages()) }
+                group.addTask { () -> (String, Any?) in
+                    let r = try? await api.getMessages()
+                    return ("messages", r)
+                }
             }
             if includeCheck {
                 group.addTask { ("check", try? await api.getCarCheck(carId: carId)) }
             }
-            var out: [String: [String: Any]?] = [:]
+            var out: [String: Any?] = [:]
             for await (key, value) in group {
                 out[key] = value
             }
             return out
-        }
-    }
-
-    func fetchVehicleData() async {
-        guard !carId.isEmpty else { return }
-        let api = APIClient.shared
-        var patch: [String: Any?] = [:]
-        do {
-            if let v = try await api.getCharge(carId: carId) { patch["charge"] = v }
-            if let v = try await api.getCarPm25(carId: carId) { patch["pm25"] = v }
-            if let v = try await api.getLocation(carId: carId) { patch["location"] = v }
-            if let v = try await api.getControl(carId: carId) { patch["control"] = v }
-            if let v = try await api.getMessages() { patch["messages"] = v }
-            if let v = try await api.getCarCheck(carId: carId) { patch["check"] = v }
-            saveCache(patch)
-        } catch {
-            NSLog("fetchVehicleData: \(error.localizedDescription)")
         }
     }
 

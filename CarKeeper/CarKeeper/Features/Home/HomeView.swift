@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 // 车况首页：SOC hero + 状态域 + 快控 + 30s 轮询 / 8s 位置
 struct HomeView: View {

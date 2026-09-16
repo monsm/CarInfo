@@ -368,7 +368,7 @@ final class APIClient: @unchecked Sendable {
             f.dateFormat = "yyyy-MM-dd HH:mm:ss"
             return f.string(from: d)
         }
-        let enc = (s: String) in s.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? s
+        let enc: (String) -> String = { s in s.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? s }
         return "\(APIConfig.baseURL)/appserver/api/information/pageReceiverInfoByTime?actionType=2&page=&limit=2000&startTime=\(enc(f(past)))&endTime=\(enc(f(now)))&token=\(TokenStore.currentToken())"
     }
 

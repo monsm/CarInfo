@@ -11,7 +11,7 @@ struct MineView: View {
                 HStack(spacing: 14) {
                     ZStack {
                         Circle().fill(Color.accentColor.opacity(0.15)).frame(width: 56, height: 56)
-                        Text(String(store.user.map { ciString($0, ["UserNickname"]) ?? "车主" } ?? "车主").prefix(1).uppercased()))
+                        Text(String((store.user.map { ciString($0, ["UserNickname"]) ?? "车主" } ?? "车主").prefix(1)).uppercased())
                             .font(.system(size: 24, weight: .semibold))
                             .foregroundStyle(Color.accentColor)
                     }
@@ -19,9 +19,8 @@ struct MineView: View {
                         Text(store.user.map { ciString($0, ["UserFullname", "UserNickname"]) ?? "车主" } ?? "车主")
                             .font(.system(size: 17, weight: .semibold))
                         HStack(spacing: 8) {
-                            Text(store.user.map { ciString($0, ["Mobile"]) ?? "" } ?? "")
-                                .font(.system(size: 13, design: .monospaced)).foregroundStyle(.secondary)
-                            if store.user.map { ciBool($0, ["RealnameAuthed"]) ?? false } == true {
+                            Text((store.user.map { ciString($0, ["Mobile"]) ?? "" } ?? "")).font(.system(size: 13, design: .monospaced)).foregroundStyle(.secondary)
+                            if (store.user.map { ciBool($0, ["RealnameAuthed"]) ?? false } ?? false) == true {
                                 Text("已实名").font(.system(size: 12)).foregroundStyle(.green)
                             }
                         }

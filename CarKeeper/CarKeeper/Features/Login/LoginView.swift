@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 // 登录：手机号 + 图形验证码 + 短信验证码（60s 倒计时）
 // 直连长安官方接口，无代理。
