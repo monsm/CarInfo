@@ -1,0 +1,47 @@
+<view class="page no-tab data-page">
+
+  <view class="tool">
+    <view>
+      <view class="tool-title">{{title}}</view>
+      <view class="tool-sub fine t-4">共 {{totalRows}} 项 · {{updatedAt}}</view>
+    </view>
+    <view class="acts">
+      <view class="act-pill softpress" bindtap="copyAll">
+        <image class="act-ic" src="{{icons.copy}}" />
+        <text>复制</text>
+      </view>
+      <view class="act-pill softpress" bindtap="load">
+        <image class="act-ic" src="{{icons.refresh}}" />
+        <text>刷新</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{!loading && !hasData}}" class="empty">
+    <view class="e-t">{{errText || '暂无数据'}}</view>
+    <view class="btn-ghost ghost-ic softpress" bindtap="load">
+      <image class="ghost-ic-img" src="{{icons.refresh}}" />
+      <text>重新加载</text>
+    </view>
+  </view>
+
+  <block wx:if="{{hasData}}">
+    <view class="console">
+      <view wx:for="{{blocks}}" wx:key="index" class="sec">
+        <view class="sec-seam" wx:if="{{index > 0}}"><view class="seam-glint"></view></view>
+        <view class="sec-head" wx:if="{{item.h}}">
+          <view class="sec-stamp">
+            <text class="sec-no num">{{index < 9 ? '0' : ''}}{{index + 1}}</text>
+            <view class="sec-tt">
+              <text class="sec-title">{{item.h}}</text>
+            </view>
+          </view>
+        </view>
+        <view wx:for="{{item.rows}}" wx:for-item="r" wx:for-index="ri" wx:key="ri" class="row">
+          <text class="k dim">{{r.k}}</text>
+          <text class="v t-2" user-select>{{r.v}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

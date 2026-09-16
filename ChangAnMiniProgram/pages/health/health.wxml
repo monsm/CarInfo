@@ -1,0 +1,83 @@
+<view class="page no-tab health">
+
+  <!-- 无数据 -->
+  <view wx:if="{{!loading && !hasData}}" class="empty">
+    <view class="e-t">暂无健康报告</view>
+    <view class="e-s">{{errText || '车辆可能未生成体检报告，下拉或点击重新加载'}}</view>
+    <view class="btn-ghost ghost-ic softpress" bindtap="load">
+      <image class="ghost-ic-img" src="{{icons.refresh}}" />
+      <text>重新加载</text>
+    </view>
+  </view>
+
+  <block wx:if="{{hasData}}">
+    <!-- 评分 hero：聚光下的大环 -->
+    <view class="glass-hero score">
+      <view class="score-beam"></view>
+      <view class="score-ring">
+        <image wx:if="{{ringImg}}" class="ring" src="{{ringImg}}" />
+        <view class="ring-num">
+          <text class="d1 num">{{score}}</text>
+          <text class="ring-den num">/100</text>
+        </view>
+      </view>
+      <view class="score-cap-row">
+        <image class="sc-ic" src="{{icons.shield}}" />
+        <text class="caps muted score-cap">综合健康评分 OVERALL</text>
+      </view>
+      <!-- 状态计数：玻璃底座上的一排灯 -->
+      <view class="counts">
+        <view wx:for="{{counts}}" wx:key="key" class="c {{item.cls === 'ok' ? 'ok' : (item.cls === 'warn' ? 'warn' : 'bad')}} {{item.n > 0 ? 'on' : ''}}">
+          {{item.key}}<text class="num"> {{item.n}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 控制台面板：手风琴分区 -->
+    <view class="console">
+      <view class="sec meta-sec" wx:if="{{time}}">
+        <view class="meta-row">
+          <text class="caps muted">最近检测 CHECKED</text>
+          <text class="fine t-4">{{time}}</text>
+        </view>
+      </view>
+
+      <view class="sec sys" wx:for="{{systems}}" wx:key="name">
+        <view class="sec-seam"><view class="seam-glint"></view></view>
+        <view class="sec-head softpress" data-idx="{{index}}" bindtap="onToggle">
+          <view class="sec-stamp">
+            <text class="sec-no num">{{index < 9 ? '0' : ''}}{{index + 1}}</text>
+            <view class="sec-tt">
+              <text class="sec-title">{{item.name}}</text>
+            </view>
+          </view>
+          <view class="sh-side">
+            <text class="sh-st {{item.statusCls}}">{{item.statusText}}</text>
+            <image class="sh-arrow {{item.open ? 'up' : ''}}" src="{{item.open ? icons.chevU : icons.chevD}}" />
+          </view>
+        </view>
+
+        <view wx:if="{{item.open}}" class="sys-body">
+          <view class="it" wx:for="{{item.children}}" wx:for-item="ch" wx:key="name">
+            <view class="it-head">
+              <text class="it-name">{{ch.name}}</text>
+              <text class="it-st {{ch.statusCls}}">{{ch.statusText}}</text>
+            </view>
+            <view class="row" wx:if="{{ch.detect}}">
+              <text class="k dim">检测值</text>
+              <text class="v t-3">{{ch.detect}}</text>
+            </view>
+            <view class="row" wx:if="{{ch.suggest}}">
+              <text class="k dim">参考范围</text>
+              <text class="v t-3">{{ch.suggest}}</text>
+            </view>
+            <view class="row" wx:if="{{ch.desc}}">
+              <text class="k dim">说明</text>
+              <text class="v t-3">{{ch.desc}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

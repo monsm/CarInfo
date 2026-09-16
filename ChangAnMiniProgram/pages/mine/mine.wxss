@@ -1,0 +1,162 @@
+/* ============ 我的 v15「GLASS」：身份卡 + 车辆卡 + 分区卡片 ============ */
+.mine { padding-top: 16rpx; }
+
+/* 用户（身份卡） */
+.u-row {
+  padding: 28rpx 32rpx;
+  margin-bottom: 24rpx;
+}
+.u-head { display: flex; align-items: center; }
+.avatar {
+  width: 100rpx; height: 100rpx;
+  border-radius: 50%;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05));
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1rpx solid rgba(255, 255, 255, 0.17);
+  box-shadow: 0 0 0 8rpx rgba(77, 166, 255, 0.05), inset 0 1rpx 0 rgba(255, 255, 255, 0.14);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 40rpx; font-weight: 300; color: #FFFFFF;
+  margin-right: 30rpx; flex-shrink: 0;
+}
+.u-m { flex: 1; min-width: 0; }
+.u-name { font-size: 38rpx; font-weight: 600; letter-spacing: -0.5rpx; }
+.u-sub { display: flex; align-items: center; margin-top: 14rpx; }
+.u-phone { font-size: 22rpx; color: var(--tx-3); margin-right: 18rpx; }
+.u-auth {
+  font-size: 20rpx; color: var(--tx-3);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1rpx solid var(--line);
+  border-radius: 999rpx; padding: 4rpx 18rpx;
+}
+.u-auth.on { color: var(--ok); border-color: rgba(48, 192, 95, 0.3); }
+
+/* 车辆卡 */
+.my-car {
+  position: relative;
+  padding: 30rpx 32rpx 32rpx;
+  margin-bottom: 24rpx;
+  overflow: hidden;
+}
+.hero-beam {
+  position: absolute; top: 0; left: 16%; right: 16%; height: 260rpx;
+  background: radial-gradient(60% 100% at 50% 0%, rgba(170, 205, 255, 0.16), rgba(170, 205, 255, 0.05) 50%, transparent 74%);
+  pointer-events: none;
+}
+.mc-name-row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; z-index: 2; }
+.mc-name {
+  font-size: 40rpx; font-weight: 600; letter-spacing: -0.5rpx; line-height: 1.2; min-width: 0;
+  color: #FFFFFF;
+}
+.mc-art { position: relative; z-index: 1; width: 100%; margin-top: 16rpx; }
+.mc-info { position: relative; z-index: 2; margin-top: 12rpx; }
+.mc-plate { font-size: 20rpx; letter-spacing: 1.5rpx; display: block; }
+.mc-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-top: 12rpx;
+  font-size: 21rpx; color: var(--tx-3);
+  line-height: 1.6;
+}
+.mc-sep { margin: 0 12rpx; flex-shrink: 0; }
+.mc-ins { display: flex; align-items: center; margin-top: 22rpx; }
+.mc-ins .fine { font-size: 18rpx; letter-spacing: 0.5rpx; color: var(--tx-3); }
+.mc-days {
+  font-size: 19rpx;
+  letter-spacing: 1rpx;
+  margin-left: 18rpx;
+  border-radius: 999rpx;
+  padding: 4rpx 20rpx;
+}
+.mc-days.ok { color: var(--ok); border: 1rpx solid rgba(48, 192, 95, 0.35); }
+.mc-days.warn { color: var(--warn); border: 1rpx solid rgba(255, 179, 64, 0.4); }
+.mc-days.bad { color: var(--bad); border: 1rpx solid rgba(255, 90, 79, 0.45); text-shadow: 0 0 12rpx rgba(255, 90, 79, 0.3); }
+.mc-go {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 10rpx;
+}
+.mc-go text { font-size: 18rpx; letter-spacing: 1rpx; }
+.mc-go .arr { width: 20rpx; height: 20rpx; opacity: 0.55; }
+
+.switch-car {
+  font-size: 21rpx; color: var(--tx-3);
+  padding: 18rpx 4rpx 4rpx;
+  text-align: center;
+}
+
+/* ---------- 控制台容器 ---------- */
+.console { padding: 0; }
+
+/* ---------- 常用：横向图标轨 ---------- */
+.rail { display: flex; justify-content: space-between; gap: 8rpx; }
+.rail-item {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 14rpx;
+  padding: 6rpx 0;
+}
+.t-ic {
+  width: 88rpx; height: 88rpx;
+  border-radius: 18rpx;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1rpx solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.11), 0 10rpx 24rpx -10rpx rgba(0, 0, 0, 0.5);
+  display: flex; align-items: center; justify-content: center;
+}
+.t-ic::before { content: none; }
+.t-ic-img { width: 40rpx; height: 40rpx; opacity: 1; }
+.t-name {
+  font-size: 19rpx; color: var(--tx-3);
+  text-align: center; line-height: 1.35;
+  max-width: 110rpx;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ---------- 工程与账户 ---------- */
+.utility {
+  display: flex;
+  justify-content: space-between;
+  gap: 14rpx;
+}
+.u-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14rpx;
+  padding: 24rpx 8rpx 20rpx;
+  border-radius: 18rpx;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.08);
+}
+.u-item::before { content: none; }
+.u-item text { font-size: 19rpx; color: var(--tx-3); }
+.u-ic {
+  width: 68rpx; height: 68rpx;
+  border-radius: 18rpx;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1rpx solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.11);
+  display: flex; align-items: center; justify-content: center;
+}
+.u-ic::before { content: none; }
+.u-ic-img { width: 34rpx; height: 34rpx; opacity: 1; }
+
+.logout {
+  margin-top: 30rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  padding: 18rpx 0;
+  border-radius: 999rpx;
+  border: 1rpx solid rgba(255, 90, 79, 0.24);
+  background: rgba(255, 90, 79, 0.06);
+}
+.logout text { font-size: 23rpx; color: var(--bad); opacity: 0.9; }
+.logout .lg-ic { width: 52rpx; height: 52rpx; border-radius: 16rpx; background: rgba(255, 90, 79, 0.1); }
+.logout .lg-ic .u-ic-img { width: 28rpx; height: 28rpx; }

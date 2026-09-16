@@ -1,0 +1,45 @@
+<view class="login">
+
+  <!-- 夜场：品牌浮标 + 大灯下的车 -->
+  <view class="lg-hero">
+    <view class="lg-brand">
+      <view class="lg-name">长安车管家</view>
+      <view class="lg-en">CHANGAN CONNECT</view>
+    </view>
+    <view class="lg-stage">
+      <view class="lg-floor"></view>
+      <image class="lg-art" src="{{sceneImg}}" mode="widthFix" />
+    </view>
+  </view>
+
+  <view class="lg-status {{statusCls === 'err' ? 'err' : (statusCls === 'ok' ? 'ok' : '')}}">{{statusText}}</view>
+
+  <!-- 玻璃表单块：聚焦时 rim 光增亮 -->
+  <view class="lg-form glass">
+    <view class="lg-row {{focusRow === 'phone' ? 'focus' : ''}}">
+      <text class="lg-lab">手机号</text>
+      <input class="lg-in" type="number" maxlength="11" placeholder="请输入手机号" placeholder-class="ph"
+        value="{{phone}}" bindinput="onPhoneInput" bindfocus="onFocus" bindblur="onBlur" data-f="phone" />
+    </view>
+    <view class="lg-row {{focusRow === 'pic' ? 'focus' : ''}}">
+      <text class="lg-lab">图形码</text>
+      <input class="lg-in" placeholder="图形验证码" placeholder-class="ph"
+        value="{{picCode}}" bindinput="onPicCodeInput" bindfocus="onFocus" bindblur="onBlur" data-f="pic" />
+      <image wx:if="{{captchaSrc}}" class="lg-captcha" src="{{captchaSrc}}" mode="aspectFit" bindtap="onTapCaptcha" />
+      <view wx:else class="lg-captcha lg-captcha-loading" bindtap="onTapCaptcha">加载</view>
+    </view>
+    <view class="lg-row {{focusRow === 'sms' ? 'focus' : ''}}">
+      <text class="lg-lab">短信码</text>
+      <input class="lg-in" type="number" maxlength="6" placeholder="6 位短信验证码" placeholder-class="ph"
+        value="{{smsCode}}" bindinput="onSmsCodeInput" bindfocus="onFocus" bindblur="onBlur" data-f="sms" />
+      <view class="lg-pill {{smsBtnDisabled ? 'off' : ''}}" bindtap="sendSms">{{smsBtnText}}</view>
+    </view>
+  </view>
+
+  <view class="lg-login">
+    <view class="btn-primary {{busy ? 'busy' : ''}}" bindtap="doLogin">{{busy ? '登录中…' : '登 录'}}</view>
+    <view class="lg-tip">短信验证码 5 分钟内有效 · 点击图形码可刷新</view>
+  </view>
+
+  <view class="lg-foot pressable" bindtap="goDev">登录遇到问题？</view>
+</view>

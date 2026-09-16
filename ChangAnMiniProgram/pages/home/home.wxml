@@ -1,0 +1,289 @@
+<view class="page home {{enter ? 'ent' : ''}}">
+
+  <!-- 空数据提示 -->
+  <view wx:if="{{!hasData}}" class="waiting">
+    <view class="spinner"></view>
+    <text class="caps muted">正在唤醒车辆…</text>
+  </view>
+
+  <!-- ================= hero：全幅场景舞台（车为封面，数字居中压阵） ================= -->
+  <view class="glass-hero stage">
+    <view class="stage-top">
+      <text class="greet caps muted">{{greeting}}</text>
+      <view class="rb softpress" bindtap="onManualRefresh">
+        <image class="rb-ic" src="{{icons.refresh}}" />
+      </view>
+    </view>
+    <view class="stage-id">
+      <picker mode="selector" range="{{carOptions}}" range-key="name" value="{{carIndex}}" bindchange="onCarChange">
+        <view class="pick pressable">
+          <text class="car-name">{{carName}}</text>
+          <image class="pick-chev" src="{{icons.chevD}}" />
+        </view>
+      </picker>
+      <text class="plate caps muted">{{carPlate}}</text>
+    </view>
+
+    <!-- 场景：聚光下的车 -->
+    <view class="scene">
+      <image wx:if="{{heroHalo}}" class="halo" src="{{heroHalo}}" />
+      <image wx:if="{{heroCar}}" class="hero-car" src="{{heroCar}}" mode="widthFix" />
+      <view class="scene-floor"></view>
+      <view wx:if="{{energy.charging}}" class="chg-note">
+        <view class="dot acc breath"></view>
+        <text class="chg-t">{{energy.charging.power}}</text>
+        <text class="caps muted chg-sub">CHARGING</text>
+      </view>
+    </view>
+
+    <!-- 数字：SOC 居中巨字 + 续航副栏 -->
+    <view class="digits-wrap">
+      <view class="h-eyebrow">
+        <text class="caps b">当前电量 SOC</text>
+        <view wx:if="{{heroPill.t}}" class="pill {{heroPill.cls}}">
+          <view class="dot {{heroPill.cls === 'acc' ? 'breath' : ''}}"></view>
+          <text>{{heroPill.t}}</text>
+        </view>
+      </view>
+      <view class="digits">
+        <view class="soc">
+          <text class="d1 num">{{energy.soc}}</text>
+          <text class="pct num">%</text>
+        </view>
+        <view class="rg" wx:if="{{energy.range !== '--'}}">
+          <view class="rg-lab caps muted">约可行驶 RANGE</view>
+          <view class="rg-v"><text class="d3 num">{{energy.range}}</text><text class="rg-u">km</text></view>
+          <view class="rg-sub">{{heroSub}}</view>
+        </view>
+        <view class="rg na" wx:else>
+          <view class="rg-lab caps muted">续航 RANGE</view>
+          <view class="rg-na small t-3">续航数据暂不可用</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 运行快览：单行数据条 -->
+    <view class="run" wx:if="{{hasData}}">
+      <view class="rm" wx:for="{{metrics}}" wx:key="k">
+        <view class="rk caps muted">{{item.k}}</view>
+        <view class="rv num">{{item.v}}<text class="ru">{{item.u}}</text></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ================= 半悬浮快控坞（压住舞台底边） ================= -->
+  <view class="qdock" wx:if="{{hasData}}">
+    <view class="qd-inner">
+      <view wx:for="{{qctrl}}" wx:key="key" class="qseg softpress" data-key="{{item.key}}" bindtap="onQuickCtrl">
+        <image class="qseg-ic" src="{{item.icon}}" />
+        <text class="qseg-t">{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ================= 控制台面板：一整块玻璃，编号分区 + 发丝拼缝 ================= -->
+  <view class="console">
+
+    <!-- 01 车辆状态 -->
+    <view class="sec" wx:if="{{hasData && statusRows.length}}">
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">01</text>
+          <view class="sec-tt">
+            <text class="sec-title">车辆状态</text>
+            <text class="caps muted sec-en">STATUS</text>
+          </view>
+        </view>
+        <text class="sec-side {{summary.overall.cls}}">{{summary.overall.title}}</text>
+      </view>
+      <view wx:for="{{statusRows}}" wx:key="key" class="st softpress" data-key="{{item.key}}" bindtap="onDomainTap">
+        <view class="st-ic-box"><image class="st-ic" src="{{item.icon}}" /></view>
+        <view class="st-main">
+          <view class="st-line">
+            <text class="st-name">{{item.label}}</text>
+            <text class="st-v {{item.cls}}">{{item.short}}</text>
+          </view>
+          <view class="st-sub" wx:if="{{item.reason}}">{{item.reason}}</view>
+        </view>
+        <image class="st-go" src="{{icons.chevR}}" />
+      </view>
+    </view>
+
+    <!-- 02 电池与动力 -->
+    <view class="sec" wx:if="{{hasData && (cellRows.length || powerRows.length)}}">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">02</text>
+          <view class="sec-tt">
+            <text class="sec-title">电池与动力</text>
+            <text class="caps muted sec-en">BATTERY</text>
+          </view>
+        </view>
+        <view class="mod-link softpress" bindtap="goBattery">
+          <text>详情</text>
+          <image src="{{icons.chevR}}" />
+        </view>
+      </view>
+      <image wx:if="{{barV}}" class="bars" src="{{barV}}" mode="widthFix" />
+      <view class="cell-pills">
+        <view wx:for="{{cellRows}}" wx:key="k" class="cpill {{item.cls === 'bad' ? 'bad' : ''}}">
+          <text class="cp-k">{{item.k}}</text>
+          <text class="cp-v num">{{item.v}}</text>
+        </view>
+      </view>
+      <view wx:for="{{powerRows}}" wx:key="k" class="lr">
+        <text class="lr-k">{{item.k}}</text>
+        <text class="lr-v t-3">{{item.v}}</text>
+      </view>
+    </view>
+
+    <!-- 03 车身与胎压 -->
+    <view class="sec" wx:if="{{hasData}}">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">03</text>
+          <view class="sec-tt">
+            <text class="sec-title">车身与胎压</text>
+            <text class="caps muted sec-en">BODY · TYRES</text>
+          </view>
+        </view>
+      </view>
+      <view class="bd-toggle softpress" wx:if="{{bodyRows.length}}" bindtap="toggleBody">
+        <text class="caps muted">车身明细</text>
+        <text class="caps muted">{{bodyOpen ? '收起' : '展开'}}</text>
+      </view>
+      <view class="bd-grid" wx:if="{{bodyOpen}}">
+        <view wx:for="{{bodyRows}}" wx:key="label" class="bd-cell">
+          <view class="bd-line">
+            <view class="bd-dot {{item.cls}}"></view>
+            <text class="bd-k">{{item.label}}</text>
+          </view>
+          <text class="bd-v {{item.cls === 'bad' ? 'bad' : ''}}">{{item.text}}</text>
+        </view>
+      </view>
+
+      <view class="tyre-head">
+        <text class="caps muted">胎压 TYRES</text>
+        <text class="tyre-more {{tyre.alarmCls}}">{{tyre.alarmText}}</text>
+      </view>
+      <view class="tyre-wrap" id="tyreAnchor" wx:if="{{tyre.items.length}}">
+        <image class="topview" src="{{tyreTop}}" mode="widthFix" />
+        <view
+          wx:for="{{tyre.items}}"
+          wx:for-index="idx"
+          wx:key="label"
+          class="wheel {{idx === 0 ? 'w-fl' : (idx === 1 ? 'w-fr' : (idx === 2 ? 'w-rl' : 'w-rr'))}} {{item.cls === 'bad' ? 'bad' : ''}}"
+        >
+          <text class="w-k caps muted">{{item.label}}</text>
+          <text class="w-v num">{{item.kpa}}<text class="w-u">kPa</text></text>
+          <text class="w-t num">{{item.temp}}℃</text>
+        </view>
+      </view>
+      <view class="lr" wx:if="{{tyre.tempRange !== '--'}}">
+        <text class="lr-k">胎温区间</text>
+        <text class="lr-v t-3">{{tyre.tempRange}}</text>
+      </view>
+    </view>
+
+    <!-- 04 位置（上移：一眼可读） -->
+    <view class="sec" wx:if="{{hasData}}">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">04</text>
+          <view class="sec-tt">
+            <text class="sec-title">位置</text>
+            <text class="caps muted sec-en">LOCATION</text>
+          </view>
+        </view>
+        <view class="mod-link softpress {{loc.lat === '--' ? 'dim' : ''}}" bindtap="openMap">
+          <text>地图</text>
+          <image src="{{icons.chevR}}" />
+        </view>
+      </view>
+      <view class="loc-meta">
+        <view class="compass">
+          <image class="comp-ic" src="{{icons.needle}}" />
+        </view>
+        <view class="loc-txt">
+          <view class="loc-hd" wx:if="{{loc.deg !== '--'}}"><text class="loc-deg num">{{loc.deg}}</text><text class="caps muted loc-dir">{{loc.dir}}</text></view>
+          <view class="loc-sub fine t-4">{{loc.satAlt}}</view>
+        </view>
+      </view>
+      <view class="addr">{{loc.addr || '暂无定位数据'}}</view>
+      <image wx:if="{{loc.snap}}" class="snap" src="{{loc.snap}}" mode="widthFix" binderror="onLocImgErr" />
+    </view>
+
+    <!-- 05 座舱 -->
+    <view class="sec" wx:if="{{hasData}}">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">05</text>
+          <view class="sec-tt">
+            <text class="sec-title">座舱</text>
+            <text class="caps muted sec-en">CABIN</text>
+          </view>
+        </view>
+      </view>
+      <view class="cab-grid">
+        <view class="cab-cell">
+          <view class="cab-top">
+            <image class="cab-ic" src="{{icons.kv.air}}" />
+            <text class="cab-k">空调</text>
+          </view>
+          <view class="air-v"><view class="dot {{comfort.acCls}}"></view><text class="cab-v {{comfort.acText ? 'strong' : ''}}">{{comfort.acText}}</text></view>
+        </view>
+        <view class="cab-cell" wx:if="{{comfort.seatD !== '--'}}">
+          <view class="cab-top">
+            <image class="cab-ic" src="{{icons.kv.seat}}" />
+            <text class="cab-k">主驾座椅</text>
+          </view>
+          <text class="cab-v">{{comfort.seatD}}</text>
+        </view>
+        <view class="cab-cell" wx:if="{{comfort.seatP !== '--'}}">
+          <view class="cab-top">
+            <image class="cab-ic" src="{{icons.kv.seat}}" />
+            <text class="cab-k">副驾座椅</text>
+          </view>
+          <text class="cab-v">{{comfort.seatP}}</text>
+        </view>
+        <view class="cab-cell" wx:if="{{comfort.cabinTemp !== '--' || comfort.envTemp !== '--'}}">
+          <view class="cab-top">
+            <image class="cab-ic" src="{{icons.kv.temp}}" />
+            <text class="cab-k">车内 / 外温度</text>
+          </view>
+          <text class="cab-v num">{{comfort.cabinTemp}} <text class="fine t-4">/</text> {{comfort.envTemp}}<text class="fine t-4">℃</text></text>
+        </view>
+        <view class="cab-cell">
+          <view class="cab-top">
+            <image class="cab-ic" src="{{icons.kv.pm}}" />
+            <text class="cab-k">PM2.5</text>
+          </view>
+          <text class="cab-v num">车内 {{comfort.pmIn}} <text class="fine t-4">· 车外 {{comfort.pmOut}}</text></text>
+        </view>
+        <view class="cab-cell" wx:if="{{comfort.purifier !== '--'}}">
+          <view class="cab-top">
+            <image class="cab-ic" src="{{icons.kv.pur}}" />
+            <text class="cab-k">空气净化</text>
+          </view>
+          <text class="cab-v">{{comfort.purifier}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 页脚并入面板：更新时间 + 健康入口 -->
+    <view class="sec sec-foot">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="foot">
+        <text class="fine t-4">更新 {{shortTime}} · 30 秒自动</text>
+        <view class="foot-link softpress" bindtap="goHealth">
+          <text class="small t-2">车辆健康</text>
+          <image class="go" src="{{icons.chevR}}" />
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

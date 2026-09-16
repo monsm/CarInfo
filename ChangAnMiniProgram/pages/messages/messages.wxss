@@ -1,0 +1,161 @@
+/* ============ 消息 v15「GLASS」：页头 + 液态玻璃收件箱 + 日期分组 ============ */
+.msg { padding-top: 16rpx; }
+
+.head { display: flex; align-items: center; justify-content: space-between; padding: 20rpx 4rpx 36rpx; }
+.head-l { display: flex; align-items: baseline; gap: 18rpx; }
+.head-title {
+  font-size: 48rpx; font-weight: 600; letter-spacing: -1rpx;
+  color: #FFFFFF;
+}
+.head-en { font-size: 18rpx; letter-spacing: 2.5rpx; }
+.head-r { display: flex; align-items: center; gap: 20rpx; }
+.unread-pill {
+  font-size: 20rpx;
+  color: #000000;
+  background: linear-gradient(180deg, #FFFFFF, #E6EBF2);
+  border-radius: 999rpx;
+  padding: 8rpx 22rpx;
+  font-weight: 500;
+  box-shadow: 0 8rpx 24rpx -8rpx rgba(255, 255, 255, 0.25), inset 0 1rpx 0 rgba(255, 255, 255, 0.9);
+}
+.rb {
+  width: 64rpx; height: 64rpx;
+  border-radius: 50%;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05));
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1rpx solid rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.12), 0 8rpx 20rpx -8rpx rgba(0, 0, 0, 0.5);
+  display: flex; align-items: center; justify-content: center;
+}
+.rb::before { content: none; }
+.rb-ic { width: 26rpx; height: 26rpx; opacity: 1; }
+
+/* 骨架 */
+.skel { padding: 8rpx 30rpx; }
+.sk-row { display: flex; align-items: center; padding: 32rpx 0; }
+.sk-row + .sk-row { border-top: 1rpx solid rgba(255, 255, 255, 0.04); }
+.sk-l { height: 20rpx; border-radius: 6rpx; background: rgba(255, 255, 255, 0.06); margin-right: 24rpx; flex-shrink: 0; }
+.sk-t { flex: 1; height: 20rpx; border-radius: 6rpx; background: rgba(255, 255, 255, 0.035); }
+.sk-l.w80 { width: 200rpx; } .sk-l.w60 { width: 150rpx; } .sk-l.w75 { width: 180rpx; }
+
+/* ---------- 收件箱卡片（液态玻璃） ---------- */
+.console {
+  position: relative;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04) 45%, rgba(255, 255, 255, 0.02));
+  background-color: rgba(21, 26, 35, 0.64);
+  border: 1rpx solid rgba(255, 255, 255, 0.12);
+  border-radius: 28rpx;
+  box-shadow:
+    0 16rpx 44rpx -20rpx rgba(0, 0, 0, 0.6),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.09);
+  -webkit-backdrop-filter: blur(44rpx) saturate(1.6);
+  backdrop-filter: blur(44rpx) saturate(1.6);
+  padding: 10rpx 32rpx 18rpx;
+  overflow: hidden;
+}
+.console::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 6%; right: 6%; height: 110rpx;
+  background: radial-gradient(50% 100% at 50% 0%, rgba(255, 255, 255, 0.11), transparent 72%);
+  pointer-events: none;
+}
+
+/* ---------- 日期分组 ---------- */
+.group { position: relative; padding-top: 22rpx; }
+.sec-seam { display: none; }
+.seam-glint { display: none; }
+.date-rail {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8rpx 2rpx 4rpx;
+}
+.date-stamp { display: flex; align-items: center; flex: 1; min-width: 0; }
+.ds-line {
+  flex: 1; height: 1rpx;
+  background: rgba(255, 255, 255, 0.08);
+}
+.ds-line:last-child {
+  background: rgba(255, 255, 255, 0.08);
+}
+.ds-date {
+  font-size: 20rpx; letter-spacing: 1.5rpx; color: var(--tx-2); font-weight: 500;
+  margin: 0 18rpx;
+  white-space: nowrap;
+}
+.ds-count { font-size: 18rpx; letter-spacing: 1rpx; color: var(--acc); flex-shrink: 0; margin-left: 14rpx; }
+.ds-count.dim { color: var(--tx-4); }
+
+/* ---------- 条目 ---------- */
+.item { display: flex; align-items: flex-start; padding: 32rpx 0; position: relative; }
+.item + .item::before {
+  content: '';
+  position: absolute; left: 0; right: 0; top: 0; height: 1rpx;
+  background: rgba(255, 255, 255, 0.05);
+}
+.udot {
+  width: 12rpx; height: 12rpx; border-radius: 50%;
+  background: #FFFFFF;
+  margin: 28rpx 24rpx 0 0;
+  flex-shrink: 0;
+  box-shadow: 0 0 12rpx rgba(255, 255, 255, 0.5);
+}
+.i-read .udot { display: none; }
+.i-main { flex: 1; min-width: 0; }
+.i-title-row { display: flex; align-items: baseline; flex-wrap: wrap; row-gap: 4rpx; }
+.i-title { font-size: 30rpx; color: #FFFFFF; font-weight: 500; line-height: 1.42; }
+.i-read .i-title { color: var(--tx-3); font-weight: 400; }
+.i-tag { font-size: 18rpx; margin-left: 20rpx; flex-shrink: 0; letter-spacing: 1rpx; }
+.i-tag.alarm { color: var(--bad); text-shadow: 0 0 12rpx rgba(255, 90, 79, 0.3); }
+.i-tag.charge { color: var(--ok); }
+.i-tag.locate { color: var(--tx-3); }
+.i-read .i-tag { opacity: 0.4; }
+.i-meta { margin-top: 18rpx; }
+.i-time { font-size: 18rpx; color: var(--tx-3); letter-spacing: 0.5rpx; }
+.i-content {
+  font-size: 25rpx;
+  color: var(--tx-2);
+  margin-top: 24rpx;
+  line-height: 1.85;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.item.open .i-content {
+  display: block;
+  -webkit-line-clamp: unset;
+  word-break: break-all;
+  color: var(--tx);
+}
+.i-read .i-content { color: var(--tx-4); }
+.i-read.item.open .i-content { color: var(--tx-3); }
+.i-none { font-size: 20rpx; color: var(--tx-3); margin-top: 10rpx; }
+.i-tip { font-size: 18rpx; letter-spacing: 1.5rpx; margin-top: 30rpx; }
+.item.open .i-tip { color: var(--tx-3); }
+
+.i-exp {
+  margin-top: 26rpx;
+  padding: 18rpx 30rpx;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  border-radius: 18rpx;
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.08);
+}
+.i-exp::before { content: none; }
+.i-exp-row { display: flex; align-items: flex-start; padding: 22rpx 0; font-size: 22rpx; }
+.i-exp-row + .i-exp-row { border-top: 1rpx solid rgba(255, 255, 255, 0.04); }
+.i-exp-k { color: var(--tx-3); width: 90rpx; flex-shrink: 0; }
+.i-exp-v { color: var(--tx-2); flex: 1; word-break: break-all; line-height: 1.75; }
+
+/* ---------- 空态 ---------- */
+.moon-empty { padding: 60rpx 40rpx 40rpx; }
+.empty-scene { width: 420rpx; display: block; margin: 0 auto; }
+.moon-empty .e-t {
+  margin-top: 36rpx;
+  font-size: 32rpx;
+  letter-spacing: 2rpx;
+  color: var(--tx);
+  text-align: center;
+}
+.moon-empty .e-s { margin-top: 14rpx; line-height: 1.7; color: var(--tx-3); text-align: center; }

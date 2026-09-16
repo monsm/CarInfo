@@ -1,0 +1,172 @@
+<view class="page ctrl {{enter ? 'ent' : ''}}">
+
+  <!-- 舞台头：车名 + 状态胶囊（半悬浮执行条压底边） -->
+  <view class="glass-hero stage">
+    <view class="stage-top">
+      <picker mode="selector" range="{{carOptions}}" range-key="name" value="{{carIndex}}" bindchange="onCarChange">
+        <view class="car-line softpress">
+          <text class="car-name">{{carName}}</text>
+          <image class="car-chev" src="{{icons.chevD}}" />
+        </view>
+      </picker>
+      <view class="status-pill {{statusCls === 'err' ? 'err' : ''}}">
+        <view class="status-dot"></view>
+        <text class="status-t">{{statusText}}</text>
+      </view>
+    </view>
+
+    <!-- 主控双盘 -->
+    <view class="ct-hero">
+      <view wx:for="{{hero}}" wx:key="key" class="citem">
+        <view
+          class="disc {{item.cls}} softpress {{busy || running ? 'disabled' : ''}}"
+          data-cmd="{{item.key}}"
+          bindtap="onCmd"
+        >
+          <view class="disc-halo"></view>
+          <image class="disc-ic" src="{{item.img}}" />
+          <view wx:if="{{running && running.cmd === item.key}}" class="disc-spin"></view>
+        </view>
+        <view class="disc-t">
+          <text class="disc-name">{{item.name}}</text>
+          <text class="caps muted disc-en">{{item.key === 'LockDoor' ? 'LOCK' : 'UNLOCK'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 执行中：半悬浮进度条 -->
+    <view class="ct-run" wx:if="{{running}}">
+      <view class="run-sp"></view>
+      <view class="run-m">
+        <text class="run-t">{{running.name}}</text>
+        <text class="run-s">{{running.progress || '正在等待车辆响应'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 控制台面板 -->
+  <view class="console">
+
+    <!-- 01 远程指令 -->
+    <view class="sec">
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">01</text>
+          <view class="sec-tt">
+            <text class="sec-title">远程控制</text>
+            <text class="caps muted sec-en">REMOTE</text>
+          </view>
+        </view>
+      </view>
+      <view class="cmd-grid">
+        <view
+          wx:for="{{list}}"
+          wx:key="key"
+          class="cmd-tile {{index === list.length - 1 ? 'cmd-wide' : ''}} {{busy || running ? 'disabled' : ''}} softpress"
+          data-cmd="{{item.key}}"
+          bindtap="onCmd"
+        >
+          <view class="ct-ic-box">
+            <image class="ct-ic" src="{{item.img}}" />
+          </view>
+          <view class="ct-txt">
+            <text class="ct-name">{{item.name}}</text>
+            <text class="ct-note" wx:if="{{item.note}}">{{item.note}}</text>
+          </view>
+          <view wx:if="{{running && running.cmd === item.key}}" class="cmd-state">
+            <view class="cmd-spin"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 02 车身状态 -->
+    <view class="sec" wx:if="{{body.has}}">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">02</text>
+          <view class="sec-tt">
+            <text class="sec-title">车身状态</text>
+            <text class="caps muted sec-en">BODY</text>
+          </view>
+        </view>
+        <text class="body-sum {{body.summary.cls}}">{{body.summary.text}}</text>
+      </view>
+      <view wx:if="{{body.doorRows.length}}" class="bd-sec">
+        <view class="bd-sec-t caps muted">车门 DOORS</view>
+        <view class="bd-grid">
+          <view wx:for="{{body.doorRows}}" wx:key="k" class="bd-cell">
+            <text class="bd-k">{{item.k}}</text>
+            <text class="bd-v {{item.cls}}">{{item.v}}</text>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{body.extraRows.length}}" class="bd-sec">
+        <view class="bd-sec-t caps muted">盖板 / 天窗 LIDS</view>
+        <view class="bd-grid">
+          <view wx:for="{{body.extraRows}}" wx:key="k" class="bd-cell">
+            <text class="bd-k">{{item.k}}</text>
+            <text class="bd-v {{item.cls}}">{{item.v}}</text>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{body.windowRows.length}}" class="bd-sec">
+        <view class="bd-sec-t caps muted">车窗 WINDOWS</view>
+        <view class="bd-grid">
+          <view wx:for="{{body.windowRows}}" wx:key="k" class="bd-cell">
+            <text class="bd-k">{{item.k}}</text>
+            <text class="bd-v {{item.cls}}">{{item.v}}</text>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{body.lampRows.length}}" class="bd-sec">
+        <view class="bd-sec-t caps muted">灯光 LIGHTS</view>
+        <view class="bd-grid">
+          <view wx:for="{{body.lampRows}}" wx:key="k" class="bd-cell">
+            <text class="bd-k">{{item.k}}</text>
+            <text class="bd-v {{item.cls}}">{{item.v}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 03 记录（时间戳列） -->
+    <view class="sec" wx:if="{{history.length}}">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">03</text>
+          <view class="sec-tt">
+            <text class="sec-title">记录</text>
+            <text class="caps muted sec-en">LOG</text>
+          </view>
+        </view>
+        <view class="mod-action softpress" bindtap="clearHistory">
+          <image class="mod-action-ic" src="{{icons.trash}}" />
+          <text>清空</text>
+        </view>
+      </view>
+      <view
+        wx:for="{{history}}"
+        wx:key="id"
+        class="log softpress"
+        data-idx="{{index}}"
+        bindtap="onLogTap"
+      >
+        <text class="log-time num">{{item.timeShort}}</text>
+        <view class="log-main">
+          <text class="log-name">{{item.name}}</text>
+          <text class="log-status {{item.cls}}">{{item.statusText}}</text>
+          <text class="log-desc">{{item.desc}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 备注 -->
+    <view class="note" wx:if="{{!running && !history.length}}">远程控制需要车辆在线、已开通车联网服务，并输入 6 位控车码</view>
+  </view>
+</view>
+
+<temp-input show="{{showTemp}}" bindconfirm="onTempConfirm" bindcancel="onTempCancel" />
+<pin-input show="{{showPin}}" bindconfirm="onPinConfirm" bindcancel="onPinCancel" />

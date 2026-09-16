@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "车控",
+  "backgroundColor": "#05060A",
+  "usingComponents": {
+    "pin-input": "/components/pin-input/pin-input",
+    "temp-input": "/components/temp-input/temp-input"
+  }
+}

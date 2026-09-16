@@ -1,0 +1,229 @@
+<view class="page no-tab bt">
+
+  <!-- 眉 -->
+  <view class="bt-eyebrow">
+    <image class="bt-ic" src="{{icons.soc}}" />
+    <text class="caps muted">BATTERY &amp; CHARGE · 电池与充电</text>
+  </view>
+
+  <!-- hero：SOC 光环 -->
+  <view class="glass-hero bt-hero">
+    <view class="bt-hero-beam"></view>
+    <view class="bh-body">
+      <image wx:if="{{bhHalo}}" class="bh-halo" src="{{bhHalo}}" />
+      <view class="bh-num">
+        <text class="d1 num">{{soc}}</text>
+        <text class="bh-pct num">%</text>
+      </view>
+    </view>
+    <!-- hero 底部：双格统计条（压住光环下缘） -->
+    <view class="bh-foot">
+      <view class="bh-stat" wx:if="{{range !== '--'}}">
+        <text class="bh-stat-k caps muted">约可行驶 RANGE</text>
+        <view class="bh-stat-v">
+          <text class="bh-range-n num">{{range}}</text>
+          <text class="bh-unit caps muted">KM</text>
+        </view>
+      </view>
+      <view class="bh-stat" wx:else>
+        <text class="bh-stat-k caps muted">续航 RANGE</text>
+        <text class="bh-na caps muted">数据暂不可用</text>
+      </view>
+      <view class="bh-stat bh-stat-r">
+        <text class="bh-stat-k caps muted">充电状态 STATUS</text>
+        <view class="pill {{chargeCls ? chargeCls : 'na'}}">
+          <view class="dot {{chargeCls ? chargeCls : 'na'}}"></view>
+          <text>{{chargeTitle}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="bh-upd fine t-4">更新 {{updated}} · 下拉刷新</view>
+  </view>
+
+  <!-- 加载 -->
+  <view wx:if="{{!ready}}" class="waiting">
+    <view class="spinner"></view>
+    <text class="caps muted">正在读取车辆数据…</text>
+  </view>
+
+  <block wx:if="{{ready}}">
+
+    <!-- 控制台面板 -->
+    <view class="console">
+
+    <!-- 01 分析结论 -->
+    <view class="sec" wx:if="{{head.title && head.title !== '--'}}">
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">01</text>
+          <view class="sec-tt">
+            <text class="sec-title">分析结论</text>
+            <text class="caps muted sec-en">DIAGNOSIS</text>
+          </view>
+        </view>
+      </view>
+      <view class="an-line">
+        <view class="an-dot {{head.cls}}"></view>
+        <text class="an-title {{head.cls}}">{{head.title}}</text>
+      </view>
+      <view class="an-reason" wx:for="{{head.reasons}}" wx:key="index" wx:for-item="r">
+        <view class="an-rdot {{r.cls}}"></view>
+        <text class="an-rt t-3">{{r.t}}</text>
+      </view>
+    </view>
+
+    <!-- 02 一致性 -->
+    <view class="sec">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">02</text>
+          <view class="sec-tt">
+            <text class="sec-title">一致性</text>
+            <text class="caps muted sec-en">CELLS · PROBES</text>
+          </view>
+        </view>
+        <text class="caps muted">{{cellText}} · {{probeText}}</text>
+      </view>
+      <view class="sec-cap caps muted">单体电压 CELLS</view>
+      <image wx:if="{{barV}}" class="bars" src="{{barV}}" mode="widthFix" />
+      <view class="bstats" wx:if="{{cellChips.length}}">
+        <view wx:for="{{cellChips}}" wx:key="k" class="bs {{item.cls === 'bad' ? 'bad' : ''}}">
+          <text class="bs-k">{{item.k}}</text>
+          <text class="bs-v num">{{item.v}}</text>
+        </view>
+      </view>
+      <view class="row" wx:if="{{!cellChips.length}}" wx:for="{{cellRows}}" wx:key="k">
+        <text class="k dim">{{item.k}}</text>
+        <text class="v {{item.cls === 'bad' ? 't-bad' : 't-3'}}">{{item.v}}</text>
+      </view>
+
+      <view class="sec-div"></view>
+      <view class="sec-cap caps muted">温度探针 PROBES</view>
+      <image wx:if="{{barT}}" class="bars" src="{{barT}}" mode="widthFix" />
+      <view class="bstats" wx:if="{{tempChips.length}}">
+        <view wx:for="{{tempChips}}" wx:key="k" class="bs {{item.cls === 'bad' ? 'bad' : ''}}">
+          <text class="bs-k">{{item.k}}</text>
+          <text class="bs-v num">{{item.v}}</text>
+        </view>
+      </view>
+      <view class="row" wx:if="{{!tempChips.length}}" wx:for="{{tempRows}}" wx:key="k">
+        <text class="k dim">{{item.k}}</text>
+        <text class="v {{item.cls === 'bad' ? 't-bad' : 't-3'}}">{{item.v}}</text>
+      </view>
+    </view>
+
+    <!-- 03 充电会话 -->
+    <view class="sec">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">03</text>
+          <view class="sec-tt">
+            <text class="sec-title">充电</text>
+            <text class="caps muted sec-en">CHARGING</text>
+          </view>
+        </view>
+        <text class="sec-side {{chargeCls}}">{{chargeTitle}}</text>
+      </view>
+      <view class="row" wx:for="{{chargeRows}}" wx:key="k">
+        <text class="k dim">{{item.k}}</text>
+        <text class="v t-2">{{item.v}}</text>
+      </view>
+    </view>
+
+    <!-- 04 子系统 -->
+    <view class="sec" wx:if="{{subV.length || subT.length}}">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">04</text>
+          <view class="sec-tt">
+            <text class="sec-title">子系统</text>
+            <text class="caps muted sec-en">SUBSYSTEM</text>
+          </view>
+        </view>
+      </view>
+      <view class="sec-cap caps muted" wx:if="{{subV.length}}">电压采样 VOLTAGE</view>
+      <view class="row" wx:for="{{subV}}" wx:key="k">
+        <text class="k dim">{{item.k}}</text>
+        <text class="v small t-3">{{item.v}}</text>
+      </view>
+      <view class="sec-cap caps muted sub-cap" wx:if="{{subT.length}}">温度采样 THERMAL</view>
+      <view class="row" wx:for="{{subT}}" wx:key="k">
+        <text class="k dim">{{item.k}}</text>
+        <text class="v small t-3">{{item.v}}</text>
+      </view>
+    </view>
+
+    <!-- 05 动力电机 -->
+    <view class="sec" wx:if="{{motors.length}}">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">05</text>
+          <view class="sec-tt">
+            <text class="sec-title">动力系统</text>
+            <text class="caps muted sec-en">DRIVE</text>
+          </view>
+        </view>
+        <text class="caps muted">{{motors.length}} 台电机</text>
+      </view>
+      <view wx:for="{{motors}}" wx:key="name" wx:for-item="motor" wx:for-index="mi">
+        <view class="sec-cap caps muted motor-name">{{motor.name}}</view>
+        <view class="row" wx:for="{{motor.rows}}" wx:for-item="mr" wx:key="k">
+          <text class="k dim">{{mr.k}}</text>
+          <text class="v num t-2">{{mr.v}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 06 故障码 -->
+    <view class="sec">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">06</text>
+          <view class="sec-tt">
+            <text class="sec-title">故障码</text>
+            <text class="caps muted sec-en">DTC</text>
+          </view>
+        </view>
+        <text class="sec-side {{faultTotal > 0 ? 'bad' : 'ok'}}">{{faultTotal > 0 ? '共 ' + faultTotal + ' 条' : '无故障'}}</text>
+      </view>
+      <block wx:if="{{faults.length}}">
+        <view wx:for="{{faults}}" wx:key="k">
+          <view class="row">
+            <text class="k dim">{{item.k}}</text>
+            <text class="v t-bad">{{item.v}}</text>
+          </view>
+          <view class="codes mono" wx:if="{{item.codes}}" user-select>{{item.codes}}</view>
+        </view>
+      </block>
+      <view class="row" wx:else>
+        <text class="k dim">驱动电机 / 储能 / 发动机</text>
+        <text class="v t-2">均无故障</text>
+      </view>
+    </view>
+
+    <!-- 07 电池告警 -->
+    <view class="sec" wx:if="{{alarms.length}}">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">07</text>
+          <view class="sec-tt">
+            <text class="sec-title">电池告警</text>
+            <text class="caps muted sec-en">ALERT</text>
+          </view>
+        </view>
+      </view>
+      <view class="row" wx:for="{{alarms}}" wx:key="k">
+        <text class="k">{{item.k}}</text>
+        <text class="v t-bad">{{item.v}}</text>
+      </view>
+    </view>
+
+    </view>
+  </block>
+</view>

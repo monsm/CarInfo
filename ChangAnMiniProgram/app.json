@@ -1,0 +1,39 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/home/home",
+    "pages/control/control",
+    "pages/messages/messages",
+    "pages/mine/mine",
+    "pages/vehicle/vehicle",
+    "pages/health/health",
+    "pages/battery/battery",
+    "pages/data/data",
+    "pages/dev/dev"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#0B0D12",
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "",
+    "backgroundColor": "#0B0D12",
+    "backgroundColorTop": "#0B0D12",
+    "backgroundColorBottom": "#0B0D12",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#636366",
+    "selectedColor": "#FFFFFF",
+    "backgroundColor": "#000000",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/home/home", "text": "车况" },
+      { "pagePath": "pages/control/control", "text": "车控" },
+      { "pagePath": "pages/messages/messages", "text": "消息" },
+      { "pagePath": "pages/mine/mine", "text": "我的" }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

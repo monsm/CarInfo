@@ -1,0 +1,160 @@
+/* ============ 登录 v15：品牌 + 车图 + 液态玻璃表单 ============ */
+.login {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: calc(env(safe-area-inset-top) + 64rpx) 40rpx calc(48rpx + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 品牌 + 车台 ---------- */
+.lg-hero { text-align: center; }
+.lg-brand { padding-top: 12rpx; position: relative; z-index: 2; }
+.lg-name {
+  font-size: 48rpx;
+  font-weight: 600;
+  letter-spacing: 8rpx;
+  color: #FFFFFF;
+  text-indent: 8rpx; /* 抵消 letter-spacing 造成的视觉右偏 */
+}
+.lg-en {
+  margin-top: 16rpx;
+  font-size: 19rpx;
+  letter-spacing: 4rpx;
+  color: var(--tx-3);
+}
+/* 车台：聚光从上打下 */
+.lg-stage {
+  position: relative;
+  margin-top: 4rpx;
+}
+.lg-stage::before {
+  content: '';
+  position: absolute; top: -30rpx; left: 10%; right: 10%; height: 380rpx;
+  background: radial-gradient(60% 100% at 50% 0%, rgba(170, 205, 255, 0.18), rgba(170, 205, 255, 0.06) 48%, transparent 72%);
+  pointer-events: none;
+}
+.lg-art {
+  position: relative; z-index: 2;
+  width: 560rpx;
+  max-width: 100%;
+  margin-top: 12rpx;
+  display: block;
+  filter: drop-shadow(0 30rpx 28rpx rgba(0, 0, 0, 0.6));
+}
+.lg-floor {
+  position: absolute; left: 12%; right: 12%; bottom: -10rpx; height: 36rpx;
+  background: radial-gradient(50% 100% at 50% 50%, rgba(190, 220, 255, 0.22), transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ---------- 状态 ---------- */
+.lg-status {
+  text-align: center;
+  min-height: 44rpx;
+  padding: 30rpx 0 10rpx;
+  font-size: 22rpx;
+  color: var(--tx-3);
+}
+.lg-status.ok { color: var(--ok); }
+.lg-status.err { color: var(--bad); text-shadow: 0 0 14rpx rgba(255, 90, 79, 0.3); }
+
+/* ---------- 表单卡片 ---------- */
+.lg-form {
+  margin-top: 30rpx;
+  padding: 6rpx 32rpx;
+}
+.lg-row {
+  display: flex;
+  align-items: center;
+  height: 118rpx;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.06);
+  position: relative;
+  transition: border-color 0.2s ease;
+}
+.lg-row::after {
+  content: '';
+  position: absolute; left: 0; right: 0; bottom: -1rpx; height: 1rpx;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+}
+.lg-row.focus { border-bottom-color: transparent; }
+.lg-row.focus::after {
+  background: linear-gradient(90deg, transparent, rgba(77, 166, 255, 0.9), transparent);
+}
+.lg-row.focus {
+  background-image: linear-gradient(180deg, rgba(77, 166, 255, 0.07), transparent 60%);
+}
+.lg-row:last-child { border-bottom: none; }
+.lg-row:last-child::after { display: none; }
+.lg-lab {
+  font-size: 24rpx;
+  color: var(--tx-3);
+  width: 120rpx;
+  flex-shrink: 0;
+  letter-spacing: 1rpx;
+}
+.lg-in {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: none;
+  font-size: 32rpx;
+  color: var(--tx);
+  font-weight: 400;
+}
+.lg-captcha {
+  width: 180rpx;
+  height: 70rpx;
+  border-radius: 14rpx;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1rpx solid rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.09);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.lg-captcha-loading { font-size: 21rpx; color: var(--tx-3); }
+.lg-pill {
+  flex-shrink: 0;
+  font-size: 23rpx;
+  color: var(--tx-2);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.04));
+  background-color: rgba(255, 255, 255, 0.035);
+  border: 1rpx solid rgba(255, 255, 255, 0.13);
+  border-radius: 999rpx;
+  padding: 14rpx 30rpx;
+  letter-spacing: 1rpx;
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.1);
+}
+.lg-pill.off { opacity: 0.35; }
+
+/* ---------- 登录钮 ---------- */
+.lg-login { margin-top: 56rpx; }
+.lg-login .btn-primary {
+  width: 100%;
+  height: 100rpx;
+  line-height: 100rpx;
+}
+.lg-login .btn-primary.busy { opacity: 0.5; }
+.lg-tip {
+  text-align: center;
+  font-size: 19rpx;
+  color: var(--tx-3);
+  margin-top: 32rpx;
+  letter-spacing: 0.5rpx;
+}
+
+/* ---------- 页脚 ---------- */
+.lg-foot {
+  margin-top: auto;
+  text-align: center;
+  padding: 40rpx 0 4rpx;
+  font-size: 23rpx;
+  color: var(--tx-3);
+  letter-spacing: 1rpx;
+}

@@ -1,0 +1,31 @@
+<view wx:if="{{show}}" class="sh-mask" catchtouchmove="noop">
+  <view class="sh-sheet">
+    <view class="sh-grab"></view>
+    <view class="sh-title">空调温度</view>
+    <view class="sh-sub">设置范围 17 – 33 ℃</view>
+
+    <view class="ti-pick">
+      <view class="ti-step pressable" bindtap="minus">
+        <view class="ti-ic minus-ic"></view>
+      </view>
+      <view class="ti-value">
+        <text class="ti-num num">{{temp}}</text><text class="ti-unit">℃</text>
+      </view>
+      <view class="ti-step pressable" bindtap="plus">
+        <view class="ti-ic plus-ic"></view>
+      </view>
+    </view>
+
+    <view class="ti-scale">
+      <text class="ti-s">17</text>
+      <view class="ti-bar"><view class="ti-fill" style="width: {{(temp - 17) / 16 * 100}}%"></view></view>
+      <text class="ti-s">33</text>
+    </view>
+    <view class="ti-tip">设置后立即开启空调制冷</view>
+
+    <view class="sh-btns">
+      <view class="sh-btn cancel" bindtap="onCancel">取消</view>
+      <view class="sh-btn ok" bindtap="onConfirm">确认</view>
+    </view>
+  </view>
+</view>

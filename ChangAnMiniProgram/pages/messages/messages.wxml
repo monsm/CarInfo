@@ -1,0 +1,83 @@
+<view class="page msg {{enter ? 'ent' : ''}}">
+
+  <view class="head">
+    <view class="head-l">
+      <view class="head-title">消息</view>
+      <view class="caps muted head-en">MESSAGES</view>
+    </view>
+    <view class="head-r">
+      <view wx:if="{{unread > 0}}" class="unread-pill num">{{unread}} 条未读</view>
+      <view class="rb softpress" bindtap="refresh">
+        <image class="rb-ic" src="{{icons.refresh}}" />
+      </view>
+    </view>
+  </view>
+
+  <!-- 骨架 -->
+  <view wx:if="{{loading}}" class="glass mod skel">
+    <view class="sk-row"><view class="sk-l w80"></view><view class="sk-t"></view></view>
+    <view class="sk-row"><view class="sk-l w60"></view><view class="sk-t"></view></view>
+    <view class="sk-row"><view class="sk-l w75"></view><view class="sk-t"></view></view>
+  </view>
+
+  <!-- 收件箱：日期戳侧栏 + 行式条目（控制台面板） -->
+  <view wx:elif="{{groups.length}}" class="console">
+    <view wx:for="{{groups}}" wx:key="key" wx:for-item="g" wx:for-index="gi" class="group">
+      <view class="sec-seam" wx:if="{{gi > 0}}"><view class="seam-glint"></view></view>
+
+      <!-- 日期戳侧栏 -->
+      <view class="date-rail">
+        <view class="date-stamp">
+          <text class="ds-line"></text>
+          <text class="ds-date">{{g.label}}</text>
+          <text class="ds-line"></text>
+        </view>
+        <text wx:if="{{g.unread > 0}}" class="ds-count num">{{g.unread}} 未读</text>
+        <text wx:else class="ds-count dim">已读</text>
+      </view>
+
+      <view
+        wx:for="{{g.items}}"
+        wx:for-item="item"
+        wx:for-index="idx"
+        wx:key="id"
+        class="item {{item.read ? 'i-read' : ''}} {{item.open ? 'open' : ''}} softpress"
+        data-g="{{gi}}"
+        data-idx="{{idx}}"
+        bindtap="onTapItem"
+      >
+        <view class="udot" wx:if="{{!item.read}}"></view>
+        <view class="i-main">
+          <view class="i-title-row">
+            <text class="i-title">{{item.title}}</text>
+            <text wx:if="{{item.tag}}" class="i-tag {{item.tagCls}}">{{item.tag}}</text>
+          </view>
+          <view class="i-meta">
+            <text class="i-time num">{{item.time}}</text>
+          </view>
+          <view class="i-content" wx:if="{{item.body}}">{{item.body}}</view>
+          <view class="i-none" wx:elif="{{!item.location}}">暂无正文内容</view>
+          <!-- 展开：完整正文（不再省略）+ 地点 / 时间 -->
+          <view class="i-exp" wx:if="{{item.open}}">
+            <view class="i-exp-row" wx:if="{{item.location}}">
+              <text class="i-exp-k">地点</text>
+              <text class="i-exp-v">{{item.location}}</text>
+            </view>
+            <view class="i-exp-row" wx:if="{{item.time}}">
+              <text class="i-exp-k">时间</text>
+              <text class="i-exp-v">{{item.time}}</text>
+            </view>
+          </view>
+          <view class="i-tip caps muted">{{item.open ? '收起' : '查看详情'}}</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态：月光下的停驻 -->
+  <view wx:else class="empty moon-empty">
+    <image class="empty-scene" src="{{emptyScene}}" mode="widthFix" />
+    <view class="e-t">暂无消息</view>
+    <view class="e-s">车辆通知与提醒会安静地出现在这里</view>
+  </view>
+</view>

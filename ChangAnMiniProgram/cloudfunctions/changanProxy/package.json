@@ -1,0 +1,7 @@
+{
+  "name": "changanProxy",
+  "version": "1.0.0",
+  "description": "长安接口反向代理（小程序云函数）",
+  "main": "index.js",
+  "dependencies": {}
+}

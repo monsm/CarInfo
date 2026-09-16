@@ -1,0 +1,33 @@
+<view wx:if="{{show}}" class="sh-mask" catchtouchmove="noop">
+  <view class="sh-sheet">
+    <view class="sh-grab"></view>
+    <view class="sh-title">输入控车码</view>
+    <view class="sh-sub">6 位数字 · 输满后自动执行</view>
+
+    <view class="pi-boxes">
+      <view
+        wx:for="{{boxes}}"
+        wx:key="index"
+        class="pi-box {{pin.length === index ? 'active' : (pin.length > index ? 'filled' : '')}}"
+      >{{item}}</view>
+    </view>
+
+    <view class="pi-keys">
+      <view
+        wx:for="{{keys}}"
+        wx:key="key"
+        class="pi-key {{item === '' ? 'blank' : ''}} pressable"
+        data-k="{{item}}"
+        bindtap="onKey"
+      >
+        <text wx:if="{{item !== 'del' && item !== ''}}" class="pi-knum">{{item}}</text>
+        <view wx:elif="{{item === 'del'}}" class="pi-kdel"></view>
+      </view>
+    </view>
+
+    <view class="sh-btns">
+      <view class="sh-btn cancel" bindtap="onCancel">取消</view>
+      <view class="sh-btn ok {{pin.length === 6 ? 'ready' : ''}}" bindtap="onConfirm">确认</view>
+    </view>
+  </view>
+</view>

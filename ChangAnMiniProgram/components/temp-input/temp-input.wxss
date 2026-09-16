@@ -1,0 +1,87 @@
+/* 空调温度弹层 —— 与控车码弹层同一套单块玻璃底部弹片（sh-* 共用命名）。 */
+.sh-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  z-index: 2000;
+  animation: shMaskIn 0.18s ease-out;
+}
+@keyframes shMaskIn { from { opacity: 0; } to { opacity: 1; } }
+
+.sh-sheet {
+  border-radius: 48rpx 48rpx 0 0;
+  background: linear-gradient(180deg, rgba(30, 33, 44, 0.94), rgba(16, 18, 26, 0.92) 60%, rgba(18, 20, 28, 0.94));
+  -webkit-backdrop-filter: blur(60rpx) saturate(1.6);
+  backdrop-filter: blur(60rpx) saturate(1.6);
+  border-top: 1rpx solid rgba(255, 255, 255, 0.26);
+  box-shadow:
+    0 -36rpx 100rpx rgba(0, 0, 0, 0.72),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.18),
+    inset 0 24rpx 48rpx -24rpx rgba(255, 255, 255, 0.1);
+  padding: 22rpx 44rpx calc(28rpx + env(safe-area-inset-bottom));
+  animation: shRise 0.36s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes shRise { from { transform: translateY(30%); opacity: 0.4; } to { transform: translateY(0); opacity: 1; } }
+
+.sh-grab {
+  width: 72rpx; height: 8rpx; border-radius: 8rpx;
+  background: rgba(255, 255, 255, 0.22);
+  margin: 0 auto 24rpx;
+}
+.sh-title { font-size: 36rpx; font-weight: 600; text-align: center; color: #FFFFFF; letter-spacing: -0.5rpx; }
+.sh-sub { font-size: 21rpx; color: #8A93A3; text-align: center; margin: 10rpx 0 26rpx; }
+
+/* 温度盘 */
+.ti-pick { display: flex; align-items: center; justify-content: center; gap: 64rpx; }
+.ti-step {
+  width: 112rpx; height: 112rpx; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1rpx solid rgba(255, 255, 255, 0.12);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.1s ease, background 0.1s ease;
+}
+.ti-step:active { transform: scale(0.94); background: rgba(255, 255, 255, 0.16); }
+.ti-ic { width: 40rpx; height: 40rpx; }
+.minus-ic {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E");
+  background-size: contain;
+}
+.plus-ic {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
+  background-size: contain;
+}
+.ti-value { text-align: center; min-width: 220rpx; }
+.ti-num {
+  font-size: 140rpx; font-weight: 200; color: #FFFFFF;
+  letter-spacing: -5rpx; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.ti-unit { font-size: 42rpx; color: #8A93A3; margin-left: 10rpx; font-weight: 200; }
+
+/* 17–33 刻度条 */
+.ti-scale { display: flex; align-items: center; gap: 20rpx; margin: 34rpx 60rpx 0; }
+.ti-s { font-size: 19rpx; color: #6F7683; font-variant-numeric: tabular-nums; }
+.ti-bar {
+  flex: 1; height: 6rpx; border-radius: 6rpx;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.ti-fill {
+  height: 100%; border-radius: 6rpx;
+  background: linear-gradient(90deg, #5AC8FA, #7EE0C0);
+  transition: width 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.ti-tip { text-align: center; font-size: 20rpx; color: #6F7683; margin: 22rpx 0 4rpx; }
+
+/* 底部按钮 */
+.sh-btns { display: flex; gap: 22rpx; margin-top: 28rpx; }
+.sh-btn {
+  flex: 1; height: 96rpx; line-height: 96rpx;
+  text-align: center; border-radius: 999rpx;
+  font-size: 30rpx; font-weight: 500;
+}
+.sh-btn.cancel { background: rgba(255, 255, 255, 0.07); color: #FFFFFF; border: 1rpx solid rgba(255, 255, 255, 0.14); }
+.sh-btn.ok { background: #FFFFFF; color: #000000; font-weight: 600; box-shadow: 0 10rpx 30rpx rgba(255, 255, 255, 0.16); }

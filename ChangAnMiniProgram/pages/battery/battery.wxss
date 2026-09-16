@@ -1,0 +1,142 @@
+/* ============ 电池与充电 v15「GLASS」：SOC hero 卡 + 分区卡片 ============ */
+.bt { padding-top: 16rpx; }
+.bt-eyebrow { padding: 18rpx 4rpx 34rpx; display: flex; align-items: center; }
+.bt-eyebrow .caps { font-size: 18rpx; letter-spacing: 2.5rpx; }
+.bt-ic { width: 28rpx; height: 28rpx; opacity: 0.75; margin-right: 16rpx; }
+
+/* hero 卡 */
+.bt-hero {
+  margin: 0 0 24rpx;
+  padding: 30rpx 32rpx 34rpx;
+  overflow: hidden;
+}
+.bt-hero-beam {
+  position: absolute; top: 0; left: 14%; right: 14%; height: 400rpx;
+  background: radial-gradient(58% 100% at 50% 0%, rgba(120, 200, 255, 0.17), rgba(120, 200, 255, 0.06) 48%, transparent 74%);
+  pointer-events: none;
+}
+.bh-body {
+  position: relative;
+  height: 330rpx;
+  display: flex; align-items: center; justify-content: center;
+}
+.bh-halo {
+  position: absolute;
+  width: 330rpx; height: 330rpx;
+  top: 0; left: 50%;
+  margin-left: -165rpx;
+  pointer-events: none;
+}
+.bh-num {
+  position: relative; z-index: 2;
+  display: flex; align-items: baseline;
+}
+.bh-num .d1 { font-size: 128rpx; }
+.bh-pct { font-size: 42rpx; font-weight: 200; color: var(--tx-3); margin-left: 10rpx; }
+/* hero 底部：双格统计条 */
+.bh-foot {
+  display: flex;
+  align-items: stretch;
+  padding: 20rpx 8rpx 0;
+}
+.bh-stat {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+.bh-stat-r {
+  border-left: 1rpx solid rgba(255, 255, 255, 0.08);
+  padding-left: 30rpx;
+  margin-left: 26rpx;
+}
+.bh-stat-r::before { content: none; }
+.bh-stat-k { font-size: 18rpx; letter-spacing: 2rpx; }
+.bh-stat-v { display: flex; align-items: baseline; }
+.bh-range-n {
+  font-size: 48rpx; font-weight: 250; letter-spacing: -2rpx;
+  margin-right: 12rpx; font-variant-numeric: tabular-nums;
+}
+.bh-unit { font-size: 18rpx; letter-spacing: 2rpx; }
+.bh-na { font-size: 21rpx; }
+.bh-stat-r .pill { margin-top: 2rpx; }
+.bh-upd { text-align: center; margin-top: 30rpx; font-size: 20rpx; color: var(--tx-3); }
+
+.waiting {
+  display: flex; align-items: center; justify-content: center;
+  gap: 16rpx; padding: 70rpx 0;
+}
+.spinner {
+  width: 30rpx; height: 30rpx; border-radius: 50%;
+  border: 3rpx solid rgba(255, 255, 255, 0.16); border-top-color: #FFFFFF;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ---------- 控制台容器 ---------- */
+.console { padding: 0; }
+
+/* 分析结论 */
+.an-line { display: flex; align-items: center; padding: 18rpx 2rpx; }
+.an-dot { width: 12rpx; height: 12rpx; border-radius: 50%; margin-right: 20rpx; }
+.an-dot.ok { background: var(--ok); box-shadow: 0 0 10rpx rgba(48, 192, 95, 0.6); }
+.an-dot.warn { background: var(--warn); box-shadow: 0 0 10rpx rgba(255, 179, 64, 0.6); }
+.an-dot.bad { background: var(--bad); box-shadow: 0 0 10rpx rgba(255, 90, 79, 0.6); }
+.an-dot.na { background: rgba(255, 255, 255, 0.2); }
+.an-title { font-size: 29rpx; font-weight: 600; }
+.an-title.ok { color: var(--ok); }
+.an-title.warn { color: var(--warn); }
+.an-title.bad { color: var(--bad); text-shadow: 0 0 14rpx rgba(255, 90, 79, 0.3); }
+.an-title.na { color: var(--tx); }
+.an-reason {
+  display: flex; align-items: baseline;
+  padding: 24rpx 0 0 40rpx;
+}
+.an-rdot { width: 8rpx; height: 8rpx; border-radius: 50%; margin-right: 16rpx; flex-shrink: 0; }
+.an-rdot.ok { background: var(--ok); }
+.an-rdot.warn { background: var(--warn); }
+.an-rdot.bad { background: var(--bad); }
+.an-rdot.na { background: rgba(255, 255, 255, 0.2); }
+.an-rt { font-size: 22rpx; line-height: 1.78; }
+
+/* 图表区 */
+.bars { width: 100%; margin: 2rpx 0 10rpx; }
+.sec-cap { font-size: 18rpx; letter-spacing: 1.5rpx; margin-top: 34rpx; color: var(--tx-3); }
+.sec-div { height: 1rpx; background: rgba(255, 255, 255, 0.06); margin: 32rpx 0 0; }
+.sec-div::after { content: none; }
+.motor-name { margin-top: 40rpx; }
+.sub-cap { margin-top: 32rpx; }
+
+/* 统计瓦片 */
+.bstats { display: flex; gap: 12rpx; margin: 22rpx 0 14rpx; }
+.bs {
+  flex: 1;
+  min-width: 0;
+  display: flex; flex-direction: column; align-items: flex-start;
+  padding: 18rpx 22rpx;
+  border-radius: 18rpx;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1rpx solid rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.09);
+  box-sizing: border-box;
+}
+.bs::before { content: none; }
+.bs-k { font-size: 18rpx; color: var(--tx-3); letter-spacing: 1rpx; }
+.bs-v { font-size: 28rpx; color: var(--tx); font-weight: 500; margin-top: 8rpx; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.bs.bad .bs-v { color: var(--bad); text-shadow: 0 0 14rpx rgba(255, 90, 79, 0.3); }
+
+.codes {
+  font-size: 19rpx;
+  color: var(--tx-3);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  border-radius: 18rpx;
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.08);
+  padding: 24rpx 30rpx;
+  margin: 12rpx 2rpx 28rpx;
+  line-height: 1.8;
+  word-break: break-all;
+}

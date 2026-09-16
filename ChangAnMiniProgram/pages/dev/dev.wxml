@@ -1,0 +1,92 @@
+<view class="page no-tab dev">
+
+  <view class="dev-eyebrow">
+    <text class="caps muted">DEVELOPER · 开发者工具</text>
+  </view>
+
+  <view class="console">
+
+    <!-- 01 网络通道 -->
+    <view class="sec">
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">01</text>
+          <view class="sec-tt">
+            <text class="sec-title">网络通道</text>
+            <text class="caps muted sec-en">CHANNEL</text>
+          </view>
+        </view>
+        <text class="mod-more">{{modeText}}</text>
+      </view>
+      <view class="row">
+        <text class="k dim">环境 ID</text>
+        <text class="v t-3">{{envId}}</text>
+      </view>
+      <view class="row">
+        <text class="k dim">云函数版本</text>
+        <text class="v t-3">{{fnVersion || '未连接'}}</text>
+      </view>
+    </view>
+
+    <!-- 02 请求 / 响应日志 -->
+    <view class="sec">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">02</text>
+          <view class="sec-tt">
+            <text class="sec-title">请求 / 响应日志</text>
+            <text class="caps muted sec-en">LOG</text>
+          </view>
+        </view>
+        <view class="mod-link softpress" bindtap="toggleLog">
+          <text>{{logOpen ? '收起' : '展开'}}（{{logCount}} 条）</text>
+        </view>
+      </view>
+      <view wx:if="{{logOpen}}">
+        <scroll-view class="log-body" scroll-y>
+          <text class="mono log-line" user-select>{{logText}}</text>
+        </scroll-view>
+        <view class="log-acts">
+          <view class="act-pill softpress" bindtap="refreshLog">
+            <image class="act-ic" src="{{icons.refresh}}" /><text>刷新</text>
+          </view>
+          <view class="act-pill softpress" bindtap="copyLog">
+            <image class="act-ic" src="{{icons.copy}}" /><text>复制全部</text>
+          </view>
+          <view class="act-pill danger softpress" bindtap="clearLog">
+            <image class="act-ic" src="{{icons.trash}}" /><text>清空</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 03 排查指引 -->
+    <view class="sec">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">03</text>
+          <view class="sec-tt">
+            <text class="sec-title">排查指引</text>
+            <text class="caps muted sec-en">GUIDE</text>
+          </view>
+        </view>
+      </view>
+      <view class="row pressable" data-guide="deploy" bindtap="copyGuide">
+        <text class="k">云函数部署步骤</text>
+        <text class="v t-3">复制</text>
+      </view>
+      <view class="row pressable" data-guide="login" bindtap="copyGuide">
+        <text class="k">短信 / 登录失败排查</text>
+        <text class="v t-3">复制</text>
+      </view>
+      <view class="row pressable" bindtap="clearCache">
+        <text class="k">清除车辆数据缓存</text>
+        <text class="v t-bad">清除</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="dev-foot caps muted">本页仅供排查使用</view>
+</view>

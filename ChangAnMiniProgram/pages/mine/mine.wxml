@@ -1,0 +1,117 @@
+<view class="page mine {{enter ? 'ent' : ''}}">
+
+  <!-- 身份条 -->
+  <view class="glass u-row">
+    <view class="u-head">
+      <view class="avatar">{{user.avatar || '车'}}</view>
+      <view class="u-m">
+        <view class="u-name">{{user.name || '车主'}}</view>
+        <view class="u-sub">
+          <text class="u-phone num">{{user.mobile || '--'}}</text>
+          <text class="u-auth {{user.authed ? 'on' : ''}}">{{user.authed ? '已实名' : '未实名'}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 我的车辆（场景大卡） -->
+  <view class="glass glass-hero my-car">
+    <view class="hero-beam"></view>
+    <view class="mc-name-row">
+      <text class="mc-name">{{car.name || '未绑定车辆'}}</text>
+      <view class="mc-go softpress" data-url="/pages/vehicle/vehicle" bindtap="go">
+        <text class="caps muted">查看档案</text>
+        <image class="arr" src="{{icons.chevR}}" />
+      </view>
+    </view>
+    <image class="mc-art" src="{{sceneImg}}" mode="widthFix" />
+    <view class="mc-info">
+      <text class="caps muted mc-plate">{{car.plate || '暂无车牌'}}</text>
+      <view class="mc-sub" wx:if="{{car.model || car.color}}">
+        <text>{{car.model || ''}}</text>
+        <text class="mc-sep" wx:if="{{car.model && car.color}}">·</text>
+        <text>{{car.color || ''}}</text>
+      </view>
+      <view class="mc-ins" wx:if="{{car.insuranceEnd}}">
+        <text class="fine t-4">保险至 {{car.insuranceEnd}}</text>
+        <text class="mc-days {{insExpired ? 'bad' : (insWarn ? 'warn' : 'ok')}}">{{insExpired ? '已到期' : '剩 ' + car.insuranceDays + ' 天'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <picker wx:if="{{carCount > 1}}" mode="selector" range="{{carList}}" bindchange="onSwitchCar">
+    <view class="switch-car softpress">切换车辆 · 共 {{carCount}} 辆</view>
+  </picker>
+
+  <!-- 控制台面板：横向图标轨 + 工程入口 -->
+  <view class="console">
+
+    <!-- 01 常用：横向图标轨 -->
+    <view class="sec">
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">01</text>
+          <view class="sec-tt">
+            <text class="sec-title">常用</text>
+            <text class="caps muted sec-en">FAVORITES</text>
+          </view>
+        </view>
+      </view>
+      <view class="rail">
+        <view class="rail-item softpress" data-url="/pages/health/health" bindtap="go">
+          <view class="t-ic"><image class="t-ic-img" src="{{icons.tiles.health}}" /></view>
+          <text class="t-name">健康报告</text>
+        </view>
+        <view class="rail-item softpress" data-url="/pages/battery/battery" bindtap="go">
+          <view class="t-ic"><image class="t-ic-img" src="{{icons.tiles.batt}}" /></view>
+          <text class="t-name">电池充电</text>
+        </view>
+        <view class="rail-item softpress" data-url="/pages/data/data?kind=analysis" bindtap="go">
+          <view class="t-ic"><image class="t-ic-img" src="{{icons.tiles.an}}" /></view>
+          <text class="t-name">全量分析</text>
+        </view>
+        <view class="rail-item softpress" data-url="/pages/data/data?kind=location" bindtap="go">
+          <view class="t-ic"><image class="t-ic-img" src="{{icons.tiles.loc}}" /></view>
+          <text class="t-name">定位记录</text>
+        </view>
+        <view class="rail-item softpress" data-url="/pages/data/data?kind=user" bindtap="go">
+          <view class="t-ic"><image class="t-ic-img" src="{{icons.tiles.acc}}" /></view>
+          <text class="t-name">账号资料</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 02 工程与账户 -->
+    <view class="sec">
+      <view class="sec-seam"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">02</text>
+          <view class="sec-tt">
+            <text class="sec-title">工程与账户</text>
+            <text class="caps muted sec-en">UTILITY</text>
+          </view>
+        </view>
+      </view>
+      <view class="utility">
+        <view class="u-item softpress" bindtap="goDev">
+          <view class="u-ic"><image class="u-ic-img" src="{{icons.dev}}" /></view>
+          <text>开发者工具</text>
+        </view>
+        <view class="u-item softpress" bindtap="goData">
+          <view class="u-ic"><image class="u-ic-img" src="{{icons.data}}" /></view>
+          <text>全量数据</text>
+        </view>
+        <view class="u-item softpress" bindtap="showAbout">
+          <view class="u-ic"><image class="u-ic-img" src="{{icons.about}}" /></view>
+          <text>关于</text>
+        </view>
+      </view>
+
+      <view class="logout softpress" bindtap="logout">
+        <view class="u-ic lg-ic"><image class="u-ic-img" src="{{icons.logout}}" /></view>
+        <text>退出登录</text>
+      </view>
+    </view>
+  </view>
+</view>

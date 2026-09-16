@@ -1,0 +1,54 @@
+<view class="page no-tab veh">
+
+  <view class="veh-eyebrow">
+    <text class="caps muted">PROFILE · 车辆档案</text>
+  </view>
+
+  <!-- 名片 -->
+  <view class="glass-hero vcard">
+    <view class="vc-top">
+      <text class="vc-name">{{name || '未绑定车辆'}}</text>
+      <view wx:if="{{isNev}}" class="nev-pill caps">新能源</view>
+    </view>
+    <view class="vc-plate caps muted">{{plate || '暂无车牌'}}</view>
+
+    <view class="vc-vin softpress" bindtap="copyVin">
+      <text class="mono vin-t">{{vin || '--'}}</text>
+      <image class="vin-copy" src="{{icons.copy}}" />
+    </view>
+
+    <view class="vc-hr"></view>
+
+    <view class="vc-line">
+      <view class="vc-pin">
+        <text class="caps muted">控车码</text>
+        <text class="fine t-3">{{pinText}}</text>
+      </view>
+      <view class="srv" wx:if="{{srvChips.length}}">
+        <view wx:for="{{srvChips}}" wx:key="label" class="pill {{item.cls}}">
+          <view class="dot {{item.cls}}"></view>
+          <text>{{item.label}} {{item.text}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 控制台面板：分组档案 -->
+  <view class="console">
+    <view wx:for="{{groups}}" wx:key="name" class="sec">
+      <view class="sec-seam" wx:if="{{index > 0}}"><view class="seam-glint"></view></view>
+      <view class="sec-head">
+        <view class="sec-stamp">
+          <text class="sec-no num">{{index < 9 ? '0' : ''}}{{index + 1}}</text>
+          <view class="sec-tt">
+            <text class="sec-title">{{item.name}}</text>
+          </view>
+        </view>
+      </view>
+      <view wx:for="{{item.rows}}" wx:for-item="r" wx:for-index="ri" wx:key="ri" class="row">
+        <text class="k dim">{{r.k}}</text>
+        <text class="v {{r.mono ? 'mono v-mono' : ''}}">{{r.v}}</text>
+      </view>
+    </view>
+  </view>
+</view>
