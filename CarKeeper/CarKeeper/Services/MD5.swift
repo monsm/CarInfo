@@ -24,7 +24,7 @@ enum MD5 {
         }
 
         // 初始常量
-        var a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476
+        var a0: UInt32 = 0x67452301, b0: UInt32 = 0xefcdab89, c0: UInt32 = 0x98badcfe, d0: UInt32 = 0x10325476
         let K: [UInt32] = (0..<64).map { i in
             UInt32((abs(sin(Double(i + 1))) * 0x100000000).rounded(.down))
         }

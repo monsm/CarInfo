@@ -44,7 +44,7 @@ struct VehicleView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("控车码").font(.system(size: 11)).foregroundStyle(.secondary)
                                 Text(sum.pinText).font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(sum.pinCls == "ok" ? .primary : .orange)
+                                    .foregroundStyle(sum.pinCls == "ok" ? Color.primary : Color.orange)
                             }
                             if let insDays = sum.insuranceDays {
                                 VStack(alignment: .leading, spacing: 2) {

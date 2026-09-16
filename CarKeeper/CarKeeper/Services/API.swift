@@ -375,12 +375,15 @@ final class APIClient: @unchecked Sendable {
 
     static func parseMessages(_ text: String) -> [[String: Any]] {
         let dict = jsonToAny(text) ?? [:]
-        let dataArr = ciArray(dict, ["Data", "data"])
-        // 服务端把消息放在 Data.Content（数组）里；兜底取 Data 自身的第一项 Content。
+        // Data 可能是包含 Content 数组的对象，也可能直接是消息数组。
         let content: [[String: Any]]
-        if let inner = ciArray(dataArr, ["Content", "content"]) { content = inner }
-        else if let first = dataArr?.first { content = ciArray(first, ["Content", "content"]) ?? [] }
-        else { content = [] }
+        if let dataObj = ciObject(dict, ["Data", "data"]), let inner = ciArray(dataObj, ["Content", "content"]) {
+            content = inner
+        } else if let arr = ciPick(dict, ["Data", "data"]) as? [[String: Any]] {
+            content = arr
+        } else {
+            content = []
+        }
         // 映射车牌号（与小程序一致：realReceiverId 命中本地车辆列表则替换为车牌）
         let cars = AppStore.shared.cars
         var plateOf: [String: String] = [:]
