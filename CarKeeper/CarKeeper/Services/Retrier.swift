@@ -122,7 +122,7 @@ struct Retrier {
 
     /// 便捷版：包装一个普通 `() async throws -> T` 闭包（忽略 attempt 序号）。
     func run<T>(_ body: @escaping () async throws -> T, label: String = "request") async throws -> T {
-        try await retrying({ _ in await body() }, label: label)
+        try await retrying({ _ in try await body() }, label: label)
     }
 }
 

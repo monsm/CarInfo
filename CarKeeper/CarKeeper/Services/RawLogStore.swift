@@ -8,7 +8,7 @@ final class RawLogStore: @unchecked Sendable {
     static let shared = RawLogStore()
 
     private let lock = NSLock()
-    private var entries: [String] = []
+    private var logEntries: [String] = []
     private let maxEntries = 60
     private let maxChars = 3000
 
@@ -26,8 +26,8 @@ final class RawLogStore: @unchecked Sendable {
 
     private func push(_ entry: String) {
         lock.lock()
-        entries.insert(entry, at: 0)
-        if entries.count > maxEntries { entries.removeLast(entries.count - maxEntries) }
+        logEntries.insert(entry, at: 0)
+        if logEntries.count > maxEntries { logEntries.removeLast(logEntries.count - maxEntries) }
         lock.unlock()
         // 同步输出到系统日志（Console.app / Device Logs 可查）
         NSLog("[CarKeeper] %@", entry)
@@ -52,21 +52,21 @@ final class RawLogStore: @unchecked Sendable {
         push(entry)
     }
 
-    func entries() -> [String] {
+    func allEntries() -> [String] {
         lock.lock(); defer { lock.unlock() }
-        return entries
+        return logEntries
     }
 
     func joined() -> String {
-        entries().joined(separator: "\n\n──────────\n\n")
+        allEntries().joined(separator: "\n\n──────────\n\n")
     }
 
     func clear() {
-        lock.lock(); entries.removeAll(); lock.unlock()
+        lock.lock(); logEntries.removeAll(); lock.unlock()
     }
 
     func count() -> Int {
         lock.lock(); defer { lock.unlock() }
-        return entries.count
+        return logEntries.count
     }
 }

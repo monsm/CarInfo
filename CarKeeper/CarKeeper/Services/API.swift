@@ -125,10 +125,11 @@ final class APIClient: @unchecked Sendable {
             if text.range(of: "token expired", options: .caseInsensitive) != nil {
                 var err = APIError(message: "token expired")
                 err.expired = true
+                err.statusCode = http.statusCode
                 throw err
             }
             guard (200..<300).contains(http.statusCode) else {
-                let e = APIError(message: "HTTP \(http.statusCode): \(text.prefix(200))")
+                var e = APIError(message: "HTTP \(http.statusCode): \(text.prefix(200))")
                 e.statusCode = http.statusCode
                 throw e
             }
@@ -353,7 +354,7 @@ final class APIClient: @unchecked Sendable {
         }
     }
 
-    func getMessages() async throws -> [String: Any] {
+    func getMessages() async throws -> [[String: Any]] {
         try await withRefresh { [self] in
             let res = try await request(url: messagesURL(), method: "POST", body: [:])
             return Self.parseMessages(res.text)
@@ -372,14 +373,14 @@ final class APIClient: @unchecked Sendable {
         return "\(APIConfig.baseURL)/appserver/api/information/pageReceiverInfoByTime?actionType=2&page=&limit=2000&startTime=\(enc(f(past)))&endTime=\(enc(f(now)))&token=\(TokenStore.currentToken())"
     }
 
-    static func parseMessages(_ text: String) -> [String: Any] {
+    static func parseMessages(_ text: String) -> [[String: Any]] {
         let dict = jsonToAny(text) ?? [:]
         let dataArr = ciArray(dict, ["Data", "data"])
+        // 服务端把消息放在 Data.Content（数组）里；兜底取 Data 自身的第一项 Content。
         let content: [[String: Any]]
         if let inner = ciArray(dataArr, ["Content", "content"]) { content = inner }
-        else if let arr = dataArr, arr.first != nil {
-            content = ciArray(arr.first!, ["content"]) ?? []
-        } else { content = [] }
+        else if let first = dataArr?.first { content = ciArray(first, ["Content", "content"]) ?? [] }
+        else { content = [] }
         // 映射车牌号（与小程序一致：realReceiverId 命中本地车辆列表则替换为车牌）
         let cars = AppStore.shared.cars
         var plateOf: [String: String] = [:]
@@ -417,16 +418,16 @@ final class APIClient: @unchecked Sendable {
 
     private func refreshOnce() async throws {
         guard let cfg = TokenStore.read(), !cfg.refreshToken.isEmpty else {
-            let e = APIError(message: "未找到刷新凭证，请重新登录")
+            var e = APIError(message: "未找到刷新凭证，请重新登录")
             e.noRefresh = true
             throw e
         }
         try await refreshInFlight.runOnce { [self] in
             let res = try await request(url: "\(APIConfig.authURL)/refresh", method: "POST",
                                         body: ["refreshToken": cfg.refreshToken])
-            let (ok, data, msg) = unpack(res.text)
-            guard ok, let d = data else {
-                throw APIError(message: "Token 刷新失败：\(msg.isEmpty ? "未知错误" : msg)")
+            let unpacked = unpack(res.text)
+            guard unpacked.ok, let d = unpacked.data else {
+                throw APIError(message: "Token 刷新失败：\(unpacked.msg.isEmpty ? "未知错误" : unpacked.msg)")
             }
             let dict = d as? [String: Any] ?? [:]
             let newAccess = ciString(dict, ["access_token", "accessToken", "access_Token"])
@@ -451,24 +452,23 @@ final class APIClient: @unchecked Sendable {
 
 // token 刷新并发去重：基于 actor 的原子持有器（Swift 6 原生、无锁、类型安全）。
 actor AtomicTaskHolder {
-    private var task: Task<Void, Error>?
+    private var task: Task<Result<Void, Error>, Never>?
 
     /// 同一时刻只允许一个刷新任务在跑；其它调用者 await 其结果（或错误）。
-    func runOnce(_ body: @escaping () async throws -> Void) async {
+    func runOnce(_ body: @escaping () async throws -> Void) async throws {
         if let existing = task {
-            let e = await existing.value
-            if case .failure(let error) = e { throw error }
+            let r = await existing.value
+            if case .failure(let e) = r { throw e }
             return
         }
-        let t = Task { () -> Result<Void, Error> in
-            do { try await body() }
+        let t: Task<Result<Void, Error>, Never> = Task { () -> Result<Void, Error> in
+            do { try await body(); return .success(()) }
             catch { return .failure(error) }
-            return .success(())
         }
         task = t
         let result = await t.value
         task = nil
-        if case .failure(let error) = result { throw error }
+        if case .failure(let e) = result { throw e }
     }
 }
 

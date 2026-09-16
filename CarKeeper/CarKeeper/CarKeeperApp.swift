@@ -23,7 +23,13 @@ struct CarKeeperApp: App {
     private let store = AppStore.shared
     @StateObject private var nav = NavState.shared
 
-    var body: some View {
+    var body: some Scene {
+        WindowGroup {
+            root
+        }
+    }
+
+    private var root: some View {
         Group {
             if store.isLoggedIn {
                 MainTabView()

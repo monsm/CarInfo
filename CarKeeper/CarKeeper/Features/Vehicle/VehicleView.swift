@@ -71,7 +71,7 @@ struct VehicleView: View {
                 }
 
                 // 分组档案
-                for group in groups {
+                ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
                     CardBox(title: group.name) {
                         VStack(spacing: 0) {
                             ForEach(group.rows, id: \.k) { row in

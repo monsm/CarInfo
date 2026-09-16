@@ -22,7 +22,7 @@ struct MessagesView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(grouped) { group in
+                ForEach(Array(grouped.enumerated()), id: \.offset) { _, group in
                     Section {
                         ForEach(group.items) { item in
                             messageRow(item)
@@ -44,7 +44,7 @@ struct MessagesView: View {
         }
         .background(Color(.systemGroupedBackground))
         .navigationTitle("消息")
-        .onAppear { load() }
+        .onAppear { Task { await load() } }
         .refreshable { await load() }
     }
 

@@ -101,7 +101,7 @@ struct HealthView: View {
         }
         .background(Color(.systemGroupedBackground))
         .navigationTitle("健康报告")
-        .onAppear { load() }
+        .onAppear { Task { await load() } }
         .refreshable { await load() }
     }
 

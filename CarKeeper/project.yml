@@ -6,7 +6,7 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    SWIFT_VERSION: "6.0"
+    SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "27.0"
     CURRENT_PROJECT_VERSION: 1
     MARKETING_VERSION: 1.0.0
@@ -22,6 +22,7 @@ targets:
       path: CarKeeper/Resources/Info.plist
     settings:
       base:
+        SWIFT_VERSION: "5.0"
         PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper
         PRODUCT_NAME: CarKeeper
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

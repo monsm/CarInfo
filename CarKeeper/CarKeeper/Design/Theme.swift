@@ -87,7 +87,7 @@ struct KVRow: View {
                 .foregroundStyle(.secondary)
             Spacer(minLength: 16)
             Text(v)
-                .font(.system(size: 14, design: mono ? .monospaced : .default, weight: strong ? .semibold : .regular))
+                .font(.system(size: 14, weight: strong ? .semibold : .regular, design: mono ? .monospaced : .default))
                 .foregroundStyle(strong ? .primary : .secondary)
                 .multilineTextAlignment(.trailing)
                 .lineLimit(2)

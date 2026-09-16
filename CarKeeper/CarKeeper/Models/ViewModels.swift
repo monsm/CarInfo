@@ -72,7 +72,7 @@ enum VM {
             let id = s(c["CarId"] ?? c["carId"]) ?? ""
             return (id, name)
         }
-        var idx = options.firstIndex { $0.id == carId } ?? 0
+        var idx = options.firstIndex { $0.0 == carId } ?? 0
         if idx < 0 { idx = 0 }
         return (options, idx, idx < cars.count ? cars[idx] : nil, cars.count)
     }
@@ -204,7 +204,7 @@ enum VM {
             if drive != nil { return drive }
             return ciObject(c, ["MotorData"])
         }
-        let motor = motorArr.flatMap { $0.first }
+        let motor = motorArr
 
         let gearCls = (hasCtrl && num(control?["ShiftPosition"]) != 0) ? "bad" : ""
 

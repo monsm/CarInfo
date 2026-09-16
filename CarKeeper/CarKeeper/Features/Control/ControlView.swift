@@ -244,7 +244,7 @@ struct ControlView: View {
     }
 
     private func nameOf(_ key: String) -> String {
-        (hero + list).first { $0.key == key }?.name ?? key
+        hero.first { $0.key == key }?.name ?? list.first { $0.key == key }?.name ?? key
     }
 }
 
@@ -268,7 +268,7 @@ struct PINKeypadView: View {
 
             HStack(spacing: 10) {
                 ForEach(0..<6, id: \.self) { i in
-                    Text(i < pin.count ? String(pin[i]) : "·")
+                    Text(i < pin.count ? String(pin[pin.index(pin.startIndex, offsetBy: i)]) : "·")
                         .font(.system(size: 28, weight: .medium, design: .rounded))
                         .frame(width: 40, height: 52)
                         .background(RoundedRectangle(cornerRadius: 8).fill(.background))
@@ -307,7 +307,7 @@ struct PINKeypadView: View {
 
     private func onKey(_ k: String) {
         if k == "del" { if !pin.isEmpty { pin.removeLast() } }
-        else if !k.isEmpty { pin = (pin + k).prefix(6) }
+        else if !k.isEmpty { pin = String((pin + k).prefix(6)) }
         if pin.count == 6 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { confirm() }
         }

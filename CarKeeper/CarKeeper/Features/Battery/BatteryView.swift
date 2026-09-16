@@ -200,7 +200,7 @@ struct BatteryView: View {
         }
         .background(Color(.systemGroupedBackground))
         .navigationTitle("电池与充电")
-        .onAppear { load() }
+        .onAppear { Task { await load() } }
         .refreshable { await load() }
     }
 
