@@ -77,6 +77,7 @@ struct DataView: View {
         Task { await load() }
     }
 
+    @MainActor
     private func load() async {
         let carId = store.carId
         var newBlocks: [Block] = []

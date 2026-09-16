@@ -105,6 +105,7 @@ struct HealthView: View {
         .refreshable { await load() }
     }
 
+    @MainActor
     private func load() async {
         guard !store.carId.isEmpty else {
             errText = "请先在车况页选择车辆"; loading = false; return

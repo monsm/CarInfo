@@ -124,6 +124,7 @@ struct MessagesView: View {
         }
     }
 
+    @MainActor
     private func load() async {
         guard !store.carId.isEmpty else { return }
         loading = true

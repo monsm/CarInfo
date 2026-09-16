@@ -249,6 +249,7 @@ struct BatteryView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
+    @MainActor
     private func load() async {
         guard !store.carId.isEmpty else { return }
         let api = APIClient.shared
