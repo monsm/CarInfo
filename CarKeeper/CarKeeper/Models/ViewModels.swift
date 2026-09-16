@@ -257,7 +257,7 @@ enum VM {
 
         return ComfortModel(
             acOn: acOnFinal,
-            acText: air == nil ? "暂无数据" : "\(acOnFinal == true ? "运行中" : "已关闭") · \(s(air?["Temperature"], "26"))℃ · 风量\(s(air?["Wind"], "0"))档",
+            acText: air == nil ? "暂无数据" : "\(acOnFinal == true ? "运行中" : "已关闭") · \(s(air?["Temperature"]) ?? "26")℃ · 风量\(s(air?["Wind"]) ?? "0")档",
             acCls: acOnFinal == nil ? "na" : (acOnFinal == true ? "ok" : "off"),
             seatD: hasCtrl ? "通风\(num(control?["DriverSeatAirStatus"]) == 1 ? "开" : "关") · 加热\(num(control?["DriverSeatHeatStatus"]) == 1 ? "开" : "关")" : "--",
             seatP: hasCtrl ? "通风\(num(control?["PassengerSeatAirStatus"]) == 1 ? "开" : "关") · 加热\(num(control?["PassengerSeatHeatStatus"]) == 1 ? "开" : "关")" : "--",

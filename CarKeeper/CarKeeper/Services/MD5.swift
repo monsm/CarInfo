@@ -4,7 +4,7 @@ import Foundation
 // 输入为 UTF-8 字符串，按标准 MD5 分块（512-bit）处理。
 enum MD5 {
     static func hash(_ input: String) -> String {
-        let msg = input.data(using: .utf8)!.count == 0 ? Data() : input.data(using: .utf8)!
+        let msg = input.data(using: .utf8) ?? Data()
         return hash(data: msg)
     }
 
@@ -17,10 +17,10 @@ enum MD5 {
         while padded.count % 64 != 56 {
             padded.append(0)
         }
-        // 64-bit 小端长度（长度 = 原始数据字节数 * 8，按 8 字节小端追加）
+        // 64-bit 小端长度（长度 = 原始数据字节数 * 8，按 8 字节小端逐字节追加：LSB 在前）
         let bitLen = UInt64(n) * 8
         for i in 0..<8 {
-            padded.append(UInt8(bitLen >> (UInt64(8 - i) * 8)))
+            padded.append(UInt8(truncatingIfNeeded: bitLen >> UInt64(i * 8)))
         }
 
         // 初始常量
