@@ -30,7 +30,6 @@ struct HomeView: View {
         let tyre = VM.tyreStatus(cache)
         let comfort = VM.comfortStatus(cache)
         let loc = VM.locStatus(cache)
-        let drive = VM.driveStatus(cache)
         let hasData = cache["control"] != nil
 
         return ScrollView {

@@ -5,6 +5,7 @@ import Foundation
 // 全局应用状态（对应小程序 app.js 的 globalData）。
 // 使用 @Observable 宏（iOS 17+）做细粒度响应式更新。
 
+@MainActor
 @Observable
 final class AppStore: @unchecked Sendable {
     static let shared = AppStore()
@@ -70,10 +71,18 @@ final class AppStore: @unchecked Sendable {
     private func gather(carId: String, includeMessages: Bool, includeCheck: Bool) async -> [String: Any?] {
         await withTaskGroup(of: (String, Any?).self) { group in
             let api = APIClient.shared
-            group.addTask { ("charge", try? await api.getCharge(carId: carId)) }
-            group.addTask { ("pm25", try? await api.getCarPm25(carId: carId)) }
-            group.addTask { ("location", try? await api.getLocation(carId: carId)) }
-            group.addTask { ("control", try? await api.getControl(carId: carId)) }
+            group.addTask { () -> (String, Any?) in
+                return ("charge", try? await api.getCharge(carId: carId))
+            }
+            group.addTask { () -> (String, Any?) in
+                return ("pm25", try? await api.getCarPm25(carId: carId))
+            }
+            group.addTask { () -> (String, Any?) in
+                return ("location", try? await api.getLocation(carId: carId))
+            }
+            group.addTask { () -> (String, Any?) in
+                return ("control", try? await api.getControl(carId: carId))
+            }
             if includeMessages {
                 group.addTask { () -> (String, Any?) in
                     let r = try? await api.getMessages()
@@ -81,7 +90,9 @@ final class AppStore: @unchecked Sendable {
                 }
             }
             if includeCheck {
-                group.addTask { ("check", try? await api.getCarCheck(carId: carId)) }
+                group.addTask { () -> (String, Any?) in
+                    return ("check", try? await api.getCarCheck(carId: carId))
+                }
             }
             var out: [String: Any?] = [:]
             for await (key, value) in group {

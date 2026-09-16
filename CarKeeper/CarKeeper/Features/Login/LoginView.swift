@@ -159,9 +159,12 @@ struct LoginView: View {
                 let _ = try await APIClient.shared.login(
                     phone: phone.trimmingCharacters(in: .whitespaces),
                     smsCode: smsCode, picCode: picCode)
-                AppStore.shared.isLoggedIn = true
-                AppStore.shared.phone = phone
-                await AppStore.shared.bootstrap()
+                // AppStore 是 @MainActor，登录任务需显式 hop 到主线程改状态并 bootstrap。
+                await MainActor.run {
+                    AppStore.shared.isLoggedIn = true
+                    AppStore.shared.phone = phone
+                    await AppStore.shared.bootstrap()
+                }
             } catch {
                 showStatus(error.localizedDescription, isErr: true)
             }

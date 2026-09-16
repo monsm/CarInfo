@@ -20,7 +20,7 @@ enum MD5 {
         // 64-bit 小端长度（长度 = 原始数据字节数 * 8，按 8 字节小端逐字节追加：LSB 在前）
         let bitLen = UInt64(n) * 8
         for i in 0..<8 {
-            padded.append(UInt8(truncatingIfNeeded: bitLen >> UInt64(i * 8)))
+            padded.append(UInt8(truncatingIfNeeded: bitLen >> UInt64(i) * 8))
         }
 
         // 初始常量

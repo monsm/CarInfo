@@ -37,8 +37,13 @@ enum TokenStore {
     }
     static func save(_ cfg: TokenConfig) {
         TokenStore.write(cfg)
-        AppStore.shared.isLoggedIn = !cfg.accessToken.isEmpty
-        AppStore.shared.phone = cfg.mobile
+        // AppStore 是 @MainActor；这里在后台调用，需 hop 回主线程更新 UI 状态。
+        let logged = !cfg.accessToken.isEmpty
+        let mob = cfg.mobile
+        Task { @MainActor in
+            AppStore.shared.isLoggedIn = logged
+            AppStore.shared.phone = mob
+        }
     }
 }
 
@@ -385,7 +390,8 @@ final class APIClient: @unchecked Sendable {
             content = []
         }
         // 映射车牌号（与小程序一致：realReceiverId 命中本地车辆列表则替换为车牌）
-        let cars = AppStore.shared.cars
+        // AppStore 是 @MainActor，静态 func 里需显式取主线程快照。
+        let cars = { MainActor.assumeIsolated { AppStore.shared.cars } }()
         var plateOf: [String: String] = [:]
         for c in cars {
             let id = ciString(c, ["carId", "CarId"]) ?? ""

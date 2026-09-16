@@ -24,20 +24,20 @@ struct DataView: View {
     @State private var errText = ""
 
     init(kind: Kind = .status) {
-        _kind = State(initialValue: kind)
+        _kind = State(wrappedValue: kind)
     }
 
     struct Block: Identifiable {
-        let id = UUID()
         let h: String
         let rows: [(k: String, v: String)]
+        var id: String { h }
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.cardSpacing) {
-                if !loading && blocks.isEmpty && !errText.isEmpty {
-                    ContentUnavailableView(errText, systemImage: "doc", description: Text("暂无数据"))
+                if !loading && blocks.isEmpty {
+                    ContentUnavailableView(errText.isEmpty ? "暂无数据" : errText, systemImage: "doc", description: Text("暂无数据"))
                 } else {
                     ForEach(blocks) { b in
                         CardBox(title: b.h) {
