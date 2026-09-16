@@ -352,11 +352,11 @@ struct DomainVerdict: Identifiable {
     let key: String
     let label: String
     let url: String
-    let cls: String
-    let short: String
-    let title: String
-    let reasons: [Reason]
-    let metrics: [Metric]
+    var cls: String
+    var short: String
+    var title: String
+    var reasons: [Reason]
+    var metrics: [Metric]
 }
 
 struct Reason: Identifiable {

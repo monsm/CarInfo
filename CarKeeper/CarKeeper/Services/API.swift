@@ -123,7 +123,7 @@ final class APIClient: @unchecked Sendable {
             // token 过期检测（与小程序一致：响应体出现 "token expired" 字样）
             let text = String(data: data, encoding: .utf8) ?? ""
             if text.range(of: "token expired", options: .caseInsensitive) != nil {
-                let err = APIError(message: "token expired")
+                var err = APIError(message: "token expired")
                 err.expired = true
                 throw err
             }
@@ -271,7 +271,7 @@ final class APIClient: @unchecked Sendable {
 
     // MARK: 数据接口（带 token 刷新）
 
-    func getCars() async throws -> [String: Any]? {
+    func getCars() async throws -> [[String: Any]] {
         try await withRefresh { [self] in
             let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/car/getMyCars?isNev=1&token=\(TokenStore.currentToken())",
                                         method: "POST", body: [:])
@@ -279,7 +279,7 @@ final class APIClient: @unchecked Sendable {
             guard ok else { throw APIError(message: msg.isEmpty ? "获取车辆列表失败" : msg) }
             if let arr = data as? [[String: Any]] { return arr }
             if let arr = data as? [Any] { return arr.compactMap { $0 as? [String: Any] } }
-            return nil
+            return []
         }
     }
 
@@ -299,8 +299,8 @@ final class APIClient: @unchecked Sendable {
         try await withRefresh { [self] in
             let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/carcheck/getCheckResult?carId=\(carId)&isNev=1&token=\(TokenStore.currentToken())",
                                         method: "POST", body: [:])
-            let (ok, data) = unpack(res.text)
-            return ok ? (data as? [String: Any]) : nil
+            let unpacked = unpack(res.text)
+            return unpacked.ok ? (unpacked.data as? [String: Any]) : nil
         }
     }
 
@@ -308,8 +308,8 @@ final class APIClient: @unchecked Sendable {
         try await withRefresh { [self] in
             let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/car/pm/getCarPm25ByCarId?carId=\(carId)&token=\(TokenStore.currentToken())",
                                         method: "POST", body: [:])
-            let (ok, data) = unpack(res.text)
-            return ok ? (data as? [String: Any]) : nil
+            let unpacked = unpack(res.text)
+            return unpacked.ok ? (unpacked.data as? [String: Any]) : nil
         }
     }
 
@@ -317,8 +317,8 @@ final class APIClient: @unchecked Sendable {
         try await withRefresh { [self] in
             let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/charge/info?carId=\(carId)&token=\(TokenStore.currentToken())",
                                         method: "POST", body: [:])
-            let (ok, data) = unpack(res.text)
-            return ok ? (data as? [String: Any]) : nil
+            let unpacked = unpack(res.text)
+            return unpacked.ok ? (unpacked.data as? [String: Any]) : nil
         }
     }
 
@@ -326,8 +326,8 @@ final class APIClient: @unchecked Sendable {
         try await withRefresh { [self] in
             let res = try await request(url: "\(APIConfig.baseURL)/api/car/getControlStatus?carId=\(carId)&token=\(TokenStore.currentToken())",
                                         method: "POST", body: [:])
-            let (ok, data) = unpack(res.text)
-            return ok ? (data as? [String: Any]) : nil
+            let unpacked = unpack(res.text)
+            return unpacked.ok ? (unpacked.data as? [String: Any]) : nil
         }
     }
 
@@ -348,8 +348,8 @@ final class APIClient: @unchecked Sendable {
         try await withRefresh { [self] in
             let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/cardata/getCarLocation?carId=\(carId)&mapType=GCJ02&token=\(TokenStore.currentToken())",
                                         method: "POST", body: [:])
-            let (ok, data) = unpack(res.text)
-            return ok ? (data as? [String: Any]) : nil
+            let unpacked = unpack(res.text)
+            return unpacked.ok ? (unpacked.data as? [String: Any]) : nil
         }
     }
 
@@ -449,34 +449,26 @@ final class APIClient: @unchecked Sendable {
     }
 }
 
-// 简单原子任务持有器：用于 token 刷新并发去重。
-final class AtomicTaskHolder: @unchecked Sendable {
-    private var task: Task<Void, Never>?
-    private var err: Error?
-    private let lock = NSLock()
+// token 刷新并发去重：基于 actor 的原子持有器（Swift 6 原生、无锁、类型安全）。
+actor AtomicTaskHolder {
+    private var task: Task<Void, Error>?
 
+    /// 同一时刻只允许一个刷新任务在跑；其它调用者 await 其结果（或错误）。
     func runOnce(_ body: @escaping () async throws -> Void) async {
-        lock.lock()
         if let existing = task {
-            let pendingErr = err
-            lock.unlock()
             let e = await existing.value
-            if let pendingErr { throw pendingErr }
-            _ = e
+            if case .failure(let error) = e { throw error }
             return
         }
-        let t = Task.detached { () -> Error? in
-            do { try await body(); return nil } catch { return error }
+        let t = Task { () -> Result<Void, Error> in
+            do { try await body() }
+            catch { return .failure(error) }
+            return .success(())
         }
         task = t
-        err = nil
-        lock.unlock()
-        let e = await t.value
-        lock.lock()
+        let result = await t.value
         task = nil
-        err = e
-        lock.unlock()
-        if let e { throw e }
+        if case .failure(let error) = result { throw error }
     }
 }
 

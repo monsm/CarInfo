@@ -10,7 +10,7 @@ import Foundation
 // - 可配置最大次数、基础延迟、退避倍数、抖动幅度；
 // - 提供全局默认策略 `Retrier.global`，以及单次调用覆盖。
 
-enum RetryPolicy {
+struct RetryPolicy {
     /// 最大尝试次数（包含首次），>=1。
     var maxAttempts: Int
     /// 首次重试前的基础延迟（秒）。
@@ -21,6 +21,14 @@ enum RetryPolicy {
     var maxDelay: TimeInterval
     /// 抖动比例 0...1，实际延迟 = base * backoff^n * (1 + jitter * random)。
     var jitter: Double
+
+    init(maxAttempts: Int, baseDelay: TimeInterval, backoff: Double, maxDelay: TimeInterval, jitter: Double) {
+        self.maxAttempts = maxAttempts
+        self.baseDelay = baseDelay
+        self.backoff = backoff
+        self.maxDelay = maxDelay
+        self.jitter = jitter
+    }
 
     static let `default` = RetryPolicy(maxAttempts: 4, baseDelay: 0.6, backoff: 2.0, maxDelay: 8.0, jitter: 0.4)
     /// 只跑一次，绝不重试。用于有副作用的接口（发短信、车控）。

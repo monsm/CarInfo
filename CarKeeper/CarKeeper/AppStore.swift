@@ -40,7 +40,7 @@ final class AppStore: @unchecked Sendable {
         do {
             let carsRes = try await api.getCars()
             let userRes = try await api.getUser()
-            self.cars = carsRes ?? []
+            self.cars = carsRes
             if let u = userRes { user = u }
             if let first = self.cars.first {
                 let id = ciString(first, ["CarId", "carId"]) ?? ""
