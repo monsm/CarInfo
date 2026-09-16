@@ -180,7 +180,7 @@ struct ControlView: View {
                             taskId: "", status: "run", progress: "", resultText: "", resultCls: "")
         running = run
 
-        Task {
+        Task { @MainActor in
             do {
                 let data = try await APIClient.shared.sendControlCommand(cmd: cmd, carId: store.carId, pin: pin, temperature: temperature)
                 let taskId = data.flatMap { ciString($0, ["TaskId", "taskId"]) } ?? ""
@@ -198,7 +198,7 @@ struct ControlView: View {
 
     private func startPolling(taskId: String, run: RunState) {
         pollTask?.cancel()
-        pollTask = Task {
+        pollTask = Task { @MainActor in
             var i = 0
             while !Task.isCancelled {
                 i += 1
@@ -236,7 +236,7 @@ struct ControlView: View {
         history.insert(newRun, at: 0)
         if history.count > 6 { history.removeLast() }
         // 静默回刷车辆状态
-        Task {
+        Task { @MainActor in
             if let ctrl = try? await APIClient.shared.getControl(carId: store.carId) {
                 store.saveCache(["control": ctrl])
             }
