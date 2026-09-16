@@ -168,13 +168,13 @@ struct HomeView: View {
     private func startPolling() {
         refreshTask?.cancel()
         locTask?.cancel()
-        refreshTask = Task {
+        refreshTask = Task { @MainActor in
             while !Task.isCancelled {
                 await store.fetchCore()
                 try? await Task.sleep(for: .seconds(30))
             }
         }
-        locTask = Task {
+        locTask = Task { @MainActor in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(8))
                 let api = APIClient.shared
