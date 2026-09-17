@@ -7,14 +7,10 @@ import Charts
 struct BatteryView: View {
     private let store = AppStore.shared
     @State private var loaded = false
-    @State private var errText: String = ""
 
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.cardSpacing) {
-                if let h = headSummary {
-                    headCard(h)
-                }
                 let cache = store.caches
                 let b = batteryModel(cache)
                 let e = VM.energy(cache, store.car)
@@ -35,24 +31,6 @@ struct BatteryView: View {
         .navigationTitle("电池与充电")
         .onAppear { Task { await load() } }
         .refreshable { await load() }
-        .overlay {
-            if !loaded && errText.isEmpty {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if !errText.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle").font(.title).foregroundStyle(.orange)
-                    Text(errText).font(.system(size: 14)).foregroundStyle(.secondary)
-                    Button("重试") { Task { await load() } }
-                        .buttonStyle(.borderedProminent)
-                }
-            }
-        }
-    }
-
-    private var headSummary: (cls: String, title: String, reasons: [String])?
-    {
-        guard let cache = store.caches, let batt = AN.summarize(cache, store.car).domains.first(where: { $0.key == "battery" }) else { return nil }
-        return (batt.cls, batt.title, batt.reasons.map { $0.t })
     }
 
     // MARK: SOC Hero
@@ -87,21 +65,6 @@ struct BatteryView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22)
         .glassCard()
-    }
-
-    // MARK: 头部摘要卡（对应小程序 head 域）
-    private func headCard(_ h: (cls: String, title: String, reasons: [String])) -> some View {
-        CardBox(title: "电池状态", side: h.title, sideCls: h.cls) {
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(Array(h.reasons.enumerated()), id: \.offset) { idx, r in
-                    HStack(alignment: .top, spacing: 8) {
-                        StatusDot(cls: h.cls)
-                        Text(r).font(.system(size: 13)).foregroundStyle(.secondary)
-                    }
-                    if idx < h.reasons.count - 1 { ListDivider().padding(.vertical, 2) }
-                }
-            }
-        }
     }
 
     // MARK: 分析结论
@@ -348,20 +311,8 @@ struct BatteryView: View {
     private func load() async {
         guard !store.carId.isEmpty else { return }
         let api = APIClient.shared
-        do {
-            if let charge = try? await api.getCharge(carId: store.carId) { store.saveCache(["charge": charge]) }
-            if let control = try? await api.getControl(carId: store.carId) { store.saveCache(["control": control]) }
-            loaded = true
-            errText = ""
-        } catch {
-            errText = error.localizedDescription
-            let errDesc = error.localizedDescription.lowercased()
-            if errDesc.contains("未找到") || errDesc.contains("登录") || errDesc.contains("token") {
-                // token 过期，跳回登录页
-                await MainActor.run { AppStore.shared.logout() }
-            }
-        }
+        if let charge = try? await api.getCharge(carId: store.carId) { store.saveCache(["charge": charge]) }
+        if let control = try? await api.getControl(carId: store.carId) { store.saveCache(["control": control]) }
+        loaded = true
     }
 }
-
-
