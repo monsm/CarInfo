@@ -67,7 +67,8 @@ jobs:
           zip -qr "CarKeeper-unsigned.zip" "CarKeeper-unsigned.ipa"
           ls -la
 
-      - name: Upload artifacts
+      - name: Upload artifacts (best-effort)
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: CarKeeper-unsigned
