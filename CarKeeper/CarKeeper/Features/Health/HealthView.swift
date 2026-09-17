@@ -48,49 +48,58 @@ struct HealthView: View {
         }
         .frame(maxWidth: .infinity).padding(.vertical, 60)
         .glassCard()
-    }
-
-    // MARK: 评分 Hero
+    }    // MARK: 评分 Hero — Apple Watch Activity Rings 风格
     private func scoreHero(_ m: HealthModel) -> some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             ZStack {
+                // 外发光
                 Circle()
-                    .stroke(Color(.systemGray4).opacity(0.5), lineWidth: 14)
-                    .frame(width: 176, height: 176)
+                    .fill(AngularGradient(colors: [.green.opacity(0.08), .accentColor.opacity(0.05)],
+                                          center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)))
+                    .frame(width: 216, height: 216)
+                // 轨道
+                Circle()
+                    .stroke(Color(.systemGray5).opacity(0.5), lineWidth: 20)
+                    .frame(width: 216, height: 216)
+                // 进度弧
                 Circle()
                     .trim(from: 0, to: max(0.01, CGFloat(m.scorePct) / 100))
                     .stroke(
                         AngularGradient(colors: [.red, .orange, .yellow, .green, .green],
                                         center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
-                        style: StrokeStyle(lineWidth: 14, lineCap: .round))
+                        style: StrokeStyle(lineWidth: 20, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .frame(width: 176, height: 176)
-                    .shadow(color: Color.green.opacity(0.35), radius: 10)
-                VStack(spacing: 0) {
+                    .frame(width: 216, height: 216)
+                    .shadow(color: .green.opacity(0.2), radius: 16, y: 6)
+                // 中心数字
+                VStack(spacing: 2) {
                     Text(m.score).font(Theme.d1)
-                    Text("健康评分").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+                    Text("健康评分").font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
                 }
             }
-            HStack(spacing: 10) {
+            // 三计数徽章
+            HStack(spacing: 12) {
                 ForEach(m.counts) { c in
-                    VStack(spacing: 3) {
-                        Text(c.n).font(.system(size: 22, weight: .bold, design: .rounded))
+                    VStack(spacing: 4) {
+                        Text(c.n).font(.system(size: 26, weight: .bold, design: .rounded))
                             .foregroundStyle(Theme.statusColor(c.cls))
                         Text(c.key).font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.vertical, 12)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
             }
             if !m.time.isEmpty {
-                Text("最近检测 \(m.time)")
-                    .font(.system(size: 11)).foregroundStyle(.tertiary)
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar").font(.system(size: 11)).foregroundStyle(.tertiary)
+                    Text("最近检测 \(m.time)").font(.system(size: 11)).foregroundStyle(.tertiary)
+                }
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 22)
-        .glassCard()
+        .padding(.vertical, 32)
+        .glassHeroCard()
     }
 
     // MARK: 系统列表（可展开）

@@ -52,25 +52,33 @@ struct LoginView: View {
         }
     }
 
-    // MARK: 品牌
+    // MARK: 品牌区 — Apple Store Style
     private var brandHeader: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             ZStack {
+                // 外发光层
                 Circle()
-                    .fill(LinearGradient(colors: [Color.accentColor.opacity(0.9), Color.accentColor.opacity(0.55)],
+                    .fill(AngularGradient(colors: [Color.accentColor.opacity(0.25), Color.accentColor.opacity(0.05)],
+                                          center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)))
+                    .frame(width: 108, height: 108)
+                // 主体圆
+                Circle()
+                    .fill(LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.65)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 84, height: 84)
-                    .shadow(color: Color.accentColor.opacity(0.45), radius: 22, y: 8)
+                    .frame(width: 92, height: 92)
+                    .shadow(color: Color.accentColor.opacity(0.4), radius: 20, y: 8)
+                // 图标
                 Image(systemName: "car.side.fill")
-                    .font(.system(size: 36, weight: .medium))
+                    .font(.system(size: 40, weight: .medium))
                     .foregroundStyle(.white)
             }
             VStack(spacing: 6) {
                 Text("长安车管家")
                     .font(Theme.h1)
+                    .letterSpacing(2)
                 Text("CHANGAN CONNECT")
                     .font(.system(size: 11, weight: .semibold))
-                    .tracking(4)
+                    .tracking(5)
                     .foregroundStyle(.secondary)
             }
         }

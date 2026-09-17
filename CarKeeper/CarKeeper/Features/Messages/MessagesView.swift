@@ -120,51 +120,77 @@ struct MessagesView: View {
 
     private func messageRow(_ item: MessageItem) -> some View {
         let isOpen = expanded.contains(item.id)
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(item.read ? Color.clear : Color.accentColor)
-                    .frame(width: 8, height: 8)
-                    .shadow(color: item.read ? .clear : Color.accentColor.opacity(0.6), radius: 3)
-                Text(item.title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .lineLimit(1)
-                if !item.tag.isEmpty {
-                    Text(item.tag)
-                        .font(.system(size: 10, weight: .semibold))
-                        .padding(.horizontal, 7).padding(.vertical, 3)
-                        .background(Capsule().fill(Theme.statusColor(item.tagCls).opacity(0.14)))
-                        .foregroundStyle(Theme.statusColor(item.tagCls))
+        return VStack(alignment: .leading, spacing: 0) {
+            // 顶部：标签 + 未读指示 + 标题
+            HStack(spacing: 10) {
+                if !item.read {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 10, height: 10)
+                        .shadow(color: Color.accentColor.opacity(0.5), radius: 4)
+                } else {
+                    Circle()
+                        .fill(Color.clear)
+                        .frame(width: 10, height: 10)
                 }
-                Spacer()
-                Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(item.title)
+                            .font(.system(size: 16, weight: .semibold))
+                            .lineLimit(1)
+                        if !item.tag.isEmpty {
+                            Text(item.tag)
+                                .font(.system(size: 10, weight: .semibold))
+                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                .background(Capsule().fill(Theme.statusColor(item.tagCls).opacity(0.12)))
+                                .foregroundStyle(Theme.statusColor(item.tagCls))
+                        }
+                        Spacer()
+                        Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    if !item.time.isEmpty {
+                        Text(item.time)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
             }
+            // 正文
             if !item.body.isEmpty {
                 Text(item.body)
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .lineLimit(isOpen ? nil : 2)
+                    .padding(.top, 8)
             }
-            if isOpen {
-                VStack(spacing: 0) {
+            // 展开详情
+            if isOpen && (!item.location.isEmpty || !item.time.isEmpty) {
+                VStack(spacing: 6) {
                     if !item.location.isEmpty {
-                        KVRow(k: "地点", v: item.location).padding(.vertical, 5)
+                        HStack(spacing: 8) {
+                            Image(systemName: "map.pin").font(.system(size: 12)).foregroundStyle(.tertiary)
+                            Text(item.location).font(.system(size: 13)).foregroundStyle(.secondary)
+                        }
                     }
                     if !item.time.isEmpty {
-                        KVRow(k: "时间", v: item.time).padding(.vertical, 5)
+                        HStack(spacing: 8) {
+                            Image(systemName: "clock").font(.system(size: 12)).foregroundStyle(.tertiary)
+                            Text(item.time).font(.system(size: 13)).foregroundStyle(.secondary)
+                        }
                     }
                 }
-                .padding(.top, 4)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(corner: 18)
+        .glassCard(corner: 20)
         .contentShape(Rectangle())
         .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                 if expanded.contains(item.id) { expanded.remove(item.id) }
                 else {
                     expanded.insert(item.id)

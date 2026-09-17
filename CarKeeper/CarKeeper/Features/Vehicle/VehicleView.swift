@@ -30,29 +30,32 @@ struct VehicleView: View {
         .navigationTitle("车辆档案")
     }
 
-    // MARK: 名片
+    // MARK: 名片 — Apple Style Vehicle Card
     private func plateCard(_ sum: VehicleSummary) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 16) {
+                // 车牌徽章
                 ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.75)],
                                              startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: 88, height: 56)
-                        .shadow(color: Color.accentColor.opacity(0.35), radius: 10, y: 4)
-                    VStack(spacing: 2) {
-                        Text("新能源").font(.system(size: 8, weight: .semibold)).foregroundStyle(.white.opacity(0.9))
-                        Text(sum.plate).font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                        .frame(width: 96, height: 58)
+                        .shadow(color: Color.accentColor.opacity(0.3), radius: 10, y: 4)
+                    VStack(spacing: 3) {
+                        Text("新能源").font(.system(size: 8, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
+                        Text(sum.plate).font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
                     }
                 }
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(sum.name.isEmpty ? "未绑定车辆" : sum.name)
-                        .font(.system(size: 22, weight: .bold))
-                    Text(sum.model).font(.system(size: 12)).foregroundStyle(.secondary)
+                        .font(.system(size: 24, weight: .bold))
+                    Text(sum.model).font(.system(size: 13)).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
+            // VIN 复制条
             vinBar(sum)
+            // 三徽章行
             HStack(spacing: 10) {
                 badgeRow("控车码", sum.pinText, cls: sum.pinCls)
                 if let d = sum.insuranceDays {
@@ -63,9 +66,9 @@ struct VehicleView: View {
                 }
             }
         }
-        .padding(18)
+        .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
+        .glassHeroCard()
     }
 
     private func vinBar(_ sum: VehicleSummary) -> some View {

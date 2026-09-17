@@ -146,30 +146,37 @@ struct ControlView: View {
 
     private func heroDisc(_ item: (key: String, name: String, symbol: String)) -> some View {
         let disabled = busy || running != nil
-        return VStack(spacing: 10) {
-            Button {
-                onCmd(item.key)
-            } label: {
+        return Button {
+            onCmd(item.key)
+        } label: {
+            VStack(spacing: 12) {
                 ZStack {
+                    // 外发光
                     Circle()
-                        .fill(LinearGradient(colors: [Color.blue.opacity(0.18), Color.blue.opacity(0.06)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: 84, height: 84)
+                        .fill(Color.blue.opacity(0.08))
+                        .frame(width: 92, height: 92)
+                    // 底色
                     Circle()
-                        .strokeBorder(Color.blue.opacity(0.35), lineWidth: 1.5)
-                        .frame(width: 84, height: 84)
+                        .fill(Color.blue.opacity(0.12))
+                        .frame(width: 80, height: 80)
+                    // 描边
+                    Circle()
+                        .strokeBorder(Color.blue.opacity(0.30), lineWidth: 1.5)
+                        .frame(width: 80, height: 80)
+                    // 图标
                     Image(systemName: item.symbol)
-                        .font(.system(size: 30, weight: .medium))
+                        .font(.system(size: 32, weight: .medium))
                         .foregroundStyle(Color.blue)
                 }
-                .opacity(disabled ? 0.4 : 1)
-                .shadow(color: Color.blue.opacity(disabled ? 0 : 0.3), radius: 12, y: 4)
+                .opacity(disabled ? 0.45 : 1)
+                .animation(.easeInOut(duration: 0.2), value: disabled)
+                Text(item.name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(disabled ? .secondary : .primary)
             }
-            .buttonStyle(.plain)
-            .disabled(disabled)
-            Text(item.name)
-                .font(.system(size: 15, weight: .semibold))
         }
+        .buttonStyle(.plain)
+        .disabled(disabled)
     }
 
     // MARK: 执行中

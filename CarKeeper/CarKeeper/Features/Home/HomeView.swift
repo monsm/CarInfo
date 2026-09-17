@@ -2,9 +2,8 @@ import SwiftUI
 import Charts
 import MapKit
 
-// 车况首页 —— iOS 27 Liquid Glass：
-// SOC 渐变 Hero 环 + 车辆切换玻璃条 + 快控圆钮 + 状态域 / 胎压 / 座舱 / 位置。
-// 数据逻辑与轮询节奏不变（30s 全量 / 8s 位置，地图懒加载）。
+// 车况首页 —— Apple Premium Design
+// SOC 渐变光弧 Hero + 大尺寸快控网格 + 状态卡片 + 位置信息
 
 struct HomeView: View {
     private let store = AppStore.shared
@@ -16,25 +15,19 @@ struct HomeView: View {
 
     enum QuickCtrl: String, CaseIterable {
         case lock, unlock, air, charge
-        var symbol: String {
-            switch self {
+        var symbol: String { switch self {
             case .lock: "lock.fill"; case .unlock: "lock.open.fill"
             case .air: "fan.blades"; case .charge: "bolt.fill"
-            }
-        }
-        var title: String {
-            switch self {
+        }}
+        var title: String { switch self {
             case .lock: "锁车"; case .unlock: "解锁"
             case .air: "空调"; case .charge: "充电"
-            }
-        }
-        var accent: Color {
-            switch self {
-            case .lock, .unlock: return Color.primary
+        }}
+        var accent: Color { switch self {
+            case .lock, .unlock: return .primary
             case .air: return .blue
             case .charge: return .accentColor
-            }
-        }
+        }}
     }
 
     var body: some View {
@@ -127,56 +120,66 @@ struct HomeView: View {
 
     // MARK: SOC Hero
     private func socHero(_ e: EnergyModel) -> some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 18) {
+            // 大尺寸 SOC 光环 Hero
             ZStack {
+                // 外发光层
                 Circle()
-                    .stroke(Color(.systemGray4).opacity(0.5), lineWidth: 14)
-                    .frame(width: 172, height: 172)
+                    .fill(AngularGradient(colors: [.green.opacity(0.15), .accentColor.opacity(0.1)],
+                                          center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)))
+                    .frame(width: 196, height: 196)
+                // 底色轨道
+                Circle()
+                    .stroke(Color(.systemGray5).opacity(0.6), lineWidth: 16)
+                    .frame(width: 196, height: 196)
+                // 进度弧
                 Circle()
                     .trim(from: 0, to: max(0.02, CGFloat(e.socPct) / 100))
                     .stroke(
-                        AngularGradient(colors: [.green, .green, Color.accentColor, .orange, .red],
+                        AngularGradient(colors: [.green, .green, .accentColor, .orange, .red],
                                         center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
-                        style: StrokeStyle(lineWidth: 14, lineCap: .round))
+                        style: StrokeStyle(lineWidth: 16, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .frame(width: 172, height: 172)
-                    .shadow(color: Color.accentColor.opacity(0.35), radius: 10)
-                VStack(spacing: 0) {
+                    .frame(width: 196, height: 196)
+                    .shadow(color: .green.opacity(0.3), radius: 12, y: 4)
+                // 中心数字
+                VStack(spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(e.soc == "--" ? "--" : e.soc)
                             .font(Theme.d1)
-                        Text("%").font(.system(size: 20, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+                        Text("%").font(.system(size: 22, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
                     }
-                    Text("电量")
-                        .font(.system(size: 12, weight: .medium))
+                    Text("剩余电量")
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
             }
-            HStack(spacing: 22) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
-                        .font(.system(size: 12)).foregroundStyle(.secondary)
-                    Text(e.range == "--" ? "续航暂不可用" : "约 \(e.range) km")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                }
-                Pill(text: e.chargeText, cls: e.chargeCls == "idle" ? "na" : e.chargeCls)
+            // 续航 + 充电状态
+            HStack(spacing: 16) {
+                MetricPill(icon: "point.topleft.down.curvedto.point.bottomright.up",
+                           value: e.range == "--" ? "--" : e.range,
+                           unit: "km", tint: .green)
+                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accentColor)
             }
+            // 在线状态
             Text(e.online.text)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 22)
-        .glassCard()
+        .padding(.vertical, 28)
+        .glassHeroCard()
     }
 
     // MARK: 车辆切换
     private var carSelector: some View {
         let carSel = VM.carSel(store.cars, store.carId)
-        return HStack(spacing: 10) {
+        return HStack(spacing: 12) {
             Image(systemName: "car.2.fill")
-                .font(.system(size: 14))
+                .font(.system(size: 16))
                 .foregroundStyle(Color.accentColor)
+                .frame(width: 40, height: 40)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             Picker("车辆", selection: Binding(
                 get: { carSel.index },
                 set: { store.selectCar($0) }
@@ -185,42 +188,70 @@ struct HomeView: View {
                     Text(opt.name).tag(idx)
                 }
             }
-            .font(.system(size: 15, weight: .semibold))
+            .pickerStyle(.menu)
+            .padding(.horizontal, 4)
+            .font(.system(size: 16, weight: .semibold))
             Spacer()
             if carSel.count > 1 {
                 Text("\(carSel.count) 辆")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(.ultraThinMaterial, in: Capsule())
             }
         }
-        .padding(.horizontal, 16).padding(.vertical, 12)
-        .glassCard(corner: 20)
+        .padding(16)
+        .glassCard(corner: 22)
     }
 
-    // MARK: 快控
+    // MARK: 快控 - 2x2 网格大圆钮
     private var quickControl: some View {
-        HStack(spacing: 12) {
-            ForEach(QuickCtrl.allCases, id: \.self) { q in
-                QuickCtrlButton(q: q) { onQuickCtrl(q) }
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                ForEach(Array(QuickCtrl.allCases.enumerated()), id: \.element) { idx, q in
+                    quickButton(q)
+                }
             }
         }
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity)
-        .glassCard()
+        .padding(20)
+        .glassHeroCard()
+    }
+
+    private func quickButton(_ q: QuickCtrl) -> some View {
+        Button { onQuickCtrl(q) }
+        label: {
+            VStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(q.accent.opacity(0.12))
+                        .frame(width: 60, height: 60)
+                    Image(systemName: q.symbol)
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(q.accent)
+                }
+                Text(q.title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: 状态域
     private func domainCard(_ summary: Summary) -> some View {
         CardBox(title: "车辆状态", side: summary.overall.title, sideCls: summary.overall.cls) {
-            VStack(spacing: 0) {
+            VStack(spacing: 2) {
                 let rows = summary.domains.filter { $0.key != "service" }
                 ForEach(Array(rows.enumerated()), id: \.element.id) { idx, d in
                     domainRow(d)
-                    if idx < rows.count - 1 { ListDivider().padding(.vertical, 2) }
+                    if idx < rows.count - 1 {
+                        Divider().opacity(0.5)
+                            .padding(.leading, 32)
+                    }
                 }
             }
+            .padding(.top, 4)
         }
     }
 
@@ -403,18 +434,35 @@ struct HomeView: View {
             let f = DateFormatter(); f.dateFormat = "M月d日 星期 E"
             return f.string(from: Date())
         }()
-        return Text("\(gree) · \(dateStr)")
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 2)
+        return HStack(spacing: 8) {
+            Image(systemName: hour < 6 || hour >= 20 ? "moon.fill" : hour < 12 ? "sun.max.fill" : "sun.horizon.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(hour < 6 || hour >= 20 ? Color.indigo : .orange)
+            Text("\(gree)")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary)
+            Spacer()
+            Text(dateStr)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 4)
     }
 
     private func footerNote(_ e: EnergyModel) -> some View {
-        Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5))) · 每 30 秒自动刷新")
-            .font(.system(size: 11))
-            .foregroundStyle(.tertiary)
-            .frame(maxWidth: .infinity)
+        HStack(spacing: 6) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+            Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5)))")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+            Spacer()
+            Image(systemName: "wifi")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: 快控 / 导航 / 轮询（逻辑不变）
@@ -479,31 +527,27 @@ struct HomeView: View {
     }
 }
 
-// 快控玻璃圆钮
+// 快控大圆钮（2x2 网格）
 struct QuickCtrlButton: View {
     let q: HomeView.QuickCtrl
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 7) {
+            VStack(spacing: 8) {
                 ZStack {
                     Circle()
-                        .fill(q.accent.opacity(0.14))
-                        .frame(width: 58, height: 58)
-                    Circle()
-                        .strokeBorder(q.accent.opacity(0.35), lineWidth: 1)
-                        .frame(width: 58, height: 58)
+                        .fill(q.accent.opacity(0.10))
+                        .frame(width: 60, height: 60)
                     Image(systemName: q.symbol)
-                        .font(.system(size: 22, weight: .medium))
+                        .font(.system(size: 24, weight: .medium))
                         .foregroundStyle(q.accent)
                 }
                 Text(q.title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

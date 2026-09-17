@@ -57,53 +57,87 @@ struct BatteryView: View {
         return (batt.cls, batt.title, batt.reasons.map { $0.t })
     }
 
-    // MARK: SOC Hero
+    // MARK: SOC Hero — Apple Watch 风格大圆环
     private func socHero(_ e: EnergyModel) -> some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 18) {
             ZStack {
+                // 外发光
                 Circle()
-                    .stroke(Color(.systemGray4).opacity(0.5), lineWidth: 14)
-                    .frame(width: 172, height: 172)
+                    .fill(AngularGradient(colors: [.green.opacity(0.12), .accentColor.opacity(0.08)],
+                                          center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)))
+                    .frame(width: 208, height: 208)
+                // 轨道
+                Circle()
+                    .stroke(Color(.systemGray5).opacity(0.5), lineWidth: 18)
+                    .frame(width: 208, height: 208)
+                // 进度弧
                 Circle()
                     .trim(from: 0, to: max(0.02, CGFloat(e.socPct) / 100))
                     .stroke(
-                        AngularGradient(colors: [.orange, .yellow, .green, .green],
+                        AngularGradient(colors: [.green, .green, .accentColor, .orange, .red],
                                         center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
-                        style: StrokeStyle(lineWidth: 14, lineCap: .round))
+                        style: StrokeStyle(lineWidth: 18, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .frame(width: 172, height: 172)
-                    .shadow(color: Color.green.opacity(0.35), radius: 10)
-                VStack(spacing: 0) {
-                    Text(e.soc).font(Theme.d1)
-                    Text("% SOC").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+                    .frame(width: 208, height: 208)
+                    .shadow(color: .green.opacity(0.25), radius: 14, y: 5)
+                // 中心数字
+                VStack(spacing: 2) {
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text(e.soc == "--" ? "--" : e.soc)
+                            .font(Theme.d1)
+                        Text("%").font(.system(size: 22, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+                    }
+                    Text("电池电量")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
                 }
             }
-            HStack(spacing: 10) {
-                StatTile(icon: "point.topleft.down.curvedto.point.bottomright.up",
-                         label: "约可行驶", value: e.range, unit: "km", tint: .green)
-                StatTile(icon: "bolt.fill", label: "充电状态", value: e.chargeText, tint: .accentColor)
+            // 续航 + 充电状态
+            HStack(spacing: 14) {
+                MetricPill(icon: "point.topleft.down.curvedto.point.bottomright.up",
+                           value: e.range == "--" ? "--" : e.range, unit: "km", tint: .green)
+                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accentColor)
             }
             Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5)))")
                 .font(.system(size: 11)).foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 22)
-        .glassCard()
+        .padding(.vertical, 30)
+        .glassHeroCard()
     }
 
-    // MARK: 头部摘要卡（对应小程序 head 域）
+    // MARK: 头部摘要卡
     private func headCard(_ h: (cls: String, title: String, reasons: [String])) -> some View {
-        CardBox(title: "电池状态", side: h.title, sideCls: h.cls) {
-            VStack(alignment: .leading, spacing: 8) {
+        VStack(spacing: 14) {
+            HStack {
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle().fill(Theme.statusColor(h.cls).opacity(0.12)).frame(width: 44, height: 44)
+                        Circle().fill(Theme.statusColor(h.cls).opacity(0.25)).frame(width: 12, height: 12)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(h.title).font(.system(size: 17, weight: .semibold))
+                        Text(h.cls == "ok" ? "一切正常" : "需要关注").font(.system(size: 12)).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Pill(text: "\(h.reasons.count) 项", cls: h.cls == "ok" ? "na" : "bad", dot: false)
+            }
+            VStack(spacing: 6) {
                 ForEach(Array(h.reasons.enumerated()), id: \.offset) { idx, r in
                     HStack(alignment: .top, spacing: 8) {
                         StatusDot(cls: h.cls)
                         Text(r).font(.system(size: 13)).foregroundStyle(.secondary)
+                        Spacer()
                     }
-                    if idx < h.reasons.count - 1 { ListDivider().padding(.vertical, 2) }
+                    if idx < h.reasons.count - 1 {
+                        Divider().opacity(0.4).padding(.leading, 20)
+                    }
                 }
             }
         }
+        .padding(20)
+        .glassHeroCard()
     }
 
     // MARK: 分析结论

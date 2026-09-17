@@ -48,37 +48,57 @@ struct MineView: View {
         .sheet(isPresented: $shareSheetFlag) { ShareSheet(items: shareItems) }
     }
 
-    // MARK: 身份卡
+    // MARK: 身份卡 — Apple Profile Card
     private var profileCard: some View {
         let um = VM.userModel(store.user)
-        return HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.6)],
-                                         startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 60, height: 60)
-                    .shadow(color: Color.accentColor.opacity(0.4), radius: 10, y: 4)
-                Text(um?.avatar ?? "主")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(.white)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(um?.name ?? "车主").font(.system(size: 19, weight: .bold))
-                HStack(spacing: 8) {
-                    Text(um?.mobile ?? "--")
-                        .font(.system(size: 13, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    if um?.authed == true {
-                        Label("已实名", systemImage: "checkmark.seal.fill")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color.green)
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 16) {
+                // 头像
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.65)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: 68, height: 68)
+                        .shadow(color: Color.accentColor.opacity(0.35), radius: 12, y: 5)
+                    Text(um?.avatar ?? "主")
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(um?.name ?? "车主").font(.system(size: 21, weight: .bold))
+                    HStack(spacing: 10) {
+                        Text(um?.mobile ?? "--")
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        if um?.authed == true {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Color.green)
+                                Text("已实名")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(Color.green)
+                            }
+                        }
                     }
                 }
+                Spacer()
             }
-            Spacer()
+            // 分割线
+            Divider().opacity(0.4)
+            // 底部统计
+            HStack(spacing: 16) {
+                HStack(spacing: 6) {
+                    Image(systemName: "car.fill").font(.system(size: 14)).foregroundStyle(Color.accentColor)
+                    Text("1 辆车").font(.system(size: 14, weight: .medium))
+                }
+                Spacer()
+                Image(systemName: "wifi").font(.system(size: 14)).foregroundStyle(.secondary)
+                Text("在线").font(.system(size: 13)).foregroundStyle(.secondary)
+            }
         }
-        .padding(18)
-        .glassCard()
+        .padding(22)
+        .glassHeroCard()
     }
 
     // MARK: 车辆卡
@@ -154,24 +174,32 @@ struct MineView: View {
         }
     }
 
-    // 常用入口玻璃磁贴。
+    // 常用入口大尺寸磁贴
     private func tile(_ symbol: String, _ label: String, tint: Color,
                       _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 7) {
-                Image(systemName: symbol)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(tint)
+            VStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(tint.opacity(0.10))
+                        .frame(width: 48, height: 48)
+                    Image(systemName: symbol)
+                        .font(.system(size: 22, weight: .medium))
+                        .foregroundStyle(tint)
+                }
                 Text(label)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.vertical, 14)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.8))
+        .shadow(color: .black.opacity(0.04), radius: 8, y: 3)
     }
 
     @ViewBuilder

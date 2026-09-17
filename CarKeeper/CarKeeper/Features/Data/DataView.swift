@@ -90,39 +90,42 @@ struct DataView: View {
         }
     }
 
-    // kind 切换胶囊（局部变量拆分表达式，避免类型检查超时）
+    // kind 切换胶囊
     private func kindChip(_ k: Kind) -> some View {
         let sel = (kind == k)
-        let fg: Color = sel ? .white : Color.primary
-        let bg: Color = sel ? Color.indigo : Color(.systemGray5).opacity(0.6)
         return Button {
             kind = k
             onKindChange()
         } label: {
             Text(k.title)
-                .font(.system(size: 13, weight: sel ? .semibold : .regular))
-                .foregroundStyle(fg)
-                .padding(.horizontal, 14).padding(.vertical, 8)
-                .background(Capsule().fill(bg))
+                .font(.system(size: 13, weight: sel ? .semibold : .medium))
+                .foregroundStyle(sel ? .white : .primary)
+                .padding(.horizontal, 14).padding(.vertical, 9)
+                .background(sel ? Color.accentColor : Color(.systemGray5).opacity(0.5), in: Capsule())
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: 数据块（玻璃卡 + 单色间隔行）
+    // MARK: 数据块
     private func dataBlock(_ b: Block) -> some View {
         CardBox(title: b.h) {
             VStack(spacing: 0) {
                 ForEach(Array(b.rows.enumerated()), id: \.offset) { idx, r in
-                    HStack(alignment: .top) {
-                        Text(r.k).font(.system(size: 13)).foregroundStyle(.secondary)
-                        Spacer(minLength: 12)
+                    HStack(alignment: .top, spacing: 12) {
+                        Text(r.k)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 120, alignment: .leading)
                         Text(r.v)
                             .font(.system(size: 13, weight: .medium, design: .monospaced))
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.trailing).lineLimit(3)
+                        Spacer(minLength: 8)
                     }
-                    .padding(.vertical, 7)
-                    if idx < b.rows.count - 1 { ListDivider().opacity(0.5) }
+                    .padding(.vertical, 9)
+                    if idx < b.rows.count - 1 {
+                        Divider().opacity(0.4).padding(.leading, 120)
+                    }
                 }
             }
         }
