@@ -9,6 +9,7 @@ struct HomeView: View {
     @State private var refreshTask: Task<Void, Never>? = nil
     @State private var locTask: Task<Void, Never>? = nil
     @State private var entered = false
+    @State private var showMap = false  // 地图懒加载：点「展开地图」才创建 Map，省首屏内存
 
     enum QuickCtrl: String, CaseIterable {
         case lock, unlock, air, charge
@@ -134,27 +135,40 @@ struct HomeView: View {
                     }
                 }
 
-                // 位置（内置地图 + 导航）
+                // 位置（地图懒加载：默认收起，点「展开地图」才创建 Map，省首屏内存）
                 CardBox(title: "位置", side: loc.deg != "--" ? loc.dir : nil) {
                     VStack(alignment: .leading, spacing: 10) {
-                        // 实时刷新：locTask 每 8s 拉新坐标，Map 随 loc 变化自动平移。
-                        LocationMapView(latStr: loc.lat, lngStr: loc.lng, addr: loc.addr)
-                            .frame(height: 180)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        // 已展开：才真正渲染 Map/Marker（否则首屏不创建，省内存/启动更快）。
+                        if showMap {
+                            LocationMapView(latStr: loc.lat, lngStr: loc.lng, addr: loc.addr)
+                                .frame(height: 180)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .transition(.opacity)
+                        }
                         HStack(spacing: 8) {
                             Text(loc.addr.isEmpty ? "暂无定位数据" : loc.addr)
                                 .font(.system(size: 14))
                                 .lineLimit(1)
                             Spacer()
-                            if loc.lat != "--" && loc.lng != "--" {
+                            HStack(spacing: 8) {
                                 Button {
-                                    openMaps(lat: loc.lat, lng: loc.lng, addr: loc.addr)
+                                    withAnimation(.easeInOut(duration: 0.25)) { showMap.toggle() }
                                 } label: {
-                                    Label("导航", systemImage: "location.north.fill")
+                                    Label(showMap ? "收起地图" : "展开地图", systemImage: showMap ? "chevron.up" : "map.fill")
                                         .font(.system(size: 13, weight: .medium))
                                 }
-                                .buttonStyle(.borderedProminent)
+                                .buttonStyle(.bordered)
                                 .controlSize(.small)
+                                if loc.lat != "--" && loc.lng != "--" {
+                                    Button {
+                                        openMaps(lat: loc.lat, lng: loc.lng, addr: loc.addr)
+                                    } label: {
+                                        Label("导航", systemImage: "location.north.fill")
+                                            .font(.system(size: 13, weight: .medium))
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .controlSize(.small)
+                                }
                             }
                         }
                         Text(loc.satAlt).font(.caption).foregroundStyle(.secondary)
