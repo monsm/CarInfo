@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 env:
   XCODEGEN_VERSION: 2.43.0
 
@@ -72,6 +75,24 @@ jobs:
             CarKeeper/CarKeeper-unsigned.ipa
             CarKeeper/CarKeeper-unsigned.zip
           retention-days: 30
+
+      # 上传 ipa 到固定 tag=latest 的 GitHub Release（每次构建覆盖），
+      # 供 App 内「检查更新」直接下载分享。私库需要带 token。
+      - name: Upload Release (tag=latest)
+        run: |
+          cd CarKeeper
+          echo "latest ${GITHUB_SHA:0:8} $(date +'%Y-%m-%d %H:%M')" > CarKeeper-release-note.txt
+          gh release delete latest --delete-branch --force 2>/dev/null || true
+          gh release create latest \
+            --title "CarKeeper unsigned build" \
+            --notes-file CarKeeper-release-note.txt \
+            --target "${GITHUB_SHA}" \
+            --tag-name "latest" \
+            CarKeeper-unsigned.ipa \
+            CarKeeper-unsigned.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Failure hint
         if: failure()

@@ -4,6 +4,16 @@ import SwiftUI
 struct MineView: View {
     private let store = AppStore.shared
     @State private var showAboutAlert = false
+    // 检查更新状态
+    @State private var updateBusy = false
+    @State private var updateMsg: String? = nil
+    @State private var downloadPct: Double = 0
+    @State private var showDownload = false
+    @State private var showToken = false
+    @State private var tokenDraft: String = ""
+    @State private var downloadFile: URL? = nil
+    @State private var shareItems: [Any] = []
+    @State private var shareSheetFlag = false
 
     var body: some View {
         ScrollView {
@@ -73,13 +83,34 @@ struct MineView: View {
                     .frame(maxWidth: .infinity)
                 }
 
-                // 工程与账户
-                CardBox(title: "工程与账户") {
-                    VStack(spacing: 0) {
-                        utilityRow("gearshape", "开发者工具") { post(.navToDev) }
-                        utilityRow("doc.text", "全量数据") { post(.navToData) }
-                        utilityRow("info", "关于") { showAboutAlert = true }
-                        utilityRow("rectangle.portrait.and.arrow.right", "退出登录") { logout() }
+                // 检查更新
+                CardBox(title: "检查更新") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("下载最新 GitHub 构建的 ipa，分享后可用 AltStore/自签工具安装")
+                            .font(.system(size: 13)).foregroundStyle(.secondary)
+                        if showDownload {
+                            VStack(spacing: 6) {
+                                ProgressView(value: downloadPct)
+                                Text("正在下载… \(Int(downloadPct * 100))%").font(.system(size: 12)).foregroundStyle(.secondary)
+                            }
+                        }
+                        if let m = updateMsg {
+                            Text(m).font(.system(size: 13)).foregroundStyle(.secondary)
+                        }
+                        HStack(spacing: 12) {
+                            Button(updateBusy ? "检查中…" : "检查更新") { checkUpdate() }
+                                .font(.system(size: 14, weight: .medium))
+                                .disabled(updateBusy)
+                            if downloadFile != nil {
+                                Button("分享安装包") {
+                                    shareItems = [downloadFile as Any]
+                                    shareSheetFlag = true
+                                }
+                                .font(.system(size: 14, weight: .medium))
+                            }
+                            Button("GitHub Token") { tokenDraft = UpdateService.githubToken; showToken = true }
+                                .font(.system(size: 14)).foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -93,6 +124,18 @@ struct MineView: View {
         } message: {
             Text(aboutText)
         }
+        .alert("GitHub Token", isPresented: $showToken) {
+            TextField("粘贴 Token", text: $tokenDraft)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.asciiCapable)
+            Button("保存") {
+                UpdateService.githubToken = tokenDraft
+                updateMsg = tokenDraft.isEmpty ? "已清空 Token" : "Token 已保存，点「检查更新」获取最新构建"
+            }
+            Button("取消", role: .cancel) { }
+        }
+        .sheet(isPresented: $shareSheetFlag) { ShareSheet(items: shareItems) }
     }
 
     // 常用入口磁贴。
@@ -139,5 +182,35 @@ struct MineView: View {
     private func logout() {
         store.logout()
         // RootView 监听 isLoggedIn 变化后自动切回登录页
+    }
+
+    private func checkUpdate() {
+        updateBusy = true
+        updateMsg = "正在检查最新构建…"
+        shareItems = []
+        downloadPct = 0
+        showDownload = true
+        Task { @MainActor in
+            do {
+                if UpdateService.githubToken.isEmpty {
+                    updateMsg = "请先点「GitHub Token」填入私库访问 Token"
+                    updateBusy = false
+                    return
+                }
+                let rel = try await UpdateService.fetchLatestRelease(token: UpdateService.githubToken)
+                updateMsg = "发现构建 \(rel.name) · \(rel.displaySize)，开始下载…"
+                showDownload = true
+                let file = try await UpdateService.downloadIPA(url: rel.ipaUrl) { pct in downloadPct = pct }
+                downloadFile = file
+                updateMsg = "已下载 \(file.lastPathComponent)，点「分享安装包」弹出系统分享菜单"
+                showDownload = false
+                shareItems = [file as Any]
+                shareSheetFlag = true
+            } catch {
+                updateMsg = "❌ \(error.localizedDescription)"
+                showDownload = false
+            }
+            updateBusy = false
+        }
     }
 }
