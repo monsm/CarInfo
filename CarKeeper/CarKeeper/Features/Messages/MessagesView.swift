@@ -165,8 +165,10 @@ struct MessagesView: View {
                 let rawLoc = ciString(m, ["Content", "content"]) ?? ""
                 let location = (rawLoc != body && !rawLoc.isEmpty && rawLoc != "null" && rawLoc != "无") ? rawLoc : ""
                 let cat = Self.classify(title: title, content: body.isEmpty ? rawLoc : body)
-                // 未读 = 服务端 ReadStatus 非已读 且 本地也没标记过已读。
-                let serverRead = (ciNumber(m, ["ReadStatus", "readStatus"]) ?? 0) == 1.0
+                // 未读判定：服务端用 `new` 字段标记新消息（日志证实 `new:false` 即已读），
+                // 其次 `readStatus` 非 0 视为已读，最后并本地已读集合（展开过即记入）。
+                let isNew = ciBool(m, ["New", "new"]) ?? false
+                let serverRead = (ciNumber(m, ["ReadStatus", "readStatus"]) ?? 0) != 0 || !isNew
                 let read = serverRead || readSet.contains(id)
                 return MessageItem(
                     id: id, title: title, body: body, location: location,

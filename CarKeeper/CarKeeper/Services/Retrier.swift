@@ -30,7 +30,10 @@ struct RetryPolicy {
         self.jitter = jitter
     }
 
-    static let `default` = RetryPolicy(maxAttempts: 4, baseDelay: 0.6, backoff: 2.0, maxDelay: 8.0, jitter: 0.4)
+    /// 全局默认：2 次（首次 + 1 重试）、固定 1.5s、无退避、无抖动。
+    /// 弱网下单请求最坏 ≈ 15s(超时) + 1.5s + 15s ≈ 31.5s，可接受；
+    /// 强网下基本一发即中，不会累积 30s+ 拖死 UI。
+    static let `default` = RetryPolicy(maxAttempts: 2, baseDelay: 1.5, backoff: 1.0, maxDelay: 1.5, jitter: 0.0)
     /// 只跑一次，绝不重试。用于有副作用的接口（发短信、车控）。
     static let none = RetryPolicy(maxAttempts: 1, baseDelay: 0, backoff: 1, maxDelay: 0, jitter: 0)
     /// 激进一点：更多次数，适合弱网环境的数据拉取。

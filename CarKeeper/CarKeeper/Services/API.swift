@@ -68,8 +68,8 @@ final class APIClient: @unchecked Sendable {
     private init() {
         let cfg = URLSessionConfiguration.default
         cfg.httpAdditionalHeaders = ["User-Agent": APIConfig.userAgent, "Accept": "*/*"]
-        cfg.timeoutIntervalForRequest = 20
-        cfg.timeoutIntervalForResource = 30
+        cfg.timeoutIntervalForRequest = 15
+        cfg.timeoutIntervalForResource = 60
         cfg.httpCookieStorage = nil
         self.session = URLSession(configuration: cfg)
     }
@@ -378,7 +378,10 @@ final class APIClient: @unchecked Sendable {
             return f.string(from: d)
         }
         let enc: (String) -> String = { s in s.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? s }
-        return "\(APIConfig.baseURL)/appserver/api/information/pageReceiverInfoByTime?actionType=2&page=&limit=2000&startTime=\(enc(f(past)))&endTime=\(enc(f(now)))&token=\(TokenStore.currentToken())"
+        // limit=500 + 7 天窗口：服务端实际 7 天消息约 55~200 条，500 足以覆盖；
+        // 降回 2000 会让每次消息请求拉 100KB+ 巨包，弱网下拖死整批 gather，
+        // 进而卡 UI（日志 17:19:17 messages 响应 99287 字符已印证风险）。
+        return "\(APIConfig.baseURL)/appserver/api/information/pageReceiverInfoByTime?actionType=2&page=&limit=500&startTime=\(enc(f(past)))&endTime=\(enc(f(now)))&token=\(TokenStore.currentToken())"
     }
 
     static func parseMessages(_ text: String, cars: [[String: Any]] = []) -> [[String: Any]] {

@@ -160,6 +160,12 @@ struct ControlView: View {
                 }
         }
         .onAppear {
+            // 自愈：若上次执行被打断（onDisappear cancel 了轮询但 running 未清），
+            // 恢复时把 running 复位、busy 归零，避免按钮永久 disabled。
+            if running != nil && pollTask == nil {
+                running = nil
+                busy = false
+            }
             // 接住首页快控穿透：lock/unlock/air 映射到车控指令键名。
             if let q = store.pendingQuickCtrl {
                 store.pendingQuickCtrl = nil
@@ -218,20 +224,27 @@ struct ControlView: View {
                 i += 1
                 let r = await APIClient.shared.getControlInfo(carId: store.carId, taskId: taskId)
                 guard let d = r.data else {
-                    running?.progress = "查询异常，重试中…"
-                    if i >= 12 { finish(run, ok: false, text: "结果待确认", desc: "60秒未收到车辆终态") }
+                    // 查询异常：最多连失 12 次后终止（避免 busy 永久锁死）。
+                    running?.progress = "查询异常，重试中…（\(i)/12)"
+                    if i >= 12 {
+                        finish(run, ok: false, text: "结果待确认", desc: "60秒未收到车辆终态")
+                        return
+                    }
                     try? await Task.sleep(for: .seconds(5)); continue
                 }
-                let status = ciString(d, ["HandleStatus"]) ?? ""
-                let finals = ["Success", "Completed", "RunFailure", "Failed", "Timeout"]
+                let status = ciString(d, ["HandleStatus", "handleStatus", "Status", "status"]) ?? ""
+                let finals = ["Success", "Completed", "RunFailure", "Failed", "Timeout", "success", "completed", "runFailure", "failed", "timeout"]
                 if finals.contains(status) {
-                    let ok = ["Success", "Completed"].contains(status)
-                    let desc = ciString(d, ["HandleStatusDesc"]) ?? ""
-                    finish(run, ok: ok, text: ok ? "执行成功" : "执行失败", desc: desc)
+                    let ok = ["Success", "Completed", "success", "completed"].contains(status)
+                    let desc = ciString(d, ["HandleStatusDesc", "handleStatusDesc", "Desc"]) ?? ""
+                    finish(run, ok: ok, text: ok ? "执行成功" : "执行失败", desc: desc.isEmpty ? status : desc)
                     return
                 }
-                running?.progress = "第 \(i) 次查询"
-                if i >= 12 { finish(run, ok: false, text: "结果待确认", desc: "60秒未收到车辆终态"); return }
+                running?.progress = "第 \(i) 次查询 · 车辆处理中"
+                if i >= 12 {
+                    finish(run, ok: false, text: "结果待确认", desc: "60秒未收到车辆终态")
+                    return
+                }
                 try? await Task.sleep(for: .seconds(5))
             }
         }

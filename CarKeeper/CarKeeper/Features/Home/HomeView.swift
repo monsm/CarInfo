@@ -262,15 +262,16 @@ struct HomeView: View {
     private func startPolling() {
         refreshTask?.cancel()
         locTask?.cancel()
+        // 全量轮询任务：后台线程跑，完成后回到主线程写 store，避免主线程被 URLSession/Task.sleep 卡住。
         refreshTask = Task { @MainActor in
             while !Task.isCancelled {
-                await store.fetchCore()
-                try? await Task.sleep(for: .seconds(30))
+                await store.fetchCore()  // 只拉 6 个轻接口，不拉 7 天消息
+                do { try await Task.sleep(for: .seconds(30)) } catch { break }
             }
         }
         locTask = Task { @MainActor in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(8))
+                do { try await Task.sleep(for: .seconds(8)) } catch { break }
                 let api = APIClient.shared
                 guard !store.carId.isEmpty else { continue }
                 if let loc = try? await api.getLocation(carId: store.carId) {
