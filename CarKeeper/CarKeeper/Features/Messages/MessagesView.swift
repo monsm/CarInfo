@@ -38,33 +38,41 @@ struct MessagesView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(spacing: 10) {
                 ForEach(Array(grouped.enumerated()), id: \.offset) { _, group in
                     Section {
                         ForEach(group.items) { item in
                             messageRow(item)
                         }
                     } header: {
-                        HStack {
-                            Text(group.label).font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            Text(group.label)
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(.secondary)
                             if group.unread > 0 {
-                                Text("\(group.unread) 未读").font(.system(size: 11)).foregroundStyle(Color.accentColor)
+                                Text("\(group.unread) 未读")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 7).padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.accentColor))
                             }
+                            Spacer()
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 6)
+                        .padding(.top, 6)
                     }
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 90)
+            .padding(.bottom, 96)
         }
-        .background(Color(.systemGroupedBackground))
+        .scrollBounceBehavior(.basedOnSize)
+        .pageBackground(.accentColor)
         .navigationTitle("消息")
         .onAppear { Task { await load() } }
         .refreshable { await load() }
     }
 
+    // MARK: 分组（今天/昨天/前天/M月d日/更早）
     private var grouped: [(label: String, items: [MessageItem], unread: Int)] {
         let map: [String: [MessageItem]] = Dictionary(grouping: items) { dayKey($0.time) }
         let dated = map
@@ -79,14 +87,13 @@ struct MessagesView: View {
                 (label: dayLabel(key), items: its, unread: its.filter { !$0.read }.count)
             }
             .filter { $0.label == "更早" }
-        // 有日期分组在前（新→旧），无日期（更早）垫底。
         let result: [(label: String, items: [MessageItem], unread: Int)] =
             dated.map { ($0.label, $0.items, $0.unread) } + earlier.map { ($0.label, $0.items, $0.unread) }
         return result
     }
 
     private func dayKey(_ t: String) -> String {
-        guard let re = try? NSRegularExpression(pattern: "(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})")
+        guard let re = try? NSRegularExpression(pattern: "(\d{4})[-/](\d{1,2})[-/](\d{1,2})")
             , let m = re.firstMatch(in: t, range: NSRange(t.startIndex..., in: t))
             , let range = Range(m.range, in: t) else { return "" }
         return String(t[range])
@@ -113,40 +120,54 @@ struct MessagesView: View {
         let isOpen = expanded.contains(item.id)
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Circle().fill(item.read ? Color.clear : Color.accentColor).frame(width: 8, height: 8)
-                Text(item.title).font(.system(size: 15, weight: .medium)).lineLimit(1)
+                Circle()
+                    .fill(item.read ? Color.clear : Color.accentColor)
+                    .frame(width: 8, height: 8)
+                    .shadow(color: item.read ? .clear : Color.accentColor.opacity(0.6), radius: 3)
+                Text(item.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
                 if !item.tag.isEmpty {
-                    Text(item.tag).font(.system(size: 11, weight: .medium))
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Capsule().fill(Theme.statusColor(item.tagCls).opacity(0.12)))
+                    Text(item.tag)
+                        .font(.system(size: 10, weight: .semibold))
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(Capsule().fill(Theme.statusColor(item.tagCls).opacity(0.14)))
                         .foregroundStyle(Theme.statusColor(item.tagCls))
                 }
                 Spacer()
-                if isOpen {
-                    Image(systemName: "chevron.up").font(.system(size: 12)).foregroundStyle(.secondary)
-                }
+                Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.tertiary)
             }
             if !item.body.isEmpty {
-                Text(item.body).font(.system(size: 14)).foregroundStyle(.secondary).lineLimit(isOpen ? nil : 2)
+                Text(item.body)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(isOpen ? nil : 2)
             }
             if isOpen {
-                if !item.location.isEmpty {
-                    KVRow(k: "地点", v: item.location)
+                VStack(spacing: 0) {
+                    if !item.location.isEmpty {
+                        KVRow(k: "地点", v: item.location).padding(.vertical, 5)
+                    }
+                    if !item.time.isEmpty {
+                        KVRow(k: "时间", v: item.time).padding(.vertical, 5)
+                    }
                 }
-                if !item.time.isEmpty {
-                    KVRow(k: "时间", v: item.time)
-                }
+                .padding(.top, 4)
             }
         }
         .padding(14)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard(corner: 18)
         .contentShape(Rectangle())
         .onTapGesture {
-            if expanded.contains(item.id) { expanded.remove(item.id) }
-            else {
-                expanded.insert(item.id)
-                markRead(item.id)  // 展开即本地记为已读，未读数随更新。
+            withAnimation(.easeInOut(duration: 0.2)) {
+                if expanded.contains(item.id) { expanded.remove(item.id) }
+                else {
+                    expanded.insert(item.id)
+                    markRead(item.id)
+                }
             }
         }
     }

@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 
 // 登录：手机号 + 图形验证码 + 短信验证码（60s 倒计时）
-// 直连长安官方接口，无代理。
+// iOS 27 视觉：品牌区 + 玻璃表单卡 + 渐变登录大按钮，直连长安官方接口。
 
 struct LoginView: View {
     @State private var phone: String = ""
@@ -20,91 +20,29 @@ struct LoginView: View {
         Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     }
 
+    private var phoneValid: Bool { phone.trimmingCharacters(in: .whitespaces).count >= 11 }
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    // 品牌
-                    VStack(spacing: 6) {
-                        Text("长安车管家")
-                            .font(.system(size: 34, weight: .semibold))
-                        Text("CHANGAN CONNECT")
-                            .font(.system(size: 12, weight: .medium))
-                            .tracking(3)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.top, 40)
-
-                    // 表单卡片
-                    VStack(spacing: 16) {
-                        TextField("手机号", text: $phone)
-                            .keyboardType(.numberPad)
-                            .onChange(of: phone) { _ in loadCaptcha() }
-
-                        HStack(spacing: 12) {
-                            TextField("图形验证码", text: $picCode)
-                            if let img = UIImage(data: captchaData ?? Data()) {
-                                Image(uiImage: img)
-                                    .resizable()
-                                    .frame(height: 40)
-                                    .frame(width: 100)
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(6)
-                                    .onTapGesture { loadCaptcha() }
-                            } else {
-                                Rectangle()
-                                    .fill(Color(.systemGray6))
-                                    .frame(height: 40)
-                                    .frame(width: 100)
-                                    .cornerRadius(6)
-                                    .overlay(Text("点击刷新").font(.caption).foregroundStyle(.secondary))
-                                    .onTapGesture { loadCaptcha() }
-                            }
-                        }
-
-                        HStack(spacing: 12) {
-                            TextField("6位短信验证码", text: $smsCode)
-                                .keyboardType(.numberPad)
-                            Button(smsBtnText) { sendSms() }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(smsBtnDisabled)
-                        }
-                    }
-                    .textFieldStyle(.roundedBorder)
-                    .padding(20)
-                    .background(Color(.systemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-                    if !statusText.isEmpty {
-                        Text(statusText)
-                            .font(.system(size: 14))
-                            .foregroundStyle(statusErr ? Color.red : Color.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    Button {
-                        doLogin()
-                    } label: {
-                        Text(busy ? "登录中…" : "登 录")
-                            .font(.system(size: 17, weight: .semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .disabled(busy)
-                    .padding(.top, 8)
+                VStack(spacing: 28) {
+                    brandHeader
+                        .padding(.top, 56)
+                    formCard
+                    if !statusText.isEmpty { statusBanner }
+                    loginButton
+                    Spacer(minLength: 12)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 32)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 40)
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("登录")
+            .scrollBounceBehavior(.basedOnSize)
+            .pageBackground(.accentColor)
             .navigationBarTitleDisplayMode(.inline)
             .onReceive(countdownTimer) { _ in
                 if countdown > 0 {
                     countdown -= 1
-                    smsBtnText = "重新获取(\(countdown))"
+                    smsBtnText = "\(countdown)s"
                 } else if countdown == 0 && smsBtnDisabled {
                     smsBtnDisabled = false
                     smsBtnText = "获取验证码"
@@ -114,6 +52,150 @@ struct LoginView: View {
         }
     }
 
+    // MARK: 品牌
+    private var brandHeader: some View {
+        VStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(colors: [Color.accentColor.opacity(0.9), Color.accentColor.opacity(0.55)],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 84, height: 84)
+                    .shadow(color: Color.accentColor.opacity(0.45), radius: 22, y: 8)
+                Image(systemName: "car.side.fill")
+                    .font(.system(size: 36, weight: .medium))
+                    .foregroundStyle(.white)
+            }
+            VStack(spacing: 6) {
+                Text("长安车管家")
+                    .font(Theme.h1)
+                Text("CHANGAN CONNECT")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(4)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    // MARK: 表单玻璃卡
+    private var formCard: some View {
+        VStack(spacing: 18) {
+            HStack(spacing: 12) {
+                Image(systemName: "phone.fill")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 24)
+                TextField("手机号", text: $phone)
+                    .keyboardType(.numberPad)
+                    .font(.system(size: 17, design: .rounded))
+                    .onChange(of: phone) { _ in loadCaptcha() }
+                if phoneValid {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.green)
+                        .font(.system(size: 15))
+                }
+            }
+            ListDivider()
+            HStack(spacing: 12) {
+                Image(systemName: "photo.on.rectangle")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 24)
+                TextField("图形验证码", text: $picCode)
+                    .font(.system(size: 17, design: .rounded))
+                captchaView
+            }
+            ListDivider()
+            HStack(spacing: 12) {
+                Image(systemName: "message.badge.fill")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 24)
+                TextField("6 位短信验证码", text: $smsCode)
+                    .keyboardType(.numberPad)
+                    .font(.system(size: 17, design: .rounded))
+                smsButton
+            }
+        }
+        .padding(20)
+        .glassCard()
+    }
+
+    private var smsButton: some View {
+        Button {
+            sendSms()
+        } label: {
+            Text(smsBtnText)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(smsBtnDisabled ? Color.secondary : Color.accentColor)
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(.ultraThinMaterial, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(smsBtnDisabled)
+    }
+
+    @ViewBuilder
+    private var captchaView: some View {
+        Button {
+            loadCaptcha()
+        } label: {
+            Group {
+                if let img = UIImage(data: captchaData ?? Data()) {
+                    Image(uiImage: img)
+                        .resizable()
+                        .interpolation(.none)
+                        .frame(height: 40).frame(width: 104)
+                } else {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(.tertiarySystemFill))
+                        .frame(height: 40).frame(width: 104)
+                        .overlay(Text("点我刷新").font(.system(size: 11)).foregroundStyle(.secondary))
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: 状态条
+    @ViewBuilder
+    private var statusBanner: some View {
+        if !statusText.isEmpty {
+            Label(statusText, systemImage: statusErr ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+                .font(.system(size: 13))
+                .foregroundStyle(statusErr ? Color.red : Color.green)
+                .padding(.horizontal, 14).padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+    }
+
+    // MARK: 登录按钮
+    private var loginButton: some View {
+        Button {
+            doLogin()
+        } label: {
+            HStack(spacing: 8) {
+                if busy { ProgressView().tint(.white) }
+                Text(busy ? "登录中…" : "登 录")
+                    .font(.system(size: 17, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.72)],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+            )
+            .shadow(color: Color.accentColor.opacity(0.4), radius: 16, y: 6)
+        }
+        .buttonStyle(.plain)
+        .disabled(busy)
+        .padding(.top, 4)
+    }
+
+    // MARK: 逻辑（与原版一致）
     private func loadCaptcha() {
         let trimmed = phone.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -130,7 +212,7 @@ struct LoginView: View {
         guard !trimmed.isEmpty, !picCode.isEmpty else {
             showStatus("请填写手机号和图形验证码", isErr: true); return
         }
-        Task { [store = AppStore.shared] in
+        Task {
             let r = await APIClient.shared.smsSend(phone: trimmed, picCode: picCode)
             if r.ok {
                 showStatus(r.msg, isErr: false)
@@ -156,7 +238,6 @@ struct LoginView: View {
         }
         busy = true
         statusText = ""
-        // Task 在 @MainActor 的 doLogin 里创建，继承 MainActor，直接改 @State 安全。
         Task { [phone, smsCode, picCode] in
             do {
                 let _ = try await APIClient.shared.login(

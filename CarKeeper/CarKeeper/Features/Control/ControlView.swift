@@ -1,6 +1,9 @@
 import SwiftUI
 
-// 车控：锁车/解锁 + 指令列表 + PIN 数字键盘弹层 + 温度 Stepper + 指令轮询
+// 车控 —— iOS 27 Liquid Glass：
+// 渐变主控双盘 + 玻璃指令列表 + 执行进度卡 + PIN 数字键盘 / 温度弹层。
+// 指令与轮询逻辑不变。
+
 struct ControlView: View {
     private let store = AppStore.shared
 
@@ -47,97 +50,17 @@ struct ControlView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.cardSpacing) {
-                // 车辆选择
-                let carSel = VM.carSel(store.cars, store.carId)
-                Picker("车辆", selection: Binding(
-                    get: { carSel.index },
-                    set: { store.selectCar($0) }
-                )) {
-                    ForEach(Array(carSel.options.enumerated()), id: \.offset) { idx, opt in
-                        Text(opt.name).tag(idx)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                // 主控双盘
-                HStack(spacing: 24) {
-                    ForEach(hero, id: \.key) { item in
-                        VStack(spacing: 8) {
-                            Button {
-                                onCmd(item.key)
-                            } label: {
-                                ZStack {
-                                    Circle().fill(Color(.systemGray6)).frame(width: 72, height: 72)
-                                    Image(systemName: item.symbol).font(.system(size: 28)).foregroundStyle(.primary)
-                                }
-                                .opacity(busy || running != nil ? 0.4 : 1)
-                            }
-                            .disabled(busy || running != nil)
-                            Text(item.name).font(.system(size: 14, weight: .medium))
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-
-                // 执行中进度条
-                if let run = running {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ProgressView().controlSize(.small)
-                        Text(run.name).font(.system(size: 15, weight: .medium))
-                        Text(run.progress.isEmpty ? "正在等待车辆响应…" : run.progress)
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    .padding(12)
-                    .frame(maxWidth: .infinity)
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-
-                // 远程指令
-                CardBox(title: "远程控制") {
-                    VStack(spacing: 0) {
-                        ForEach(Array(list.enumerated()), id: \.offset) { idx, item in
-                            HStack {
-                                Image(systemName: item.symbol).frame(width: 24).foregroundStyle(.secondary)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.name).font(.system(size: 15))
-                                    if let note = item.note {
-                                        Text(note).font(.caption).foregroundStyle(.secondary)
-                                    }
-                                }
-                                Spacer()
-                            }
-                            .padding(.vertical, 12)
-                            .contentShape(Rectangle())
-                            .onTapGesture { onCmd(item.key) }
-                            if idx < list.count - 1 { Divider() }
-                        }
-                    }
-                    .disabled(busy || running != nil)
-                    .opacity(busy || running != nil ? 0.5 : 1)
-                }
-
-                // 记录
-                if !history.isEmpty {
-                    CardBox(title: "记录") {
-                        ForEach(history) { item in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.name).font(.system(size: 14, weight: .medium))
-                                    Text(item.resultText).font(.caption).foregroundStyle(Theme.statusColor(item.resultCls))
-                                }
-                                Spacer()
-                                Text(item.startedAt.suffix(5)).font(.system(size: 12, design: .monospaced)).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
+                carSelector
+                heroDiscs
+                if let run = running { runningCard(run) }
+                commandCard
+                if !history.isEmpty { historyCard }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 90)
+            .padding(.bottom, 96)
         }
-        .background(Color(.systemGroupedBackground))
+        .scrollBounceBehavior(.basedOnSize)
+        .pageBackground(.blue)
         .navigationTitle("车控")
         .sheet(isPresented: $showPin) {
             PINKeypadView()
@@ -160,13 +83,10 @@ struct ControlView: View {
                 }
         }
         .onAppear {
-            // 自愈：若上次执行被打断（onDisappear cancel 了轮询但 running 未清），
-            // 恢复时把 running 复位、busy 归零，避免按钮永久 disabled。
             if running != nil && pollTask == nil {
                 running = nil
                 busy = false
             }
-            // 接住首页快控穿透：lock/unlock/air 映射到车控指令键名。
             if let q = store.pendingQuickCtrl {
                 store.pendingQuickCtrl = nil
                 let cmd = q == "air" ? "OpenAir" : (q == "lock" ? "LockDoor" : "UnLockDoor")
@@ -180,6 +100,147 @@ struct ControlView: View {
         }
     }
 
+    // MARK: 车辆切换
+    private var carSelector: some View {
+        let carSel = VM.carSel(store.cars, store.carId)
+        return HStack(spacing: 10) {
+            Image(systemName: "car.2.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(Color.blue)
+            Picker("车辆", selection: Binding(
+                get: { carSel.index },
+                set: { store.selectCar($0) }
+            )) {
+                ForEach(Array(carSel.options.enumerated()), id: \.offset) { idx, opt in
+                    Text(opt.name).tag(idx)
+                }
+            }
+            .font(.system(size: 15, weight: .semibold))
+            Spacer()
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
+        .glassCard(corner: 20)
+    }
+
+    // MARK: 主控双盘
+    private var heroDiscs: some View {
+        HStack(spacing: 28) {
+            ForEach(hero, id: \.key) { item in
+                heroDisc(item)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .glassCard()
+    }
+
+    private func heroDisc(_ item: (key: String, name: String, symbol: String)) -> some View {
+        let disabled = busy || running != nil
+        return VStack(spacing: 10) {
+            Button {
+                onCmd(item.key)
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(colors: [Color.blue.opacity(0.18), Color.blue.opacity(0.06)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: 84, height: 84)
+                    Circle()
+                        .strokeBorder(Color.blue.opacity(0.35), lineWidth: 1.5)
+                        .frame(width: 84, height: 84)
+                    Image(systemName: item.symbol)
+                        .font(.system(size: 30, weight: .medium))
+                        .foregroundStyle(Color.blue)
+                }
+                .opacity(disabled ? 0.4 : 1)
+                .shadow(color: Color.blue.opacity(disabled ? 0 : 0.3), radius: 12, y: 4)
+            }
+            .buttonStyle(.plain)
+            .disabled(disabled)
+            Text(item.name)
+                .font(.system(size: 15, weight: .semibold))
+        }
+    }
+
+    // MARK: 执行中
+    private func runningCard(_ run: RunState) -> some View {
+        HStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.regular)
+                .tint(.blue)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(run.name).font(.system(size: 15, weight: .semibold))
+                Text(run.progress.isEmpty ? "正在等待车辆响应…" : run.progress)
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(16)
+        .glassCard(corner: 20)
+    }
+
+    // MARK: 指令列表
+    private var commandCard: some View {
+        CardBox(title: "远程控制", side: busy || running != nil ? "执行中" : nil, sideCls: "acc") {
+            VStack(spacing: 0) {
+                ForEach(Array(list.enumerated()), id: \.offset) { idx, item in
+                    Button {
+                        onCmd(item.key)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: item.symbol)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(Color.blue)
+                                .frame(width: 30, height: 30)
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.name).font(.system(size: 15, weight: .medium))
+                                if let note = item.note {
+                                    Text(note).font(.system(size: 11)).foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.vertical, 10)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(busy || running != nil)
+                    .opacity(busy || running != nil ? 0.45 : 1)
+                    if idx < list.count - 1 { ListDivider() }
+                }
+            }
+        }
+    }
+
+    // MARK: 记录
+    private var historyCard: some View {
+        CardBox(title: "执行记录", side: "\(history.count) 条", sideCls: "na") {
+            VStack(spacing: 0) {
+                ForEach(Array(history.enumerated()), id: \.element.id) { idx, item in
+                    HStack(spacing: 12) {
+                        StatusDot(cls: item.resultCls)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.name).font(.system(size: 14, weight: .medium))
+                            Text(item.resultText).font(.system(size: 12))
+                                .foregroundStyle(Theme.statusColor(item.resultCls))
+                        }
+                        Spacer()
+                        Text(item.startedAt.suffix(5))
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                    if idx < history.count - 1 { ListDivider() }
+                }
+            }
+        }
+    }
+
+    // MARK: 指令执行逻辑（不变）
     private func onCmd(_ key: String) {
         guard !busy, running == nil else { return }
         guard !store.carId.isEmpty else {
@@ -197,7 +258,7 @@ struct ControlView: View {
         busy = true
         let startedAt = VM.nowText()
         let run = RunState(id: Self.seq(), cmd: cmd, name: nameOf(cmd), startedAt: startedAt,
-                            taskId: "", status: "run", progress: "", resultText: "", resultCls: "")
+                           taskId: "", status: "run", progress: "", resultText: "", resultCls: "")
         running = run
 
         Task { @MainActor in
@@ -224,7 +285,6 @@ struct ControlView: View {
                 i += 1
                 let r = await APIClient.shared.getControlInfo(carId: store.carId, taskId: taskId)
                 guard let d = r.data else {
-                    // 查询异常：最多连失 12 次后终止（避免 busy 永久锁死）。
                     running?.progress = "查询异常，重试中…（\(i)/12)"
                     if i >= 12 {
                         finish(run, ok: false, text: "结果待确认", desc: "60秒未收到车辆终态")
@@ -233,7 +293,8 @@ struct ControlView: View {
                     try? await Task.sleep(for: .seconds(5)); continue
                 }
                 let status = ciString(d, ["HandleStatus", "handleStatus", "Status", "status"]) ?? ""
-                let finals = ["Success", "Completed", "RunFailure", "Failed", "Timeout", "success", "completed", "runFailure", "failed", "timeout"]
+                let finals = ["Success", "Completed", "RunFailure", "Failed", "Timeout",
+                              "success", "completed", "runFailure", "failed", "timeout"]
                 if finals.contains(status) {
                     let ok = ["Success", "Completed", "success", "completed"].contains(status)
                     let desc = ciString(d, ["HandleStatusDesc", "handleStatusDesc", "Desc"]) ?? ""
@@ -262,7 +323,6 @@ struct ControlView: View {
         busy = false
         history.insert(newRun, at: 0)
         if history.count > 6 { history.removeLast() }
-        // 静默回刷车辆状态
         Task { @MainActor in
             if let ctrl = try? await APIClient.shared.getControl(carId: store.carId) {
                 store.saveCache(["control": ctrl])
@@ -275,7 +335,7 @@ struct ControlView: View {
     }
 }
 
-// MARK: - PIN 数字键盘弹层（输满自动执行）
+// MARK: - PIN 数字键盘弹层（玻璃化）
 
 extension Notification.Name {
     static let pinConfirmed = Notification.Name("car_pin_confirmed")
@@ -288,22 +348,24 @@ struct PINKeypadView: View {
     private let keys = ["1","2","3","4","5","6","7","8","9","","0","del"]
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 22) {
             Capsule().fill(.secondary.opacity(0.4)).frame(width: 40, height: 5)
-            Text("输入控车码").font(.headline)
-            Text("6 位数字 · 输满后自动执行").font(.caption).foregroundStyle(.secondary)
-
+            VStack(spacing: 4) {
+                Text("输入控车码").font(.system(size: 20, weight: .bold))
+                Text("6 位数字 · 输满后自动执行").font(.system(size: 12)).foregroundStyle(.secondary)
+            }
             HStack(spacing: 10) {
                 ForEach(0..<6, id: \.self) { i in
-                    Text(i < pin.count ? String(pin[pin.index(pin.startIndex, offsetBy: i)]) : "·")
-                        .font(.system(size: 28, weight: .medium, design: .rounded))
-                        .frame(width: 40, height: 52)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(.background))
-                        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(i == pin.count ? Color.accentColor : Color(.systemGray4), lineWidth: 2))
+                    Text(i < pin.count ? String(pin[pin.index(pin.startIndex, offsetBy: i)]) : "")
+                        .font(.system(size: 26, weight: .semibold, design: .rounded))
+                        .frame(width: 42, height: 54)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(i == pin.count ? Color.blue : Color(.systemGray4),
+                                          lineWidth: i == pin.count ? 2 : 1))
                 }
             }
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(keys, id: \.self) { k in
                     Button {
                         onKey(k)
@@ -313,23 +375,22 @@ struct PINKeypadView: View {
                             else if k == "" { Color.clear }
                             else { Text(k) }
                         }
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemGray6)))
-                        .font(.system(size: 24, weight: .medium))
+                        .font(.system(size: 24, weight: .medium, design: .rounded))
+                        .frame(maxWidth: .infinity, minHeight: 56)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .foregroundStyle(.primary)
                     }
+                    .buttonStyle(.plain)
                 }
             }
-
-            HStack(spacing: 16) {
-                Button("取消") { dismiss() }
-                    .buttonStyle(.bordered)
-                Button("确认") { confirm() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(pin.count != 6)
-            }
+            Button("取消") { dismiss() }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 8)
         }
         .padding(24)
         .presentationDetents([.large])
+        .presentationDragIndicator(.hidden)
     }
 
     private func onKey(_ k: String) {
@@ -347,12 +408,11 @@ struct PINKeypadView: View {
     }
 }
 
-// MARK: - 空调温度弹层（Stepper 17–33℃）
+// MARK: - 空调温度弹层（玻璃化）
 
 struct ACStepperView: View {
     @Environment(\.dismiss) private var dismiss
     @State var temp: Int
-    @State private var useSystem: Bool = true
 
     init(initialTemp: Binding<Int>) {
         _temp = State(initialValue: initialTemp.wrappedValue)
@@ -361,35 +421,52 @@ struct ACStepperView: View {
     var body: some View {
         VStack(spacing: 24) {
             Capsule().fill(.secondary.opacity(0.4)).frame(width: 40, height: 5)
-            Text("空调温度").font(.headline)
-            Text("设置范围 17 – 33 ℃").font(.caption).foregroundStyle(.secondary)
-
-            HStack(spacing: 28) {
-                Button { if temp > 17 { temp -= 1 } } label: {
-                    Image(systemName: "minus.circle.fill").font(.system(size: 40)).foregroundStyle(.secondary)
-                }
-                VStack(spacing: 2) {
-                    Text("\(temp)").font(Theme.d1)
-                    Text("℃").font(.caption).foregroundStyle(.secondary)
-                }
-                Button { if temp < 33 { temp += 1 } } label: {
-                    Image(systemName: "plus.circle.fill").font(.system(size: 40)).foregroundStyle(.secondary)
-                }
+            VStack(spacing: 4) {
+                Text("空调温度").font(.system(size: 20, weight: .bold))
+                Text("设置范围 17 – 33 ℃").font(.system(size: 12)).foregroundStyle(.secondary)
             }
-
-            Text("设置后立即开启空调制冷").font(.caption).foregroundStyle(.secondary)
-
-            HStack(spacing: 16) {
-                Button("取消") { dismiss() }
-                    .buttonStyle(.bordered)
-                Button("确认") {
-                    NotificationCenter.default.post(name: .tempConfirmed, object: temp)
-                    dismiss()
+            HStack(spacing: 32) {
+                tempButton("minus", canDo: temp > 17) { temp -= 1 }
+                VStack(spacing: 0) {
+                    Text("\(temp)")
+                        .font(.system(size: 76, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.blue)
+                        .contentTransition(.numericText())
+                    Text("℃").font(.system(size: 14)).foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderedProminent)
+                tempButton("plus", canDo: temp < 33) { temp += 1 }
             }
+            .padding(.vertical, 8)
+            Button {
+                NotificationCenter.default.post(name: .tempConfirmed, object: temp)
+                dismiss()
+            } label: {
+                Text("下一步 · 输入控车码")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.blue))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 8)
+            Button("取消") { dismiss() }
+                .font(.system(size: 14)).foregroundStyle(.secondary)
         }
         .padding(24)
         .presentationDetents([.medium])
+        .presentationDragIndicator(.hidden)
+    }
+
+    private func tempButton(_ sym: String, canDo: Bool, _ action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+        } label: {
+            Image(systemName: "\(sym).circle.fill")
+                .font(.system(size: 42))
+                .foregroundStyle(canDo ? Color.blue : Color(.systemGray4))
+        }
+        .buttonStyle(.plain)
+        .disabled(!canDo)
     }
 }

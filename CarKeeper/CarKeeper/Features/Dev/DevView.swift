@@ -43,8 +43,7 @@ struct DevView: View {
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(10)
-                                .background(Color(.systemGray6))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
                         .frame(maxHeight: 360)
                         HStack(spacing: 10) {
@@ -85,7 +84,7 @@ struct DevView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 32)
         }
-        .background(Color(.systemGroupedBackground))
+        .pageBackground(.secondary)
         .navigationTitle("开发者工具")
     }
 

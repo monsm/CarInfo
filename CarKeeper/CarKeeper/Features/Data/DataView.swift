@@ -35,53 +35,35 @@ struct DataView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // kind 切换器（8 种数据视图）
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(DataView.Kind.allCases) { k in
-                        kindChip(k)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-            }
-            .background(Color(.systemBackground))
-            Divider()
+            kindSwitcher
             ScrollView {
-            VStack(spacing: Theme.cardSpacing) {
-                if !loading && blocks.isEmpty {
-                    ContentUnavailableView(errText.isEmpty ? "暂无数据" : errText, systemImage: "doc", description: Text("暂无数据"))
-                } else {
-                    ForEach(blocks) { b in
-                        CardBox(title: b.h) {
-                            VStack(spacing: 0) {
-                                ForEach(Array(b.rows.enumerated()), id: \.offset) { _, r in
-                                    HStack(alignment: .top) {
-                                        Text(r.k).font(.system(size: 13)).foregroundStyle(.secondary)
-                                        Spacer(minLength: 12)
-                                        Text(r.v).font(.system(size: 13, design: .monospaced)).foregroundStyle(.primary)
-                                            .multilineTextAlignment(.trailing).lineLimit(3)
-                                    }
-                                    .padding(.vertical, 7)
-                                }
-                            }
+                VStack(spacing: Theme.cardSpacing) {
+                    if !loading && blocks.isEmpty {
+                        ContentUnavailableView(errText.isEmpty ? "暂无数据" : errText,
+                                               systemImage: "doc.text.magnifyingglass",
+                                               description: Text("下拉或点刷新按钮重试"))
+                            .padding(.top, 60)
+                    } else {
+                        ForEach(blocks) { b in
+                            dataBlock(b)
                         }
                     }
                 }
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 32)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 32)
+                .frame(maxWidth: .infinity, alignment: .top)
             }
         }
-        .background(Color(.systemGroupedBackground))
+        .pageBackground(.indigo)
         .navigationTitle(kind.title)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 12) {
+                HStack(spacing: 16) {
                     Button { copyAll() } label: { Image(systemName: "doc.on.doc") }
                     Button { refresh() } label: { Image(systemName: "arrow.clockwise") }
-                    ShareLink(item: shareText, subject: Text("全量数据 · \(kind.title)"), preview: SharePreview(kind.title)) {
+                    ShareLink(item: shareText, subject: Text("全量数据 · \(kind.title)"),
+                              preview: SharePreview(kind.title)) {
                         Image(systemName: "square.and.arrow.up")
                     }
                 }
@@ -90,25 +72,55 @@ struct DataView: View {
         .onAppear { refresh() }
     }
 
-    private func refresh() {
-        loading = true
-        Task { await load() }
+    // MARK: kind 切换条（横向滚动玻璃胶囊）
+    private var kindSwitcher: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(DataView.Kind.allCases) { k in
+                    kindChip(k)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
     }
 
-    // kind 切换胶囊（拆成子表达式避免 SwiftUI 类型检查超时）。
+    // kind 切换胶囊（局部变量拆分表达式，避免类型检查超时）
     private func kindChip(_ k: Kind) -> some View {
         let sel = (kind == k)
-        let fg: Color = sel ? .accentColor : .secondary
-        let bg: Color = sel ? .accentColor.opacity(0.15) : Color(.systemGray6)
-        let wt: Font.Weight = sel ? .semibold : .regular
-        return Button(k.title) {
+        let fg: Color = sel ? .white : Color.primary
+        let bg: Color = sel ? Color.indigo : Color(.systemGray5).opacity(0.6)
+        return Button {
             kind = k
             refresh()
+        } label: {
+            Text(k.title)
+                .font(.system(size: 13, weight: sel ? .semibold : .regular))
+                .foregroundStyle(fg)
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(Capsule().fill(bg))
         }
-        .font(.system(size: 13, weight: wt))
-        .padding(.horizontal, 12).padding(.vertical, 6)
-        .background(Capsule().fill(bg))
-        .foregroundStyle(fg)
+        .buttonStyle(.plain)
+    }
+
+    // MARK: 数据块（玻璃卡 + 单色间隔行）
+    private func dataBlock(_ b: Block) -> some View {
+        CardBox(title: b.h) {
+            VStack(spacing: 0) {
+                ForEach(Array(b.rows.enumerated()), id: \.offset) { idx, r in
+                    HStack(alignment: .top) {
+                        Text(r.k).font(.system(size: 13)).foregroundStyle(.secondary)
+                        Spacer(minLength: 12)
+                        Text(r.v)
+                            .font(.system(size: 13, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.trailing).lineLimit(3)
+                    }
+                    .padding(.vertical, 7)
+                    if idx < b.rows.count - 1 { ListDivider().opacity(0.5) }
+                }
+            }
+        }
     }
 
     @MainActor

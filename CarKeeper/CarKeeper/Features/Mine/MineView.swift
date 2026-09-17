@@ -18,93 +18,16 @@ struct MineView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.cardSpacing) {
-                // 身份条
-                HStack(spacing: 14) {
-                    ZStack {
-                        Circle().fill(Color.accentColor.opacity(0.15)).frame(width: 56, height: 56)
-                        Text(VM.userModel(store.user)?.avatar ?? "主")
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(Color.accentColor)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(store.user.map { ciString($0, ["UserFullname", "UserNickname"]) ?? "车主" } ?? "车主")
-                            .font(.system(size: 17, weight: .semibold))
-                        HStack(spacing: 8) {
-                            Text((store.user.map { ciString($0, ["Mobile"]) ?? "" } ?? "")).font(.system(size: 13, design: .monospaced)).foregroundStyle(.secondary)
-                            if (store.user.map { ciBool($0, ["RealnameAuthed"]) ?? false } ?? false) == true {
-                                Text("已实名").font(.system(size: 12)).foregroundStyle(.green)
-                            }
-                        }
-                    }
-                    Spacer()
-                }
-                .padding(16)
-                .background(Color(.systemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-
-                // 车辆卡
-                if let car = store.car {
-                    let sum = VM.vehicleSummary(car)
-                    HStack(spacing: 14) {
-                        Image(systemName: "car.fill").font(.system(size: 32)).foregroundStyle(Color.accentColor)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(sum?.name ?? "未绑定车辆").font(.system(size: 17, weight: .semibold))
-                            Text(sum?.plate ?? "暂无车牌").font(.system(size: 13)).foregroundStyle(.secondary)
-                            if let end = sum?.insuranceEnd, !end.isEmpty {
-                                HStack(spacing: 6) {
-                                    Text("保险至 \(end)").font(.system(size: 12)).foregroundStyle(.secondary)
-                                    if let d = sum?.insuranceDays {
-                                        Text(d < 0 ? "已到期" : "剩 \(d) 天")
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundStyle(d < 0 ? Color.red : (d <= 30 ? Color.orange : Color.green))
-                                    }
-                                }
-                            }
-                        }
-                        Spacer()
-                    }
-                    .padding(16)
-                    .background(Color(.systemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        NotificationCenter.default.post(name: .navToVehicle, object: nil)
-                    }
-                }
-
-                // 常用入口（磁贴接上深潜页导航）
-                CardBox(title: "常用") {
-                    HStack(spacing: 20) {
-                        tile("shield.fill", "健康报告") { post(.navToHealth) }
-                        tile("battery.100", "电池充电") { post(.navToBattery) }
-                        tile("chart.bar", "全量分析") { post(.navToData) }
-                        tile("doc.text", "车辆档案") { post(.navToVehicle) }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-
-                // 检查更新
-                CardBox(title: "检查更新") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("下载最新 GitHub 构建的 ipa，分享后可用 AltStore/自签工具安装")
-                            .font(.system(size: 13)).foregroundStyle(.secondary)
-                        if showDownload {
-                            VStack(spacing: 6) {
-                                ProgressView(value: downloadPct)
-                                Text("正在下载… \(Int(downloadPct * 100))%").font(.system(size: 12)).foregroundStyle(.secondary)
-                            }
-                        }
-                        if let m = updateMsg {
-                            Text(m).font(.system(size: 13)).foregroundStyle(.secondary)
-                        }
-                        HStack(spacing: 12) { updateButtons() }
-                    }
-                }
+                profileCard
+                if let car = store.car { carCard(car) }
+                tilesCard
+                updateCard
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 90)
+            .padding(.bottom, 96)
         }
-        .background(Color(.systemGroupedBackground))
+        .scrollBounceBehavior(.basedOnSize)
+        .pageBackground(.accentColor)
         .navigationTitle("我的")
         .alert("关于 长安车管家", isPresented: $showAboutAlert) {
             Button("关闭", role: .cancel) { }
@@ -125,14 +48,120 @@ struct MineView: View {
         .sheet(isPresented: $shareSheetFlag) { ShareSheet(items: shareItems) }
     }
 
-    // 常用入口磁贴。
-    private func tile(_ symbol: String, _ label: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: symbol).font(.system(size: 20)).foregroundStyle(.secondary)
-                Text(label).font(.system(size: 11)).foregroundStyle(.secondary)
+    // MARK: 身份卡
+    private var profileCard: some View {
+        let um = VM.userModel(store.user)
+        return HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.6)],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 60, height: 60)
+                    .shadow(color: Color.accentColor.opacity(0.4), radius: 10, y: 4)
+                Text(um?.avatar ?? "主")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(um?.name ?? "车主").font(.system(size: 19, weight: .bold))
+                HStack(spacing: 8) {
+                    Text(um?.mobile ?? "--")
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    if um?.authed == true {
+                        Label("已实名", systemImage: "checkmark.seal.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color.green)
+                    }
+                }
+            }
+            Spacer()
+        }
+        .padding(18)
+        .glassCard()
+    }
+
+    // MARK: 车辆卡
+    private func carCard(_ car: [String: Any]) -> some View {
+        let sum = VM.vehicleSummary(car)
+        return Button {
+            NotificationCenter.default.post(name: .navToVehicle, object: nil)
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "car.fill")
+                    .font(.system(size: 26))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 52, height: 52)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(sum?.name ?? "未绑定车辆").font(.system(size: 17, weight: .semibold))
+                    Text(sum?.plate ?? "暂无车牌").font(.system(size: 13)).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if let d = sum?.insuranceDays {
+                    Pill(text: d < 0 ? "保险到期" : "保险剩 \(d) 天",
+                         cls: d < 0 ? "bad" : (d <= 30 ? "warn" : "ok"), dot: false)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .glassCard()
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: 常用磁贴
+    private var tilesCard: some View {
+        CardBox(title: "常用功能") {
+            HStack(spacing: 10) {
+                tile("shield.lefthalf.filled", "健康报告", tint: .green) { post(.navToHealth) }
+                tile("battery.100", "电池充电", tint: .green) { post(.navToBattery) }
+                tile("chart.bar.xaxis", "全量分析", tint: .indigo) { post(.navToData) }
+                tile("doc.text.fill", "车辆档案", tint: .orange) { post(.navToVehicle) }
             }
             .frame(maxWidth: .infinity)
+        }
+    }
+
+    // MARK: 检查更新
+    private var updateCard: some View {
+        CardBox(title: "检查更新", side: nil) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("下载最新 GitHub 构建的 ipa，分享后用自签工具安装")
+                    .font(.system(size: 13)).foregroundStyle(.secondary)
+                if showDownload {
+                    VStack(spacing: 6) {
+                        ProgressView(value: downloadPct)
+                            .tint(.accentColor)
+                        Text("正在下载… \(Int(downloadPct * 100))%")
+                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                    }
+                }
+                if let m = updateMsg {
+                    Text(m).font(.system(size: 13)).foregroundStyle(.secondary)
+                }
+                HStack(spacing: 12) { updateButtons() }
+            }
+        }
+    }
+
+    // 常用入口玻璃磁贴。
+    private func tile(_ symbol: String, _ label: String, tint: Color,
+                      _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 7) {
+                Image(systemName: symbol)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(tint)
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -140,42 +169,59 @@ struct MineView: View {
 
     @ViewBuilder
     private func updateButtons() -> some View {
-        HStack(spacing: 12) {
-            Button(updateBusy ? "检查中…" : "检查更新") { checkUpdate() }
-                .font(.system(size: 14, weight: .medium))
-                .disabled(updateBusy)
-            if downloadFile != nil {
-                Button("分享安装包") {
-                    shareItems = [downloadFile as Any]
-                    shareSheetFlag = true
-                }
-                .font(.system(size: 14, weight: .medium))
-            }
-            Button("GitHub Token") { tokenDraft = UpdateService.githubToken; showToken = true }
-                .font(.system(size: 14)).foregroundStyle(.secondary)
+        HStack(spacing: 10) {
+            mainUpdateButton
+            if downloadFile != nil { shareButton }
+            tokenButton
         }
+    }
+
+    private var mainUpdateButton: some View {
+        Button {
+            checkUpdate()
+        } label: {
+            HStack(spacing: 6) {
+                if updateBusy { ProgressView().controlSize(.mini).tint(.white) }
+                Text(updateBusy ? "检查中…" : "检查更新")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16).padding(.vertical, 10)
+            .background(Capsule().fill(Color.accentColor))
+        }
+        .buttonStyle(.plain)
+        .disabled(updateBusy)
+    }
+
+    private var shareButton: some View {
+        Button {
+            shareItems = [downloadFile as Any]
+            shareSheetFlag = true
+        } label: {
+            Label("分享安装包", systemImage: "square.and.arrow.up")
+                .font(.system(size: 14, weight: .semibold))
+                .padding(.horizontal, 14).padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var tokenButton: some View {
+        Button {
+            tokenDraft = UpdateService.githubToken
+            showToken = true
+        } label: {
+            Label("Token", systemImage: "key.fill")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12).padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func post(_ name: Notification.Name) {
         NotificationCenter.default.post(name: name, object: nil)
-    }
-
-    private func utilityRow(_ symbol: String, _ label: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: symbol).frame(width: 24).foregroundStyle(.secondary)
-                Text(label).font(.system(size: 15))
-                Spacer()
-                if label == "退出登录" {
-                    Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(.secondary)
-                } else {
-                    Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(.secondary)
-                }
-            }
-            .padding(.vertical, 14)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     private var aboutText: String {

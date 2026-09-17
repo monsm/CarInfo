@@ -1,7 +1,8 @@
 import SwiftUI
 
-// 设计系统：遵循苹果 HIG 的语义色 / 字体 / 间距令牌。
-// 浅色 + 深色模式自动适配（全部用系统语义色，零硬编码）。
+// 设计系统 v2 —— iOS 27「Liquid Glass」设计语言。
+// 玻璃材质卡片 + 渐变光晕页底 + SF 圆体数字层级 + 语义色系统。
+// 材质全部走系统 Material / glassEffect，深浅色模式自动适配，零硬编码颜色。
 
 enum Theme {
     // 语义色（随系统外观自动切换）
@@ -11,34 +12,73 @@ enum Theme {
     static var acc: Color { Color.accentColor }
     static var na: Color { Color.secondary }
 
-    // 状态胶囊配色（ok/warn/bad/na）
+    // 状态 → 语义色
     static func statusColor(_ cls: String) -> Color {
         switch cls {
         case "ok": return .green
         case "warn": return .orange
         case "bad": return .red
         case "acc": return .accentColor
-        default: return .secondary
+        case "idle", "off": return Color.secondary
+        default: return Color.secondary
         }
     }
 
-    // 字号（SF Pro 系统字体，大数字用 rounded）
-    static let d1 = Font.system(size: 64, weight: .ultraLight, design: .rounded)
-    static let d2 = Font.system(size: 48, weight: .ultraLight, design: .rounded)
-    static let d3 = Font.system(size: 32, weight: .light, design: .rounded)
-    static let h1 = Font.system(size: 34, weight: .semibold)
-    static let h2 = Font.system(size: 24, weight: .semibold)
-    static let t1 = Font.system(size: 18, weight: .semibold)
+    // 字号（SF Pro；大数字用 rounded，凸显数字产品的仪表感）
+    static let d1 = Font.system(size: 76, weight: .bold, design: .rounded)
+    static let d2 = Font.system(size: 48, weight: .semibold, design: .rounded)
+    static let d3 = Font.system(size: 30, weight: .medium, design: .rounded)
+    static let h1 = Font.system(size: 34, weight: .bold)
+    static let h2 = Font.system(size: 22, weight: .semibold)
+    static let t1 = Font.system(size: 17, weight: .semibold)
     static let body = Font.system(size: 16, weight: .regular)
     static let small = Font.system(size: 14, weight: .regular)
     static let fine = Font.system(size: 12, weight: .regular)
 
-    // 间距
-    static let cardSpacing: CGFloat = 16
-    static let cardPadding: CGFloat = 16
+    // 间距与圆角令牌
+    static let cardSpacing: CGFloat = 14
+    static let cardPadding: CGFloat = 18
+    static let radius: CGFloat = 26
 }
 
-// 状态点（小圆点 + 语义色）
+// MARK: - 页面底色：柔和主题色光晕（每页可传 tint）
+struct PageBackground: View {
+    var tint: Color = .accentColor
+    var body: some View {
+        ZStack {
+            Color(.systemGroupedBackground)
+            LinearGradient(colors: [tint.opacity(0.16), .clear],
+                           startPoint: .top, endPoint: UnitPoint(x: 0.5, y: 0.42))
+            RadialGradient(colors: [tint.opacity(0.10), .clear],
+                           center: .topTrailing, startRadius: 20, endRadius: 460)
+        }
+        .ignoresSafeArea()
+    }
+}
+
+extension View {
+    /// 页面底：系统分组底色 + 主题色光晕
+    func pageBackground(_ tint: Color = .accentColor) -> some View {
+        background(PageBackground(tint: tint))
+    }
+
+    /// 玻璃卡片：ultraThin 材质 + 顶部高光描边 + 柔和投影
+    func glassCard(corner: CGFloat = Theme.radius) -> some View {
+        self
+            .background(.ultraThinMaterial,
+                        in: RoundedRectangle(cornerRadius: corner, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: corner, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(colors: [.white.opacity(0.35), .white.opacity(0.06)],
+                                       startPoint: .top, endPoint: .bottom),
+                        lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.08), radius: 18, y: 6)
+    }
+}
+
+// MARK: - 状态点（带同色光晕）
 struct StatusDot: View {
     let cls: String
     var size: CGFloat = 8
@@ -47,10 +87,11 @@ struct StatusDot: View {
             .fill(Theme.statusColor(cls))
             .frame(width: size, height: size)
             .opacity(cls == "na" ? 0.4 : 1)
+            .shadow(color: Theme.statusColor(cls).opacity(0.55), radius: 3)
     }
 }
 
-// 语义色胶囊（Pill）
+// MARK: - 语义色玻璃胶囊
 struct Pill: View {
     let text: String
     let cls: String
@@ -60,20 +101,18 @@ struct Pill: View {
         HStack(spacing: 6) {
             if dot { StatusDot(cls: cls, size: 6) }
             Text(text)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.statusColor(cls))
+                .lineLimit(1)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 5)
-        .background(
-            Capsule()
-                .fill(Theme.statusColor(cls).opacity(0.12))
-        )
-        .overlay(Capsule().strokeBorder(Theme.statusColor(cls).opacity(0.35), lineWidth: 1))
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(Theme.statusColor(cls).opacity(0.30), lineWidth: 1))
     }
 }
 
-// 键值行（详情页 / 明细）
+// MARK: - 键值行（详情 / 明细）
 struct KVRow: View {
     let k: String
     let v: String
@@ -87,8 +126,9 @@ struct KVRow: View {
                 .foregroundStyle(.secondary)
             Spacer(minLength: 16)
             Text(v)
-                .font(.system(size: 14, weight: strong ? .semibold : .regular, design: mono ? .monospaced : .default))
-                .foregroundStyle(strong ? .primary : .secondary)
+                .font(.system(size: 14, weight: strong ? .semibold : .medium,
+                              design: mono ? .monospaced : .rounded))
+                .foregroundStyle(.primary)
                 .multilineTextAlignment(.trailing)
                 .lineLimit(2)
         }
@@ -96,7 +136,7 @@ struct KVRow: View {
     }
 }
 
-// 分组卡片（系统分组样式）
+// MARK: - 玻璃分组卡片（全局容器：标题 + 状态胶囊 + 内容）
 struct CardBox<Content: View>: View {
     let title: String
     var side: String? = nil
@@ -105,22 +145,61 @@ struct CardBox<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(alignment: .firstTextBaseline) {
                 Text(title)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.secondary)
                 Spacer()
-                if let side {
-                    Text(side)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Theme.statusColor(sideCls))
+                if let side, !side.isEmpty {
+                    Pill(text: side, cls: sideCls.isEmpty ? "na" : sideCls, dot: false)
                 }
             }
             content()
         }
-        .padding(16)
+        .padding(Theme.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+        .glassCard()
+    }
+}
+
+// MARK: - 统计小磁贴（图标 + 标签 + 大数字）
+struct StatTile: View {
+    let icon: String
+    let label: String
+    let value: String
+    var unit: String = ""
+    var tint: Color = .accentColor
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text(value)
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .lineLimit(1)
+                    if !unit.isEmpty {
+                        Text(unit).font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(.ultraThinMaterial,
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+// MARK: - 列表分隔行（分组内标准行高）
+struct ListDivider: View {
+    var body: some View {
+        Divider().opacity(0.6)
     }
 }

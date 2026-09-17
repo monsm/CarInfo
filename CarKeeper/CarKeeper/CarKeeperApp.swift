@@ -122,10 +122,13 @@ struct MainTabView: View {
         .accentColor(.accentColor)
         .overlay(alignment: .bottom) {
             if nav.showCopiedToast {
-                Text("VIN 已复制").font(.system(size: 14, weight: .medium))
-                    .padding(.horizontal, 20).padding(.vertical, 10)
-                    .background(Capsule().fill(.ultraThinMaterial))
-                    .offset(y: 80)
+                Label("VIN 已复制", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .padding(.horizontal, 20).padding(.vertical, 12)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+                    .offset(y: -10)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
