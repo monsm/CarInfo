@@ -124,12 +124,13 @@ struct LoginView: View {
         }
     }
 
+    @MainActor
     private func sendSms() {
         let trimmed = phone.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !picCode.isEmpty else {
             showStatus("请填写手机号和图形验证码", isErr: true); return
         }
-        Task {
+        Task { [store = AppStore.shared] in
             let r = await APIClient.shared.smsSend(phone: trimmed, picCode: picCode)
             if r.ok {
                 showStatus(r.msg, isErr: false)
@@ -147,6 +148,7 @@ struct LoginView: View {
         }
     }
 
+    @MainActor
     private func doLogin() {
         guard !phone.trimmingCharacters(in: .whitespaces).isEmpty,
               !smsCode.isEmpty, !picCode.isEmpty else {
@@ -154,17 +156,15 @@ struct LoginView: View {
         }
         busy = true
         statusText = ""
-        Task {
+        // Task 在 @MainActor 的 doLogin 里创建，继承 MainActor，直接改 @State 安全。
+        Task { [phone, smsCode, picCode] in
             do {
                 let _ = try await APIClient.shared.login(
                     phone: phone.trimmingCharacters(in: .whitespaces),
                     smsCode: smsCode, picCode: picCode)
-                // AppStore 是 @MainActor，登录任务需显式 hop 到主线程改状态并 bootstrap。
-                await MainActor.run {
-                    AppStore.shared.isLoggedIn = true
-                    AppStore.shared.phone = phone
-                    await AppStore.shared.bootstrap()
-                }
+                AppStore.shared.isLoggedIn = true
+                AppStore.shared.phone = phone
+                await AppStore.shared.bootstrap()
             } catch {
                 showStatus(error.localizedDescription, isErr: true)
             }
