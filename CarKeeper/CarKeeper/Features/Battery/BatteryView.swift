@@ -355,7 +355,8 @@ struct BatteryView: View {
             errText = ""
         } catch {
             errText = error.localizedDescription
-            if /未找到|登录|token/i.isMatch(in: error.localizedDescription) {
+            let errDesc = error.localizedDescription.lowercased()
+            if errDesc.contains("未找到") || errDesc.contains("登录") || errDesc.contains("token") {
                 // token 过期，跳回登录页
                 await MainActor.run { AppStore.shared.logout() }
             }
@@ -363,12 +364,4 @@ struct BatteryView: View {
     }
 }
 
-// MARK: - String 正则匹配扩展
-private extension String {
-    var isMatch: Bool {
-        range(of: self, options: .regularExpression) != nil
-    }
-    func isMatch(in str: String) -> Bool {
-        str.range(of: self, options: .regularExpression) != nil
-    }
-}
+
