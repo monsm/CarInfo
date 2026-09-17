@@ -93,7 +93,7 @@ struct MessagesView: View {
     }
 
     private func dayKey(_ t: String) -> String {
-        guard let re = try? NSRegularExpression(pattern: "(\d{4})[-/](\d{1,2})[-/](\d{1,2})")
+        guard let re = try? NSRegularExpression(pattern: "(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})")
             , let m = re.firstMatch(in: t, range: NSRange(t.startIndex..., in: t))
             , let range = Range(m.range, in: t) else { return "" }
         return String(t[range])
