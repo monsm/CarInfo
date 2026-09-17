@@ -11,7 +11,7 @@ struct MineView: View {
                 HStack(spacing: 14) {
                     ZStack {
                         Circle().fill(Color.accentColor.opacity(0.15)).frame(width: 56, height: 56)
-                        Text(String((store.user.map { ciString($0, ["UserNickname"]) ?? "车主" } ?? "车主").prefix(1)).uppercased())
+                        Text(VM.userModel(store.user)?.avatar ?? "主")
                             .font(.system(size: 24, weight: .semibold))
                             .foregroundStyle(Color.accentColor)
                     }

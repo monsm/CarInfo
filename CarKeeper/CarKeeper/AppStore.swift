@@ -122,6 +122,7 @@ final class AppStore: @unchecked Sendable {
         car = nil
         user = nil
         clearCache()
+        NotificationCenter.default.post(name: .didLogout, object: nil)
     }
 
     func selectCar(_ idx: Int) {

@@ -48,8 +48,12 @@ struct ControlView: View {
         ScrollView {
             VStack(spacing: Theme.cardSpacing) {
                 // 车辆选择
-                Picker("车辆", selection: .constant(0)) {
-                    ForEach(Array(VM.carSel(store.cars, store.carId).options.enumerated()), id: \.offset) { idx, opt in
+                let carSel = VM.carSel(store.cars, store.carId)
+                Picker("车辆", selection: Binding(
+                    get: { carSel.index },
+                    set: { store.selectCar($0) }
+                )) {
+                    ForEach(Array(carSel.options.enumerated()), id: \.offset) { idx, opt in
                         Text(opt.name).tag(idx)
                     }
                 }

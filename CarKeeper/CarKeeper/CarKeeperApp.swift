@@ -12,6 +12,7 @@ extension Notification.Name {
     static let navToMessages = Notification.Name("navToMessages")
     static let navHome = Notification.Name("navHome")
     static let vinCopied = Notification.Name("vinCopied")
+    static let didLogout = Notification.Name("didLogout")
 }
 
 enum Deeplink: Hashable {
@@ -45,6 +46,10 @@ struct CarKeeperApp: App {
                     .onReceive(NotificationCenter.default.publisher(for: .vinCopied)) { _ in
                         nav.showCopiedToast = true
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { nav.showCopiedToast = false }
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
+                        nav.path = []
+                        nav.selectedTab = 0
                     }
             } else {
                 LoginView()

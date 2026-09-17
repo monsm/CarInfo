@@ -50,15 +50,22 @@ struct MessagesView: View {
 
     private var grouped: [(label: String, items: [MessageItem], unread: Int)] {
         let map: [String: [MessageItem]] = Dictionary(grouping: items) { dayKey($0.time) }
-        return map
+        let dated = map
+            .map { key, its in
+                (label: dayLabel(key), items: its, unread: its.filter { !$0.read }.count,
+                 sortKey: its.first?.time ?? "")
+            }
+            .filter { $0.label != "更早" }
+            .sorted { a, b in a.sortKey > b.sortKey }
+        let earlier = map
             .map { key, its in
                 (label: dayLabel(key), items: its, unread: its.filter { !$0.read }.count)
             }
-            .sorted { a, b in
-                if a.label == "更早" { return false }
-                if b.label == "更早" { return true }
-                return a.items.first?.time ?? "" > (b.items.first?.time ?? "")
-            }
+            .filter { $0.label == "更早" }
+        // 有日期分组在前（新→旧），无日期（更早）垫底。
+        let result: [(label: String, items: [MessageItem], unread: Int)] =
+            dated.map { ($0.label, $0.items, $0.unread) } + earlier.map { ($0.label, $0.items, $0.unread) }
+        return result
     }
 
     private func dayKey(_ t: String) -> String {
