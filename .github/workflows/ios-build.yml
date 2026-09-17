@@ -67,6 +67,17 @@ jobs:
           zip -qr "CarKeeper-unsigned.zip" "CarKeeper-unsigned.ipa"
           ls -la
 
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarKeeper-unsigned
+          path: |
+            CarKeeper/CarKeeper-unsigned.ipa
+            CarKeeper/CarKeeper-unsigned.zip
+          retention-days: 30
+
+      # 上传 ipa 到固定 tag=latest 的 GitHub Release（每次构建覆盖），
+      # 供 App 内「检查更新」直接下载分享。私库需要带 token。
       - name: Upload Release (tag=latest)
         run: |
           cd CarKeeper
@@ -87,3 +98,4 @@ jobs:
           echo "构建失败。请在 Actions 页面查看日志。常见原因："
           echo "  1. Xcode 版本与 XcodeGen 生成工程不兼容"
           echo "  2. Swift 编译错误（查看 build 日志）"
+          echo "  3. 资源缺失"
