@@ -97,20 +97,7 @@ struct MineView: View {
                         if let m = updateMsg {
                             Text(m).font(.system(size: 13)).foregroundStyle(.secondary)
                         }
-                        HStack(spacing: 12) {
-                            Button(updateBusy ? "检查中…" : "检查更新") { checkUpdate() }
-                                .font(.system(size: 14, weight: .medium))
-                                .disabled(updateBusy)
-                            if downloadFile != nil {
-                                Button("分享安装包") {
-                                    shareItems = [downloadFile as Any]
-                                    shareSheetFlag = true
-                                }
-                                .font(.system(size: 14, weight: .medium))
-                            }
-                            Button("GitHub Token") { tokenDraft = UpdateService.githubToken; showToken = true }
-                                .font(.system(size: 14)).foregroundStyle(.secondary)
-                        }
+                        HStack(spacing: 12) { updateButtons() }
                     }
                 }
             }
@@ -149,6 +136,24 @@ struct MineView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func updateButtons() -> some View {
+        HStack(spacing: 12) {
+            Button(updateBusy ? "检查中…" : "检查更新") { checkUpdate() }
+                .font(.system(size: 14, weight: .medium))
+                .disabled(updateBusy)
+            if downloadFile != nil {
+                Button("分享安装包") {
+                    shareItems = [downloadFile as Any]
+                    shareSheetFlag = true
+                }
+                .font(.system(size: 14, weight: .medium))
+            }
+            Button("GitHub Token") { tokenDraft = UpdateService.githubToken; showToken = true }
+                .font(.system(size: 14)).foregroundStyle(.secondary)
+        }
     }
 
     private func post(_ name: Notification.Name) {

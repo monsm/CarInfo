@@ -1,5 +1,5 @@
 import Foundation
-import UIKit
+import SwiftUI
 
 // 检查更新：查询 GitHub 仓库 tag=latest 的 Release（由 Actions 每次构建覆盖上传 ipa），
 // 下载其 ipa 附件到 App 沙盒，再以系统分享菜单（UIActivityViewController）弹出。
@@ -89,16 +89,11 @@ enum UpdateService {
     /// 下载文件并轮询进度。downloadTask 无内建进度回调，轮询 progress 对象最稳。
     static func downloadWithProgress(request: URLRequest, progress: @escaping (Double) -> Void) async throws -> URL {
         let state = DownloadState()
-        let task = URLSession.shared.downloadTask { tmpURL, resp, error in
-            if let err = error {
-                state.error = err
-            } else if let url = tmpURL {
-                state.url = url
-            } else {
-                state.error = URLError(.unknown)
-            }
+        let task = URLSession.shared.downloadTask(with: request) { tmpURL, _, error in
+            if let err = error { state.error = err }
+            else if let url = tmpURL { state.url = url }
+            else { state.error = URLError(.unknown) }
             state.done = true
-            _ = resp
         }
         task.progress.totalUnitCount = 1
         task.resume()
