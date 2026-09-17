@@ -1,5 +1,5 @@
 import Foundation
-import UIKit
+import SwiftUI
 
 // 检查更新：查询 GitHub 仓库 tag=latest 的 Release（由 Actions 每次构建覆盖上传 ipa），
 // 下载其 ipa 附件到 App 沙盒，再以系统分享菜单（UIActivityViewController）弹出。
@@ -44,9 +44,8 @@ enum UpdateService {
         for (k, v) in apiHeader(token) { req.setValue(v, forHTTPHeaderField: k) }
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse else { throw URLError(.badServerResponse) }
-        guard http.statusCode == 200 else {
-            let msg = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
-            throw UpdateError.fetchFailed(msg.prefix(200))
+        guard http.statusCode == 200 else {                let msg = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
+            throw UpdateError.fetchFailed(String(msg.prefix(200)))
         }
         guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw UpdateError.fetchFailed("响应不是有效 JSON")
@@ -82,39 +81,34 @@ enum UpdateService {
         try? FileManager.default.removeItem(at: target)
 
         let request = URLRequest(url: URL(string: url)!)
-        let (location, _) = try await downloadWithProgress(request: request, progress: progress)
+        let location = try await downloadWithProgress(request: request, progress: progress)
         try FileManager.default.moveItem(at: location, to: target)
         return target
     }
 
-    /// URLSessionDownloadTask + 进度（downloadTask 无内建进度回调，轮询 progress object 最稳）
-    static func downloadWithProgress(request: URLRequest, progress: @escaping (Double) -> Void) async -> (URL, URLResponse) {
-        await withCheckedContinuation { (cont: CheckedContinuation<(URL, URLResponse), Error>) in
-            let task = URLSession.shared.downloadTask(with: request) { tmpURL, resp, error in
-                if let err = error {
-                    if (err as NSError).code == NSURLErrorCancelled { return } // 取消不 resume 两次
-                    cont.resume(throwing: err)
-                } else if let url = tmpURL {
-                    progress(1.0)
-                    cont.resume(returning: (url, resp ?? URLResponse()))
-                } else {
-                    cont.resume(throwing: URLError(.unknown))
-                }
-            }
-            let progressObj = task.progress
-            task.resume()
-            // 轮询进度直至任务结束
-            let queue = DispatchQueue.global(qos: .utility)
-            queue.async {
-                var finished = false
-                while !finished {
-                    Thread.sleep(forTimeInterval: 0.2)
-                    let frac = progressObj.fractionCompleted
-                    progress(min(1.0, frac))
-                    if progressObj.isFinished { finished = true; break }
-                }
-            }
+    /// 下载文件并轮询进度。downloadTask 无内建进度回调，轮询 progress 对象最稳。
+    static func downloadWithProgress(request: URLRequest, progress: @escaping (Double) -> Void) async throws -> URL {
+        var done = false
+        var resultURL: URL?
+        var resultError: Error?
+        let task = URLSession.shared.downloadTask { tmpURL, _, error in
+            if let err = error { resultError = err }
+            else if let url = tmpURL { resultURL = url }
+            else { resultError = URLError(.unknown) }
+            done = true
         }
+        task.progress.totalUnitCount = 1 // 让 fractionCompleted 在 0~1 之间
+        task.resume()
+        // 轮询：进度回调 + 等待任务结束（避免 continuation 与轮询线程互相卡死）
+        while !done {
+            progress(min(1.0, task.progress.fractionCompleted))
+            try await Task.sleep(nanoseconds: 200_000_000) // 0.2s
+            if Task.isCancelled { task.cancel(); break }
+        }
+        progress(1.0)
+        if let err = resultError { throw err }
+        guard let url = resultURL else { throw URLError(.unknown) }
+        return url
     }
 }
 
