@@ -123,6 +123,11 @@ struct DataView: View {
         }
     }
 
+    private func refresh() {
+        loading = true
+        Task { await load() }
+    }
+
     @MainActor
     private func load() async {
         let carId = store.carId
