@@ -24,10 +24,12 @@ struct ControlView: View {
     @State private var history: [RunState] = []
     @State private var showPin = false
     @State private var showTemp = false
+    @State private var showResult = false
     @State private var pendingCmd = ""
     @State private var pendingTemp = 25
     @State private var pinDigits = ""
     @State private var pollTask: Task<Void, Never>? = nil
+    @State private var lastResult: RunState? = nil
 
     struct RunState: Identifiable {
         let id: Int
@@ -39,6 +41,8 @@ struct ControlView: View {
         var progress: String
         var resultText: String
         var resultCls: String
+        var handleCode: String = ""
+        var finishTime: String = ""
     }
 
     private static let seq: () -> Int = {
@@ -97,7 +101,9 @@ struct ControlView: View {
         }
         .onDisappear {
             pollTask?.cancel()
+            showResult = false
         }
+        .sheet(isPresented: $showResult) { resultSheet }
     }
 
     // MARK: 车辆切换
@@ -298,7 +304,10 @@ struct ControlView: View {
                 if finals.contains(status) {
                     let ok = ["Success", "Completed", "success", "completed"].contains(status)
                     let desc = ciString(d, ["HandleStatusDesc", "handleStatusDesc", "Desc"]) ?? ""
-                    finish(run, ok: ok, text: ok ? "执行成功" : "执行失败", desc: desc.isEmpty ? status : desc)
+                    let handleCode = ciString(d, ["HandleCode", "handleCode"]) ?? ""
+                    let finishTime = ciString(d, ["CmdFinishTime", "cmdFinishTime"]) ?? ""
+                    finish(run, ok: ok, text: ok ? "执行成功" : "执行失败", desc: desc.isEmpty ? status : desc,
+                           handleCode: handleCode, finishTime: finishTime)
                     return
                 }
                 running?.progress = "第 \(i) 次查询 · 车辆处理中"
@@ -311,7 +320,7 @@ struct ControlView: View {
         }
     }
 
-    private func finish(_ run: RunState, ok: Bool, text: String, desc: String) {
+    private func finish(_ run: RunState, ok: Bool, text: String, desc: String, handleCode: String = "", finishTime: String = "") {
         pollTask?.cancel()
         let cls = ok ? "ok" : "bad"
         var newRun = run
@@ -319,6 +328,9 @@ struct ControlView: View {
         newRun.resultText = text
         newRun.resultCls = cls
         newRun.progress = desc
+        newRun.handleCode = handleCode
+        newRun.finishTime = finishTime.isEmpty ? VM.nowText() : finishTime
+        lastResult = newRun
         running = nil
         busy = false
         history.insert(newRun, at: 0)
@@ -328,6 +340,32 @@ struct ControlView: View {
                 store.saveCache(["control": ctrl])
             }
         }
+        // 弹结果详情
+        showResult = true
+    }
+
+    // MARK: 执行结果详情 Sheet
+    private var resultSheet: some View {
+        guard let r = lastResult else { return EmptyView().frame(width: 0, height: 0) }
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(r.name).font(.system(size: 18, weight: .bold))
+                Spacer()
+                Pill(text: r.resultText, cls: r.resultCls, dot: false)
+            }
+            if !r.progress.isEmpty {
+                Text(r.progress).font(.system(size: 14)).foregroundStyle(.secondary)
+            }
+            if !r.handleCode.isEmpty {
+                KVRow(k: "错误码", v: r.handleCode)
+            }
+            KVRow(k: "发起时间", v: r.startedAt)
+            KVRow(k: "完成时间", v: r.finishTime)
+            KVRow(k: "任务 ID", v: r.taskId.isEmpty ? "--" : r.taskId)
+            Spacer()
+        }
+        .padding(20)
+        .presentationDetents([.medium])
     }
 
     private func nameOf(_ key: String) -> String {
