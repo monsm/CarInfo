@@ -13,6 +13,7 @@ extension Notification.Name {
     static let navHome = Notification.Name("navHome")
     static let vinCopied = Notification.Name("vinCopied")
     static let didLogout = Notification.Name("didLogout")
+    static let locationUpdated = Notification.Name("locationUpdated")
 }
 
 enum Deeplink: Hashable {

@@ -7,6 +7,23 @@ struct MessagesView: View {
     @State private var loading = true
     @State private var expanded: Set<String> = []
 
+    // 本地已读持久化（无服务端 mark-read 接口，用 UserDefaults 记已读消息 ID）。
+    private static let readKey = "changan_read_message_ids"
+    private static var localRead: Set<String> {
+        get {
+            Set(UserDefaults.standard.stringArray(forKey: readKey) ?? [])
+        }
+        set { UserDefaults.standard.set(Array(newValue), forKey: readKey) }
+    }
+
+    private func markRead(_ id: String) {
+        guard !id.isEmpty else { return }
+        var s = Self.localRead
+        guard s.insert(id).inserted else { return }
+        Self.localRead = s
+        for i in items.indices { if items[i].id == id { items[i].read = true } }
+    }
+
     struct MessageItem: Identifiable {
         let id: String
         var title: String
@@ -27,6 +44,8 @@ struct MessagesView: View {
                         ForEach(group.items) { item in
                             messageRow(item)
                         }
+                        // 展开即视为已读。
+                        .onAppear { group.items.filter { expanded.contains($0.id) }.forEach { markRead($0.id) } }
                     } header: {
                         HStack {
                             Text(group.label).font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
@@ -127,7 +146,10 @@ struct MessagesView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             if expanded.contains(item.id) { expanded.remove(item.id) }
-            else { expanded.insert(item.id) }
+            else {
+                expanded.insert(item.id)
+                markRead(item.id)  // 展开即本地记为已读，未读数随更新。
+            }
         }
     }
 
@@ -137,6 +159,7 @@ struct MessagesView: View {
         loading = true
         do {
             let list = try await APIClient.shared.getMessages()
+            let readSet = Self.localRead
             items = list.enumerated().compactMap { idx, m in
                 let id = ciString(m, ["Id", "id"]) ?? "row-\(idx)"
                 let title = ciString(m, ["Title", "title"]) ?? "车辆通知"
@@ -144,12 +167,14 @@ struct MessagesView: View {
                 let rawLoc = ciString(m, ["Content", "content"]) ?? ""
                 let location = (rawLoc != body && !rawLoc.isEmpty && rawLoc != "null" && rawLoc != "无") ? rawLoc : ""
                 let cat = Self.classify(title: title, content: body.isEmpty ? rawLoc : body)
+                // 未读 = 服务端 ReadStatus 非已读 且 本地也没标记过已读。
+                let serverRead = (ciNumber(m, ["ReadStatus", "readStatus"]) ?? 0) == 1.0
+                let read = serverRead || readSet.contains(id)
                 return MessageItem(
                     id: id, title: title, body: body, location: location,
                     time: ciString(m, ["CreatedAt", "createdAt"]) ?? "",
                     plate: ciString(m, ["realReceiverId", "RealReceiverId"]) ?? "",
-                    read: (ciNumber(m, ["ReadStatus", "readStatus"]) ?? 0) == 1.0,
-                    tag: cat.tag, tagCls: cat.cls
+                    read: read, tag: cat.tag, tagCls: cat.cls
                 )
             }
             store.saveCache(["messages": list])

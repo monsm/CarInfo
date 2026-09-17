@@ -1,12 +1,35 @@
 import SwiftUI
 import Charts
+import MapKit
 
-// 车况首页：SOC hero + 状态域 + 快控 + 30s 轮询 / 8s 位置
+// 车况首页：SOC hero + 状态域 + 快控 + 内置地图 + 30s 轮询 / 8s 位置
 struct HomeView: View {
     private let store = AppStore.shared
+    @StateObject private var nav = NavState.shared
     @State private var refreshTask: Task<Void, Never>? = nil
     @State private var locTask: Task<Void, Never>? = nil
     @State private var entered = false
+
+    enum QuickCtrl: String, CaseIterable {
+        case lock, unlock, air, charge
+        var symbol: String {
+            switch self {
+            case .lock: "lock.fill"; case .unlock: "lock.open.fill"
+            case .air: "snowflake"; case .charge: "bolt.fill"
+            }
+        }
+        var title: String {
+            switch self {
+            case .lock: "锁车"; case .unlock: "解锁"
+            case .air: "空调"; case .charge: "充电"
+            }
+        }
+        var accent: Color {
+            switch self {
+            case .lock, .unlock: .primary; case .air: .blue; case .charge: .accentColor
+            }
+        }
+    }
 
     var body: some View {
         Group {
@@ -63,6 +86,16 @@ struct HomeView: View {
                 }
                 .pickerStyle(.menu)
 
+                // 快控圆钮（对应小程序 home 的 qctrl：锁车/解锁/空调/充电直达）
+                CardBox(title: "快控") {
+                    HStack(spacing: 12) {
+                        ForEach(QuickCtrl.allCases, id: \.self) { q in
+                            QuickCtrlButton(q: q) { onQuickCtrl(q) }
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+
                 // 状态域
                 CardBox(title: "车辆状态", side: summary.overall.title, sideCls: summary.overall.cls) {
                     ForEach(summary.domains.filter { $0.key != "service" }) { d in
@@ -99,13 +132,30 @@ struct HomeView: View {
                     }
                 }
 
-                // 位置
+                // 位置（内置地图 + 导航）
                 CardBox(title: "位置", side: loc.deg != "--" ? loc.dir : nil) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(loc.addr.isEmpty ? "暂无定位数据" : loc.addr)
-                            .font(.system(size: 15))
-                        Text(loc.satAlt)
-                            .font(.caption).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 10) {
+                        // 实时刷新：locTask 每 8s 拉新坐标，Map 随 loc 变化自动平移。
+                        LocationMapView(latStr: loc.lat, lngStr: loc.lng, addr: loc.addr)
+                            .frame(height: 180)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        HStack(spacing: 8) {
+                            Text(loc.addr.isEmpty ? "暂无定位数据" : loc.addr)
+                                .font(.system(size: 14))
+                                .lineLimit(1)
+                            Spacer()
+                            if loc.lat != "--" && loc.lng != "--" {
+                                Button {
+                                    openMaps(lat: loc.lat, lng: loc.lng, addr: loc.addr)
+                                } label: {
+                                    Label("导航", systemImage: "location.north.fill")
+                                        .font(.system(size: 13, weight: .medium))
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                            }
+                        }
+                        Text(loc.satAlt).font(.caption).foregroundStyle(.secondary)
                     }
                 }
 
@@ -141,6 +191,30 @@ struct HomeView: View {
             Spacer()
             Text(d.short).font(.system(size: 14)).foregroundStyle(Theme.statusColor(d.cls))
         }
+    }
+
+    // 快控圆钮：充电直达电池页；其余切到车控 tab 并透传指令（PIN/温度由车控页接住）。
+    private func onQuickCtrl(_ q: QuickCtrl) {
+        switch q {
+        case .charge:
+            nav.path = [.battery]
+            nav.selectedTab = 0
+        default:
+            store.pendingQuickCtrl = q.rawValue
+            nav.selectedTab = 1
+        }
+    }
+
+    // 调起 Apple Maps 导航到车辆定位（iOS 通过 URL 打开地图，无需定位权限）。
+    private func openMaps(lat: String, lng: String, addr: String) {
+        guard let la = Double(lat), let lo = Double(lng) else { return }
+        UIApplication.shared.open(mapsURL(lat: la, lng: lo, dest: addr.isEmpty ? "车辆位置" : addr))
+    }
+
+    private func mapsURL(lat: Double, lng: Double, dest: String) -> URL {
+        let escaped = dest.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? dest
+        // dirflg=d 驾车导航；saddr 留空 = 以我当前位置为起点。
+        return URL(string: "http://maps.apple.com/?dirflg=d&saddr=&daddr=\(lat),\(lng)&q=\(escaped)")!
     }
 
     private func batterySection(_ cache: [String: Any?]) -> some View {
@@ -184,9 +258,89 @@ struct HomeView: View {
                 let api = APIClient.shared
                 guard !store.carId.isEmpty else { continue }
                 if let loc = try? await api.getLocation(carId: store.carId) {
+                    let newLat = ciString(loc, ["Lat", "lat"]) ?? ""
+                    let newLng = ciString(loc, ["Lng", "lng"]) ?? ""
                     store.saveCache(["location": loc])
+                    // 坐标变化时通知内置地图平移。
+                    if !newLat.isEmpty, !newLng.isEmpty {
+                        NotificationCenter.default.post(name: .locationUpdated, object: nil)
+                    }
                 }
             }
         }
+    }
+}
+
+// 快控圆钮（4 个：锁车/解锁/空调/充电）
+struct QuickCtrlButton: View {
+    let q: HomeView.QuickCtrl
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .fill(q.accent.opacity(0.12))
+                        .frame(width: 56, height: 56)
+                    Circle()
+                        .strokeBorder(q.accent.opacity(0.35), lineWidth: 1)
+                        .frame(width: 56, height: 56)
+                    Image(systemName: q.symbol)
+                        .font(.system(size: 22))
+                        .foregroundStyle(q.accent)
+                }
+                Text(q.title)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// 内置车辆位置地图（随 8s 轮询的新坐标自动平移）。
+struct LocationMapView: View {
+    let latStr: String
+    let lngStr: String
+    let addr: String
+    @State private var camera: MapCameraPosition = .automatic
+
+    private var coordinate: CLLocationCoordinate2D? {
+        Double(latStr).flatMap { la in Double(lngStr).map { lo in
+            CLLocationCoordinate2D(latitude: la, longitude: lo)
+        }}
+    }
+
+    var body: some View {
+        Group {
+            if let coord = coordinate {
+                Map(position: $camera) {
+                    Marker(addr.isEmpty ? "车辆" : addr, systemImage: "car.fill",
+                           coordinate: coord)
+                        .tint(.red)
+                }
+                .interactionModes(.all)
+                .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
+                    // 8s 轮询拉到新坐标后，AppStore 发通知；地图平移到新车。
+                    withAnimation(.easeInOut(duration: 0.4)) { camera = .camera(MapCamera(centerCoordinate: coord, distance: 600)) }
+                }
+                .onAppear {
+                    // 首次进入：定位到当前坐标。
+                    withAnimation { camera = .camera(MapCamera(centerCoordinate: coord, distance: 600)) }
+                }
+            } else {
+                ZStack {
+                    Rectangle().fill(Color(.systemGray5))
+                    VStack(spacing: 6) {
+                        Image(systemName: "location.slash").font(.title2).foregroundStyle(.secondary)
+                        Text("暂无定位坐标").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemGray6))
     }
 }

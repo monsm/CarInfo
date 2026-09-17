@@ -34,7 +34,27 @@ struct DataView: View {
     }
 
     var body: some View {
-        ScrollView {
+        VStack(spacing: 0) {
+            // kind 切换器（8 种数据视图）
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(DataView.Kind.allCases) { k in
+                        Button(k.title) {
+                            kind = k
+                            refresh()
+                        }
+                        .font(.system(size: 13, weight: kind == k ? .semibold : .regular))
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Capsule().fill(kind == k ? Color.accentColor.opacity(0.15) : Color(.systemGray6)))
+                        .foregroundStyle(kind == k ? Color.accentColor : .secondary)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+            }
+            .background(Color(.systemBackground))
+            Divider()
+            ScrollView {
             VStack(spacing: Theme.cardSpacing) {
                 if !loading && blocks.isEmpty {
                     ContentUnavailableView(errText.isEmpty ? "暂无数据" : errText, systemImage: "doc", description: Text("暂无数据"))
@@ -58,6 +78,8 @@ struct DataView: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 32)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
         }
         .background(Color(.systemGroupedBackground))
         .navigationTitle(kind.title)
@@ -66,6 +88,9 @@ struct DataView: View {
                 HStack(spacing: 12) {
                     Button { copyAll() } label: { Image(systemName: "doc.on.doc") }
                     Button { refresh() } label: { Image(systemName: "arrow.clockwise") }
+                    ShareLink(item: shareText, subject: Text("全量数据 · \(kind.title)"), preview: SharePreview(kind.title, text: shareText)) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
                 }
             }
         }
@@ -241,5 +266,15 @@ struct DataView: View {
             for r in b.rows { lines.append("\(r.k) : \(r.v)") }
         }
         UIPasteboard.general.string = lines.joined(separator: "\n")
+    }
+
+    // 导出文本（复制 / 分享共用）。
+    private var shareText: String {
+        var lines: [String] = ["【\(kind.title)  ·  \(VM.nowText())】"]
+        for b in blocks {
+            if !b.h.isEmpty { lines.append("【\(b.h)】") }
+            for r in b.rows { lines.append("\(r.k) : \(r.v)") }
+        }
+        return lines.joined(separator: "\n")
     }
 }

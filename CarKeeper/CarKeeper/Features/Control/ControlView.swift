@@ -159,6 +159,16 @@ struct ControlView: View {
                     }
                 }
         }
+        .onAppear {
+            // 接住首页快控穿透：lock/unlock/air 映射到车控指令键名。
+            if let q = store.pendingQuickCtrl {
+                store.pendingQuickCtrl = nil
+                let cmd = q == "air" ? "OpenAir" : (q == "lock" ? "LockDoor" : "UnLockDoor")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                    onCmd(cmd)
+                }
+            }
+        }
         .onDisappear {
             pollTask?.cancel()
         }
