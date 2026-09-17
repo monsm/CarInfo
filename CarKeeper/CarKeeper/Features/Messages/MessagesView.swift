@@ -6,6 +6,7 @@ struct MessagesView: View {
     @State private var items: [MessageItem] = []
     @State private var loading = true
     @State private var expanded: Set<String> = []
+    @State private var loadTask: Task<Void, Never>? = nil
 
     // 本地已读持久化（无服务端 mark-read 接口，用 UserDefaults 记已读消息 ID）。
     private static let readKey = "changan_read_message_ids"
@@ -68,7 +69,8 @@ struct MessagesView: View {
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accentColor)
         .navigationTitle("消息")
-        .onAppear { Task { await load() } }
+        .onAppear { loadIfNeeded() }
+        .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { await load() }
     }
 
@@ -169,6 +171,14 @@ struct MessagesView: View {
                     markRead(item.id)
                 }
             }
+        }
+    }
+
+    private func loadIfNeeded() {
+        guard !store.carId.isEmpty else { return }
+        guard loadTask == nil || loadTask!.isCancelled else { return }
+        if store.needsRefresh("messages") {
+            loadTask = Task { await load() }
         }
     }
 

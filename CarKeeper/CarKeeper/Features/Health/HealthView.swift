@@ -9,6 +9,7 @@ struct HealthView: View {
     @State private var loading = true
     @State private var errText: String?
     @State private var expandedSystems: Set<String> = []
+    @State private var loadTask: Task<Void, Never>? = nil
 
     var body: some View {
         ScrollView {
@@ -34,8 +35,9 @@ struct HealthView: View {
             if expandedSystems.isEmpty, let m = model {
                 for sys in m.systems where sys.statusCls == "bad" { expandedSystems.insert(sys.name) }
             }
-            Task { await load() }
+            loadIfNeeded()
         }
+        .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { await load() }
     }
 
@@ -154,6 +156,14 @@ struct HealthView: View {
         }
         .padding(.leading, 8)
         .padding(.vertical, 4)
+    }
+
+    private func loadIfNeeded() {
+        guard !store.carId.isEmpty else { return }
+        guard loadTask == nil || loadTask!.isCancelled else { return }
+        if store.needsRefresh("check") {
+            loadTask = Task { await load() }
+        }
     }
 
     // MARK: 加载（逻辑不变）

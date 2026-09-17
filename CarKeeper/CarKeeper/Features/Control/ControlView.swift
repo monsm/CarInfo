@@ -91,6 +91,10 @@ struct ControlView: View {
                 running = nil
                 busy = false
             }
+            // 首次进入时若缓存为空，主动拉一次数据
+            if store.caches["control"] == nil {
+                Task { await refreshControlCache() }
+            }
             if let q = store.pendingQuickCtrl {
                 store.pendingQuickCtrl = nil
                 let cmd = q == "air" ? "OpenAir" : (q == "lock" ? "LockDoor" : "UnLockDoor")
@@ -334,7 +338,7 @@ struct ControlView: View {
         running = nil
         busy = false
         history.insert(newRun, at: 0)
-        if history.count > 6 { history.removeLast() }
+        if history.count > 10 { history.removeLast() }
         Task { @MainActor in
             if let ctrl = try? await APIClient.shared.getControl(carId: store.carId) {
                 store.saveCache(["control": ctrl])
@@ -370,6 +374,13 @@ struct ControlView: View {
 
     private func nameOf(_ key: String) -> String {
         hero.first { $0.key == key }?.name ?? list.first { $0.key == key }?.name ?? key
+    }
+
+    // MARK: 缓存刷新
+    private func refreshControlCache() async {
+        if let ctrl = try? await APIClient.shared.getControl(carId: store.carId) {
+            store.saveCache(["control": ctrl])
+        }
     }
 }
 

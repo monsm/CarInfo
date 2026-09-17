@@ -442,15 +442,21 @@ struct HomeView: View {
     private func startPolling() {
         refreshTask?.cancel()
         locTask?.cancel()
+        // 延迟首次拉取，等 UI 渲染完成
         refreshTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            await store.fetchCore()
             while !Task.isCancelled {
-                await store.fetchCore()
-                do { try await Task.sleep(for: .seconds(30)) } catch { break }
+                do { try await Task.sleep(for: .seconds(60)) } catch { break }
+                if !Task.isCancelled { await store.fetchCore() }
             }
         }
         locTask = Task { @MainActor in
+            guard !Task.isCancelled else { return }
             while !Task.isCancelled {
-                do { try await Task.sleep(for: .seconds(8)) } catch { break }
+                try? await Task.sleep(for: .seconds(8))
+                guard !Task.isCancelled else { return }
                 let api = APIClient.shared
                 guard !store.carId.isEmpty else { continue }
                 if let loc = try? await api.getLocation(carId: store.carId) {
@@ -463,6 +469,13 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    private func stopPolling() {
+        refreshTask?.cancel()
+        locTask?.cancel()
+        refreshTask = nil
+        locTask = nil
     }
 }
 

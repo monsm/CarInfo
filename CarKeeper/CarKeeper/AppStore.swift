@@ -23,6 +23,16 @@ final class AppStore: @unchecked Sendable {
         "charge": nil, "pm25": nil, "location": nil,
         "control": nil, "check": nil, "messages": nil
     ]
+    // 缓存时间戳，用于 TTL 过期（3 分钟）
+    private var cacheTimestamps: [String: Date] = [:]
+    static let cacheTTL: TimeInterval = 180
+
+    /// 判断指定 key 是否需要重新拉取（缓存缺失 或 已过期）
+    func needsRefresh(_ key: String) -> Bool {
+        guard let v = caches[key] else { return true }
+        guard let d = v as? [String: Any] else { return true }
+        return isCacheExpired(key)
+    }
 
     // 首页快控穿透（对应 globalData.pendingQuickCtrl）
     var pendingQuickCtrl: String? = nil
@@ -103,11 +113,33 @@ final class AppStore: @unchecked Sendable {
     }
 
     func saveCache(_ patch: [String: Any?]) {
-        for (k, v) in patch { caches[k] = v }
+        let now = Date()
+        for (k, v) in patch {
+            caches[k] = v
+            cacheTimestamps[k] = now
+        }
+    }
+
+    /// 返回指定 key 的缓存是否已过期（超过 TTL）
+    func isCacheExpired(_ key: String) -> Bool {
+        guard let ts = cacheTimestamps[key] else { return true }
+        return Date().timeIntervalSince(ts) > Self.cacheTTL
+    }
+
+    /// 清理所有过期缓存，返回需要重拉的数据键列表
+    func evictStale() -> [String] {
+        var staleKeys: [String] = []
+        let now = Date()
+        for (k, ts) in cacheTimestamps where now.timeIntervalSince(ts) > Self.cacheTTL {
+            staleKeys.append(k)
+        }
+        for k in staleKeys { caches[k] = nil; cacheTimestamps.removeValue(forKey: k) }
+        return staleKeys
     }
 
     func clearCache() {
         caches = ["charge": nil, "pm25": nil, "location": nil, "control": nil, "check": nil, "messages": nil]
+        cacheTimestamps.removeAll()
     }
 
     // MARK: 登录 / 退出

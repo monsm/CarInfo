@@ -8,6 +8,7 @@ struct BatteryView: View {
     private let store = AppStore.shared
     @State private var loaded = false
     @State private var errText: String = ""
+    @State private var loadTask: Task<Void, Never>? = nil
 
     var body: some View {
         ScrollView {
@@ -33,7 +34,8 @@ struct BatteryView: View {
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.green)
         .navigationTitle("电池与充电")
-        .onAppear { Task { await load() } }
+        .onAppear { loadIfNeeded() }
+        .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { await load() }
         .overlay {
             if !loaded && errText.isEmpty {
@@ -342,6 +344,14 @@ struct BatteryView: View {
         if m.inputV != "--" { rows.append(R(k: "控制器输入电压", v: "\(m.inputV) V")) }
         if m.dcBus != "--" { rows.append(R(k: "母线电流", v: "\(m.dcBus) A")) }
         return rows
+    }
+
+    private func loadIfNeeded() {
+        guard !store.carId.isEmpty else { return }
+        guard loadTask == nil || loadTask!.isCancelled else { return }
+        if store.needsRefresh("charge") || store.needsRefresh("control") {
+            loadTask = Task { await load() }
+        }
     }
 
     @MainActor

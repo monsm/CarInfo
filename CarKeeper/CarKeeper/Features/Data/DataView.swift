@@ -22,9 +22,14 @@ struct DataView: View {
     @State private var blocks: [Block] = []
     @State private var loading = true
     @State private var errText = ""
+    @State private var loadTask: Task<Void, Never>? = nil
 
     init(kind: Kind = .status) {
         _kind = State(wrappedValue: kind)
+    }
+
+    deinit {
+        loadTask?.cancel()
     }
 
     struct Block: Identifiable {
@@ -69,7 +74,7 @@ struct DataView: View {
                 }
             }
         }
-        .onAppear { refresh() }
+        .onAppear { loadIfNeeded() }
     }
 
     // MARK: kind 切换条（横向滚动玻璃胶囊）
@@ -92,7 +97,7 @@ struct DataView: View {
         let bg: Color = sel ? Color.indigo : Color(.systemGray5).opacity(0.6)
         return Button {
             kind = k
-            refresh()
+            onKindChange()
         } label: {
             Text(k.title)
                 .font(.system(size: 13, weight: sel ? .semibold : .regular))
@@ -124,8 +129,39 @@ struct DataView: View {
     }
 
     private func refresh() {
+        loadTask?.cancel()
         loading = true
-        Task { await load() }
+        loadTask = Task { await load() }
+    }
+
+    private func loadIfNeeded() {
+        guard !store.carId.isEmpty else { return }
+        guard loadTask == nil || loadTask!.isCancelled else { return }
+        let needsFetch = switch kind {
+        case .status: store.needsRefresh("control")
+        case .charge: store.needsRefresh("charge")
+        case .location: store.needsRefresh("location")
+        case .env: store.needsRefresh("pm25")
+        case .check: store.needsRefresh("check")
+        default: false
+        }
+        if needsFetch {
+            loadTask = Task { await load() }
+        } else {
+            blocks = reloadBlocks()
+            errText = ""
+            loading = false
+        }
+    }
+
+    // kind 切换时优先用缓存，缓存为空才拉取
+    private func onKindChange() {
+        loadTask?.cancel()
+        loadTask = nil
+        blocks = reloadBlocks()
+        errText = ""
+        loading = blocks.isEmpty && !store.carId.isEmpty
+        if loading { loadTask = Task { await load() } }
     }
 
     @MainActor
