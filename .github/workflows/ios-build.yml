@@ -79,16 +79,16 @@ jobs:
 
       # 上传 ipa 到固定 tag=latest 的 GitHub Release（每次构建覆盖），
       # 供 App 内「检查更新」直接下载分享。私库需要带 token。
+      # 上传 ipa 到固定 tag=latest 的 GitHub Release（每次构建追加附件）。
+      # 供 App 内「检查更新」直接下载分享。
       - name: Upload Release (tag=latest)
         run: |
           cd CarKeeper
-          echo "latest ${GITHUB_SHA:0:8} $(date +'%Y-%m-%d %H:%M')" > CarKeeper-release-note.txt
-          gh release delete latest --force 2>/dev/null || true
-          gh release create latest \
-            --title "CarKeeper unsigned build" \
-            --notes-file CarKeeper-release-note.txt \
-            CarKeeper-unsigned.ipa \
-            CarKeeper-unsigned.zip
+          NOTE="CarKeeper unsigned build · ${GITHUB_SHA:0:8} · $(date +'%Y-%m-%d %H:%M')"
+          # 先创建或更新 Release（无附件），再用 upload 追加文件
+          gh release create latest --title "$NOTE" --notes "" --prerelease || true
+          gh release upload latest CarKeeper-unsigned.ipa --clobber || true
+          gh release upload latest CarKeeper-unsigned.zip --clobber || true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
