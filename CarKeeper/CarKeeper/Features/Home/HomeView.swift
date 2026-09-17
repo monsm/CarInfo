@@ -26,7 +26,9 @@ struct HomeView: View {
         }
         var accent: Color {
             switch self {
-            case .lock, .unlock: .primary; case .air: .blue; case .charge: .accentColor
+            case .lock, .unlock: return .primary
+            case .air: return .blue
+            case .charge: return .accentColor
             }
         }
     }

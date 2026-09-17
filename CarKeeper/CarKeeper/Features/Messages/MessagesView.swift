@@ -44,8 +44,6 @@ struct MessagesView: View {
                         ForEach(group.items) { item in
                             messageRow(item)
                         }
-                        // 展开即视为已读。
-                        .onAppear { group.items.filter { expanded.contains($0.id) }.forEach { markRead($0.id) } }
                     } header: {
                         HStack {
                             Text(group.label).font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
