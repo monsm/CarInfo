@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+import UIKit
 
 // 检查更新：查询 GitHub 仓库 tag=latest 的 Release（由 Actions 每次构建覆盖上传 ipa），
 // 下载其 ipa 附件到 App 沙盒，再以系统分享菜单（UIActivityViewController）弹出。
@@ -88,27 +88,36 @@ enum UpdateService {
 
     /// 下载文件并轮询进度。downloadTask 无内建进度回调，轮询 progress 对象最稳。
     static func downloadWithProgress(request: URLRequest, progress: @escaping (Double) -> Void) async throws -> URL {
-        var done = false
-        var resultURL: URL?
-        var resultError: Error?
-        let task = URLSession.shared.downloadTask { tmpURL, _, error in
-            if let err = error { resultError = err }
-            else if let url = tmpURL { resultURL = url }
-            else { resultError = URLError(.unknown) }
-            done = true
+        let state = DownloadState()
+        let task = URLSession.shared.downloadTask { tmpURL, resp, error in
+            if let err = error {
+                state.error = err
+            } else if let url = tmpURL {
+                state.url = url
+            } else {
+                state.error = URLError(.unknown)
+            }
+            state.done = true
+            _ = resp
         }
-        task.progress.totalUnitCount = 1 // 让 fractionCompleted 在 0~1 之间
+        task.progress.totalUnitCount = 1
         task.resume()
-        // 轮询：进度回调 + 等待任务结束（避免 continuation 与轮询线程互相卡死）
-        while !done {
+        while !state.done {
             progress(min(1.0, task.progress.fractionCompleted))
-            try await Task.sleep(nanoseconds: 200_000_000) // 0.2s
             if Task.isCancelled { task.cancel(); break }
+            try await Task.sleep(nanoseconds: 200_000_000)
         }
         progress(1.0)
-        if let err = resultError { throw err }
-        guard let url = resultURL else { throw URLError(.unknown) }
+        if let err = state.error { throw err }
+        guard let url = state.url else { throw URLError(.unknown) }
         return url
+    }
+
+    // 完成回调与轮询线程共享的下发状态（用简单类避免跨线程捕获可变局部量）
+    private final class DownloadState: @unchecked Sendable {
+        var done = false
+        var url: URL?
+        var error: Error?
     }
 }
 
