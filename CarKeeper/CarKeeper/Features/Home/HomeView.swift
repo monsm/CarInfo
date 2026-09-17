@@ -12,7 +12,6 @@ struct HomeView: View {
     @State private var refreshTask: Task<Void, Never>? = nil
     @State private var locTask: Task<Void, Never>? = nil
     @State private var showMap = false
-    @State private var selectedDomain: DomainVerdict? = nil
 
     enum QuickCtrl: String, CaseIterable {
         case lock, unlock, air, charge
@@ -59,7 +58,6 @@ struct HomeView: View {
 
         return ScrollView {
             VStack(spacing: Theme.cardSpacing) {
-                greetingRow(energy)
                 socHero(energy)
                 carSelector
                 quickControl
@@ -82,47 +80,6 @@ struct HomeView: View {
             locTask?.cancel()
         }
         .refreshable { await store.fetchCore() }
-        .sheet(item: $selectedDomain) { d in
-            domainDetailSheet(d)
-        }
-    }
-
-    private func domainDetailSheet(_ d: DomainVerdict) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text(d.label).font(.system(size: 18, weight: .bold))
-                Spacer()
-                Pill(text: d.short, cls: d.cls, dot: false)
-            }
-            if !d.title.isEmpty {
-                Text(d.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary)
-            }
-            if !d.reasons.isEmpty {
-                VStack(spacing: 8) {
-                    ForEach(d.reasons) { r in
-                        HStack(alignment: .top, spacing: 8) {
-                            StatusDot(cls: r.cls)
-                            Text(r.t).font(.system(size: 14)).foregroundStyle(.primary)
-                        }
-                    }
-                }
-            }
-            if !d.metrics.isEmpty {
-                VStack(spacing: 6) {
-                    ForEach(d.metrics) { m in
-                        HStack {
-                            Text(m.k).font(.system(size: 13)).foregroundStyle(.secondary)
-                            Spacer()
-                            Text(m.v).font(.system(size: 13, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.primary)
-                        }
-                    }
-                }
-            }
-            Spacer()
-        }
-        .padding(20)
-        .presentationDetents([.medium, .large])
     }
 
     // MARK: SOC Hero
@@ -225,46 +182,14 @@ struct HomeView: View {
     }
 
     private func domainRow(_ d: DomainVerdict) -> some View {
-        Button {
-            if !d.reasons.isEmpty || d.url.isEmpty {
-                selectedDomain = d
-            } else if !d.url.isEmpty {
-                nav.path.append(contentsOf: navPath(forUrl: d.url))
-            }
-        } label: {
-            HStack(spacing: 12) {
-                StatusDot(cls: d.cls)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text(d.label).font(.system(size: 15, weight: .medium))
-                        Spacer()
-                        Text(d.short).font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundStyle(Theme.statusColor(d.cls))
-                    }
-                    if !d.reasons.isEmpty {
-                        Text(d.reasons.prefix(1).first?.t ?? "")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                    }
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.tertiary.opacity(0.6))
-            }
-            .padding(.vertical, 8)
+        HStack(spacing: 12) {
+            StatusDot(cls: d.cls)
+            Text(d.label).font(.system(size: 15, weight: .medium))
+            Spacer()
+            Text(d.short).font(.system(size: 14, weight: .medium, design: .rounded))
+                .foregroundStyle(Theme.statusColor(d.cls))
         }
-        .buttonStyle(.plain)
-    }
-
-    private func navPath(forUrl url: String) -> [Deeplink] {
-        switch url {
-        case "/pages/battery/battery": return [.battery]
-        case "/pages/health/health": return [.health]
-        case "/pages/data/data?kind=env": return [.data]
-        default: return []
-        }
+        .padding(.vertical, 7)
     }
 
     // MARK: 电池一致性
@@ -393,21 +318,6 @@ struct HomeView: View {
                 .foregroundStyle(.white)
         }
         .buttonStyle(.plain)
-    }
-
-    // MARK: 时段问候
-    private func greetingRow(_ e: EnergyModel) -> some View {
-        let hour = Calendar.current.component(.hour, from: Date())
-        let gree = hour < 5 ? "夜深了" : (hour < 11 ? "早上好" : (hour < 13 ? "中午好" : (hour < 18 ? "下午好" : "晚上好")))
-        let dateStr = {
-            let f = DateFormatter(); f.dateFormat = "M月d日 星期 E"
-            return f.string(from: Date())
-        }()
-        return Text("\(gree) · \(dateStr)")
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 2)
     }
 
     private func footerNote(_ e: EnergyModel) -> some View {
