@@ -82,12 +82,10 @@ jobs:
         run: |
           cd CarKeeper
           echo "latest ${GITHUB_SHA:0:8} $(date +'%Y-%m-%d %H:%M')" > CarKeeper-release-note.txt
-          gh release delete latest --delete-branch --force 2>/dev/null || true
+          gh release delete latest --force 2>/dev/null || true
           gh release create latest \
             --title "CarKeeper unsigned build" \
             --notes-file CarKeeper-release-note.txt \
-            --target "${GITHUB_SHA}" \
-            --tag-name "latest" \
             CarKeeper-unsigned.ipa \
             CarKeeper-unsigned.zip
         env:
