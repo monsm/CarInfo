@@ -360,9 +360,12 @@ final class APIClient: @unchecked Sendable {
     }
 
     func getMessages() async throws -> [[String: Any]] {
-        try await withRefresh { [self] in
+        // AppStore 是 @MainActor；parseMessages 会在协作线程跑，不能在那里假设主线程。
+        // 在 getMessages（主线程入口）先取 cars 快照，再传给 parseMessages。
+        let cars = await MainActor.run { AppStore.shared.cars }
+        return try await withRefresh { [self] in
             let res = try await request(url: messagesURL(), method: "POST", body: [:])
-            return Self.parseMessages(res.text)
+            return Self.parseMessages(res.text, cars: cars)
         }
     }
 
@@ -378,7 +381,7 @@ final class APIClient: @unchecked Sendable {
         return "\(APIConfig.baseURL)/appserver/api/information/pageReceiverInfoByTime?actionType=2&page=&limit=2000&startTime=\(enc(f(past)))&endTime=\(enc(f(now)))&token=\(TokenStore.currentToken())"
     }
 
-    static func parseMessages(_ text: String) -> [[String: Any]] {
+    static func parseMessages(_ text: String, cars: [[String: Any]] = []) -> [[String: Any]] {
         let dict = jsonToAny(text) ?? [:]
         // Data 可能是包含 Content 数组的对象，也可能直接是消息数组。
         let content: [[String: Any]]
@@ -390,8 +393,7 @@ final class APIClient: @unchecked Sendable {
             content = []
         }
         // 映射车牌号（与小程序一致：realReceiverId 命中本地车辆列表则替换为车牌）
-        // AppStore 是 @MainActor，静态 func 里需显式取主线程快照。
-        let cars = { MainActor.assumeIsolated { AppStore.shared.cars } }()
+        // cars 由调用方在主线程取快照后传入（parseMessages 本身在协作线程跑，不能再 assumeIsolated）。
         var plateOf: [String: String] = [:]
         for c in cars {
             let id = ciString(c, ["carId", "CarId"]) ?? ""
