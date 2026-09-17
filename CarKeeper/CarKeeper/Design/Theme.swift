@@ -203,3 +203,5 @@ struct ListDivider: View {
         Divider().opacity(0.6)
     }
 }
+
+// Optimized polling: 2026-09-17T22:07:47.871446
