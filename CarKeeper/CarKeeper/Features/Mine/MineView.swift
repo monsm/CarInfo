@@ -115,13 +115,20 @@ struct MineView: View {
     // MARK: 常用磁贴
     private var tilesCard: some View {
         CardBox(title: "常用功能") {
-            HStack(spacing: 10) {
-                tile("shield.lefthalf.filled", "健康报告", tint: .green) { post(.navToHealth) }
-                tile("battery.100", "电池充电", tint: .green) { post(.navToBattery) }
-                tile("chart.bar.xaxis", "全量分析", tint: .indigo) { post(.navToData) }
-                tile("doc.text.fill", "车辆档案", tint: .orange) { post(.navToVehicle) }
+            VStack(spacing: 12) {
+                HStack(spacing: 10) {
+                    tile("shield.lefthalf.filled", "健康报告", tint: .green) { post(.navToHealth) }
+                    tile("battery.100", "电池充电", tint: .green) { post(.navToBattery) }
+                }
+                HStack(spacing: 10) {
+                    tile("chart.bar.xaxis", "全量数据", tint: .indigo) { post(.navToData) }
+                    tile("doc.text.fill", "车辆档案", tint: .orange) { post(.navToVehicle) }
+                }
+                HStack(spacing: 10) {
+                    tile("bubble.left.fill", "消息中心", tint: .blue) { post(.navToMessages) }
+                    tile("wrench.adjustable", "开发者工具", tint: .purple) { post(.navToDev) }
+                }
             }
-            .frame(maxWidth: .infinity)
         }
     }
 
