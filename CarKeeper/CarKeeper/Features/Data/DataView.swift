@@ -81,7 +81,7 @@ struct DataView: View {
                 HStack(spacing: 12) {
                     Button { copyAll() } label: { Image(systemName: "doc.on.doc") }
                     Button { refresh() } label: { Image(systemName: "arrow.clockwise") }
-                    ShareLink(item: shareText, subject: Text("全量数据 · \(kind.title)"), preview: SharePreview(kind.title, text: shareText)) {
+                    ShareLink(item: shareText, subject: Text("全量数据 · \(kind.title)"), preview: SharePreview(kind.title)) {
                         Image(systemName: "square.and.arrow.up")
                     }
                 }
