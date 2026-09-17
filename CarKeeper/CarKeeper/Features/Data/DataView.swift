@@ -39,14 +39,7 @@ struct DataView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(DataView.Kind.allCases) { k in
-                        Button(k.title) {
-                            kind = k
-                            refresh()
-                        }
-                        .font(.system(size: 13, weight: kind == k ? .semibold : .regular))
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(Capsule().fill(kind == k ? Color.accentColor.opacity(0.15) : Color(.systemGray6)))
-                        .foregroundStyle(kind == k ? Color.accentColor : .secondary)
+                        kindChip(k)
                     }
                 }
                 .padding(.horizontal, 12)
@@ -100,6 +93,22 @@ struct DataView: View {
     private func refresh() {
         loading = true
         Task { await load() }
+    }
+
+    // kind 切换胶囊（拆成子表达式避免 SwiftUI 类型检查超时）。
+    private func kindChip(_ k: Kind) -> some View {
+        let sel = (kind == k)
+        let fg: Color = sel ? .accentColor : .secondary
+        let bg: Color = sel ? .accentColor.opacity(0.15) : Color(.systemGray6)
+        let wt: Font.Weight = sel ? .semibold : .regular
+        return Button(k.title) {
+            kind = k
+            refresh()
+        }
+        .font(.system(size: 13, weight: wt))
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .background(Capsule().fill(bg))
+        .foregroundStyle(fg)
     }
 
     @MainActor

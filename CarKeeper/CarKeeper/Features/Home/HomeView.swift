@@ -318,12 +318,11 @@ struct LocationMapView: View {
     var body: some View {
         Group {
             if let coord = coordinate {
-                Map(position: $camera) {
+                Map(position: $camera, interactionModes: .all) {
                     Marker(addr.isEmpty ? "车辆" : addr, systemImage: "car.fill",
                            coordinate: coord)
                         .tint(.red)
                 }
-                .interactionModes(.all)
                 .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
                     // 8s 轮询拉到新坐标后，AppStore 发通知；地图平移到新车。
                     withAnimation(.easeInOut(duration: 0.4)) { camera = .camera(MapCamera(centerCoordinate: coord, distance: 600)) }
