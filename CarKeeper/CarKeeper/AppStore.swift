@@ -128,7 +128,11 @@ final class AppStore: @unchecked Sendable {
     func selectCar(_ idx: Int) {
         guard cars.indices.contains(idx) else { return }
         let c = cars[idx]
+        let newId = ciString(c, ["CarId", "carId"]) ?? ""
+        // 切车时清掉上一辆的旧缓存，避免串数据；再拉新车全量。
+        clearCache()
         car = c
-        carId = ciString(c, ["CarId", "carId"]) ?? ""
+        carId = newId
+        Task { await fetchVehicleData() }
     }
 }
