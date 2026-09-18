@@ -94,10 +94,10 @@ struct ControlView: View {
         guard hasCtrl else { return nil }
         
         func num(_ k: String) -> Int? {
-            (ctrl[k] as? NSNumber)?.intValue
+            ciNumber(ctrl, [k])
         }
         func s(_ k: String) -> String? {
-            (ctrl[k] as? String).map { $0.isEmpty ? nil : $0 }
+            ciString(ctrl, [k])
         }
         
         var doorRows: [(String, String, String)] = []
