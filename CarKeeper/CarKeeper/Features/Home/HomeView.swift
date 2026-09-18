@@ -14,6 +14,7 @@ struct HomeView: View {
     @State private var carVersion: Int = 0          // 切换车辆时 +1，驱动过渡动画
     @State private var socProgress: CGFloat = 0      // SOC圆环进度 0→socPct
     @State private var socCardOpacity: CGFloat = 0   // SOC卡片入场淡入
+    @State private var socCount: Int = 0             // SOC数字滚动计数
 
     var body: some View {
         Group {
@@ -119,7 +120,7 @@ struct HomeView: View {
                     .frame(width: 218, height: 218)
                     .opacity(0.10)
                     .blur(radius: 5)
-                    .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: socProgress)
+                    .heartbeatPulse()
 
                 // 第 2 层：底色轨道
                 Circle()
@@ -143,7 +144,7 @@ struct HomeView: View {
                 // 第 5 层：中心数字
                 VStack(spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text(e.soc == "--" ? "--" : e.soc)
+                        Text(e.soc == "--" ? "--" : String(socCount))
                             .font(Theme.d1)
                         Text("%").font(Theme.d5) weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
                     }
@@ -567,9 +568,11 @@ struct HomeView: View {
     private func startSocAnimation() {
         withAnimation(.spring(Theme.Duration.springNormal)) { socCardOpacity = 1 }
         let target = max(0, min(100, VM.energy(store.caches, store.car).socPct))
+        // 数字滚动：从 0 弹性计数到目标值（与圆环动画同步）
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
                 socProgress = CGFloat(target)
+                socCount = target
             }
         }
     }

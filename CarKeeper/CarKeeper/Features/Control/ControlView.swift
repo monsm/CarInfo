@@ -544,7 +544,6 @@ struct HeroDiscButton: View {
     let disabled: Bool
     let appearDelay: CGFloat
     let action: () -> Void
-    @State private var isPressed = false
     @State private var isEntered = false
 
     var body: some View {
@@ -573,19 +572,14 @@ struct HeroDiscButton: View {
         }
         .buttonStyle(.plain)
         .disabled(disabled)
-        // 液态玻璃入场：交错淡入 + 缩放回弹
+        // 入场动画：交错淡入 + 缩放回弹
         .opacity(isEntered ? 1 : 0)
         .scaleEffect(isEntered ? 1.0 : 0.85)
         .animation(.spring(response: 0.55, dampingFraction: 0.7, blendDuration: 0.35).delay(appearDelay), value: isEntered)
         .onAppear { isEntered = true }
-        // 液态玻璃按压缩放
-        .scaleEffect(isPressed ? 0.88 : 1.0)
-        .animation(.spring(response: 0.35, dampingFraction: 0.6, blendDuration: 0.3), value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
+        // 液态玻璃按压反馈（统一 PressFeedback）
+        .modifier(PressFeedback(pressScale: 0.88, glowColor: Theme.brand, glowIntensity: 1.0,
+                                springResponse: 0.4, springDamping: 0.65))
     }
 }
 

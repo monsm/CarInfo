@@ -11,6 +11,7 @@ struct BatteryView: View {
     @State private var loadTask: Task<Void, Never>? = nil
     @State private var socProgress: CGFloat = 0      // SOC圆环进度 0→socPct
     @State private var socCardOpacity: CGFloat = 0   // SOC卡片入场淡入
+    @State private var socCount: Int = 0             // SOC数字滚动计数
 
     var body: some View {
         ScrollView {
@@ -68,7 +69,7 @@ struct BatteryView: View {
                     .frame(width: 232, height: 232)
                     .opacity(0.10)
                     .blur(radius: 5)
-                    .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: socProgress)
+                    .heartbeatPulse()
 
                 // 第 2 层：底色轨道
                 Circle()
@@ -92,7 +93,7 @@ struct BatteryView: View {
                 // 第 5 层：中心数字
                 VStack(spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text(e.soc == "--" ? "--" : e.soc)
+                        Text(e.soc == "--" ? "--" : String(socCount))
                             .font(Theme.d1)
                         Text("%").font(Theme.d5) weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
                     }
@@ -405,7 +406,7 @@ struct BatteryView: View {
             loaded = true
             errText = ""
             // 刷新后重新播放 SOC 液态玻璃入场动画
-            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0 }
+            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0; socCount = 0 }
             startSocAnimation()
         } catch {
         } catch {

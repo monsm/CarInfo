@@ -122,8 +122,7 @@ struct HealthView: View {
                 .frame(width: 236, height: 236)
                 .opacity(0.12)
                 .blur(radius: 6)
-                .scaleEffect(scoreProgress > 0 ? 1.0 : 1.0)
-                .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: scoreProgress)
+                .heartbeatPulse()
 
             // ── 第 2 层：浅色底轨 ─────────────────────────────────
             Circle()

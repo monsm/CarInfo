@@ -169,7 +169,7 @@ enum Theme {
         static let background: Color = Color(.systemGroupedBackground)
         static let cardBg: Color = Color(.secondarySystemGroupedBackground)
         static let overlay: Color = Color(.thinMaterial)
-        static let glass: Color = Color(.ultraThinMaterial)
+        static let glass: Color = Color(.thinMaterial)      // 与 overlay 统一，深色模式可见度更好
 
         // ---- 文字色（Text）----
         static let primary: Color = Color(.label)
@@ -484,13 +484,14 @@ struct CardBox<Content: View>: View {
     }
 }
 
-// MARK: - 统计小磁贴
+// MARK: - 统计小磁贴（hover 液态玻璃光晕）
 struct StatTile: View {
     let icon: String
     let label: String
     let value: String
     var unit: String = ""
     var tint: Color = .accentColor
+    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
@@ -514,9 +515,99 @@ struct StatTile: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Theme.Spacing.md)
-        .background(.thin,
-                    in: RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
+                .fill(.thin)
+                .overlay(
+                    // hover 高亮光晕：tint 色扩散 + 白色边缘高光
+                    RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
+                        .fill(tint.opacity(isHovered ? 0.12 : 0.0))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
+                                .strokeBorder(
+                                    tint.opacity(isHovered ? 0.55 : 0.0),
+                                    lineWidth: isHovered ? 1.5 : 0
+                                )
+                        )
+                        .shadow(color: tint.opacity(isHovered ? 0.35 : 0.0), radius: isHovered ? 10 : 0, y: 0)
+                )
+        )
+        .scaleEffect(isHovered ? 1.02 : 1.0)
+        .animation(.spring(response: 0.4, dampingFraction: 0.65, blendDuration: 0.2), value: isHovered)
+        .onHover { hovered in isHovered = hovered }
     }
+}
+
+// MARK: - Liquid Glass Press Feedback（统一按压/悬停动效）
+/// 所有 Button 组件共享的液态玻璃按压反馈修饰符：scale 压缩 + glow 光晕
+struct PressFeedback: ViewModifier {
+    /// 按下时的缩放比例（0.88 = 明显压缩，0.93 = 轻微压缩）
+    let pressScale: CGFloat
+    /// 发光颜色（nil 时自动取内容前景色/ accentColor）
+    let glowColor: Color?
+    /// 发光强度（0~1）
+    let glowIntensity: CGFloat
+    /// 弹簧响应（越大越慢）
+    let springResponse: CGFloat
+    /// 弹簧阻尼（越小回弹越快）
+    let springDamping: CGFloat
+
+    @State private var isPressed = false
+    @State private var isHovered  = false
+
+    func body(content: Content) -> some View {
+        content
+            // 缩放：按下压缩 / 悬停微放大
+            .scaleEffect(isPressed ? pressScale : (isHovered ? 1.02 : 1.0))
+            .animation(.spring(response: springResponse, dampingFraction: springDamping, blendDuration: 0.2),
+                       value: isPressed)
+            .animation(.spring(response: springResponse, dampingFraction: springDamping, blendDuration: 0.2),
+                       value: isHovered)
+            // glow 叠加层：描边 + 外发光
+            .overlay(
+                Rectangle()
+                    .fill(glowColor?.opacity(isPressed ? glowIntensity * 0.6 : isHovered ? glowIntensity * 0.2 : 0))
+                    .blendMode(.screen)
+                    .blur(radius: isPressed ? 8 : isHovered ? 5 : 0)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(
+                        glowColor?.opacity(isPressed ? glowIntensity : isHovered ? glowIntensity * 0.4 : 0),
+                        lineWidth: isPressed ? 2 : isHovered ? 1.2 : 0
+                    )
+            )
+            // 手势：DragGesture 实时响应按/放
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in isPressed = true }
+                    .onEnded   { _ in isPressed = false }
+            )
+            // 悬停（iPad / 桌面）
+            .onHover { hovered in isHovered = hovered }
+    }
+}
+
+/// 带液态玻璃按压反馈的 Button 包装器
+/// - Parameters:
+///   - action: 点击回调
+///   - scale: 按压缩放比例，默认 0.93（轻微）；0.88（明显）
+///   - glowColor: 发光颜色，nil 时取 AccentColor
+///   - label: 按钮内容
+@ViewBuilder
+func GlowButton<T: View>(
+    scale: CGFloat = 0.93,
+    glowColor: Color? = nil,
+    @ViewBuilder label: () -> T
+) -> some View {
+    label()
+        .modifier(PressFeedback(
+            pressScale:      scale,
+            glowColor:       glowColor,
+            glowIntensity:   1.0,
+            springResponse:  0.4,
+            springDamping:   0.65
+        ))
 }
 
 // MARK: - 列表分隔行
@@ -570,31 +661,25 @@ struct QuickControlButton: View {
     let label: String
     let tint: Color
     let action: () -> Void
-    @State private var isPressed = false
 
     var body: some View {
-        Button {
-            action()
-        } label: {
-            VStack(spacing: Theme.Spacing.sm) {
-                Image(systemName: icon)
-                    .font(Theme.font(24, weight: .semibold))
-                    .foregroundStyle(tint)
-                    .frame(width: 56, height: 56)
-                    .background(tint.opacity(0.12), in: Circle())
-                Text(label)
-                    .font(Theme.caption)
-                    .foregroundStyle(.secondary)
+        GlowButton(scale: 0.88, glowColor: tint) {
+            Button {
+                action()
+            } label: {
+                VStack(spacing: Theme.Spacing.sm) {
+                    Image(systemName: icon)
+                        .font(Theme.font(24, weight: .semibold))
+                        .foregroundStyle(tint)
+                        .frame(width: 56, height: 56)
+                        .background(tint.opacity(0.12), in: Circle())
+                    Text(label)
+                        .font(Theme.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
-        .scaleEffect(isPressed ? 0.88 : 1.0)
-        .animation(Animation.spring(response: 0.35, dampingFraction: 0.6, blendDuration: 0.3), value: isPressed)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
     }
 }
 
@@ -605,8 +690,6 @@ struct TyreCell: View {
     let temp: String
     let cls: String
     let minSafePressure: Double
-    @State private var isPressed = false
-
     var body: some View {
         let pressurePercent = min(1.0, max(0.0,
             (Double(kpa) ?? 220) - minSafePressure) / (280 - minSafePressure))
@@ -654,23 +737,45 @@ struct TyreCell: View {
         }
         .padding(.vertical, Theme.Spacing.sm)
         .frame(maxWidth: .infinity)
-        .scaleEffect(isPressed ? 0.93 : 1.0)
-        .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.25), value: isPressed)
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous)
-                .strokeBorder(barColor.opacity(isPressed ? 0.8 : 0.25), lineWidth: isPressed ? 2 : 0.8)
-                .shadow(color: barColor.opacity(isPressed ? 0.45 : 0.0), radius: isPressed ? 8 : 0, y: 0)
-        )
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous)
                 .fill(cls == "bad"
                       ? Color.red.opacity(0.06)
                       : Color.green.opacity(0.04))
         )
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded   { _ in isPressed = false }
-        )
+        .modifier(PressFeedback(pressScale: 0.93, glowColor: barColor, glowIntensity: 1.0,
+                                springResponse: 0.4, springDamping: 0.65))
+    }
+}
+
+// =============================================================================
+// HeartbeatPulse —— 双拍心跳脉冲效果 ViewModifier
+// 模拟真实心电图（ECG）波形：快速收缩（systole）→ 舒张（diastole）→ 短暂停顿
+// 用于 SOC / 健康评分圆环的实时脉冲光环，替代无效的 easeInOut repeatForever。
+// =============================================================================
+
+struct HeartbeatPulse: ViewModifier {
+    @State private var t: CGFloat = 0
+
+    /// 双拍心跳波形（0→1 周期），返回当前脉冲强度
+    /// T 在 0～5s 循环，形成「咚-咚」→ 回弹 → 短暂停顿的经典心率形态
+    private static func beatIntensity(t: CGFloat) -> CGFloat {
+        // 每 5s 一个完整心跳周期
+        let cycle = t * 2 * .pi / 5.0
+        // 双峰：主峰（systole）+ 次峰（dicrotic notch）
+        let peak1 = exp(-pow(sin(cycle * 0.5), 2) * 8.0)
+        let peak2 = exp(-pow(sin(cycle * 0.5 + 0.9), 2) * 12.0)
+        let raw = peak1 + peak2 * 0.55
+        return min(1.0, raw * 1.8)
+    }
+
+    func body(content: Content) -> some View {
+        let intensity = HeartbeatPulse.beatIntensity(t: t)
+        content
+            .scaleEffect(1.0 + intensity * 0.06)
+            .opacity(0.6 + intensity * 0.4)
+            .blur(radius: intensity * 3)
+            .animation(.linear(duration: 5.0).repeatForever(autoreverses: false), value: t)
+            .onAppear { t = 0 }
     }
 }
