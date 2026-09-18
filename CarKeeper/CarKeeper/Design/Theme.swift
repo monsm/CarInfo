@@ -605,6 +605,7 @@ struct TyreCell: View {
     let temp: String
     let cls: String
     let minSafePressure: Double
+    @State private var isPressed = false
 
     var body: some View {
         let pressurePercent = min(1.0, max(0.0,
@@ -653,15 +654,23 @@ struct TyreCell: View {
         }
         .padding(.vertical, Theme.Spacing.sm)
         .frame(maxWidth: .infinity)
+        .scaleEffect(isPressed ? 0.93 : 1.0)
+        .animation(.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0.25), value: isPressed)
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous)
+                .strokeBorder(barColor.opacity(isPressed ? 0.8 : 0.25), lineWidth: isPressed ? 2 : 0.8)
+                .shadow(color: barColor.opacity(isPressed ? 0.45 : 0.0), radius: isPressed ? 8 : 0, y: 0)
+        )
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous)
                 .fill(cls == "bad"
                       ? Color.red.opacity(0.06)
                       : Color.green.opacity(0.04))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous)
-                        .strokeBorder(barColor.opacity(0.25), lineWidth: 0.8)
-                )
+        )
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded   { _ in isPressed = false }
         )
     }
 }
