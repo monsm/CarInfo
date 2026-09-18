@@ -140,6 +140,19 @@ struct VehicleView: View {
                    row("LastOnlineTime", "最后在线"), row("ActiveTime", "激活时间")].compactMap { $0 }
         if !svc.isEmpty { out.append(Grp(name: "服务与保养", rows: svc)) }
 
+        let deviceInfo = [row("CurrentDeviceType", "设备类型")].compactMap { $0 }
+        if !deviceInfo.isEmpty { out.append(Grp(name: "设备信息", rows: deviceInfo)) }
+
+        let extra = [
+            ("IsCaCar", "是否CA车辆", { let v = ciString(c, ["IsCaCar"]); return (v == "true" || v == "1") ? "是" : "否" }),
+            ("BindedJD", "绑定京东", { let v = ciBool(c, ["BindedJD"]); return v ? "已绑定" : "未绑定" }),
+            ("RealnameAuthStatus", "实名认证", { let v = ciString(c, ["RealnameAuthStatus"]); return (v == "AUTHED" || v == "authed") ? "已认证" : "未认证" })
+        ].compactMap { k, label, fn in
+            let v = fn()
+            return Row(k: k, v: label + "：" + v)
+        }
+        if !extra.isEmpty { out.append(Grp(name: "扩展信息", rows: extra)) }
+
         // 车况报文 — 来自 tbox control 缓存（对齐小程序 vehicle.js）
         let ctl = store.caches["control"] as? [String: Any]
         var ctlRows: [Row] = []

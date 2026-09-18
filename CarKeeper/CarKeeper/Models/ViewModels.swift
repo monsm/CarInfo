@@ -225,6 +225,9 @@ enum VM {
         let t = ciNumber(motor, ["Temperature"])
         let ct = ciNumber(motor, ["ControllerTemperature"])
 
+        let fireSt = ciString(control, ["FireStatus", "fireStatus"]) ?? ""
+        let fireCN: [String: String] = ["1": "启动", "2": "熄火"]
+        let fireStatus = fireSt.isEmpty ? "" : (fireCN[fireSt] ?? fireSt)
         return DriveModel(
             speed: hasCtrl ? (n0(control?["VehicleSpeed"]) ?? "--") : "--",
             mile: hasCtrl ? (n0(control?["TotalOdometer"]) ?? "--") : "--",
@@ -233,7 +236,8 @@ enum VM {
             gearCls: gearCls,
             motorTemp: motor == nil ? "--" : "\(t == nil ? "--" : "\(Int(t!))℃") / \(ct == nil ? "--" : "\(Int(ct!))℃")",
             batteryNote: note,
-            isMoving: hasCtrl && num(control?["VehicleSpeed"]) > 0
+            isMoving: hasCtrl && num(control?["VehicleSpeed"]) > 0,
+            fireStatus: fireStatus
         )
     }
 
@@ -386,6 +390,8 @@ enum VM {
         if let ct = s(d["CheckTime"]) { timeStr = ct } else { timeStr = "" }
         let idStr: String?
         if let cid = s(d["CheckHistoryId"]) { idStr = cid } else { idStr = nil }
+        let statusMap: [String: String] = ["normal": "正常", "fault": "故障", "warning": "预警", "risk": "风险", "abnormal": "异常", "ok": "正常"]
+        let vehicleStatus = s(d["Status"]).flatMap { statusMap[$0] ?? $0 }
         return HealthModel(
             time: timeStr,
             score: score == nil ? "--" : "\(Int(score!.rounded()))",
@@ -396,7 +402,10 @@ enum VM {
                 CountPill(key: "故障", n: n0(d["FaultCount"]) ?? "--", cls: "bad")
             ],
             systems: systems,
-            id: idStr
+            id: idStr,
+            checkId: s(d["CheckHistoryId"]),
+            endTime: s(d["CarDataUpdateTime"]),
+            vehicleStatus: vehicleStatus
         )
     }
 
@@ -408,12 +417,22 @@ enum VM {
         let mobile = s(u["Mobile"]) ?? ""
         let authed = (ciBool(u, ["RealnameAuthed"]) ?? false)
         let nickname = s(u["UserNickname"]) ?? ""
+        let genderRaw = s(u["Gender"]) ?? ""
+        let genderCN: [String: String] = ["m": "男", "f": "女"]
+        let gender = genderCN[genderRaw] ?? genderRaw
+        let lastLogin = s(u["LastLoginTime"]) ?? ""
+        let lastLoginShort = lastLogin.count > 10 ? String(lastLogin.suffix(10)) : lastLogin
+        let source = s(u["Source"]) ?? ""
         return UserVM(
             name: nameFinal,
             avatar: (u["UserNickname"] as? String ?? nameFinal).prefix(1).uppercased() as String,
             mobile: mobile.count >= 11 ? String(mobile.prefix(3)) + "****" + String(mobile.suffix(4)) : (mobile.isEmpty ? "--" : mobile),
             authed: authed,
-            nickname: nickname.isEmpty ? "未设置昵称" : nickname
+            nickname: nickname.isEmpty ? "未设置昵称" : nickname,
+            gender: gender.isEmpty ? "" : gender,
+            birthday: s(u["Birthday"]) ?? "",
+            lastLoginTime: lastLoginShort,
+            source: source
         )
     }
 
