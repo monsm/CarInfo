@@ -5,6 +5,8 @@ import SwiftUI
 
 extension Notification.Name {
     static let navToVehicle = Notification.Name("navToVehicle")
+    static let pinConfirmed = Notification.Name("car_pin_confirmed")
+    static let tempConfirmed = Notification.Name("car_temp_confirmed")
     static let navToDev = Notification.Name("navToDev")
     static let navToData = Notification.Name("navToData")
     static let navToHealth = Notification.Name("navToHealth")

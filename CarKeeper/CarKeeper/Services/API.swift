@@ -378,10 +378,10 @@ final class APIClient: @unchecked Sendable {
             return f.string(from: d)
         }
         let enc: (String) -> String = { s in s.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? s }
-        // limit=500 + 7 天窗口：服务端实际 7 天消息约 55~200 条，500 足以覆盖；
-        // 降回 2000 会让每次消息请求拉 100KB+ 巨包，弱网下拖死整批 gather，
+        // limit=2000 + 7 天窗口：与小程序对齐，服务端最多返回 ~200 条
+        // 日志实测 7 天消息约 64 条/次（log_20260917），2000 完全覆盖，无性能风险。
         // 进而卡 UI（日志 17:19:17 messages 响应 99287 字符已印证风险）。
-        return "\(APIConfig.baseURL)/appserver/api/information/pageReceiverInfoByTime?actionType=2&page=&limit=500&startTime=\(enc(f(past)))&endTime=\(enc(f(now)))&token=\(TokenStore.currentToken())"
+        return "\(APIConfig.baseURL)/appserver/api/information/pageReceiverInfoByTime?actionType=2&page=&limit=2000&startTime=\(enc(f(past)))&endTime=\(enc(f(now)))&token=\(TokenStore.currentToken())"
     }
 
     static func parseMessages(_ text: String, cars: [[String: Any]] = []) -> [[String: Any]] {

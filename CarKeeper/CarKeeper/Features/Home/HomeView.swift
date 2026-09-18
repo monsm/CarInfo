@@ -49,11 +49,13 @@ struct HomeView: View {
         let comfort = VM.comfortStatus(cache)
         let loc = VM.locStatus(cache)
         let hasData = cache["control"] != nil
+        let drive = VM.driveStatus(cache)
 
         return ScrollView {
             VStack(spacing: Theme.cardSpacing) {
                 greetingRow(energy)
                 socHero(energy)
+                driveMetricsRow(drive)
                 carSelector
                 quickControl
                 domainCard(summary)
@@ -202,6 +204,16 @@ struct HomeView: View {
         }
         .padding(16)
         .glassCard(corner: 22)
+    }
+
+    // MARK: 车速里程行
+    private func driveMetricsRow(_ d: DriveModel) -> some View {
+        HStack(spacing: 16) {
+            MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: .blue)
+            MetricPill(icon: "gauge.full", value: d.mile, unit: "km", tint: .accentColor)
+        }
+        .padding(20)
+        .glassHeroCard()
     }
 
     // MARK: 快控 - 2x2 网格大圆钮

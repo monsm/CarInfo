@@ -257,8 +257,8 @@ enum AN {
     // ---------- 服务 ----------
     private static func serviceDomain(_ cache: [String: Any?], _ carRaw: [String: Any]?) -> DomainVerdict {
         let car = carRaw
-        let insDays = car.flatMap { VM.daysUntil($0["InsuranceEndDate"]) }
-        let srvDays = car.flatMap { VM.daysUntil($0["TserviceEndtime"]) }
+        let insDays: Int? = car.flatMap { VM.daysUntil($0["InsuranceEndDate"]) }
+        let srvDays: Int? = car.flatMap { VM.daysUntil($0["TserviceEndtime"]) }
         var d = DomainVerdict(key: "service", label: "服务", url: "/pages/vehicle/vehicle",
                               cls: NA, short: "--", title: "暂无到期信息", reasons: [], metrics: [])
         if let insDays { d.metrics.append(Metric(k: "保险到期", v: insDays < 0 ? "已过 \(abs(insDays)) 天" : "剩 \(insDays) 天")) }

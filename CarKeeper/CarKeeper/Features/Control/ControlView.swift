@@ -58,6 +58,7 @@ struct ControlView: View {
                 heroDiscs
                 if let run = running { runningCard(run) }
                 commandCard
+                if let bd = bodyDetail { bodyDetailCard(bd) }
                 if !history.isEmpty { historyCard }
             }
             .padding(.horizontal, 16)
@@ -86,6 +87,122 @@ struct ControlView: View {
                     }
                 }
         }
+        // MARK: 车身明细（车门/窗/灯状态）
+    private var bodyDetail: (summary: String, cls: String, doorRows: [(String, String, String)], windowRows: [(String, String, String)], lampRows: [(String, String)])? {
+        guard let ctrl = ciVal(store.caches, "control") else { return nil }
+        let hasCtrl = ctrl.count > 0
+        guard hasCtrl else { return nil }
+        
+        func num(_ k: String) -> Int? {
+            (ctrl[k] as? NSNumber)?.intValue
+        }
+        func s(_ k: String) -> String? {
+            (ctrl[k] as? String).map { $0.isEmpty ? nil : $0 }
+        }
+        
+        var doorRows: [(String, String, String)] = []
+        let doorDefs: [(String, String, String)] = [
+            ("左前门", "LeftFrontDoor", "LeftFrontDoorLock"),
+            ("右前门", "RightFrontDoor", "RightFrontDoorLock"),
+            ("左后门", "LeftRearDoor", "LeftRearDoorLock"),
+            ("右后门", "RightRearDoor", "RightRearDoorLock")
+        ]
+        for (label, doorK, lockK) in doorDefs {
+            let d = num(doorK), lk = num(lockK)
+            if d == nil && lk == nil { continue }
+            let parts: [String] = [
+                d.map { $0 == 0 ? "已关" : "开启" },
+                lk.map { $0 == 0 ? "已锁" : "未锁" }
+            ].compactMap { $0 }
+            if !parts.isEmpty {
+                doorRows.append((label, parts.joined(separator: " · "), d != nil && d! != 0 || lk != nil && lk! != 0 ? "bad" : "ok"))
+            }
+        }
+        
+        var windowRows: [(String, String, String)] = []
+        let winDefs: [(String, String, String)] = [
+            ("左前窗", "LeftAnteriorWindowDegree"),
+            ("右前窗", "RightAnteriorWindowDegree"),
+            ("左后窗", "LeftRearWindowDegree"),
+            ("右后窗", "RightRearWindowDegree")
+        ]
+        for (label, degK) in winDefs {
+            let deg = num(degK)
+            if deg == nil { continue }
+            let v = deg == 0 ? "关闭" : "开启 \(deg!)°"
+            windowRows.append((label, v, deg != 0 ? "bad" : "ok"))
+        }
+        
+        var lampRows: [(String, String)] = []
+        let lampDefs: [(String, String, String?)] = [
+            ("近光灯", "LowBeam", nil),
+            ("远光灯", "HighBeam", nil),
+            ("前雾灯", "FrontFoglamp", "FrontFogLight"),
+            ("后雾灯", "RearFoglamp", "RearFogLight"),
+            ("示廓灯", "PositionLamp", "PositionLight"),
+            ("左转向灯", "LeftTurnSignal", "TurnLndicatorLeft"),
+            ("右转向灯", "RightTurnSignal", "TurnLndicatorRight")
+        ]
+        for (label, k1, k2) in lampDefs {
+            let x1 = num(k1), x2 = k2.map { num($0) }
+            if x1 == nil && x2 == nil { continue }
+            let isOn = (x1 != nil && x1! != 0) || (x2 != nil && x2! != 0)
+            lampRows.append((label, isOn ? "亮" : "灭"))
+        }
+        
+        let badCount = doorRows.filter { $0.2 == "bad" }.count + windowRows.filter { $0.2 == "bad" }.count
+        let summary = doorRows.isEmpty && windowRows.isEmpty && lampRows.isEmpty
+            ? "--"
+            : (badCount > 0 ? "\(badCount) 项异常" : "全部正常")
+        let cls = badCount > 0 ? "bad" : "ok"
+        
+        return (summary: summary, cls: cls, doorRows: doorRows, windowRows: windowRows, lampRows: lampRows)
+    }
+    
+    private func bodyDetailCard(_ bd: (summary: String, cls: String, doorRows: [(String, String, String)], windowRows: [(String, String, String)], lampRows: [(String, String)])) -> some View {
+        CardBox(title: "车身状态", side: bd.summary, sideCls: bd.cls) {
+            VStack(spacing: 8) {
+                if !bd.doorRows.isEmpty {
+                    sectionLabel("车门")
+                    ForEach(Array(bd.doorRows.enumerated()), id: \.offset) { _, r in
+                        HStack {
+                            Text(r.0).font(.system(size: 13)).foregroundStyle(.secondary)
+                            Spacer()
+                            Text(r.1).font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(r.2 == "bad" ? Color.red : .primary)
+                        }
+                    }
+                }
+                if !bd.windowRows.isEmpty {
+                    sectionLabel("车窗")
+                    ForEach(Array(bd.windowRows.enumerated()), id: \.offset) { _, r in
+                        HStack {
+                            Text(r.0).font(.system(size: 13)).foregroundStyle(.secondary)
+                            Spacer()
+                            Text(r.1).font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(r.2 == "bad" ? Color.red : .primary)
+                        }
+                    }
+                }
+                if !bd.lampRows.isEmpty {
+                    sectionLabel("灯光")
+                    let lit = bd.lampRows.filter { $0.1 == "亮" }
+                    if !lit.isEmpty {
+                        Text(lit.map { $0.0 }.joined(separator: " · "))
+                            .font(.system(size: 13)).foregroundStyle(.orange)
+                    } else {
+                        Text("全部关闭").font(.system(size: 13)).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func sectionLabel(_ t: String) -> some View {
+        Text(t).font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
         .onAppear {
             if running != nil && pollTask == nil {
                 running = nil
@@ -392,11 +509,6 @@ struct ControlView: View {
 }
 
 // MARK: - PIN 数字键盘弹层（玻璃化）
-
-extension Notification.Name {
-    static let pinConfirmed = Notification.Name("car_pin_confirmed")
-    static let tempConfirmed = Notification.Name("car_temp_confirmed")
-}
 
 struct PINKeypadView: View {
     @Environment(\.dismiss) private var dismiss
