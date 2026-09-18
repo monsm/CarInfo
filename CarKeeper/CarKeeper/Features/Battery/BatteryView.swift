@@ -13,9 +13,6 @@ struct BatteryView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.cardSpacing) {
-                if let h = headSummary {
-                    headCard(h)
-                }
                 let cache = store.caches
                 let b = batteryModel(cache)
                 let e = VM.energy(cache, store.car)
@@ -49,12 +46,6 @@ struct BatteryView: View {
                 }
             }
         }
-    }
-
-    private var headSummary: (cls: String, title: String, reasons: [String])?
-    {
-        guard let cache = store.caches, let batt = AN.summarize(cache, store.car).domains.first(where: { $0.key == "battery" }) else { return nil }
-        return (batt.cls, batt.title, batt.reasons.map { $0.t })
     }
 
     // MARK: SOC Hero — Apple Watch 风格大圆环
@@ -103,40 +94,6 @@ struct BatteryView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 30)
-        .glassHeroCard()
-    }
-
-    // MARK: 头部摘要卡
-    private func headCard(_ h: (cls: String, title: String, reasons: [String])) -> some View {
-        VStack(spacing: 14) {
-            HStack {
-                HStack(spacing: 10) {
-                    ZStack {
-                        Circle().fill(Theme.statusColor(h.cls).opacity(0.12)).frame(width: 44, height: 44)
-                        Circle().fill(Theme.statusColor(h.cls).opacity(0.25)).frame(width: 12, height: 12)
-                    }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(h.title).font(.system(size: 17, weight: .semibold))
-                        Text(h.cls == "ok" ? "一切正常" : "需要关注").font(.system(size: 12)).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-                Pill(text: "\(h.reasons.count) 项", cls: h.cls == "ok" ? "na" : "bad", dot: false)
-            }
-            VStack(spacing: 6) {
-                ForEach(Array(h.reasons.enumerated()), id: \.offset) { idx, r in
-                    HStack(alignment: .top, spacing: 8) {
-                        StatusDot(cls: h.cls)
-                        Text(r).font(.system(size: 13)).foregroundStyle(.secondary)
-                        Spacer()
-                    }
-                    if idx < h.reasons.count - 1 {
-                        Divider().opacity(0.4).padding(.leading, 20)
-                    }
-                }
-            }
-        }
-        .padding(20)
         .glassHeroCard()
     }
 

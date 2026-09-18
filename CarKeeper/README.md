@@ -2,7 +2,7 @@
 
 由微信小程序 `ChangAnMiniProgram` 移植而来的原生 iOS App。
 
-- **技术栈**：Swift 6 + SwiftUI，最低 iOS 27.0
+- **技术栈**：Swift 6 + SwiftUI，最低 iOS 26.0
 - **网络**：直连长安官方接口（不再走云函数代理）
 - **设计**：遵循苹果 HIG（系统配色 / SF Symbols / 原生控件 / 深浅色自动适配）
 - **构建**：GitHub Actions 出未签名 ipa，你用自签工具安装

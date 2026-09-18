@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // 车况首页 —— iOS 27 Liquid Glass：
 // SOC Hero + 车速里程 + 快控按钮 + 状态域 + 电池 + 胎压 + 座舱 + 位置
@@ -131,6 +132,13 @@ struct HomeView: View {
         .glassHeroCard()
     }
 
+    // MARK: 快控按钮动作
+    private func onQuickCtrl(_ q: QuickCtrl) {
+        store.pendingQuickCtrl = q.rawValue
+        NotificationCenter.default.post(name: .navToMessages, object: nil)
+        // 穿透到车控页自动执行（见 ControlView.onAppear）
+    }
+
     // MARK: 车辆切换
     private var carSelector: some View {
         let carSel = VM.carSel(store.cars, store.carId)
@@ -164,6 +172,27 @@ struct HomeView: View {
         .glassCard(corner: 22)
     }
 
+    // MARK: 电池摘要行（来自 AN.summarize）
+    private var battSummary: (headLines: [HeadLine], cls: String, title: String) {
+        guard let battDomain = AN.summarize(store.caches, store.car).domains.first(where: { $0.key == "battery" }) else {
+            return ([], "na", "--")
+        }
+        let lines: [HeadLine] = [
+            HeadLine(id: "soc", label: "SOC", value: battDomain.metrics.first { $0.k == "SOC" }?.v ?? "--", cls: battDomain.cls, reason: ""),
+            HeadLine(id: "range", label: "续航", value: VM.energy(store.caches, store.car).range + " km", cls: battDomain.cls, reason: ""),
+            HeadLine(id: "alarm", label: "告警", value: battDomain.alarms.isEmpty ? "无" : "\(battDomain.alarms.count) 项", cls: battDomain.cls, reason: battDomain.alarms.isEmpty ? "" : battDomain.alarms.joined(separator: " · "))
+        ].filter { !$0.value.contains("--") }
+        return (lines, battDomain.cls, battDomain.title)
+    }
+
+    private struct HeadLine: Identifiable {
+        let id: String
+        let label: String
+        let value: String
+        let cls: String
+        let reason: String
+    }
+
     // MARK: 车速里程行
     private func driveMetricsRow(_ d: DriveModel) -> some View {
         HStack(spacing: 12) {
@@ -181,7 +210,7 @@ struct HomeView: View {
             MetricPill(icon: "gauge.full", value: d.mile, unit: "km", tint: .accentColor)
         }
         .padding(20)
-        .glassHeroCard()
+        .glassCard(corner: 20)
     }
 
     // MARK: 快控 - 2x2 网格大圆钮
@@ -199,6 +228,37 @@ struct HomeView: View {
         .glassHeroCard()
     }
 
+    // MARK: 快捷控制枚举
+    private enum QuickCtrl: String, CaseIterable {
+        case lock = "LockDoor"
+        case unlock = "UnLockDoor"
+        case air = "OpenAir"
+        case search = "RemoteSearchCar"
+        var symbol: String {
+            switch self {
+            case .lock: return "lock.fill"
+            case .unlock: return "lock.open.fill"
+            case .air: return "snowflake"
+            case .search: return "location"
+            }
+        }
+        var title: String {
+            switch self {
+            case .lock: return "锁车"
+            case .unlock: return "解锁"
+            case .air: return "开空调"
+            case .search: return "寻车"
+            }
+        }
+        var accent: Color {
+            switch self {
+            case .lock, .unlock: return .blue
+            case .air: return .teal
+            case .search: return .orange
+            }
+        }
+    }
+
     // MARK: 状态域
     private func domainCard(_ summary: Summary) -> some View {
         CardBox(title: "车辆状态", side: summary.overall.title, sideCls: summary.overall.cls) {
@@ -212,71 +272,73 @@ struct HomeView: View {
         }
     }
 
-    private func domainRow(_ d: DomainSummary) -> some View {
+    private func domainRow(_ d: DomainVerdict) -> some View {
+        let icon = domainIcon(d.key)
         HStack(spacing: 10) {
-            Text(d.icon)
+            Text(icon)
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.statusColor(d.cls))
                 .frame(width: 20)
-            Text(d.title)
+            Text(d.label)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.primary)
             Spacer()
-            Text(d.result)
+            Text(d.short)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.statusColor(d.cls))
         }
         .padding(.vertical, 6)
     }
 
+    private func domainIcon(_ key: String) -> String {
+        switch key {
+        case "battery": return "battery.3quarter.fill"
+        case "charge": return "lightning.bolt.fill"
+        case "body": return "car.door"
+        case "tyre": return "tire.flattraction"
+        case "climate": return "snowflake.fill"
+        case "power": return "bolt.circle.fill"
+        case "safety": return "shield.lefthalf.fill"
+        case "network": return "antenna.radiowaves.left.and.right"
+        case "service": return "wrench.and.screwdriver.fill"
+        default: return "circle.fill"
+        }
+    }
+
     // MARK: 电池区
     private func batterySection(_ cache: [String: Any?]) -> some View {
         let batt = VM.batteryModel(cache)
         return VStack(spacing: Theme.cardSpacing) {
-            // Head 摘要
-            VStack(spacing: 14) {
+            // 电池摘要行（SOC / 续航 / 告警 来自分析域，不重复 SOC Hero）
+            VStack(alignment: .leading, spacing: 8) {
+                Text("电池状态").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 12) {
-                    ForEach(batt.headItems) { h in
-                        VStack(spacing: 6) {
-                            Circle()
-                                .fill(Theme.statusColor(h.cls).opacity(0.12))
-                                .frame(width: 44, height: 44)
-                            Circle()
-                                .fill(Theme.statusColor(h.cls).opacity(0.25))
-                                .frame(width: 12, height: 12)
-                        }
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(h.title)
-                                .font(.system(size: 12)).foregroundStyle(.secondary)
-                            Text(h.value)
-                                .font(.system(size: 17, weight: .semibold))
+                    ForEach(battSummary.headLines, id: \.id) { h in
+                        VStack(spacing: 4) {
+                            Text(h.label).font(.system(size: 11)).foregroundStyle(.secondary)
+                            Text(h.value).font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(h.cls == "ok" ? .green : (h.cls == "bad" ? .red : .primary))
-                            Text(h.reason)
-                                .font(.system(size: 11)).foregroundStyle(.secondary)
+                            if !h.reason.isEmpty {
+                                Text(h.reason).font(.system(size: 10)).foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
                         }
+                        Spacer()
                     }
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(20)
-            .glassHeroCard()
+            .padding(18)
+            .glassCard(corner: 20)
 
-            // 分析结论
-            if !batt.conclusions.isEmpty {
-                CardBox(title: "分析结论", side: batt.title, sideCls: batt.cls) {
-                    VStack(spacing: 8) {
-                        ForEach(Array(batt.conclusions.enumerated()), id: \.offset) { _, r in
-                            HStack(spacing: 10) {
-                                StatusDot(cls: r.cls)
-                                Text(r.text)
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                if let n = r.n, !n.isEmpty {
-                                    Text(n).font(.system(size: 13)).foregroundStyle(.secondary)
-                                }
-                            }
-                        }
+            // 分析结论详情
+            for line in battSummary.headLines {
+                HStack(spacing: 6) {
+                    Text(line.label).font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text(line.value).font(.system(size: 13, weight: .semibold)).foregroundStyle(line.cls == "ok" ? .green : (line.cls == "bad" ? .red : .primary))
+                    if !line.reason.isEmpty {
+                        Text(line.reason).font(.system(size: 11)).foregroundStyle(.secondary)
+                        Spacer()
                     }
                 }
             }
@@ -316,9 +378,9 @@ struct HomeView: View {
                 let rows: [(String, String)] = [
                     ("开始", batt.charging.start),
                     ("结束", batt.charging.end),
-                    ("时长", batt.charging.duration),
+                    ("时长", batt.charging.durMin),
                     ("功率", batt.charging.power),
-                    ("状态", batt.charging.status)
+                    ("状态", batt.charging.text)
                 ]
                 ForEach(Array(rows.enumerated()), id: \.offset) { idx, r in
                     KVRow(k: r.0, v: r.1)
@@ -369,7 +431,7 @@ struct HomeView: View {
         CardBox(title: "位置", side: loc.deg != "--" ? loc.dir : nil) {
             VStack(alignment: .leading, spacing: 10) {
                 if showMap {
-                    LocationMapView(latStr: loc.lat, lngStr: loc.lng, addr: loc.addr)
+                    LocationMapViewPlaceholder(addr: loc.addr, lat: loc.lat, lng: loc.lng)
                         .frame(height: 190)
                         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .transition(.opacity)
@@ -416,18 +478,16 @@ struct HomeView: View {
 
     // MARK: Footer
     private var footerNote: some View {
-        let cache = store.caches
-        let update = lastFetch.map { DateFormatter.relative($0) } ?? "--"
-        let carName = store.car.flatMap { VM.vehicleSummary($0) }.map { "\($0.name) · \($0.plate)" } ?? "--"
+        let update = lastFetch.map { DateFormatter.relative($0) } ?? "刚刚"
         return HStack(spacing: 8) {
-            Text(carName)
+            Image(systemName: "clock.badge.checkmark")
+                .font(.system(size: 11)).foregroundStyle(.tertiary)
+            Text("更新于 \(update)")
                 .font(.system(size: 12)).foregroundStyle(.secondary)
             Spacer()
-            Text("更新 \(update)")
-                .font(.system(size: 12)).foregroundStyle(.secondary)
             Button { fetchCore() } label: {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 12))
+                Image(systemName: "arrow.clockwise.circle.fill")
+                    .font(.system(size: 13))
                     .foregroundStyle(.accentColor)
                     .padding(6)
                     .background(.ultraThinMaterial, in: Circle())
@@ -436,6 +496,14 @@ struct HomeView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+    }
+
+    private func openNav(_ loc: LocModel) {
+        guard loc.lat != "--", loc.lng != "--" else { return }
+        let url = "http://uri.amap.com/navigation?to=\(loc.lng),\(loc.lat)&mode=car"
+        if let u = URL(string: url) {
+            UIApplication.shared.open(u, options: [:], completionHandler: nil)
+        }
     }
 
     // MARK: 轮询
@@ -451,12 +519,7 @@ struct HomeView: View {
 
     private func fetchCore() async {
         await withTaskGroup(of: Void.self) { g in
-            g.addTask { await store.fetchCharge() }
-            g.addTask { await store.fetchPm25() }
-            g.addTask { await store.fetchLocation() }
-            g.addTask { await store.fetchControl() }
-            g.addTask { await store.fetchCheck() }
-            g.addTask { await store.fetchMessages() }
+            g.addTask { await store.fetchCore() }
         }
         lastFetch = Date()
     }
@@ -471,6 +534,34 @@ extension DateFormatter {
         if diff < 3600 { return "\(diff / 60) 分钟前" }
         if diff < 86400 { return "\(diff / 3600) 小时前" }
         return "\(diff / 86400) 天前"
+    }
+}
+
+// MARK: - 位置地图占位（iOS 27 液态玻璃风格）
+struct LocationMapViewPlaceholder: View {
+    let addr: String
+    let lat: String
+    let lng: String
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [.blue.opacity(0.12), .teal.opacity(0.06)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+                .opacity(0.9)
+            VStack(spacing: 6) {
+                Image(systemName: "map.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.accentColor.opacity(0.6))
+                Text(addr.isEmpty ? "点击导航查看位置" : addr)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                if lat != "--" && lng != "--" {
+                    Text("\(lat) · \(lng)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
     }
 }
 

@@ -24,7 +24,7 @@ struct DataView: View {
     @State private var errText = ""
     @State private var loadTask: Task<Void, Never>? = nil
 
-    init(kind: Kind = .status) {
+    init(kind: Kind = .analysis) {
         _kind = State(wrappedValue: kind)
     }
 

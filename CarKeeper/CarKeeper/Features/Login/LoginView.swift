@@ -95,7 +95,7 @@ struct LoginView: View {
                 TextField("手机号", text: $phone)
                     .keyboardType(.numberPad)
                     .font(.system(size: 17, design: .rounded))
-                    .onChange(of: phone) { _ in loadCaptcha() }
+                    .onChange(of: phone) { _, _ in loadCaptcha() }
                 if phoneValid {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(Color.green)

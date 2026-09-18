@@ -266,8 +266,8 @@ enum VM {
             seatD: hasCtrl ? "通风\(num(control?["DriverSeatAirStatus"]) == 1 ? "开" : "关") · 加热\(num(control?["DriverSeatHeatStatus"]) == 1 ? "开" : "关")" : "--",
             seatP: hasCtrl ? "通风\(num(control?["PassengerSeatAirStatus"]) == 1 ? "开" : "关") · 加热\(num(control?["PassengerSeatHeatStatus"]) == 1 ? "开" : "关")" : "--",
             pmIn: pmIn, pmOut: pmOut,
-            cabinTemp: vehTemp == nil ? "--" : "\(Int(vehTemp!))℃",
-            envTemp: envT == nil ? "--" : "\(Int(envT!))℃",
+            cabinTemp: (vehTemp == nil || Int(vehTemp!) == 0) ? "--" : "\(Int(vehTemp!))℃",
+            envTemp: (envT == nil || Int(envT!) == 0) ? "--" : "\(Int(envT!))℃",
             purifier: purifier == nil ? "--" : (purifier! == 1 ? "运行" : "关闭")
         )
     }
@@ -421,7 +421,7 @@ enum VM {
         let genderCN: [String: String] = ["m": "男", "f": "女"]
         let gender = genderCN[genderRaw] ?? genderRaw
         let lastLogin = s(u["LastLoginTime"]) ?? ""
-        let lastLoginShort = lastLogin.count > 10 ? String(lastLogin.suffix(10)) : lastLogin
+        let lastLoginClean = lastLogin.replacingOccurrences(of: "\.0$", with: "")
         let source = s(u["Source"]) ?? ""
         return UserVM(
             name: nameFinal,
@@ -431,7 +431,7 @@ enum VM {
             nickname: nickname.isEmpty ? "未设置昵称" : nickname,
             gender: gender.isEmpty ? "" : gender,
             birthday: s(u["Birthday"]) ?? "",
-            lastLoginTime: lastLoginShort,
+            lastLoginTime: (lastLoginClean.count > 10 ? String(lastLoginClean.suffix(10)) : lastLoginClean),
             source: source
         )
     }

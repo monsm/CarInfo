@@ -300,7 +300,7 @@ func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
         for sub in list {
             let arr: [Any]
             if let s = sub[itemKey] as? [Any] { arr = s }
-            else if let a = sub[itemKey] as? Any, let casted = a as? [Any] { arr = casted }
+            else if let a = sub[itemKey] as? [Any] { arr = a }
             else { arr = [] }
             for v in arr {
                 let d: Double?

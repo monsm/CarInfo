@@ -7,12 +7,28 @@ import SwiftUI
 // 原则：Apple HIG + Liquid Glass + 分层深度感 + 精确数值
 // =============================================================================
 
+// MARK: - Color(hex:) 工具
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let r, g, b: UInt64
+        switch hex.count {
+        case 6: (r, g, b) = (int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        case 8: (r, g, b) = (int >> 24 & 0xFF, int >> 16 & 0xFF, int >> 8 & 0xFF)
+        default: (r, g, b) = (255, 255, 255)
+        }
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: 1)
+    }
+}
+
 enum Theme {
     // MARK: - 品牌色（自适应浅色/深色模式）
     /// 主色调：长安品牌蓝，浅暗双模式
-    static var brand: Color { Color(hex: "007AFF") }          // iOS 标准蓝
-    static var brandLight: Color { Color(hex: "0A84FF") }     // 高亮蓝
-    static var brandDark: Color { Color(hex: "0056CC") }      // 深色模式蓝
+    static var brand: Color { .blue }                              // iOS 标准蓝
+    static var brandLight: Color { Color(hex: "0A84FF") }          // 高亮蓝
+    static var brandDark: Color { Color(hex: "0056CC") }           // 深色模式蓝
 
     // MARK: - 语义色（系统自适应）
     static var ok: Color { Color.green }
@@ -143,6 +159,16 @@ enum Theme {
         static let glow = GlowStyle(color: .accentColor, radius: 12, offset: 4)
     }
 
+    enum Spring {
+        static let responseBase: Double = 0.45
+        static let dampingFraction: Double = 0.8
+        static let duration: Double = 0.5
+        static var standard: Animation { Animation.spring(response: responseBase, dampingFraction: dampingFraction, blendDuration: duration) }
+        static var quick: Animation { Animation.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.25) }
+        static var slow: Animation { Animation.spring(response: 0.6, dampingFraction: 0.9, blendDuration: 0.5) }
+        static var smooth: Animation { Animation.easeInOut(duration: 0.35) }
+    }
+
     // =============================================================================
     // 六、动画时长（Animation Duration）
     // =============================================================================
@@ -193,18 +219,25 @@ struct PageBackground: View {
             // 底层：系统分组背景
             Color(.systemGroupedBackground)
             // 中层：主题色渐变光晕（大面积、柔和）
+            // 暗色模式提高 opacities 保证可见度
             LinearGradient(
-                colors: [tint.opacity(0.18), tint.opacity(0.04), .clear],
+                colors: [
+                    tint.opacity(0.22),
+                    tint.opacity(0.06),
+                    .clear
+                ],
                 startPoint: .top,
                 endPoint: UnitPoint(x: 0.5, y: 0.65)
             )
             // 顶层：径向光晕（右上角，模拟环境光）
             RadialGradient(
-                colors: [tint.opacity(0.10), .clear],
+                colors: [tint.opacity(0.14), .clear],
                 center: .topTrailing,
-                startRadius: 20,
+                startRadius: 30,
                 endRadius: 400
             )
+            // 暗色模式下增加微弱白色层提升卡片对比度
+            Color.white.opacity(0.015)
         }
         .ignoresSafeArea()
     }
@@ -217,15 +250,15 @@ extension View {
         background(PageBackground(tint: tint))
     }
 
-    // ---- 玻璃卡片：薄材质 + 顶部高光描边 + 大圆角 + 柔和投影 ----
+    // ---- 玻璃卡片：深浅双模式自适应材质 + 高光描边 ----
     func glassCard(corner: CGFloat = Theme.Radius.card) -> some View {
         self
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: corner, style: .continuous))
+            .background(Material.thin, in: RoundedRectangle(cornerRadius: corner, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
                     .strokeBorder(
                         LinearGradient(
-                            colors: [.white.opacity(0.38), .white.opacity(0.06)],
+                            colors: [.white.opacity(0.28), .white.opacity(0.04)],
                             startPoint: .top,
                             endPoint: .bottom
                         ),
@@ -235,15 +268,15 @@ extension View {
             .shadow(color: .black.opacity(0.05), radius: 16, y: 6)
     }
 
-    // ---- Hero 玻璃卡片：更大的圆角 + 更强的光晕 ----
+    // ---- Hero 玻璃卡片：深浅双模式自适应 + 更强光晕 ----
     func glassHeroCard(corner: CGFloat = Theme.Radius.hero) -> some View {
         self
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: corner, style: .continuous))
+            .background(Material.thin, in: RoundedRectangle(cornerRadius: corner, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
                     .strokeBorder(
                         LinearGradient(
-                            colors: [.white.opacity(0.42), .white.opacity(0.08)],
+                            colors: [.white.opacity(0.34), .white.opacity(0.06)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
@@ -308,7 +341,7 @@ struct Pill: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
-        .background(.ultraThinMaterial, in: Capsule())
+        .background(.thin, in: Capsule())
         .overlay(Capsule().strokeBorder(Theme.statusColor(cls).opacity(0.28), lineWidth: 0.8))
     }
 }
@@ -393,7 +426,7 @@ struct StatTile: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Theme.Spacing.md)
-        .background(.ultraThinMaterial,
+        .background(.thin,
                     in: RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous))
     }
 }
@@ -438,7 +471,7 @@ struct MetricPill: View {
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
-        .background(.ultraThinMaterial,
+        .background(.thin,
                     in: RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous))
     }
 }

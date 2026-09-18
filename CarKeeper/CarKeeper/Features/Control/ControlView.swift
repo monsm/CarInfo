@@ -11,9 +11,13 @@ struct ControlView: View {
         ("LockDoor", "锁车", "lock.fill"),
         ("UnLockDoor", "解锁", "lock.open.fill")
     ]
-    private let list: [(key: String, name: String, symbol: String, note: String?)] = [
+    // 高频指令（默认展示）
+    private let mainCommands: [(key: String, name: String, symbol: String, note: String?)] = [
         ("OpenAir", "开启空调", "snowflake", "需设置温度"),
-        ("CloseAir", "关闭空调", "snowflake.slash", nil),
+        ("CloseAir", "关闭空调", "snowflake.slash", nil)
+    ]
+    // 低频指令（折叠区）
+    private let moreCommands: [(key: String, name: String, symbol: String, note: String?)] = [
         ("FlashLight", "闪灯", "lightbulb", nil),
         ("Whistle", "鸣笛", "speaker.wave.2", nil),
         ("RemoteSearchCar", "远程寻车", "location", nil)
@@ -25,11 +29,13 @@ struct ControlView: View {
     @State private var showPin = false
     @State private var showTemp = false
     @State private var showResult = false
+    @State private var showMoreCommands = false
     @State private var pendingCmd = ""
     @State private var pendingTemp = 25
     @State private var pinDigits = ""
     @State private var pollTask: Task<Void, Never>? = nil
     @State private var lastResult: RunState? = nil
+    // lastResult 由 resultSheet 直接使用，保留
 
     struct RunState: Identifiable {
         let id: Int
@@ -338,37 +344,66 @@ struct ControlView: View {
     private var commandCard: some View {
         CardBox(title: "远程控制", side: busy || running != nil ? "执行中" : nil, sideCls: "acc") {
             VStack(spacing: 0) {
-                ForEach(Array(list.enumerated()), id: \.offset) { idx, item in
-                    Button {
-                        onCmd(item.key)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: item.symbol)
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(Color.blue)
-                                .frame(width: 30, height: 30)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.name).font(.system(size: 15, weight: .medium))
-                                if let note = item.note {
-                                    Text(note).font(.system(size: 11)).foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(.tertiary)
-                        }
-                        .padding(.vertical, 10)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(busy || running != nil)
-                    .opacity(busy || running != nil ? 0.45 : 1)
-                    if idx < list.count - 1 { ListDivider() }
+                // 高频指令（默认展示）
+                ForEach(Array(mainCommands.enumerated()), id: \.offset) { idx, item in
+                    cmdRow(item)
+                    if idx < mainCommands.count - 1 || showMoreCommands { ListDivider() }
                 }
+                // 低频指令（可折叠）
+                if showMoreCommands {
+                    ForEach(Array(moreCommands.enumerated()), id: \.offset) { idx, item in
+                        cmdRow(item)
+                        if idx < moreCommands.count - 1 { ListDivider() }
+                    }
+                }
+                // 展开/收起按钮
+                Button {
+                    withAnimation(.spring(Theme.Duration.springFast)) { showMoreCommands.toggle() }
+                } label: {
+                    HStack {
+                        Image(systemName: showMoreCommands ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                        Text(showMoreCommands ? "收起" : "更多指令")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.accentColor)
+                        Spacer()
+                    }
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
+    }
+
+    private func cmdRow(_ item: (key: String, name: String, symbol: String, note: String?)) -> some View {
+        Button {
+            onCmd(item.key)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: item.symbol)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.blue)
+                    .frame(width: 30, height: 30)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.name).font(.system(size: 15, weight: .medium))
+                    if let note = item.note {
+                        Text(note).font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(busy || running != nil)
+        .opacity(busy || running != nil ? 0.45 : 1)
     }
 
     // MARK: 记录
@@ -518,7 +553,10 @@ struct ControlView: View {
     }
 
     private func nameOf(_ key: String) -> String {
-        hero.first { $0.key == key }?.name ?? list.first { $0.key == key }?.name ?? key
+        hero.first { $0.key == key }?.name
+        ?? mainCommands.first { $0.key == key }?.name
+        ?? moreCommands.first { $0.key == key }?.name
+        ?? key
     }
 
     // MARK: 缓存刷新
