@@ -540,6 +540,40 @@ struct StatTile: View {
 
 // MARK: - Liquid Glass Press Feedback（统一按压/悬停动效）
 /// 所有 Button 组件共享的液态玻璃按压反馈修饰符：scale 压缩 + glow 光晕
+/// 按压光晕跟随位置 —— 可复用的子视图
+private struct PressGlow: View {
+    let color: Color?
+    let intensity: CGFloat
+    let isPressed: Bool
+    let isHovered: Bool
+    let glowCenter: CGPoint  // 归一化坐标 0~1（几何读者传入）
+    let size: CGSize
+
+    private var active: Bool { isPressed || isHovered }
+    private var glowOpacity: CGFloat {
+        isPressed ? intensity * 0.65 : isHovered ? intensity * 0.20 : 0
+    }
+    private var blurRadius: CGFloat { isPressed ? 12 : 8 }
+
+    var body: some View {
+        ZStack {
+            // 柔和光晕圆：跟随触摸点，尺寸随 press 状态放大
+            Circle()
+                .fill(color?.opacity(glowOpacity).scaledToWidth(80 + (isPressed ? 40 : 0), of: size))
+                .blur(radius: blurRadius)
+                .offset(x: glowCenter.x * size.width - size.width / 2,
+                        y: glowCenter.y * size.height - size.height / 2)
+            // 边缘高光描边（跟随手指，press 时更亮）
+            Circle()
+                .stroke(color?.opacity(isPressed ? intensity : isHovered ? intensity * 0.45 : 0),
+                        lineWidth: isPressed ? 2.2 : isHovered ? 1.4 : 0)
+                .frame(width: isPressed ? 72 : 56, height: isPressed ? 72 : 56)
+                .offset(x: glowCenter.x * size.width - size.width / 2,
+                        y: glowCenter.y * size.height - size.height / 2)
+        }
+    }
+}
+
 struct PressFeedback: ViewModifier {
     /// 按下时的缩放比例（0.88 = 明显压缩，0.93 = 轻微压缩）
     let pressScale: CGFloat
@@ -552,39 +586,54 @@ struct PressFeedback: ViewModifier {
     /// 弹簧阻尼（越小回弹越快）
     let springDamping: CGFloat
 
-    @State private var isPressed = false
+    @State private var isPressed  = false
     @State private var isHovered  = false
+    @State private var touchPoint = CGPoint.zero   // 触摸点（几何空间坐标）
+    @State private var geoSize    = CGSize.zero    // 容器尺寸
 
     func body(content: Content) -> some View {
-        content
-            // 缩放：按下压缩 / 悬停微放大
-            .scaleEffect(isPressed ? pressScale : (isHovered ? 1.02 : 1.0))
-            .animation(.spring(response: springResponse, dampingFraction: springDamping, blendDuration: 0.2),
-                       value: isPressed)
-            .animation(.spring(response: springResponse, dampingFraction: springDamping, blendDuration: 0.2),
-                       value: isHovered)
-            // glow 叠加层：描边 + 外发光
-            .overlay(
-                Rectangle()
-                    .fill(glowColor?.opacity(isPressed ? glowIntensity * 0.6 : isHovered ? glowIntensity * 0.2 : 0))
-                    .blendMode(.screen)
-                    .blur(radius: isPressed ? 8 : isHovered ? 5 : 0)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(
-                        glowColor?.opacity(isPressed ? glowIntensity : isHovered ? glowIntensity * 0.4 : 0),
-                        lineWidth: isPressed ? 2 : isHovered ? 1.2 : 0
-                    )
-            )
-            // 手势：DragGesture 实时响应按/放
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in isPressed = true }
-                    .onEnded   { _ in isPressed = false }
-            )
-            // 悬停（iPad / 桌面）
-            .onHover { hovered in isHovered = hovered }
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let cx = touchPoint.x / max(w, 1)
+            let cy = touchPoint.y / max(h, 1)
+            content
+                // 缩放：按下压缩 / 悬停微放大
+                .scaleEffect(isPressed ? pressScale : (isHovered ? 1.02 : 1.0))
+                .animation(.spring(response: springResponse, dampingFraction: springDamping, blendDuration: 0.2),
+                           value: isPressed)
+                .animation(.spring(response: springResponse, dampingFraction: springDamping, blendDuration: 0.2),
+                           value: isHovered)
+                // 跟随手指的光晕叠加层
+                .overlay(alignment: .center) {
+                    PressGlow(color: glowColor, intensity: glowIntensity,
+                              isPressed: isPressed, isHovered: isHovered,
+                              glowCenter: CGPoint(x: cx, y: cy),
+                              size: geo.size)
+                }
+                // 整体边框（静态）
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(
+                            glowColor?.opacity(isPressed ? glowIntensity * 0.5 : isHovered ? glowIntensity * 0.25 : 0),
+                            lineWidth: isPressed ? 1.5 : isHovered ? 1.0 : 0
+                        )
+                )
+                // 手势追踪：记录触摸位置 + press 状态
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                        .onChanged { v in
+                            touchPoint = v.location
+                            isPressed  = true
+                        }
+                        .onEnded   { _ in isPressed = false }
+                )
+                // 悬停（iPad / 桌面）
+                .onHover { hovered in isHovered = hovered }
+                // 记录容器尺寸
+                .onAppear { geoSize = geo.size }
+                .onChange(of: geo.size) { geoSize = $0 }
+        }
     }
 }
 

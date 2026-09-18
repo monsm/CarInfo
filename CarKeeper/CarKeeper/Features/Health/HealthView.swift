@@ -50,16 +50,15 @@ struct HealthView: View {
 
     // MARK: 入场动画
     private func startAnimations() {
-        withAnimation(.spring(Theme.Duration.springNormal)) {
-            cardOpacity = 1
-            cardSlideY = 0
-        }
         // 圆环从 0 动画到目标分数
         guard let m = model else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
-                scoreProgress = CGFloat(m.scorePct)
             }
+        }
+        withAnimation(.spring(Theme.Duration.springNormal)) {
+            cardOpacity = 1
+            cardSlideY = 0
         }
         // 三项计数徽章交错出现
         withAnimation(.spring(Theme.Duration.springFast).delay(0.35)) { pillPhase = 0 }
@@ -287,6 +286,35 @@ struct HealthView: View {
     private func systemRow(_ sys: HealthSystem) -> some View {
         let isOpen = expandedSystems.contains(sys.name)
         SystemRowView(sys: sys, isOpen: isOpen)
+    }
+
+    // MARK: 数据加载
+    private func loadIfNeeded() {
+        guard model == nil || store.isCacheExpired("check") else { return }
+        loadTask = Task { await load() }
+    }
+
+    @MainActor
+    private func load() async {
+        guard !store.carId.isEmpty else { return }
+        let api = APIClient.shared
+        do {
+            if let checkRaw = try? await api.getCarCheck(carId: store.carId) {
+                store.saveCache(["check": checkRaw])
+            }
+            model = VM.healthModel(store.caches["check"] as? [String: Any])
+            errText = nil
+            // 刷新后重置并重播入场动画
+            withAnimation(.spring(Theme.Duration.springFast)) {
+                scoreProgress = 0
+                cardOpacity = 0
+                cardSlideY = 24
+                pillPhase = -1
+            }
+            startAnimations()
+        } catch {
+            errText = error.localizedDescription
+        }
     }
 }
 

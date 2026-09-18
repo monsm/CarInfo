@@ -15,6 +15,7 @@ struct HomeView: View {
     @State private var socProgress: CGFloat = 0      // SOC圆环进度 0→socPct
     @State private var socCardOpacity: CGFloat = 0   // SOC卡片入场淡入
     @State private var socCount: Int = 0             // SOC数字滚动计数
+    @State private var isRefreshing = false          // 下拉刷新标志（仅刷新时重播动画）
 
     var body: some View {
         Group {
@@ -82,7 +83,7 @@ struct HomeView: View {
             startTimer?.cancel()
             startTimer = nil
         }
-        .refreshable { await fetchCore() }
+        .refreshable { isRefreshing = true; await fetchCore() }
     }
 
     // MARK: 问候行
@@ -593,7 +594,12 @@ struct HomeView: View {
             g.addTask { await store.fetchCore() }
         }
         lastFetch = Date()
-        // 轮询刷新不重播 SOC 入场动画，避免仪表盘闪烁
+        if isRefreshing {
+            // 下拉刷新：重置并重播 SOC 入场动画
+            isRefreshing = false
+            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0; socCount = 0 }
+            startSocAnimation()
+        }
     }
 }
 
