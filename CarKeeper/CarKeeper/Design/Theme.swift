@@ -518,7 +518,6 @@ struct StatTile: View {
     let value: String
     var unit: String = ""
     var tint: Color = .accentColor
-    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
@@ -545,23 +544,13 @@ struct StatTile: View {
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
                 .fill(.thin)
-                .overlay(
-                    // hover 高亮光晕：tint 色扩散 + 白色边缘高光
-                    RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
-                        .fill(tint.opacity(isHovered ? 0.12 : 0.0))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
-                                .strokeBorder(
-                                    tint.opacity(isHovered ? 0.55 : 0.0),
-                                    lineWidth: isHovered ? 1.5 : 0
-                                )
-                        )
-                        .shadow(color: tint.opacity(isHovered ? 0.35 : 0.0), radius: isHovered ? 10 : 0, y: 0)
-                )
         )
-        .scaleEffect(isHovered ? 1.02 : 1.0)
-        .animation(.spring(response: 0.4, dampingFraction: 0.65, blendDuration: 0.2), value: isHovered)
-        .onHover { hovered in isHovered = hovered }
+        .modifier(PressFeedback(pressScale: 0.93,
+                                glowColor: tint,
+                                glowIntensity: 0.6,
+                                springResponse: 0.4,
+                                springDamping: 0.65))
+        .liquidGlassRipple(cornerRadius: Theme.Radius.medium)
     }
 }
 
@@ -728,6 +717,12 @@ struct MetricPill: View {
         .padding(.vertical, Theme.Spacing.sm)
         .background(.thin,
                     in: RoundedRectangle(cornerRadius: Theme.Radius.small, style: .continuous))
+        .modifier(PressFeedback(pressScale: 0.90,
+                                glowColor: tint,
+                                glowIntensity: 0.5,
+                                springResponse: 0.35,
+                                springDamping: 0.60))
+        .liquidGlassRipple(cornerRadius: Theme.Radius.small)
     }
 }
 
@@ -756,6 +751,7 @@ struct QuickControlButton: View {
             }
             .buttonStyle(.plain)
         }
+        .liquidGlassRipple(cornerRadius: Theme.Radius.hero)
     }
 }
 
@@ -821,6 +817,7 @@ struct TyreCell: View {
         )
         .modifier(PressFeedback(pressScale: 0.93, glowColor: barColor, glowIntensity: 1.0,
                                 springResponse: 0.4, springDamping: 0.65))
+        .liquidGlassRipple(cornerRadius: Theme.Radius.small)
     }
 }
 
@@ -968,45 +965,61 @@ struct FluidScoreHero: View {
 
 // =============================================================================
 // LiquidRipple —— iOS 27 液态玻璃水波纹点击反馈
-// 触摸时从接触点扩散出一圈白色水波纹，模拟 Liquid Glass 触感
+// 三层同心涟漪：中心白色高光 + 中层蓝色光晕 + 外层扩散淡出
+// 所有涟漪严格约束在卡片圆角内，不溢出边界
 // =============================================================================
 
-/// iOS 27 Liquid Glass 水波纹点击反馈
-/// 触摸位置处扩散出白色圆形涟漪，随 spring 动画扩张并淡出
+/// iOS 27 Liquid Glass 水波纹点击反馈（三层同心涟漪）
 struct LiquidRipple: ViewModifier {
     @State private var rippleCenter: CGPoint = .zero
     @State private var rippleActive = false
     let cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
+        // 先 clip 到圆角，再叠加涟漪
         content
-            // 用 RoundedRectangle clipShape 裁剪涟漪，使其贴合卡片圆角
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            // 使用 DragGesture(minimumDistance:0) 捕获触摸起点（包含坐标）
+            // 手势层（在 clip 之外，保证触摸坐标准确）
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .local)
                     .onChanged { v in
                         rippleCenter = v.location
                     }
                     .onEnded { _ in
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.6, blendDuration: 0.25)) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.55, blendDuration: 0.2)) {
                             rippleActive = true
                         }
                     }
             )
+            // 三层同心涟漪叠加层
             .overlay {
                 if rippleActive {
-                    Circle()
-                        .fill(Color.white.opacity(0.5))
-                        .scaleEffect(rippleActive ? 5.0 : 0.0)
-                        .frame(width: 60, height: 60)
-                        .position(rippleCenter)
-                        .clipped()
+                    ZStack {
+                        // 外层扩散环：最大半径，最淡，最先消失
+                        Circle()
+                            .fill(Color.white.opacity(0.18))
+                            .scaleEffect(rippleActive ? 6.0 : 0.0)
+                            .frame(width: 50, height: 50)
+                            .position(rippleCenter)
+                        // 中层蓝色光晕：中等半径，蓝色 tint，模拟液体折射
+                        Circle()
+                            .fill(Color.blue.opacity(0.12))
+                            .scaleEffect(rippleActive ? 4.0 : 0.0)
+                            .frame(width: 50, height: 50)
+                            .position(rippleCenter)
+                        // 内层白色高光：最小半径，最亮，模拟接触点
+                        Circle()
+                            .fill(Color.white.opacity(0.45))
+                            .scaleEffect(rippleActive ? 2.5 : 0.0)
+                            .frame(width: 50, height: 50)
+                            .position(rippleCenter)
+                    }
                 }
             }
+            // 0.7s 后自动清除状态
             .onChange(of: rippleActive) { active in
                 if !active { return }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
                     withAnimation(.easeOut(duration: 0.15)) {
                         rippleActive = false
                     }
@@ -1016,7 +1029,7 @@ struct LiquidRipple: ViewModifier {
 }
 
 /// 为玻璃卡片添加水波纹涟漪效果
-/// - Parameter cornerRadius: 圆角半径，用于 clipShape 裁剪涟漪
+/// - Parameter cornerRadius: 圆角半径，涟漪将严格约束在此范围内
 func liquidGlassRipple(cornerRadius: CGFloat = Theme.Radius.card) -> some View {
     self.modifier(LiquidRipple(cornerRadius: cornerRadius))
 }

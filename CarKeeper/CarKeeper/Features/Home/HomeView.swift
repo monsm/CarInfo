@@ -15,6 +15,7 @@ struct HomeView: View {
     @State private var socProgress: CGFloat = 0      // SOC圆环进度 0→socPct
     @State private var socCardOpacity: CGFloat = 0   // SOC卡片入场淡入
     @State private var socCount: Int = 0             // SOC数字滚动计数
+    @State private var mileCount: Int = 0            // 里程数字滚动计数
     @State private var isRefreshing = false          // 下拉刷新标志（仅刷新时重播动画）
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
@@ -79,7 +80,7 @@ struct HomeView: View {
                 carVersion += 1
             }
         }
-        .onAppear { startPolling(); startSocAnimation() }
+        .onAppear { startPolling(); startSocAnimation(); startMileAnimation() }
         .onDisappear {
             startTimer?.cancel()
             startTimer = nil
@@ -266,7 +267,7 @@ struct HomeView: View {
                 .background(Theme.statusColor(fCls).opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: Theme.brand)
-            MetricPill(icon: "gauge.full", value: d.mile, unit: "km", tint: .accentColor)
+            MetricPill(icon: "gauge.full", value: mileCount > 0 ? String(mileCount) : d.mile, unit: "km", tint: .accentColor)
         }
         .padding(Theme.Spacing.xl)
         .dynamicTypeCompress()
@@ -577,6 +578,18 @@ struct HomeView: View {
             withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
                 socProgress = CGFloat(target)
                 socCount = target
+            }
+        }
+    }
+
+    // MARK: 里程入场动画
+    private func startMileAnimation() {
+        let drive = VM.driveStatus(store.caches)
+        let target = Int(drive.mile) ?? 0
+        // 延迟 0.2s 后开始计数，与 SOC 错开避免冲突
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
+                mileCount = target
             }
         }
     }

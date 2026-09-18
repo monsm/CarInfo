@@ -553,15 +553,25 @@ struct HeroDiscButton: View {
         Button(action: action) {
             VStack(spacing: 12) {
                 ZStack {
+                    // 第 1 层：脉冲光环（持续呼吸，模拟 Liquid Glass 生命感）
+                    Circle()
+                        .strokeBorder(Theme.brand.opacity(0.25), lineWidth: 1.5)
+                        .frame(width: 96, height: 96)
+                        .blur(radius: 3)
+                        .heartbeatPulse()
+                    // 第 2 层：底色填充
                     Circle()
                         .fill(Theme.brand.opacity(0.08))
                         .frame(width: 92, height: 92)
+                    // 第 3 层：中层填充
                     Circle()
                         .fill(Theme.brand.opacity(0.12))
                         .frame(width: 80, height: 80)
+                    // 第 4 层：清晰边框
                     Circle()
                         .strokeBorder(Theme.brand.opacity(0.30), lineWidth: 1.5)
                         .frame(width: 80, height: 80)
+                    // 第 5 层：图标
                     Image(systemName: symbol)
                         .font(Theme.d3))
                         .foregroundStyle(Theme.brand)
@@ -659,6 +669,8 @@ struct PINKeypadView: View {
 struct ACStepperView: View {
     @Environment(\.dismiss) private var dismiss
     @State var temp: Int
+    // 数字滚动：从 0 弹性计数到目标温度（入场动画 + 每次变化同步滚动）
+    @State private var tempDisplayCount = 0
 
     init(initialTemp: Binding<Int>) {
         _temp = State(initialValue: initialTemp.wrappedValue)
@@ -674,7 +686,7 @@ struct ACStepperView: View {
             HStack(spacing: 32) {
                 tempButton("minus", canDo: temp > 17) { temp -= 1 }
                 VStack(spacing: 0) {
-                    Text("\(temp)")
+                    Text("\(tempDisplayCount)")
                         .font(Theme.d1) weight: .bold, design: .rounded))
                         .foregroundStyle(Theme.brand)
                         .contentTransition(.numericText())
@@ -702,6 +714,18 @@ struct ACStepperView: View {
         .padding(Theme.Spacing.xxl)
         .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
+        // 入场动画：从 0 弹性计数到目标温度
+        .onAppear {
+            withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
+                tempDisplayCount = temp
+            }
+        }
+        // 每次加减按钮触发时同步滚动数字
+        .onChange(of: temp) { newTemp in
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.6)) {
+                tempDisplayCount = newTemp
+            }
+        }
     }
 
     private func tempButton(_ sym: String, canDo: Bool, _ action: @escaping () -> Void) -> some View {

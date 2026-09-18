@@ -8,6 +8,7 @@ struct MineView: View {
     @State private var updateBusy = false
     @State private var updateMsg: String? = nil
     @State private var downloadPct: Double = 0
+    @State private var downloadPctDisplay: Int = 0    // 下载进度数字滚动计数
     @State private var showDownload = false
     @State private var showToken = false
     @State private var tokenDraft: String = ""
@@ -185,7 +186,7 @@ struct MineView: View {
                     VStack(spacing: 6) {
                         ProgressView(value: downloadPct)
                             .tint(.accentColor)
-                        Text("正在下载… \(Int(downloadPct * 100))%")
+                        Text("正在下载… \(downloadPctDisplay)%")
                             .font(Theme.caption)).foregroundStyle(.secondary)
                     }
                 }
@@ -193,6 +194,13 @@ struct MineView: View {
                     Text(m).font(Theme.caption)).foregroundStyle(.secondary)
                 }
                 HStack(spacing: 12) { updateButtons() }
+            }
+        }
+        // 下载进度数字滚动：从当前 display 值弹性过渡到目标百分比
+        .onChange(of: downloadPct) { pct in
+            let target = max(0, min(100, Int(pct * 100)))
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0.5)) {
+                downloadPctDisplay = target
             }
         }
     }
@@ -298,6 +306,7 @@ struct MineView: View {
         updateMsg = "正在检查最新构建…"
         shareItems = []
         downloadPct = 0
+        downloadPctDisplay = 0
         showDownload = true
         Task { @MainActor in
             do {

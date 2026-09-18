@@ -75,9 +75,19 @@ final class NavState: ObservableObject, @unchecked Sendable {
     @Published var selectedTab: Int = 0
     @Published var showCopiedToast: Bool = false
 
+    /// 每个 Tab 的 VoiceOver 描述（用于动态朗读切换时的页面名称）
+    static let tabAccessibilityLabels: [Int: String] = [
+        0: "车况", 1: "车控", 2: "消息", 3: "我的"
+    ]
+
     private init() {}
 
     func popToRoot() { path = [] }
+
+    /// 获取当前选中 Tab 的无障碍朗读文本
+    var selectedTabVoiceOverLabel: String {
+        Self.tabAccessibilityLabels[selectedTab] ?? "Tab \(selectedTab)"
+    }
 }
 
 // MARK: - 主 Tab
@@ -103,6 +113,8 @@ struct TabCardTransition: ViewModifier {
 struct MainTabView: View {
     @StateObject private var nav = NavState.shared
     @State private var prevSelectedTab: Int = 0
+    // VoiceOver：记录上次朗读的 Tab，避免重复播报
+    @State private var lastAnnouncedTab: Int = 0
 
     var body: some View {
         TabView(selection: $nav.selectedTab) {
@@ -126,7 +138,12 @@ struct MainTabView: View {
                             .animation(.easeInOut(duration: 0.25))
                     ))
             }
-            .tabItem { Label("车况", systemImage: "car.fill") }
+            .tabItem {
+                Label("车况", systemImage: "car.fill")
+                    .accessibilityLabel(Text("车况"))
+                    .accessibilityHint(Text("车辆状态概览，包含行驶里程、胎压、SOC 电量等关键信息"))
+            }
+            .accessibilitySortPriority(0)
             .tag(0)
             .transaction { t in
                 t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
@@ -140,7 +157,12 @@ struct MainTabView: View {
             NavigationStack {
                 ControlView()
             }
-            .tabItem { Label("车控", systemImage: "slider.horizontal.3") }
+            .tabItem {
+                Label("车控", systemImage: "slider.horizontal.3")
+                    .accessibilityLabel(Text("车控"))
+                    .accessibilityHint(Text("远程控制车辆，包括锁车、解锁、空调控制等功能"))
+            }
+            .accessibilitySortPriority(1)
             .tag(1)
             .transaction { t in
                 t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
@@ -154,7 +176,12 @@ struct MainTabView: View {
             NavigationStack {
                 MessagesView()
             }
-            .tabItem { Label("消息", systemImage: "bubble.left.fill") }
+            .tabItem {
+                Label("消息", systemImage: "bubble.left.fill")
+                    .accessibilityLabel(Text("消息"))
+                    .accessibilityHint(Text("车辆通知和消息中心"))
+            }
+            .accessibilitySortPriority(2)
             .tag(2)
             .transaction { t in
                 t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
@@ -168,7 +195,12 @@ struct MainTabView: View {
             NavigationStack {
                 MineView()
             }
-            .tabItem { Label("我的", systemImage: "person.fill") }
+            .tabItem {
+                Label("我的", systemImage: "person.fill")
+                    .accessibilityLabel(Text("我的"))
+                    .accessibilityHint(Text("账号设置和个人信息管理"))
+            }
+            .accessibilitySortPriority(3)
             .tag(3)
             .transaction { t in
                 t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
@@ -179,6 +211,18 @@ struct MainTabView: View {
                 prevSelectedTab = nav.selectedTab
             }
         }
+        // VoiceOver：切换 Tab 时朗读当前页面名称（仅首次切换到新 Tab）
+        .onChange(of: nav.selectedTab) { newTab in
+            if newTab != lastAnnouncedTab {
+                lastAnnouncedTab = newTab
+                let label = NavState.tabAccessibilityLabels[newTab] ?? "Tab \(newTab)"
+                UIAccessibility.post(notification: .announcement, argument: "已切换到\(label)页")
+            }
+        }
+        // 设置 TabView 整体无障碍描述和朗读顺序
+        .accessibilityLabel(Text("主导航栏"))
+        .accessibilityHint(Text("四个主要功能模块：车况、车控、消息、我的。左右滑动可切换标签页"))
+        .accessibilitySortPriority(0)
         .accentColor(.accentColor)
         // 液态玻璃 TabBar：磨砂背景 + 选中态脉冲光晕
         .overlay(alignment: .bottom) {
