@@ -60,8 +60,7 @@ struct DataView: View {
             }
         }
         .pageBackground(.indigo)
-        .navigationTitle(kind.title)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationTitle(kind.title).navBarStyle()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 16) {
@@ -101,7 +100,7 @@ struct DataView: View {
                 .font(.system(size: 13, weight: sel ? .semibold : .medium))
                 .foregroundStyle(sel ? .white : .primary)
                 .padding(.horizontal, 14).padding(.vertical, 9)
-                .background(sel ? Color.accentColor : Color(.systemGray5).opacity(0.5), in: Capsule())
+                .background(sel ? Color.accentColor : Color(.tertiarySystemFill), in: Capsule())
         }
         .buttonStyle(.plain)
     }

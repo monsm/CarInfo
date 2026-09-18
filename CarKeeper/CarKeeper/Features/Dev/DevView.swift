@@ -43,7 +43,7 @@ struct DevView: View {
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(10)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .background(.thin, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
                         .frame(maxHeight: 360)
                         HStack(spacing: 10) {
@@ -85,7 +85,7 @@ struct DevView: View {
             .padding(.bottom, 32)
         }
         .pageBackground(.secondary)
-        .navigationTitle("开发者工具")
+        .navigationTitle("开发者工具").navBarStyle()
     }
 
     private var appVersion: String {

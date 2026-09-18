@@ -250,6 +250,16 @@ extension View {
         background(PageBackground(tint: tint))
     }
 
+    // MARK: - 导航栏样式：iOS 27 Liquid Glass
+    // inline 标题 + 玻璃材质背景 + 白色高光描边 + 强调色图标
+    func navBarStyle() -> some View {
+        self
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.visible, for: .navigation)
+            .toolbarBackgroundMaterial(.thin)
+            .tint(.accentColor)
+    }
+
     // ---- 玻璃卡片：深浅双模式自适应材质 + 高光描边 ----
     func glassCard(corner: CGFloat = Theme.Radius.card) -> some View {
         self
@@ -308,6 +318,40 @@ extension View {
         self
             .shadow(color: g.color.opacity(0.3), radius: g.radius, y: g.offset)
             .shadow(color: g.color.opacity(0.15), radius: g.radius * 1.5, y: g.offset * 2)
+    }
+}
+
+// MARK: - 浮动装饰粒子（SOC/评分圆环专用）
+struct FloatingParticles: View {
+    let size: CGFloat
+
+    var body: some View {
+        VStack {
+            ForEach(0..<6, id: \.self) { i in
+                particle(at: i, total: 6)
+            }
+        }
+    }
+
+    private func particle(at i: Int, total: Int) -> some View {
+        let angle = (Double(i) / Double(total)) * 2 * .pi
+        let radius = size / 2 + 14 + CGFloat(i % 3) * 5
+        let baseX = radius * cos(angle)
+        let baseY = radius * sin(angle)
+        return Circle()
+            .fill(floatingColor(i).opacity(0.32))
+            .frame(width: 3.5, height: 3.5)
+            .offset(x: baseX, y: baseY)
+    }
+
+    private func floatingColor(_ i: Int) -> Color {
+        switch i % 5 {
+        case 0: return .green
+        case 1: return .teal
+        case 2: return .blue
+        case 3: return .yellow
+        default: return .orange
+        }
     }
 }
 
@@ -482,9 +526,12 @@ struct QuickControlButton: View {
     let label: String
     let tint: Color
     let action: () -> Void
+    @State private var isPressed = false
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            action()
+        } label: {
             VStack(spacing: Theme.Spacing.sm) {
                 Image(systemName: icon)
                     .font(Theme.font(24, weight: .semibold))
@@ -497,6 +544,13 @@ struct QuickControlButton: View {
             }
         }
         .buttonStyle(.plain)
+        .scaleEffect(isPressed ? 0.88 : 1.0)
+        .animation(Animation.spring(response: 0.35, dampingFraction: 0.6, blendDuration: 0.3), value: isPressed)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
     }
 }
 

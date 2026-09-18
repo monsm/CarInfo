@@ -72,7 +72,7 @@ struct ControlView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.blue)
-        .navigationTitle("车控")
+        .navigationTitle("车控").navBarStyle()
         .sheet(isPresented: $showPin) {
             PINKeypadView()
                 .onReceive(NotificationCenter.default.publisher(for: .pinConfirmed)) { note in
@@ -289,38 +289,7 @@ struct ControlView: View {
     }
 
     private func heroDisc(_ item: (key: String, name: String, symbol: String)) -> some View {
-        let disabled = busy || running != nil
-        return Button {
-            onCmd(item.key)
-        } label: {
-            VStack(spacing: 12) {
-                ZStack {
-                    // 外发光
-                    Circle()
-                        .fill(Color.blue.opacity(0.08))
-                        .frame(width: 92, height: 92)
-                    // 底色
-                    Circle()
-                        .fill(Color.blue.opacity(0.12))
-                        .frame(width: 80, height: 80)
-                    // 描边
-                    Circle()
-                        .strokeBorder(Color.blue.opacity(0.30), lineWidth: 1.5)
-                        .frame(width: 80, height: 80)
-                    // 图标
-                    Image(systemName: item.symbol)
-                        .font(.system(size: 32, weight: .medium))
-                        .foregroundStyle(Color.blue)
-                }
-                .opacity(disabled ? 0.45 : 1)
-                .animation(.easeInOut(duration: 0.2), value: disabled)
-                Text(item.name)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(disabled ? .secondary : .primary)
-            }
-        }
-        .buttonStyle(.plain)
-        .disabled(disabled)
+        HeroDiscButton(key: item.key, name: item.name, symbol: item.symbol, disabled: busy || running != nil) { onCmd(item.key) }
     }
 
     // MARK: 执行中
@@ -386,7 +355,7 @@ struct ControlView: View {
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(Color.blue)
                     .frame(width: 30, height: 30)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(.thin, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name).font(.system(size: 15, weight: .medium))
                     if let note = item.note {
@@ -548,7 +517,7 @@ struct ControlView: View {
             KVRow(k: "任务 ID", v: r.taskId.isEmpty ? "--" : r.taskId)
             Spacer()
         }
-        .padding(20)
+        .padding(Theme.Spacing.xl)
         .presentationDetents([.medium])
     }
 
@@ -564,6 +533,51 @@ struct ControlView: View {
         if let ctrl = try? await APIClient.shared.getControl(carId: store.carId) {
             store.saveCache(["control": ctrl])
         }
+    }
+}
+
+// MARK: - 主控双盘按钮（液态玻璃按压回弹）
+struct HeroDiscButton: View {
+    let key: String
+    let name: String
+    let symbol: String
+    let disabled: Bool
+    let action: () -> Void
+    @State private var isPressed = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.08))
+                        .frame(width: 92, height: 92)
+                    Circle()
+                        .fill(Color.blue.opacity(0.12))
+                        .frame(width: 80, height: 80)
+                    Circle()
+                        .strokeBorder(Color.blue.opacity(0.30), lineWidth: 1.5)
+                        .frame(width: 80, height: 80)
+                    Image(systemName: symbol)
+                        .font(.system(size: 32, weight: .medium))
+                        .foregroundStyle(Color.blue)
+                }
+                .opacity(disabled ? 0.45 : 1)
+                .animation(.easeInOut(duration: 0.2), value: disabled)
+                Text(name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(disabled ? .secondary : .primary)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .scaleEffect(isPressed ? 0.88 : 1.0)
+        .animation(.spring(response: 0.35, dampingFraction: 0.6, blendDuration: 0.3), value: isPressed)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
     }
 }
 
@@ -586,7 +600,7 @@ struct PINKeypadView: View {
                     Text(i < pin.count ? String(pin[pin.index(pin.startIndex, offsetBy: i)]) : "")
                         .font(.system(size: 26, weight: .semibold, design: .rounded))
                         .frame(width: 42, height: 54)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(.thin, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(i == pin.count ? Color.blue : Color(.systemGray4),
                                           lineWidth: i == pin.count ? 2 : 1))
@@ -604,7 +618,7 @@ struct PINKeypadView: View {
                         }
                         .font(.system(size: 24, weight: .medium, design: .rounded))
                         .frame(maxWidth: .infinity, minHeight: 56)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(.thin, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .foregroundStyle(.primary)
                     }
                     .buttonStyle(.plain)
@@ -615,7 +629,7 @@ struct PINKeypadView: View {
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 8)
         }
-        .padding(24)
+        .padding(Theme.Spacing.xxl)
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
     }
@@ -680,7 +694,7 @@ struct ACStepperView: View {
             Button("取消") { dismiss() }
                 .font(.system(size: 14)).foregroundStyle(.secondary)
         }
-        .padding(24)
+        .padding(Theme.Spacing.xxl)
         .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
     }

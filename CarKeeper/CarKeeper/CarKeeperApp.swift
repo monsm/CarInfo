@@ -127,7 +127,7 @@ struct MainTabView: View {
                 Label("VIN 已复制", systemImage: "checkmark.circle.fill")
                     .font(.system(size: 14, weight: .semibold))
                     .padding(.horizontal, 20).padding(.vertical, 12)
-                    .background(.ultraThinMaterial, in: Capsule())
+                    .background(.thin, in: Capsule())
                     .overlay(Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
                     .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
                     .offset(y: -10)

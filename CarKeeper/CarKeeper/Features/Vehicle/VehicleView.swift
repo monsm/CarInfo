@@ -27,7 +27,7 @@ struct VehicleView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accentColor)
-        .navigationTitle("车辆档案")
+        .navigationTitle("车辆档案").navBarStyle()
     }
 
     // MARK: 名片 — Apple Style Vehicle Card
@@ -66,7 +66,7 @@ struct VehicleView: View {
                 }
             }
         }
-        .padding(22)
+        .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassHeroCard()
     }
@@ -89,7 +89,7 @@ struct VehicleView: View {
                     .foregroundStyle(Color.accentColor)
             }
             .padding(10)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(.thin, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -102,7 +102,7 @@ struct VehicleView: View {
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.thin, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     // MARK: 档案分组（数据不变）

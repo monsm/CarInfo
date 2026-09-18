@@ -28,7 +28,7 @@ struct MineView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accentColor)
-        .navigationTitle("我的")
+        .navigationTitle("我的").navBarStyle()
         .alert("关于 长安车管家", isPresented: $showAboutAlert) {
             Button("关闭", role: .cancel) { }
         } message: {
@@ -105,19 +105,19 @@ struct MineView: View {
             HStack(spacing: 12) {
                 if let bt = um.birthday, !bt.isEmpty {
                     HStack(spacing: 4) {
-                        Image(systemName: "calendar").font(.system(size: 10)).foregroundStyle(.tertiary)
-                        Text(bt).font(.system(size: 11)).foregroundStyle(.tertiary)
+                        Image(systemName: "calendar").font(.system(size: 10)).foregroundStyle(.secondary)
+                        Text(bt).font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                 }
                 if let lt = um.lastLoginTime, !lt.isEmpty {
                     HStack(spacing: 4) {
-                        Image(systemName: "clock").font(.system(size: 10)).foregroundStyle(.tertiary)
-                        Text(lt).font(.system(size: 11)).foregroundStyle(.tertiary)
+                        Image(systemName: "clock").font(.system(size: 10)).foregroundStyle(.secondary)
+                        Text(lt).font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                 }
             }
         }
-        .padding(22)
+        .padding(Theme.Spacing.xl)
         .glassHeroCard()
     }
 
@@ -132,7 +132,7 @@ struct MineView: View {
                     .font(.system(size: 26))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 52, height: 52)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(.thin, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(sum?.name ?? "未绑定车辆").font(.system(size: 17, weight: .semibold))
                     Text(sum?.plate ?? "暂无车牌").font(.system(size: 13)).foregroundStyle(.secondary)
@@ -216,7 +216,7 @@ struct MineView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(.thin, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
             .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.8))
         .shadow(color: .black.opacity(0.04), radius: 8, y: 3)
@@ -256,7 +256,7 @@ struct MineView: View {
             Label("分享安装包", systemImage: "square.and.arrow.up")
                 .font(.system(size: 14, weight: .semibold))
                 .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(.ultraThinMaterial, in: Capsule())
+                .background(.thin, in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -270,7 +270,7 @@ struct MineView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12).padding(.vertical, 10)
-                .background(.ultraThinMaterial, in: Capsule())
+                .background(.thin, in: Capsule())
         }
         .buttonStyle(.plain)
     }

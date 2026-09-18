@@ -33,12 +33,12 @@ struct LoginView: View {
                     loginButton
                     Spacer(minLength: 12)
                 }
-                .padding(.horizontal, 24)
+                .padding(16)
                 .padding(.bottom, 40)
             }
             .scrollBounceBehavior(.basedOnSize)
             .pageBackground(.accentColor)
-            .navigationBarTitleDisplayMode(.inline)
+            .navBarStyle()
             .onReceive(countdownTimer) { _ in
                 if countdown > 0 {
                     countdown -= 1
@@ -124,7 +124,7 @@ struct LoginView: View {
                 smsButton
             }
         }
-        .padding(20)
+        .padding(Theme.Spacing.xl)
         .glassCard()
     }
 
@@ -136,7 +136,7 @@ struct LoginView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(smsBtnDisabled ? Color.secondary : Color.accentColor)
                 .padding(.horizontal, 14).padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: Capsule())
+                .background(.thin, in: Capsule())
         }
         .buttonStyle(.plain)
         .disabled(smsBtnDisabled)
@@ -174,7 +174,7 @@ struct LoginView: View {
                 .foregroundStyle(statusErr ? Color.red : Color.green)
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(.thin, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
 

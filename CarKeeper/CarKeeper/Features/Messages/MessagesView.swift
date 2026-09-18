@@ -68,7 +68,7 @@ struct MessagesView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accentColor)
-        .navigationTitle("消息")
+        .navigationTitle("消息").navBarStyle()
         .onAppear { loadIfNeeded() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { await load() }
@@ -153,7 +153,7 @@ struct MessagesView: View {
                     if !item.time.isEmpty {
                         Text(item.time)
                             .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }

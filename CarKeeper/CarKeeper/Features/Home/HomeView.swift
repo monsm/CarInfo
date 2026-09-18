@@ -11,6 +11,9 @@ struct HomeView: View {
     @State private var startTimer: Task<Void, Never>? = nil
     @State private var lastFetch: Date?
     @State private var showMap = true
+    @State private var carVersion: Int = 0          // 切换车辆时 +1，驱动过渡动画
+    @State private var socProgress: CGFloat = 0      // SOC圆环进度 0→socPct
+    @State private var socCardOpacity: CGFloat = 0   // SOC卡片入场淡入
 
     var body: some View {
         Group {
@@ -52,10 +55,28 @@ struct HomeView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 96)
         }
+        .id(carVersion)
+        .transition(
+            .asymmetric(
+                insertion: .move(edge: .trailing)
+                    .combined(with: .opacity)
+                    .combined(with: .scale(scale: 0.96, anchor: .center)),
+                removal: .move(edge: .leading)
+                    .combined(with: .opacity)
+                    .combined(with: .scale(scale: 0.96, anchor: .center))
+            )
+        )
+        .animation(.spring(response: 0.45, dampingFraction: 0.7, blendDuration: 0.4), value: carVersion)
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accentColor)
-        .navigationTitle("车况")
-        .onAppear { startPolling() }
+        .navigationTitle("车况").navBarStyle()
+        .onChange(of: store.carId) { newId in
+            guard !newId.isEmpty else { return }
+            withAnimation(.easeInOut(duration: 0.08)) {
+                carVersion += 1
+            }
+        }
+        .onAppear { startPolling(); startSocAnimation() }
         .onDisappear {
             startTimer?.cancel()
             startTimer = nil
@@ -79,31 +100,47 @@ struct HomeView: View {
         .padding(.vertical, 8)
     }
 
-    // MARK: SOC Hero — 渐变圆环
+    // MARK: SOC Hero — 渐变圆环 + 入场动画 + 浮动粒子
     private func socHero(_ e: EnergyModel) -> some View {
         VStack(spacing: 18) {
-            // 大尺寸 SOC 光环 Hero
+            // 大尺寸 SOC 光环 Hero（带脉冲发光 + 浮动粒子）
             ZStack {
-                // 外发光层
+                // 第 0 层：外扩散光晕（呼吸脉冲）
                 Circle()
-                    .fill(AngularGradient(colors: [.green.opacity(0.15), .accentColor.opacity(0.1)],
+                    .fill(AngularGradient(colors: socGlowColors(e.socPct),
                                           center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)))
-                    .frame(width: 196, height: 196)
-                // 底色轨道
+                    .frame(width: 232, height: 232)
+                    .opacity(0.15)
+                    .blur(radius: 12)
+
+                // 第 1 层：脉冲光环（持续呼吸）
                 Circle()
-                    .stroke(Color(.systemGray5).opacity(0.6), lineWidth: 16)
-                    .frame(width: 196, height: 196)
-                // 进度弧
+                    .strokeBorder(AngularGradient(colors: [.green, .teal], center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)), lineWidth: 2)
+                    .frame(width: 218, height: 218)
+                    .opacity(0.10)
+                    .blur(radius: 5)
+                    .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: socProgress)
+
+                // 第 2 层：底色轨道
                 Circle()
-                    .trim(from: 0, to: max(0.02, CGFloat(e.socPct) / 100))
+                    .stroke(Color(.systemGray5).opacity(0.55), lineWidth: 16)
+                    .frame(width: 196, height: 196)
+
+                // 第 3 层：彩色进度弧（动画展开）
+                Circle()
+                    .trim(from: 0, to: max(0.02, socProgress / 100))
                     .stroke(
                         AngularGradient(colors: [.green, .green, .accentColor, .orange, .red],
                                         center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
                         style: StrokeStyle(lineWidth: 16, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .frame(width: 196, height: 196)
-                    .shadow(color: .green.opacity(0.3), radius: 12, y: 4)
-                // 中心数字
+                    .shadow(color: socShadowColor(e.socPct).opacity(0.35), radius: 12, y: 4)
+
+                // 第 4 层：浮动装饰粒子
+                FloatingParticles(size: 196)
+
+                // 第 5 层：中心数字
                 VStack(spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(e.soc == "--" ? "--" : e.soc)
@@ -125,11 +162,31 @@ struct HomeView: View {
             // 在线状态
             Text(e.online.text)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
         .glassHeroCard()
+        .opacity(socCardOpacity)
+    }
+
+    // MARK: SOC颜色辅助函数
+    private func socGlowColors(_ pct: Int) -> [Color] {
+        switch pct {
+        case 0...39: return [.red.opacity(0.5), .clear]
+        case 40...69: return [.orange.opacity(0.45), .clear]
+        case 70...89: return [.yellow.opacity(0.45), .green.opacity(0.25)]
+        default: return [.green.opacity(0.45), .teal.opacity(0.25)]
+        }
+    }
+
+    private func socShadowColor(_ pct: Int) -> Color {
+        switch pct {
+        case 0...39: return .red
+        case 40...69: return .orange
+        case 70...89: return .yellow
+        default: return .green
+        }
     }
 
     // MARK: 快控按钮动作
@@ -147,7 +204,7 @@ struct HomeView: View {
                 .font(.system(size: 16))
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 40, height: 40)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(.thin, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             Picker("车辆", selection: Binding(
                 get: { carSel.index },
                 set: { store.selectCar($0) }
@@ -165,7 +222,7 @@ struct HomeView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(.ultraThinMaterial, in: Capsule())
+                    .background(.thin, in: Capsule())
             }
         }
         .padding(16)
@@ -209,7 +266,7 @@ struct HomeView: View {
             MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: .blue)
             MetricPill(icon: "gauge.full", value: d.mile, unit: "km", tint: .accentColor)
         }
-        .padding(20)
+        .padding(Theme.Spacing.xl)
         .glassCard(corner: 20)
     }
 
@@ -224,7 +281,7 @@ struct HomeView: View {
                 }
             }
         }
-        .padding(20)
+        .padding(Theme.Spacing.xl)
         .glassHeroCard()
     }
 
@@ -328,7 +385,7 @@ struct HomeView: View {
                     }
                 }
             }
-            .padding(18)
+            .padding(Theme.Spacing.xl)
             .glassCard(corner: 20)
 
             // 分析结论详情
@@ -459,7 +516,7 @@ struct HomeView: View {
                     .font(.system(size: 12, weight: .medium))
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(.ultraThinMaterial, in: Capsule())
+            .background(.thin, in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -471,7 +528,7 @@ struct HomeView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.accentColor)
                 .padding(8)
-                .background(.ultraThinMaterial, in: Circle())
+                .background(.thin, in: Circle())
         }
         .buttonStyle(.plain)
     }
@@ -490,7 +547,7 @@ struct HomeView: View {
                     .font(.system(size: 13))
                     .foregroundStyle(.accentColor)
                     .padding(6)
-                    .background(.ultraThinMaterial, in: Circle())
+                    .background(.thin, in: Circle())
             }
             .buttonStyle(.plain)
         }
@@ -503,6 +560,17 @@ struct HomeView: View {
         let url = "http://uri.amap.com/navigation?to=\(loc.lng),\(loc.lat)&mode=car"
         if let u = URL(string: url) {
             UIApplication.shared.open(u, options: [:], completionHandler: nil)
+        }
+    }
+
+    // MARK: SOC入场动画
+    private func startSocAnimation() {
+        withAnimation(.spring(Theme.Duration.springNormal)) { socCardOpacity = 1 }
+        let target = max(0, min(100, VM.energy(store.caches, store.car).socPct))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
+                socProgress = CGFloat(target)
+            }
         }
     }
 

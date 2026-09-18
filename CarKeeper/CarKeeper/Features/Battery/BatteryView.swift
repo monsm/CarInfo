@@ -9,6 +9,8 @@ struct BatteryView: View {
     @State private var loaded = false
     @State private var errText: String = ""
     @State private var loadTask: Task<Void, Never>? = nil
+    @State private var socProgress: CGFloat = 0      // SOC圆环进度 0→socPct
+    @State private var socCardOpacity: CGFloat = 0   // SOC卡片入场淡入
 
     var body: some View {
         ScrollView {
@@ -30,8 +32,8 @@ struct BatteryView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.green)
-        .navigationTitle("电池与充电")
-        .onAppear { loadIfNeeded() }
+        .navigationTitle("电池与充电").navBarStyle()
+        .onAppear { loadIfNeeded(); startSocAnimation() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { await load() }
         .overlay {
@@ -48,30 +50,46 @@ struct BatteryView: View {
         }
     }
 
-    // MARK: SOC Hero — Apple Watch 风格大圆环
+    // MARK: SOC Hero — Apple Watch 风格大圆环 + 入场动画 + 浮动粒子
     private func socHero(_ e: EnergyModel) -> some View {
         VStack(spacing: 18) {
             ZStack {
-                // 外发光
+                // 第 0 层：外扩散光晕（呼吸脉冲）
                 Circle()
-                    .fill(AngularGradient(colors: [.green.opacity(0.12), .accentColor.opacity(0.08)],
+                    .fill(AngularGradient(colors: socGlowColors(e.socPct),
                                           center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)))
-                    .frame(width: 208, height: 208)
-                // 轨道
+                    .frame(width: 248, height: 248)
+                    .opacity(0.15)
+                    .blur(radius: 12)
+
+                // 第 1 层：脉冲光环（持续呼吸）
+                Circle()
+                    .strokeBorder(AngularGradient(colors: [.green, .teal], center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)), lineWidth: 2)
+                    .frame(width: 232, height: 232)
+                    .opacity(0.10)
+                    .blur(radius: 5)
+                    .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: socProgress)
+
+                // 第 2 层：底色轨道
                 Circle()
                     .stroke(Color(.systemGray5).opacity(0.5), lineWidth: 18)
                     .frame(width: 208, height: 208)
-                // 进度弧
+
+                // 第 3 层：彩色进度弧（动画展开）
                 Circle()
-                    .trim(from: 0, to: max(0.02, CGFloat(e.socPct) / 100))
+                    .trim(from: 0, to: max(0.02, socProgress / 100))
                     .stroke(
                         AngularGradient(colors: [.green, .green, .accentColor, .orange, .red],
                                         center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
                         style: StrokeStyle(lineWidth: 18, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .frame(width: 208, height: 208)
-                    .shadow(color: .green.opacity(0.25), radius: 14, y: 5)
-                // 中心数字
+                    .shadow(color: socShadowColor(e.socPct).opacity(0.35), radius: 14, y: 5)
+
+                // 第 4 层：浮动装饰粒子
+                FloatingParticles(size: 208)
+
+                // 第 5 层：中心数字
                 VStack(spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(e.soc == "--" ? "--" : e.soc)
@@ -90,11 +108,31 @@ struct BatteryView: View {
                 MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accentColor)
             }
             Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5)))")
-                .font(.system(size: 11)).foregroundStyle(.tertiary)
+                .font(.system(size: 11)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 30)
         .glassHeroCard()
+        .opacity(socCardOpacity)
+    }
+
+    // MARK: SOC颜色辅助函数
+    private func socGlowColors(_ pct: Int) -> [Color] {
+        switch pct {
+        case 0...39: return [.red.opacity(0.5), .clear]
+        case 40...69: return [.orange.opacity(0.45), .clear]
+        case 70...89: return [.yellow.opacity(0.45), .green.opacity(0.25)]
+        default: return [.green.opacity(0.45), .teal.opacity(0.25)]
+        }
+    }
+
+    private func socShadowColor(_ pct: Int) -> Color {
+        switch pct {
+        case 0...39: return .red
+        case 40...69: return .orange
+        case 70...89: return .yellow
+        default: return .green
+        }
     }
 
     // MARK: 分析结论
@@ -256,7 +294,7 @@ struct BatteryView: View {
                             }
                         }
                         .padding(10)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(.thin, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                 }
             }
@@ -297,11 +335,11 @@ struct BatteryView: View {
             Text(k).font(.system(size: 11)).foregroundStyle(.secondary)
             Text(v).font(.system(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundStyle(warn ? Color.red : .primary)
-            Text(unit).font(.system(size: 10)).foregroundStyle(.tertiary)
+            Text(unit).font(.system(size: 10)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(.thin, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private struct R { let k: String; let v: String; var cls: String = "" }
@@ -335,6 +373,18 @@ struct BatteryView: View {
         if m.inputV != "--" { rows.append(R(k: "控制器输入电压", v: "\(m.inputV) V")) }
         if m.dcBus != "--" { rows.append(R(k: "母线电流", v: "\(m.dcBus) A")) }
         return rows
+    }
+
+    // MARK: SOC入场动画
+    private func startSocAnimation() {
+        withAnimation(.spring(Theme.Duration.springNormal)) { socCardOpacity = 1 }
+        let e = VM.energy(store.caches, store.car)
+        let target = max(0, min(100, e.socPct))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
+                socProgress = CGFloat(target)
+            }
+        }
     }
 
     private func loadIfNeeded() {
