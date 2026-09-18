@@ -1,34 +1,15 @@
 import SwiftUI
-import Charts
-import MapKit
 
-// 车况首页 —— Apple Premium Design
-// SOC 渐变光弧 Hero + 大尺寸快控网格 + 状态卡片 + 位置信息
+// 车况首页 —— iOS 27 Liquid Glass：
+// SOC Hero + 车速里程 + 快控按钮 + 状态域 + 电池 + 胎压 + 座舱 + 位置
+// 轮询 60s（fetchCore）+ 位置 8s
 
 struct HomeView: View {
     private let store = AppStore.shared
-    @StateObject private var nav = NavState.shared
-    @State private var refreshTask: Task<Void, Never>? = nil
-    @State private var locTask: Task<Void, Never>? = nil
-    @State private var showMap = false
-    @State private var selectedDomain: DomainVerdict? = nil
-
-    enum QuickCtrl: String, CaseIterable {
-        case lock, unlock, air, charge
-        var symbol: String { switch self {
-            case .lock: "lock.fill"; case .unlock: "lock.open.fill"
-            case .air: "fan.blades"; case .charge: "bolt.fill"
-        }}
-        var title: String { switch self {
-            case .lock: "锁车"; case .unlock: "解锁"
-            case .air: "空调"; case .charge: "充电"
-        }}
-        var accent: Color { switch self {
-            case .lock, .unlock: return .primary
-            case .air: return .blue
-            case .charge: return .accentColor
-        }}
-    }
+    @State private var showLoginAlert = false
+    @State private var startTimer: Task<Void, Never>? = nil
+    @State private var lastFetch: Date?
+    @State private var showMap = true
 
     var body: some View {
         Group {
@@ -36,8 +17,10 @@ struct HomeView: View {
                 content
             } else {
                 ContentUnavailableView("请先登录", systemImage: "lock.rectangle", description: Text("点击下方登录"))
+                    .padding(.top, 100)
             }
         }
+        .sheet(isPresented: $showLoginAlert) { LoginView() }
     }
 
     private var content: some View {
@@ -73,54 +56,29 @@ struct HomeView: View {
         .navigationTitle("车况")
         .onAppear { startPolling() }
         .onDisappear {
-            refreshTask?.cancel()
-            locTask?.cancel()
+            startTimer?.cancel()
+            startTimer = nil
         }
-        .refreshable { await store.fetchCore() }
-        .sheet(item: $selectedDomain) { d in
-            domainDetailSheet(d)
-        }
+        .refreshable { await fetchCore() }
     }
 
-    private func domainDetailSheet(_ d: DomainVerdict) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text(d.label).font(.system(size: 18, weight: .bold))
-                Spacer()
-                Pill(text: d.short, cls: d.cls, dot: false)
-            }
-            if !d.title.isEmpty {
-                Text(d.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary)
-            }
-            if !d.reasons.isEmpty {
-                VStack(spacing: 8) {
-                    ForEach(d.reasons) { r in
-                        HStack(alignment: .top, spacing: 8) {
-                            StatusDot(cls: r.cls)
-                            Text(r.t).font(.system(size: 14)).foregroundStyle(.primary)
-                        }
-                    }
-                }
-            }
-            if !d.metrics.isEmpty {
-                VStack(spacing: 6) {
-                    ForEach(d.metrics) { m in
-                        HStack {
-                            Text(m.k).font(.system(size: 13)).foregroundStyle(.secondary)
-                            Spacer()
-                            Text(m.v).font(.system(size: 13, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.primary)
-                        }
-                    }
-                }
-            }
+    // MARK: 问候行
+    private func greetingRow(_ e: EnergyModel) -> some View {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let greeting = hour < 6 ? "🌙 深夜了" : hour < 12 ? "☀️ 上午好" : hour < 18 ? "☀️ 下午好" : "🌙 晚上好"
+        let dateStr = DateFormatter.relative(Date())
+        return HStack {
+            Text(greeting)
+                .font(.system(size: 15, weight: .semibold))
             Spacer()
+            Text(dateStr)
+                .font(.system(size: 13)).foregroundStyle(.secondary)
         }
-        .padding(20)
-        .presentationDetents([.medium, .large])
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
-    // MARK: SOC Hero
+    // MARK: SOC Hero — 渐变圆环
     private func socHero(_ e: EnergyModel) -> some View {
         VStack(spacing: 18) {
             // 大尺寸 SOC 光环 Hero
@@ -231,33 +189,14 @@ struct HomeView: View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
                 ForEach(Array(QuickCtrl.allCases.enumerated()), id: \.element) { idx, q in
-                    quickButton(q)
+                    QuickControlButton(icon: q.symbol, label: q.title, tint: q.accent) {
+                        onQuickCtrl(q)
+                    }
                 }
             }
         }
         .padding(20)
         .glassHeroCard()
-    }
-
-    private func quickButton(_ q: QuickCtrl) -> some View {
-        Button { onQuickCtrl(q) }
-        label: {
-            VStack(spacing: 8) {
-                ZStack {
-                    Circle()
-                        .fill(q.accent.opacity(0.12))
-                        .frame(width: 60, height: 60)
-                    Image(systemName: q.symbol)
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(q.accent)
-                }
-                Text(q.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: 状态域
@@ -267,114 +206,141 @@ struct HomeView: View {
                 let rows = summary.domains.filter { $0.key != "service" }
                 ForEach(Array(rows.enumerated()), id: \.element.id) { idx, d in
                     domainRow(d)
-                    if idx < rows.count - 1 {
-                        Divider().opacity(0.5)
-                            .padding(.leading, 32)
-                    }
+                    if idx < rows.count - 1 { ListDivider() }
                 }
             }
-            .padding(.top, 4)
         }
     }
 
-    private func domainRow(_ d: DomainVerdict) -> some View {
-        Button {
-            if !d.reasons.isEmpty || d.url.isEmpty {
-                selectedDomain = d
-            } else if !d.url.isEmpty {
-                nav.path.append(contentsOf: navPath(forUrl: d.url))
-            }
-        } label: {
-            HStack(spacing: 12) {
-                StatusDot(cls: d.cls)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text(d.label).font(.system(size: 15, weight: .medium))
-                        Spacer()
-                        Text(d.short).font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundStyle(Theme.statusColor(d.cls))
-                    }
-                    if !d.reasons.isEmpty {
-                        Text(d.reasons.prefix(1).first?.t ?? "")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                    }
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.tertiary.opacity(0.6))
-            }
-            .padding(.vertical, 8)
+    private func domainRow(_ d: DomainSummary) -> some View {
+        HStack(spacing: 10) {
+            Text(d.icon)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.statusColor(d.cls))
+                .frame(width: 20)
+            Text(d.title)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.primary)
+            Spacer()
+            Text(d.result)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.statusColor(d.cls))
         }
-        .buttonStyle(.plain)
+        .padding(.vertical, 6)
     }
 
-    private func navPath(forUrl url: String) -> [Deeplink] {
-        switch url {
-        case "/pages/battery/battery": return [.battery]
-        case "/pages/health/health": return [.health]
-        case "/pages/data/data?kind=env": return [.data]
-        default: return []
-        }
-    }
-
-    // MARK: 电池一致性
+    // MARK: 电池区
     private func batterySection(_ cache: [String: Any?]) -> some View {
-        let b = batteryModel(cache)
-        return CardBox(title: "电池与动力", side: b.alarms.isEmpty ? "无告警" : "\(b.alarms.count) 项告警",
-                       sideCls: b.alarms.isEmpty ? "ok" : "bad") {
-            VStack(spacing: 10) {
-                if let cell = b.cellStats {
-                    VStack(spacing: 6) {
-                        HStack {
-                            Text("单体电压 \(cell.count) 节").font(.system(size: 12)).foregroundStyle(.secondary)
-                            Spacer()
-                            Text("压差 \(b.diffV.map { String(format: "%.3f", $0) } ?? "--")V")
-                                .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                                .foregroundStyle((b.diffV ?? 0) >= 0.05 ? Color.red : Color.green)
+        let batt = VM.batteryModel(cache)
+        return VStack(spacing: Theme.cardSpacing) {
+            // Head 摘要
+            VStack(spacing: 14) {
+                HStack(spacing: 12) {
+                    ForEach(batt.headItems) { h in
+                        VStack(spacing: 6) {
+                            Circle()
+                                .fill(Theme.statusColor(h.cls).opacity(0.12))
+                                .frame(width: 44, height: 44)
+                            Circle()
+                                .fill(Theme.statusColor(h.cls).opacity(0.25))
+                                .frame(width: 12, height: 12)
                         }
-                        Chart(Array(cell.bars.enumerated()), id: \.offset) { idx, v in
-                            BarMark(x: .value("序号", idx), y: .value("V", v))
-                                .foregroundStyle(Color.accentColor.opacity(0.75))
-                                .cornerRadius(1.5)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(h.title)
+                                .font(.system(size: 12)).foregroundStyle(.secondary)
+                            Text(h.value)
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(h.cls == "ok" ? .green : (h.cls == "bad" ? .red : .primary))
+                            Text(h.reason)
+                                .font(.system(size: 11)).foregroundStyle(.secondary)
                         }
-                        .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
-                        .frame(height: 84)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(20)
+            .glassHeroCard()
+
+            // 分析结论
+            if !batt.conclusions.isEmpty {
+                CardBox(title: "分析结论", side: batt.title, sideCls: batt.cls) {
+                    VStack(spacing: 8) {
+                        ForEach(Array(batt.conclusions.enumerated()), id: \.offset) { _, r in
+                            HStack(spacing: 10) {
+                                StatusDot(cls: r.cls)
+                                Text(r.text)
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if let n = r.n, !n.isEmpty {
+                                    Text(n).font(.system(size: 13)).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 电池一致性
+            CardBox(title: "一致性", side: batt.cellStats.map { "\($0.count) 节采样" } ?? "接口未上报", sideCls: "ok") {
+                if let cells = batt.cellStats {
+                    let maxV = cells.max { a, b -> Bool in (a.maxV ?? 0) < (b.maxV ?? 0) }?.maxV ?? 0
+                    let minV = cells.min { a, b -> Bool in (a.minV ?? 999) > (b.minV ?? 999) }?.minV ?? 999
+                    let diff = maxV - minV
+                    HStack(spacing: 8) {
+                        ForEach(cells) { s in
+                            VStack(spacing: 2) {
+                                Text(s.num == "--" ? "子" : "S\(s.num!)")
+                                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                                Text(s.maxV.map { String(format: "%.3f", $0) } ?? "--")
+                                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(.primary)
+                            }
+                            .frame(width: 52)
+                        }
+                    }
+                    HStack(spacing: 8) {
+                        Text("压差 \(String(format: "%.3f", diff))V")
+                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                        Spacer()
+                        Text("最低 \(String(format: "%.3f", minV))V / 最高 \(String(format: "%.3f", maxV))V")
+                            .font(.system(size: 12)).foregroundStyle(.secondary)
                     }
                 } else {
                     Text("接口未上报单体电压").font(.system(size: 13)).foregroundStyle(.secondary)
                 }
             }
+
+            // 充电
+            CardBox(title: "充电", side: batt.charging.text, sideCls: batt.charging.cls.isEmpty ? "na" : batt.charging.cls) {
+                let rows: [(String, String)] = [
+                    ("开始", batt.charging.start),
+                    ("结束", batt.charging.end),
+                    ("时长", batt.charging.duration),
+                    ("功率", batt.charging.power),
+                    ("状态", batt.charging.status)
+                ]
+                ForEach(Array(rows.enumerated()), id: \.offset) { idx, r in
+                    KVRow(k: r.0, v: r.1)
+                    if idx < rows.count - 1 { ListDivider() }
+                }
+            }
         }
     }
 
-    // MARK: 胎压（四宫格）
+    // MARK: 胎压四宫格
     private func tyreCard(_ tyre: TyreModel) -> some View {
         CardBox(title: "胎压", side: tyre.alarmText, sideCls: tyre.alarmCls) {
-            VStack(spacing: 10) {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()),
-                                    GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ForEach(tyre.items) { item in
-                        VStack(spacing: 3) {
-                            Text(item.label).font(.system(size: 11)).foregroundStyle(.secondary)
-                            HStack(alignment: .firstTextBaseline, spacing: 1) {
-                                Text(item.kpa).font(.system(size: 20, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(item.cls == "bad" ? Color.red : .primary)
-                                Text("kPa").font(.system(size: 9)).foregroundStyle(.secondary)
-                            }
-                            Text("\(item.temp)℃").font(.system(size: 10)).foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 8)
-                        .frame(maxWidth: .infinity)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()),
+                                GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(tyre.items) { item in
+                    TyreCell(label: item.label, kpa: item.kpa, temp: item.temp,
+                             cls: item.cls, minSafePressure: 200)
                 }
-                Text("温度 \(tyre.tempRange)")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
+            Text("温度 \(tyre.tempRange)")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
 
@@ -423,204 +389,95 @@ struct HomeView: View {
     }
 
     private var mapToggleButton: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.25)) { showMap.toggle() }
-        } label: {
-            Label(showMap ? "收起地图" : "展开地图", systemImage: showMap ? "chevron.up" : "map.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .padding(.horizontal, 12).padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: Capsule())
+        Button { withAnimation(.spring(Theme.Duration.springFast)) { showMap.toggle() } }
+        label: {
+            HStack(spacing: 4) {
+                Image(systemName: showMap ? "map.fill" : "map")
+                Text(showMap ? "隐藏地图" : "显示地图")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(.ultraThinMaterial, in: Capsule())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(.primary)
     }
 
     private func navButton(_ loc: LocModel) -> some View {
-        Button {
-            openMaps(lat: loc.lat, lng: loc.lng, addr: loc.addr)
-        } label: {
-            Label("导航", systemImage: "location.north.circle.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .padding(.horizontal, 12).padding(.vertical, 8)
-                .background(Color.accentColor, in: Capsule())
-                .foregroundStyle(.white)
+        Button { openNav(loc) }
+        label: {
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 12))
+                .foregroundStyle(.accentColor)
+                .padding(8)
+                .background(.ultraThinMaterial, in: Circle())
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: 时段问候
-    private func greetingRow(_ e: EnergyModel) -> some View {
-        let hour = Calendar.current.component(.hour, from: Date())
-        let gree = hour < 5 ? "夜深了" : (hour < 11 ? "早上好" : (hour < 13 ? "中午好" : (hour < 18 ? "下午好" : "晚上好")))
-        // 对齐小程序：weekday 取简写（周五），非全称（星期五）
-        let weekdayAbbrev = "日一二三四五六"[Calendar.current.component(.weekday, from: Date()) - 1]
-        let dateStr = {
-            let f = DateFormatter(); f.dateFormat = "M月d日"
-            return f.string(from: Date()) + " 周" + weekdayAbbrev
-        }()
+    // MARK: Footer
+    private var footerNote: some View {
+        let cache = store.caches
+        let update = lastFetch.map { DateFormatter.relative($0) } ?? "--"
+        let carName = store.car.flatMap { VM.vehicleSummary($0) }.map { "\($0.name) · \($0.plate)" } ?? "--"
         return HStack(spacing: 8) {
-            Image(systemName: hour < 6 || hour >= 20 ? "moon.fill" : hour < 12 ? "sun.max.fill" : "sun.horizon.fill")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(hour < 6 || hour >= 20 ? Color.indigo : .orange)
-            Text("\(gree)")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.primary)
+            Text(carName)
+                .font(.system(size: 12)).foregroundStyle(.secondary)
             Spacer()
-            Text(dateStr)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
+            Text("更新 \(update)")
+                .font(.system(size: 12)).foregroundStyle(.secondary)
+            Button { fetchCore() } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.accentColor)
+                    .padding(6)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
-    private func footerNote(_ e: EnergyModel) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "arrow.clockwise")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-            Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5)))")
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
-            Spacer()
-            Image(systemName: "wifi")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: 快控 / 导航 / 轮询（逻辑不变）
-    private func onQuickCtrl(_ q: QuickCtrl) {
-        switch q {
-        case .charge:
-            nav.path = [.battery]
-            nav.selectedTab = 0
-        default:
-            store.pendingQuickCtrl = q.rawValue
-            nav.selectedTab = 1
-        }
-    }
-
-    private func openMaps(lat: String, lng: String, addr: String) {
-        guard let la = Double(lat), let lo = Double(lng) else { return }
-        UIApplication.shared.open(mapsURL(lat: la, lng: lo, dest: addr.isEmpty ? "车辆位置" : addr))
-    }
-
-    private func mapsURL(lat: Double, lng: Double, dest: String) -> URL {
-        let escaped = dest.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? dest
-        return URL(string: "http://maps.apple.com/?dirflg=d&saddr=&daddr=\(lat),\(lng)&q=\(escaped)")!
-    }
-
+    // MARK: 轮询
     private func startPolling() {
-        refreshTask?.cancel()
-        locTask?.cancel()
-        // 延迟首次拉取，等 UI 渲染完成
-        refreshTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(2))
-            guard !Task.isCancelled else { return }
-            await store.fetchCore()
+        startTimer?.cancel()
+        startTimer = Task {
             while !Task.isCancelled {
-                do { try await Task.sleep(for: .seconds(60)) } catch { break }
-                if !Task.isCancelled { await store.fetchCore() }
-            }
-        }
-        locTask = Task { @MainActor in
-            guard !Task.isCancelled else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(8))
-                guard !Task.isCancelled else { return }
-                let api = APIClient.shared
-                guard !store.carId.isEmpty else { continue }
-                if let loc = try? await api.getLocation(carId: store.carId) {
-                    let newLat = ciString(loc, ["Lat", "lat"]) ?? ""
-                    let newLng = ciString(loc, ["Lng", "lng"]) ?? ""
-                    store.saveCache(["location": loc])
-                    if !newLat.isEmpty, !newLng.isEmpty {
-                        NotificationCenter.default.post(name: .locationUpdated, object: nil)
-                    }
-                }
+                await fetchCore()
+                try? await Task.sleep(for: .seconds(60))
             }
         }
     }
 
-    private func stopPolling() {
-        refreshTask?.cancel()
-        locTask?.cancel()
-        refreshTask = nil
-        locTask = nil
+    private func fetchCore() async {
+        await withTaskGroup(of: Void.self) { g in
+            g.addTask { await store.fetchCharge() }
+            g.addTask { await store.fetchPm25() }
+            g.addTask { await store.fetchLocation() }
+            g.addTask { await store.fetchControl() }
+            g.addTask { await store.fetchCheck() }
+            g.addTask { await store.fetchMessages() }
+        }
+        lastFetch = Date()
     }
 }
 
-// 快控大圆钮（2x2 网格）
-struct QuickCtrlButton: View {
-    let q: HomeView.QuickCtrl
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                ZStack {
-                    Circle()
-                        .fill(q.accent.opacity(0.10))
-                        .frame(width: 60, height: 60)
-                    Image(systemName: q.symbol)
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(q.accent)
-                }
-                Text(q.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+// MARK: - 辅助
+extension DateFormatter {
+    static func relative(_ date: Date) -> String {
+        let now = Date()
+        let diff = Int(now.timeIntervalSince(date))
+        if diff < 60 { return "刚刚" }
+        if diff < 3600 { return "\(diff / 60) 分钟前" }
+        if diff < 86400 { return "\(diff / 3600) 小时前" }
+        return "\(diff / 86400) 天前"
     }
 }
 
-// 内置车辆位置地图（懒加载 + 随 8s 轮询平移）
-struct LocationMapView: View {
-    let latStr: String
-    let lngStr: String
-    let addr: String
-    @State private var camera: MapCameraPosition = .automatic
-
-    private var coordinate: CLLocationCoordinate2D? {
-        Double(latStr).flatMap { la in Double(lngStr).map { lo in
-            CLLocationCoordinate2D(latitude: la, longitude: lo)
-        }}
-    }
-
-    var body: some View {
-        Group {
-            if let coord = coordinate {
-                Map(position: $camera, interactionModes: .all) {
-                    Marker(addr.isEmpty ? "车辆" : addr, systemImage: "car.fill", coordinate: coord)
-                        .tint(.red)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
-                    withAnimation(.easeInOut(duration: 0.4)) {
-                        camera = .camera(MapCamera(centerCoordinate: coord, distance: 600))
-                    }
-                }
-                .onAppear {
-                    withAnimation {
-                        camera = .camera(MapCamera(centerCoordinate: coord, distance: 600))
-                    }
-                }
-            } else {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color(.systemGray5))
-                    VStack(spacing: 6) {
-                        Image(systemName: "location.slash").font(.title2).foregroundStyle(.secondary)
-                        Text("暂无定位坐标").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .frame(height: 190)
-            }
+struct HomeView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            HomeView()
         }
-        .frame(maxWidth: .infinity)
     }
 }
