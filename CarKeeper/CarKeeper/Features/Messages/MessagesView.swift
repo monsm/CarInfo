@@ -180,6 +180,13 @@ struct MessagesView: View {
                             Text(item.time).font(.system(size: 13)).foregroundStyle(.secondary)
                         }
                     }
+                    if !item.plate.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "car.fill").font(.system(size: 12)).foregroundStyle(.accentColor)
+                            Text(item.plate).font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.accentColor)
+                        }
+                    }
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 4)

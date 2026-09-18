@@ -90,11 +90,31 @@ struct MineView: View {
             HStack(spacing: 16) {
                 HStack(spacing: 6) {
                     Image(systemName: "car.fill").font(.system(size: 14)).foregroundStyle(Color.accentColor)
-                    Text("1 辆车").font(.system(size: 14, weight: .medium))
+                    Text(String(store.cars?.count ?? 0) + " 辆车")
+                        .font(.system(size: 14, weight: .medium))
                 }
                 Spacer()
-                Image(systemName: "wifi").font(.system(size: 14)).foregroundStyle(.secondary)
-                Text("在线").font(.system(size: 13)).foregroundStyle(.secondary)
+                if let gt = um?.gender, !gt.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: gt == "男" ? "person.fill" : "person.circle.fill")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                        Text(gt).font(.system(size: 12)).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            HStack(spacing: 12) {
+                if let bt = um.birthday, !bt.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar").font(.system(size: 10)).foregroundStyle(.tertiary)
+                        Text(bt).font(.system(size: 11)).foregroundStyle(.tertiary)
+                    }
+                }
+                if let lt = um.lastLoginTime, !lt.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock").font(.system(size: 10)).foregroundStyle(.tertiary)
+                        Text(lt).font(.system(size: 11)).foregroundStyle(.tertiary)
+                    }
+                }
             }
         }
         .padding(22)

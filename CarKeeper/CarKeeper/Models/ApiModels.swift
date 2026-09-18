@@ -169,6 +169,7 @@ struct DriveModel {
     var motorTemp: String
     var batteryNote: String
     var isMoving: Bool
+    var fireStatus: String?
 }
 
 struct ComfortModel {
@@ -240,6 +241,12 @@ struct HealthModel {
     var counts: [CountPill]
     var systems: [HealthSystem]
     var id: String?
+    /// 检测ID（CheckHistoryId）
+    var checkId: String?
+    /// 数据更新时间（CarDataUpdateTime）
+    var endTime: String?
+    /// 车辆状态（Status: normal/fault 等）
+    var vehicleStatus: String?
 }
 
 struct CountPill: Identifiable {
@@ -255,6 +262,10 @@ struct UserVM {
     var mobile: String
     var authed: Bool
     var nickname: String
+    var gender: String?
+    var birthday: String?
+    var lastLoginTime: String?
+    var source: String?
 }
 
 struct VehicleSummary {

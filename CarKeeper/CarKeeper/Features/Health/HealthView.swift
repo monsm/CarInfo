@@ -96,6 +96,33 @@ struct HealthView: View {
                     Text("最近检测 \(m.time)").font(.system(size: 11)).foregroundStyle(.tertiary)
                 }
             }
+            // 检测ID + 数据更新时间
+            if m.checkId != nil || m.endTime != nil {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let id = m.checkId, !id.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "doc.text.fill").font(.system(size: 10)).foregroundStyle(.tertiary)
+                            Text("检测 ID: \(id.prefix(16))...").font(.system(size: 11, design: .monospaced)).foregroundStyle(.tertiary)
+                        }
+                    }
+                    if let et = m.endTime, !et.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "clock.fill").font(.system(size: 10)).foregroundStyle(.tertiary)
+                            Text("数据更新: \(et)").font(.system(size: 11, design: .monospaced)).foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+            }
+            // 车辆状态 chip
+            if let vs = m.vehicleStatus, !vs.isEmpty {
+                let vsCN: [String: String] = ["normal": "正常", "fault": "故障", "warning": "预警"]
+                let vsCls: [String: String] = ["normal": "ok", "fault": "bad", "warning": "warn"]
+                HStack(spacing: 6) {
+                    StatusDot(cls: vsCls[vs] ?? "na")
+                    Text(vsCN[vs] ?? vs).font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.statusColor(vsCls[vs] ?? "na"))
+                }
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)

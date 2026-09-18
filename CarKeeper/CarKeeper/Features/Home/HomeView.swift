@@ -208,7 +208,17 @@ struct HomeView: View {
 
     // MARK: 车速里程行
     private func driveMetricsRow(_ d: DriveModel) -> some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
+            if !d.fireStatus.isEmpty {
+                let fCls = d.fireStatus == "启动" ? "bad" : "ok"
+                VStack(spacing: 2) {
+                    Image(systemName: d.fireStatus == "启动" ? "fire.fill" : "battery.100")
+                        .font(.system(size: 11)).foregroundStyle(Theme.statusColor(fCls))
+                    Text(d.fireStatus).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.statusColor(fCls))
+                }
+                .frame(width: 52, height: 40)
+                .background(Theme.statusColor(fCls).opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
             MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: .blue)
             MetricPill(icon: "gauge.full", value: d.mile, unit: "km", tint: .accentColor)
         }

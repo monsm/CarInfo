@@ -88,7 +88,7 @@ struct ControlView: View {
                 }
         }
         // MARK: 车身明细（车门/窗/灯状态）
-    private var bodyDetail: (summary: String, cls: String, doorRows: [(String, String, String)], windowRows: [(String, String, String)], lampRows: [(String, String)])? {
+    private var bodyDetail: (summary: String, cls: String, doorRows: [(String, String, String)], windowRows: [(String, String, String)], extraRows: [(String, String, String)], lampRows: [(String, String)])? {
         guard let ctrl = ciVal(store.caches, "control") else { return nil }
         let hasCtrl = ctrl.count > 0
         guard hasCtrl else { return nil }
@@ -150,16 +150,26 @@ struct ControlView: View {
             lampRows.append((label, isOn ? "亮" : "灭"))
         }
         
-        let badCount = doorRows.filter { $0.2 == "bad" }.count + windowRows.filter { $0.2 == "bad" }.count
+        // 舱盖/天窗（引擎盖/天窗）
+        var extraRows: [(String, String, String)] = []
+        if let hood = ciNumber(ctrl, ["Hood", "hood"]) {
+            let v = hood == 0 ? "关闭" : "开启"
+            extraRows.append(("引擎盖", v, hood != 0 ? "bad" : "ok"))
+        }
+        if let sunroof = ciNumber(ctrl, ["Sunroof", "sunroof"]) {
+            let v = sunroof == 0 ? "关闭" : "开启"
+            extraRows.append(("天窗", v, sunroof != 0 ? "bad" : "ok"))
+        }
+        let badCount = doorRows.filter { $0.2 == "bad" }.count + windowRows.filter { $0.2 == "bad" }.count + extraRows.filter { $0.2 == "bad" }.count
         let summary = doorRows.isEmpty && windowRows.isEmpty && lampRows.isEmpty
             ? "--"
             : (badCount > 0 ? "\(badCount) 项异常" : "全部正常")
         let cls = badCount > 0 ? "bad" : "ok"
         
-        return (summary: summary, cls: cls, doorRows: doorRows, windowRows: windowRows, lampRows: lampRows)
+        return (summary: summary, cls: cls, doorRows: doorRows, windowRows: windowRows, extraRows: extraRows, lampRows: lampRows)
     }
     
-    private func bodyDetailCard(_ bd: (summary: String, cls: String, doorRows: [(String, String, String)], windowRows: [(String, String, String)], lampRows: [(String, String)])) -> some View {
+    private func bodyDetailCard(_ bd: (summary: String, cls: String, doorRows: [(String, String, String)], windowRows: [(String, String, String)], extraRows: [(String, String, String)], lampRows: [(String, String)])) -> some View {
         CardBox(title: "车身状态", side: bd.summary, sideCls: bd.cls) {
             VStack(spacing: 8) {
                 if !bd.doorRows.isEmpty {
@@ -176,6 +186,17 @@ struct ControlView: View {
                 if !bd.windowRows.isEmpty {
                     sectionLabel("车窗")
                     ForEach(Array(bd.windowRows.enumerated()), id: \.offset) { _, r in
+                        HStack {
+                            Text(r.0).font(.system(size: 13)).foregroundStyle(.secondary)
+                            Spacer()
+                            Text(r.1).font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(r.2 == "bad" ? Color.red : .primary)
+                        }
+                    }
+                }
+                if !bd.extraRows.isEmpty {
+                    sectionLabel("舱盖/天窗")
+                    ForEach(Array(bd.extraRows.enumerated()), id: \.offset) { _, r in
                         HStack {
                             Text(r.0).font(.system(size: 13)).foregroundStyle(.secondary)
                             Spacer()
