@@ -161,10 +161,11 @@ final class AppStore: @unchecked Sendable {
         guard cars.indices.contains(idx) else { return }
         let c = cars[idx]
         let newId = ciString(c, ["CarId", "carId"]) ?? ""
-        // 切车时清掉上一辆的旧缓存，避免串数据；再拉新车全量。
-        clearCache()
+        // 先更新 carId（触发视图重建，缓存仍在，避免闪烁）
         car = c
         carId = newId
+        // 再清除旧缓存，后台异步拉新车数据
+        clearCache()
         Task { await fetchVehicleData() }
     }
 }

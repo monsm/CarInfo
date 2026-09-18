@@ -590,6 +590,7 @@ struct HomeView: View {
             g.addTask { await store.fetchCore() }
         }
         lastFetch = Date()
+        // 轮询刷新不重播 SOC 入场动画，避免仪表盘闪烁
     }
 }
 

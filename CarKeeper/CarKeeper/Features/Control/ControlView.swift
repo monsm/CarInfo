@@ -279,8 +279,8 @@ struct ControlView: View {
     // MARK: 主控双盘
     private var heroDiscs: some View {
         HStack(spacing: 28) {
-            ForEach(hero, id: \.key) { item in
-                heroDisc(item)
+            ForEach(Array(hero.enumerated()), id: \.element.key) { idx, item in
+                heroDisc(item, idx: idx)
             }
         }
         .frame(maxWidth: .infinity)
@@ -288,8 +288,8 @@ struct ControlView: View {
         .glassCard()
     }
 
-    private func heroDisc(_ item: (key: String, name: String, symbol: String)) -> some View {
-        HeroDiscButton(key: item.key, name: item.name, symbol: item.symbol, disabled: busy || running != nil) { onCmd(item.key) }
+    private func heroDisc(_ item: (key: String, name: String, symbol: String), idx: Int) -> some View {
+        HeroDiscButton(key: item.key, name: item.name, symbol: item.symbol, disabled: busy || running != nil, appearDelay: Double(idx) * 0.08) { onCmd(item.key) }
     }
 
     // MARK: 执行中
@@ -542,8 +542,10 @@ struct HeroDiscButton: View {
     let name: String
     let symbol: String
     let disabled: Bool
+    let appearDelay: CGFloat
     let action: () -> Void
     @State private var isPressed = false
+    @State private var isEntered = false
 
     var body: some View {
         Button(action: action) {
@@ -571,6 +573,12 @@ struct HeroDiscButton: View {
         }
         .buttonStyle(.plain)
         .disabled(disabled)
+        // 液态玻璃入场：交错淡入 + 缩放回弹
+        .opacity(isEntered ? 1 : 0)
+        .scaleEffect(isEntered ? 1.0 : 0.85)
+        .animation(.spring(response: 0.55, dampingFraction: 0.7, blendDuration: 0.35).delay(appearDelay), value: isEntered)
+        .onAppear { isEntered = true }
+        // 液态玻璃按压缩放
         .scaleEffect(isPressed ? 0.88 : 1.0)
         .animation(.spring(response: 0.35, dampingFraction: 0.6, blendDuration: 0.3), value: isPressed)
         .simultaneousGesture(

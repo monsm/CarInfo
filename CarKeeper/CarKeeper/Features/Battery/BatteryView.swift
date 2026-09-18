@@ -404,6 +404,10 @@ struct BatteryView: View {
             if let control = try? await api.getControl(carId: store.carId) { store.saveCache(["control": control]) }
             loaded = true
             errText = ""
+            // 刷新后重新播放 SOC 液态玻璃入场动画
+            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0 }
+            startSocAnimation()
+        } catch {
         } catch {
             errText = error.localizedDescription
             let errDesc = error.localizedDescription.lowercased()
