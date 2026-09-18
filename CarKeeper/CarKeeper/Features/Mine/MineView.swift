@@ -61,23 +61,23 @@ struct MineView: View {
                         .frame(width: 68, height: 68)
                         .shadow(color: Color.accentColor.opacity(0.35), radius: 12, y: 5)
                     Text(um?.avatar ?? "主")
-                        .font(.system(size: 26, weight: .bold))
+                        .font(Theme.d4) weight: .bold))
                         .foregroundStyle(.white)
                 }
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(um?.name ?? "车主").font(.system(size: 21, weight: .bold))
+                    Text(um?.name ?? "车主").font(Theme.d5) weight: .bold))
                     HStack(spacing: 10) {
                         Text(um?.mobile ?? "--")
-                            .font(.system(size: 13, design: .monospaced))
+                            .font(Theme.mono))
                             .foregroundStyle(.secondary)
                         if um?.authed == true {
                             HStack(spacing: 4) {
                                 Image(systemName: "checkmark.seal.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(Color.green)
+                                    .font(Theme.micro))
+                                    .foregroundStyle(Theme.ok)
                                 Text("已实名")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(Color.green)
+                                    .font(Theme.footnote.bold())))
+                                    .foregroundStyle(Theme.ok)
                             }
                         }
                     }
@@ -89,30 +89,30 @@ struct MineView: View {
             // 底部统计
             HStack(spacing: 16) {
                 HStack(spacing: 6) {
-                    Image(systemName: "car.fill").font(.system(size: 14)).foregroundStyle(Color.accentColor)
+                    Image(systemName: "car.fill").font(Theme.caption)).foregroundStyle(Color.accentColor)
                     Text(String(store.cars?.count ?? 0) + " 辆车")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(Theme.caption)))
                 }
                 Spacer()
                 if let gt = um?.gender, !gt.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: gt == "男" ? "person.fill" : "person.circle.fill")
-                            .font(.system(size: 11)).foregroundStyle(.secondary)
-                        Text(gt).font(.system(size: 12)).foregroundStyle(.secondary)
+                            .font(Theme.footnote)).foregroundStyle(.secondary)
+                        Text(gt).font(Theme.caption)).foregroundStyle(.secondary)
                     }
                 }
             }
             HStack(spacing: 12) {
                 if let bt = um.birthday, !bt.isEmpty {
                     HStack(spacing: 4) {
-                        Image(systemName: "calendar").font(.system(size: 10)).foregroundStyle(.secondary)
-                        Text(bt).font(.system(size: 11)).foregroundStyle(.secondary)
+                        Image(systemName: "calendar").font(Theme.micro)).foregroundStyle(.secondary)
+                        Text(bt).font(Theme.footnote)).foregroundStyle(.secondary)
                     }
                 }
                 if let lt = um.lastLoginTime, !lt.isEmpty {
                     HStack(spacing: 4) {
-                        Image(systemName: "clock").font(.system(size: 10)).foregroundStyle(.secondary)
-                        Text(lt).font(.system(size: 11)).foregroundStyle(.secondary)
+                        Image(systemName: "clock").font(Theme.micro)).foregroundStyle(.secondary)
+                        Text(lt).font(Theme.footnote)).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -129,13 +129,13 @@ struct MineView: View {
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: "car.fill")
-                    .font(.system(size: 26))
+                    .font(Theme.d4))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 52, height: 52)
                     .background(.thin, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(sum?.name ?? "未绑定车辆").font(.system(size: 17, weight: .semibold))
-                    Text(sum?.plate ?? "暂无车牌").font(.system(size: 13)).foregroundStyle(.secondary)
+                    Text(sum?.name ?? "未绑定车辆").font(Theme.h3)))
+                    Text(sum?.plate ?? "暂无车牌").font(Theme.caption)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 if let d = sum?.insuranceDays {
@@ -143,7 +143,7 @@ struct MineView: View {
                          cls: d < 0 ? "bad" : (d <= 30 ? "warn" : "ok"), dot: false)
                 }
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.tertiary)
+                    .font(Theme.footnote.bold()))).foregroundStyle(.tertiary)
             }
             .padding(16)
             .glassCard()
@@ -177,17 +177,17 @@ struct MineView: View {
         CardBox(title: "检查更新", side: nil) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("下载最新 GitHub 构建的 ipa，分享后用自签工具安装")
-                    .font(.system(size: 13)).foregroundStyle(.secondary)
+                    .font(Theme.caption)).foregroundStyle(.secondary)
                 if showDownload {
                     VStack(spacing: 6) {
                         ProgressView(value: downloadPct)
                             .tint(.accentColor)
                         Text("正在下载… \(Int(downloadPct * 100))%")
-                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                            .font(Theme.caption)).foregroundStyle(.secondary)
                     }
                 }
                 if let m = updateMsg {
-                    Text(m).font(.system(size: 13)).foregroundStyle(.secondary)
+                    Text(m).font(Theme.caption)).foregroundStyle(.secondary)
                 }
                 HStack(spacing: 12) { updateButtons() }
             }
@@ -204,11 +204,11 @@ struct MineView: View {
                         .fill(tint.opacity(0.10))
                         .frame(width: 48, height: 48)
                     Image(systemName: symbol)
-                        .font(.system(size: 22, weight: .medium))
+                        .font(Theme.d5) weight: .medium))
                         .foregroundStyle(tint)
                 }
                 Text(label)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Theme.caption.bold())))
                     .foregroundStyle(.primary)
             }
             .frame(maxWidth: .infinity)
@@ -238,7 +238,7 @@ struct MineView: View {
             HStack(spacing: 6) {
                 if updateBusy { ProgressView().controlSize(.mini).tint(.white) }
                 Text(updateBusy ? "检查中…" : "检查更新")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.caption.bold())))
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -254,7 +254,7 @@ struct MineView: View {
             shareSheetFlag = true
         } label: {
             Label("分享安装包", systemImage: "square.and.arrow.up")
-                .font(.system(size: 14, weight: .semibold))
+                .font(Theme.caption.bold())))
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .background(.thin, in: Capsule())
         }
@@ -267,7 +267,7 @@ struct MineView: View {
             showToken = true
         } label: {
             Label("Token", systemImage: "key.fill")
-                .font(.system(size: 13))
+                .font(Theme.caption))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12).padding(.vertical, 10)
                 .background(.thin, in: Capsule())

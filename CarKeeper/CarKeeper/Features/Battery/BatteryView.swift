@@ -31,7 +31,7 @@ struct BatteryView: View {
             .safeAreaPadding(.bottom, 8)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground(.green)
+        .pageBackground(Theme.pageGreen)
         .navigationTitle("电池与充电").navBarStyle()
         .onAppear { loadIfNeeded(); startSocAnimation() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
@@ -42,7 +42,7 @@ struct BatteryView: View {
             } else if !errText.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle").font(.title).foregroundStyle(.orange)
-                    Text(errText).font(.system(size: 14)).foregroundStyle(.secondary)
+                    Text(errText).font(Theme.caption)).foregroundStyle(.secondary)
                     Button("重试") { Task { await load() } }
                         .buttonStyle(.borderedProminent)
                 }
@@ -94,10 +94,10 @@ struct BatteryView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(e.soc == "--" ? "--" : e.soc)
                             .font(Theme.d1)
-                        Text("%").font(.system(size: 22, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+                        Text("%").font(Theme.d5) weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
                     }
                     Text("电池电量")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Theme.caption)))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -108,7 +108,7 @@ struct BatteryView: View {
                 MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accentColor)
             }
             Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5)))")
-                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .font(Theme.footnote)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 30)
@@ -144,7 +144,7 @@ struct BatteryView: View {
                         ForEach(batt.reasons) { r in
                             HStack(alignment: .top, spacing: 8) {
                                 StatusDot(cls: r.cls)
-                                Text(r.t).font(.system(size: 13)).foregroundStyle(.secondary)
+                                Text(r.t).font(Theme.caption)).foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -162,7 +162,7 @@ struct BatteryView: View {
                         sectionLabel("单体电压 (V)")
                         Chart(Array(cell.bars.enumerated()), id: \.offset) { idx, v in
                             BarMark(x: .value("序号", idx), y: .value("V", v))
-                                .foregroundStyle(Color.green.opacity(0.7))
+                                .foregroundStyle(Theme.ok.opacity(0.7))
                                 .cornerRadius(1.5)
                         }
                         .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
@@ -182,7 +182,7 @@ struct BatteryView: View {
                         sectionLabel("温度探针 (℃)")
                         Chart(Array(probe.bars.enumerated()), id: \.offset) { idx, v in
                             BarMark(x: .value("序号", idx), y: .value("℃", v))
-                                .foregroundStyle(Color.blue.opacity(0.55))
+                                .foregroundStyle(Theme.brand.opacity(0.55))
                                 .cornerRadius(1.5)
                         }
                         .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
@@ -255,7 +255,7 @@ struct BatteryView: View {
                         ForEach(Array(b.motors.enumerated()), id: \.offset) { _, m in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(m.num == "--" ? "驱动电机" : "驱动电机 #\(m.num)")
-                                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary)
+                                    .font(Theme.caption.bold()))).foregroundStyle(.secondary)
                                 let rows = motorRows(m)
                                 ForEach(Array(rows.enumerated()), id: \.offset) { idx, r in
                                     KVRow(k: r.k, v: r.v)
@@ -276,20 +276,20 @@ struct BatteryView: View {
                 sideCls: b.faultTotal > 0 ? "bad" : "ok") {
             if b.faults.filter({ $0.count > 0 }).isEmpty {
                 Text("驱动电机 / 储能 / 发动机均无故障")
-                    .font(.system(size: 13)).foregroundStyle(.secondary)
+                    .font(Theme.caption)).foregroundStyle(.secondary)
             } else {
                 VStack(spacing: 10) {
                     ForEach(b.faults.filter { $0.count > 0 }) { f in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(f.name).font(.system(size: 14, weight: .semibold))
+                                Text(f.name).font(Theme.caption.bold())))
                                 Spacer()
-                                Text("\(f.count) 条").font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(Color.red)
+                                Text("\(f.count) 条").font(Theme.caption.bold())))
+                                    .foregroundStyle(Theme.bad)
                             }
                             if !f.codes.isEmpty {
                                 Text(f.codes)
-                                    .font(.system(size: 11, design: .monospaced))
+                                    .font(Theme.mono))
                                     .foregroundStyle(.secondary).lineLimit(3)
                             }
                         }
@@ -310,10 +310,10 @@ struct BatteryView: View {
                         ForEach(Array(b.alarms.enumerated()), id: \.offset) { idx, a in
                             HStack {
                                 StatusDot(cls: "bad")
-                                Text(a).font(.system(size: 14))
+                                Text(a).font(Theme.caption))
                                 Spacer()
-                                Text("触发").font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Color.red)
+                                Text("触发").font(Theme.footnote.bold())))
+                                    .foregroundStyle(Theme.bad)
                             }
                             .padding(.vertical, 6)
                             if idx < b.alarms.count - 1 { ListDivider() }
@@ -326,16 +326,16 @@ struct BatteryView: View {
 
     // MARK: 辅助
     private func sectionLabel(_ t: String) -> some View {
-        Text(t).font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+        Text(t).font(Theme.footnote.bold()))).foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func miniStat(_ k: String, _ v: String, _ unit: String, warn: Bool = false) -> some View {
         HStack(spacing: 4) {
-            Text(k).font(.system(size: 11)).foregroundStyle(.secondary)
-            Text(v).font(.system(size: 13, weight: .semibold, design: .monospaced))
-                .foregroundStyle(warn ? Color.red : .primary)
-            Text(unit).font(.system(size: 10)).foregroundStyle(.secondary)
+            Text(k).font(Theme.footnote)).foregroundStyle(.secondary)
+            Text(v).font(Theme.caption.bold()), design: .monospaced))
+                .foregroundStyle(warn ? Theme.bad : .primary)
+            Text(unit).font(Theme.micro)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)

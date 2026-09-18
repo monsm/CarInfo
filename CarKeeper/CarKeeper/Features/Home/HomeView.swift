@@ -91,10 +91,10 @@ struct HomeView: View {
         let dateStr = DateFormatter.relative(Date())
         return HStack {
             Text(greeting)
-                .font(.system(size: 15, weight: .semibold))
+                .font(Theme.h4)))
             Spacer()
             Text(dateStr)
-                .font(.system(size: 13)).foregroundStyle(.secondary)
+                .font(Theme.caption)).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -145,10 +145,10 @@ struct HomeView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(e.soc == "--" ? "--" : e.soc)
                             .font(Theme.d1)
-                        Text("%").font(.system(size: 22, weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
+                        Text("%").font(Theme.d5) weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
                     }
                     Text("剩余电量")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Theme.caption)))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -161,7 +161,7 @@ struct HomeView: View {
             }
             // 在线状态
             Text(e.online.text)
-                .font(.system(size: 11, weight: .medium))
+                .font(Theme.footnote)))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -201,7 +201,7 @@ struct HomeView: View {
         let carSel = VM.carSel(store.cars, store.carId)
         return HStack(spacing: 12) {
             Image(systemName: "car.2.fill")
-                .font(.system(size: 16))
+                .font(Theme.bodyMd))
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 40, height: 40)
                 .background(.thin, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -215,11 +215,11 @@ struct HomeView: View {
             }
             .pickerStyle(.menu)
             .padding(.horizontal, 4)
-            .font(.system(size: 16, weight: .semibold))
+            .font(Theme.h4)))
             Spacer()
             if carSel.count > 1 {
                 Text("\(carSel.count) 辆")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Theme.footnote.bold())))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(.thin, in: Capsule())
@@ -257,13 +257,13 @@ struct HomeView: View {
                 let fCls = d.fireStatus == "启动" ? "bad" : "ok"
                 VStack(spacing: 2) {
                     Image(systemName: d.fireStatus == "启动" ? "fire.fill" : "battery.100")
-                        .font(.system(size: 11)).foregroundStyle(Theme.statusColor(fCls))
-                    Text(d.fireStatus).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.statusColor(fCls))
+                        .font(Theme.footnote)).foregroundStyle(Theme.statusColor(fCls))
+                    Text(d.fireStatus).font(Theme.micro))).foregroundStyle(Theme.statusColor(fCls))
                 }
                 .frame(width: 52, height: 40)
                 .background(Theme.statusColor(fCls).opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
-            MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: .blue)
+            MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: Theme.brand)
             MetricPill(icon: "gauge.full", value: d.mile, unit: "km", tint: .accentColor)
         }
         .padding(Theme.Spacing.xl)
@@ -333,15 +333,15 @@ struct HomeView: View {
         let icon = domainIcon(d.key)
         HStack(spacing: 10) {
             Text(icon)
-                .font(.system(size: 13))
+                .font(Theme.caption))
                 .foregroundStyle(Theme.statusColor(d.cls))
                 .frame(width: 20)
             Text(d.label)
-                .font(.system(size: 14, weight: .medium))
+                .font(Theme.caption)))
                 .foregroundStyle(.primary)
             Spacer()
             Text(d.short)
-                .font(.system(size: 13, weight: .semibold))
+                .font(Theme.caption.bold())))
                 .foregroundStyle(Theme.statusColor(d.cls))
         }
         .padding(.vertical, 6)
@@ -368,16 +368,16 @@ struct HomeView: View {
         return VStack(spacing: Theme.cardSpacing) {
             // 电池摘要行（SOC / 续航 / 告警 来自分析域，不重复 SOC Hero）
             VStack(alignment: .leading, spacing: 8) {
-                Text("电池状态").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                Text("电池状态").font(Theme.footnote.bold()))).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 12) {
                     ForEach(battSummary.headLines, id: \.id) { h in
                         VStack(spacing: 4) {
-                            Text(h.label).font(.system(size: 11)).foregroundStyle(.secondary)
-                            Text(h.value).font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(h.cls == "ok" ? .green : (h.cls == "bad" ? .red : .primary))
+                            Text(h.label).font(Theme.footnote)).foregroundStyle(.secondary)
+                            Text(h.value).font(Theme.h3)))
+                                .foregroundStyle(h.cls == "ok" ? Theme.ok : (h.cls == "bad" ? Theme.bad : .primary))
                             if !h.reason.isEmpty {
-                                Text(h.reason).font(.system(size: 10)).foregroundStyle(.secondary)
+                                Text(h.reason).font(Theme.micro)).foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }
                         }
@@ -391,10 +391,10 @@ struct HomeView: View {
             // 分析结论详情
             for line in battSummary.headLines {
                 HStack(spacing: 6) {
-                    Text(line.label).font(.system(size: 12)).foregroundStyle(.secondary)
-                    Text(line.value).font(.system(size: 13, weight: .semibold)).foregroundStyle(line.cls == "ok" ? .green : (line.cls == "bad" ? .red : .primary))
+                    Text(line.label).font(Theme.caption)).foregroundStyle(.secondary)
+                    Text(line.value).font(Theme.caption.bold()))).foregroundStyle(line.cls == "ok" ? Theme.ok : (line.cls == "bad" ? Theme.bad : .primary))
                     if !line.reason.isEmpty {
-                        Text(line.reason).font(.system(size: 11)).foregroundStyle(.secondary)
+                        Text(line.reason).font(Theme.footnote)).foregroundStyle(.secondary)
                         Spacer()
                     }
                 }
@@ -410,9 +410,9 @@ struct HomeView: View {
                         ForEach(cells) { s in
                             VStack(spacing: 2) {
                                 Text(s.num == "--" ? "子" : "S\(s.num!)")
-                                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                                    .font(Theme.micro)).foregroundStyle(.secondary)
                                 Text(s.maxV.map { String(format: "%.3f", $0) } ?? "--")
-                                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                    .font(Theme.footnote.bold()), design: .monospaced))
                                     .foregroundStyle(.primary)
                             }
                             .frame(width: 52)
@@ -420,13 +420,13 @@ struct HomeView: View {
                     }
                     HStack(spacing: 8) {
                         Text("压差 \(String(format: "%.3f", diff))V")
-                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                            .font(Theme.caption)).foregroundStyle(.secondary)
                         Spacer()
                         Text("最低 \(String(format: "%.3f", minV))V / 最高 \(String(format: "%.3f", maxV))V")
-                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                            .font(Theme.caption)).foregroundStyle(.secondary)
                     }
                 } else {
-                    Text("接口未上报单体电压").font(.system(size: 13)).foregroundStyle(.secondary)
+                    Text("接口未上报单体电压").font(Theme.caption)).foregroundStyle(.secondary)
                 }
             }
 
@@ -458,7 +458,7 @@ struct HomeView: View {
                 }
             }
             Text("温度 \(tyre.tempRange)")
-                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .font(Theme.footnote)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
@@ -474,10 +474,10 @@ struct HomeView: View {
                 }
                 HStack(spacing: 10) {
                     StatTile(icon: "air.purifier", label: "净化器", value: comfort.purifier, tint: .purple)
-                    StatTile(icon: "cloud.sun", label: "车外温度", value: comfort.envTemp == "--" ? "--" : String(comfort.envTemp.dropLast()), unit: "℃", tint: .blue)
+                    StatTile(icon: "cloud.sun", label: "车外温度", value: comfort.envTemp == "--" ? "--" : String(comfort.envTemp.dropLast()), unit: "℃", tint: Theme.brand)
                 }
                 Text(comfort.acText)
-                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                    .font(Theme.caption)).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -494,9 +494,9 @@ struct HomeView: View {
                         .transition(.opacity)
                 }
                 Text(loc.addr.isEmpty ? "暂无定位数据" : loc.addr)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(Theme.caption)))
                     .lineLimit(1)
-                Text(loc.satAlt).font(.system(size: 11)).foregroundStyle(.secondary)
+                Text(loc.satAlt).font(Theme.footnote)).foregroundStyle(.secondary)
                 HStack(spacing: 8) {
                     mapToggleButton
                     if loc.lat != "--" && loc.lng != "--" { navButton(loc) }
@@ -513,7 +513,7 @@ struct HomeView: View {
             HStack(spacing: 4) {
                 Image(systemName: showMap ? "map.fill" : "map")
                 Text(showMap ? "隐藏地图" : "显示地图")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(Theme.caption)))
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
             .background(.thin, in: Capsule())
@@ -525,7 +525,7 @@ struct HomeView: View {
         Button { openNav(loc) }
         label: {
             Image(systemName: "arrow.up.right")
-                .font(.system(size: 12))
+                .font(Theme.caption))
                 .foregroundStyle(.accentColor)
                 .padding(8)
                 .background(.thin, in: Circle())
@@ -538,13 +538,13 @@ struct HomeView: View {
         let update = lastFetch.map { DateFormatter.relative($0) } ?? "刚刚"
         return HStack(spacing: 8) {
             Image(systemName: "clock.badge.checkmark")
-                .font(.system(size: 11)).foregroundStyle(.tertiary)
+                .font(Theme.footnote)).foregroundStyle(.tertiary)
             Text("更新于 \(update)")
-                .font(.system(size: 12)).foregroundStyle(.secondary)
+                .font(Theme.caption)).foregroundStyle(.secondary)
             Spacer()
             Button { fetchCore() } label: {
                 Image(systemName: "arrow.clockwise.circle.fill")
-                    .font(.system(size: 13))
+                    .font(Theme.caption))
                     .foregroundStyle(.accentColor)
                     .padding(6)
                     .background(.thin, in: Circle())
@@ -618,15 +618,15 @@ struct LocationMapViewPlaceholder: View {
                 .opacity(0.9)
             VStack(spacing: 6) {
                 Image(systemName: "map.fill")
-                    .font(.system(size: 28))
+                    .font(Theme.d0b))
                     .foregroundStyle(.accentColor.opacity(0.6))
                 Text(addr.isEmpty ? "点击导航查看位置" : addr)
-                    .font(.system(size: 12))
+                    .font(Theme.caption))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                 if lat != "--" && lng != "--" {
                     Text("\(lat) · \(lng)")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(Theme.micro))
                         .foregroundStyle(.tertiary)
                 }
             }

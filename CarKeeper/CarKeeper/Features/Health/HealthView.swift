@@ -35,7 +35,7 @@ struct HealthView: View {
             .safeAreaPadding(.bottom, 8)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground(.green)
+        .pageBackground(Theme.pageGreen)
         .navigationTitle("健康报告").navBarStyle()
         .onAppear {
             if expandedSystems.isEmpty, let m = model {
@@ -70,8 +70,8 @@ struct HealthView: View {
     // MARK: 加载状态
     private var loadingView: some View {
         VStack(spacing: 12) {
-            ProgressView().controlSize(.large).tint(.green)
-            Text("正在读取健康报告…").font(.system(size: 13)).foregroundStyle(.secondary)
+            ProgressView().controlSize(.large).tint(Theme.ok)
+            Text("正在读取健康报告…").font(Theme.caption)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity).padding(.vertical, 60)
         .glassCard()
@@ -152,11 +152,11 @@ struct HealthView: View {
                         .font(Theme.d1)
                         .foregroundStyle(scoreForeground(m.scorePct))
                     Text("分")
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .font(Theme.h2) weight: .semibold, design: .rounded))
                         .foregroundStyle(.secondary)
                 }
                 Text("健康评分")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(Theme.caption)))
                     .foregroundStyle(.secondary)
             }
         }
@@ -168,10 +168,10 @@ struct HealthView: View {
         let clsColor = Theme.statusColor(c.cls)
         return VStack(spacing: 4) {
             Text(c.n)
-                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .font(Theme.d4) weight: .bold, design: .rounded))
                 .foregroundStyle(clsColor)
             Text(c.key)
-                .font(.system(size: 11))
+                .font(Theme.footnote))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -192,10 +192,10 @@ struct HealthView: View {
             if !m.time.isEmpty {
                 HStack(spacing: 6) {
                     Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 11))
+                        .font(Theme.footnote))
                         .foregroundStyle(.secondary)
                     Text("最近检测  \(m.time)")
-                        .font(.system(size: 11))
+                        .font(Theme.footnote))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -204,20 +204,20 @@ struct HealthView: View {
                     if let id = m.checkId, !id.isEmpty {
                         HStack(spacing: 6) {
                             Image(systemName: "doc.text.fill")
-                                .font(.system(size: 10))
+                                .font(Theme.micro))
                                 .foregroundStyle(.secondary)
                             Text("检测 ID: \(id.prefix(16))…")
-                                .font(.system(size: 11, design: .monospaced))
+                                .font(Theme.mono))
                                 .foregroundStyle(.secondary)
                         }
                     }
                     if let et = m.endTime, !et.isEmpty {
                         HStack(spacing: 6) {
                             Image(systemName: "clock.fill")
-                                .font(.system(size: 10))
+                                .font(Theme.micro))
                                 .foregroundStyle(.secondary)
                             Text("数据更新: \(et)")
-                                .font(.system(size: 11, design: .monospaced))
+                                .font(Theme.mono))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -229,7 +229,7 @@ struct HealthView: View {
                 HStack(spacing: 6) {
                     StatusDot(cls: vsCls[vs] ?? "na")
                     Text(vsCN[vs] ?? vs)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(Theme.footnote)))
                         .foregroundStyle(Theme.statusColor(vsCls[vs] ?? "na"))
                 }
             }
@@ -301,10 +301,10 @@ struct SystemRowView: View {
             // 标题行：带玻璃形变高亮
             HStack(spacing: 10) {
                 StatusDot(cls: sys.statusCls)
-                Text(sys.name).font(.system(size: 15, weight: .semibold))
+                Text(sys.name).font(Theme.h4)))
                 Spacer()
                 Text(sys.statusText)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Theme.caption.bold())))
                     .foregroundStyle(Theme.statusColor(sys.statusCls))
                 // 旋转 Chevron + 玻璃反光条
                 HStack(spacing: 6) {
@@ -315,7 +315,7 @@ struct SystemRowView: View {
                         .frame(width: isOpen ? 18 : 0, height: 2)
                         .animation(.spring(.duration(0.3)), value: isOpen)
                     Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Theme.footnote.bold())))
                         .foregroundStyle(isOpen ? Theme.statusColor(sys.statusCls) : .tertiary)
                         .rotationEffect(.degrees(isOpen ? 0 : 180))
                         .animation(.spring(response: 0.35, dampingFraction: 0.65), value: isOpen)
@@ -365,16 +365,16 @@ struct SystemChildRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
-                Text(item.name).font(.system(size: 13)).foregroundStyle(.secondary)
+                Text(item.name).font(Theme.caption)).foregroundStyle(.secondary)
                 Spacer()
                 Text(item.statusText)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Theme.footnote.bold())))
                     .foregroundStyle(Theme.statusColor(item.statusCls))
             }
             if let d = item.detect, !d.isEmpty { KVRow(k: "检测值", v: d) }
             if let s = item.suggest, !s.isEmpty { KVRow(k: "参考范围", v: s) }
             if let desc = item.desc, !desc.isEmpty {
-                Text(desc).font(.system(size: 11)).foregroundStyle(.secondary)
+                Text(desc).font(Theme.footnote)).foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 8)

@@ -71,7 +71,7 @@ struct ControlView: View {
             .safeAreaPadding(.bottom, 12)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground(.blue)
+        .pageBackground(Theme.pageBlue)
         .navigationTitle("车控").navBarStyle()
         .sheet(isPresented: $showPin) {
             PINKeypadView()
@@ -182,10 +182,10 @@ struct ControlView: View {
                     sectionLabel("车门")
                     ForEach(Array(bd.doorRows.enumerated()), id: \.offset) { _, r in
                         HStack {
-                            Text(r.0).font(.system(size: 13)).foregroundStyle(.secondary)
+                            Text(r.0).font(Theme.caption)).foregroundStyle(.secondary)
                             Spacer()
-                            Text(r.1).font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(r.2 == "bad" ? Color.red : .primary)
+                            Text(r.1).font(Theme.caption)))
+                                .foregroundStyle(r.2 == "bad" ? Theme.bad : .primary)
                         }
                     }
                 }
@@ -193,10 +193,10 @@ struct ControlView: View {
                     sectionLabel("车窗")
                     ForEach(Array(bd.windowRows.enumerated()), id: \.offset) { _, r in
                         HStack {
-                            Text(r.0).font(.system(size: 13)).foregroundStyle(.secondary)
+                            Text(r.0).font(Theme.caption)).foregroundStyle(.secondary)
                             Spacer()
-                            Text(r.1).font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(r.2 == "bad" ? Color.red : .primary)
+                            Text(r.1).font(Theme.caption)))
+                                .foregroundStyle(r.2 == "bad" ? Theme.bad : .primary)
                         }
                     }
                 }
@@ -204,10 +204,10 @@ struct ControlView: View {
                     sectionLabel("舱盖/天窗")
                     ForEach(Array(bd.extraRows.enumerated()), id: \.offset) { _, r in
                         HStack {
-                            Text(r.0).font(.system(size: 13)).foregroundStyle(.secondary)
+                            Text(r.0).font(Theme.caption)).foregroundStyle(.secondary)
                             Spacer()
-                            Text(r.1).font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(r.2 == "bad" ? Color.red : .primary)
+                            Text(r.1).font(Theme.caption)))
+                                .foregroundStyle(r.2 == "bad" ? Theme.bad : .primary)
                         }
                     }
                 }
@@ -216,9 +216,9 @@ struct ControlView: View {
                     let lit = bd.lampRows.filter { $0.1 == "亮" }
                     if !lit.isEmpty {
                         Text(lit.map { $0.0 }.joined(separator: " · "))
-                            .font(.system(size: 13)).foregroundStyle(.orange)
+                            .font(Theme.caption)).foregroundStyle(Theme.warn)
                     } else {
-                        Text("全部关闭").font(.system(size: 13)).foregroundStyle(.secondary)
+                        Text("全部关闭").font(Theme.caption)).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -226,7 +226,7 @@ struct ControlView: View {
     }
     
     private func sectionLabel(_ t: String) -> some View {
-        Text(t).font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+        Text(t).font(Theme.footnote.bold()))).foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -259,8 +259,8 @@ struct ControlView: View {
         let carSel = VM.carSel(store.cars, store.carId)
         return HStack(spacing: 10) {
             Image(systemName: "car.2.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(Color.blue)
+                .font(Theme.caption))
+                .foregroundStyle(Theme.brand)
             Picker("车辆", selection: Binding(
                 get: { carSel.index },
                 set: { store.selectCar($0) }
@@ -269,7 +269,7 @@ struct ControlView: View {
                     Text(opt.name).tag(idx)
                 }
             }
-            .font(.system(size: 15, weight: .semibold))
+            .font(Theme.h4)))
             Spacer()
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
@@ -297,11 +297,11 @@ struct ControlView: View {
         HStack(spacing: 12) {
             ProgressView()
                 .controlSize(.regular)
-                .tint(.blue)
+                .tint(Theme.brand)
             VStack(alignment: .leading, spacing: 3) {
-                Text(run.name).font(.system(size: 15, weight: .semibold))
+                Text(run.name).font(Theme.h4)))
                 Text(run.progress.isEmpty ? "正在等待车辆响应…" : run.progress)
-                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                    .font(Theme.caption)).foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -331,10 +331,10 @@ struct ControlView: View {
                 } label: {
                     HStack {
                         Image(systemName: showMoreCommands ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(Theme.footnote.bold())))
                             .foregroundStyle(.tertiary)
                         Text(showMoreCommands ? "收起" : "更多指令")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(Theme.caption)))
                             .foregroundStyle(.accentColor)
                         Spacer()
                     }
@@ -352,19 +352,19 @@ struct ControlView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: item.symbol)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.blue)
+                    .font(Theme.bodyMd)))
+                    .foregroundStyle(Theme.brand)
                     .frame(width: 30, height: 30)
                     .background(.thin, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name).font(.system(size: 15, weight: .medium))
+                    Text(item.name).font(Theme.body)))
                     if let note = item.note {
-                        Text(note).font(.system(size: 11)).foregroundStyle(.secondary)
+                        Text(note).font(Theme.footnote)).foregroundStyle(.secondary)
                     }
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Theme.footnote.bold())))
                     .foregroundStyle(.tertiary)
             }
             .padding(.vertical, 10)
@@ -383,13 +383,13 @@ struct ControlView: View {
                     HStack(spacing: 12) {
                         StatusDot(cls: item.resultCls)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(item.name).font(.system(size: 14, weight: .medium))
-                            Text(item.resultText).font(.system(size: 12))
+                            Text(item.name).font(Theme.caption)))
+                            Text(item.resultText).font(Theme.caption))
                                 .foregroundStyle(Theme.statusColor(item.resultCls))
                         }
                         Spacer()
                         Text(item.startedAt.suffix(5))
-                            .font(.system(size: 12, design: .monospaced))
+                            .font(Theme.monoLg))
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 8)
@@ -502,12 +502,12 @@ struct ControlView: View {
         guard let r = lastResult else { return EmptyView().frame(width: 0, height: 0) }
         return VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(r.name).font(.system(size: 18, weight: .bold))
+                Text(r.name).font(Theme.h3) weight: .bold))
                 Spacer()
                 Pill(text: r.resultText, cls: r.resultCls, dot: false)
             }
             if !r.progress.isEmpty {
-                Text(r.progress).font(.system(size: 14)).foregroundStyle(.secondary)
+                Text(r.progress).font(Theme.caption)).foregroundStyle(.secondary)
             }
             if !r.handleCode.isEmpty {
                 KVRow(k: "错误码", v: r.handleCode)
@@ -552,22 +552,22 @@ struct HeroDiscButton: View {
             VStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(Color.blue.opacity(0.08))
+                        .fill(Theme.brand.opacity(0.08))
                         .frame(width: 92, height: 92)
                     Circle()
-                        .fill(Color.blue.opacity(0.12))
+                        .fill(Theme.brand.opacity(0.12))
                         .frame(width: 80, height: 80)
                     Circle()
-                        .strokeBorder(Color.blue.opacity(0.30), lineWidth: 1.5)
+                        .strokeBorder(Theme.brand.opacity(0.30), lineWidth: 1.5)
                         .frame(width: 80, height: 80)
                     Image(systemName: symbol)
-                        .font(.system(size: 32, weight: .medium))
-                        .foregroundStyle(Color.blue)
+                        .font(Theme.d3))
+                        .foregroundStyle(Theme.brand)
                 }
                 .opacity(disabled ? 0.45 : 1)
                 .animation(.easeInOut(duration: 0.2), value: disabled)
                 Text(name)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(Theme.h4)))
                     .foregroundStyle(disabled ? .secondary : .primary)
             }
         }
@@ -600,17 +600,17 @@ struct PINKeypadView: View {
         VStack(spacing: 22) {
             Capsule().fill(.secondary.opacity(0.4)).frame(width: 40, height: 5)
             VStack(spacing: 4) {
-                Text("输入控车码").font(.system(size: 20, weight: .bold))
-                Text("6 位数字 · 输满后自动执行").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text("输入控车码").font(Theme.h2) weight: .bold))
+                Text("6 位数字 · 输满后自动执行").font(Theme.caption)).foregroundStyle(.secondary)
             }
             HStack(spacing: 10) {
                 ForEach(0..<6, id: \.self) { i in
                     Text(i < pin.count ? String(pin[pin.index(pin.startIndex, offsetBy: i)]) : "")
-                        .font(.system(size: 26, weight: .semibold, design: .rounded))
+                        .font(Theme.d4) weight: .semibold, design: .rounded))
                         .frame(width: 42, height: 54)
                         .background(.thin, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(i == pin.count ? Color.blue : Color(.systemGray4),
+                            .strokeBorder(i == pin.count ? Theme.brand : Color(.systemGray4),
                                           lineWidth: i == pin.count ? 2 : 1))
                 }
             }
@@ -624,7 +624,7 @@ struct PINKeypadView: View {
                             else if k == "" { Color.clear }
                             else { Text(k) }
                         }
-                        .font(.system(size: 24, weight: .medium, design: .rounded))
+                        .font(Theme.d4) weight: .medium, design: .rounded))
                         .frame(maxWidth: .infinity, minHeight: 56)
                         .background(.thin, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .foregroundStyle(.primary)
@@ -633,7 +633,7 @@ struct PINKeypadView: View {
                 }
             }
             Button("取消") { dismiss() }
-                .font(.system(size: 15, weight: .semibold))
+                .font(Theme.h4)))
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 8)
         }
@@ -671,17 +671,17 @@ struct ACStepperView: View {
         VStack(spacing: 24) {
             Capsule().fill(.secondary.opacity(0.4)).frame(width: 40, height: 5)
             VStack(spacing: 4) {
-                Text("空调温度").font(.system(size: 20, weight: .bold))
-                Text("设置范围 17 – 33 ℃").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text("空调温度").font(Theme.h2) weight: .bold))
+                Text("设置范围 17 – 33 ℃").font(Theme.caption)).foregroundStyle(.secondary)
             }
             HStack(spacing: 32) {
                 tempButton("minus", canDo: temp > 17) { temp -= 1 }
                 VStack(spacing: 0) {
                     Text("\(temp)")
-                        .font(.system(size: 76, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.blue)
+                        .font(Theme.d1) weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.brand)
                         .contentTransition(.numericText())
-                    Text("℃").font(.system(size: 14)).foregroundStyle(.secondary)
+                    Text("℃").font(Theme.caption)).foregroundStyle(.secondary)
                 }
                 tempButton("plus", canDo: temp < 33) { temp += 1 }
             }
@@ -691,16 +691,16 @@ struct ACStepperView: View {
                 dismiss()
             } label: {
                 Text("下一步 · 输入控车码")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(Theme.h3)))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 15)
-                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.blue))
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.brand))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 8)
             Button("取消") { dismiss() }
-                .font(.system(size: 14)).foregroundStyle(.secondary)
+                .font(Theme.caption)).foregroundStyle(.secondary)
         }
         .padding(Theme.Spacing.xxl)
         .presentationDetents([.medium])
@@ -712,8 +712,8 @@ struct ACStepperView: View {
             action()
         } label: {
             Image(systemName: "\(sym).circle.fill")
-                .font(.system(size: 42))
-                .foregroundStyle(canDo ? Color.blue : Color(.systemGray4))
+                .font(Theme.d0))
+                .foregroundStyle(canDo ? Theme.brand : Color(.systemGray4))
         }
         .buttonStyle(.plain)
         .disabled(!canDo)

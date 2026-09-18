@@ -125,7 +125,7 @@ struct MainTabView: View {
         .overlay(alignment: .bottom) {
             if nav.showCopiedToast {
                 Label("VIN 已复制", systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.caption.bold())))
                     .padding(.horizontal, 20).padding(.vertical, 12)
                     .background(.thin, in: Capsule())
                     .overlay(Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))

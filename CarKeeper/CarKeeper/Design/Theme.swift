@@ -30,6 +30,16 @@ enum Theme {
     static var brandLight: Color { Color(hex: "0A84FF") }          // 高亮蓝
     static var brandDark: Color { Color(hex: "0056CC") }           // 深色模式蓝
 
+    // MARK: - 页面背景语义色
+    /// 车况页（默认）
+    static var pageAccent: Color { .accentColor }
+    /// 电池/健康页 — 绿色调
+    static var pageGreen: Color { Color.green }
+    /// 车控页 — 蓝色调
+    static var pageBlue: Color { Color.blue }
+    /// 全量数据页 — 靛蓝调
+    static var pageIndigo: Color { Color(.systemIndigo) }
+
     // MARK: - 语义色（系统自适应）
     static var ok: Color { Color.green }
     static var warn: Color { Color.orange }
@@ -50,39 +60,73 @@ enum Theme {
     }
 
     // =============================================================================
-    // 一、字号体系（Typography Scale）
+    // 一、字号体系（Typography Scale）— iOS 27 Dynamic Type 兼容
     // =============================================================================
     // 基准字号：17pt（iOS 标准正文）
     // 比例：1.25（Major Third）
+    //
+    // Dynamic Type 策略：
+    //   • Hero 数字（d1~d5）：Fixed，不受字号缩放影响（仪表盘视觉完整性）
+    //   • 标题/正文：使用系统语义字体（.title/.headline/.body/.caption 等）
+    //     自动跟随系统字号设置，确保 accessibility 合规
+    //   • 等宽数字（mono/monoLg）：Fixed monospaced，保持数据对齐
+    //   • 辅助文字（footnote/micro）：使用系统语义样式，允许缩放
 
-    // ---- 数字字体（SF Pro Rounded 专用）----
-    static let d1 = Font.system(size: 80, weight: .bold, design: .rounded)    // Hero 大数字（SOC/评分）
-    static let d2 = Font.system(size: 52, weight: .semibold, design: .rounded) // 二级数字（胎压/温度）
-    static let d3 = Font.system(size: 34, weight: .medium, design: .rounded)  // 三级数字（电压/电流）
-    static let d4 = Font.system(size: 26, weight: .semibold, design: .monospaced) // 数据面板数字
-    static let d5 = Font.system(size: 20, weight: .semibold, design: .rounded)  // 小数字徽章
+    // ---- Hero 数字（固定大小，不参与 Dynamic Type 缩放）----
+    // 仪表盘大数字：无论用户是否开启大字体，始终保持视觉冲击力
+    static let d1 = Font.system(size: 80, weight: .bold, design: .rounded)
+    static let d2 = Font.system(size: 52, weight: .semibold, design: .rounded)
+    static let d3 = Font.system(size: 34, weight: .medium, design: .rounded)
+    static let d4 = Font.system(size: 26, weight: .semibold, design: .monospaced)
+    static let d5 = Font.system(size: 20, weight: .semibold, design: .rounded)
 
-    // ---- 标题字体（SF Pro）----
-    static let h1 = Font.system(size: 28, weight: .bold)                        // 页面大标题
-    static let h2 = Font.system(size: 20, weight: .semibold)                    // 卡片主标题
-    static let h3 = Font.system(size: 17, weight: .semibold)                    // 子标题 / 分组名
-    static let h4 = Font.system(size: 15, weight: .semibold)                    // 微标题
+    // ---- 语义标题（跟随 Dynamic Type）----
+    static var h1: Font { .largeTitle }                                       // 页面大标题
+    static var h2: Font { .title }                                             // 卡片主标题
+    static var h3: Font { .title3 }                                            // 子标题 / 分组名
+    static var h4: Font { .headline }                                          // 微标题
 
-    // ---- 正文字体----
-    static let body = Font.system(size: 17, weight: .regular)                   // 正文（基准）
-    static let bodySm = Font.system(size: 15, weight: .regular)                 // 小正文
-    static let bodyMd = Font.system(size: 16, weight: .regular)                 // 中等正文
-    static let bodyLg = Font.system(size: 19, weight: .regular)                 // 大正文
+    // ---- 正文（跟随 Dynamic Type）----
+    static var body: Font { .body }                                            // 正文（基准）
+    static var bodySm: Font { .subheadline }                                   // 小正文
+    static var bodyMd: Font { .body }                                          // 中等正文
+    static var bodyLg: Font { .callout }                                       // 大正文
 
-    // ---- 辅助文字----
-    static let caption = Font.system(size: 13, weight: .regular)                // 说明文字
-    static let captionBold = Font.system(size: 13, weight: .semibold)           // 说明文字（强调）
-    static let footnote = Font.system(size: 11, weight: .regular)               // 脚注 / 时间戳
-    static let micro = Font.system(size: 10, weight: .regular)                  // 超微文字
+    // ---- 辅助文字（跟随 Dynamic Type）----
+    static var caption: Font { .caption }                                      // 说明文字
+    static var captionBold: Font { .caption.bold() }                           // 说明文字（强调）
+    static var footnote: Font { .footnote }                                    // 脚注 / 时间戳
+    static var micro: Font { .caption2 }                                       // 超微文字
 
-    // ---- 数字专用（等宽）----
+    // ---- 数字专用（等宽，固定大小保持对齐）----
     static let mono = Font.system(size: 14, weight: .medium, design: .monospaced)
     static let monoLg = Font.system(size: 17, weight: .semibold, design: .monospaced)
+
+    // ---- 其他固定 Hero 尺寸（不受 Dynamic Type 影响）----
+    static let d0 = Font.system(size: 42, weight: .bold, design: .rounded)    // 超大数字（AC温度）
+    static let d0b = Font.system(size: 28, weight: .regular)                 // 地图坐标大数字
+
+    // =============================================================================
+    // Font 扩展：语义样式便捷方法
+    // =============================================================================
+    extension Font {
+        /// 返回跟随 Dynamic Type 的语义字体
+        static func headline(weight: Font.Weight = .semibold) -> Font {
+            .headline.weight(weight)
+        }
+        static func body(weight: Font.Weight = .regular) -> Font {
+            .body.weight(weight)
+        }
+        static func subheadline(weight: Font.Weight = .regular) -> Font {
+            .subheadline.weight(weight)
+        }
+        static func caption(weight: Font.Weight = .regular) -> Font {
+            .caption.weight(weight)
+        }
+        static func footnote(weight: Font.Weight = .regular) -> Font {
+            .footnote.weight(weight)
+        }
+    }
 
     // =============================================================================
     // 二、间距体系（Spacing Scale）

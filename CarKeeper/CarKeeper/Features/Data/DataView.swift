@@ -59,7 +59,7 @@ struct DataView: View {
                 .frame(maxWidth: .infinity, alignment: .top)
             }
         }
-        .pageBackground(.indigo)
+        .pageBackground(Theme.pageIndigo)
         .navigationTitle(kind.title).navBarStyle()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -97,7 +97,7 @@ struct DataView: View {
             onKindChange()
         } label: {
             Text(k.title)
-                .font(.system(size: 13, weight: sel ? .semibold : .medium))
+                .font(Theme.caption.weight(sel ? .semibold : .regular))
                 .foregroundStyle(sel ? .white : .primary)
                 .padding(.horizontal, 14).padding(.vertical, 9)
                 .background(sel ? Color.accentColor : Color(.tertiarySystemFill), in: Capsule())
@@ -112,11 +112,11 @@ struct DataView: View {
                 ForEach(Array(b.rows.enumerated()), id: \.offset) { idx, r in
                     HStack(alignment: .top, spacing: 12) {
                         Text(r.k)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(Theme.caption)))
                             .foregroundStyle(.secondary)
                             .frame(width: 120, alignment: .leading)
                         Text(r.v)
-                            .font(.system(size: 13, weight: .medium, design: .monospaced))
+                            .font(Theme.caption), design: .monospaced))
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.trailing).lineLimit(3)
                         Spacer(minLength: 8)

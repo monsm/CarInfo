@@ -69,7 +69,7 @@ struct LoginView: View {
                     .shadow(color: Color.accentColor.opacity(0.4), radius: 20, y: 8)
                 // 图标
                 Image(systemName: "car.side.fill")
-                    .font(.system(size: 40, weight: .medium))
+                    .font(Theme.d3) weight: .medium))
                     .foregroundStyle(.white)
             }
             VStack(spacing: 6) {
@@ -77,7 +77,7 @@ struct LoginView: View {
                     .font(Theme.h1)
                     .letterSpacing(2)
                 Text("CHANGAN CONNECT")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(Theme.footnote.bold())))
                     .tracking(5)
                     .foregroundStyle(.secondary)
             }
@@ -89,38 +89,38 @@ struct LoginView: View {
         VStack(spacing: 18) {
             HStack(spacing: 12) {
                 Image(systemName: "phone.fill")
-                    .font(.system(size: 15))
+                    .font(Theme.body))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 24)
                 TextField("手机号", text: $phone)
                     .keyboardType(.numberPad)
-                    .font(.system(size: 17, design: .rounded))
+                    .font(.title.design(.rounded)))
                     .onChange(of: phone) { _, _ in loadCaptcha() }
                 if phoneValid {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.green)
-                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.ok)
+                        .font(Theme.body))
                 }
             }
             ListDivider()
             HStack(spacing: 12) {
                 Image(systemName: "photo.on.rectangle")
-                    .font(.system(size: 15))
+                    .font(Theme.body))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 24)
                 TextField("图形验证码", text: $picCode)
-                    .font(.system(size: 17, design: .rounded))
+                    .font(.title.design(.rounded)))
                 captchaView
             }
             ListDivider()
             HStack(spacing: 12) {
                 Image(systemName: "message.badge.fill")
-                    .font(.system(size: 15))
+                    .font(Theme.body))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 24)
                 TextField("6 位短信验证码", text: $smsCode)
                     .keyboardType(.numberPad)
-                    .font(.system(size: 17, design: .rounded))
+                    .font(.title.design(.rounded)))
                 smsButton
             }
         }
@@ -133,7 +133,7 @@ struct LoginView: View {
             sendSms()
         } label: {
             Text(smsBtnText)
-                .font(.system(size: 13, weight: .semibold))
+                .font(Theme.caption.bold())))
                 .foregroundStyle(smsBtnDisabled ? Color.secondary : Color.accentColor)
                 .padding(.horizontal, 14).padding(.vertical, 8)
                 .background(.thin, in: Capsule())
@@ -157,7 +157,7 @@ struct LoginView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color(.tertiarySystemFill))
                         .frame(height: 40).frame(width: 104)
-                        .overlay(Text("点我刷新").font(.system(size: 11)).foregroundStyle(.secondary))
+                        .overlay(Text("点我刷新").font(Theme.footnote)).foregroundStyle(.secondary))
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -170,8 +170,8 @@ struct LoginView: View {
     private var statusBanner: some View {
         if !statusText.isEmpty {
             Label(statusText, systemImage: statusErr ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
-                .font(.system(size: 13))
-                .foregroundStyle(statusErr ? Color.red : Color.green)
+                .font(Theme.caption))
+                .foregroundStyle(statusErr ? Theme.bad : Theme.ok)
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.thin, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -186,7 +186,7 @@ struct LoginView: View {
             HStack(spacing: 8) {
                 if busy { ProgressView().tint(.white) }
                 Text(busy ? "登录中…" : "登 录")
-                    .font(.system(size: 17, weight: .bold))
+                    .font(.title.weight(.bold))
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)

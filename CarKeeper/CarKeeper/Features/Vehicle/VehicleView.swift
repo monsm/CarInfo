@@ -42,14 +42,14 @@ struct VehicleView: View {
                         .frame(width: 96, height: 58)
                         .shadow(color: Color.accentColor.opacity(0.3), radius: 10, y: 4)
                     VStack(spacing: 3) {
-                        Text("新能源").font(.system(size: 8, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
-                        Text(sum.plate).font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                        Text("新能源").font(.caption.weight(.semibold))).foregroundStyle(.white.opacity(0.85))
+                        Text(sum.plate).font(.title.weight(.bold).design(.rounded))).foregroundStyle(.white)
                     }
                 }
                 VStack(alignment: .leading, spacing: 5) {
                     Text(sum.name.isEmpty ? "未绑定车辆" : sum.name)
-                        .font(.system(size: 24, weight: .bold))
-                    Text(sum.model).font(.system(size: 13)).foregroundStyle(.secondary)
+                        .font(Theme.d4) weight: .bold))
+                    Text(sum.model).font(Theme.caption)).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
@@ -80,12 +80,12 @@ struct VehicleView: View {
         } label: {
             HStack {
                 Text("VIN \(sum.vin.isEmpty ? "--" : sum.vin)")
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(Theme.monoLg))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()
                 Image(systemName: "doc.on.doc.fill")
-                    .font(.system(size: 13))
+                    .font(Theme.caption))
                     .foregroundStyle(Color.accentColor)
             }
             .padding(10)
@@ -96,8 +96,8 @@ struct VehicleView: View {
 
     private func badgeRow(_ k: String, _ v: String, cls: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(k).font(.system(size: 10)).foregroundStyle(.secondary)
-            Text(v).font(.system(size: 13, weight: .semibold))
+            Text(k).font(Theme.micro)).foregroundStyle(.secondary)
+            Text(v).font(Theme.caption.bold())))
                 .foregroundStyle(Theme.statusColor(cls) == Color.secondary ? Color.primary : Theme.statusColor(cls))
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
