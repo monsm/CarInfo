@@ -53,7 +53,7 @@ struct HomeView: View {
                 footerNote(energy)
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 96)
+            .safeAreaPadding(.bottom, 12)
         }
         .id(carVersion)
         .transition(

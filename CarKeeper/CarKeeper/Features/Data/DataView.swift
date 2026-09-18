@@ -55,7 +55,7 @@ struct DataView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 32)
+                .safeAreaPadding(.bottom, 8)
                 .frame(maxWidth: .infinity, alignment: .top)
             }
         }

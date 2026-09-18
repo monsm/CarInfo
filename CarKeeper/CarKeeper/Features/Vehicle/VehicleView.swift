@@ -23,7 +23,7 @@ struct VehicleView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 32)
+            .safeAreaPadding(.bottom, 8)
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accentColor)

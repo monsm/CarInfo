@@ -68,7 +68,7 @@ struct ControlView: View {
                 if !history.isEmpty { historyCard }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 96)
+            .safeAreaPadding(.bottom, 12)
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.blue)

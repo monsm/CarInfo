@@ -82,7 +82,7 @@ struct DevView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 32)
+            .safeAreaPadding(.bottom, 8)
         }
         .pageBackground(.secondary)
         .navigationTitle("开发者工具").navBarStyle()

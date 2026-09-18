@@ -34,7 +34,7 @@ struct LoginView: View {
                     Spacer(minLength: 12)
                 }
                 .padding(16)
-                .padding(.bottom, 40)
+                .safeAreaPadding(.bottom, 12)
             }
             .scrollBounceBehavior(.basedOnSize)
             .pageBackground(.accentColor)
