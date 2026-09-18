@@ -7,6 +7,8 @@ struct MessagesView: View {
     @State private var loading = true
     @State private var expanded: Set<String> = []
     @State private var loadTask: Task<Void, Never>? = nil
+    @State private var isRefreshing = false            // 下拉刷新涟漪标志
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     // 本地已读持久化（无服务端 mark-read 接口，用 UserDefaults 记已读消息 ID）。
     private static let readKey = "changan_read_message_ids"
@@ -39,39 +41,46 @@ struct MessagesView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 10) {
-                ForEach(Array(grouped.enumerated()), id: \.offset) { _, group in
-                    Section {
-                        ForEach(group.items) { item in
-                            messageRow(item)
-                        }
-                    } header: {
-                        HStack(spacing: 8) {
-                            Text(group.label)
-                                .font(.headline.bold()))
-                                .foregroundStyle(.secondary)
-                            if group.unread > 0 {
-                                Text("\(group.unread) 未读")
-                                    .font(Theme.micro.bold())))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 7).padding(.vertical, 2)
-                                    .background(Capsule().fill(Color.accentColor))
+            if loading {
+                PageLoadingView("正在加载消息…")
+            } else if items.isEmpty {
+                PageEmptyView("暂无消息", subtitle: "车辆暂无推送消息", icon: "bubble.left.and.bubble.right")
+            } else {
+                LazyVStack(spacing: 10) {
+                    ForEach(Array(grouped.enumerated()), id: \.offset) { _, group in
+                        Section {
+                            ForEach(group.items) { item in
+                                messageRow(item)
                             }
-                            Spacer()
+                        } header: {
+                            HStack(spacing: 8) {
+                                Text(group.label)
+                                    .font(.headline.bold()))
+                                    .foregroundStyle(.secondary)
+                                if group.unread > 0 {
+                                    Text("\(group.unread) 未读")
+                                        .font(Theme.micro.bold())))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 7).padding(.vertical, 2)
+                                        .background(Capsule().fill(Color.accentColor))
+                                }
+                                Spacer()
+                            }
+                            .padding(.top, 6)
                         }
-                        .padding(.top, 6)
                     }
                 }
+                .adaptivePagePadding(dynamicTypeSize)
             }
-            .padding(.horizontal, 16)
-            .safeAreaPadding(.bottom, 12)
+            .adaptiveSafeAreaBottom(12, dynamicTypeSize)
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accentColor)
         .navigationTitle("消息").navBarStyle()
         .onAppear { loadIfNeeded() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
-        .refreshable { await load() }
+        .refreshable { isRefreshing = true; await load(); isRefreshing = false }
+        .glassRefreshRipple(isRefreshing: $isRefreshing)
     }
 
     // MARK: 分组（今天/昨天/前天/M月d日/更早）
@@ -194,6 +203,7 @@ struct MessagesView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .dynamicTypeCompress()
         .glassCard(corner: 20)
         .contentShape(Rectangle())
         .onTapGesture {

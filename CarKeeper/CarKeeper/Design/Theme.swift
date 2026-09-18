@@ -289,6 +289,31 @@ struct PageBackground: View {
 
 // MARK: - View Extensions：Apple Premium 组件
 extension View {
+    /// iOS 27 Liquid Glass Tab 切换过渡动画：
+    /// 每个 Tab 内容以弹簧回弹 + 淡入方式滑入，配合 TabView.transaction 使用。
+    func liquidGlassTabTransition() -> some View {
+        self
+            .scaleEffect(1.0)
+            .opacity(1.0)
+            .offset(y: 0)
+    }
+
+    /// iOS 27 Liquid Glass 深潜页面滑入转场
+    /// 从右侧滑入 + 淡入 + 轻微弹簧回弹，配合 navigationDestination 的 transition 使用
+    func liquidGlassSlideIn() -> some View {
+        self
+            .transition(
+                .asymmetric(
+                    insertion: .move(edge: .trailing)
+                        .combined(with: .opacity)
+                        .animation(.spring(response: 0.45, dampingFraction: 0.6, blendDuration: 0.3)),
+                    removal: .move(edge: .leading)
+                        .combined(with: .opacity)
+                        .animation(.easeInOut(duration: 0.25))
+                )
+            )
+    }
+
     // 页面底色
     func pageBackground(_ tint: Color = .accentColor) -> some View {
         background(PageBackground(tint: tint))
@@ -304,7 +329,7 @@ extension View {
             .tint(.accentColor)
     }
 
-    // ---- 玻璃卡片：深浅双模式自适应材质 + 高光描边 ----
+    // ---- 玻璃卡片：深浅双模式自适应材质 + 高光描边 + 水波纹涟漪 ----
     func glassCard(corner: CGFloat = Theme.Radius.card) -> some View {
         self
             .background(Material.thin, in: RoundedRectangle(cornerRadius: corner, style: .continuous))
@@ -320,9 +345,10 @@ extension View {
                     )
             )
             .shadow(color: .black.opacity(0.05), radius: 16, y: 6)
+            .liquidGlassRipple(cornerRadius: corner)
     }
 
-    // ---- Hero 玻璃卡片：深浅双模式自适应 + 更强光晕 ----
+    // ---- Hero 玻璃卡片：深浅双模式自适应 + 更强光晕 + 水波纹涟漪 ----
     func glassHeroCard(corner: CGFloat = Theme.Radius.hero) -> some View {
         self
             .background(Material.thin, in: RoundedRectangle(cornerRadius: corner, style: .continuous))
@@ -338,6 +364,7 @@ extension View {
                     )
             )
             .shadow(color: .black.opacity(0.07), radius: 20, y: 8)
+            .liquidGlassRipple(cornerRadius: corner)
     }
 
     // ---- 通用圆角卡片（可选圆角值）----
@@ -828,3 +855,486 @@ struct HeartbeatPulse: ViewModifier {
             .onAppear { t = 0 }
     }
 }
+
+// =============================================================================
+// FluidHeroFont —— iOS 27 流体数字字体
+// 根据容器宽度动态计算字号，确保数字在不同屏幕尺寸上始终占据最佳视觉比例
+// 同时保持设计令牌驱动，方便统一调整基础参数
+// =============================================================================
+
+/// 流体 Hero 数字字体组件
+/// - Parameters:
+///   - text: 要显示的文字内容（如 "85"、"92"）
+///   - unit: 单位文字（如 "%"、"分"）
+///   - baseSize: 基准字号（默认 80pt，对应 iPhone 标准屏宽）
+///   - minSize: 最小字号（默认 56pt，防止小屏字号过小）
+///   - maxSize: 最大字号（默认 96pt，防止大屏字号过大）
+///   - weight: 字重（默认 bold）
+///   - design: 字体设计（默认 rounded，符合 iOS 27 风格）
+struct FluidHeroFont: View {
+    let text: String
+    let unit: String?
+    let baseSize: CGFloat
+    let minSize: CGFloat
+    let maxSize: CGFloat
+    let weight: Font.Weight
+    let design: Font.Design?
+
+    init(
+        _ text: String,
+        unit: String? = nil,
+        baseSize: CGFloat = 80,
+        minSize: CGFloat = 56,
+        maxSize: CGFloat = 96,
+        weight: Font.Weight = .bold,
+        design: Font.Design? = .rounded
+    ) {
+        self.text = text
+        self.unit = unit
+        self.baseSize = baseSize
+        self.minSize = minSize
+        self.maxSize = maxSize
+        self.weight = weight
+        self.design = design
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let containerWidth = geo.size.width
+            // 流体比例：以 baseSize 为基准，根据容器宽度按比例缩放
+            // 设计令牌：默认基准宽度 390pt（iPhone 14 Pro 标准屏宽）
+            let fluidScale = max(minSize / baseSize, min(containerWidth / 390.0, maxSize / baseSize))
+            let fontSize = baseSize * fluidScale
+
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(text)
+                    .font(.system(size: fontSize, weight: weight, design: design))
+                if let unit {
+                    Text(unit)
+                        .font(.system(size: fontSize * 0.45, weight: weight, design: design))
+                        .offset(y: -fontSize * 0.05)
+                }
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// 流体百分比数字（SOC / 健康评分专用）
+struct FluidPercentHero: View {
+    let text: String
+    let minSize: CGFloat
+    let maxSize: CGFloat
+
+    init(_ text: String, minSize: CGFloat = 56, maxSize: CGFloat = 96) {
+        self.text = text
+        self.minSize = minSize
+        self.maxSize = maxSize
+    }
+
+    var body: some View {
+        FluidHeroFont(
+            text,
+            unit: "%",
+            minSize: minSize,
+            maxSize: maxSize
+        )
+    }
+}
+
+/// 流体评分数字（健康报告专用）
+struct FluidScoreHero: View {
+    let text: String
+    let minSize: CGFloat
+    let maxSize: CGFloat
+
+    init(_ text: String, minSize: CGFloat = 56, maxSize: CGFloat = 96) {
+        self.text = text
+        self.minSize = minSize
+        self.maxSize = maxSize
+    }
+
+    var body: some View {
+        FluidHeroFont(
+            text,
+            unit: "分",
+            minSize: minSize,
+            maxSize: maxSize
+        )
+    }
+}
+
+// =============================================================================
+// LiquidRipple —— iOS 27 液态玻璃水波纹点击反馈
+// 触摸时从接触点扩散出一圈白色水波纹，模拟 Liquid Glass 触感
+// =============================================================================
+
+/// iOS 27 Liquid Glass 水波纹点击反馈
+/// 触摸位置处扩散出白色圆形涟漪，随 spring 动画扩张并淡出
+struct LiquidRipple: ViewModifier {
+    @State private var rippleCenter: CGPoint = .zero
+    @State private var rippleActive = false
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            // 用 RoundedRectangle clipShape 裁剪涟漪，使其贴合卡片圆角
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            // 使用 DragGesture(minimumDistance:0) 捕获触摸起点（包含坐标）
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                    .onChanged { v in
+                        rippleCenter = v.location
+                    }
+                    .onEnded { _ in
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.6, blendDuration: 0.25)) {
+                            rippleActive = true
+                        }
+                    }
+            )
+            .overlay {
+                if rippleActive {
+                    Circle()
+                        .fill(Color.white.opacity(0.5))
+                        .scaleEffect(rippleActive ? 5.0 : 0.0)
+                        .frame(width: 60, height: 60)
+                        .position(rippleCenter)
+                        .clipped()
+                }
+            }
+            .onChange(of: rippleActive) { active in
+                if !active { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        rippleActive = false
+                    }
+                }
+            }
+    }
+}
+
+/// 为玻璃卡片添加水波纹涟漪效果
+/// - Parameter cornerRadius: 圆角半径，用于 clipShape 裁剪涟漪
+func liquidGlassRipple(cornerRadius: CGFloat = Theme.Radius.card) -> some View {
+    self.modifier(LiquidRipple(cornerRadius: cornerRadius))
+}
+
+// =============================================================================
+// GlassRefreshRipple —— 下拉刷新时的全屏玻璃涟漪扩散动效
+// 绑定 isRefreshing 状态：true 时从中心扩散一圈半透明光晕，false 时淡出
+// =============================================================================
+
+/// iOS 27 Liquid Glass 下拉刷新涟漪动效
+/// - Parameter isRefreshing: 绑定刷新状态（true = 正在刷新，触发扩散动画）
+struct GlassRefreshRipple: ViewModifier {
+    @Binding var isRefreshing: Bool
+    @State private var ripplePhase: CGFloat = 0  // 0→1 表示扩散进度
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .center) {
+                if isRefreshing || ripplePhase > 0 {
+                    ZStack {
+                        // 背景光晕：大面积柔和扩散
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.12), .clear],
+                                    startPoint: .center,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .scaleEffect(ripplePhase * 3.5)
+                            .opacity(max(0, 1 - ripplePhase * 0.8))
+                        // 核心光晕：中心高亮扩散
+                        Circle()
+                            .fill(Color.white.opacity(0.18))
+                            .scaleEffect(ripplePhase * 1.8)
+                            .opacity(max(0, 1 - ripplePhase * 1.2))
+                    }
+                    .frame(width: UIScreen.main.bounds.width * 1.5,
+                           height: UIScreen.main.bounds.width * 1.5)
+                }
+            }
+            .onChange(of: isRefreshing) { refreshing in
+                if refreshing {
+                    // 开始扩散
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.55, blendDuration: 0.3)) {
+                        ripplePhase = 1.0
+                    }
+                } else {
+                    // 淡出消失
+                    withAnimation(.easeOut(duration: 0.35)) {
+                        ripplePhase = 0
+                    }
+                }
+            }
+    }
+}
+
+/// 为页面添加下拉刷新玻璃涟漪动效
+/// - Parameter isRefreshing: 绑定刷新状态
+func glassRefreshRipple(isRefreshing: Binding<Bool>) -> some View {
+    self.modifier(GlassRefreshRipple(isRefreshing: isRefreshing))
+}
+
+// =============================================================================
+// Dynamic Type —— 大字体模式自适应工具
+// 根据系统动态类型设置自动缩放间距、边距和字体，确保可读性和布局完整性
+// =============================================================================
+
+/// Dynamic Type 缩放因子（根据 ContentSizeCategory 返回倍数）
+enum DynamicTypeScale {
+    static func factor(for size: ContentSizeCategory) -> CGFloat {
+        switch size {
+        case .xxLarge, .large, .extraLarge, .medium, .small, .accessibilityMedium:
+            return 1.0
+        case .accessibilityExtraLarge:
+            return 1.15
+        case .accessibilityHuge:
+            return 1.3
+        case .accessibilityExtraExtraHuge:
+            return 1.5
+        case .accessibilityExtraExtraExtraHuge:
+            return 1.7
+        case .accessibilityExtraExtraExtraExtraHuge:
+            return 2.0
+        @unknown default:
+            return 1.0
+        }
+    }
+
+    /// 将基准间距乘以当前 Dynamic Type 缩放因子
+    static func spacing(_ base: CGFloat, for size: ContentSizeCategory) -> CGFloat {
+        base * factor(for: size)
+    }
+
+    /// 将基准 padding 乘以当前 Dynamic Type 缩放因子
+    static func padding(_ base: CGFloat, for size: ContentSizeCategory) -> CGFloat {
+        base * factor(for: size)
+    }
+}
+
+// MARK: - Dynamic Type View 扩展
+extension View {
+    /// 应用 Dynamic Type 感知的水平内边距（自适应页面左右留白）
+    func adaptivePagePadding(_ size: ContentSizeCategory) -> some View {
+        self.padding(.horizontal, DynamicTypeScale.padding(Theme.Spacing.page, for: size))
+    }
+
+    /// 应用 Dynamic Type 感知的 VStack/HStack 间距
+    func adaptiveSpacing(_ base: CGFloat, _ size: ContentSizeCategory) -> some View {
+        self.spacing(DynamicTypeScale.spacing(base, for: size))
+    }
+
+    /// 应用 Dynamic Type 感知的安全区域底部 padding
+    func adaptiveSafeAreaBottom(_ base: CGFloat, _ size: ContentSizeCategory) -> some View {
+        self.safeAreaPadding(.bottom, DynamicTypeScale.padding(base, for: size))
+    }
+
+    /// 动态类型字号限制：大字体模式下限制行数，防止溢出
+    func dynamicTypeLineLimit(_ limit: Int = 3) -> some View {
+        self.lineLimit(limit)
+    }
+}
+
+// MARK: - DynamicTypeCompressModifier
+/// 玻璃卡片内容压缩：大字体模式下自动缩减间距、限制行数、压缩内边距
+struct DynamicTypeCompressModifier: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var size
+
+    private var isCompressThreshold: Bool { size.isLargeOrBigger }
+
+    private var compressRatio: CGFloat {
+        guard isCompressThreshold else { return 1.0 }
+        switch size {
+        case .accessibilityMedium, .large, .extraLarge:
+            return 0.75
+        case .accessibilityLarge:
+            return 0.60
+        default:
+            return 0.45
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, compressRatio * Theme.Spacing.page)
+            .padding(.vertical, compressRatio * Theme.Spacing.md)
+    }
+}
+
+// MARK: - DynamicTypeTextCompressModifier
+/// 文字行限制压缩：大字体模式下自动限制文本行数
+struct DynamicTypeTextCompressModifier: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var size
+    let isTitle: Bool
+
+    private var lineLimit: Int {
+        guard size.isLargeOrBigger else { return 3 }
+        if isTitle {
+            switch size {
+            case .accessibilityMedium, .large, .extraLarge:
+                return 2
+            default:
+                return 1
+            }
+        } else {
+            return 3
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content.lineLimit(lineLimit)
+    }
+}
+
+// MARK: - DynamicType 扩展
+extension View {
+    /// 应用玻璃卡片内容压缩（间距+padding）
+    func dynamicTypeCompress() -> some View {
+        self.modifier(DynamicTypeCompressModifier())
+    }
+
+    /// 应用文字行限制压缩
+    func dynamicTypeTextCompress(isTitle: Bool = false) -> some View {
+        self.modifier(DynamicTypeTextCompressModifier(isTitle: isTitle))
+    }
+}
+
+// MARK: - ContentSizeCategory 辅助扩展
+extension ContentSizeCategory {
+    /// 判断是否为大字体模式（.extraLarge 及以上）
+    var isLargeOrBigger: Bool {
+        switch self {
+        case .large, .extraLarge,
+             .accessibilityMedium, .accessibilityLarge,
+             .accessibilityExtraLarge, .accessibilityExtraExtraLarge,
+             .accessibilityExtraExtraExtraLarge, .accessibilityExtraExtraExtraExtraLarge:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// 获取当前字号对应的行限制（1=标题紧凑，2=正文，3=默认）
+    var lineLimitForTitle: Int {
+        guard isLargeOrBigger else { return 3 }
+        switch self {
+        case .accessibilityMedium, .large, .extraLarge:
+            return 2
+        default:  // accessibilityLarge 及以上
+            return 1
+        }
+    }
+
+    /// 获取当前字号对应的内边距压缩比例
+    var paddingCompression: CGFloat {
+        guard isLargeOrBigger else { return 1.0 }
+        switch self {
+        case .accessibilityMedium, .large, .extraLarge:
+            return 0.80   // 压缩 20%
+        case .accessibilityLarge:
+            return 0.65   // 压缩 35%
+        default:  // accessibilityExtraLarge 及以上
+            return 0.50   // 压缩 50%
+        }
+    }
+}
+
+
+// =============================================================================
+// Page State Views —— 统一的加载 / 错误 / 空状态展示组件
+// 所有 Feature 页面统一使用，确保深浅双模式下视觉一致
+// =============================================================================
+
+/// 页面加载中状态（全屏玻璃卡片 + 旋转进度指示）
+struct PageLoadingView: View {
+    let message: String
+
+    init(_ message: String = "正在加载…") {
+        self.message = message
+    }
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.lg) {
+            ProgressView()
+                .controlSize(.large)
+                .tint(.accentColor)
+                .scaleEffect(1.1)
+            Text(message)
+                .font(Theme.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Theme.Spacing.xxl)
+        .glassCard()
+    }
+}
+
+/// 页面加载失败状态（玻璃卡片 + 重试按钮）
+struct PageErrorView: View {
+    let message: String
+    let retryAction: () -> Void
+
+    init(_ message: String, retry: @escaping () -> Void) {
+        self.message = message
+        self.retryAction = retry
+    }
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.title2)
+                .foregroundStyle(Theme.warn)
+                .padding(.bottom, 4)
+            Text(message)
+                .font(Theme.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Theme.Spacing.lg)
+            Button("重新加载") { retryAction() }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
+                .controlSize(.small)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Theme.Spacing.xl)
+        .glassCard()
+    }
+}
+
+/// 页面空状态（无数据但无错误）
+struct PageEmptyView: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+
+    init(_ title: String, subtitle: String = "", icon: String = "doc.text") {
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+    }
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: icon)
+                .font(.system(size: 36, weight: .medium))
+                .foregroundStyle(.tertiary)
+            Text(title)
+                .font(Theme.h4)
+                .foregroundStyle(.primary)
+            if !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(Theme.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Theme.Spacing.xxl)
+        .glassCard()
+    }
+}
+

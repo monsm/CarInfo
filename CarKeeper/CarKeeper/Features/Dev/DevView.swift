@@ -29,6 +29,7 @@ private struct ColorSwatch: View {
         }
         .padding(Theme.Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .dynamicTypeCompress()
         .glassCard()
     }
 }
@@ -114,6 +115,7 @@ private struct ContrastRow: View {
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
+        .dynamicTypeCompress()
         .glassCard()
     }
 }
@@ -133,6 +135,7 @@ struct DevView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Theme.Spacing.md)
+                .dynamicTypeCompress()
                 .glassHeroCard()
 
                 // 品牌色

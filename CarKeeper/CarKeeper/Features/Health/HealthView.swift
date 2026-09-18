@@ -16,23 +16,24 @@ struct HealthView: View {
     @State private var cardOpacity: CGFloat = 0        // 卡片入场淡入
     @State private var cardSlideY: CGFloat = 24        // 卡片入场下滑
     @State private var pillPhase: Int = -1             // 三项徽章交错动画相位
+    @State private var isRefreshing = false            // 下拉刷新涟漪标志
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.cardSpacing) {
+            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
                 if loading {
                     loadingView
                 } else if let model {
                     scoreHero(model)
                     systemList(model)
                 } else if let err = errText {
-                    ContentUnavailableView("暂无健康报告", systemImage: "exclamationmark.triangle",
-                                           description: Text(err))
-                        .glassCard()
+                    PageErrorView(err) { Task { await load() } }
+                }
                 }
             }
-            .padding(.horizontal, 16)
-            .safeAreaPadding(.bottom, 8)
+            .adaptivePagePadding(dynamicTypeSize)
+            .adaptiveSafeAreaBottom(8, dynamicTypeSize)
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(Theme.pageGreen)
@@ -45,7 +46,8 @@ struct HealthView: View {
             startAnimations()
         }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
-        .refreshable { await load() }
+        .refreshable { isRefreshing = true; await load(); isRefreshing = false }
+        .glassRefreshRipple(isRefreshing: $isRefreshing)
     }
 
     // MARK: 入场动画
@@ -68,12 +70,7 @@ struct HealthView: View {
 
     // MARK: 加载状态
     private var loadingView: some View {
-        VStack(spacing: 12) {
-            ProgressView().controlSize(.large).tint(Theme.ok)
-            Text("正在读取健康报告…").font(Theme.caption)).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity).padding(.vertical, 60)
-        .glassCard()
+        PageLoadingView("正在读取健康报告…")
     }
 
     // MARK: 评分 Hero — Apple Watch Activity Rings + Liquid Glass
@@ -94,6 +91,7 @@ struct HealthView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)
+        .dynamicTypeCompress()
         .glassHeroCard(corner: Theme.Radius.hero)
         .opacity(cardOpacity)
         .offset(y: cardSlideY)
@@ -143,16 +141,10 @@ struct HealthView: View {
             // ── 第 4 层：浮动装饰粒子 ──────────────────────────────
             FloatingParticles(size: 216)
 
-            // ── 第 5 层：中心数字 ──────────────────────────────────
+            // ── 第 5 层：中心数字（流体字体，随容器宽度自适应）────────────
             VStack(spacing: 3) {
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text(m.score)
-                        .font(Theme.d1)
-                        .foregroundStyle(scoreForeground(m.scorePct))
-                    Text("分")
-                        .font(Theme.h2) weight: .semibold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
+                FluidScoreHero(m.score)
+                    .foregroundStyle(scoreForeground(m.scorePct))
                 Text("健康评分")
                     .font(Theme.caption)))
                     .foregroundStyle(.secondary)
@@ -273,19 +265,49 @@ struct HealthView: View {
 
     // MARK: 检测系统列表
     private func systemList(_ m: HealthModel) -> some View {
-        CardBox(title: "检测系统", side: "\(m.systems.count) 项", sideCls: "na") {
-            VStack(spacing: 0) {
-                ForEach(Array(m.systems.enumerated()), id: \ .element.id) { idx, sys in
-                    systemRow(sys)
-                    if idx < m.systems.count - 1 { ListDivider().padding(.vertical, 4) }
+        // 整体卡片：弹簧高度动画 + 玻璃形变光晕 + 弹性缩放
+        ZStack(alignment: .center) {
+            CardBox(title: "检测系统", side: "\(m.systems.count) 项", sideCls: "na") {
+                VStack(spacing: 0) {
+                    ForEach(Array(m.systems.enumerated()), id: \.element.id) { idx, sys in
+                        systemRow(sys) { toggleExpand(sys.name) }
+                        if idx < m.systems.count - 1 { ListDivider().padding(.vertical, 4) }
+                    }
                 }
             }
+            // 玻璃形变光晕：有展开项时叠加柔和色扩散
+            if !expandedSystems.isEmpty {
+                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                    .fill(
+                        AngularGradient(
+                            colors: [Theme.ok.opacity(0.08), Theme.ok.opacity(0.02), .clear],
+                            center: .center,
+                            startAngle: .degrees(0),
+                            endAngle: .degrees(360)
+                        )
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .allowsHitTesting(false)
+            }
         }
+        // 弹簧高度 + 弹性缩放：动画作用于整个 ZStack，确保卡片整体形变
+        .animation(.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0.35), value: expandedSystems)
+        .scaleEffect(expandedSystems.isEmpty ? 1.0 : 1.0 + CGFloat(expandedSystems.count) * 0.003)
     }
 
-    private func systemRow(_ sys: HealthSystem) -> some View {
+    private func systemRow(_ sys: HealthSystem, toggle: @escaping () -> Void) -> some View {
         let isOpen = expandedSystems.contains(sys.name)
-        SystemRowView(sys: sys, isOpen: isOpen)
+        SystemRowView(sys: sys, isOpen: isOpen, onToggle: toggle)
+    }
+
+    private func toggleExpand(_ name: String) {
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.7, blendDuration: 0.3)) {
+            if expandedSystems.contains(name) {
+                expandedSystems.remove(name)
+            } else {
+                expandedSystems.insert(name)
+            }
+        }
     }
 
     // MARK: 数据加载
@@ -316,69 +338,72 @@ struct HealthView: View {
             errText = error.localizedDescription
         }
     }
-}
 
 // MARK: - 检测系统行（液态玻璃形变动效）
 struct SystemRowView: View {
     let sys: HealthSystem
     let isOpen: Bool
+    let onToggle: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 标题行：带玻璃形变高亮
-            HStack(spacing: 10) {
-                StatusDot(cls: sys.statusCls)
-                Text(sys.name).font(Theme.h4)))
-                Spacer()
-                Text(sys.statusText)
-                    .font(Theme.caption.bold())))
-                    .foregroundStyle(Theme.statusColor(sys.statusCls))
-                // 旋转 Chevron + 玻璃反光条
-                HStack(spacing: 6) {
-                    Capsule()
-                        .fill(isOpen
-                              ? Theme.statusColor(sys.statusCls).opacity(0.35)
-                              : Color.white.opacity(0.0))
-                        .frame(width: isOpen ? 18 : 0, height: 2)
-                        .animation(.spring(.duration(0.3)), value: isOpen)
-                    Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                        .font(Theme.footnote.bold())))
-                        .foregroundStyle(isOpen ? Theme.statusColor(sys.statusCls) : .tertiary)
-                        .rotationEffect(.degrees(isOpen ? 0 : 180))
-                        .animation(.spring(response: 0.35, dampingFraction: 0.65), value: isOpen)
-                }
-            }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 4)
-
-            // 展开内容：交错淡入
-            if isOpen {
-                VStack(spacing: 0) {
-                    ForEach(Array(sys.children.enumerated()), id: \.element.id) { idx, item in
-                        SystemChildRow(item: item, idx: idx, total: sys.children.count)
-                        if idx < sys.children.count - 1 {
-                            ListDivider().padding(.leading, 4)
-                        }
+        Button(action: onToggle) {
+            VStack(spacing: 0) {
+                // 标题行：带玻璃形变高亮
+                HStack(spacing: 10) {
+                    StatusDot(cls: sys.statusCls)
+                    Text(sys.name).font(Theme.h4)))
+                    Spacer()
+                    Text(sys.statusText)
+                        .font(Theme.caption.bold())))
+                        .foregroundStyle(Theme.statusColor(sys.statusCls))
+                    // 旋转 Chevron + 玻璃反光条
+                    HStack(spacing: 6) {
+                        Capsule()
+                            .fill(isOpen
+                                  ? Theme.statusColor(sys.statusCls).opacity(0.35)
+                                  : Color.white.opacity(0.0))
+                            .frame(width: isOpen ? 18 : 0, height: 2)
+                            .animation(.spring(.duration(0.3)), value: isOpen)
+                        Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                            .font(Theme.footnote.bold())))
+                            .foregroundStyle(isOpen ? Theme.statusColor(sys.statusCls) : .tertiary)
+                            .rotationEffect(.degrees(isOpen ? 0 : 180))
+                            .animation(.spring(response: 0.35, dampingFraction: 0.65), value: isOpen)
                     }
                 }
-                .padding(.leading, 22)
+                .padding(.vertical, 12)
                 .padding(.horizontal, 4)
+
+                // 展开内容：交错淡入
+                if isOpen {
+                    VStack(spacing: 0) {
+                        ForEach(Array(sys.children.enumerated()), id: \.element.id) { idx, item in
+                            SystemChildRow(item: item, idx: idx, total: sys.children.count)
+                            if idx < sys.children.count - 1 {
+                                ListDivider().padding(.leading, 4)
+                            }
+                        }
+                    }
+                    .padding(.leading, 22)
+                    .padding(.horizontal, 4)
+                }
             }
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(isOpen ? Color.white.opacity(0.06) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(
+                        isOpen
+                            ? Theme.statusColor(sys.statusCls).opacity(0.20)
+                            : Color.clear,
+                        lineWidth: 1
+                    )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(isOpen ? Color.white.opacity(0.06) : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(
-                    isOpen
-                        ? Theme.statusColor(sys.statusCls).opacity(0.20)
-                        : Color.clear,
-                    lineWidth: 1
-                )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .buttonStyle(.plain)
     }
 }
 

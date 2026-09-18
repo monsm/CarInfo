@@ -59,7 +59,7 @@ struct ControlView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.cardSpacing) {
+            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
                 carSelector
                 heroDiscs
                 if let run = running { runningCard(run) }
@@ -67,8 +67,8 @@ struct ControlView: View {
                 if let bd = bodyDetail { bodyDetailCard(bd) }
                 if !history.isEmpty { historyCard }
             }
-            .padding(.horizontal, 16)
-            .safeAreaPadding(.bottom, 12)
+            .adaptivePagePadding(dynamicTypeSize)
+            .adaptiveSafeAreaBottom(12, dynamicTypeSize)
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(Theme.pageBlue)
@@ -272,7 +272,8 @@ struct ControlView: View {
             .font(Theme.h4)))
             Spacer()
         }
-        .padding(.horizontal, 16).padding(.vertical, 12)
+        .adaptivePagePadding(dynamicTypeSize).padding(.vertical, 12)
+        .dynamicTypeCompress()
         .glassCard(corner: 20)
     }
 
@@ -285,6 +286,7 @@ struct ControlView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
+        .dynamicTypeCompress()
         .glassCard()
     }
 
@@ -306,6 +308,7 @@ struct ControlView: View {
             Spacer()
         }
         .padding(16)
+        .dynamicTypeCompress()
         .glassCard(corner: 20)
     }
 

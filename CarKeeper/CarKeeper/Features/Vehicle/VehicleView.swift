@@ -6,9 +6,10 @@ import SwiftUI
 struct VehicleView: View {
     private let store = AppStore.shared
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.cardSpacing) {
+            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
                 if let sum = VM.vehicleSummary(store.car) { plateCard(sum) }
                 ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
                     CardBox(title: group.name) {
@@ -22,8 +23,8 @@ struct VehicleView: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .safeAreaPadding(.bottom, 8)
+            .adaptivePagePadding(dynamicTypeSize)
+            .adaptiveSafeAreaBottom(8, dynamicTypeSize)
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accentColor)
@@ -68,6 +69,7 @@ struct VehicleView: View {
         }
         .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .dynamicTypeCompress()
         .glassHeroCard()
     }
 

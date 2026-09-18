@@ -14,17 +14,18 @@ struct MineView: View {
     @State private var downloadFile: URL? = nil
     @State private var shareItems: [Any] = []
     @State private var shareSheetFlag = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.cardSpacing) {
+            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
                 profileCard
                 if let car = store.car { carCard(car) }
                 tilesCard
                 updateCard
             }
-            .padding(.horizontal, 16)
-            .safeAreaPadding(.bottom, 12)
+            .adaptivePagePadding(dynamicTypeSize)
+            .adaptiveSafeAreaBottom(12, dynamicTypeSize)
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accentColor)
@@ -118,6 +119,7 @@ struct MineView: View {
             }
         }
         .padding(Theme.Spacing.xl)
+        .dynamicTypeCompress()
         .glassHeroCard()
     }
 
@@ -146,6 +148,7 @@ struct MineView: View {
                     .font(Theme.footnote.bold()))).foregroundStyle(.tertiary)
             }
             .padding(16)
+            .dynamicTypeCompress()
             .glassCard()
             .contentShape(Rectangle())
         }
@@ -241,7 +244,7 @@ struct MineView: View {
                     .font(Theme.caption.bold())))
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 16).padding(.vertical, 10)
+            .adaptivePagePadding(dynamicTypeSize).padding(.vertical, 10)
             .background(Capsule().fill(Color.accentColor))
         }
         .buttonStyle(.plain)

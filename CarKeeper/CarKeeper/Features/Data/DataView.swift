@@ -42,20 +42,21 @@ struct DataView: View {
         VStack(spacing: 0) {
             kindSwitcher
             ScrollView {
-                VStack(spacing: Theme.cardSpacing) {
+                VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
                     if !loading && blocks.isEmpty {
-                        ContentUnavailableView(errText.isEmpty ? "暂无数据" : errText,
-                                               systemImage: "doc.text.magnifyingglass",
-                                               description: Text("下拉或点刷新按钮重试"))
-                            .padding(.top, 60)
+                        if !errText.isEmpty {
+                            PageErrorView(errText) { Task { await load() } }
+                        } else {
+                            PageEmptyView("暂无数据", subtitle: "下拉或点刷新按钮重试", icon: "doc.text")
+                        }
                     } else {
                         ForEach(blocks) { b in
                             dataBlock(b)
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .safeAreaPadding(.bottom, 8)
+                .adaptivePagePadding(dynamicTypeSize)
+                .adaptiveSafeAreaBottom(8, dynamicTypeSize)
                 .frame(maxWidth: .infinity, alignment: .top)
             }
         }
@@ -84,7 +85,7 @@ struct DataView: View {
                     kindChip(k)
                 }
             }
-            .padding(.horizontal, 16)
+            .adaptivePagePadding(dynamicTypeSize)
             .padding(.vertical, 10)
         }
     }

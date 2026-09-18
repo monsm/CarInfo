@@ -12,10 +12,12 @@ struct BatteryView: View {
     @State private var socProgress: CGFloat = 0      // SOC圆环进度 0→socPct
     @State private var socCardOpacity: CGFloat = 0   // SOC卡片入场淡入
     @State private var socCount: Int = 0             // SOC数字滚动计数
+    @State private var isRefreshing = false          // 下拉刷新涟漪标志
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.cardSpacing) {
+            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
                 let cache = store.caches
                 let b = batteryModel(cache)
                 let e = VM.energy(cache, store.car)
@@ -28,25 +30,21 @@ struct BatteryView: View {
                 faultCard(b)
                 alarmCard(b)
             }
-            .padding(.horizontal, 16)
-            .safeAreaPadding(.bottom, 8)
+            .adaptivePagePadding(dynamicTypeSize)
+            .adaptiveSafeAreaBottom(8, dynamicTypeSize)
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(Theme.pageGreen)
         .navigationTitle("电池与充电").navBarStyle()
         .onAppear { loadIfNeeded(); startSocAnimation() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
-        .refreshable { await load() }
-        .overlay {
+        .refreshable { isRefreshing = true; await load(); isRefreshing = false }
+        .glassRefreshRipple(isRefreshing: $isRefreshing)
+        .overlay(alignment: .center) {
             if !loaded && errText.isEmpty {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                PageLoadingView("正在同步电池数据…")
             } else if !errText.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle").font(.title).foregroundStyle(.orange)
-                    Text(errText).font(Theme.caption)).foregroundStyle(.secondary)
-                    Button("重试") { Task { await load() } }
-                        .buttonStyle(.borderedProminent)
-                }
+                PageErrorView(errText) { Task { await load() } }
             }
         }
     }
@@ -90,13 +88,9 @@ struct BatteryView: View {
                 // 第 4 层：浮动装饰粒子
                 FloatingParticles(size: 208)
 
-                // 第 5 层：中心数字
+                // 第 5 层：中心数字（流体字体，随容器宽度自适应）
                 VStack(spacing: 2) {
-                    HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text(e.soc == "--" ? "--" : String(socCount))
-                            .font(Theme.d1)
-                        Text("%").font(Theme.d5) weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
-                    }
+                    FluidPercentHero(e.soc == "--" ? "--" : String(socCount))
                     Text("电池电量")
                         .font(Theme.caption)))
                         .foregroundStyle(.secondary)
@@ -113,6 +107,7 @@ struct BatteryView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 30)
+        .dynamicTypeCompress()
         .glassHeroCard()
         .opacity(socCardOpacity)
     }

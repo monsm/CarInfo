@@ -16,6 +16,7 @@ struct HomeView: View {
     @State private var socCardOpacity: CGFloat = 0   // SOC卡片入场淡入
     @State private var socCount: Int = 0             // SOC数字滚动计数
     @State private var isRefreshing = false          // 下拉刷新标志（仅刷新时重播动画）
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     var body: some View {
         Group {
@@ -41,7 +42,7 @@ struct HomeView: View {
         let drive = VM.driveStatus(cache)
 
         return ScrollView {
-            VStack(spacing: Theme.cardSpacing) {
+            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
                 greetingRow(energy)
                 socHero(energy)
                 driveMetricsRow(drive)
@@ -54,8 +55,8 @@ struct HomeView: View {
                 locationCard(loc)
                 footerNote(energy)
             }
-            .padding(.horizontal, 16)
-            .safeAreaPadding(.bottom, 12)
+            .adaptivePagePadding(dynamicTypeSize)
+            .adaptiveSafeAreaBottom(12, dynamicTypeSize)
         }
         .id(carVersion)
         .transition(
@@ -83,7 +84,8 @@ struct HomeView: View {
             startTimer?.cancel()
             startTimer = nil
         }
-        .refreshable { isRefreshing = true; await fetchCore() }
+        .refreshable { isRefreshing = true; await fetchCore(); isRefreshing = false }
+        .glassRefreshRipple(isRefreshing: $isRefreshing)
     }
 
     // MARK: 问候行
@@ -98,7 +100,7 @@ struct HomeView: View {
             Text(dateStr)
                 .font(Theme.caption)).foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 16)
+        .adaptivePagePadding(dynamicTypeSize)
         .padding(.vertical, 8)
     }
 
@@ -142,13 +144,9 @@ struct HomeView: View {
                 // 第 4 层：浮动装饰粒子
                 FloatingParticles(size: 196)
 
-                // 第 5 层：中心数字
+                // 第 5 层：中心数字（流体字体，随容器宽度自适应）
                 VStack(spacing: 2) {
-                    HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text(e.soc == "--" ? "--" : String(socCount))
-                            .font(Theme.d1)
-                        Text("%").font(Theme.d5) weight: .semibold, design: .rounded)).foregroundStyle(.secondary)
-                    }
+                    FluidPercentHero(e.soc == "--" ? "--" : String(socCount))
                     Text("剩余电量")
                         .font(Theme.caption)))
                         .foregroundStyle(.secondary)
@@ -168,6 +166,7 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
+        .dynamicTypeCompress()
         .glassHeroCard()
         .opacity(socCardOpacity)
     }
@@ -228,6 +227,7 @@ struct HomeView: View {
             }
         }
         .padding(16)
+        .dynamicTypeCompress()
         .glassCard(corner: 22)
     }
 
@@ -269,6 +269,7 @@ struct HomeView: View {
             MetricPill(icon: "gauge.full", value: d.mile, unit: "km", tint: .accentColor)
         }
         .padding(Theme.Spacing.xl)
+        .dynamicTypeCompress()
         .glassCard(corner: 20)
     }
 
@@ -284,6 +285,7 @@ struct HomeView: View {
             }
         }
         .padding(Theme.Spacing.xl)
+        .dynamicTypeCompress()
         .glassHeroCard()
     }
 
@@ -367,7 +369,7 @@ struct HomeView: View {
     // MARK: 电池区
     private func batterySection(_ cache: [String: Any?]) -> some View {
         let batt = VM.batteryModel(cache)
-        return VStack(spacing: Theme.cardSpacing) {
+        return VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
             // 电池摘要行（SOC / 续航 / 告警 来自分析域，不重复 SOC Hero）
             VStack(alignment: .leading, spacing: 8) {
                 Text("电池状态").font(Theme.footnote.bold()))).foregroundStyle(.secondary)
@@ -388,6 +390,7 @@ struct HomeView: View {
                 }
             }
             .padding(Theme.Spacing.xl)
+            .dynamicTypeCompress()
             .glassCard(corner: 20)
 
             // 分析结论详情
@@ -553,7 +556,7 @@ struct HomeView: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 16)
+        .adaptivePagePadding(dynamicTypeSize)
         .padding(.vertical, 8)
     }
 

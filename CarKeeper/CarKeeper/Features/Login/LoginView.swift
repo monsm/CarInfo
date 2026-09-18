@@ -21,6 +21,7 @@ struct LoginView: View {
     }
 
     private var phoneValid: Bool { phone.trimmingCharacters(in: .whitespaces).count >= 11 }
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         NavigationStack {
@@ -34,7 +35,7 @@ struct LoginView: View {
                     Spacer(minLength: 12)
                 }
                 .padding(16)
-                .safeAreaPadding(.bottom, 12)
+                .adaptiveSafeAreaBottom(12, dynamicTypeSize)
             }
             .scrollBounceBehavior(.basedOnSize)
             .pageBackground(.accentColor)
@@ -125,6 +126,7 @@ struct LoginView: View {
             }
         }
         .padding(Theme.Spacing.xl)
+        .dynamicTypeCompress()
         .glassCard()
     }
 
