@@ -139,6 +139,16 @@ struct VehicleView: View {
                    row("LastMaintainMileage", "上次保养里程", suffix: " km"),
                    row("LastOnlineTime", "最后在线"), row("ActiveTime", "激活时间")].compactMap { $0 }
         if !svc.isEmpty { out.append(Grp(name: "服务与保养", rows: svc)) }
+
+        // 车况报文 — 来自 tbox control 缓存（对齐小程序 vehicle.js）
+        let ctl = store.caches["control"] as? [String: Any]
+        var ctlRows: [Row] = []
+        if let ctl, let pv = ciNumber(ctl, ["protocolVer"]) {
+            ctlRows.append(Row(k: "协议版本", v: "V\(pv)"))
+        }
+        if let tl = ciString(ctl, ["ignitionTime"]), !tl.isEmpty { ctlRows.append(Row(k: "点火时间", v: tl)) }
+        if let ll = ciString(ctl, ["lastLoginTime"]), !ll.isEmpty { ctlRows.append(Row(k: "报文登录时间", v: ll)) }
+        if !ctlRows.isEmpty { out.append(Grp(name: "车况报文", rows: ctlRows)) }
         return out
     }
 }

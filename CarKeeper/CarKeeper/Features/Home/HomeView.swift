@@ -442,9 +442,11 @@ struct HomeView: View {
     private func greetingRow(_ e: EnergyModel) -> some View {
         let hour = Calendar.current.component(.hour, from: Date())
         let gree = hour < 5 ? "夜深了" : (hour < 11 ? "早上好" : (hour < 13 ? "中午好" : (hour < 18 ? "下午好" : "晚上好")))
+        // 对齐小程序：weekday 取简写（周五），非全称（星期五）
+        let weekdayAbbrev = "日一二三四五六"[Calendar.current.component(.weekday, from: Date()) - 1]
         let dateStr = {
-            let f = DateFormatter(); f.dateFormat = "M月d日 星期 E"
-            return f.string(from: Date())
+            let f = DateFormatter(); f.dateFormat = "M月d日"
+            return f.string(from: Date()) + " 周" + weekdayAbbrev
         }()
         return HStack(spacing: 8) {
             Image(systemName: hour < 6 || hour >= 20 ? "moon.fill" : hour < 12 ? "sun.max.fill" : "sun.horizon.fill")

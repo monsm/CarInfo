@@ -184,6 +184,7 @@ struct HealthView: View {
         loading = true
         if let raw = store.caches["check"] as? [String: Any] {
             model = VM.healthModel(raw)
+            errText = nil
         }
         if let raw = try? await APIClient.shared.getCarCheck(carId: store.carId) {
             store.saveCache(["check": raw])
