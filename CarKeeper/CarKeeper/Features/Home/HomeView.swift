@@ -3,6 +3,7 @@ import CoreLocation
 import UserNotifications
 import Intents
 import UIKit
+import MapKit
 
 // 车况首页 —— iOS 27 Liquid Glass：
 // SOC Hero + 车速里程 + 快控按钮 + 状态域 + 电池 + 胎压 + 座舱 + 位置
@@ -774,10 +775,17 @@ struct HomeView: View {
         ExpandingCardBox(title: "位置", side: loc.deg != "--" ? loc.dir : nil, cornerRadius: 20) {
             VStack(alignment: .leading, spacing: 10) {
                 if showMap {
-                    LocationMapViewPlaceholder(addr: loc.addr, lat: loc.lat, lng: loc.lng)
-                        .frame(height: 190)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .transition(.opacity)
+                    if loc.lat != "--" && loc.lng != "--" {
+                        LocationMapView(addr: loc.addr, lat: loc.lat, lng: loc.lng)
+                            .frame(height: 190)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .transition(.opacity)
+                    } else {
+                        LocationMapViewPlaceholder(addr: loc.addr, lat: loc.lat, lng: loc.lng)
+                            .frame(height: 190)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .transition(.opacity)
+                    }
                 }
                 Text(loc.addr.isEmpty ? "暂无定位数据" : loc.addr)
                     .font(Theme.caption)))
@@ -1022,7 +1030,75 @@ extension DateFormatter {
     }
 }
 
-// MARK: - 位置地图占位（iOS 27 液态玻璃风格）
+// MARK: - 位置地图（#NEW-102 内嵌 MapKit 实时地图）
+struct LocationMapView: View {
+    let addr: String
+    let lat: String
+    let lng: String
+    @State private var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 39.9, longitude: 116.4), span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01))
+    @State private var annotationsAdded = false
+
+    var body: some View {
+        MapView(coordinate: parseCoordinate(), region: $region, hasAnnotation: !annotationsAdded)
+            .frame(height: 190)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .transition(.opacity)
+            .onAppear {
+                if !annotationsAdded, let coord = parseCoordinate() {
+                    annotationsAdded = true
+                }
+            }
+    }
+
+    private func parseCoordinate() -> CLLocationCoordinate2D? {
+        guard let latVal = Double(lat), let lngVal = Double(lng) else { return nil }
+        return CLLocationCoordinate2D(latitude: latVal, longitude: lngVal)
+    }
+}
+
+struct MapView: UIViewRepresentable {
+    let coordinate: CLLocationCoordinate2D?
+    @Binding var region: MKCoordinateRegion
+    var hasAnnotation: Bool
+
+    func makeUIView(context: Context) -> MKMapView {
+        let map = MKMapView()
+        map.delegate = context.coordinator
+        map.showsUserLocation = true
+        if let coord = coordinate {
+            map.setRegion(MKCoordinateRegion(center: coord, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)), animated: true)
+        }
+        return map
+    }
+
+    func updateUIView(_ map: MKMapView, context: Context) {
+        context.coordinator.map = map
+        if let coord = coordinate {
+            map.setRegion(region, animated: true)
+            if hasAnnotation {
+                let annotation = MKPointAnnotation()
+                annotation.coordinate = coord
+                annotation.title = addr
+                map.addAnnotation(annotation)
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator: NSObject, MKMapViewDelegate {
+        var map: MKMapView?
+        func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
+            // 显示用户位置
+        }
+    }
+
+    private var addr: String { "" } // placeholder
+}
+
+// MARK: - 位置地图占位（原降级视图）
 struct LocationMapViewPlaceholder: View {
     let addr: String
     let lat: String

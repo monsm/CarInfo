@@ -1,4 +1,5 @@
 import SwiftUI
+import Photos
 
 // 车辆档案 —— iOS 27 Liquid Glass：
 // 车辆名片（渐变标牌 + VIN 复制条 + 三项时效徽章）+ 分组档案卡。
@@ -8,6 +9,10 @@ struct VehicleView: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
     @State private var isRefreshing = false         // 下拉刷新涟漪标志
+    // #NEW-105 维保相册
+    @State private var maintenancePhotos: [String] = []  // Base64 图片
+    @State private var showPhotoPicker = false
+    @State private var selectedPhoto: UIImage? = nil
 
     private var isLoading: Bool { store.carId.isEmpty }
     private var isEmpty:   Bool { !store.carId.isEmpty && store.car == nil }
@@ -48,6 +53,11 @@ struct VehicleView: View {
                     .adaptiveSafeAreaBottom(8, dynamicTypeSize)
                 }
                 .scrollBounceBehavior(.basedOnSize)
+                // #NEW-105 维保相册
+                if !isLoading && !isEmpty {
+                    maintenanceSection
+                        .padding(.horizontal)
+                }
             } else {
                 // 兜底：car 数据解析失败
                 PageErrorView("车辆数据解析失败，请重新进入页面") { _ in }
@@ -60,11 +70,62 @@ struct VehicleView: View {
             .accessibilityHint(Text("车牌、VIN、车型配置与保险保养信息"))
         .refreshable {
             isRefreshing = true
-            try? await Task.sleep(nanoseconds: 500_000_000)  // 0.5s 模拟刷新
+            try? await Task.sleep(nanoseconds: 500_000_000)
             Task { await store.fetchVehicleData() }
             isRefreshing = false
         }
         .glassRefreshRipple(isRefreshing: $isRefreshing)
+        .onAppear { loadMaintenancePhotos() }
+    }
+
+    // MARK: 维保相册
+    private var maintenanceSection: some View {
+        CardBox(title: "维保照片", cornerRadius: Theme.Radius.card) {
+            if maintenancePhotos.isEmpty {
+                Button("添加维保照片") {
+                    showPhotoPicker = true
+                }
+                .font(Theme.caption)
+                .foregroundStyle(.accentColor)
+                .padding(.vertical, 12)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(maintenancePhotos.indices, id: \.self) { idx in
+                            if let data = Data(base64Encoded: maintenancePhotos[idx]),
+                               let img = UIImage(data: data) {
+                                Image(uiImage: img)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 100, height: 75)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                        }
+                        Button {
+                            showPhotoPicker = true
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(Theme.body)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 100, height: 75)
+                                .background(.thin, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func saveMaintenancePhotos() {
+        if let data = try? JSONEncoder().encode(maintenancePhotos) {
+            UserDefaults.standard.set(data, forKey: "carkeeper_maintenance_photos")
+        }
+    }
+
+    private func loadMaintenancePhotos() {
+        guard let data = UserDefaults.standard.data(forKey: "carkeeper_maintenance_photos"),
+              let photos = try? JSONDecoder().decode([String].self, from: data) else { return }
+        maintenancePhotos = photos
     }
 
     // MARK: 名片 — Apple Style Vehicle Card
@@ -231,5 +292,96 @@ struct VehicleView: View {
         if let ll = ciString(ctl, ["lastLoginTime"]), !ll.isEmpty { ctlRows.append(Row(k: "报文登录时间", v: ll)) }
         if !ctlRows.isEmpty { out.append(Grp(name: "车况报文", rows: ctlRows)) }
         return out
+    }
+}
+
+// MARK: - #NEW-105 图片选择器 Sheet
+struct PhotoPickerSheet: View {
+    @Binding var selectedImage: UIImage?
+    let onConfirm: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                Text("选择维保照片")
+                    .font(Theme.h3)
+                VStack(spacing: 12) {
+                    Button {
+                        selectedImage = nil
+                        // 使用系统相机
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                            let picker = UIImagePickerController()
+                            picker.sourceType = .camera
+                            picker.delegate = PhotoPickerDelegate { img in
+                                selectedImage = img
+                                onConfirm()
+                                dismiss()
+                            }
+                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                               let rootVC = windowScene.windows.first?.rootViewController {
+                                rootVC.present(picker, animated: true)
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "camera.fill").font(.title2)
+                            Text("拍照")
+                                .font(Theme.body)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    Button {
+                        selectedImage = nil
+                        if UIImagePickerController.isSourceTypeAvailable(.photoLibrary) {
+                            let picker = UIImagePickerController()
+                            picker.sourceType = .photoLibrary
+                            picker.delegate = PhotoPickerDelegate { img in
+                                selectedImage = img
+                                onConfirm()
+                                dismiss()
+                            }
+                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                               let rootVC = windowScene.windows.first?.rootViewController {
+                                rootVC.present(picker, animated: true)
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "photo.on.rectangle").font(.title2)
+                            Text("从相册选择")
+                                .font(Theme.body)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("添加照片")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+private class PhotoPickerDelegate: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    let onPick: (UIImage?) -> Void
+    init(onPick: @escaping (UIImage?) -> Void) { self.onPick = onPick }
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        onPick(info[.originalImage] as? UIImage)
+        picker.dismiss(animated: true)
+    }
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        onPick(nil)
+        picker.dismiss(animated: true)
     }
 }

@@ -4,6 +4,10 @@ import Foundation
 import CoreLocation
 import Intents
 import UserNotifications
+import LocalAuthentication
+import CoreHaptics
+import AVFoundation
+import Photos
 
 // 全局应用状态（对应小程序 app.js 的 globalData）。
 // 使用 @Observable 宏（iOS 17+）做细粒度响应式更新。
@@ -228,6 +232,8 @@ final class AppStore: @unchecked Sendable {
     // #8 PIN码Keychain安全存储
     private static let pinKeychainService = "com.carkeeper.pin"
     private static let pinKeychainAccount = "car_pin"
+    // #NEW-101 FaceID/TouchID 生物识别
+    private static let biometricSetupKey = "carkeeper_biometric_setup"
 
     func savePin(_ pin: String) {
         let pinData = pin.data(using: .utf8)!
@@ -263,6 +269,47 @@ final class AppStore: @unchecked Sendable {
             kSecAttrAccount as String: Self.pinKeychainAccount
         ]
         SecItemDelete(query as CFDictionary)
+    }
+
+    // #NEW-101 生物识别状态
+    var hasBiometricSetup: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.biometricSetupKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.biometricSetupKey) }
+    }
+
+    /// 检查设备是否支持生物识别
+    func canUseBiometric() -> Bool {
+        let context = LAContext()
+        var error: NSError?
+        return context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+    }
+
+    /// 使用生物识别验证（FaceID/TouchID）
+    func authenticateWithBiometrics(reason: String) async -> Bool {
+        let context = LAContext()
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+            return false
+        }
+        do {
+            try await context.evaluatePolicy(
+                .deviceOwnerAuthenticationWithBiometrics,
+                localizedReason: reason
+            )
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// 启用生物识别（首次设置时调用）
+    func enableBiometric() {
+        hasBiometricSetup = true
+    }
+
+    /// 禁用生物识别
+    func disableBiometric() {
+        hasBiometricSetup = false
     }
 
     /// 判断当前是否应使用深色模式

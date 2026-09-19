@@ -1,4 +1,7 @@
 import SwiftUI
+import CoreHaptics
+import AVFoundation
+import Photos
 
 // =============================================================================
 // 长安车管家 — iOS 27 Apple Premium Design System
@@ -2611,4 +2614,186 @@ func calculateDriveBehaviorScore(_ cache: [String: Any?]) -> DriveBehaviorScore?
     let totalTrips = max(1, aggressiveAccel + harshBrake + 1)
     let score = max(0, min(100, 100 - aggressiveAccel * 5 - harshBrake * 3))
     return DriveBehaviorScore(aggressiveAccel: aggressiveAccel, harshBrake: harshBrake, totalTrips: totalTrips, score: score)
+}
+
+// =============================================================================
+// #NEW-103 CoreHaptics 精密触觉反馈
+// =============================================================================
+enum HapticFeedback {
+    /// 轻触反馈（用于按钮点击）
+    static func lightTap() {
+        let engine = CHHapticEngine()
+        do {
+            let pattern = try CHHapticEvent(eventType: .hapticContinuous, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3), relativeTime: 0, duration: 0.05)
+            let event = try CHHapticPattern(events: [pattern], parameters: [])
+            try engine.start()
+            let player = try engine.makePlayer(with: event)
+            try player.start(atTime: 0)
+        } catch {
+            // 忽略错误，设备不支持时降级
+        }
+    }
+
+    /// 成功反馈（用于操作成功）
+    static func success() {
+        let engine = CHHapticEngine()
+        do {
+            let event1 = try CHHapticEvent(eventType: .hapticLight, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5), relativeTime: 0, duration: 0.1)
+            let event2 = try CHHapticEvent(eventType: .hapticSoft, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3), relativeTime: 0.1, duration: 0.15)
+            let pattern = try CHHapticPattern(events: [event1, event2], parameters: [])
+            try engine.start()
+            let player = try engine.makePlayer(with: pattern)
+            try player.start(atTime: 0)
+        } catch {
+            // 降级处理
+        }
+    }
+
+    /// 警告反馈（用于告警）
+    static func warning() {
+        let engine = CHHapticEngine()
+        do {
+            let event1 = try CHHapticEvent(eventType: .hapticHard, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8), relativeTime: 0, duration: 0.15)
+            let event2 = try CHHapticEvent(eventType: .hapticLight, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6), relativeTime: 0.12, duration: 0.15)
+            let event3 = try CHHapticEvent(eventType: .hapticHard, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8), relativeTime: 0.24, duration: 0.15)
+            let pattern = try CHHapticPattern(events: [event1, event2, event3], parameters: [])
+            try engine.start()
+            let player = try engine.makePlayer(with: pattern)
+            try player.start(atTime: 0)
+        } catch {
+            // 降级处理
+        }
+    }
+
+    /// 解锁反馈
+    static func unlock() {
+        let engine = CHHapticEngine()
+        do {
+            let event = try CHHapticEvent(eventType: .hapticSoft, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.4), relativeTime: 0, duration: 0.2)
+            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            try engine.start()
+            let player = try engine.makePlayer(with: pattern)
+            try player.start(atTime: 0)
+        } catch {}
+    }
+
+    /// 锁车反馈
+    static func lock() {
+        let engine = CHHapticEngine()
+        do {
+            let event = try CHHapticEvent(eventType: .hapticLight, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6), relativeTime: 0, duration: 0.15)
+            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            try engine.start()
+            let player = try engine.makePlayer(with: pattern)
+            try player.start(atTime: 0)
+        } catch {}
+    }
+
+    /// 系统级轻触（兼容所有设备）
+    static func systemTap() {
+        AudioServicesPlaySystemSound(1104) // UIImpactFeedbackScheduler
+    }
+}
+
+// =============================================================================
+// #NEW-104 AudioToolbox 操作音效
+// =============================================================================
+enum SoundFeedback {
+    /// 成功音效
+    static func playSuccess() {
+        AudioServicesPlaySystemSound(1000) // 系统成功音
+    }
+
+    /// 错误音效
+    static func playError() {
+        AudioServicesPlaySystemSound(1001) // 系统错误音
+    }
+
+    /// 通知音效
+    static func playNotification() {
+        AudioServicesPlaySystemSound(1005) // 系统通知音
+    }
+
+    /// 点击音效
+    static func playClick() {
+        AudioServicesPlaySystemSound(1100) // UIButtonClick
+    }
+}
+
+// =============================================================================
+// #NEW-105 Photo Picker 图片选择器辅助
+// =============================================================================
+struct ImagePicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    let sourceType: UIImagePickerController.SourceType
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = sourceType
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: ImagePicker
+        init(_ parent: ImagePicker) { self.parent = parent }
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.image = image
+            }
+            picker.dismiss(animated: true)
+        }
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            picker.dismiss(animated: true)
+        }
+    }
+}
+
+/// 保存图片到相册
+func saveImageToPhotoLibrary(_ image: UIImage, completion: @escaping (Bool) -> Void) {
+    PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
+        guard status == .authorized || status == .limited else {
+            completion(false)
+            return
+        }
+        PHPhotoLibrary.shared().performChanges {
+            PHAssetChangeRequest.creationRequestForAsset(from: image)
+        } completionHandler: { success, error in
+            completion(success)
+        }
+    }
+}
+
+/// 从相册获取单张图片
+func pickImageFromPhotoLibrary(onCompletion: @escaping (UIImage?) -> Void) {
+    let picker = UIImagePickerController()
+    picker.delegate = ImagePickerCoordinator(completion: onCompletion)
+    picker.sourceType = .photoLibrary
+    // 需要在合适的 UIViewController 上 present
+    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+       let rootVC = windowScene.windows.first?.rootViewController {
+        rootVC.present(picker, animated: true)
+    }
+}
+
+/// 图片选择器 Coordinator
+private class ImagePickerCoordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    let completion: (UIImage?) -> Void
+    init(completion: @escaping (UIImage?) -> Void) { self.completion = completion }
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        if let image = info[.originalImage] as? UIImage {
+            completion(image)
+        }
+        picker.dismiss(animated: true)
+    }
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        completion(nil)
+        picker.dismiss(animated: true)
+    }
 }
