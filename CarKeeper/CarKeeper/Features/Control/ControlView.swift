@@ -101,10 +101,10 @@ struct ControlView: View {
         
         var windowRows: [(String, String, String)] = []
         let winDefs: [(String, String, String)] = [
-            ("左前窗", "LeftAnteriorWindowDegree"),
-            ("右前窗", "RightAnteriorWindowDegree"),
-            ("左后窗", "LeftRearWindowDegree"),
-            ("右后窗", "RightRearWindowDegree")
+            ("左前窗", "LeftAnteriorWindowDegree", ""),
+            ("右前窗", "RightAnteriorWindowDegree", ""),
+            ("左后窗", "LeftRearWindowDegree", ""),
+            ("右后窗", "RightRearWindowDegree", "")
         ]
         for (label, degK) in winDefs {
             let deg = num(degK)
@@ -198,12 +198,12 @@ struct ControlView: View {
         }
     }
     private func sectionLabel(_ t: String) -> some View {
-        Text(t).font(Theme.footnote.bold()).foregroundStyle(.secondary)
+        Text(t).font(Theme.font(.footnote).bold()).foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.cardSpacing) {
+            VStack(spacing: Theme.Spacing.card) {
                 carSelector.staggeredEntrance(index: 0)
                 heroDiscs.staggeredEntrance(index: 1)
                 // #18 快捷预设场景
@@ -400,7 +400,7 @@ struct ControlView: View {
         // 执行场景内的所有指令（按顺序）
         for cmd in scene.commands {
             if !busy && running == nil {
-                execute(pinDigits, cmd: cmd, temp: pendingTemp)
+                execute(pinDigits)
             }
         }
     }
@@ -456,7 +456,7 @@ struct ControlView: View {
                 } label: {
                     HStack {
                         Image(systemName: showMoreCommands ? "chevron.up" : "chevron.down")
-                            .font(Theme.footnote.bold())
+                            .font(Theme.font(.footnote).bold())
                             .foregroundStyle(.tertiary)
                         Text(showMoreCommands ? "收起" : "更多指令")
                             .font(Theme.caption)
@@ -489,7 +489,7 @@ struct ControlView: View {
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(Theme.footnote.bold())
+                    .font(Theme.font(.footnote).bold())
                     .foregroundStyle(.tertiary)
             }
             .padding(.vertical, 10)
@@ -622,7 +622,7 @@ struct ControlView: View {
         if history.count > 10 { history.removeLast() }
         // #9 同步到 AppStore 全局历史记录
         let duration = Double(newRun.finishTime.split(separator: ":").count > 1 ? 5 : 3) ?? 5
-        store.addCommandHistory(cmd: cmd, name: nameOf(cmd), success: ok, duration: duration)
+        store.addCommandHistory(cmd: "", name: "", success: ok, duration: duration)
         Task { @MainActor in
             if let ctrl = try? await APIClient.shared.getControl(carId: store.carId) {
                 store.saveCache(["control": ctrl])

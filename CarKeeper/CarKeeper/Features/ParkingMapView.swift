@@ -68,7 +68,7 @@ struct ParkingMapView: View {
                     .foregroundStyle(.red)
                 VStack(alignment: .leading) {
                     Text(addressText)
-                        .font(Theme.subheadline.bold())
+                        .font(Theme.font(.subheadline).bold())
                         .foregroundStyle(.primary)
                     Text(loc.formattedDistance(to: store.currentLocation))
                         .font(.caption)
@@ -144,7 +144,7 @@ struct ParkingMapView: View {
                     HStack {
                         Image(systemName: "car.fill")
                         Text("导航到停车点")
-                            .font(Theme.subheadline.bold())
+                            .font(Theme.font(.subheadline).bold())
                     }
                     .frame(maxWidth: .infinity)
                     .padding()

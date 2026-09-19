@@ -19,11 +19,11 @@ struct HealthView: View {
     @State private var isRefreshing = false            // 下拉刷新涟漪标志
     @State private var pulseTrigger: String = ""        // 触发数值脉冲高亮（评分变化时更新）
     @State private var heroExpanded = false            // Hero 卡片整体展开/收起系统列表
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.medium
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.cardSpacing) {
+            VStack(spacing: Theme.Spacing.card) {
                 if loading {
                     loadingView
                 } else if let model {
@@ -132,7 +132,7 @@ struct HealthView: View {
         .staggeredEntrance(index: 0)
         .overlay(alignment: .bottomTrailing) {
             Image(systemName: "chevron.down")
-                .font(Theme.footnote.bold())
+                .font(Theme.font(.footnote).bold())
                 .foregroundStyle(.tertiary)
                 .rotationEffect(chevronAngle)
                 .animation(.spring(response: 0.35, dampingFraction: 0.6), value: heroExpanded)
@@ -444,7 +444,7 @@ struct SystemRowView: View {
                             .frame(width: isOpen ? 18 : 0, height: 2)
                             .animation(.spring(.duration(0.3)), value: isOpen)
                         Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                            .font(Theme.footnote.bold())
+                            .font(Theme.font(.footnote).bold())
                             .foregroundStyle(isOpen ? Theme.statusColor(sys.statusCls) : .tertiary)
                             .rotationEffect(.degrees(isOpen ? 0 : 180))
                             .animation(.spring(response: 0.35, dampingFraction: 0.65), value: isOpen)
@@ -506,7 +506,7 @@ struct SystemChildRow: View {
                     Text(item.name).font(Theme.caption).foregroundStyle(.secondary)
                     Spacer()
                     Text(item.statusText)
-                        .font(Theme.footnote.bold())
+                        .font(Theme.font(.footnote).bold())
                         .foregroundStyle(Theme.statusColor(item.statusCls))
                 }
                 if let d = item.detect, !d.isEmpty { KVRow(k: "检测值", v: d) }

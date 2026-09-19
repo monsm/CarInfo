@@ -9,7 +9,7 @@ extension View {
     /// 设置 VoiceOver 朗读顺序优先级（数字越小越先朗读）
     func accessibilityReadOrder(_ order: Int) -> some View {
         self
-            .accessibilitySortPriority(-order)
+            .accessibilitySortPriority(Double(-order))
             .accessibilityLabel(Text(self.accessibilityLabelContent ?? ""))
     }
     
@@ -25,8 +25,8 @@ struct ColorBlindModeView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("色彩辅助模式").font(Theme.h4)
             Picker("模式", selection: $mode) {
-                ForEach(options, id: \.last) { name, id in
-                    Text(name).tag(id)
+                ForEach(Array(options.enumerated()), id: \.offset) { idx, item in
+                    Text(item.0).tag(item.1)
                 }
             }
             .pickerStyle(SegmentedPickerStyle())

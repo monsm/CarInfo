@@ -112,7 +112,7 @@ struct FilePicker: UIViewControllerRepresentable {
 }
 
 // MARK: - E67 A/B测试框架
-class FeatureFlags {
+class FeatureFlags : ObservableObject {
     static let shared = FeatureFlags()
     @Published var flags: [String: Bool] = [:]
     

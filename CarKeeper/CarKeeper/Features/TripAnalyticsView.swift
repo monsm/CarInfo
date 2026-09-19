@@ -116,7 +116,7 @@ struct TripAnalyticsView: View {
     // MARK: - 趋势图
     private var trendChart: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("里程趋势").font(Theme.subheadline.bold())
+            Text("里程趋势").font(Theme.font(.subheadline).bold())
             Chart {
                 ForEach(weeklyTrend.indices, id: \.self) { i in
                     let item = weeklyTrend[i]
@@ -144,7 +144,7 @@ struct TripAnalyticsView: View {
     // MARK: - 驾驶行为分布
     private var behaviorChart: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("驾驶行为评分").font(Theme.subheadline.bold())
+            Text("驾驶行为评分").font(Theme.font(.subheadline).bold())
             HStack(spacing: 16) {
                 gaugeTile(icon: "checkmark.seal.fill", label: "平稳驾驶", value: "92%", color: .green)
                 gaugeTile(icon: "exclamation.triangle.fill", label: "急加速", value: "3次", color: .orange)
@@ -168,7 +168,7 @@ struct TripAnalyticsView: View {
     // MARK: - 常用路线
     private var commonRoutes: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("常用目的地").font(Theme.subheadline.bold())
+            Text("常用目的地").font(Theme.font(.subheadline).bold())
             VStack(spacing: 0) {
                 ForEach(0..<min(3, store.tripHistory.count)) { i in
                     let trip = store.tripHistory[i]

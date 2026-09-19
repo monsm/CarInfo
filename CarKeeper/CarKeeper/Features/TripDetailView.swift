@@ -147,7 +147,7 @@ struct TripDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.accent)
                 Text("行驶路线")
-                    .font(Theme.subheadline.bold())
+                    .font(Theme.font(.subheadline).bold())
                 Spacer()
                 Button(action: { showMap.toggle() }) {
                     Text(showMap ? "收起" : "展开")
@@ -214,7 +214,7 @@ struct TripDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.green)
                 Text("能耗分析")
-                    .font(Theme.subheadline.bold())
+                    .font(Theme.font(.subheadline).bold())
                 Spacer()
             }
             
@@ -246,7 +246,7 @@ struct TripDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
                 Text("驾驶行为")
-                    .font(Theme.subheadline.bold())
+                    .font(Theme.font(.subheadline).bold())
                 Spacer()
                 Text(DurationFormatter.string(from: max((trip.endTime ?? Date()).timeIntervalSince(trip.startTime), 1)))
                     .font(.caption)
@@ -290,7 +290,7 @@ struct TripDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.blue)
                 Text("时间线")
-                    .font(Theme.subheadline.bold())
+                    .font(Theme.font(.subheadline).bold())
                 Spacer()
             }
             

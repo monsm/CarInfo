@@ -113,7 +113,7 @@ struct ServiceHistoryView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
-                Text("即将到期").font(Theme.subheadline.bold())
+                Text("即将到期").font(Theme.font(.subheadline).bold())
                 Spacer()
             }
             
@@ -219,7 +219,7 @@ struct ServiceHistoryView: View {
                 }
                 Spacer()
                 Text("¥\(Int(entry.cost))")
-                    .font(Theme.subheadline.bold())
+                    .font(Theme.font(.subheadline).bold())
                     .foregroundStyle(.accent)
             }
             HStack {

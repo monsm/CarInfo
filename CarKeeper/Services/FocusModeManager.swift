@@ -15,7 +15,7 @@ struct FocusModeConfig: Codable, Identifiable {
     var customMessage: String    // 自定义锁屏文字
 }
 
-class FocusModeManager {
+class FocusModeManager: ObservableObject {
     static let shared = FocusModeManager()
     
     var config: FocusModeConfig {

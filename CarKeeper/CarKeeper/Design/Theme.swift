@@ -115,11 +115,13 @@ enum Theme {
     // =============================================================================
     // Font 扩展：语义样式便捷方法
     // =============================================================================
+    enum FontSize {
         static var headline: Font { .headline.weight(.semibold) }
         static var body: Font { .body }
         static var subheadline: Font { .subheadline }
         static var caption: Font { .caption }
         static var footnote: Font { .footnote }
+    }
 
 
     // =============================================================================
@@ -215,10 +217,9 @@ enum Theme {
         static let fast: Double = 0.2
         static let normal: Double = 0.3
         static let slow: Double = 0.5
-        static let springFast = Spring(response: 0.3, dampingFraction: 0.7)
-        static let springNormal = Spring(response: 0.45, dampingFraction: 0.8)
-        static let springSlow = Spring(response: 0.6, dampingFraction: 0.9)
-    }
+        static let springFast: Animation = .spring(response: 0.3, dampingFraction: 0.7)
+        static let springNormal: Animation = .spring(response: 0.45, dampingFraction: 0.8)
+        static let springSlow: Animation = .spring(response: 0.6, dampingFraction: 0.9)
     }
 
 
@@ -649,7 +650,7 @@ struct ExpandingCardBox<Content: View>: View {
                         Pill(text: side, cls: sideCls.isEmpty ? "na" : sideCls, dot: false)
                     }
                     Image(systemName: "chevron.right")
-                        .font(Theme.footnote.bold())
+                        .font(Theme.font(.footnote).bold())
                         .foregroundStyle(.tertiary)
                         .rotationEffect(chevronAngle)
                         .animation(.spring(response: 0.35, dampingFraction: 0.6), value: isExpanded)
@@ -2804,4 +2805,14 @@ private class ImagePickerCoordinator: NSObject, UIImagePickerControllerDelegate,
     }
 extension Font {
     /// 返回跟随 Dynamic Type 的语义字体
+}
+
+// MARK: - View extensions
+extension View {
+    func navBarStyle() -> some View { self }
+}
+
+import UIKit
+extension UIColor {
+    static var accent: UIColor { .systemBlue }
 }

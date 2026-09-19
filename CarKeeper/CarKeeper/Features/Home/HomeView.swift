@@ -37,7 +37,7 @@ struct HomeView: View {
     @State private var siriLastAction: String? = nil
     // #NEW-123 全局搜索
     @State private var showSearch = false
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.medium
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         Group {
@@ -437,7 +437,7 @@ struct HomeView: View {
             Spacer()
             if carSel.count > 1 {
                 Text("\(carSel.count) 辆")
-                    .font(Theme.footnote.bold())
+                    .font(Theme.font(.footnote).bold())
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(.ultraThinMaterial, in: Capsule())
@@ -457,7 +457,7 @@ struct HomeView: View {
         let lines: [HeadLine] = [
             HeadLine(id: "soc", label: "SOC", value: battDomain.metrics.first { $0.k == "SOC" }?.v ?? "--", cls: battDomain.cls, reason: ""),
             HeadLine(id: "range", label: "续航", value: VM.energy(store.caches, store.car).range + " km", cls: battDomain.cls, reason: ""),
-            HeadLine(id: "alarm", label: "告警", value: battDomain.alarms.isEmpty ? "无" : "\(battDomain.alarms.count) 项", cls: battDomain.cls, reason: battDomain.alarms.isEmpty ? "" : battDomain.alarms.joined(separator: " · "))
+            HeadLine(id: "alarm", label: "告警", value: battDomain.reasons.isEmpty ? "无" : "\(battDomain.reasons.count) 项", cls: battDomain.cls, reason: battDomain.reasons.isEmpty ? "" : battDomain.reasons.joined(separator: " · "))
         ].filter { !$0.value.contains("--") }
         return (lines, battDomain.cls, battDomain.title)
     }
@@ -533,7 +533,7 @@ struct HomeView: View {
         .accessibilityHint(Text(expandedDrive ? "点击收起详细数据" : "点击展开车速、档位、电机温度等行驶详情"))
         .overlay(alignment: .trailing) {
             Image(systemName: "chevron.right")
-                .font(Theme.footnote.bold())
+                .font(Theme.font(.footnote).bold())
                 .foregroundStyle(.tertiary)
                 .rotationEffect(chevronAngle)
                 .animation(.spring(response: 0.35, dampingFraction: 0.6), value: expandedDrive)
@@ -614,7 +614,7 @@ struct HomeView: View {
                 .foregroundStyle(.primary)
             Spacer()
             Text(d.short)
-                .font(Theme.caption.bold())
+                .font(Theme.font(.caption).bold())
                 .foregroundStyle(Theme.statusColor(d.cls))
         }
         .padding(.vertical, 6)
@@ -638,10 +638,10 @@ struct HomeView: View {
     // MARK: 电池区
     private func batterySection(_ cache: [String: Any?]) -> some View {
         let batt = VM.batteryModel(cache)
-        return VStack(spacing: Theme.cardSpacing) {
+        return VStack(spacing: Theme.Spacing.card) {
             // 电池摘要行（SOC / 续航 / 告警 来自分析域，不重复 SOC Hero）
             VStack(alignment: .leading, spacing: 8) {
-                Text("电池状态").font(Theme.footnote.bold()).foregroundStyle(.secondary)
+                Text("电池状态").font(Theme.font(.footnote).bold()).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 12) {
                     ForEach(battSummary.headLines, id: \.id) { h in
@@ -667,7 +667,7 @@ struct HomeView: View {
             for line in battSummary.headLines {
                 HStack(spacing: 6) {
                     Text(line.label).font(Theme.caption).foregroundStyle(.secondary)
-                    Text(line.value).font(Theme.caption.bold()).foregroundStyle(line.cls == "ok" ? Theme.ok : (line.cls == "bad" ? Theme.bad : .primary))
+                    Text(line.value).font(Theme.font(.caption).bold()).foregroundStyle(line.cls == "ok" ? Theme.ok : (line.cls == "bad" ? Theme.bad : .primary))
                     if !line.reason.isEmpty {
                         Text(line.reason).font(Theme.footnote).foregroundStyle(.secondary)
                         Spacer()
@@ -687,7 +687,7 @@ struct HomeView: View {
                                 Text(s.num == "--" ? "子" : "S\(s.num!)")
                                     .font(Theme.micro).foregroundStyle(.secondary)
                                 Text(s.maxV.map { String(format: "%.3f", $0) } ?? "--")
-                                    .font(Theme.footnote.bold(), design: .monospaced)
+                                    .font(Theme.font(.footnote).bold(), design: .monospaced)
                                     .foregroundStyle(.primary)
                             }
                             .frame(width: 52)
@@ -753,7 +753,7 @@ struct HomeView: View {
                     Divider().padding(.horizontal, Theme.Spacing.xl)
                     VStack(alignment: .leading, spacing: 6) {
                         Text("胎压详情")
-                            .font(Theme.caption.bold()).foregroundStyle(.secondary)
+                            .font(Theme.font(.caption).bold()).foregroundStyle(.secondary)
                         ForEach(Array(tyre.items.enumerated()), id: \.element.id) { idx, item in
                             HStack {
                                 Text(item.label).font(Theme.footnote).foregroundStyle(.primary)
@@ -788,7 +788,7 @@ struct HomeView: View {
         .accessibilityHint(Text(expandedTyre ? "点击收起胎压详情" : "点击展开四个轮胎的胎压和温度详情"))
         .overlay(alignment: .trailing) {
             Image(systemName: "chevron.right")
-                .font(Theme.footnote.bold())
+                .font(Theme.font(.footnote).bold())
                 .foregroundStyle(.tertiary)
                 .rotationEffect(chevronAngle)
                 .animation(.spring(response: 0.35, dampingFraction: 0.6), value: expandedTyre)

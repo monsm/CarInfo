@@ -20,7 +20,7 @@ private struct ColorSwatch: View {
                     .fill(color)
                     .frame(width: 36, height: 36)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(name).font(Theme.caption.bold()).foregroundStyle(.primary)
+                    Text(name).font(Theme.font(.caption).bold()).foregroundStyle(.primary)
                     if let sampleText {
                         Text(sampleText).font(Theme.footnote).foregroundStyle(.secondary)
                     }
@@ -107,7 +107,7 @@ private struct ContrastRow: View {
             .frame(maxWidth: .infinity)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(name).font(Theme.caption.bold()).foregroundStyle(.primary)
+                Text(name).font(Theme.font(.caption).bold()).foregroundStyle(.primary)
                 Text("light: #\(lightColor.hexString())\ndark:  #\(darkColor.hexString())")
                     .font(Theme.micro)
                     .foregroundStyle(.secondary)
@@ -127,7 +127,7 @@ private struct ContrastRow: View {
 struct DevView: View {
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.cardSpacing) {
+            VStack(spacing: Theme.Spacing.card) {
                 // Hero 说明卡
                 VStack(spacing: Theme.Spacing.sm) {
                     Text("颜色预览").font(Theme.h2.bold()).foregroundStyle(.primary)

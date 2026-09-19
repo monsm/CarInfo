@@ -53,7 +53,7 @@ struct DataView: View {
             SiriInsightView(store: store).staggeredEntrance(index: 1)
             kindSwitcher
             ScrollView {
-                VStack(spacing: Theme.cardSpacing) {
+                VStack(spacing: Theme.Spacing.card) {
                     if !loading && blocks.isEmpty {
                         if !errText.isEmpty {
                             PageErrorView(errText) { Task { await load() } }

@@ -81,7 +81,7 @@ struct CommandHistoryView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(filters, id: \.self) { f in
-                    Button(action: { filter = f }) {
+                    Button(role: nil, action: { filter = f }) {
                         Text(f)
                             .font(.caption)
                             .padding(.horizontal, 12)
@@ -116,9 +116,9 @@ struct CommandHistoryView: View {
     }
     
     private func commandRow(_ cmd: AppStore.HistoryEntry, idx: Int) -> some View {
-        let isExpanded = expandedCmds.contains(cmd.id)
+        let isExpanded = expandedCmds.map{$0}.contains(cmd.id)
         
-        Button(action: {
+        Button(role: nil, action: {
             withAnimation(.spring(response: 0.35)) {
                 if isExpanded { expandedCmds.remove(cmd.id) }
                 else { expandedCmds.insert(cmd.id) }
@@ -215,11 +215,11 @@ extension View {
     }
 }
 
-struct SpinningSymbolModifier: AnimationModifier {
+struct SpinningSymbolModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .rotationEffect(.degrees(360))
-            .animation(.linear(duration: 1.5).repeatForever(autoreverses: false), value: UUID())
+            .rotationEffect(.init(degrees: 360))
+            .animation(.linear(1.5).repeatForever(autoreverses: false), value: UUID())
     }
 }
 

@@ -24,7 +24,7 @@ struct ExportDataView: View {
             VStack(spacing: 20) {
                 // 选择导出类型
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("导出类型").font(Theme.subheadline.bold())
+                    Text("导出类型").font(Theme.font(.subheadline).bold())
                     Picker("类型", selection: $exportType) {
                         ForEach(ExportType.allCases, id: \.self) { type in
                             Text(type.rawValue).tag(type)
@@ -42,7 +42,7 @@ struct ExportDataView: View {
                         HStack {
                             Image(systemName: "doc.plaintext")
                             Text("导出 CSV")
-                                .font(Theme.subheadline.bold())
+                                .font(Theme.font(.subheadline).bold())
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -55,7 +55,7 @@ struct ExportDataView: View {
                         HStack {
                             Image(systemName: "doc.richtext")
                             Text("导出 PDF")
-                                .font(Theme.subheadline.bold())
+                                .font(Theme.font(.subheadline).bold())
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -130,7 +130,7 @@ struct ExportDataView: View {
         Task {
             defer { isExporting = false }
             let content = csvContent
-            let filename = "\(exportType.rawValue)_\(Date().strftime("%Y%m%d_%H%M%S")).csv"
+            let filename = "\(exportType.rawValue)_\(Date().formatted(date: .abbreviated, time: .standard)).csv"
             if let url = saveToFile(content, filename: filename) {
                 exportURL = url
                 showSuccess = true
@@ -143,7 +143,7 @@ struct ExportDataView: View {
         Task {
             defer { isExporting = false }
             let html = pdfHTMLContent
-            let filename = "\(exportType.rawValue)_\(Date().strftime("%Y%m%d_%H%M%S")).pdf"
+            let filename = "\(exportType.rawValue)_\(Date().formatted(date: .abbreviated, time: .standard)).pdf"
             if let url = saveHTMLAsPDF(html, filename: filename) {
                 exportURL = url
                 showSuccess = true

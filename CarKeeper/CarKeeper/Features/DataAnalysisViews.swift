@@ -23,7 +23,7 @@ struct ChargeEfficiencyTrend: View {
             Text("暂无足够数据").font(.caption).foregroundColor(.secondary).frame(maxWidth: .infinity).glassCard()
         } else {
             Chart {
-                ForEach(efficiencyData.indices.dropLast(), id: \.offset) { i in
+                ForEach(efficiencyData.indices.dropLast(), id: \.self) { i in
                     LineMark(x: .value("时间", efficiencyData[i].0), y: .value("能耗 kWh/h", efficiencyData[i].1))
                         .foregroundStyle(.green)
                     PointMark(x: .value("时间", efficiencyData[i].0), y: .value("能耗 kWh/h", efficiencyData[i].1))
@@ -38,7 +38,7 @@ struct ChargeEfficiencyTrend: View {
 // MARK: - E27 驾驶行为周环比报告
 struct WeeklyDrivingReport: View {
     let store: AppStore
-    private var lastWeekTrips: [TripRecord] {
+    private var lastWeekTrips: [AppStore.TripRecord] {
         let weekStart = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
         return store.tripHistory.filter { $0.startTime >= weekStart }
     }
@@ -140,12 +140,12 @@ struct CommandSuccessRate: View {
 // MARK: - E33 Siri使用习惯分析
 struct SiriUsageAnalysis: View {
     let store: AppStore
-    var topCommands: [(String, Int)] { store.siriUsageCount.sorted{$0.value>$1.value}.prefix(3) }
+    var topCommands: [(String, Int)] { Array(store.siriUsageCount.sorted{$0.value>$1.value}.prefix(3)) }
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             Text("Siri使用排行").font(.subheadline).fontWeight(.semibold)
-            ForEach(Array(topCommands.enumerated()), id: \.offset) { idx, item in
-                HStack { Text("#\(idx+1)").font(.caption).foregroundColor(.secondary).frame(width: 20); Text(item.key).font(.subheadline); Spacer(); Text("\(item.value)次").font(.caption).foregroundColor(.secondary) }
+            ForEach(Array(topCommands.enumerated()), id: \.self) { idx, item in
+                HStack { Text("#\(idx+1)").font(.caption).foregroundColor(.secondary).frame(width: 20); Text(item.0).font(.subheadline); Spacer(); Text("\(item.1)次").font(.caption).foregroundColor(.secondary) }
             }
         }.padding().glassCard()
     }

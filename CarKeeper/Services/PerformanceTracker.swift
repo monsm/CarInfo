@@ -17,7 +17,7 @@ struct APIStatistic {
     let timestamp: Date
 }
 
-class PerformanceTracker {
+class PerformanceTracker : ObservableObject {
     static let shared = PerformanceTracker()
     
     private var pageStartTimes: [String: Date] = [:]

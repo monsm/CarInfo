@@ -89,6 +89,7 @@ final class AppStore: @unchecked Sendable {
         let startLocation: CLLocation?
         let endLocation: CLLocation?
         let distanceKm: Double
+        var durationText: String { duration > 0 ? "\(Int(duration/60))min" : "--" }
         let startSoc: Int
         let endSoc: Int
         let avgEfficiency: Double?  // kWh/100km

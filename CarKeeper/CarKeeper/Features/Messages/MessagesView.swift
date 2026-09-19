@@ -14,7 +14,7 @@ struct MessagesView: View {
     @State private var filterTag: String? = nil
     @State private var showUnreadOnly = false
     @EnvironmentObject var nav: NavState                // C3: 用于 pushNavigation
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.medium
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     // 本地已读持久化（无服务端 mark-read 接口，用 UserDefaults 记已读消息 ID）。
     private static let readKey = "changan_read_message_ids"
@@ -138,7 +138,7 @@ struct MessagesView: View {
                     markAllRead()
                 } label: {
                     Text("全部已读")
-                        .font(Theme.caption.bold())
+                        .font(Theme.font(.caption).bold())
                         .foregroundStyle(.accent)
                 }
                 .accessibilityLabel(Text("全部已读"))
@@ -266,7 +266,7 @@ struct MessagesView: View {
                         }
                         Spacer()
                         Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                            .font(Theme.footnote.bold())
+                            .font(Theme.font(.footnote).bold())
                             .foregroundStyle(.tertiary)
                     }
                     if !item.time.isEmpty {
@@ -302,7 +302,7 @@ struct MessagesView: View {
                     if !item.plate.isEmpty {
                         HStack(spacing: 8) {
                             Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(.accent)
-                            Text(item.plate).font(Theme.caption.bold(), design: .monospaced)
+                            Text(item.plate).font(Theme.font(.caption).bold(), design: .monospaced)
                                 .foregroundStyle(.accent)
                         }
                     }

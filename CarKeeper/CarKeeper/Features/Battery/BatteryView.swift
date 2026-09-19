@@ -27,11 +27,11 @@ struct BatteryView: View {
         var id: String { rawValue }
     }
     @State private var energyTrendPeriod: EnergyTrendPeriod = .realtime
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.medium
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.cardSpacing) {
+            VStack(spacing: Theme.Spacing.card) {
                 let cache = store.caches
                 let b = batteryModel(cache)
                 let e = VM.energy(cache, store.car)
@@ -318,7 +318,7 @@ struct BatteryView: View {
                         ForEach(Array(b.motors.enumerated()), id: \.offset) { _, m in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(m.num == "--" ? "驱动电机" : "驱动电机 #\(m.num)")
-                                    .font(Theme.caption.bold()).foregroundStyle(.secondary)
+                                    .font(Theme.font(.caption).bold()).foregroundStyle(.secondary)
                                 let rows = motorRows(m)
                                 ForEach(Array(rows.enumerated()), id: \.offset) { idx, r in
                                     KVRow(k: r.k, v: r.v)
@@ -345,9 +345,9 @@ struct BatteryView: View {
                     ForEach(b.faults.filter { $0.count > 0 }) { f in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(f.name).font(Theme.caption.bold())
+                                Text(f.name).font(Theme.font(.caption).bold())
                                 Spacer()
-                                Text("\(f.count) 条").font(Theme.caption.bold())
+                                Text("\(f.count) 条").font(Theme.font(.caption).bold())
                                     .foregroundStyle(Theme.bad)
                             }
                             if !f.codes.isEmpty {
@@ -375,7 +375,7 @@ struct BatteryView: View {
                                 StatusDot(cls: "bad")
                                 Text(a).font(Theme.caption)
                                 Spacer()
-                                Text("触发").font(Theme.footnote.bold())
+                                Text("触发").font(Theme.font(.footnote).bold())
                                     .foregroundStyle(Theme.bad)
                             }
                             .padding(.vertical, 6)
@@ -389,14 +389,14 @@ struct BatteryView: View {
 
     // MARK: 辅助
     private func sectionLabel(_ t: String) -> some View {
-        Text(t).font(Theme.footnote.bold()).foregroundStyle(.secondary)
+        Text(t).font(Theme.font(.footnote).bold()).foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func miniStat(_ k: String, _ v: String, _ unit: String, warn: Bool = false) -> some View {
         HStack(spacing: 4) {
             Text(k).font(Theme.footnote).foregroundStyle(.secondary)
-            Text(v).font(Theme.caption.bold(), design: .monospaced)
+            Text(v).font(Theme.font(.caption).bold(), design: .monospaced)
                 .foregroundStyle(warn ? Theme.bad : .primary)
             Text(unit).font(Theme.micro).foregroundStyle(.secondary)
         }

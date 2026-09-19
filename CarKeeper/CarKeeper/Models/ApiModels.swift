@@ -259,7 +259,7 @@ struct ComfortModel {
     var purifier: String
 }
 
-struct TyreItem: Identifiable {
+struct TyreItem: Identifiable, Equatable {
     var id: String { label }
     let label: String
     let kpa: String

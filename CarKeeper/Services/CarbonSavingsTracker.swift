@@ -19,7 +19,7 @@ struct CarbonSavingStats {
     }
 }
 
-class CarbonSavingsTracker {
+class CarbonSavingsTracker : ObservableObject {
     static let shared = CarbonSavingsTracker()
     
     private let stepsPerKm = 1300  // 每公里步数估算

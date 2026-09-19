@@ -7,7 +7,7 @@ import Photos
 struct VehicleView: View {
     private let store = AppStore.shared
 
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.medium
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var isRefreshing = false         // 下拉刷新涟漪标志
     // #NEW-105 维保相册
     @State private var maintenancePhotos: [String] = []  // Base64 图片
@@ -35,7 +35,7 @@ struct VehicleView: View {
             } else if let sum = VM.vehicleSummary(store.car) {
                 // 正常内容：显示车辆档案
                 ScrollView {
-                    VStack(spacing: Theme.cardSpacing) {
+                    VStack(spacing: Theme.Spacing.card) {
                         plateCard(sum)
                         ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
                             CardBox(title: group.name) {
@@ -226,7 +226,7 @@ struct VehicleView: View {
     private func badgeRow(_ k: String, _ v: String, cls: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(k).font(Theme.micro).foregroundStyle(.secondary)
-            Text(v).font(Theme.caption.bold())
+            Text(v).font(Theme.font(.caption).bold())
                 .foregroundStyle(Theme.statusColor(cls) == Color.secondary ? Color.primary : Theme.statusColor(cls))
         }
         .padding(.horizontal, 12).padding(.vertical, 8)

@@ -39,7 +39,7 @@ enum TripCostType: String, CaseIterable, Identifiable {
     }
 }
 
-struct CostEntry: Identifiable {
+struct CostEntry: Identifiable, Codable {
     let id = UUID()
     let date: Date
     let type: TripCostType
@@ -48,7 +48,7 @@ struct CostEntry: Identifiable {
     let odometerKm: Double?
 }
 
-class MileageTracker {
+class MileageTracker : ObservableObject {
     static let shared = MileageTracker()
     
     var entries: [CostEntry] {

@@ -5,7 +5,7 @@
 import Foundation
 
 // MARK: - N38 崩溃日志捕获与上报
-class CrashReporter {
+class CrashReporter : ObservableObject {
     static let shared = CrashReporter()
     
     private let logFileKey = "carkeeper_crash_log"

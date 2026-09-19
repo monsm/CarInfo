@@ -39,7 +39,7 @@ struct MineView: View {
     // MARK: 生命周期
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.cardSpacing) {
+            VStack(spacing: Theme.Spacing.card) {
                 profileCard
                 if let car = store.car { carCard(car) }
                 tilesCard
@@ -173,7 +173,7 @@ struct MineView: View {
                                     .font(Theme.micro)
                                     .foregroundStyle(Theme.ok)
                                 Text("已实名")
-                                    .font(Theme.footnote.bold())
+                                    .font(Theme.font(.footnote).bold())
                                     .foregroundStyle(Theme.ok)
                             }
                         }
@@ -242,7 +242,7 @@ struct MineView: View {
                          cls: d < 0 ? "bad" : (d <= 30 ? "warn" : "ok"), dot: false)
                 }
                 Image(systemName: "chevron.right")
-                    .font(Theme.footnote.bold()).foregroundStyle(.tertiary)
+                    .font(Theme.font(.footnote).bold()).foregroundStyle(.tertiary)
             }
             .padding(16)
             .dynamicTypeCompress()
@@ -422,7 +422,7 @@ struct MineView: View {
                         .foregroundStyle(tint)
                 }
                 Text(label)
-                    .font(Theme.caption.bold())
+                    .font(Theme.font(.caption).bold())
                     .foregroundStyle(.primary)
             }
             .frame(maxWidth: .infinity)
@@ -452,7 +452,7 @@ struct MineView: View {
             HStack(spacing: 6) {
                 if updateBusy { ProgressView().controlSize(.mini).tint(.white) }
                 Text(updateBusy ? "检查中…" : "检查更新")
-                    .font(Theme.caption.bold())
+                    .font(Theme.font(.caption).bold())
             }
             .foregroundStyle(.white)
             .padding(.vertical, 10)
@@ -468,7 +468,7 @@ struct MineView: View {
             shareSheetFlag = true
         } label: {
             Label("分享安装包", systemImage: "square.and.arrow.up")
-                .font(Theme.caption.bold())
+                .font(Theme.font(.caption).bold())
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .background(.ultraThinMaterial, in: Capsule())
         }

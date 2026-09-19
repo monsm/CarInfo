@@ -93,7 +93,7 @@ struct LoginView: View {
                     .font(Theme.h1)
                     .letterSpacing(2)
                 Text("CHANGAN CONNECT")
-                    .font(Theme.footnote.bold())
+                    .font(Theme.font(.footnote).bold())
                     .tracking(5)
                     .foregroundStyle(.secondary)
             }
@@ -150,7 +150,7 @@ struct LoginView: View {
             sendSms()
         } label: {
             Text(smsBtnText)
-                .font(Theme.caption.bold())
+                .font(Theme.font(.caption).bold())
                 .foregroundStyle(smsBtnDisabled ? Color.secondary : .accent)
                 .padding(.horizontal, 14).padding(.vertical, 8)
                 .background(.ultraThinMaterial, in: Capsule())
