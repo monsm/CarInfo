@@ -486,7 +486,7 @@ struct HomeView: View {
                     let minV = cells.min { a, b -> Bool in (a.minV ?? 999) > (b.minV ?? 999) }?.minV ?? 999
                     let diff = maxV - minV
                     HStack(spacing: 8) {
-                        ForEach(cells) { s in
+                        ForEach(cells.enumerated(), id: \.offset) { _, s in
                             VStack(spacing: 2) {
                                 Text(s.num == "--" ? "子" : "S\(s.num!)")
                                     .font(Theme.micro)).foregroundStyle(.secondary)

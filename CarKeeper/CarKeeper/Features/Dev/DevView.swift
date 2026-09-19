@@ -175,11 +175,43 @@ struct DevView: View {
 
                 // 玻璃材质
                 ColorGroup(groupName: "玻璃材质", items: [
-                    ("thin",      .thickMaterial,     "卡片材质"),
-                    ("prominent", .prominentMaterial, "模态背景"),
-                    ("ultraThin", .ultraThickMaterial,.极淡材质"),
-                    ("sidebar",   .sidebarMaterial,   "侧栏背景"),
-                    ("content",   .contentBackground, "内容背景"),
+                    ("thin",       Material.thin,       "卡片材质（默认）"),
+                    ("prominent",  Material.prominent,  "模态背景"),
+                    ("ultraThin",  Material.ultraThin,  "极淡材质"),
+                    ("sidebar",    Material.sidebar,    "侧栏背景"),
+                    ("content",    Material.content,    "内容背景"),
+                ])
+
+                // 页面背景色
+                ColorGroup(groupName: "页面背景", items: [
+                    ("pageAccent",    Theme.pageAccent,    "车况页（默认）"),
+                    ("pageGreen",     Theme.pageGreen,     "电池/健康页"),
+                    ("pageBlue",      Theme.pageBlue,      "车控页"),
+                    ("pageIndigo",    Theme.pageIndigo,    "全量数据页"),
+                ])
+
+                // 表面色（ColorSystem）
+                ColorGroup(groupName: "表面色", items: [
+                    ("background",   Theme.ColorSystem.background,   "系统分组背景"),
+                    ("cardBg",       Theme.ColorSystem.cardBg,       "次级分组背景"),
+                    ("overlay",      Theme.ColorSystem.overlay,      "磨砂覆盖层"),
+                    ("glass",        Theme.ColorSystem.glass,        "玻璃材质（与 overlay 统一）"),
+                ])
+
+                // 边框与填充色
+                ColorGroup(groupName: "边框与填充", items: [
+                    ("border",          Theme.ColorSystem.border,          "分隔线"),
+                    ("borderSubtle",    Theme.ColorSystem.borderSubtle,    "浅边框"),
+                    ("fill",            Theme.ColorSystem.fill,            "次级填充"),
+                    ("fillSubtle",      Theme.ColorSystem.fillSubtle,      "三级填充"),
+                    ("fillHighlighted", Theme.ColorSystem.fillHighlighted, "四级填充"),
+                ])
+
+                // 阴影色
+                ColorGroup(groupName: "阴影色", items: [
+                    ("shadowLight",   Theme.ColorSystem.shadowLight,   "轻微阴影 4%"),
+                    ("shadowMedium",  Theme.ColorSystem.shadowMedium,  "中等阴影 8%"),
+                    ("shadowStrong",  Theme.ColorSystem.shadowStrong,  "强阴影 12%"),
                 ])
 
                 // 深浅双模式对比
@@ -232,7 +264,7 @@ extension Color {
 struct DevView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            ColorPreviewView()
+            DevView()
         }
     }
 }
