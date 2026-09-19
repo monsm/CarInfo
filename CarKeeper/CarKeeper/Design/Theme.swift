@@ -221,7 +221,7 @@ enum Theme {
         static let springNormal: Animation = .spring(response: 0.45, dampingFraction: 0.8)
         static let springSlow: Animation = .spring(response: 0.6, dampingFraction: 0.9)
     }
-
+}
 
 extension Theme {
     // MARK: - 字体尺寸
@@ -2794,6 +2794,12 @@ private class ImagePickerCoordinator: NSObject, UIImagePickerControllerDelegate,
 }
 
 
+
+// MARK: - Font extensions
+extension Font {
+    /// 返回跟随 Dynamic Type 的语义字体
+    func dynamicTypeFont() -> Font { self }
+    
     /// Apply font design (iOS 17+)
     func design(_ design: Font.Design) -> Font {
         .system(size: 0, design: design) // placeholder
@@ -2803,8 +2809,6 @@ private class ImagePickerCoordinator: NSObject, UIImagePickerControllerDelegate,
     func weight(_ weight: Font.Weight) -> Font {
         .system(size: 0, weight: weight)
     }
-extension Font {
-    /// 返回跟随 Dynamic Type 的语义字体
 }
 
 // MARK: - View extensions
