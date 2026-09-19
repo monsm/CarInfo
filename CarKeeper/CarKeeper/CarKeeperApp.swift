@@ -113,6 +113,16 @@ struct CarKeeperApp: App {
             _ = InsuranceReminderScheduler.shared
             // #NEW-120 App Intents 注册（Siri 对话入口）
             _ = AppIntentsManager.shared
+            // E17-E18 触觉反馈 + E47 性能监控启动
+            PerformanceTracker.shared.start()
+            // E38 专注模式监听
+            _ = FocusModeManager.shared
+            // E9-E16 位置智能功能启动
+            LocationSmartFeatures.shared.startMonitoring()
+            // E40 充电状态监控
+            _ = ChargingStatusMonitor.shared
+            // N10 车牌加密初始化
+            _ = DataEncryption.shared
         }
         .nightModeBreathing(enabled: store.isNightMode)
     }

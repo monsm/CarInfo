@@ -72,6 +72,14 @@ final class AppStore: @unchecked Sendable {
         let range: Int
     }
     var energyHistory: [EnergyRecord] = []
+    
+    // E7 充电功率历史记录
+    struct ChargingPowerRecord: Identifiable {
+        let id = UUID()
+        let time: Date
+        let power: Double // kW
+    }
+    var chargingPowerHistory: [ChargingPowerRecord] = []
 
     // #NEW-2 驾驶行程记录
     struct TripRecord: Identifiable {
@@ -530,10 +538,11 @@ final class AppStore: @unchecked Sendable {
             if let saved = UserDefaults.standard.array(forKey: Self.cardOrderKey) as? [String] {
                 return saved
             }
-            // 默认顺序
+            // 默认顺序（含 E1-E8 实时车况卡片）
             return [
                 "socHero", "driveMetrics", "quickControl", "domainCard",
-                "batterySection", "tyreCard", "comfortCard", "locationCard"
+                "realtimeEnergy", "sohDashboard", "energyGauge", "driveMode",
+                "batterySection", "tyreCard", "comfortCard", "vehicle2D", "locationCard"
             ]
         }
         set { UserDefaults.standard.set(newValue, forKey: Self.cardOrderKey) }

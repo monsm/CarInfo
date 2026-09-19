@@ -38,13 +38,25 @@ struct BatteryView: View {
                 socHero(e).staggeredEntrance(index: 0)
                 verdictCard(cache, b).staggeredEntrance(index: 1)
                 consistencyCard(b).staggeredEntrance(index: 2)
-                chargeCard(b).staggeredEntrance(index: 3)
+                // E2 电池健康度 SOH
+                BatteryHealthCard(b).staggeredEntrance(index: 2)
+                // E7 充电功率曲线
+                ChargePowerChart(b).staggeredEntrance(index: 3)
+                chargeCard(b).staggeredEntrance(index: 4)
                 // #13 能耗历史折线图
-                energyHistoryChart.staggeredEntrance(index: 4)
+                // E26 充电效率趋势
+                ChargeEfficiencyTrend(store: store).staggeredEntrance(index: 3)
+                // E22 能耗对比柱状图
+                EnergyCompareChart(store: store).staggeredEntrance(index: 5)
+                energyHistoryChart.staggeredEntrance(index: 6)
                 subsystemCard(b).staggeredEntrance(index: 5)
                 motorCard(b).staggeredEntrance(index: 5)
                 faultCard(b).staggeredEntrance(index: 6)
-                alarmCard(b).staggeredEntrance(index: 7)
+                // E56 SOC历史曲线
+                SOCHistoryChart(store: store).staggeredEntrance(index: 8)
+                // E3 胎压趋势折线图
+                TireTrendChart(checkRaw: store.caches["check"] as? [String: Any] ?? {}).staggeredEntrance(index: 10)
+                alarmCard(b).staggeredEntrance(index: 11)
             }
             .adaptivePagePadding(dynamicTypeSize)
             .adaptiveSafeAreaBottom(8, dynamicTypeSize)

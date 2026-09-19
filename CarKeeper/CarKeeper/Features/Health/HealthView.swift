@@ -28,9 +28,16 @@ struct HealthView: View {
                     loadingView
                 } else if let model {
                     scoreHeroListWrapper(model)
+                    // E54 胎压趋势折线图
+                    TireTrendChart(checkRaw: store.caches["check"] as? [String: Any] ?? [:]).staggeredEntrance(index: 2)
+                    // E55 实时能耗率显示
+                    RealtimeEnergyDisplay(store: store).staggeredEntrance(index: 3)
+                    // E56 SOC历史曲线
+                    SOCHistoryChart(store: store).staggeredEntrance(index: 4)
+                    // E62 驾驶风格热力图
+                    DrivingStyleHeatmap(store: store).staggeredEntrance(index: 5)
                 } else if let err = errText {
                     PageErrorView(err) { Task { await load() } }
-                }
                 }
             }
             .adaptivePagePadding(dynamicTypeSize)
@@ -186,7 +193,7 @@ struct HealthView: View {
                     .foregroundStyle(scoreForeground(m.scorePct))
                     .dynamicTypeLineLimit(1)
                 Text("健康评分")
-                    .font(Theme.caption)))
+                    .font(Theme.caption))
                     .foregroundStyle(.secondary)
                     .dynamicTypeTextCompress(isTitle: true)
                     .accessibilityLabel(Text("健康评分"))
@@ -262,7 +269,7 @@ struct HealthView: View {
                 HStack(spacing: 6) {
                     StatusDot(cls: vsCls[vs] ?? "na")
                     Text(vsCN[vs] ?? vs)
-                        .font(Theme.footnote)))
+                        .font(Theme.footnote))
                         .foregroundStyle(Theme.statusColor(vsCls[vs] ?? "na"))
                 }
             }
@@ -423,7 +430,7 @@ struct SystemRowView: View {
                 // 标题行：带玻璃形变高亮
                 HStack(spacing: 10) {
                     StatusDot(cls: sys.statusCls)
-                    Text(sys.name).font(Theme.h4)))
+                    Text(sys.name).font(Theme.h4))
                     Spacer()
                     // 小圆环健康统计卡（带心跳脉冲）
                     HealthSystemRing(name: sys.name, statusCls: sys.statusCls,
@@ -437,7 +444,7 @@ struct SystemRowView: View {
                             .frame(width: isOpen ? 18 : 0, height: 2)
                             .animation(.spring(.duration(0.3)), value: isOpen)
                         Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                            .font(Theme.footnote.bold())))
+                            .font(Theme.footnote.bold())
                             .foregroundStyle(isOpen ? Theme.statusColor(sys.statusCls) : .tertiary)
                             .rotationEffect(.degrees(isOpen ? 0 : 180))
                             .animation(.spring(response: 0.35, dampingFraction: 0.65), value: isOpen)
@@ -499,7 +506,7 @@ struct SystemChildRow: View {
                     Text(item.name).font(Theme.caption)).foregroundStyle(.secondary)
                     Spacer()
                     Text(item.statusText)
-                        .font(Theme.footnote.bold())))
+                        .font(Theme.footnote.bold())
                         .foregroundStyle(Theme.statusColor(item.statusCls))
                 }
                 if let d = item.detect, !d.isEmpty { KVRow(k: "检测值", v: d) }
@@ -552,4 +559,5 @@ struct SystemChildRow: View {
         .frame(height: nil, alignment: .leading)
         .liquidGlassRipple(cornerRadius: Theme.Radius.small)
     }
+}
 }

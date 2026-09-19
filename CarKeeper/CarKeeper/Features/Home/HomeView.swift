@@ -99,6 +99,11 @@ struct HomeView: View {
                             case "tyreCard": tyreCardExpanded(tyre)
                             case "comfortCard": comfortCard(comfort)
                             case "carbonSavings": CarbonSavingsCard(stats: carbonStats)
+                            // E1-E8 实时车况增强
+                            case "realtimeEnergy": RealtimeEnergyDisplay(store: store)
+                            case "sohDashboard": SOHDashboard(store: store)
+                            case "driveMode": DriveModeDisplay(currentMode: .eco, availableModes: [.eco, .comfort, .sport], onModeChange: {_ in })
+                            case "vehicle2D": Vehicle2DStatusView(control: store.caches["control"] as? [String: Any])
                             default: locationCard(loc)
                             }
                         }

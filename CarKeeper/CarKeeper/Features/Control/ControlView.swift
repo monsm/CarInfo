@@ -120,7 +120,7 @@ struct ControlView: View {
                         // #8 首次输入PIN后保存到Keychain
                         if store.readPin() == nil {
                             store.savePin(pin)
-                            ToastManager.shared.show("PIN码已安全保存", icon: "key.fill")
+                            EnhancedToastManager.shared.show("PIN码已安全保存", icon: "key.fill")
                         }
                         execute(pin)
                     }
@@ -631,7 +631,7 @@ struct ControlView: View {
         // 弹结果详情
         showResult = true
         // #14 指令成功时 Toast 提示
-        if ok { ToastManager.shared.show(name, icon: "checkmark.circle.fill") }
+        if ok { EnhancedToastManager.shared.show(name, icon: "checkmark.circle.fill") }
     }
 
     // MARK: 执行结果详情 Sheet

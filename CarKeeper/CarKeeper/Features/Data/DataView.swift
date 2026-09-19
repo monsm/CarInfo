@@ -45,6 +45,12 @@ struct DataView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // E21 驾驶行为雷达图
+            DrivingRadarChart(store: store).staggeredEntrance(index: 0)
+            // E32 充电成本饼图
+            ChargeCostChart(store: store).staggeredEntrance(index: 1)
+            // E33 Siri 使用洞察
+            SiriInsightView(store: store).staggeredEntrance(index: 1)
             kindSwitcher
             ScrollView {
                 VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
