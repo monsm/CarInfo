@@ -20,35 +20,13 @@ extension Notification.Name {
 
 enum Deeplink: Hashable {
     case vehicle, health, battery, data, dev, messages, control, dashboard
+    case trips, commands, service, parking, export, emergency, tips, score
 }
 
 @main
 struct CarKeeperApp: App {
     private let store = AppStore.shared
     @StateObject private var nav = NavState.shared
-
-    /// 深潜页目标视图（独立函数避免巨型 switch 拖慢类型检查）
-    @ViewBuilder
-    private func deeplinkDestination(_ link: Deeplink) -> some View {
-        switch link {
-        case .vehicle: VehicleView().environmentObject(nav)
-        case .health: HealthView().environmentObject(nav)
-        case .battery: BatteryView().environmentObject(nav)
-        case .data: DataView(kind: .status).environmentObject(nav)
-        case .dev: DevView().environmentObject(nav)
-        case .messages: MessagesView().environmentObject(nav)
-        case .control: ControlView().environmentObject(nav)
-        case .dashboard: DashboardView().environmentObject(nav)
-        case .trips: TripAnalyticsView().environmentObject(nav)
-        case .commands: CommandHistoryView().environmentObject(nav)
-        case .service: ServiceHistoryView().environmentObject(nav)
-        case .parking: ParkingMapView().environmentObject(nav)
-        case .export: ExportDataView().environmentObject(nav)
-        case .emergency: EmergencyPanel().environmentObject(nav)
-        case .tips: VehicleTipsView().environmentObject(nav)
-        case .score: DrivingScorePage().environmentObject(nav)
-        }
-    }
 
     var body: some Scene {
         WindowGroup {
@@ -454,6 +432,29 @@ struct MainTabView: View {
     // #4 网络状态监测定时器（每 30 秒检查一次）
     private let networkMonitorTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
+    /// 深潜页目标视图（独立函数避免巨型 switch 拖慢类型检查）
+    @ViewBuilder
+    private func deeplinkDestination(_ link: Deeplink) -> some View {
+        switch link {
+        case .vehicle: VehicleView().environmentObject(nav)
+        case .health: HealthView().environmentObject(nav)
+        case .battery: BatteryView().environmentObject(nav)
+        case .data: DataView(kind: .status).environmentObject(nav)
+        case .dev: DevView().environmentObject(nav)
+        case .messages: MessagesView().environmentObject(nav)
+        case .control: ControlView().environmentObject(nav)
+        case .dashboard: DashboardView().environmentObject(nav)
+        case .trips: TripAnalyticsView().environmentObject(nav)
+        case .commands: CommandHistoryView().environmentObject(nav)
+        case .service: ServiceHistoryView().environmentObject(nav)
+        case .parking: ParkingMapView().environmentObject(nav)
+        case .export: ExportDataView().environmentObject(nav)
+        case .emergency: EmergencyPanel().environmentObject(nav)
+        case .tips: VehicleTipsView().environmentObject(nav)
+        case .score: DrivingScorePage().environmentObject(nav)
+        }
+    }
+
     private var homeTab: some View {
             NavigationStack(path: $nav.path) {
                 HomeView()
@@ -492,7 +493,7 @@ struct MainTabView: View {
                     )
             }
             .transaction { t in
-                t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
+                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
             }
             .tabGlassContainer()
             .tabItem {
@@ -508,7 +509,7 @@ struct MainTabView: View {
             .accessibilitySortPriority(0)
             .tag(0)
             .transaction { t in
-                t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
+                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
                 t.labelSize = .medium
             }
             .modifier(TabCardTransition(tabId: 0, isActive: nav.selectedTab == 0 && prevSelectedTab != 0))
@@ -571,7 +572,7 @@ struct MainTabView: View {
                     )
             }
             .transaction { t in
-                t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
+                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
             }
             .tabGlassContainer()
             .tabItem {
@@ -582,7 +583,7 @@ struct MainTabView: View {
             .accessibilitySortPriority(1)
             .tag(1)
             .transaction { t in
-                t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
+                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
                 t.labelSize = .medium
             }
             .modifier(TabCardTransition(tabId: 1, isActive: nav.selectedTab == 1 && prevSelectedTab != 1))
@@ -627,7 +628,7 @@ struct MainTabView: View {
                     )
             }
             .transaction { t in
-                t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
+                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
             }
             .tabGlassContainer()
             .tabItem {
@@ -638,7 +639,7 @@ struct MainTabView: View {
             .accessibilitySortPriority(2)
             .tag(2)
             .transaction { t in
-                t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
+                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
                 t.labelSize = .medium
             }
             .modifier(TabCardTransition(tabId: 2, isActive: nav.selectedTab == 2 && prevSelectedTab != 2))
@@ -683,7 +684,7 @@ struct MainTabView: View {
                     )
             }
             .transaction { t in
-                t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
+                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
             }
             .tabGlassContainer()
             .tabItem {
@@ -694,7 +695,7 @@ struct MainTabView: View {
             .accessibilitySortPriority(3)
             .tag(3)
             .transaction { t in
-                t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
+                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
                 t.labelSize = .medium
             }
             .modifier(TabCardTransition(tabId: 3, isActive: nav.selectedTab == 3 && prevSelectedTab != 3))
@@ -754,9 +755,9 @@ struct MainTabView: View {
             }
         }
         .transaction { t in
-            t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
+            t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
         }
-        .animation(.easeOut(duration: 0.2), value: nav.currentToast)
+        .animation(.easeOut(duration: 0.2), value: nav.currentToast?.text)
     }
 }
 
@@ -785,7 +786,7 @@ private class TabBarGlowOverlay: UIView {
         guard let tabBar = superview as? UITabBar, let touch = touches.first else { return }
         let point = touch.location(in: self)
         for (idx, item) in (tabBar.items ?? []).enumerated() {
-            let frame = item.frame(in: tabBar)
+            guard let frame = item.frame(in: tabBar) else { continue }
             if frame.contains(point) {
                 triggerPressGlow(at: frame.midX, y: frame.midY)
                 triggerIconBounce(at: frame.midX, y: frame.midY - 14)
@@ -1064,7 +1065,7 @@ private class TabBarGlowOverlay: UIView {
 
     private var items: [CGRect] {
         guard let tabBar = superview as? UITabBar else { return [] }
-        return (tabBar.items ?? []).map { $0.frame(in: tabBar) }
+        return (tabBar.items ?? []).map { $0.frame(in: tabBar) ?? .zero }
     }
 }
 

@@ -8,7 +8,8 @@ struct PrivacyDashboardView: View {
     private let store = AppStore.shared
     @State private var showClearConfirm = false
     
-    private let dataCategories: [(title: String, items: [(name: String, size: String, type: String)])] = [
+    private var dataCategories: [(title: String, items: [(name: String, size: String, type: String)])] {
+        [
         (
             title: "位置数据",
             items: [
@@ -39,11 +40,12 @@ struct PrivacyDashboardView: View {
             items: [
                 ("夜间模式", UserDefaults.standard.object(forKey: "carkeeper_force_dark_mode") != nil ? "自定义" : "跟随系统", "UserDefaults"),
                 ("卡片排序", "\(store.cardOrder.count) 个自定义", "UserDefaults"),
-                ("语言", AppLanguage.current.rawValue, "UserDefaults")
+                ("语言", Locale.current.language.languageCode?.identifier ?? "zh", "UserDefaults")
             ]
         )
     ]
-    
+    }
+
     private var totalRecords: Int {
         store.energyHistory.count + store.tripHistory.count + store.commandHistory.count
     }
@@ -130,7 +132,7 @@ struct PrivacyCategorySection: View {
                 .padding(.horizontal)
                 .padding(.top, Theme.Spacing.sm)
             
-            ForEach(category.items, id: \.name) { item in
+            ForEach(Array(category.items.enumerated()), id: \.offset) { idx, item in
                 HStack {
                     Text(item.name)
                         .font(.subheadline)
@@ -140,11 +142,11 @@ struct PrivacyCategorySection: View {
                         .foregroundColor(.secondary)
                     Text(item.type)
                         .font(.caption2)
-                        .foregroundColor(.tertiaryLabel)
+                        .foregroundColor(Color(.tertiaryLabel))
                 }
                 .padding(.horizontal)
                 .padding(.vertical, Theme.Spacing.xs)
-                if category.items.firstIndex(where: { $0.name == item.name }) != category.items.count - 1 {
+                if idx != category.items.count - 1 {
                     Divider().opacity(0.3)
                         .padding(.horizontal)
                 }

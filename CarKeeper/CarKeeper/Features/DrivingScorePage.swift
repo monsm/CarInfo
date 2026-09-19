@@ -243,7 +243,7 @@ struct DrivingScorePage: View {
                 AxisMarks(values: .stride(by: 1)) { _ in
                     AxisGridLine()
                     AxisTick(stroke: StrokeStyle(lineWidth: 1))
-                    AxisValueLabel(format: .number)
+                    AxisValueLabel()
                 }
             }
             .frame(height: 120)

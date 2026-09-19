@@ -6,6 +6,8 @@ import SwiftUI
 
 extension View {
     /// 夜间呼吸灯效果：深色模式下图标微光呼吸
+    @ViewBuilder
+    @MainActor
     func nightModeBreathing(enabled: Bool = true) -> some View {
         if enabled && AppStore.shared.shouldUseDarkMode() {
             self

@@ -161,7 +161,7 @@ struct DevView: View {
                 ColorGroup(groupName: "文字层级", items: [
                     ("primary",   .primary,   "主文本"),
                     ("secondary", .secondary, "次要文本"),
-                    ("tertiary",  .tertiary,  "辅助信息"),
+                    ("tertiary",  Color(.tertiaryLabel),  "辅助信息"),
                     ("quaternary", Color(.systemGray4), "极低对比度"),
                 ])
 

@@ -27,13 +27,13 @@ enum ServiceType: String, CaseIterable {
     }
 }
 
-struct ServiceReminder: Identifiable {
-    let id = UUID()
+struct ServiceReminder: Identifiable, Codable {
+    var id = UUID()
     let type: ServiceType
-    let nextMileageKm: Double  // 下次保养里程
-    let nextDate: Date         // 下次保养日期
-    let lastMileageKm: Double  // 上次保养时里程
-    let lastDate: Date         // 上次保养日期
+    var nextMileageKm: Double  // 下次保养里程
+    var nextDate: Date         // 下次保养日期
+    var lastMileageKm: Double  // 上次保养时里程
+    var lastDate: Date         // 上次保养日期
     let notes: String
 }
 

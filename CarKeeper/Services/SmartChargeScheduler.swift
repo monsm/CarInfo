@@ -66,7 +66,7 @@ class SmartChargeScheduler {
             time: nextChargeTime,
             reason: reason,
             estimatedCost: estimatedCost,
-            savingsPercent: max(0, savings)
+            savingsPercent: Int(max(0, savings))
         )
     }
     
@@ -94,7 +94,7 @@ class SmartChargeScheduler {
         
         // 清除旧提醒
         for item in items {
-            center.removePendingNotificationRequests(withIds: [item.request.identifier])
+            center.removePendingNotificationRequests(withIdentifiers: [item.identifier])
         }
         
         // 创建新提醒

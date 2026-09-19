@@ -139,11 +139,7 @@ struct HomeView: View {
         .onChange(of: switchingCar) { switching in
             guard switching else { return }
             // 涟漪扩散后自动消散
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.easeOut(duration: 0.3)) {
-                    switchingCar = false
-                }
-            }
+            scheduleSwitchingReset()
         }
         .onAppear { startPolling(); startSocAnimation(); startMileAnimation(); tyreWatchValue = UUID().uuidString }
         .alert("上车打卡", isPresented: $showCheckInReminder) {
@@ -479,12 +475,12 @@ struct HomeView: View {
                 .opacity(0.18)
                 .allowsHitTesting(false)
             HStack(spacing: 12) {
-            if !d.fireStatus.isEmpty {
-                let fCls = d.fireStatus == "启动" ? "bad" : "ok"
+            if let fireStatus = d.fireStatus, !fireStatus.isEmpty {
+                let fCls = fireStatus == "启动" ? "bad" : "ok"
                 VStack(spacing: 2) {
-                    Image(systemName: d.fireStatus == "启动" ? "fire.fill" : "battery.100")
+                    Image(systemName: fireStatus == "启动" ? "fire.fill" : "battery.100")
                         .font(Theme.footnote).foregroundStyle(Theme.statusColor(fCls))
-                    Text(d.fireStatus).font(Theme.micro).foregroundStyle(Theme.statusColor(fCls))
+                    Text(fireStatus).font(Theme.micro).foregroundStyle(Theme.statusColor(fCls))
                 }
                 .frame(width: 52, height: 40)
                 .background(Theme.statusColor(fCls).opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -679,16 +675,14 @@ struct HomeView: View {
             // 电池一致性（可展开）
             ExpandingCardBox(title: "一致性", side: batt.cellStats.map { "\($0.count) 节采样" } ?? "接口未上报", sideCls: "ok", cornerRadius: 20) {
                 if let cells = batt.cellStats {
-                    let maxV = cells.max { a, b -> Bool in (a.maxV ?? 0) < (b.maxV ?? 0) }?.maxV ?? 0
-                    let minV = cells.min { a, b -> Bool in (a.minV ?? 999) > (b.minV ?? 999) }?.minV ?? 999
+                    let maxV = cells.max
+                    let minV = cells.min
                     let diff = maxV - minV
                     HStack(spacing: 8) {
-                        ForEach(cells.enumerated(), id: \.offset) { _, s in
+                        ForEach(Array(cells.bars.enumerated()), id: \.offset) { _, v in
                             VStack(spacing: 2) {
-                                Text(s.num == "--" ? "子" : "S\(s.num!)")
-                                    .font(Theme.micro).foregroundStyle(.secondary)
-                                Text(s.maxV.map { String(format: "%.3f", $0) } ?? "--")
-                                    .font(Theme.font(.footnote as Font).bold(), design: .monospaced)
+                                Text("S\(String(format: "%.3f", v))")
+                                    .font(Font.system(.footnote, design: .monospaced).bold())
                                     .foregroundStyle(.primary)
                             }
                             .frame(width: 52)
@@ -903,7 +897,7 @@ struct HomeView: View {
         } label: {
             Image(systemName: store.parkingLocation != nil ? "parkingsign.circle.fill" : "parkingsign.circle")
                 .font(Theme.caption)
-                .foregroundStyle(store.parkingLocation != nil ? Theme.Colors.accent : .tertiary)
+                .foregroundStyle(store.parkingLocation != nil ? AnyShapeStyle(Theme.Colors.accent) : AnyShapeStyle(.tertiary))
                 .padding(8)
                 .background(.ultraThinMaterial, in: Circle())
         }
@@ -922,7 +916,7 @@ struct HomeView: View {
             Spacer()
             // #3 数据新鲜度徽章
             DataFreshnessBadge(timestamp: lastFetch)
-            Button { fetchCore() } label: {
+            Button { Task { await fetchCore() } } label: {
                 Image(systemName: "arrow.clockwise.circle.fill")
                     .font(Theme.caption)
                     .foregroundStyle(Theme.Colors.accent)
@@ -1051,6 +1045,15 @@ struct HomeView: View {
                     showCheckInReminder = true
                 }
                 try? await Task.sleep(for: .seconds(60))
+            }
+        }
+    }
+
+    /// 切车涟漪自动消散（独立方法，避免巨型 ViewBuilder 类型检查超时）
+    private func scheduleSwitchingReset() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                switchingCar = false
             }
         }
     }

@@ -4,13 +4,13 @@
 
 import Foundation
 
-struct PerformanceMetric {
+struct PerformanceMetric: Codable {
     let page: String
     let duration: TimeInterval  // 停留时长（秒）
     let timestamp: Date
 }
 
-struct APIStatistic {
+struct APIStatistic: Codable {
     let endpoint: String
     let duration: TimeInterval
     let success: Bool

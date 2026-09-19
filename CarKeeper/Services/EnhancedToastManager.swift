@@ -115,7 +115,7 @@ struct EmptyStateView: View {
                     .font(.system(size: 40))
                     .foregroundColor(Theme.Colors.accent)
                     .scaleEffect(1)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.5).repeatAutologically(), value: icon)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.5).repeatForever(autoreverses: true), value: icon)
             }
             
             Text(title)

@@ -7,8 +7,8 @@ import SwiftUI
 struct OTAChangelogView: View {
     @State private var versionLogs: [VersionLog] = []
     
-    struct VersionLog: Identifiable {
-        let id = UUID()
+    struct VersionLog: Identifiable, Codable {
+        var id = UUID()
         let version: String
         let date: Date
         let changes: [String]

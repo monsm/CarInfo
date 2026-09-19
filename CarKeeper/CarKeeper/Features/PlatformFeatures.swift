@@ -4,6 +4,7 @@
 
 import SwiftUI
 import WidgetKit
+import AppIntents
 
 // MARK: - E73 Lock Screen Widget（Active State）
 struct LockScreenWidget: View {
@@ -111,6 +112,14 @@ struct WatchMainView: View {
 }
 
 // MARK: - E77 iPad Split View
+private struct SidebarView: View {
+    var body: some View { Text("侧边栏") }
+}
+
+private struct DetailView: View {
+    var body: some View { Text("详情") }
+}
+
 struct iPadSplitView: View {
     var body: some View {
         SplitView {

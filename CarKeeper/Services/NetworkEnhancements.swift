@@ -4,6 +4,7 @@
 
 import Foundation
 import Network
+import Combine
 
 // MARK: - N36 指数退避重试
 struct RetryConfig {
@@ -22,7 +23,7 @@ extension URLSession {
         var lastError: Error?
         for attempt in 0..<config.maxRetries {
             do {
-                let (data, response) = try await dataTask(url: url).value
+                let (data, response) = try await self.data(from: url)
                 guard let httpResponse = response as? HTTPURLResponse else { continue }
                 if httpResponse.statusCode >= 500 && attempt < config.maxRetries - 1 {
                     let delay = min(config.baseDelay * pow(2, Double(attempt)), config.maxDelay)
@@ -60,11 +61,14 @@ class NetworkQualityMonitor: ObservableObject {
         monitor.pathUpdateHandler = { [weak self] path in
             guard let self = self else { return }
             self.isReachable = path.status == .satisfied
-            switch path.usingInterfaceType {
-            case .wifi:     self.connectionType = "WiFi"
-            case .cellular: self.connectionType = "蜂窝"
-            case .wiredEthernet: self.connectionType = "有线"
-            default:        self.connectionType = "未知"
+            if path.usesInterfaceType(.wifi) {
+                self.connectionType = "WiFi"
+            } else if path.usesInterfaceType(.cellular) {
+                self.connectionType = "蜂窝"
+            } else if path.usesInterfaceType(.wiredEthernet) {
+                self.connectionType = "有线"
+            } else {
+                self.connectionType = "未知"
             }
         }
         monitor.start(queue: queue)
@@ -78,9 +82,9 @@ class NetworkQualityMonitor: ObservableObject {
     private func measureLatency() {
         guard let url = URL(string: "https://m.iov.changan.com.cn") else { return }
         let start = CFAbsoluteTimeGetCurrent()
-        URLSession.shared.dataTask(with: url) { _ in
+        URLSession.shared.dataTask(with: url) { [weak self] _, _, _ in
             let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000
-            DispatchQueue.main.async { self.latency = elapsed }
+            DispatchQueue.main.async { self?.latency = elapsed }
         }.resume()
     }
 }

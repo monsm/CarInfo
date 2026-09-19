@@ -170,7 +170,7 @@ struct TripAnalyticsView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("常用目的地").font(Theme.font(.subheadline as Font).bold())
             VStack(spacing: 0) {
-                ForEach(0..<min(3, store.tripHistory.count)) { i in
+                ForEach(Array(0..<min(3, store.tripHistory.count)), id: \.self) { i in
                     let trip = store.tripHistory[i]
                     HStack {
                         Text((i + 1)).font(.caption.monospaced()).foregroundStyle(.secondary)

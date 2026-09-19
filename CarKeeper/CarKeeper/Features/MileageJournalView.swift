@@ -5,7 +5,7 @@
 import Foundation
 import SwiftUI
 
-enum TripCostType: String, CaseIterable, Identifiable {
+enum TripCostType: String, CaseIterable, Identifiable, Codable {
     case charge = "charging"
     case fuel = "refuel"
     case parking = "parking"
@@ -277,7 +277,7 @@ struct CostEntryRow: View {
                 if let km = entry.odometerKm {
                     Text(String(format: "%.0f km", km))
                         .font(.caption2)
-                        .foregroundColor(.tertiaryLabel)
+                        .foregroundColor(Color(.tertiaryLabel))
                 }
             }
         }

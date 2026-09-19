@@ -458,7 +458,7 @@ struct SystemRowView: View {
                 if isOpen {
                     VStack(spacing: 0) {
                         ForEach(Array(sys.children.enumerated()), id: \.element.id) { idx, item in
-                            SystemChildRow(item: item, idx: idx, total: sys.children.count)
+                            SystemChildRow(item: item, idx: idx)
                             if idx < sys.children.count - 1 {
                                 ListDivider().padding(.leading, 4)
                             }

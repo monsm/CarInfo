@@ -486,7 +486,7 @@ struct BatteryView: View {
                     .foregroundStyle(LinearGradient(colors: [.green.opacity(0.2), .green.opacity(0.02)], startPoint: .top, endPoint: .bottom))
                 }
             }
-            .chartXAxis { axis in
+            .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) { _ in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
                     AxisValueLabel(format: timeFormat())

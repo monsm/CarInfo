@@ -10,6 +10,7 @@ import Foundation
 
 // MARK: - Intent 扩展接口（供 Intents Extension 调用）
 
+@MainActor
 struct SiriCarController {
     static let shared = SiriCarController()
     
@@ -27,7 +28,7 @@ struct SiriCarController {
         case let lock as CarLockIntent:
             await executeLock(pin: pin, carId: store.carId, locked: lock.locked == true)
         case let ac as CarSetAirConditioningIntent:
-            await executeAc(pin: pin, carId: store.carId, on: ac.airConditioningState == .on)
+            await executeAc(pin: pin, carId: store.carId, on: ac.airConditioningOn == true)
         case let find as CarFindIntent:
             await executeFindCar(pin: pin, carId: store.carId)
         default:
@@ -37,6 +38,8 @@ struct SiriCarController {
     }
     
     private func executeLock(pin: String, carId: String, locked: Bool) async {
+        let store = AppStore.shared
+        let api = APIClient.shared
         let cmd = locked ? "CentralLock" : "CentralUnlock"
         let name = locked ? "锁车" : "解锁"
         let start = Date()
@@ -50,6 +53,8 @@ struct SiriCarController {
     }
     
     private func executeAc(pin: String, carId: String, on: Bool) async {
+        let store = AppStore.shared
+        let api = APIClient.shared
         let cmd = on ? "OpenAir" : "CloseAir"
         let name = on ? "开空调" : "关空调"
         let start = Date()
@@ -63,6 +68,8 @@ struct SiriCarController {
     }
     
     private func executeFindCar(pin: String, carId: String) async {
+        let store = AppStore.shared
+        let api = APIClient.shared
         let cmd = "HornLight"
         let name = "寻车"
         let start = Date()
@@ -89,7 +96,7 @@ class CarLockIntent: INIntent {
 // 空调控制
 @available(iOS 12.0, *)
 class CarSetAirConditioningIntent: INIntent {
-    var airConditioningState: INAirConditioningState?
+    var airConditioningOn: Bool?
     override init() { super.init() }
     required init?(coder: NSCoder) { fatalError() }
 }

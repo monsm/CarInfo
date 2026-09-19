@@ -91,7 +91,7 @@ struct LoginView: View {
             VStack(spacing: 6) {
                 Text("长安车管家")
                     .font(Theme.h1)
-                    .letterSpacing(2)
+                    .tracking(2)
                 Text("CHANGAN CONNECT")
                     .font(Theme.font(.footnote as Font).bold())
                     .tracking(5)

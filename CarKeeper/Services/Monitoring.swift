@@ -5,6 +5,12 @@
 import Foundation
 
 // MARK: - N38 崩溃日志捕获与上报
+
+/// 顶层 C 兼容异常处理回调（NSSetUncaughtExceptionHandler 需要函数指针）
+private func carkeeperUncaughtExceptionHandler(_ exception: NSException) {
+    CrashReporter.shared.logCrash(exception)
+}
+
 class CrashReporter : ObservableObject {
     static let shared = CrashReporter()
     
@@ -13,11 +19,8 @@ class CrashReporter : ObservableObject {
     private init() {}
     
     func setup() {
-        // 捕获 Swift 未处理异常
-        let handler: (NSException) -> Void = { exception in
-            self.logCrash(exception)
-        }
-        NSSetUncaughtExceptionHandler(handler)
+        // 捕获 Swift 未处理异常（C 函数指针只能指向顶层函数）
+        NSSetUncaughtExceptionHandler(carkeeperUncaughtExceptionHandler)
         
         // 捕获信号异常（SIGSEGV 等）
         signal(SIGABRT) { sig in
@@ -30,7 +33,7 @@ class CrashReporter : ObservableObject {
         }
     }
     
-    private func logCrash(_ exception: NSException) {
+    fileprivate func logCrash(_ exception: NSException) {
         let log = """
         === Crash Report \(Date().iso8601) ===
         Exception: \(exception.name.rawValue)
@@ -90,7 +93,7 @@ class MemoryMonitor: ObservableObject {
         
         let kerr: kern_return_t = withUnsafeMutablePointer(to: &taskInfo) { ptr in
             ptr.withMemoryRebound(to: integer_t.self, capacity: 1) {
-                task_info(mach_task_self_, task_flavor_t(mach_task_basic_info_class), $0, &count)
+                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
             }
         }
         

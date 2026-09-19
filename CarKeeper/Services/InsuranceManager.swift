@@ -96,7 +96,7 @@ struct InsuranceCard: View {
                     }
                     Text(policy.policyNumber)
                         .font(.caption2)
-                        .foregroundColor(.tertiaryLabel)
+                        .foregroundColor(Color(.tertiaryLabel))
                 }
             }
             

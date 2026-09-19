@@ -23,12 +23,24 @@ class NightModeManager: ObservableObject {
                          !UserDefaults.standard.bool(forKey: "carkeeper_force_dark_mode")
     }
     
-    /// 切换到指定模式
+    /// 是否处于夜间时段（默认 21:00-07:00，可用 UserDefaults 覆盖）
+    private static var autoDarkMode: Bool {
+        if UserDefaults.standard.bool(forKey: "carkeeper_force_dark_mode") { return true }
+        if UserDefaults.standard.bool(forKey: "carkeeper_force_light_mode") { return false }
+        let hour = Calendar.current.component(.hour, from: Date())
+        let rawStart = UserDefaults.standard.integer(forKey: "carkeeper_night_start_hour")
+        let rawEnd = UserDefaults.standard.integer(forKey: "carkeeper_night_end_hour")
+        let start = rawStart > 0 ? rawStart : 21
+        let end = rawEnd > 0 ? rawEnd : 7
+        return start > end ? (hour >= start || hour < end) : (hour >= start && hour < end)
+    }
+
+    /// 切换到指定模式（纯 UserDefaults 计算，无需主线程隔离）
     func setMode(_ mode: NightModeMode) {
         switch mode {
         case .auto:
             isAutoMode = true
-            isDarkMode = AppStore.shared.shouldUseDarkMode()
+            isDarkMode = Self.autoDarkMode
         case .light:
             isAutoMode = false
             isDarkMode = false

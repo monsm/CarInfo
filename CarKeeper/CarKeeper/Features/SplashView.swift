@@ -56,12 +56,12 @@ struct SplashView: View {
                     Text("长安车管家")
                         .font(.system(size: 28, weight: .bold))
                         .foregroundStyle(.white)
-                        .letterSpacing(3)
+                        .tracking(3)
                     
                     Text("CHANGAN CONNECT")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.6))
-                        .letterSpacing(4)
+                        .tracking(4)
                     
                     // 进度条
                     ZStack(alignment: .leading) {

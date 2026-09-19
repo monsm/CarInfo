@@ -302,7 +302,7 @@ struct MessagesView: View {
                     if !item.plate.isEmpty {
                         HStack(spacing: 8) {
                             Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(Theme.Colors.accent)
-                            Text(item.plate).font(Theme.font(.caption as Font).bold(), design: .monospaced)
+                            Text(item.plate).font(Font.system(.caption, design: .monospaced).bold())
                                 .foregroundStyle(Theme.Colors.accent)
                         }
                     }

@@ -34,7 +34,7 @@ struct MineView: View {
     @State private var showDrivingScore = false
     @EnvironmentObject var nav: NavState            // C3: 用于 pushNavigation
     // #NEW-115 夜间模式管理
-    @StateObject private var nightModeManager = NightModeManager()
+    @StateObject private var nightModeManager = NightModeManager.shared
 
     // MARK: 生命周期
     var body: some View {
@@ -187,7 +187,7 @@ struct MineView: View {
             HStack(spacing: 16) {
                 HStack(spacing: 6) {
                     Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(Theme.Colors.accent)
-                    Text(String(store.cars?.count ?? 0) + " 辆车")
+                    Text(String(store.cars.count) + " 辆车")
                         .font(Theme.caption)
                 }
                 Spacer()
@@ -276,7 +276,10 @@ struct MineView: View {
                 HStack {
                     Text("夜间模式").font(Theme.h4)
                     Spacer()
-                    Picker("主题", selection: $nightModeManager.currentMode) {
+                    Picker("主题", selection: Binding(
+                        get: { nightModeManager.currentMode },
+                        set: { nightModeManager.setMode($0) }
+                    )) {
                         Text("自动").tag(NightModeMode.auto)
                         Text("浅色").tag(NightModeMode.light)
                         Text("深色").tag(NightModeMode.dark)

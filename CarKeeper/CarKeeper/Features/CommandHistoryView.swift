@@ -96,6 +96,7 @@ struct CommandHistoryView: View {
     }
     
     // MARK: - 列表
+    @ViewBuilder
     private var commandList: some View {
         if filteredCommands.isEmpty {
             VStack(spacing: 12) {
@@ -118,7 +119,7 @@ struct CommandHistoryView: View {
     private func commandRow(_ cmd: AppStore.HistoryEntry, idx: Int) -> some View {
         let isExpanded = expandedCmds.contains(cmd.id)
         
-        Button(role: nil, action: {
+        return Button(role: nil, action: {
             withAnimation(.spring(response: 0.35)) {
                 if isExpanded { expandedCmds.remove(cmd.id) }
                 else { expandedCmds.insert(cmd.id) }

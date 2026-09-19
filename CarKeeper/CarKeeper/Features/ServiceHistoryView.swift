@@ -12,8 +12,8 @@ struct ServiceHistoryView: View {
     // 维保记录（本地持久化）
     @AppStorage("serviceHistory") private var services: String = "[]"
     
-    private struct ServiceEntry: Codable, Identifiable {
-        let id = UUID()
+    struct ServiceEntry: Codable, Identifiable, Equatable {
+        var id = UUID()
         let date: Date
         let mileage: Int
         let type: String       // 保养 / 年检 / 保险 / 轮胎
@@ -206,6 +206,7 @@ struct ServiceHistoryView: View {
         .glassCard(corner: Theme.Radius.medium)
     }
     
+    @ViewBuilder
     private func timelineRow(_ entry: ServiceEntry, idx: Int, total: Int) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {

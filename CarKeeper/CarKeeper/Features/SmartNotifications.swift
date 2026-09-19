@@ -4,6 +4,7 @@
 
 import SwiftUI
 import UserNotifications
+import CoreLocation
 
 // MARK: - E39 地理围栏通知
 class GeofenceNotificationManager: ObservableObject {
@@ -92,7 +93,7 @@ struct LowBatteryRoutePlan: View {
                 .frame(maxWidth: .infinity)
                 .glassCard()
         } else {
-            List(nearbyStations.prefix(3)) { station in
+            List(Array(nearbyStations.prefix(3))) { station in
                 HStack {
                     Image(systemName: "bolt.fill")
                         .foregroundColor(.green)
@@ -117,7 +118,8 @@ struct LowBatteryRoutePlan: View {
     }
 }
 
-struct ChargingStation {
+struct ChargingStation: Identifiable {
+    let id = UUID()
     let name: String
     let distance: Double // km
     let available: Bool

@@ -4,6 +4,7 @@
 
 import SwiftUI
 import Charts
+import MapKit
 
 // MARK: - N21 驾驶行为雷达图
 struct DrivingRadarChart: View {
@@ -235,8 +236,7 @@ struct ChargingHeatOverlay: View {
     
     var body: some View {
         ZStack {
-            ForEach(stations.indices, id: \.self) { idx in
-                let station = stations[idx]
+            ForEach(Array(stations.enumerated()), id: \.offset) { idx, station in
                 Circle()
                     .fill(
                         LinearGradient(

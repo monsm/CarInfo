@@ -102,7 +102,7 @@ class SmartNotificationManager: ObservableObject {
     
     // N15 智能充电提醒
     func checkChargeNotification(soc: Int?, charging: Bool?, lastCheck: Date?) {
-        guard let soc = soc, !charging else { return }
+        guard let soc = soc, charging != true else { return }
         let fourHoursAgo = Date().addingTimeInterval(-4 * 3600)
         guard let last = lastCheck, last > fourHoursAgo else {
             sendNotification(

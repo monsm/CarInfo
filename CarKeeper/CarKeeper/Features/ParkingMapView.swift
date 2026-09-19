@@ -18,11 +18,20 @@ struct ParkingMapView: View {
     var hasLocation: Bool {
         store.parkingLocation != nil
     }
+
+    /// 到当前定位的直线距离文案
+    private func distanceText(from loc: CLLocation) -> String {
+        guard let cur = store.currentLocation else { return "距离未知" }
+        let meters = loc.distance(from: cur)
+        return meters < 1000
+            ? String(format: "%.0f m", meters)
+            : String(format: "%.1f km", meters / 1000)
+    }
     
     var body: some View {
         ZStack {
             if hasLocation, let loc = store.parkingLocation {
-                MapView(coordinate: loc.coordinate, span: region.span)
+                MapView(coordinate: loc.coordinate, span: region.span, points: [])
                     .ignoresSafeArea()
                 
                 // 地址覆盖层
@@ -70,7 +79,7 @@ struct ParkingMapView: View {
                     Text(addressText)
                         .font(Theme.font(.subheadline as Font).bold())
                         .foregroundStyle(.primary)
-                    Text(loc.formattedDistance(to: store.currentLocation))
+                    Text(distanceText(from: loc))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -120,8 +129,7 @@ struct ParkingMapView: View {
                     // 历史停车点
                     VStack(alignment: .leading, spacing: 8) {
                         Text("最近停车点").font(.headline)
-                        ForEach(0..<min(3, store.parkingHistory.count), id: \.self) { i in
-                            let p = store.parkingHistory[i]
+                        ForEach(Array(store.parkingHistory.prefix(3).enumerated()), id: \.offset) { i, p in
                             HStack {
                                 Image(systemName: "mappin").foregroundStyle(Theme.Colors.accent)
                                 VStack(alignment: .leading) {

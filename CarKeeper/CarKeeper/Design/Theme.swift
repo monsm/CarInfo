@@ -1,4 +1,5 @@
 import SwiftUI
+import MapKit
 import CoreHaptics
 import AVFoundation
 import Photos
@@ -365,6 +366,11 @@ extension View {
     /// 长按液态玻璃弹性形变（scale 1→0.94 + 光晕扩散 + 弹簧回弹）
     func glassLongPressDeform() -> some View {
         self.modifier(GlassLongPressDeformModifier())
+    }
+
+    /// Tab 页液态玻璃容器（TabBar 内容包裹）
+    func tabGlassContainer() -> some View {
+        self.modifier(tabGlassModifier())
     }
 }
 
@@ -2075,6 +2081,7 @@ extension View {
 // ReduceMotionAware —— #6 降低动态效果检测
 // =============================================================================
 extension View {
+    @ViewBuilder
     func reduceMotionIfRequired<V: View>(_ content: () -> V) -> some View {
         if UIDevice.current.isReducingTransparency || UIAccessibility.isReduceMotionEnabled {
             content()
