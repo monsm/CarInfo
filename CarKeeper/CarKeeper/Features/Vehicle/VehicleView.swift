@@ -309,6 +309,9 @@ struct PhotoPickerSheet: View {
     @Binding var selectedImage: UIImage?
     let onConfirm: () -> Void
     @Environment(\.dismiss) private var dismiss
+    /// UIImagePickerController.delegate 是 weak 引用，必须由视图强引用持有 delegate，
+    /// 否则它会在 present 之前就被释放，选中的照片永远回不来。
+    @State private var pickerDelegate: PhotoPickerDelegate? = nil
 
     var body: some View {
         NavigationStack {
@@ -322,11 +325,13 @@ struct PhotoPickerSheet: View {
                         if UIImagePickerController.isSourceTypeAvailable(.camera) {
                             let picker = UIImagePickerController()
                             picker.sourceType = .camera
-                            picker.delegate = PhotoPickerDelegate { img in
+                            let delegate = PhotoPickerDelegate { img in
                                 selectedImage = img
                                 onConfirm()
                                 dismiss()
                             }
+                            pickerDelegate = delegate
+                            picker.delegate = delegate
                             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                                let rootVC = windowScene.windows.first?.rootViewController {
                                 rootVC.present(picker, animated: true)
@@ -347,11 +352,13 @@ struct PhotoPickerSheet: View {
                         if UIImagePickerController.isSourceTypeAvailable(.photoLibrary) {
                             let picker = UIImagePickerController()
                             picker.sourceType = .photoLibrary
-                            picker.delegate = PhotoPickerDelegate { img in
+                            let delegate = PhotoPickerDelegate { img in
                                 selectedImage = img
                                 onConfirm()
                                 dismiss()
                             }
+                            pickerDelegate = delegate
+                            picker.delegate = delegate
                             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                                let rootVC = windowScene.windows.first?.rootViewController {
                                 rootVC.present(picker, animated: true)

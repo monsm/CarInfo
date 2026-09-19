@@ -116,7 +116,17 @@ enum AppModelContainer {
     static let shared: ModelContainer = {
         let schema = Schema([TripRecord.self, EnergySnapshot.self, MaintenancePhoto.self, UserSettings.self])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        return try! ModelContainer(for: schema, configurations: [config])
+        // 不要用 try!：磁盘库损坏、迁移失败或存储不足时，它会在启动阶段直接崩进程。
+        // 退化成内存容器，至少让 App 能起来（当次会话可用，但不落盘）。
+        do {
+            return try ModelContainer(for: schema, configurations: [config])
+        } catch {
+            assertionFailure("ModelContainer 初始化失败：\(error)")
+            return try! ModelContainer(
+                for: schema,
+                configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)]
+            )
+        }
     }()
 }
 

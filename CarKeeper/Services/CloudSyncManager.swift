@@ -8,8 +8,23 @@ import CloudKit
 class CloudSyncManager: ObservableObject {
     static let shared = CloudSyncManager()
     
-    private let container = CKContainer(identifier: "iCloud.com.you.CarKeeper")
-    private let publicDB = CKContainer(identifier: "iCloud.com.you.CarKeeper").publicCloudDatabase
+    /// iCloud 能力探测。
+    ///
+    /// ⚠️ `CKContainer(identifier:)` 在 entitlements 里没有该容器标识符时，会抛出一个 Swift
+    /// 无法捕获的 ObjC 异常（"The application's entitlements do not include the … container
+    /// identifier"），进程当场被杀 —— 表现就是「安装后点图标直接闪退」。
+    /// CI 的未签名构建（CODE_SIGNING_ALLOWED=NO）和用免费证书/侧载工具重签的包都没有 iCloud
+    /// 能力，所以必须先探测、再构造容器。缺少 iCloud 能力或未登录 iCloud 时该探测只返回 nil，
+    /// 不会抛异常。
+    static var isCloudKitEntitled: Bool {
+        FileManager.default.ubiquityIdentityToken != nil
+    }
+
+    private lazy var container: CKContainer? = {
+        guard Self.isCloudKitEntitled else { return nil }
+        return CKContainer(identifier: "iCloud.com.you.CarKeeper")
+    }()
+    private lazy var publicDB: CKDatabase? = container?.publicCloudDatabase
     
     // 同步的记录类型
     enum RecordType: String {
@@ -20,19 +35,19 @@ class CloudSyncManager: ObservableObject {
     
     private init() {}
     
-    /// 检查 CloudKit 是否可用
+    /// 检查 CloudKit 是否可用（自带 entitlement 探测，无 iCloud 能力时恒为 false）
     var isCloudAvailable: Bool {
-        return false
+        return publicDB != nil
     }
     
     /// 同步设置到云端
     func syncSettings(_ settings: [String: Any]) async -> Bool {
-        guard isCloudAvailable else { return false }
+        guard let db = publicDB else { return false }
         
         do {
             let record = CKRecord(recordType: RecordType.settings.rawValue, recordID: CKRecord.ID(recordName: "user_settings"))
             record["preferences"] = try JSONSerialization.data(withJSONObject: settings)
-            try await publicDB.save(record)
+            try await db.save(record)
             return true
         } catch {
             print("Cloud sync failed: \(error)")
@@ -42,10 +57,10 @@ class CloudSyncManager: ObservableObject {
     
     /// 从云端拉取设置
     func fetchSettings() async -> [String: Any]? {
-        guard isCloudAvailable else { return nil }
+        guard let db = publicDB else { return nil }
         
         do {
-            let record = try await publicDB.record(for: CKRecord.ID(recordName: "user_settings"))
+            let record = try await db.record(for: CKRecord.ID(recordName: "user_settings"))
             if let data = record["preferences"] as? Data,
                let prefs = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 return prefs
@@ -58,7 +73,7 @@ class CloudSyncManager: ObservableObject {
     
     /// 同步行程记录
     func syncTrips(_ trips: [TripRecord]) async -> Bool {
-        guard isCloudAvailable else { return false }
+        guard let db = publicDB else { return false }
         
         do {
             for trip in trips {
@@ -68,7 +83,7 @@ class CloudSyncManager: ObservableObject {
                 record["distanceKm"] = trip.distanceKm
                 record["startSoc"] = trip.startSoc
                 record["endSoc"] = trip.endSoc
-                try await publicDB.save(record)
+                try await db.save(record)
             }
             return true
         } catch {
@@ -79,13 +94,13 @@ class CloudSyncManager: ObservableObject {
     
     /// 获取云端行程记录
     func fetchTrips() async -> [TripRecord] {
-        guard isCloudAvailable else { return [] }
+        guard let db = publicDB else { return [] }
         
         var trips: [TripRecord] = []
         let query = CKQuery(recordType: RecordType.tripHistory.rawValue, predicate: NSPredicate(value: true))
         
         do {
-            let results = try await publicDB.records(matching: query)
+            let results = try await db.records(matching: query)
             for (_, result) in results.matchResults {
                 guard let record = try? result.get() else { continue }
                 if let startTime = record["startTime"] as? TimeInterval {

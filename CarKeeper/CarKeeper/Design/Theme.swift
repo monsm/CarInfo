@@ -2828,13 +2828,25 @@ func saveImageToPhotoLibrary(_ image: UIImage, completion: @escaping (Bool) -> V
 /// 从相册获取单张图片
 func pickImageFromPhotoLibrary(onCompletion: @escaping (UIImage?) -> Void) {
     let picker = UIImagePickerController()
-    picker.delegate = ImagePickerCoordinator(completion: onCompletion)
+    // UIImagePickerController.delegate 是 weak 引用：必须由外部强引用持有 coordinator，
+    // 否则临时构造的对象会在 present 之前就被释放，选中照片的回调永远不会触发。
+    let coordinator = ImagePickerCoordinator(completion: { image in
+        ImagePickerDelegateStore.current = nil
+        onCompletion(image)
+    })
+    ImagePickerDelegateStore.current = coordinator
+    picker.delegate = coordinator
     picker.sourceType = .photoLibrary
     // 需要在合适的 UIViewController 上 present
     if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
        let rootVC = windowScene.windows.first?.rootViewController {
         rootVC.present(picker, animated: true)
     }
+}
+
+/// 强引用持有相册选择器的 delegate（delegate 属性本身是 weak）。
+private enum ImagePickerDelegateStore {
+    static var current: ImagePickerCoordinator?
 }
 
 /// 图片选择器 Coordinator

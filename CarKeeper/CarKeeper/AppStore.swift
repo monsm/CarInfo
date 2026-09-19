@@ -590,6 +590,9 @@ final class AppStore: @unchecked Sendable {
 
     // #NEW-111 CloudKit 同步触发（后台）
     func triggerCloudSync() async {
+        // 无 iCloud 能力时绝不能 touch CloudSyncManager.shared：构造 CKContainer 会抛出
+        // Swift 无法捕获的 ObjC 异常，直接崩进程（侧载/未签名包的典型启动闪退原因）。
+        guard CloudSyncManager.isCloudKitEntitled else { return }
         await CloudSyncManager.shared.syncIfNeeded()
     }
 
