@@ -114,7 +114,7 @@ struct CarKeeperApp: App {
             // #NEW-120 App Intents 注册（Siri 对话入口）
             _ = AppIntentsManager.shared
             // E17-E18 触觉反馈 + E47 性能监控启动
-            PerformanceTracker.shared.start()
+            _ = PerformanceTracker.shared
             // E38 专注模式监听
             _ = FocusModeManager.shared
             // E9-E16 位置智能功能启动
@@ -293,7 +293,7 @@ struct NavGlassWrapper<Content: View>: View {
     //   contentX: 内容位移（快、最近）
     //   glassX:   玻璃卡位移（中）
     //   glowX:    光晕位移（慢、最远）
-    private static let params: [(contentX: CGFloat, glassX: CGFloat, glowX: CGFloat, delay: CGFloat)] = [
+    private var params: [(contentX: CGFloat, glassX: CGFloat, glowX: CGFloat, delay: CGFloat)] { [
         (24,  56,  96,  0.0),   // 车辆档案（第一级）
         (28,  64, 112,  0.02),  // 健康报告
         (32,  72, 128,  0.04),  // 电池充电
@@ -301,7 +301,7 @@ struct NavGlassWrapper<Content: View>: View {
         (40,  88, 152,  0.08),  // 开发者工具
         (24,  56,  96,  0.0),   // 消息
         (24,  56,  96,  0.0),   // 车控（直接从 Tab 打开）
-    ]
+    ] }
 
     init(@ViewBuilder content: () -> Content) {
         self.content = content()
@@ -383,8 +383,8 @@ struct NavGlassWrapper<Content: View>: View {
 /// pop 时：向左滑出 + 弹性缩放 + 淡出，与入场动画对称
 /// spring spring: response 0.6 / damping 0.7 / blend 0.5s
 private let liquidGlassPopTransition: AnyTransition = .asymmetric(
-    insertion: .scale().combined(with: .opacity).animation(.spring(response: 0.5, dampingFraction: 0.7)),
-    removal: .scale().combined(with: .opacity).animation(.easeInOut(duration: 0.25))
+    insertion: .scale(scale: 1.0).combined(with: .opacity).animation(.spring(response: 0.5, dampingFraction: 0.7)),
+    removal: .scale(scale: 1.0).combined(with: .opacity).animation(.easeInOut(duration: 0.25))
 )
 
 /// 液态玻璃风格返回按钮（隐藏系统默认，自定义样式）
@@ -523,8 +523,8 @@ struct MainTabView: View {
                         _ = try await api.getCars()
                         store.updateNetworkStatus(.online)
                     } catch {
-                        let isNetwork = (error as? APIError)?.statusCode != nil || error is URLError
-                        store.updateNetworkStatus(isNetwork ? .weak : .offline)
+                        let networkError = error is URLError || (error as? APIError) != nil
+                        store.updateNetworkStatus(networkError ? .weak : .offline)
                     }
                 }
             }
@@ -736,7 +736,6 @@ struct MainTabView: View {
         .accessibilityLabel(Text("主导航栏"))
         .accessibilityHint(Text("四个主要功能模块：车况、车控、消息、我的。左右滑动可切换标签页"))
         .accessibilitySortPriority(0)
-        Color.accent(Color.accent)
         // #4 网络状态指示器 + #NEW-3 离线模式提示
         .overlay(alignment: .top) {
             if store.networkStatus != .online || store.isOfflineMode {
@@ -787,7 +786,8 @@ private class TabBarGlowOverlay: UIView {
         super.touchesBegan(touches, with: event)
         guard let tabBar = superview as? UITabBar, let touch = touches.first else { return }
         let point = touch.location(in: self)
-        for (idx, frame) in tabBar.items?.enumerated().map { ($0, $1.frame) } ?? [] {
+        for (idx, item) in tabBar.items?.enumerated() ?? [] {
+            let frame = item.frame(in: tabBar)
             if frame.contains(point) {
                 triggerPressGlow(at: frame.midX, y: frame.midY)
                 triggerIconBounce(at: frame.midX, y: frame.midY - 14)
@@ -895,7 +895,7 @@ private class TabBarGlowOverlay: UIView {
 
     private func triggerPressGlow(at cx: CGFloat, y cy: CGFloat) {
         // 取消上一次按压动画（若有）
-        pressAnimation?.remove(from: pressLayer)
+        pressLayer.removeAllAnimations()
 
         let radius: CGFloat = 28
         let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)

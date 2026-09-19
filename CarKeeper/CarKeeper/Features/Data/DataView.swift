@@ -42,7 +42,7 @@ struct DataView: View {
     var body: some View {
         VStack(spacing: 0) {
             // E21 驾驶行为雷达图
-            DrivingRadarChart(store: store).staggeredEntrance(index: 0)
+            DrivingRadarChart(aggressiveAccel: store.drivingScore/3, harshBrake: store.drivingScore/3, smoothDrive: store.drivingScore/3+10, speedLimit: store.drivingScore/3+20).staggeredEntrance(index: 0)
             // E32 充电成本饼图
             ChargeCostChart(store: store).staggeredEntrance(index: 1)
             // E33 Siri 使用洞察
@@ -116,7 +116,7 @@ struct DataView: View {
                 .font(Theme.caption.weight(sel ? .semibold : .regular))
                 .foregroundStyle(sel ? .white : .primary)
                 .padding(.horizontal, 14).padding(.vertical, 9)
-                .background(sel ? Color.accent : Color(.tertiarySystemFill), in: Capsule())
+                .background(sel ? Theme.Colors.accent : Color(.tertiarySystemFill), in: Capsule())
         }
         .buttonStyle(.plain)
     }

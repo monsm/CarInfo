@@ -13,7 +13,8 @@ struct DrivingScorePage: View {
     var overallScore: Int {
         guard !store.tripHistory.isEmpty else { return 0 }
         let scores = store.tripHistory.map { calculateTripScore($0) }
-        return Int(scores.reduce(0, +) / Double(scores.count))
+        let avg = Double(scores.reduce(0, +)) / Double(scores.count)
+        return Int(avg)
     }
     
     var smoothDrivingScore: Int {
@@ -21,7 +22,7 @@ struct DrivingScorePage: View {
     }
     
     var safeSpeedScore: Int {
-        guard let best = store.tripHistory.max(by: { 0 < 1 }) else { return 80 }
+        guard let best = store.tripHistory.max(by: { _ , _ in false }) else { return 80 }
         return min(100, max(0, Int(100 - best.avgSpeed * 0.5)))
     }
     
@@ -197,7 +198,7 @@ struct DrivingScorePage: View {
                 HStack {
                     Image(systemName: "chevron.right.circle.fill")
                         .font(.caption2)
-                        .foregroundStyle(Color.accent)
+                        .foregroundStyle(Theme.Colors.accent)
                     Text(tip)
                         .font(.caption)
                         .foregroundStyle(.primary)
@@ -221,15 +222,17 @@ struct DrivingScorePage: View {
                     )
                     .foregroundStyle(scoreColor)
                 }
-                LineMark(
-                    path: .value("得分", store.tripHistory.suffix(7).map { calculateTripScore($0) })
-                )
-                .foregroundStyle(scoreColor.opacity(0.5))
-                .lineStyle(StrokeStyle(lineWidth: 2))
+                ForEach(store.tripHistory.suffix(7).enumerated(), id: \.element.id) { i, trip in
+                    LineMark(
+                        x: .value("序号", i + 1),
+                        y: .value("得分", CGFloat(calculateTripScore(trip)))
+                    )
+                    .foregroundStyle(scoreColor.opacity(0.5))
+                }
             }
             .chartXAxis {
                 AxisMarks(values: .stride(by: 1)) { _ in
-                    AxisGridLine.strokeBorder()
+                    AxisGridLine()
                     AxisTick(stroke: StrokeStyle(lineWidth: 1))
                     AxisValueLabel(format: .number)
                 }
@@ -251,7 +254,7 @@ struct DrivingScorePage: View {
         }
         
         // 平稳度
-        score += min(10, max(-10, (100 - trip.distanceKm) / 5))
+        score += min(10, max(-10, Int((100 - trip.distanceKm) / 5)))
         
         return max(0, min(100, score))
     }

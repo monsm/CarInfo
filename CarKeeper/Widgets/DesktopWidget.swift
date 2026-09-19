@@ -160,7 +160,7 @@ struct CarWidgetMedium: Widget {
                     } label: {
                         Image(systemName: "lock.fill")
                             .frame(width: 32, height: 32)
-                            .background(Color.accent.opacity(0.2))
+                            .background(Theme.Colors.accent.opacity(0.2))
                             .clipShape(Circle())
                     }
                 }

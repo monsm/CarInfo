@@ -153,7 +153,7 @@ struct DevView: View {
                     ("ok  通过",      .green,         "正常 / 成功"),
                     ("warn  警告",    .orange,        "注意 / 预警"),
                     ("bad  错误",     .red,           "故障 / 异常"),
-                    ("acc  强调",     Color.accent,   "品牌强调色"),
+                    ("acc  强调",     Theme.Colors.accent,   "品牌强调色"),
                     ("na   未知",     .secondary,     "无数据 / 未定义"),
                 ])
 
@@ -243,7 +243,7 @@ struct DevView: View {
             .padding(.horizontal, 16)
             .safeAreaPadding(.bottom, 12)
         }
-        .pageBackground(Color.accent)
+        .pageBackground(Theme.Colors.accent)
         .navigationTitle("颜色预览").navBarStyle()
     }
 }
@@ -280,7 +280,7 @@ struct PerformanceMetricsCard: View {
                 HStack {
                     Text("指令历史记录").font(Theme.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Text("\(commandCount) 条").font(Theme.monoLg).foregroundStyle(Color.accent)
+                    Text("\(commandCount) 条").font(Theme.monoLg).foregroundStyle(Theme.Colors.accent)
                 }
                 ListDivider()
                 HStack {

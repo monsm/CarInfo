@@ -56,7 +56,7 @@ struct PrivacyDashboardView: View {
                     VStack(spacing: Theme.Spacing.sm) {
                         Image(systemName: "shield.checkered")
                             .font(.system(size: 48))
-                            .foregroundColor(Color.accent)
+                            .foregroundColor(Theme.Colors.accent)
                         Text("数据透明度")
                             .font(.title2)
                             .fontWeight(.bold)

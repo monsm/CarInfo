@@ -300,7 +300,8 @@ struct HealthSystem: Identifiable {
     var healthPct: Int {
         guard !children.isEmpty else { return statusCls == "ok" ? 100 : (statusCls == "warn" ? 60 : 20) }
         let scores = children.map { $0.statusCls == "ok" ? 100 : ($0.statusCls == "warn" ? 60 : 20) }
-        return max(0, min(100, Int(scores.reduce(0, +) / CGFloat(scores.count))))
+        let avg = CGFloat(scores.reduce(0, +)) / CGFloat(scores.count)
+        return max(0, min(100, Int(avg)))
     }
 }
 

@@ -139,7 +139,7 @@ struct VehicleTipsView: View {
                 Button(action: dismissAll) {
                     Text("全部已读")
                         .font(.caption)
-                        .foregroundStyle(Color.accent)
+                        .foregroundStyle(Theme.Colors.accent)
                 }
             }
         }
@@ -156,8 +156,8 @@ struct VehicleTipsView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(selectedCategory == cat ? Color.accent.opacity(0.2) : Color.clear)
-                            .foregroundStyle(selectedCategory == cat ? Color.accent : .secondary)
+                            .background(selectedCategory == cat ? Theme.Colors.accent.opacity(0.2) : Color.clear)
+                            .foregroundStyle(selectedCategory == cat ? Theme.Colors.accent : .secondary)
                             .cornerRadius(16)
                     }
                 }
@@ -197,7 +197,7 @@ struct VehicleTipsView: View {
                     Button(action: { handleAction(tip) }) {
                         Text(action)
                             .font(.caption)
-                            .foregroundStyle(Color.accent)
+                            .foregroundStyle(Theme.Colors.accent)
                     }
                 }
                 

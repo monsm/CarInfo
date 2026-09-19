@@ -21,7 +21,7 @@ struct BiometricLockOverlay: View {
             VStack(spacing: Theme.Spacing.lg) {
                 Image(systemName: "faceid")
                     .font(.system(size: 60))
-                    .foregroundColor(Color.accent)
+                    .foregroundColor(Theme.Colors.accent)
                     .symbolEffect(.bounce)
 
                 Text("需要身份验证")
@@ -41,7 +41,7 @@ struct BiometricLockOverlay: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accent)
+                        .background(Theme.Colors.accent)
                         .foregroundColor(.white)
                         .cornerRadius(Theme.Radius.medium)
                 }

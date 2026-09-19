@@ -80,10 +80,10 @@ struct EmergencyPanel: View {
         VStack(spacing: 12) {
             Text("快捷操作").font(Theme.font(.subheadline as Font).bold())
             HStack(spacing: 12) {
-                actionButton(icon: "car.fill", title: "远程锁车", color: .blue, action: lockCar)
-                actionButton(icon: "horn.fill", title: "鸣笛寻车", color: .orange, action: honkCar)
-                actionButton(icon: "lightbulb.fill", title: "闪灯", color: .yellow, action: flashLights)
-                actionButton(icon: "fan.fill", title: "开空调", color: .cyan, action: turnOnAC)
+                actionButton(icon: "car.fill", title: "远程锁车", color: .blue) { Task { await lockCar() } }
+                actionButton(icon: "horn.fill", title: "鸣笛寻车", color: .orange) { Task { await honkCar() } }
+                actionButton(icon: "lightbulb.fill", title: "闪灯", color: .yellow) { Task { await flashLights() } }
+                actionButton(icon: "fan.fill", title: "开空调", color: .cyan) { Task { await turnOnAC() } }
             }
         }
         .glassCard(corner: Theme.Radius.medium)
@@ -113,7 +113,7 @@ struct EmergencyPanel: View {
             Text("紧急联系人").font(Theme.font(.subheadline as Font).bold())
             HStack {
                 Image(systemName: "person.fill")
-                    .foregroundStyle(Color.accent)
+                    .foregroundStyle(Theme.Colors.accent)
                 TextField("输入紧急电话", text: $emergencyContact)
                     .keyboardType(.phonePad)
                 Button(action: saveContact) {
@@ -194,23 +194,23 @@ struct EmergencyPanel: View {
         activeEmergency = false
     }
     
-    private func lockCar() {
-        store.sendControlCommand("lock")
+    private func lockCar() async {
+        _ = await store.sendControlCommand("lock")
         EnhancedToastManager.shared.show("锁车指令已发送", icon: "lock.fill")
     }
     
-    private func honkCar() {
-        store.sendControlCommand("honk")
+    private func honkCar() async {
+        _ = await store.sendControlCommand("honk")
         EnhancedToastManager.shared.show("鸣笛中...", icon: "horn.fill")
     }
     
-    private func flashLights() {
-        store.sendControlCommand("flash")
+    private func flashLights() async {
+        _ = await store.sendControlCommand("flash")
         EnhancedToastManager.shared.show("闪灯中...", icon: "lightbulb.fill")
     }
     
-    private func turnOnAC() {
-        store.sendControlCommand("ac_on")
+    private func turnOnAC() async {
+        _ = await store.sendControlCommand("ac_on")
         EnhancedToastManager.shared.show("空调已开启", icon: "fan.fill")
     }
     

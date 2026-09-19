@@ -620,10 +620,6 @@ final class AppStore: @unchecked Sendable {
     }
     var parkingHistory: [ParkingRecord] = []
 
-    // 通知检查
-    func checkNotificationsIfNeeded() {
-        _ = SmartNotificationManager.shared
-    }
 
     // 总里程
     var totalMileage: Int {

@@ -123,7 +123,7 @@ struct TripDetailView: View {
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.caption)
-                    .foregroundStyle(Color.accent)
+                    .foregroundStyle(Theme.Colors.accent)
                 Text(value)
                     .font(Theme.heroNum)
                     .foregroundStyle(.primary)
@@ -145,14 +145,14 @@ struct TripDetailView: View {
             HStack {
                 Image(systemName: "map.fill")
                     .font(.caption)
-                    .foregroundStyle(Color.accent)
+                    .foregroundStyle(Theme.Colors.accent)
                 Text("行驶路线")
                     .font(Theme.font(.subheadline as Font).bold())
                 Spacer()
                 Button(action: { showMap.toggle() }) {
                     Text(showMap ? "收起" : "展开")
                         .font(.caption)
-                        .foregroundStyle(Color.accent)
+                        .foregroundStyle(Theme.Colors.accent)
                 }
             }
             
@@ -192,7 +192,7 @@ struct TripDetailView: View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.caption)
-                .foregroundStyle(Color.accent)
+                .foregroundStyle(Theme.Colors.accent)
             VStack(alignment: .leading) {
                 Text(text).font(.caption2).foregroundStyle(.secondary)
                 Text(String(format: "%.4f, %.4f", coord.latitude, coord.longitude))
@@ -366,7 +366,7 @@ struct MapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = Color.accent
+                renderer.strokeColor = Theme.Colors.accent
                 renderer.lineWidth = 3
                 renderer.lineDashPattern = [6, 4]
                 return renderer

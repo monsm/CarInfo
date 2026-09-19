@@ -68,7 +68,7 @@ struct CheckInStreak: View {
     var body: some View {
         HStack {
             Image(systemName: "calendar.checkmark")
-                .foregroundColor(Color.accent)
+                .foregroundColor(Theme.Colors.accent)
             Text("连续打卡 \(streakDays) 天")
                 .font(.subheadline)
             Spacer()
@@ -87,7 +87,7 @@ struct CarbonChallenge: View {
     @AppStorage("carbon_goal") private var monthlyGoal: Double = 50.0
     @StateObject private var tracker = CarbonSavingsTracker.shared
     
-    var currentSavings: Double { tracker.getTodayStats().totalCO2Saved }
+    var currentSavings: Double { tracker.getTodayStats().totalCarbonKg }
     var progress: Double { min(currentSavings / monthlyGoal, 1.0) }
     
     var body: some View {
@@ -160,8 +160,8 @@ struct FamilyLeaderboard: View {
                     .font(.headline)
                     .foregroundColor(idx == 0 ? .yellow : idx == 1 ? .gray : idx == 2 ? .orange : .secondary)
                     .frame(width: 30)
-                Circle().fill(Color.accent.opacity(0.2)).frame(width: 36, height: 36)
-                    .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(Color.accent))
+                Circle().fill(Theme.Colors.accent.opacity(0.2)).frame(width: 36, height: 36)
+                    .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(Theme.Colors.accent))
                 VStack(alignment: .leading) {
                     Text(member.name).font(.subheadline).fontWeight(.medium)
                     Text(member.roles.joined(separator: " · ")).font(.caption2).foregroundColor(.secondary)

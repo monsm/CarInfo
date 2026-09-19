@@ -109,7 +109,7 @@ struct VoiceBroadcastCard: View {
                 if vm.isSpeaking {
                     HStack {
                         Image(systemName: "speaker.wave.3.fill")
-                            .foregroundColor(Color.accent)
+                            .foregroundColor(Theme.Colors.accent)
                             .pulseAnimation()
                         Text(vm.currentMessage)
                             .font(.caption)

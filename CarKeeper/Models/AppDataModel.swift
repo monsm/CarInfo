@@ -97,17 +97,17 @@ class TripRepository {
         self.container = container
     }
     
-    func fetchAll() -> [TripRecord] {
+    @MainActor func fetchAll() -> [TripRecord] {
         let descriptor = FetchDescriptor<TripRecord>(sortBy: [SortDescriptor(\.startTime, order: .reverse)])
         return (try? container.mainContext.fetch(descriptor)) ?? []
     }
     
-    func add(_ trip: TripRecord) {
+    @MainActor func add(_ trip: TripRecord) {
         container.mainContext.insert(trip)
         try? container.mainContext.save()
     }
     
-    func delete(_ trip: TripRecord) {
+    @MainActor func delete(_ trip: TripRecord) {
         container.mainContext.delete(trip)
         try? container.mainContext.save()
     }
@@ -120,16 +120,15 @@ class EnergySnapshotRepository {
         self.container = container
     }
     
-    func fetchRecent(_ count: Int = 20) -> [EnergySnapshot] {
+    @MainActor func fetchRecent(_ count: Int = 20) -> [EnergySnapshot] {
         let descriptor = FetchDescriptor<EnergySnapshot>(
             predicate: nil,
-            sortBy: [SortDescriptor(\.timestamp, order: .reverse)],
-            limit: count
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
         return (try? container.mainContext.fetch(descriptor)) ?? []
     }
     
-    func add(_ snapshot: EnergySnapshot) {
+    @MainActor func add(_ snapshot: EnergySnapshot) {
         container.mainContext.insert(snapshot)
         try? container.mainContext.save()
     }
@@ -142,12 +141,12 @@ class MaintenancePhotoRepository {
         self.container = container
     }
     
-    func fetchAll() -> [MaintenancePhoto] {
+    @MainActor func fetchAll() -> [MaintenancePhoto] {
         let descriptor = FetchDescriptor<MaintenancePhoto>(sortBy: [SortDescriptor(\.capturedAt, order: .reverse)])
         return (try? container.mainContext.fetch(descriptor)) ?? []
     }
     
-    func add(_ photo: MaintenancePhoto) {
+    @MainActor func add(_ photo: MaintenancePhoto) {
         container.mainContext.insert(photo)
         try? container.mainContext.save()
     }
@@ -160,7 +159,7 @@ class SettingsRepository {
         self.container = container
     }
     
-    func fetchOrCreate() -> UserSettings {
+    @MainActor func fetchOrCreate() -> UserSettings {
         if let settings = (try? container.mainContext.fetch(FetchDescriptor<UserSettings>()))?.first {
             return settings
         }
@@ -170,7 +169,7 @@ class SettingsRepository {
         return newSettings
     }
     
-    func update(_ settings: UserSettings) {
+    @MainActor func update(_ settings: UserSettings) {
         try? container.mainContext.save()
     }
 }

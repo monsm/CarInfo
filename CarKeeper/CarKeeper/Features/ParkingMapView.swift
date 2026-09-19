@@ -79,7 +79,7 @@ struct ParkingMapView: View {
                     Image(systemName: "car.fill")
                         .font(.caption)
                         .padding(8)
-                        .background(Color.accent.opacity(0.15))
+                        .background(Theme.Colors.accent.opacity(0.15))
                         .cornerRadius(8)
                 }
             }
@@ -123,7 +123,7 @@ struct ParkingMapView: View {
                         ForEach(0..<min(3, store.parkingHistory.count), id: \.self) { i in
                             let p = store.parkingHistory[i]
                             HStack {
-                                Image(systemName: "mappin").foregroundStyle(Color.accent)
+                                Image(systemName: "mappin").foregroundStyle(Theme.Colors.accent)
                                 VStack(alignment: .leading) {
                                     Text(p.address ?? "未知位置").font(.subheadline)
                                     Text(p.date, style: .date).font(.caption).foregroundStyle(.secondary)
@@ -148,7 +148,7 @@ struct ParkingMapView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.accent)
+                    .background(Theme.Colors.accent)
                     .foregroundStyle(.white)
                     .cornerRadius(12)
                 }

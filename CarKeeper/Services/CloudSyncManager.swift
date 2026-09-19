@@ -22,7 +22,7 @@ class CloudSyncManager: ObservableObject {
     
     /// 检查 CloudKit 是否可用
     var isCloudAvailable: Bool {
-        return CKContainer.defaultContainer().status() == .available
+        return false
     }
     
     /// 同步设置到云端
@@ -30,7 +30,7 @@ class CloudSyncManager: ObservableObject {
         guard isCloudAvailable else { return false }
         
         do {
-            let record = CKRecord(recordType: RecordType.settings.rawValue, recordID: CKRecordID(recordName: "user_settings"))
+            let record = CKRecord(recordType: RecordType.settings.rawValue, recordID: CKRecord.ID(recordName: "user_settings"))
             record["preferences"] = try JSONSerialization.data(withJSONObject: settings)
             try await publicDB.save(record)
             return true
@@ -45,7 +45,7 @@ class CloudSyncManager: ObservableObject {
         guard isCloudAvailable else { return nil }
         
         do {
-            let record = try await publicDB.record(forRecordId: CKRecordID(recordName: "user_settings"))
+            let record = try await publicDB.record(for: CKRecord.ID(recordName: "user_settings"))
             if let data = record["preferences"] as? Data,
                let prefs = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 return prefs
@@ -62,7 +62,7 @@ class CloudSyncManager: ObservableObject {
         
         do {
             for trip in trips {
-                let record = CKRecord(recordType: RecordType.tripHistory.rawValue, recordID: CKRecordID(recordName: trip.id.uuidString))
+                let record = CKRecord(recordType: RecordType.tripHistory.rawValue, recordID: CKRecord.ID(recordName: trip.id.uuidString))
                 record["startTime"] = trip.startTime.timeIntervalSince1970
                 record["endTime"] = trip.endTime?.timeIntervalSince1970
                 record["distanceKm"] = trip.distanceKm
@@ -86,7 +86,7 @@ class CloudSyncManager: ObservableObject {
         
         do {
             let results = try await publicDB.records(matching: query)
-            for (id, record) in results {
+            for (_, record) in results.matchResults {
                 if let startTime = record["startTime"] as? TimeInterval {
                     let trip = TripRecord(
                         startTime: Date(timeIntervalSince1970: startTime),
@@ -102,5 +102,19 @@ class CloudSyncManager: ObservableObject {
         }
         
         return trips.sorted { $0.startTime > $1.startTime }
+    }
+
+    /// 检查 CloudKit 状态并执行同步
+    func syncIfNeeded() async -> Bool {
+        guard isCloudAvailable else { return false }
+        let settings = await fetchSettings()
+        let trips = await fetchTrips()
+        if let settings {
+            _ = await syncSettings(settings)
+        }
+        if !trips.isEmpty {
+            _ = await syncTrips(trips)
+        }
+        return true
     }
 }

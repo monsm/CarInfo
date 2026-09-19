@@ -63,7 +63,7 @@ struct VehicleView: View {
                 PageErrorView("车辆数据解析失败，请重新进入页面") { _ in }
             }
         }
-        .pageBackground(Color.accent)
+        .pageBackground(Theme.Colors.accent)
         .navigationTitle("车辆档案")
             .navBarStyle()
             .accessibilityLabel(Text("车辆档案"))
@@ -86,7 +86,7 @@ struct VehicleView: View {
                     showPhotoPicker = true
                 }
                 .font(Theme.caption)
-                .foregroundStyle(Color.accent)
+                .foregroundStyle(Theme.Colors.accent)
                 .padding(.vertical, 12)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -135,10 +135,10 @@ struct VehicleView: View {
                 // 车牌徽章
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(LinearGradient(colors: [Color.accent, Color.accent.opacity(0.75)],
+                        .fill(LinearGradient(colors: [Theme.Colors.accent, Theme.Colors.accent.opacity(0.75)],
                                              startPoint: .topLeading, endPoint: .bottomTrailing))
                         .frame(width: 96, height: 58)
-                        .shadow(color: Color.accent.opacity(0.3), radius: 10, y: 4)
+                        .shadow(color: Theme.Colors.accent.opacity(0.3), radius: 10, y: 4)
                     VStack(spacing: 3) {
                         Text("新能源").font(.caption).foregroundStyle(.white.opacity(0.85))
                         Text(sum.plate).font(.title).foregroundStyle(.white)
@@ -180,12 +180,12 @@ struct VehicleView: View {
                     let nextServiceMiles = lastMiles + (timesSince + 1) * interval
                     let estPrice = timesSince >= 3 ? AppStore.majorServicePriceEstimate : AppStore.servicePriceEstimate
                     HStack {
-                        Image(systemName: "wrench.and.screwdriver").font(Theme.caption).foregroundStyle(Color.accent)
+                        Image(systemName: "wrench.and.screwdriver").font(Theme.caption).foregroundStyle(Theme.Colors.accent)
                         Text("下次保养预计费用")
                             .font(Theme.caption).foregroundStyle(.secondary)
                         Spacer()
                         Text("约 ¥\(estPrice)")
-                            .font(Theme.caption).foregroundStyle(Color.accent)
+                            .font(Theme.caption).foregroundStyle(Theme.Colors.accent)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -215,7 +215,7 @@ struct VehicleView: View {
                 Spacer()
                 Image(systemName: "doc.on.doc.fill")
                     .font(Theme.caption)
-                    .foregroundStyle(Color.accent)
+                    .foregroundStyle(Theme.Colors.accent)
             }
             .padding(10)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -331,7 +331,7 @@ struct PhotoPickerSheet: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                        .background(Theme.Colors.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
                     }
                     Button {
                         selectedImage = nil
@@ -356,7 +356,7 @@ struct PhotoPickerSheet: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                        .background(Theme.Colors.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
                     }
                 }
                 Spacer()

@@ -133,15 +133,15 @@ struct Inspection: Identifiable, Codable {
     var notes: String = ""
 }
 
-class InspectionCalendar {
+class InspectionCalendar: ObservableObject {
+    @Published var inspections: [Inspection] = []
     static let shared = InspectionCalendar()
     
-    var inspections: [Inspection] {
+    private init() {
         if let data = UserDefaults.standard.data(forKey: "carkeeper_inspections"),
            let decoded = try? JSONDecoder().decode([Inspection].self, from: data) {
-            return decoded
+            _inspections = decoded
         }
-        return []
     }
     
     func addInspection(_ inspection: Inspection) {
@@ -259,7 +259,7 @@ struct InspectionEditForm: View {
                 Button("保存") {
                     var list = InspectionCalendar.shared.inspections
                     if let idx = list.firstIndex(where: { $0.id == inspection.id }) {
-                        list[idx] = Inspection(id: inspection.id, vehicleName: name, date: date, notes: inspection.notes)
+                        list[idx] = Inspection(vehicleName: name, date: date, notes: inspection.notes)
                     }
                     saveInspections(list)
                     dismiss()
@@ -271,7 +271,7 @@ struct InspectionEditForm: View {
 
 // MARK: - UI: 年检日历视图
 struct InspectionCalendarView: View {
-    @StateObject private var calendar = InspectionCalendar.shared
+    @State private var calendar = InspectionCalendar.shared
     @State private var showAdd = false
     @State private var vehicleName = ""
     @State private var inspectionDate = Date()
@@ -384,7 +384,7 @@ struct VehicleValuationView: View {
 
 // MARK: - UI: 充电账单 Sheet
 struct ChargeBillSheet: View {
-    @StateObject private var store = AppStore.shared
+    private let store = AppStore.shared
     @State private var showingPDF = false
     
     var chargeRecords: [ChargeRecord] {
@@ -404,10 +404,10 @@ struct ChargeBillSheet: View {
                         action: {}
                     )
                 } else {
-                    List(chargeRecords, id: \.id) { record in
+                    ForEach(chargeRecords) { record in
                         HStack {
                             VStack(alignment: .leading) {
-                                Text(record.date.formatted(date: .numeric, time: .omitted))
+                                Text(record.date, format: .dateTime.date().time(.omitted))
                                     .font(.subheadline)
                                 Text("¥\(String(format: "%.2f", record.cost))")
                                     .font(.caption)
@@ -416,7 +416,7 @@ struct ChargeBillSheet: View {
                             Spacer()
                             Text("\(record.kWh) kWh")
                                 .font(.subheadline)
-                                .foregroundColor(Color.accent)
+                                .foregroundColor(Theme.Colors.accent)
                         }
                     }
                 }
@@ -434,7 +434,7 @@ struct ChargeBillSheet: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accent)
+                        .background(Theme.Colors.accent)
                         .foregroundColor(.white)
                         .cornerRadius(Theme.Radius.medium)
                 }

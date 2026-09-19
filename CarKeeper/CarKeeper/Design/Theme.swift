@@ -36,7 +36,7 @@ enum Theme {
 
     // MARK: - 页面背景语义色
     /// 车况页（默认）
-    static var pageAccent: Color { Color.accent }
+    static var pageAccent: Color { Theme.Colors.accent }
     /// 电池/健康页 — 绿色调
     static var pageGreen: Color { Color.green }
     static var pagePurple: Color { Color(.systemPurple) }
@@ -50,7 +50,7 @@ enum Theme {
     static var ok: Color { Color.green }
     static var warn: Color { Color.orange }
     static var bad: Color { Color.red }
-    static var acc: Color { Color.accent }
+    static var acc: Color { Theme.Colors.accent }
     static var na: Color { Color.secondary }
 
     // MARK: - 状态 → 语义色
@@ -59,7 +59,7 @@ enum Theme {
         case "ok", "normal": return .green
         case "warn", "warning": return .orange
         case "bad", "fault", "abnormal": return .red
-        case "acc": return Color.accent
+        case "acc": return Theme.Colors.accent
         case "idle", "off": return Color(.systemGray4)
         default: return Color(.systemGray4)
         }
@@ -196,7 +196,7 @@ enum Theme {
         static let light = ShadowStyle(color: ColorSystem.shadowLight, radius: 8, x: 0, y: 2)
         static let medium = ShadowStyle(color: ColorSystem.shadowMedium, radius: 16, x: 0, y: 4)
         static let strong = ShadowStyle(color: ColorSystem.shadowStrong, radius: 24, x: 0, y: 8)
-        static let glow = GlowStyle(color: Color.accent, radius: 12, offset: 4)
+        static let glow = GlowStyle(color: Theme.Colors.accent, radius: 12, offset: 4)
     }
 
     enum Spring {
@@ -258,7 +258,7 @@ struct GlowStyle {
 
 // MARK: - 页面底色：多层次渐变光晕（Apple Premium）
 struct PageBackground: View {
-    var tint: Color = Color.accent
+    var tint: Color = Theme.Colors.accent
     var body: some View {
         ZStack {
             // 底层：系统分组背景
@@ -316,7 +316,7 @@ extension View {
     }
 
     // 页面底色
-    func pageBackground(_ tint: Color = Color.accent) -> some View {
+    func pageBackground(_ tint: Color = Theme.Colors.accent) -> some View {
         background(PageBackground(tint: tint))
     }
 
@@ -326,7 +326,7 @@ extension View {
     // MARK: - 数值变化液态玻璃脉冲高亮
     /// 当绑定值变化时，触发短暂的边缘发光脉冲（scale 1.0→1.06→1.0 + glow fade）
     /// 用于 SOC Hero、里程数字、胎压数值等关键数据卡片
-    func valuePulse(tint: Color = Color.accent, watchValue: Binding<String> = Binding.constant("")) -> some View {
+    func valuePulse(tint: Color = Theme.Colors.accent, watchValue: Binding<String> = Binding.constant("")) -> some View {
         self.modifier(ValuePulseModifier(watchValue: watchValue, tint: tint))
     }
 
@@ -410,7 +410,7 @@ struct GlassLongPressDeformModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         // 深色模式下使用 accentColor 折射光，浅色模式使用白色光
-        let glowTint: Color = Color.red == Color.accent ? .white : Color.accent
+        let glowTint: Color = Color.red == Theme.Colors.accent ? .white : Theme.Colors.accent
         content
             .scaleEffect(pressScale)
             .animation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0.35), value: pressScale)
@@ -690,7 +690,7 @@ struct StatTile: View {
     let label: String
     let value: String
     var unit: String = ""
-    var tint: Color = Color.accent
+    var tint: Color = Theme.Colors.accent
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
@@ -890,7 +890,7 @@ struct RunningGlow: ViewModifier {
 /// 为视图添加液态玻璃呼吸光晕效果
 /// - Parameter color: 光晕主色调（默认 accentColor）
 extension View {
-    func runningGlow(color: Color = Color.accent) -> some View {
+    func runningGlow(color: Color = Theme.Colors.accent) -> some View {
         self.modifier(RunningGlow(color: color))
     }
 }
@@ -912,7 +912,7 @@ struct MetricPill: View {
     let icon: String
     let value: String
     let unit: String
-    var tint: Color = Color.accent
+    var tint: Color = Theme.Colors.accent
     /// 是否使用流体数字字体（随容器宽度自动缩放，仅适用于较大数值的 Hero 场景）
     var fluidValue: Bool = false
 
@@ -1811,19 +1811,19 @@ struct PageLoadingView: View {
             ZStack {
                 // 外圈光晕
                 Circle()
-                    .stroke(Color.accent.opacity(0.2), lineWidth: 3)
+                    .stroke(Theme.Colors.accent.opacity(0.2), lineWidth: 3)
                     .frame(width: 60, height: 60)
                 // 旋转进度环
                 Circle()
                     .trim(from: 0, to: 0.7)
-                    .stroke(AngularGradient(colors: [Color.accent, .blue], center: .center), lineWidth: 3)
+                    .stroke(AngularGradient(colors: [Theme.Colors.accent, .blue], center: .center), lineWidth: 3)
                     .frame(width: 60, height: 60)
                     .rotationEffect(spinAngle)
                     .animation(.linear(duration: 1.2).repeatForever(autoreverses: false), value: spinAngle)
                 // 中心图标
                 Image(systemName: "car.fill")
                     .font(.title2)
-                    .foregroundStyle(Color.accent)
+                    .foregroundStyle(Theme.Colors.accent)
             }
             Text(message)
                 .font(Theme.caption)
@@ -1866,7 +1866,7 @@ struct PageErrorView: View {
                 .padding(.horizontal, Theme.Spacing.lg)
             Button("重新加载") { retryAction() }
                 .buttonStyle(.borderedProminent)
-                .tint(Color.accent)
+                .tint(Theme.Colors.accent)
                 .controlSize(.small)
         }
         .frame(maxWidth: .infinity)
@@ -2078,7 +2078,7 @@ struct ToastView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(Theme.caption.weight(.semibold))
-                .foregroundStyle(Color.accent)
+                .foregroundStyle(Theme.Colors.accent)
             Text(text)
                 .font(Theme.caption.weight(.semibold))
                 .foregroundStyle(.primary)
@@ -2110,11 +2110,11 @@ struct RefreshProgressRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.accent.opacity(0.15), lineWidth: 2)
+                .stroke(Theme.Colors.accent.opacity(0.15), lineWidth: 2)
                 .frame(width: 16, height: 16)
             Circle()
                 .trim(from: 0, to: progress)
-                .stroke(Color.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .stroke(Theme.Colors.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                 .frame(width: 16, height: 16)
                 .rotationEffect(.degrees(-90))
         }
@@ -2393,7 +2393,7 @@ struct ChargingStationMapView: View {
                     }
                     Spacer()
                     VStack(alignment: .trailing) {
-                        Text(station.distance).font(Theme.caption.weight(.semibold)).foregroundStyle(Color.accent)
+                        Text(station.distance).font(Theme.caption.weight(.semibold)).foregroundStyle(Theme.Colors.accent)
                         Text(station.type).font(Theme.micro).foregroundStyle(.secondary)
                     }
                 }
@@ -2489,7 +2489,7 @@ struct MonthlyReportView: View {
                     shareReport()
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Color.accent)
+                .tint(Theme.Colors.accent)
                 
                 Button("关闭") { dismiss() }
                     .font(Theme.body)

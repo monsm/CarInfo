@@ -18,14 +18,7 @@ struct DashboardView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: Theme.Spacing.sm) {
                         ForEach(periods, id: \.self) { p in
-                            Text(p)
-                                .font(.subheadline)
-                                .foregroundColor(period == p ? .white : .secondary)
-                                .padding(.horizontal, Theme.Spacing.md)
-                                .padding(.vertical, Theme.Spacing.xs)
-                                .background(period == p ? Theme.Colors.accent : Color.clear)
-                                .cornerRadius(Theme.Radius.sm)
-                                .onTapGesture { period = p }
+                            periodChip(text: p, selected: period == p)
                         }
                     }
                 }
@@ -47,7 +40,7 @@ struct DashboardView: View {
                             y: .value("SOC", CGFloat(r.soc))
                         )
                         .lineStyle(StrokeStyle(lineWidth: 2))
-                        .foregroundStyle(Color.accent)
+                        .foregroundStyle(Theme.Colors.accent)
                     }
                 }
                 .frame(height: 150)
@@ -116,6 +109,17 @@ struct DashTile: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, Theme.Spacing.sm)
         .glassCard()
+    }
+}
+
+    private func periodChip(text: String, selected: Bool) -> some View {
+        Text(text)
+            .font(.subheadline)
+            .foregroundColor(selected ? .white : .secondary)
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(selected ? Theme.Colors.accent : Color.clear)
+            .cornerRadius(Theme.Radius.sm)
     }
 }
 

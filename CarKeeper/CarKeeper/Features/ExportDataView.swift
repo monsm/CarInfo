@@ -46,7 +46,7 @@ struct ExportDataView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accent)
+                        .background(Theme.Colors.accent)
                         .foregroundStyle(.white)
                         .cornerRadius(12)
                     }

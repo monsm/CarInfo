@@ -75,7 +75,7 @@ struct ControlView: View {
         guard hasCtrl else { return nil }
         
         func num(_ k: String) -> Int? {
-            ciNumber(ctrl, [k])
+            ciNumberInt(ctrl, [k])
         }
         func s(_ k: String) -> String? {
             ciString(ctrl, [k])
@@ -107,7 +107,7 @@ struct ControlView: View {
             ("左后窗", "LeftRearWindowDegree", ""),
             ("右后窗", "RightRearWindowDegree", "")
         ]
-        for (label, degK) in winDefs {
+        for (label, degK, _) in winDefs {
             let deg = num(degK)
             if deg == nil { continue }
             let v = deg == 0 ? "关闭" : "开启 \(deg!)°"
@@ -221,8 +221,8 @@ struct ControlView: View {
         .scrollBounceBehavior(.basedOnSize)
         .refreshable {
             tempDisplayCount = 0            // 数字归零
-            withAnimation(Theme.Duration.springFast) {
-                try? await refreshControlCache()
+            Task {
+                await refreshControlCache()
             }
             // 数据回来后自动重播计数动画（pendingTemp 不变，onChange 会触发）
         }
@@ -365,7 +365,7 @@ struct ControlView: View {
                         HStack(spacing: 12) {
                             Image(systemName: scene.symbol)
                                 .font(Theme.bodyMd)
-                                .foregroundStyle(Color.accent)
+                                .foregroundStyle(Theme.Colors.accent)
                                 .frame(width: 32, height: 32)
                                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                             VStack(alignment: .leading, spacing: 2) {
@@ -461,7 +461,7 @@ struct ControlView: View {
                             .foregroundStyle(.tertiary)
                         Text(showMoreCommands ? "收起" : "更多指令")
                             .font(Theme.caption)
-                            .foregroundStyle(Color.accent)
+                            .foregroundStyle(Theme.Colors.accent)
                         Spacer()
                     }
                     .padding(.vertical, 10)
@@ -632,7 +632,7 @@ struct ControlView: View {
         // 弹结果详情
         showResult = true
         // #14 指令成功时 Toast 提示
-        if ok { EnhancedToastManager.shared.show(name, icon: "checkmark.circle.fill") }
+        if ok { EnhancedToastManager.shared.show("", icon: "checkmark.circle.fill") }
     }
 
     // MARK: 执行结果详情 Sheet
@@ -799,7 +799,7 @@ struct ACHeroDisc: View {
 
                 // 第 5 层：温度数字（流体字体，随容器宽度自动缩放）
                 FluidTempHero(String(displayCount))
-                    .valuePulse(tint: Theme.brand, watchValue: Binding(get: { String(pulseTrigger) }, set: { _ in }))
+                    .valuePulse(tint: Theme.brand, watchValue: Binding(get: { pulseTrigger.uuidString }, set: { _ in }))
             }
             .scaleEffect(isEntered ? 1.0 : 0.82)
             .opacity(isEntered ? 1.0 : 0.0)

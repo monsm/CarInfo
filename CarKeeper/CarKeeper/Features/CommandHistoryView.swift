@@ -86,8 +86,8 @@ struct CommandHistoryView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(filter == f ? Color.accent.opacity(0.2) : Color.clear)
-                            .foregroundStyle(filter == f ? Color.accent : .secondary)
+                            .background(filter == f ? Theme.Colors.accent.opacity(0.2) : Color.clear)
+                            .foregroundStyle(filter == f ? Theme.Colors.accent : .secondary)
                             .cornerRadius(20)
                     }
                 }
@@ -116,7 +116,7 @@ struct CommandHistoryView: View {
     }
     
     private func commandRow(_ cmd: AppStore.HistoryEntry, idx: Int) -> some View {
-        let isExpanded = expandedCmds.map{$0}.contains(cmd.id)
+        let isExpanded = expandedCmds.contains(cmd.id)
         
         Button(role: nil, action: {
             withAnimation(.spring(response: 0.35)) {

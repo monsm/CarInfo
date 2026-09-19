@@ -77,7 +77,7 @@ struct ChargingHabitsAnalysis: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             Text("充电习惯分析").font(.subheadline).fontWeight(.semibold)
-            HStack { Image(systemName:"clock").foregroundColor(Color.accent); Text("高峰时段: \(peakHours.first ?? 0):00").font(.subheadline) }
+            HStack { Image(systemName:"clock").foregroundColor(Theme.Colors.accent); Text("高峰时段: \(peakHours.first ?? 0):00").font(.subheadline) }
         }.padding().glassCard()
     }
 }
@@ -144,8 +144,8 @@ struct SiriUsageAnalysis: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             Text("Siri使用排行").font(.subheadline).fontWeight(.semibold)
-            ForEach(Array(topCommands.enumerated()), id: \.self) { idx, item in
-                HStack { Text("#\(idx+1)").font(.caption).foregroundColor(.secondary).frame(width: 20); Text(item.0).font(.subheadline); Spacer(); Text("\(item.1)次").font(.caption).foregroundColor(.secondary) }
+            ForEach(Array(topCommands.enumerated()), id: \.offset) { idx, item in
+                HStack { Text("#\(idx+1)").font(.caption).foregroundColor(.secondary).frame(width: 20); Text(item.element.0).font(.subheadline); Spacer(); Text("\(item.element.1)次").font(.caption).foregroundColor(.secondary) }
             }
         }.padding().glassCard()
     }

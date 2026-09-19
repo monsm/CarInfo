@@ -72,7 +72,6 @@ struct BatteryView: View {
         .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { isRefreshing = true; await load(); isRefreshing = false }
         .glassRefreshRipple(isRefreshing: $isRefreshing)
-        .refreshProgressRing(progress: $isRefreshing)
         .toolbar {
             // #20 目的地续航计算器入口
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -135,7 +134,7 @@ struct BatteryView: View {
                 Circle()
                     .trim(from: 0, to: max(0.02, socProgress / 100))
                     .stroke(
-                        AngularGradient(colors: [.green, .green, Color.accent, .orange, .red],
+                        AngularGradient(colors: [.green, .green, Theme.Colors.accent, .orange, .red],
                                         center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
                         style: StrokeStyle(lineWidth: 18, lineCap: .round))
                     .rotationEffect(.degrees(-90))
@@ -160,7 +159,7 @@ struct BatteryView: View {
             HStack(spacing: 14) {
                 MetricPill(icon: "point.topleft.down.curvedto.point.bottomright.up",
                            value: e.range == "--" ? "--" : (rangeCount > 0 ? String(rangeCount) : e.range), unit: "km", tint: .green, fluidValue: true)
-                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: Color.accent)
+                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: Theme.Colors.accent)
             }
             Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5)))")
                 .font(Theme.footnote).foregroundStyle(.secondary)
@@ -454,7 +453,7 @@ struct BatteryView: View {
                     }
                     .font(Theme.micro.bold())
                     .padding(.horizontal, 12).padding(.vertical, 5)
-                    .background(energyTrendPeriod == period ? Color.accent : Color.secondary.opacity(0.15), in: Capsule())
+                    .background(energyTrendPeriod == period ? Theme.Colors.accent : Color.secondary.opacity(0.15), in: Capsule())
                     .foregroundStyle(energyTrendPeriod == period ? .white : .secondary)
                 }
             }
@@ -468,12 +467,12 @@ struct BatteryView: View {
                         y: .value("SOC %", rec.soc)
                     )
                     .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: energyTrendPeriod == .realtime ? [] : [4, 2]))
-                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : Color.accent)
+                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : Theme.Colors.accent)
                     PointMark(
                         x: .value("时间", rec.timestamp, unit: .second),
                         y: .value("SOC %", rec.soc)
                     )
-                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : Color.accent)
+                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : Theme.Colors.accent)
                     .symbolSize(8)
                 }
                 // 填充区域
@@ -612,7 +611,7 @@ struct DestinationCalculatorView: View {
                 calculateReach()
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color.accent)
+            .tint(Theme.Colors.accent)
 
             Button("取消") { dismiss() }
                 .font(Theme.body)

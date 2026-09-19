@@ -124,7 +124,7 @@ struct TripAnalyticsView: View {
                         x: .value("日期", item.0.formatted(date: .abbreviated, time: .omitted)),
                         y: .value("里程", item.1)
                     )
-                    .foregroundStyle(item.1 > 0 ? Color.accent : Color.secondary.opacity(0.3))
+                    .foregroundStyle(item.1 > 0 ? Theme.Colors.accent : Color.secondary.opacity(0.3))
                     .cornerRadius(4)
                 }
             }

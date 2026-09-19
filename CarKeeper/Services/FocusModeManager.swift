@@ -64,7 +64,7 @@ struct FocusModeHomeView: View {
                 if !focusManager.config.customMessage.isEmpty {
                     Text(focusManager.config.customMessage)
                         .font(.headline)
-                        .foregroundColor(Color.accent)
+                        .foregroundColor(Theme.Colors.accent)
                         .padding(.horizontal)
                         .glassCard()
                         .padding(.horizontal)

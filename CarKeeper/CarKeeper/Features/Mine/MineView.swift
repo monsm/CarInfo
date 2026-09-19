@@ -49,7 +49,7 @@ struct MineView: View {
             
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground(Color.accent)
+        .pageBackground(Theme.Colors.accent)
         .navigationTitle("我的")
             .navBarStyle()
             .accessibilityLabel(Text("我的"))
@@ -153,10 +153,10 @@ struct MineView: View {
                 // 头像
                 ZStack {
                     Circle()
-                        .fill(LinearGradient(colors: [Color.accent, Color.accent.opacity(0.65)],
+                        .fill(LinearGradient(colors: [Theme.Colors.accent, Theme.Colors.accent.opacity(0.65)],
                                              startPoint: .topLeading, endPoint: .bottomTrailing))
                         .frame(width: 68, height: 68)
-                        .shadow(color: Color.accent.opacity(0.35), radius: 12, y: 5)
+                        .shadow(color: Theme.Colors.accent.opacity(0.35), radius: 12, y: 5)
                     Text(um?.avatar ?? "主")
                         .font(Theme.d4.bold())
                         .foregroundStyle(.white)
@@ -186,7 +186,7 @@ struct MineView: View {
             // 底部统计
             HStack(spacing: 16) {
                 HStack(spacing: 6) {
-                    Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(Color.accent)
+                    Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(Theme.Colors.accent)
                     Text(String(store.cars?.count ?? 0) + " 辆车")
                         .font(Theme.caption)
                 }
@@ -229,7 +229,7 @@ struct MineView: View {
             HStack(spacing: 14) {
                 Image(systemName: "car.fill")
                     .font(Theme.d4)
-                    .foregroundStyle(Color.accent)
+                    .foregroundStyle(Theme.Colors.accent)
                     .frame(width: 52, height: 52)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
@@ -355,7 +355,7 @@ struct MineView: View {
                     tile("siren.fill", "紧急求助", tint: .red) { showEmergency = true }
                     tile("lightbulb.fill", "车辆提示", tint: .yellow) { showVehicleTips = true }
                 }
-                tile("trophy.fill", "驾驶评分", tint: Color.accent) { showDrivingScore = true }
+                tile("trophy.fill", "驾驶评分", tint: Theme.Colors.accent) { showDrivingScore = true }
             }
         }
     }
@@ -370,7 +370,7 @@ struct MineView: View {
                 if isChecking {
                     HStack(spacing: 10) {
                         ProgressView()
-                            .tint(Color.accent)
+                            .tint(Theme.Colors.accent)
                         Text("正在检查最新版本…")
                             .font(Theme.caption)
                             .foregroundStyle(.secondary)
@@ -380,7 +380,7 @@ struct MineView: View {
                     // 下载中：进度条 + 百分比数字
                     VStack(spacing: 6) {
                         ProgressView(value: downloadPct)
-                            .tint(Color.accent)
+                            .tint(Theme.Colors.accent)
                         Text("正在下载… \(downloadPctDisplay)%")
                             .font(Theme.caption).foregroundStyle(.secondary)
                     }
@@ -389,7 +389,7 @@ struct MineView: View {
                     HStack(spacing: 6) {
                         Image(systemName: m.hasPrefix("❌") ? "exclamationmark.triangle" : "info.circle")
                             .font(Theme.caption)
-                            .foregroundStyle(m.hasPrefix("❌") ? Theme.warn : Color.accent)
+                            .foregroundStyle(m.hasPrefix("❌") ? Theme.warn : Theme.Colors.accent)
                         Text(m)
                             .font(Theme.caption)
                             .foregroundStyle(.secondary)
@@ -456,7 +456,7 @@ struct MineView: View {
             }
             .foregroundStyle(.white)
             .padding(.vertical, 10)
-            .background(Capsule().fill(Color.accent))
+            .background(Capsule().fill(Theme.Colors.accent))
         }
         .buttonStyle(.plain)
         .disabled(updateBusy)

@@ -22,7 +22,7 @@ struct DrivingRadarChart: View {
             }
             
             // 轴线
-            ForEach(0..<4, id: \.self) { i in
+            ForEach(Array(0..<4), id: \.self) { i in
                 LineMark(
                     x: .value("轴", ""),
                     y: .value("值", 100),
@@ -43,14 +43,13 @@ struct DrivingRadarChart: View {
                     .symbolSize(8)
                 }
                 
-                // 填充区域
-                PolygonMark(
-                    points: radarPoints().map { p in
-                        (angle: angle(for: p.dimension), value: p.value)
-                    }
+                // 填充区域 (iOS 26: PolygonMark removed — use AreaMark)
+                AreaMark(
+                    x: .value("角度", Array(radarPoints().indices).map { angle(for: radarPoints()[$0].dimension) }),
+                    y: .value("强度", radarPoints().map { $0.value }),
+                    stacking: .none
                 )
-                .foregroundStyle(AccentColor.opacity(0.2))
-                .interpolationMethod(.catmullRom)
+                .foregroundStyle(Theme.Colors.accent.opacity(0.2))
             }
             .chartLegend(.hidden)
             .frame(width: 160, height: 160)
@@ -93,7 +92,7 @@ struct DrivingRadarChart: View {
         case "刹车": return .red
         case "平稳": return .green
         case "限速": return .blue
-        default: return Color.accent
+        default: return Theme.Colors.accent
         }
     }
 }
@@ -111,7 +110,7 @@ struct EnergyCompareChart: View {
                 y: .value("能耗 kWh", thisWeek),
                 width: .fixed(30)
             )
-            .foregroundStyle(Color.accent)
+            .foregroundStyle(Theme.Colors.accent)
             
             BarMark(
                 x: .value("周期", "上周"),
@@ -190,7 +189,7 @@ struct CostPieChart: View {
         Chart {
             ForEach(slices) { slice in
                 SectorMark(
-                    angleAdapter: .angular(value: .value("", slice.value)),
+                    angle: .value("", slice.value),
                     innerRadius: .ratio(0.55),
                     outerRadius: .ratio(1)
                 )
