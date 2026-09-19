@@ -135,8 +135,8 @@ struct HomeView: View {
                     .opacity(0.15)
                     .blur(radius: 12)
 
-                // 第 0.5 层：EKG 心电图描边流动环（首尾相连，沿圆环持续行进）
-                EKGFloRing(size: 224, color: .green.opacity(0.50), lineWidth: 1.5, speed: 3.5)
+                // 第 0.5 层：EKG 心电图描边流动环（颜色随 SOC 动态变化：低电量红→高电量绿）
+                EKGFloRingDynamic(size: 224, lineWidth: 1.5, speed: 3.5, percentage: e.socPct)
 
                 // 第 1 层：脉冲光环（持续呼吸）
                 Circle()
@@ -168,9 +168,12 @@ struct HomeView: View {
                 // 第 5 层：中心数字（流体字体，随容器宽度自适应）
                 VStack(spacing: 2) {
                     FluidPercentHero(e.soc == "--" ? "--" : String(socCount))
+                        .dynamicTypeLineLimit(1)
                     Text("剩余电量")
                         .font(Theme.caption)))
                         .foregroundStyle(.secondary)
+                        .dynamicTypeTextCompress(isTitle: true)
+                        .accessibilityLabel(Text("剩余电量"))
                 }
             }
             // 续航 + 充电状态
@@ -330,6 +333,8 @@ struct HomeView: View {
         .scaleEffect(expandedDrive ? 0.98 : 1.0)
         .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: expandedDrive)
         .liquidGlassRipple(cornerRadius: 20)
+        .accessibilityLabel(Text("车速里程详情"))
+        .accessibilityHint(Text(expandedDrive ? "点击收起详细数据" : "点击展开车速、档位、电机温度等行驶详情"))
         .overlay(alignment: .trailing) {
             Image(systemName: "chevron.right")
                 .font(Theme.footnote.bold())
@@ -577,6 +582,8 @@ struct HomeView: View {
         .scaleEffect(expandedTyre ? 0.98 : 1.0)
         .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: expandedTyre)
         .liquidGlassRipple(cornerRadius: 20)
+        .accessibilityLabel(Text("胎压详情"))
+        .accessibilityHint(Text(expandedTyre ? "点击收起胎压详情" : "点击展开四个轮胎的胎压和温度详情"))
         .overlay(alignment: .trailing) {
             Image(systemName: "chevron.right")
                 .font(Theme.footnote.bold())

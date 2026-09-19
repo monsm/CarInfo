@@ -346,6 +346,24 @@ extension View {
     }
 }
 
+// MARK: - Tab 玻璃容器
+/// 为 Tab 内容视图添加液态玻璃磨砂背景和微阴影，形成独立的"玻璃页"视觉层级
+struct tabGlassModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Material.thin.opacity(0.85))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.8)
+                    )
+                    .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
+            )
+            .padding(.horizontal, 2)
+    }
+}
+
 // =============================================================================
 // GlassCardModifier —— 液态玻璃卡片背景
 // =============================================================================
@@ -922,6 +940,8 @@ struct QuickControlButton: View {
                 }
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(Text(label))
+            .accessibilityHint(Text("点击执行远程" + label + "操作"))
         }
         .liquidGlassRipple(cornerRadius: Theme.Radius.hero)
     }
@@ -1819,6 +1839,33 @@ struct PageEmptyView: View {
     }
 }
 
+
+// =============================================================================
+// EKGFloRingDynamic —— 颜色随百分比动态变化的 EKG 流动环
+// SOC < 20%: 红色  |  20%~50%: 橙色  |  50%~80%: 绿色  |  > 80%: 青绿
+// =============================================================================
+
+/// EKG 心电图描边流动环（颜色动态）
+/// percentage: 0.0~1.0，决定波形颜色（红→橙→绿→青）
+struct EKGFloRingDynamic: View {
+    let size: CGFloat
+    let lineWidth: CGFloat
+    let speed: Double
+    let percentage: Double   // 0.0 ~ 1.0
+
+    var dynamicColor: Color {
+        switch percentage {
+        case ..<0.2:   return .red
+        case ..<0.5:   return .orange
+        case ..<0.8:   return .green
+        default:       return Color.cyan
+        }
+    }
+
+    var body: some View {
+        EKGFloRing(size: size, color: dynamicColor, lineWidth: lineWidth, speed: speed)
+    }
+}
 
 // =============================================================================
 // ToastView —— iOS 27 Liquid Glass 全局 Toast 提示

@@ -36,7 +36,10 @@ struct BatteryView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(Theme.pageGreen)
-        .navigationTitle("电池与充电").navBarStyle()
+        .navigationTitle("电池与充电")
+            .navBarStyle()
+            .accessibilityLabel(Text("电池与充电"))
+            .accessibilityHint(Text("电池状态、充电历史与诊断报告"))
         .onAppear { loadIfNeeded(); startSocAnimation() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { isRefreshing = true; await load(); isRefreshing = false }
@@ -63,7 +66,7 @@ struct BatteryView: View {
                     .blur(radius: 12)
 
                 // 第 0.5 层：EKG 心电图描边流动环（首尾相连，沿圆环持续行进）
-                EKGFloRing(size: 238, color: .green.opacity(0.50), lineWidth: 1.5, speed: 3.5)
+                EKGFloRingDynamic(size: 238, lineWidth: 1.5, speed: 3.5, percentage: e.socPct)
 
                 // 第 1 层：脉冲光环（持续呼吸）
                 Circle()
@@ -95,9 +98,12 @@ struct BatteryView: View {
                 // 第 5 层：中心数字（流体字体，随容器宽度自适应）
                 VStack(spacing: 2) {
                     FluidPercentHero(e.soc == "--" ? "--" : String(socCount))
+                        .dynamicTypeLineLimit(1)
                     Text("电池电量")
                         .font(Theme.caption)))
                         .foregroundStyle(.secondary)
+                        .dynamicTypeTextCompress(isTitle: true)
+                        .accessibilityLabel(Text("电池电量"))
                 }
             }
             // 续航 + 充电状态

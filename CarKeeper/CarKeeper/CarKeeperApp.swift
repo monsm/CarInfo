@@ -83,6 +83,27 @@ final class NavState: ObservableObject, @unchecked Sendable {
 
     func popToRoot() { path = [] }
 
+    /// 统一导航：从任意 Tab push 深潜页，自动切换到对应 Tab（若有）
+    /// - Parameters:
+    ///   - link: 目标深潜页
+    ///   - targetTab: 目标 Tab 索引（nil = 保持当前 Tab）
+    ///   - paths: 各 Tab 的路径绑定（调用方传入 $controlPath / $messagesPath / $minePath）
+    func pushNavigation(_ link: Deeplink, targetTab: Int? = nil,
+                        controlPath: inout [Deeplink],
+                        messagesPath: inout [Deeplink],
+                        minePath: inout [Deeplink]) {
+        // 先切换到目标 Tab（如有）
+        if let t = targetTab { selectedTab = t }
+        // 根据当前 Tab 写入对应路径
+        switch selectedTab {
+        case 0: path.append(link)
+        case 1: controlPath.append(link)
+        case 2: messagesPath.append(link)
+        case 3: minePath.append(link)
+        default: path.append(link)
+        }
+    }
+
     /// 获取当前选中 Tab 的无障碍朗读文本
     var selectedTabVoiceOverLabel: String {
         Self.tabAccessibilityLabels[selectedTab] ?? "Tab \(selectedTab)"
@@ -567,6 +588,7 @@ private class TabBarGlowOverlay: UIView {
     private let pressLayer = CAShapeLayer()
     private let indicatorLayer = CAShapeLayer()   // Liquid Glass 胶囊指示条
     private let indicatorGlowLayer = CAShapeLayer() // 指示条外部光晕
+    private let floatRingLayer = CAShapeLayer()       // 选中图标上浮光环
     private var selectedItemIndex: Int = -1
     private var pressAnimation: CABasicAnimation?
 
@@ -582,7 +604,38 @@ private class TabBarGlowOverlay: UIView {
         for (idx, frame) in tabBar.items?.enumerated().map { ($0, $1.frame) } ?? [] {
             if frame.contains(point) {
                 triggerPressGlow(at: frame.midX, y: frame.midY)
+                triggerIconBounce(at: frame.midX, y: frame.midY - 14)
                 break
+            }
+        }
+    }
+
+    /// 图标按压缩放弹跳：选中图标瞬间弹簧放大后回弹
+    private func triggerIconBounce(at cx: CGFloat, y cy: CGFloat) {
+        let radius: CGFloat = 14
+        let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)
+        let bounceLayer = CAShapeLayer()
+        bounceLayer.path = path
+        bounceLayer.fillColor = UIColor.accentColor.withAlphaComponent(0.25).cgColor
+        bounceLayer.strokeColor = nil
+        bounceLayer.opacity = 1.0
+
+        // 缩放：0.5 → 1.3 → 0.95 → 1.0（弹簧过冲）
+        let scaleAnim = CABasicAnimation(keyPath: "transform.scale")
+        scaleAnim.fromValue = 0.5
+        scaleAnim.toValue = 1.0
+        scaleAnim.duration = 0.35
+        scaleAnim.fillMode = .both
+        scaleAnim.isRemovedOnCompletion = false
+        bounceLayer.add(scaleAnim, forKey: "iconBounce")
+
+        layer.addSublayer(bounceLayer)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            withAnimation(.easeOut(duration: 0.1)) {
+                bounceLayer.opacity = 0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                bounceLayer.removeFromSuperlayer()
             }
         }
     }
@@ -593,6 +646,65 @@ private class TabBarGlowOverlay: UIView {
         selectedItemIndex = index
         updateGlow()
         slideIndicator(from: prevIndex, to: index)
+        animateFloatRing(to: index)
+    }
+
+    /// 图标上浮光环动画：spring 从 0→1 scale + 轻微上移，模拟选中时图标弹起
+    private func animateFloatRing(to index: Int) {
+        guard index >= 0, index < items.count else { return }
+        let frame = items[index]
+        let cx = frame.midX
+        let cy = frame.midY - 8  // 环中心略高于图标中心
+        let radius: CGFloat = 16
+
+        let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)
+        floatRingLayer.path = path
+        floatRingLayer.fillColor = UIColor.clear.cgColor
+        floatRingLayer.strokeColor = UIColor.accentColor.withAlphaComponent(0.5).cgColor
+        floatRingLayer.lineWidth = 2.0
+        floatRingLayer.shadowColor = UIColor.accentColor.withAlphaComponent(0.6).cgColor
+        floatRingLayer.shadowRadius = 8
+        floatRingLayer.shadowOffset = .zero
+        floatRingLayer.opacity = 0
+
+        if layer.sublayers?.contains(floatRingLayer) == false {
+            layer.addSublayer(floatRingLayer)
+        }
+
+        // 入场：scale 0→1 + opacity 0→1（弹簧回弹）
+        let scaleAnim = CABasicAnimation(keyPath: "transform.scale")
+        scaleAnim.fromValue = 0.3
+        scaleAnim.toValue = 1.0
+        scaleAnim.duration = 0.4
+        scaleAnim.fillMode = .both
+        scaleAnim.isRemovedOnCompletion = false
+        floatRingLayer.add(scaleAnim, forKey: "floatScale")
+
+        let opacityAnim = CABasicAnimation(keyPath: "opacity")
+        opacityAnim.fromValue = 0.0
+        opacityAnim.toValue = 1.0
+        opacityAnim.duration = 0.4
+        opacityAnim.fillMode = .both
+        opacityAnim.isRemovedOnCompletion = false
+        floatRingLayer.add(opacityAnim, forKey: "floatOpacity")
+
+        // 持续呼吸脉动（选中后每 2s 一次）
+        let pulse = CABasicAnimation(keyPath: "opacity")
+        pulse.fromValue = 0.5
+        pulse.toValue = 1.0
+        pulse.duration = 1.0
+        pulse.autoreverses = true
+        pulse.repeatCount = .greatestFiniteMagnitude
+        floatRingLayer.add(pulse, forKey: "floatPulse")
+
+        // 位置上移弹跳
+        let posAnim = CABasicAnimation(keyPath: "position")
+        posAnim.fromValue = NSValue(cgPoint: CGPoint(x: cx, y: cy + 12))
+        posAnim.toValue = NSValue(cgPoint: CGPoint(x: cx, y: cy))
+        posAnim.duration = 0.45
+        posAnim.fillMode = .both
+        posAnim.isRemovedOnCompletion = false
+        floatRingLayer.add(posAnim, forKey: "floatPos")
     }
 
     private func triggerPressGlow(at cx: CGFloat, y cy: CGFloat) {

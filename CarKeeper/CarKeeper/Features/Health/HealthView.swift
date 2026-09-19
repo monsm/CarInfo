@@ -119,6 +119,8 @@ struct HealthView: View {
         .buttonStyle(.plain)
         .scaleEffect(heroExpanded ? 0.97 : 1.0)
         .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: heroExpanded)
+        .accessibilityLabel(Text("健康评分报告"))
+        .accessibilityHint(Text(heroExpanded ? "点击收起系统详情" : "点击展开系统详情，查看各子系统状态"))
         .overlay(alignment: .bottomTrailing) {
             // 折叠箭头：始终显示在 hero 卡片右下角，提示可展开
             Image(systemName: "chevron.down")
@@ -144,7 +146,7 @@ struct HealthView: View {
                 .blur(radius: 12)
 
             // ── 第 0.5 层：EKG 心电图描边流动环（首尾相连，沿圆环持续行进）────────
-            EKGFloRing(size: 242, color: .green.opacity(0.45), lineWidth: 1.5, speed: 3.5)
+            EKGFloRingDynamic(size: 242, lineWidth: 1.5, speed: 3.5, percentage: m.scorePct / 100.0)
 
             // ── 第 1 层：脉冲光环（持续呼吸）───────────────────────
             Circle()
@@ -181,9 +183,12 @@ struct HealthView: View {
             VStack(spacing: 3) {
                 FluidScoreHero(m.score)
                     .foregroundStyle(scoreForeground(m.scorePct))
+                    .dynamicTypeLineLimit(1)
                 Text("健康评分")
                     .font(Theme.caption)))
                     .foregroundStyle(.secondary)
+                    .dynamicTypeTextCompress(isTitle: true)
+                    .accessibilityLabel(Text("健康评分"))
             }
         }
         .frame(width: 216, height: 216)

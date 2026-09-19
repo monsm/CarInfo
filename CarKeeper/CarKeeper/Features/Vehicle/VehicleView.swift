@@ -7,6 +7,7 @@ struct VehicleView: View {
     private let store = AppStore.shared
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
+    @State private var isRefreshing = false         // 下拉刷新涟漪标志
 
     private var isLoading: Bool { store.carId.isEmpty }
     private var isEmpty:   Bool { !store.carId.isEmpty && store.car == nil }
@@ -48,7 +49,17 @@ struct VehicleView: View {
             }
         }
         .pageBackground(.accentColor)
-        .navigationTitle("车辆档案").navBarStyle()
+        .navigationTitle("车辆档案")
+            .navBarStyle()
+            .accessibilityLabel(Text("车辆档案"))
+            .accessibilityHint(Text("车牌、VIN、车型配置与保险保养信息"))
+        .refreshable {
+            isRefreshing = true
+            try? await Task.sleep(nanoseconds: 500_000_000)  // 0.5s 模拟刷新
+            Task { await store.fetchVehicleData() }
+            isRefreshing = false
+        }
+        .glassRefreshRipple(isRefreshing: $isRefreshing)
     }
 
     // MARK: 名片 — Apple Style Vehicle Card

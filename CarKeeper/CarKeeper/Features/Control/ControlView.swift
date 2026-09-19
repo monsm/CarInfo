@@ -37,6 +37,7 @@ struct ControlView: View {
     @State private var lastResult: RunState? = nil
     // lastResult 由 resultSheet 直接使用，保留
     @State private var tempDisplayCount: Int = 0   // HeroDisc 温度数字滚动计数（0→pendingTemp）
+    @State private var isRefreshing = false         // 下拉刷新涟漪标志
 
     struct RunState: Identifiable {
         let id: Int
@@ -80,7 +81,11 @@ struct ControlView: View {
             // 数据回来后自动重播计数动画（pendingTemp 不变，onChange 会触发）
         }
         .pageBackground(Theme.pageBlue)
-        .navigationTitle("车控").navBarStyle()
+        .navigationTitle("车控")
+            .navBarStyle()
+            .accessibilityLabel(Text("车控"))
+            .accessibilityHint(Text("远程控制车辆：锁车、解锁、空调、座椅加热"))
+        .glassRefreshRipple(isRefreshing: $isRefreshing)
         .sheet(isPresented: $showPin) {
             PINKeypadView()
                 .onReceive(NotificationCenter.default.publisher(for: .pinConfirmed)) { note in
@@ -602,6 +607,8 @@ struct HeroDiscButton: View {
         }
         .buttonStyle(.plain)
         .disabled(disabled)
+        .accessibilityLabel(Text(name))
+        .accessibilityHint(Text(disabled ? "此功能当前不可用" : "点击" + name + "控制车辆"))
         // 入场动画：交错淡入 + 缩放回弹
         .opacity(isEntered ? 1 : 0)
         .scaleEffect(isEntered ? 1.0 : 0.85)

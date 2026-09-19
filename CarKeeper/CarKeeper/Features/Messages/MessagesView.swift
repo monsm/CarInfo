@@ -76,7 +76,10 @@ struct MessagesView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accentColor)
-        .navigationTitle("消息").navBarStyle()
+        .navigationTitle("消息")
+            .navBarStyle()
+            .accessibilityLabel(Text("消息"))
+            .accessibilityHint(Text("车辆通知和历史消息列表"))
         .onAppear { loadIfNeeded() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { isRefreshing = true; await load(); isRefreshing = false }

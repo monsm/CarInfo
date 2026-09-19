@@ -32,7 +32,10 @@ struct MineView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accentColor)
-        .navigationTitle("我的").navBarStyle()
+        .navigationTitle("我的")
+            .navBarStyle()
+            .accessibilityLabel(Text("我的"))
+            .accessibilityHint(Text("账号设置、个人信息和应用程序管理"))
         .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
             // 其他 Tab 退出登录时，重置 OTA 状态，避免残留下载进度
             updateBusy = false
