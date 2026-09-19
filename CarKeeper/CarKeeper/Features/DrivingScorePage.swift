@@ -6,7 +6,7 @@ import SwiftUI
 import Charts
 
 struct DrivingScorePage: View {
-    @StateObject private var store = AppStore.shared
+    private let store = AppStore.shared
     @State private var showingDetails = false
     
     // 驾驶评分计算

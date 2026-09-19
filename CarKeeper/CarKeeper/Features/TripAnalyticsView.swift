@@ -6,7 +6,7 @@ import SwiftUI
 import Charts
 
 struct TripAnalyticsView: View {
-    @StateObject private var store = AppStore.shared
+    private let store = AppStore.shared
     @State private var period: AnalyticsPeriod = .week
     
     enum AnalyticsPeriod: String, CaseIterable {
@@ -124,7 +124,7 @@ struct TripAnalyticsView: View {
                         x: .value("日期", item.0.formatted(date: .abbreviated, time: .omitted)),
                         y: .value("里程", item.1)
                     )
-                    .foregroundStyle(item.1 > 0 ? Color.accent : Color.secondary.opacity(0.3))
+                    .foregroundStyle(item.1 > 0 ? .accent : Color.secondary.opacity(0.3))
                     .cornerRadius(4)
                 }
             }

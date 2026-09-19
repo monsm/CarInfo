@@ -39,6 +39,8 @@ enum Theme {
     static var pageAccent: Color { .accent }
     /// 电池/健康页 — 绿色调
     static var pageGreen: Color { Color.green }
+    static var pagePurple: Color { Color(.systemPurple) }
+    static var pageOrange: Color { Color(.systemOrange) }
     /// 车控页 — 蓝色调
     static var pageBlue: Color { Color.blue }
     /// 全量数据页 — 靛蓝调
@@ -48,7 +50,7 @@ enum Theme {
     static var ok: Color { Color.green }
     static var warn: Color { Color.orange }
     static var bad: Color { Color.red }
-    static var acc: Color { Color.accent }
+    static var acc: Color { .accent }
     static var na: Color { Color.secondary }
 
     // MARK: - 状态 → 语义色
@@ -113,21 +115,11 @@ enum Theme {
     // =============================================================================
     // Font 扩展：语义样式便捷方法
     // =============================================================================
-        static func headline(weight: Font.Weight = .semibold) -> Font {
-            .headline.weight(weight)
-        }
-        static func body(weight: Font.Weight = .regular) -> Font {
-            .body.weight(weight)
-        }
-        static func subheadline(weight: Font.Weight = .regular) -> Font {
-            .subheadline.weight(weight)
-        }
-        static func caption(weight: Font.Weight = .regular) -> Font {
-            .caption.weight(weight)
-        }
-        static func footnote(weight: Font.Weight = .regular) -> Font {
-            .footnote.weight(weight)
-        }
+        static var headline: Font { .headline.weight(.semibold) }
+        static var body: Font { .body }
+        static var subheadline: Font { .subheadline }
+        static var caption: Font { .caption }
+        static var footnote: Font { .footnote }
 
 
     // =============================================================================
@@ -175,7 +167,7 @@ enum Theme {
 
         // ---- 文字色（Text）----
         static let primary: Color = Color(.label)
-        static let secondary: Color = Color(.secondaryLabel)
+        static let secondary: Color = Color(.secondary)
         static let tertiary: Color = Color(.tertiaryLabel)
         static let quaternary: Color = Color(.quaternaryLabel)
 
@@ -1799,7 +1791,7 @@ struct PageLoadingView: View {
             ZStack {
                 // 外圈光晕
                 Circle()
-                    .stroke(Color.accent.opacity(0.2), lineWidth: 3)
+                    .stroke(.accent.opacity(0.2), lineWidth: 3)
                     .frame(width: 60, height: 60)
                 // 旋转进度环
                 Circle()
@@ -2098,11 +2090,11 @@ struct RefreshProgressRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.accent.opacity(0.15), lineWidth: 2)
+                .stroke(.accent.opacity(0.15), lineWidth: 2)
                 .frame(width: 16, height: 16)
             Circle()
                 .trim(from: 0, to: progress)
-                .stroke(Color.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .stroke(.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                 .frame(width: 16, height: 16)
                 .rotationEffect(.degrees(-90))
         }

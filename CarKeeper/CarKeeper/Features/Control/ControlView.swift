@@ -203,7 +203,7 @@ struct ControlView: View {
     }
     var body: some View {
         ScrollView {
-            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
+            VStack(spacing: Theme.cardSpacing) {
                 carSelector.staggeredEntrance(index: 0)
                 heroDiscs.staggeredEntrance(index: 1)
                 // #18 快捷预设场景
@@ -214,8 +214,8 @@ struct ControlView: View {
                 if let bd = bodyDetail { bodyDetailCard(bd) }
                 if !history.isEmpty { historyCard.staggeredEntrance(index: 0) }
             }
-            .adaptivePagePadding(dynamicTypeSize)
-            .adaptiveSafeAreaBottom(12, dynamicTypeSize)
+            
+            
         }
         .scrollBounceBehavior(.basedOnSize)
         .refreshable {
@@ -328,7 +328,7 @@ struct ControlView: View {
             .font(Theme.h4)
             Spacer()
         }
-        .adaptivePagePadding(dynamicTypeSize).padding(.vertical, 12)
+        .padding(.vertical, 12)
         .dynamicTypeCompress()
         .glassCard(corner: 20)
         .glassLongPressDeform()

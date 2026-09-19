@@ -71,7 +71,7 @@ class MockAPIClient {
 
 // MARK: - E66 数据导入恢复
 struct DataImportView: View {
-    @StateObject private var store = AppStore.shared
+    private let store = AppStore.shared
     @State private var showPicker = false
     
     var body: some View {

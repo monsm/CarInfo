@@ -53,7 +53,7 @@ struct DataView: View {
             SiriInsightView(store: store).staggeredEntrance(index: 1)
             kindSwitcher
             ScrollView {
-                VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
+                VStack(spacing: Theme.cardSpacing) {
                     if !loading && blocks.isEmpty {
                         if !errText.isEmpty {
                             PageErrorView(errText) { Task { await load() } }
@@ -67,8 +67,8 @@ struct DataView: View {
                         .onChange(of: blocks) { _ in appearedBlockIds = []; appearedRows = [:] }
                     }
                 }
-                .adaptivePagePadding(dynamicTypeSize)
-                .adaptiveSafeAreaBottom(8, dynamicTypeSize)
+                
+                
                 .frame(maxWidth: .infinity, alignment: .top)
             }
         }
@@ -104,7 +104,7 @@ struct DataView: View {
                     kindChip(k)
                 }
             }
-            .adaptivePagePadding(dynamicTypeSize)
+            
             .padding(.vertical, 10)
         }
     }
@@ -120,7 +120,7 @@ struct DataView: View {
                 .font(Theme.caption.weight(sel ? .semibold : .regular))
                 .foregroundStyle(sel ? .white : .primary)
                 .padding(.horizontal, 14).padding(.vertical, 9)
-                .background(sel ? Color.accent : Color(.tertiarySystemFill), in: Capsule())
+                .background(sel ? .accent : Color(.tertiarySystemFill), in: Capsule())
         }
         .buttonStyle(.plain)
     }

@@ -130,7 +130,7 @@ struct DevView: View {
             VStack(spacing: Theme.cardSpacing) {
                 // Hero 说明卡
                 VStack(spacing: Theme.Spacing.sm) {
-                    Text("颜色预览").font(Theme.h2.weight(.bold)).foregroundStyle(.primary)
+                    Text("颜色预览").font(Theme.h2.bold()).foregroundStyle(.primary)
                     Text("iOS 27 Liquid Glass · 深浅双模式一致性检查")
                         .font(Theme.caption).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

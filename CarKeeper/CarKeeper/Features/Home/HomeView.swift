@@ -155,8 +155,8 @@ struct HomeView: View {
                     .staggeredEntrance(index: idx)
                 }
             }
-            .adaptivePagePadding(dynamicTypeSize)
-            .adaptiveSafeAreaBottom(12, dynamicTypeSize)
+            
+            
         }
         .id(carVersion)
         .transition(
@@ -293,7 +293,7 @@ struct HomeView: View {
             Text(dateStr)
                 .font(Theme.caption).foregroundStyle(.secondary)
         }
-        .adaptivePagePadding(dynamicTypeSize)
+        
         .padding(.vertical, 8)
     }
 
@@ -420,7 +420,7 @@ struct HomeView: View {
         return HStack(spacing: 12) {
             Image(systemName: "car.2.fill")
                 .font(Theme.bodyMd)
-                .foregroundStyle(Color.accent)
+                .foregroundStyle(.accent)
                 .frame(width: 40, height: 40)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             Picker("车辆", selection: Binding(
@@ -638,7 +638,7 @@ struct HomeView: View {
     // MARK: 电池区
     private func batterySection(_ cache: [String: Any?]) -> some View {
         let batt = VM.batteryModel(cache)
-        return VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
+        return VStack(spacing: Theme.cardSpacing) {
             // 电池摘要行（SOC / 续航 / 告警 来自分析域，不重复 SOC Hero）
             VStack(alignment: .leading, spacing: 8) {
                 Text("电池状态").font(Theme.footnote.bold()).foregroundStyle(.secondary)
@@ -930,7 +930,7 @@ struct HomeView: View {
             }
             .buttonStyle(.plain)
         }
-        .adaptivePagePadding(dynamicTypeSize)
+        
         .padding(.vertical, 8)
     }
 

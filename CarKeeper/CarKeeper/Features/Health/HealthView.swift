@@ -23,7 +23,7 @@ struct HealthView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
+            VStack(spacing: Theme.cardSpacing) {
                 if loading {
                     loadingView
                 } else if let model {
@@ -40,8 +40,8 @@ struct HealthView: View {
                     PageErrorView(err) { Task { await load() } }
                 }
             }
-            .adaptivePagePadding(dynamicTypeSize)
-            .adaptiveSafeAreaBottom(8, dynamicTypeSize)
+            
+            
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(Theme.pageGreen)

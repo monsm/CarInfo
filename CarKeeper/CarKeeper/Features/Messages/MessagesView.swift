@@ -75,7 +75,7 @@ struct MessagesView: View {
                             }
                             .font(Theme.micro.bold())
                             .padding(.horizontal, 12).padding(.vertical, 5)
-                            .background(filterTag == nil ? Color.accent : Color.secondary.opacity(0.15), in: Capsule())
+                            .background(filterTag == nil ? .accent : Color.secondary.opacity(0.15), in: Capsule())
                             .foregroundStyle(filterTag == nil ? .white : .secondary)
                             ForEach(allTags.dropFirst(), id: \.self) { tag in
                                 Button(tag) {
@@ -83,7 +83,7 @@ struct MessagesView: View {
                                 }
                                 .font(Theme.micro.bold())
                                 .padding(.horizontal, 12).padding(.vertical, 5)
-                                .background(filterTag == tag ? Color.accent : Color.secondary.opacity(0.15), in: Capsule())
+                                .background(filterTag == tag ? .accent : Color.secondary.opacity(0.15), in: Capsule())
                                 .foregroundStyle(filterTag == tag ? .white : .secondary)
                             }
                         }
@@ -113,7 +113,7 @@ struct MessagesView: View {
                                         .font(Theme.micro.bold())
                                         .foregroundStyle(.white)
                                         .padding(.horizontal, 7).padding(.vertical, 2)
-                                        .background(Capsule().fill(Color.accent))
+                                        .background(Capsule().fill(.accent))
                                 }
                                 Spacer()
                             }
@@ -121,9 +121,9 @@ struct MessagesView: View {
                         }
                     }
                 }
-                .adaptivePagePadding(dynamicTypeSize)
+                
             }
-            .adaptiveSafeAreaBottom(12, dynamicTypeSize)
+            
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accent)
@@ -244,9 +244,9 @@ struct MessagesView: View {
             HStack(spacing: 10) {
                 if !item.read {
                     Circle()
-                        .fill(Color.accent)
+                        .fill(.accent)
                         .frame(width: 10, height: 10)
-                        .shadow(color: Color.accent.opacity(0.5), radius: 4)
+                        .shadow(color: .accent.opacity(0.5), radius: 4)
                 } else {
                     Circle()
                         .fill(Color.clear)

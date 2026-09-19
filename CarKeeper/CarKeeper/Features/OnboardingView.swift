@@ -64,8 +64,8 @@ struct OnboardingView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color.accent, in: RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: Color.accent.opacity(0.3), radius: 8, y: 4)
+                    .background(.accent, in: RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: .accent.opacity(0.3), radius: 8, y: 4)
                     
                     Button("跳过引导") {
                         onboardingSeen = true
@@ -95,7 +95,7 @@ struct OnboardingView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
-                        .background(Color.accent, in: RoundedRectangle(cornerRadius: 12))
+                        .background(.accent, in: RoundedRectangle(cornerRadius: 12))
                     }
                 }
             }
@@ -107,7 +107,7 @@ struct OnboardingView: View {
         .background(
             LinearGradient(
                 colors: [
-                    Color.accent.opacity(0.15),
+                    .accent.opacity(0.15),
                     Color.purple.opacity(0.1),
                     Color.blue.opacity(0.05)
                 ],
@@ -124,7 +124,7 @@ struct OnboardingView: View {
             ZStack {
                 Circle()
                     .fill(LinearGradient(
-                        colors: [Color.accent.opacity(0.3), Color.accent.opacity(0.1)],
+                        colors: [.accent.opacity(0.3), .accent.opacity(0.1)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ))

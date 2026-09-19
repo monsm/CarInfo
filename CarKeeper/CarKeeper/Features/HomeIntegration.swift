@@ -83,7 +83,7 @@ struct HomeSceneControl: View {
                     }
                     .padding(.horizontal, Theme.Spacing.md)
                     .padding(.vertical, Theme.Spacing.sm)
-                    .background(Color.accent.opacity(0.2))
+                    .background(.accent.opacity(0.2))
                     .foregroundColor(.accent)
                     .cornerRadius(Theme.Radius.md)
                 }

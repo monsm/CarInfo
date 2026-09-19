@@ -31,7 +31,7 @@ struct RealtimeEnergyDisplay: View {
             VStack(alignment: .leading) {
                 Text("实时能耗")
                     .font(.caption2)
-                    .foregroundColor(.secondaryLabel)
+                    .foregroundColor(.secondary)
                 Text("\(String(format: "%.1f", currentEnergyRate)) kWh")
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
                     .foregroundColor(currentEnergyRate > 30 ? .orange : .green)
@@ -95,7 +95,7 @@ struct SOHDashboard: View {
                         .foregroundColor(sohColor)
                     Text("健康")
                         .font(.caption2)
-                        .foregroundColor(.secondaryLabel)
+                        .foregroundColor(.secondary)
                 }
             }
             .frame(width: 100, height: 100)
@@ -107,7 +107,7 @@ struct SOHDashboard: View {
                 Spacer()
                 Text("初始: \(initialRange) km")
                     .font(.caption)
-                    .foregroundColor(.secondaryLabel)
+                    .foregroundColor(.secondary)
             }
         }
         .padding()
@@ -185,7 +185,7 @@ struct EnergyGaugeView: View {
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                 Text("kWh/100km")
                     .font(.caption2)
-                    .foregroundColor(.secondaryLabel)
+                    .foregroundColor(.secondary)
             }
         }
         .frame(width: 80, height: 80)

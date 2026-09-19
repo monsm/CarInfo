@@ -39,14 +39,14 @@ struct MineView: View {
     // MARK: 生命周期
     var body: some View {
         ScrollView {
-            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
+            VStack(spacing: Theme.cardSpacing) {
                 profileCard
                 if let car = store.car { carCard(car) }
                 tilesCard
                 updateCard
             }
-            .adaptivePagePadding(dynamicTypeSize)
-            .adaptiveSafeAreaBottom(12, dynamicTypeSize)
+            
+            
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accent)
@@ -153,16 +153,16 @@ struct MineView: View {
                 // 头像
                 ZStack {
                     Circle()
-                        .fill(LinearGradient(colors: [Color.accent, Color.accent.opacity(0.65)],
+                        .fill(LinearGradient(colors: [.accent, .accent.opacity(0.65)],
                                              startPoint: .topLeading, endPoint: .bottomTrailing))
                         .frame(width: 68, height: 68)
-                        .shadow(color: Color.accent.opacity(0.35), radius: 12, y: 5)
+                        .shadow(color: .accent.opacity(0.35), radius: 12, y: 5)
                     Text(um?.avatar ?? "主")
-                        .font(Theme.d4.weight(.bold))
+                        .font(Theme.d4.bold())
                         .foregroundStyle(.white)
                 }
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(um?.name ?? "车主").font(Theme.d5.weight(.bold))
+                    Text(um?.name ?? "车主").font(Theme.d5.bold())
                     HStack(spacing: 10) {
                         Text(um?.mobile ?? "--")
                             .font(Theme.mono)
@@ -186,7 +186,7 @@ struct MineView: View {
             // 底部统计
             HStack(spacing: 16) {
                 HStack(spacing: 6) {
-                    Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(Color.accent)
+                    Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(.accent)
                     Text(String(store.cars?.count ?? 0) + " 辆车")
                         .font(Theme.caption)
                 }
@@ -229,7 +229,7 @@ struct MineView: View {
             HStack(spacing: 14) {
                 Image(systemName: "car.fill")
                     .font(Theme.d4)
-                    .foregroundStyle(Color.accent)
+                    .foregroundStyle(.accent)
                     .frame(width: 52, height: 52)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
@@ -455,8 +455,8 @@ struct MineView: View {
                     .font(Theme.caption.bold())
             }
             .foregroundStyle(.white)
-            .adaptivePagePadding(dynamicTypeSize).padding(.vertical, 10)
-            .background(Capsule().fill(Color.accent))
+            .padding(.vertical, 10)
+            .background(Capsule().fill(.accent))
         }
         .buttonStyle(.plain)
         .disabled(updateBusy)

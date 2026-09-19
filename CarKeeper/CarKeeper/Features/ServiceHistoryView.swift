@@ -5,7 +5,7 @@
 import SwiftUI
 
 struct ServiceHistoryView: View {
-    @StateObject private var store = AppStore.shared
+    private let store = AppStore.shared
     @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
     @State private var showAddService = false
     
@@ -155,7 +155,7 @@ struct ServiceHistoryView: View {
             .font(.caption)
             .foregroundStyle(.accent)
             .frame(width: 28, height: 28)
-            .background(Color.accent.opacity(0.1))
+            .background(.accent.opacity(0.1))
             .cornerRadius(6)
     }
     
@@ -172,7 +172,7 @@ struct ServiceHistoryView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(selectedYear == y ? Color.accent.opacity(0.2) : Color.clear)
+                            .background(selectedYear == y ? .accent.opacity(0.2) : Color.clear)
                             .foregroundStyle(selectedYear == y ? .accent : .secondary)
                             .cornerRadius(16)
                     }

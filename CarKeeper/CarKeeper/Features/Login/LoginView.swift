@@ -42,7 +42,7 @@ struct LoginView: View {
                     Spacer(minLength: 12)
                 }
                 .padding(16)
-                .adaptiveSafeAreaBottom(12, dynamicTypeSize)
+                
             }
             .scrollBounceBehavior(.basedOnSize)
             .pageBackground(.accent)
@@ -74,15 +74,15 @@ struct LoginView: View {
             ZStack {
                 // 外发光层
                 Circle()
-                    .fill(AngularGradient(colors: [Color.accent.opacity(0.25), Color.accent.opacity(0.05)],
+                    .fill(AngularGradient(colors: [.accent.opacity(0.25), .accent.opacity(0.05)],
                                           center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)))
                     .frame(width: 108, height: 108)
                 // 主体圆
                 Circle()
-                    .fill(LinearGradient(colors: [Color.accent, Color.accent.opacity(0.65)],
+                    .fill(LinearGradient(colors: [.accent, .accent.opacity(0.65)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 92, height: 92)
-                    .shadow(color: Color.accent.opacity(0.4), radius: 20, y: 8)
+                    .shadow(color: .accent.opacity(0.4), radius: 20, y: 8)
                 // 图标
                 Image(systemName: "car.side.fill")
                     .font(Theme.d3)
@@ -106,7 +106,7 @@ struct LoginView: View {
             HStack(spacing: 12) {
                 Image(systemName: "phone.fill")
                     .font(Theme.body)
-                    .foregroundStyle(Color.accent)
+                    .foregroundStyle(.accent)
                     .frame(width: 24)
                 TextField("手机号", text: $phone)
                     .keyboardType(.numberPad)
@@ -122,7 +122,7 @@ struct LoginView: View {
             HStack(spacing: 12) {
                 Image(systemName: "photo.on.rectangle")
                     .font(Theme.body)
-                    .foregroundStyle(Color.accent)
+                    .foregroundStyle(.accent)
                     .frame(width: 24)
                 TextField("图形验证码", text: $picCode)
                     .font(.title)
@@ -132,7 +132,7 @@ struct LoginView: View {
             HStack(spacing: 12) {
                 Image(systemName: "message.badge.fill")
                     .font(Theme.body)
-                    .foregroundStyle(Color.accent)
+                    .foregroundStyle(.accent)
                     .frame(width: 24)
                 TextField("6 位短信验证码", text: $smsCode)
                     .keyboardType(.numberPad)
@@ -151,7 +151,7 @@ struct LoginView: View {
         } label: {
             Text(smsBtnText)
                 .font(Theme.caption.bold())
-                .foregroundStyle(smsBtnDisabled ? Color.secondary : Color.accent)
+                .foregroundStyle(smsBtnDisabled ? Color.secondary : .accent)
                 .padding(.horizontal, 14).padding(.vertical, 8)
                 .background(.ultraThinMaterial, in: Capsule())
         }
@@ -210,10 +210,10 @@ struct LoginView: View {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(LinearGradient(colors: [Color.accent, Color.accent.opacity(0.72)],
+                    .fill(LinearGradient(colors: [.accent, .accent.opacity(0.72)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
             )
-            .shadow(color: Color.accent.opacity(0.4), radius: 16, y: 6)
+            .shadow(color: .accent.opacity(0.4), radius: 16, y: 6)
         }
         .buttonStyle(.plain)
         .disabled(busy)

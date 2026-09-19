@@ -807,7 +807,7 @@ private class TabBarGlowOverlay: UIView {
         let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)
         let bounceLayer = CAShapeLayer()
         bounceLayer.path = path
-        bounceLayer.fillColor = UIColor.accent.withAlphaComponent(0.25).cgColor
+        bounceLayer.fillColor = UI.accent.withAlphaComponent(0.25).cgColor
         bounceLayer.strokeColor = nil
         bounceLayer.opacity = 1.0
 
@@ -851,9 +851,9 @@ private class TabBarGlowOverlay: UIView {
         let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)
         floatRingLayer.path = path
         floatRingLayer.fillColor = UIColor.clear.cgColor
-        floatRingLayer.strokeColor = UIColor.accent.withAlphaComponent(0.5).cgColor
+        floatRingLayer.strokeColor = UI.accent.withAlphaComponent(0.5).cgColor
         floatRingLayer.lineWidth = 2.0
-        floatRingLayer.shadowColor = UIColor.accent.withAlphaComponent(0.6).cgColor
+        floatRingLayer.shadowColor = UI.accent.withAlphaComponent(0.6).cgColor
         floatRingLayer.shadowRadius = 8
         floatRingLayer.shadowOffset = .zero
         floatRingLayer.opacity = 0
@@ -905,9 +905,9 @@ private class TabBarGlowOverlay: UIView {
         let radius: CGFloat = 28
         let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)
         pressLayer.path = path
-        pressLayer.fillColor = UIColor.accent.withAlphaComponent(0.45).cgColor
+        pressLayer.fillColor = UI.accent.withAlphaComponent(0.45).cgColor
         pressLayer.strokeColor = nil
-        pressLayer.shadowColor = UIColor.accent.withAlphaComponent(0.8).cgColor
+        pressLayer.shadowColor = UI.accent.withAlphaComponent(0.8).cgColor
         pressLayer.shadowRadius = 10
         pressLayer.shadowOffset = .zero
         pressLayer.opacity = 1.0
@@ -1097,8 +1097,8 @@ struct LiquidGlassTabBar: UIViewRepresentable {
         appearance.compactLayoutAppearance = unselected
         // 选中图标 / 文字
         let selected = UITabBarItemAppearance()
-        selected.selected.iconColor = UIColor.accent
-        selected.selected.titleTextAttributes = [.foregroundColor: UIColor.accent]
+        selected.selected.iconColor = UI.accent
+        selected.selected.titleTextAttributes = [.foregroundColor: UI.accent]
         appearance.stackedLayoutAppearance = selected
         appearance.inlineLayoutAppearance = selected
         appearance.compactLayoutAppearance = selected

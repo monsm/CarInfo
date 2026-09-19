@@ -6,7 +6,7 @@ import SwiftUI
 import UIKit
 
 struct EmergencyPanel: View {
-    @StateObject private var store = AppStore.shared
+    private let store = AppStore.shared
     @State private var showConfirm = false
     @State private var emergencyContact: String = UserDefaults.standard.string(forKey: "emergency_contact") ?? "110"
     @State private var activeEmergency = false

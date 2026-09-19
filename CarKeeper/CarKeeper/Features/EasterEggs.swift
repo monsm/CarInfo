@@ -55,7 +55,7 @@ struct AchievementBadge: View {
 
 // MARK: - E58 连续打卡Streak
 struct CheckInStreak: View {
-    @StateObject private var store = AppStore.shared
+    private let store = AppStore.shared
     
     var streakDays: Int {
         guard let lastCheck = store.lastCheckInDate else { return 0 }
@@ -160,7 +160,7 @@ struct FamilyLeaderboard: View {
                     .font(.headline)
                     .foregroundColor(idx == 0 ? .yellow : idx == 1 ? .gray : idx == 2 ? .orange : .secondary)
                     .frame(width: 30)
-                Circle().fill(Color.accent.opacity(0.2)).frame(width: 36, height: 36)
+                Circle().fill(.accent.opacity(0.2)).frame(width: 36, height: 36)
                     .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(.accent))
                 VStack(alignment: .leading) {
                     Text(member.name).font(.subheadline).fontWeight(.medium)

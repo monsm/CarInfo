@@ -6,7 +6,7 @@ import SwiftUI
 import MapKit
 
 struct ParkingMapView: View {
-    @StateObject private var store = AppStore.shared
+    private let store = AppStore.shared
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 39.9042, longitude: 116.4074),
         span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
@@ -79,7 +79,7 @@ struct ParkingMapView: View {
                     Image(systemName: "car.fill")
                         .font(.caption)
                         .padding(8)
-                        .background(Color.accent.opacity(0.15))
+                        .background(.accent.opacity(0.15))
                         .cornerRadius(8)
                 }
             }
@@ -148,7 +148,7 @@ struct ParkingMapView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.accent)
+                    .background(.accent)
                     .foregroundStyle(.white)
                     .cornerRadius(12)
                 }

@@ -6,7 +6,7 @@ import SwiftUI
 import Charts
 
 struct DashboardView: View {
-    @StateObject private var store = AppStore.shared
+    private let store = AppStore.shared
     @State private var period: String = "7天"
     
     let periods = ["24小时", "7天", "30天"]
@@ -20,7 +20,7 @@ struct DashboardView: View {
                         ForEach(periods, id: \.self) { p in
                             Text(p)
                                 .font(.subheadline)
-                                .foregroundColor(period == p ? .white : .secondaryLabel)
+                                .foregroundColor(period == p ? .white : .secondary)
                                 .padding(.horizontal, Theme.Spacing.md)
                                 .padding(.vertical, Theme.Spacing.xs)
                                 .background(period == p ? Theme.Colors.accent : Color.clear)
@@ -117,7 +117,7 @@ struct DashTile: View {
                 .fontWeight(.bold)
             Text(label)
                 .font(.caption2)
-                .foregroundColor(.secondaryLabel)
+                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Theme.Spacing.sm)
@@ -132,7 +132,7 @@ struct DashSubScore: View {
         HStack {
             Text(label)
                 .font(.caption)
-                .foregroundColor(.secondaryLabel)
+                .foregroundColor(.secondary)
             Spacer()
             Text("\(value)")
                 .font(.callout)

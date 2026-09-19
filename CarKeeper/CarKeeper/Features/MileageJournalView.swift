@@ -105,7 +105,7 @@ struct MileageJournalView: View {
                         ForEach(months.indices, id: \.self) { i in
                             Text(months[i])
                                 .font(.subheadline)
-                                .foregroundColor(currentPeriod == i ? .white : .secondaryLabel)
+                                .foregroundColor(currentPeriod == i ? .white : .secondary)
                                 .padding(.horizontal, Theme.Spacing.md)
                                 .padding(.vertical, Theme.Spacing.xs)
                                 .background(currentPeriod == i ? Theme.Colors.accent : Color.clear)
@@ -181,7 +181,7 @@ struct CostSummaryTile: View {
                 .fontWeight(.semibold)
             Text(type.displayName)
                 .font(.caption2)
-                .foregroundColor(.secondaryLabel)
+                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Theme.Spacing.sm)
@@ -255,7 +255,7 @@ struct CostEntryRow: View {
             Image(systemName: entry.type.icon)
                 .font(.headline)
                 .frame(width: 36, height: 36)
-                .background(Color.accent.opacity(0.15))
+                .background(.accent.opacity(0.15))
                 .clipShape(Circle())
             
             VStack(alignment: .leading, spacing: 2) {
@@ -264,7 +264,7 @@ struct CostEntryRow: View {
                     .fontWeight(.medium)
                 Text(entry.note.isEmpty ? entry.date.formatted(date: .omitted, time: .standard) : entry.note)
                     .font(.caption)
-                    .foregroundColor(.secondaryLabel)
+                    .foregroundColor(.secondary)
             }
             
             Spacer()

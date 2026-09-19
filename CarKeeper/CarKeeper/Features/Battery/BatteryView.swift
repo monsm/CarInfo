@@ -31,7 +31,7 @@ struct BatteryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
+            VStack(spacing: Theme.cardSpacing) {
                 let cache = store.caches
                 let b = batteryModel(cache)
                 let e = VM.energy(cache, store.car)
@@ -58,8 +58,8 @@ struct BatteryView: View {
                 TireTrendChart(checkRaw: store.caches["check"] as? [String: Any] ?? {}).staggeredEntrance(index: 10)
                 alarmCard(b).staggeredEntrance(index: 11)
             }
-            .adaptivePagePadding(dynamicTypeSize)
-            .adaptiveSafeAreaBottom(8, dynamicTypeSize)
+            
+            
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(Theme.pageGreen)
@@ -454,7 +454,7 @@ struct BatteryView: View {
                     }
                     .font(Theme.micro.bold())
                     .padding(.horizontal, 12).padding(.vertical, 5)
-                    .background(energyTrendPeriod == period ? Color.accent : Color.secondary.opacity(0.15), in: Capsule())
+                    .background(energyTrendPeriod == period ? .accent : Color.secondary.opacity(0.15), in: Capsule())
                     .foregroundStyle(energyTrendPeriod == period ? .white : .secondary)
                 }
             }

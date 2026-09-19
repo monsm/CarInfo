@@ -6,7 +6,7 @@ import SwiftUI
 import UIKit
 
 struct ExportDataView: View {
-    @StateObject private var store = AppStore.shared
+    private let store = AppStore.shared
     @State private var exportType: ExportType = .trips
     @State private var isExporting = false
     @State private var exportURL: URL?
@@ -46,7 +46,7 @@ struct ExportDataView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accent)
+                        .background(.accent)
                         .foregroundStyle(.white)
                         .cornerRadius(12)
                     }

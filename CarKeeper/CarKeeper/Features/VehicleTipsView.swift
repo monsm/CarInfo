@@ -5,7 +5,7 @@
 import SwiftUI
 
 struct VehicleTipsView: View {
-    @StateObject private var store = AppStore.shared
+    private let store = AppStore.shared
     @State private var selectedCategory: TipCategory = .all
     @State private var dismissedTips: Set<String> = UserDefaults.standard.stringArray(forKey: "dismissed_tips") ?? []
     
@@ -156,7 +156,7 @@ struct VehicleTipsView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(selectedCategory == cat ? Color.accent.opacity(0.2) : Color.clear)
+                            .background(selectedCategory == cat ? .accent.opacity(0.2) : Color.clear)
                             .foregroundStyle(selectedCategory == cat ? .accent : .secondary)
                             .cornerRadius(16)
                     }

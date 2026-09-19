@@ -32,7 +32,7 @@ struct LockScreenWidget: View {
                     Image(systemName: "lock.fill")
                         .font(.title2)
                         .frame(width: 44, height: 44)
-                        .background(Color.accent.opacity(0.2))
+                        .background(.accent.opacity(0.2))
                         .clipShape(Circle())
                 }
                 Button {

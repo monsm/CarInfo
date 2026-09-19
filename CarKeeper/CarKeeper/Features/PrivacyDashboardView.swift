@@ -5,7 +5,7 @@
 import SwiftUI
 
 struct PrivacyDashboardView: View {
-    @StateObject private var store = AppStore.shared
+    private let store = AppStore.shared
     @State private var showClearConfirm = false
     
     private let dataCategories: [(title: String, items: [(name: String, size: String, type: String)])] = [
@@ -137,7 +137,7 @@ struct PrivacyCategorySection: View {
                     Spacer()
                     Text(item.size)
                         .font(.caption)
-                        .foregroundColor(.secondaryLabel)
+                        .foregroundColor(.secondary)
                     Text(item.type)
                         .font(.caption2)
                         .foregroundColor(.tertiaryLabel)

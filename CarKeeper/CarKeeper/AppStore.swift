@@ -337,8 +337,8 @@ final class AppStore: @unchecked Sendable {
 
     /// 判断当前是否应使用深色模式
     func shouldUseDarkMode() -> Bool {
-        if forceDarkMode { return true }
-        if forceLightMode { return false }
+        if Self.forceDarkMode { return true }
+        if Self.forceLightMode { return false }
         let hour = Calendar.current.component(.hour, from: Date())
         let start = Self.nightModeStartHour > 0 ? Self.nightModeStartHour : 21  // 默认 21:00
         let end = Self.nightModeEndHour > 0 ? Self.nightModeEndHour : 7         // 默认 07:00
