@@ -451,6 +451,14 @@ struct MainTabView: View {
                             case .messages: MessagesView().environmentObject(nav)
                             case .control: ControlView().environmentObject(nav)
                             case .dashboard: DashboardView().environmentObject(nav)
+                            case .trips: TripAnalyticsView().environmentObject(nav)
+                            case .commands: CommandHistoryView().environmentObject(nav)
+                            case .service: ServiceHistoryView().environmentObject(nav)
+                            case .parking: ParkingMapView().environmentObject(nav)
+                            case .export: ExportDataView().environmentObject(nav)
+                            case .emergency: EmergencyPanel().environmentObject(nav)
+                            case .tips: VehicleTipsView().environmentObject(nav)
+                            case .score: DrivingScorePage().environmentObject(nav)
                             }
                         }
                     }

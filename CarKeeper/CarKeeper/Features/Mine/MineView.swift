@@ -25,6 +25,13 @@ struct MineView: View {
     @State private var showInspection = false
     @State private var showValuation = false
     @State private var showChargeBill = false
+    @State private var showTripAnalytics = false
+    @State private var showCommandHistory = false
+    @State private var showServiceHistory = false
+    @State private var showParkingMap = false
+    @State private var showEmergency = false
+    @State private var showVehicleTips = false
+    @State private var showDrivingScore = false
     @EnvironmentObject var nav: NavState            // C3: 用于 pushNavigation
     // #NEW-115 夜间模式管理
     @StateObject private var nightModeManager = NightModeManager()
@@ -335,6 +342,20 @@ struct MineView: View {
                 }
                 // #N32 充电账单 PDF
                 tile("doc.plaintext.fill", "充电账单", tint: .cyan) { showChargeBill = true }
+                // E新增功能入口
+                HStack(spacing: 10) {
+                    tile("chart.bar.fill", "行程分析", tint: .blue) { showTripAnalytics = true }
+                    tile("clock.fill", "指令历史", tint: .purple) { showCommandHistory = true }
+                }
+                HStack(spacing: 10) {
+                    tile("wrench.and.screwdriver.fill", "维保记录", tint: .orange) { showServiceHistory = true }
+                    tile("mappin.circle.fill", "停车位置", tint: .green) { showParkingMap = true }
+                }
+                HStack(spacing: 10) {
+                    tile("siren.fill", "紧急求助", tint: .red) { showEmergency = true }
+                    tile("lightbulb.fill", "车辆提示", tint: .yellow) { showVehicleTips = true }
+                }
+                tile("trophy.fill", "驾驶评分", tint: .accent) { showDrivingScore = true }
             }
         }
     }
