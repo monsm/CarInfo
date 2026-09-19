@@ -1,6 +1,9 @@
 import SwiftUI
 import Observation
 import Foundation
+import CoreLocation
+import Intents
+import UserNotifications
 
 // 全局应用状态（对应小程序 app.js 的 globalData）。
 // 使用 @Observable 宏（iOS 17+）做细粒度响应式更新。
@@ -66,6 +69,61 @@ final class AppStore: @unchecked Sendable {
     }
     var energyHistory: [EnergyRecord] = []
 
+    // #NEW-2 驾驶行程记录
+    struct TripRecord: Identifiable {
+        let id = UUID()
+        let startTime: Date
+        let endTime: Date?
+        let startLocation: CLLocation?
+        let endLocation: CLLocation?
+        let distanceKm: Double
+        let startSoc: Int
+        let endSoc: Int
+        let avgEfficiency: Double?  // kWh/100km
+    }
+    var tripHistory: [TripRecord] = []
+    private var currentTrip: (startTime: Date, startSoc: Int, startLocation: CLLocation?)? = nil
+
+    // #NEW-1 停车位置
+    var parkingLocation: CLLocation? {
+        get { if let data = UserDefaults.standard.data(forKey: "carkeeper_parking_loc"), let loc = try? NSKeyedUnarchiver.unarchivedObject(ofClass: CLLocation.self, from: data) { return loc } else { return nil } }
+        set { if let loc = newValue, let data = try? NSKeyedArchiver.archivedData(withRootObject: loc, requiringSecureCoding: true) { UserDefaults.standard.set(data, forKey: "carkeeper_parking_loc") }
+        }
+    }
+    var lastParkingTime: Date? {
+        get { UserDefaults.standard.object(forKey: "carkeeper_parking_time") as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: "carkeeper_parking_time") }
+    }
+
+    // #NEW-4 上车打卡
+    var lastCheckInDate: Date? {
+        get { UserDefaults.standard.object(forKey: "carkeeper_last_checkin") as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: "carkeeper_last_checkin") }
+    }
+    var checkInCount: Int {
+        get { UserDefaults.standard.integer(forKey: "carkeeper_checkin_count") }
+        set { UserDefaults.standard.set(newValue, forKey: "carkeeper_checkin_count") }
+    }
+
+    // #NEW-3 离线模式标记
+    var isOfflineMode: Bool = false
+    var offlineMessage: String = ""
+
+    // #NEW-6 Siri 快捷指令最近使用统计
+    var siriUsageCount: [String: Int] {
+        get {
+            let dict = UserDefaults.standard.dictionary(forKey: "carkeeper_siri_usage") as? [String: Int] ?? [:]
+            return dict
+        }
+        set { UserDefaults.standard.set(newValue, forKey: "carkeeper_siri_usage") }
+    }
+
+    func recordSiriUsage(_ action: String) {
+        var count = siriUsageCount[action] ?? 0
+        count += 1
+        siriUsageCount[action] = count
+    }
+
     func recordEnergySnapshot(soc: Int, rangeKm: Int) {
         // 防止重复记录（同一分钟内只记一次）
         let recent = energyHistory.filter { Date().timeIntervalSince($0.timestamp) < 60 }
@@ -73,6 +131,74 @@ final class AppStore: @unchecked Sendable {
         energyHistory.append(EnergyRecord(timestamp: Date(), soc: soc, range: rangeKm))
         // 只保留最近 20 条
         if energyHistory.count > 20 { energyHistory = Array(energyHistory.suffix(20)) }
+    }
+
+    // #NEW-1 记录停车位置
+    func saveParkingLocation(_ location: CLLocation?, at time: Date? = nil) {
+        parkingLocation = location
+        lastParkingTime = time ?? Date()
+    }
+
+    // #NEW-2 开始新行程
+    func startTrip(_ location: CLLocation? = nil, soc: Int? = nil) {
+        let currentSoc = soc ?? (energyHistory.last?.soc ?? 0)
+        currentTrip = (Date(), currentSoc, location)
+    }
+
+    // #NEW-2 结束行程
+    func endTrip(distanceKm: Double, endSoc: Int? = nil, endLocation: CLLocation? = nil) -> TripRecord? {
+        guard let trip = currentTrip else { return nil }
+        let endSoc = endSoc ?? (energyHistory.last?.soc ?? 0)
+        let avgEfficiency: Double?
+        if trip.startSoc > endSoc && distanceKm > 0 {
+            let energyUsed = Double(trip.startSoc - endSoc) / 100.0 * 15.0  // 假设电池容量15kWh
+            avgEfficiency = (distanceKm > 0) ? energyUsed / distanceKm * 100 : nil
+        } else { avgEfficiency = nil }
+        let record = TripRecord(
+            startTime: trip.startTime,
+            endTime: Date(),
+            startLocation: trip.startLocation,
+            endLocation: endLocation,
+            distanceKm: distanceKm,
+            startSoc: trip.startSoc,
+            endSoc: endSoc,
+            avgEfficiency: avgEfficiency
+        )
+        tripHistory.insert(record, at: 0)
+        if tripHistory.count > 50 { tripHistory = Array(tripHistory.prefix(50)) }
+        currentTrip = nil
+        return record
+    }
+
+    // #NEW-4 打卡
+    func checkIn() {
+        lastCheckInDate = Date()
+        checkInCount += 1
+        UserDefaults.standard.synchronize()
+    }
+
+    // #NEW-5 消息已读计数（服务端没有 mark-all，本地统计）
+    var unreadMessageCount: Int { 0 }  // 由 MessagesView 自己管理
+
+    // #NEW-7 控制中心快速车况数据（供 ControlCenter 扩展使用）
+    struct CCQuickStatus {
+        var soc: Int = 0
+        var range: String = "--"
+        var locked: Bool = true
+        var cabinTemp: String = "--"
+        var charging: Bool = false
+        var online: String = "--"
+    }
+    func quickStatus() -> CCQuickStatus {
+        guard let charge = caches["charge"] as? [String: Any],
+              let socStr = charge["RemainPower"] as? String,
+              let soc = Int(socStr) else { return CCQuickStatus() }
+        let rangeStr = charge["RemainedPowerMile"] as? String ?? "--"
+        let ctrl = caches["control"] as? [String: Any]
+        let locked = (ciBool(ctrl, ["DoorLocked", "doorLocked"]) ?? true)
+        let temp = VM.n0(ctrl, ["InteriorTemperature", "interiorTemperature"]) ?? "--"
+        let charging = soc < 100
+        return CCQuickStatus(soc: soc, range: rangeStr, locked: locked, cabinTemp: "\(temp)℃", charging: charging, online: "在线")
     }
 
     // #4 网络状态追踪
@@ -297,6 +423,15 @@ final class AppStore: @unchecked Sendable {
                 recordEnergySnapshot(soc: soc, rangeKm: range)
             }
         }
+        // #NEW-3 检测离线状态：缓存超过 TTL 则标记离线
+        let staleKeys = evictStale()
+        if !staleKeys.isEmpty && !isLoggedIn {
+            isOfflineMode = true
+            offlineMessage = "网络异常，显示缓存数据"
+        } else {
+            isOfflineMode = false
+            offlineMessage = ""
+        }
     }
 
     /// 返回指定 key 的缓存是否已过期（超过 TTL）
@@ -319,6 +454,22 @@ final class AppStore: @unchecked Sendable {
     func clearCache() {
         caches = ["charge": nil, "pm25": nil, "location": nil, "control": nil, "check": nil, "messages": nil]
         cacheTimestamps.removeAll()
+    }
+
+    // #24 首页卡片自定义排序
+    static let cardOrderKey = "carkeeper_home_card_order"
+    var cardOrder: [String] {
+        get {
+            if let saved = UserDefaults.standard.array(forKey: Self.cardOrderKey) as? [String] {
+                return saved
+            }
+            // 默认顺序
+            return [
+                "socHero", "driveMetrics", "quickControl", "domainCard",
+                "batterySection", "tyreCard", "comfortCard", "locationCard"
+            ]
+        }
+        set { UserDefaults.standard.set(newValue, forKey: Self.cardOrderKey) }
     }
 
     // MARK: 登录 / 退出

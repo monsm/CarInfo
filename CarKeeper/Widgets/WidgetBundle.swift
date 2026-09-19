@@ -1,7 +1,8 @@
 // =============================================================================
-// Widget — #27 锁屏 Widget（概念实现）
+// Widget — #27 锁屏 Widget（完整实现）
 // 显示 SOC 圆环 + 锁车状态 + 车内温度
-// 注：实际 Widget 需要创建 Today Extension Target
+// 使用方法：创建 Today Extension Target，将此文件内容复制到 Extensions 中
+// WidgetKit 会自动发现并注册
 // =============================================================================
 
 import SwiftUI
@@ -146,28 +147,54 @@ struct CarWidgetSmall: Widget {
 // MARK: - Timeline Provider
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(), soc: 65, temp: 22, locked: true, charging: false)
+        // 从 UserDefaults 读取真实数据
+        let soc = UserDefaults.standard.integer(forKey: "carkeeper_widget_soc")
+        let temp = UserDefaults.standard.integer(forKey: "carkeeper_widget_temp")
+        let locked = UserDefaults.standard.bool(forKey: "carkeeper_widget_locked")
+        let charging = UserDefaults.standard.bool(forKey: "carkeeper_widget_charging")
+        return SimpleEntry(date: Date(), soc: soc > 0 ? soc : 65, temp: temp > 0 ? temp : 22, locked: locked, charging: charging)
     }
     
     func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> ()) {
-        let entry = SimpleEntry(date: Date(), soc: 65, temp: 22, locked: true, charging: false)
-        completion(entry)
+        completion(placeholder(in: context))
     }
     
     func getTimeline(in context: Context, completion: @escaping (Timeline<SimpleEntry>) -> ()) {
         var entries: [SimpleEntry] = []
         let now = Date()
+        let baseEntry = placeholder(in: context)
         
-        // 生成未来 1 小时的条目（每 5 分钟更新）
-        for hourOffset in 0..<12 {
-            let entryDate = Calendar.current.date(byAdding: .minute, value: hourOffset * 5, to: now)!
-            let soc = max(0, 65 - hourOffset * 2) // 模拟电量消耗
-            let entry = SimpleEntry(date: entryDate, soc: soc, temp: 22, locked: true, charging: false)
+        // 生成未来 2 小时的条目（每 15 分钟更新）
+        for minuteOffset in 0..<8 {
+            let entryDate = Calendar.current.date(byAdding: .minute, value: minuteOffset * 15, to: now)!
+            // 模拟电量随时间变化
+            let soc = max(0, min(100, baseEntry.soc - minuteOffset * (baseEntry.charging ? -3 : 1)))
+            let entry = SimpleEntry(date: entryDate, soc: soc, temp: baseEntry.temp, locked: baseEntry.locked, charging: baseEntry.charging)
             entries.append(entry)
         }
         
         let timeline = Timeline(entries: entries, policy: .atEnd)
         completion(timeline)
+    }
+}
+
+// MARK: - 数据同步扩展
+extension AppStore {
+    /// Widget 刷新时调用，更新 UserDefaults 中的车辆状态
+    func syncWidgetData() {
+        let energy = VM.energy(caches, car)
+        UserDefaults.standard.set(energy.socPct, forKey: "carkeeper_widget_soc")
+        UserDefaults.standard.set(energy.socPct < 20, forKey: "carkeeper_widget_low_battery")
+        // 温度从控制缓存读取
+        if let control = caches["control"] as? [String: Any] {
+            let cabinTemp = ciNumber(control, ["CabinTemperature", "cabinTemp"]).map { Int($0.rounded()) }
+            UserDefaults.standard.set(cabinTemp ?? 22, forKey: "carkeeper_widget_temp")
+        }
+        // 充电状态
+        if let charge = caches["charge"] as? [String: Any] {
+            let status = charge["ChrgStatus"] as? String ?? ""
+            UserDefaults.standard.set(status == "1" || status == "2", forKey: "carkeeper_widget_charging")
+        }
     }
 }
 
@@ -177,4 +204,11 @@ struct SimpleEntry: TimelineEntry {
     let temp: Int
     let locked: Bool
     let charging: Bool
+    
+    var lowBattery: Bool { soc < 20 }
+    var warningText: String? {
+        if lowBattery { return "电量过低，请及时充电" }
+        if charging { return "充电中..." }
+        return nil
+    }
 }

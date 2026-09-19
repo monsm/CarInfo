@@ -22,6 +22,9 @@ struct HomeView: View {
     @State private var expandedTyre = false           // 胎压卡展开状态
     @State private var tyreWatchValue: String = ""    // B7: 胎压数值变化脉冲触发器
     @State private var switchingCar = false           // 切换车辆涟漪标志
+    @State private var isEditingOrder = false         // #24 卡片排序编辑模式
+    @State private var draggedCard: String? = nil     // 当前拖拽的卡片ID
+    @State private var cardOrder: [String] = []       // #24 卡片顺序
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     var body: some View {
@@ -34,6 +37,7 @@ struct HomeView: View {
             }
         }
         .sheet(isPresented: $showLoginAlert) { LoginView() }
+        .task { cardOrder = store.cardOrder }
     }
 
     private var content: some View {
@@ -48,18 +52,88 @@ struct HomeView: View {
         let drive = VM.driveStatus(cache)
 
         return ScrollView {
-            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
-                greetingRow(energy)
-                socHero(energy).staggeredEntrance(index: 0)
-                driveMetricsExpanded(drive).staggeredEntrance(index: 1)
-                carSelector.staggeredEntrance(index: 2)
-                quickControl.staggeredEntrance(index: 3)
-                domainCard(summary).staggeredEntrance(index: 4)
-                if hasData { batterySection(cache).staggeredEntrance(index: 5) }
-                tyreCardExpanded(tyre).staggeredEntrance(index: 6)
-                comfortCard(comfort).staggeredEntrance(index: 7)
-                locationCard(loc).staggeredEntrance(index: 8)
-                footerNote(energy).staggeredEntrance(index: 9)
+            VStack(spacing: 8) {
+                // 编辑模式工具栏
+                if isEditingOrder {
+                    HStack {
+                        Text("按住卡片拖拽排序")
+                            .font(Theme.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("完成") {
+                            isEditingOrder = false
+                            store.cardOrder = cardOrder
+                        }
+                        .font(Theme.caption.weight(.semibold))
+                        .foregroundStyle(.accentColor)
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 4)
+                }
+                // 按排序渲染卡片
+                ForEach(cardOrder.indices, id: \.self) { idx in
+                    let id = cardOrder[idx]
+                    ZStack(alignment: .topTrailing) {
+                        Group {
+                            switch id {
+                            case "socHero": socHero(energy)
+                            case "driveMetrics": driveMetricsExpanded(drive)
+                            case "carSelector": carSelector
+                            case "quickControl": quickControl
+                            case "domainCard": domainCard(summary)
+                            case "batterySection": if hasData { batterySection(cache) }
+                            case "tyreCard": tyreCardExpanded(tyre)
+                            case "comfortCard": comfortCard(comfort)
+                            default: locationCard(loc)
+                            }
+                        }
+                        // 编辑模式：显示拖拽手柄和移除指示
+                        if isEditingOrder {
+                            VStack {
+                                Image(systemName: "line.3.horizontal")
+                                    .font(Theme.caption)
+                                    .foregroundStyle(.tertiary)
+                                Text("\(idx + 1)")
+                                    .font(Theme.micro)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(8)
+                            .background(.thin, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                    .offset(y: draggedCard == id ? -60 : 0)
+                    .scaleEffect(draggedCard == id ? 1.02 : 1.0)
+                    .opacity(draggedCard != nil && draggedCard != id ? 0.5 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: draggedCard)
+                    .gesture(
+                        isEditingOrder ? DragGesture(minimumDistance: 10)
+                            .onChanged { value in
+                                if draggedCard == nil { draggedCard = id }
+                                // 检测是否应该交换位置
+                                if let currentCard = draggedCard,
+                                   currentCard != id {
+                                    let currentIdx = cardOrder.firstIndex(of: currentCard) ?? 0
+                                    let targetIdx = idx
+                                    var newOrder = cardOrder
+                                    if currentIdx < targetIdx {
+                                        newOrder.remove(at: currentIdx)
+                                        newOrder.insert(currentCard, at: targetIdx)
+                                    } else {
+                                        newOrder.remove(at: currentIdx)
+                                        newOrder.insert(currentCard, at: targetIdx)
+                                    }
+                                    cardOrder = newOrder
+                                }
+                            }
+                            .onEnded { _ in
+                                draggedCard = nil
+                                store.cardOrder = cardOrder
+                                ToastManager.shared.show("卡片顺序已保存", icon: "checkmark.circle.fill")
+                            }
+                        : nil
+                    )
+                    .staggeredEntrance(index: idx)
+                }
             }
             .adaptivePagePadding(dynamicTypeSize)
             .adaptiveSafeAreaBottom(12, dynamicTypeSize)
@@ -79,6 +153,22 @@ struct HomeView: View {
         .scrollBounceBehavior(.basedOnSize)
         .milestoneCelebration(mileage: mileCount)
         .pageBackground(.accentColor)
+        .toolbar {
+            // #24 卡片排序编辑按钮
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    isEditingOrder.toggle()
+                } label: {
+                    if isEditingOrder {
+                        Text("完成")
+                            .font(Theme.caption.weight(.semibold))
+                    } else {
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+                }
+                .accessibilityLabel(Text(isEditingOrder ? "完成排序" : "编辑卡片顺序"))
+            }
+        }
         .overlay(alignment: .top) {
             // #41 天气联动主题 - 雨天粒子效果
             if WeatherTheme.currentCondition == .rainy {
@@ -738,9 +828,21 @@ struct HomeView: View {
         .padding(.vertical, 8)
     }
 
+    // #24 卡片排序：定义卡片ID映射
+    private let cardIds: [String] = [
+        "socHero", "driveMetrics", "carSelector", "quickControl", "domainCard",
+        "batterySection", "tyreCard", "comfortCard", "locationCard"
+    ]
+
     // #3 数据新鲜度徽章 — 返回缓存时间戳
     private func freshnessTimestamp(for key: String) -> Date? {
         lastFetch
+    }
+
+    // #24 根据排序返回卡片索引
+    private func cardIndex(id: String) -> Int {
+        guard let idx = cardOrder.firstIndex(of: id) else { return 0 }
+        return idx
     }
 
     // #36 多语言国际化
