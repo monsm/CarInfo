@@ -13,7 +13,8 @@ struct RealtimeEnergyDisplay: View {
     let store: AppStore
     
     var currentEnergyRate: Double {
-        guard let history = store.energyHistory, history.count >= 2 else { return 0 }
+        let history = store.energyHistory
+        guard history.count >= 2 else { return 0 }
         let recent = history.filter { Date().timeIntervalSince($0.timestamp) < 3600 }
         guard recent.count >= 2 else { return 0 }
         let first = recent.first!
@@ -145,11 +146,11 @@ struct TirePressureTrendChart: View {
                 }
                 
                 // 正常范围带
-                RuleMark(y: .literal(2.5))
-                    .lineStyle(StrokeStyle(dash: [5, 3], lineWidth: 1))
+                RuleMark(y: .value("下限", 2.5))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
                     .foregroundStyle(.green.opacity(0.5))
-                RuleMark(y: .literal(3.0))
-                    .lineStyle(StrokeStyle(dash: [5, 3], lineWidth: 1))
+                RuleMark(y: .value("上限", 3.0))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
                     .foregroundStyle(.green.opacity(0.5))
             }
             .chartYAxis {

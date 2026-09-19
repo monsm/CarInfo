@@ -60,7 +60,7 @@ struct DataView: View {
                         ForEach(Array(blocks.enumerated()), id: \.element.h) { idx, b in
                             dataBlock(b, idx: idx)
                         }
-                        .onChange(of: blocks) { _ in appearedBlockIds = []; appearedRows = [:] }
+                        .onChange(of: blocks.map(\.h)) { _ in appearedBlockIds = []; appearedRows = [:] }
                     }
                 }
                 

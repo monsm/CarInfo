@@ -636,27 +636,28 @@ struct ControlView: View {
     }
 
     // MARK: 执行结果详情 Sheet
+    @ViewBuilder
     private var resultSheet: some View {
-        guard let r = lastResult else { return EmptyView().frame(width: 0, height: 0) }
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text(r.name).font(Theme.h3)
+        if let r = lastResult {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text(r.name).font(Theme.h3)
+                    Spacer()
+                    Pill(text: r.resultText, cls: r.resultCls, dot: false)
+                }
+                if !r.progress.isEmpty {
+                    Text(r.progress).font(Theme.caption).foregroundStyle(.secondary)
+                }
+                if !r.handleCode.isEmpty {
+                    KVRow(k: "错误码", v: r.handleCode)
+                }
+                KVRow(k: "发起时间", v: r.startedAt)
+                KVRow(k: "完成时间", v: r.finishTime)
+                KVRow(k: "任务 ID", v: r.taskId.isEmpty ? "--" : r.taskId)
                 Spacer()
-                Pill(text: r.resultText, cls: r.resultCls, dot: false)
             }
-            if !r.progress.isEmpty {
-                Text(r.progress).font(Theme.caption).foregroundStyle(.secondary)
-            }
-            if !r.handleCode.isEmpty {
-                KVRow(k: "错误码", v: r.handleCode)
-            }
-            KVRow(k: "发起时间", v: r.startedAt)
-            KVRow(k: "完成时间", v: r.finishTime)
-            KVRow(k: "任务 ID", v: r.taskId.isEmpty ? "--" : r.taskId)
-            Spacer()
+            .padding(Theme.Spacing.xl)
         }
-        .padding(Theme.Spacing.xl)
-        .presentationDetents([.medium])
     }
 
     private func nameOf(_ key: String) -> String {
@@ -901,6 +902,7 @@ struct ACStepperView: View {
     @State var temp: Int
     // 数字滚动：从 0 弹性计数到目标温度（入场动画 + 每次变化同步滚动）
     @State private var tempDisplayCount = 0
+    @State private var pulseTrigger = UUID()
 
     init(initialTemp: Binding<Int>) {
         _temp = State(initialValue: initialTemp.wrappedValue)

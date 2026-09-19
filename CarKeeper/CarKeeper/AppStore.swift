@@ -44,6 +44,10 @@ final class AppStore: @unchecked Sendable {
         let finishedAt: Date?
         let success: Bool
         let duration: TimeInterval  // 执行耗时（秒）
+
+        var statusColor: Color { success ? .green : .red }
+        var iconName: String { success ? "checkmark.circle.fill" : "xmark.circle.fill" }
+        var durationText: String { duration > 0 ? "\(Int(duration/60))min" : "--" }
     }
 
     func addCommandHistory(cmd: String, name: String, success: Bool, duration: TimeInterval) {

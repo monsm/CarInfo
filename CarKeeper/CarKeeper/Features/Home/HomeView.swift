@@ -53,110 +53,8 @@ struct HomeView: View {
     }
 
     private var content: some View {
-        let cache = store.caches
-        let car = store.car
-        let energy = VM.energy(cache, car)
-        let summary = AN.summarize(cache, car)
-        let tyre = VM.tyreStatus(cache)
-        let comfort = VM.comfortStatus(cache)
-        let loc = VM.locStatus(cache)
-        let hasData = cache["control"] != nil
-        let drive = VM.driveStatus(cache)
-        // #NEW-107 碳减排统计
-        let carbonStats = CarbonSavingsTracker.shared.getTodayStats()
-
-        return ScrollView {
-            VStack(spacing: 8) {
-                // 编辑模式工具栏
-                if isEditingOrder {
-                    HStack {
-                        Text("按住卡片拖拽排序")
-                            .font(Theme.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("完成") {
-                            isEditingOrder = false
-                            store.cardOrder = cardOrder
-                        }
-                        .font(Theme.caption.weight(.semibold))
-                        .foregroundStyle(Theme.Colors.accent)
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 4)
-                }
-                // 按排序渲染卡片
-                ForEach(cardOrder.indices, id: \.self) { idx in
-                    let id = cardOrder[idx]
-                    ZStack(alignment: .topTrailing) {
-                        Group {
-                            switch id {
-                            case "socHero": socHero(energy)
-                            case "driveMetrics": driveMetricsExpanded(drive)
-                            case "carSelector": carSelector
-                            case "quickControl": quickControl
-                            case "domainCard": domainCard(summary)
-                            case "batterySection": if hasData { batterySection(cache) }
-                            case "tyreCard": tyreCardExpanded(tyre)
-                            case "comfortCard": comfortCard(comfort)
-                            case "carbonSavings": CarbonSavingsCard(stats: carbonStats)
-                            // E1-E8 实时车况增强
-                            case "realtimeEnergy": RealtimeEnergyDisplay(store: store)
-                            case "sohDashboard": SOHDashboard(store: store)
-                            case "driveMode": DriveModeDisplay(currentMode: .eco, availableModes: [.eco, .comfort, .sport], onModeChange: {_ in })
-                            case "vehicle2D": Vehicle2DStatusView(control: store.caches["control"] as? [String: Any])
-                            default: locationCard(loc)
-                            }
-                        }
-                        // 编辑模式：显示拖拽手柄和移除指示
-                        if isEditingOrder {
-                            VStack {
-                                Image(systemName: "line.3.horizontal")
-                                    .font(Theme.caption)
-                                    .foregroundStyle(.tertiary)
-                                Text("\(idx + 1)")
-                                    .font(Theme.micro)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(8)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
-                        }
-                    }
-                    .offset(y: draggedCard == id ? -60 : 0)
-                    .scaleEffect(draggedCard == id ? 1.02 : 1.0)
-                    .opacity(draggedCard != nil && draggedCard != id ? 0.5 : 1.0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: draggedCard)
-                    .gesture(
-                        isEditingOrder ? DragGesture(minimumDistance: 10)
-                            .onChanged { value in
-                                if draggedCard == nil { draggedCard = id }
-                                // 检测是否应该交换位置
-                                if let currentCard = draggedCard,
-                                   currentCard != id {
-                                    let currentIdx = cardOrder.firstIndex(of: currentCard) ?? 0
-                                    let targetIdx = idx
-                                    var newOrder = cardOrder
-                                    if currentIdx < targetIdx {
-                                        newOrder.remove(at: currentIdx)
-                                        newOrder.insert(currentCard, at: targetIdx)
-                                    } else {
-                                        newOrder.remove(at: currentIdx)
-                                        newOrder.insert(currentCard, at: targetIdx)
-                                    }
-                                    cardOrder = newOrder
-                                }
-                            }
-                            .onEnded { _ in
-                                draggedCard = nil
-                                store.cardOrder = cardOrder
-                                ToastManager.shared.show("卡片顺序已保存", icon: "checkmark.circle.fill")
-                            }
-                        : nil
-                    )
-                    .staggeredEntrance(index: idx)
-                }
-            }
-            
-            
+        ScrollView {
+            cardStack
         }
         .id(carVersion)
         .transition(
@@ -280,6 +178,110 @@ struct HomeView: View {
         .glassSwitchRipple(isSwitching: $switchingCar)
     }
 
+
+    /// 卡片列表（抽出以降低巨型 ViewBuilder 的类型检查负担）
+    private var cardStack: some View {
+        let cache = store.caches
+        let car = store.car
+        let energy = VM.energy(cache, car)
+        let summary = AN.summarize(cache, car)
+        let tyre = VM.tyreStatus(cache)
+        let comfort = VM.comfortStatus(cache)
+        let loc = VM.locStatus(cache)
+        let hasData = cache["control"] != nil
+        let drive = VM.driveStatus(cache)
+        // #NEW-107 碳减排统计
+        let carbonStats = CarbonSavingsTracker.shared.getTodayStats()
+        return VStack(spacing: 8) {
+                // 编辑模式工具栏
+                if isEditingOrder {
+                    HStack {
+                        Text("按住卡片拖拽排序")
+                            .font(Theme.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("完成") {
+                            isEditingOrder = false
+                            store.cardOrder = cardOrder
+                        }
+                        .font(Theme.caption.weight(.semibold))
+                        .foregroundStyle(Theme.Colors.accent)
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 4)
+                }
+                // 按排序渲染卡片
+                ForEach(cardOrder.indices, id: \.self) { idx in
+                    let id = cardOrder[idx]
+                    ZStack(alignment: .topTrailing) {
+                        Group {
+                            switch id {
+                            case "socHero": socHero(energy)
+                            case "driveMetrics": driveMetricsExpanded(drive)
+                            case "carSelector": carSelector
+                            case "quickControl": quickControl
+                            case "domainCard": domainCard(summary)
+                            case "batterySection": if hasData { batterySection(cache) }
+                            case "tyreCard": tyreCardExpanded(tyre)
+                            case "comfortCard": comfortCard(comfort)
+                            case "carbonSavings": CarbonSavingsCard(stats: carbonStats)
+                            // E1-E8 实时车况增强
+                            case "realtimeEnergy": RealtimeEnergyDisplay(store: store)
+                            case "sohDashboard": SOHDashboard(store: store)
+                            case "driveMode": DriveModeDisplay(currentMode: .eco, availableModes: [.eco, .comfort, .sport], onModeChange: {_ in })
+                            case "vehicle2D": Vehicle2DStatusView(control: store.caches["control"] as? [String: Any])
+                            default: locationCard(loc)
+                            }
+                        }
+                        // 编辑模式：显示拖拽手柄和移除指示
+                        if isEditingOrder {
+                            VStack {
+                                Image(systemName: "line.3.horizontal")
+                                    .font(Theme.caption)
+                                    .foregroundStyle(.tertiary)
+                                Text("\(idx + 1)")
+                                    .font(Theme.micro)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(8)
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                    .offset(y: draggedCard == id ? -60 : 0)
+                    .scaleEffect(draggedCard == id ? 1.02 : 1.0)
+                    .opacity(draggedCard != nil && draggedCard != id ? 0.5 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: draggedCard)
+                    .gesture(
+                        isEditingOrder ? DragGesture(minimumDistance: 10)
+                            .onChanged { value in
+                                if draggedCard == nil { draggedCard = id }
+                                // 检测是否应该交换位置
+                                if let currentCard = draggedCard,
+                                   currentCard != id {
+                                    let currentIdx = cardOrder.firstIndex(of: currentCard) ?? 0
+                                    let targetIdx = idx
+                                    var newOrder = cardOrder
+                                    if currentIdx < targetIdx {
+                                        newOrder.remove(at: currentIdx)
+                                        newOrder.insert(currentCard, at: targetIdx)
+                                    } else {
+                                        newOrder.remove(at: currentIdx)
+                                        newOrder.insert(currentCard, at: targetIdx)
+                                    }
+                                    cardOrder = newOrder
+                                }
+                            }
+                            .onEnded { _ in
+                                draggedCard = nil
+                                store.cardOrder = cardOrder
+                                ToastManager.shared.show("卡片顺序已保存", icon: "checkmark.circle.fill")
+                            }
+                        : nil
+                    )
+                    .staggeredEntrance(index: idx)
+                }
+            }
+    }
     // MARK: 问候行
     private func greetingRow(_ e: EnergyModel) -> some View {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -456,7 +458,7 @@ struct HomeView: View {
         let lines: [HeadLine] = [
             HeadLine(id: "soc", label: "SOC", value: battDomain.metrics.first { $0.k == "SOC" }?.v ?? "--", cls: battDomain.cls, reason: ""),
             HeadLine(id: "range", label: "续航", value: VM.energy(store.caches, store.car).range + " km", cls: battDomain.cls, reason: ""),
-            HeadLine(id: "alarm", label: "告警", value: battDomain.reasons.isEmpty ? "无" : "\(battDomain.reasons.count) 项", cls: battDomain.cls, reason: battDomain.reasons.isEmpty ? "" : battDomain.reasons.joined(separator: " · "))
+            HeadLine(id: "alarm", label: "告警", value: battDomain.reasons.isEmpty ? "无" : "\(battDomain.reasons.count) 项", cls: battDomain.cls, reason: battDomain.reasons.isEmpty ? "" : battDomain.reasons.map { $0.t }.joined(separator: " · "))
         ].filter { !$0.value.contains("--") }
         return (lines, battDomain.cls, battDomain.title)
     }
@@ -473,7 +475,7 @@ struct HomeView: View {
     private func driveMetricsRow(_ d: DriveModel) -> some View {
         ZStack(alignment: .leading) {
             // EKG 波形背景（微透明流动描边，模拟速度波动）
-            EKGFloRingDynamic(size: 200, lineWidth: 1.0, speed: 4.0, percentage: min(1.0, max(0.0, Double(d.speed) / 200)))
+            EKGFloRingDynamic(size: 200, lineWidth: 1.0, speed: 4.0, percentage: min(1.0, max(0.0, (Double(d.speed) ?? 0) / 200)))
                 .opacity(0.18)
                 .allowsHitTesting(false)
             HStack(spacing: 12) {
@@ -603,7 +605,7 @@ struct HomeView: View {
 
     private func domainRow(_ d: DomainVerdict) -> some View {
         let icon = domainIcon(d.key)
-        HStack(spacing: 10) {
+        return HStack(spacing: 10) {
             Text(icon)
                 .font(Theme.caption)
                 .foregroundStyle(Theme.statusColor(d.cls))
@@ -636,7 +638,7 @@ struct HomeView: View {
 
     // MARK: 电池区
     private func batterySection(_ cache: [String: Any?]) -> some View {
-        let batt = VM.batteryModel(cache)
+        let batt = batteryModel(cache)
         return VStack(spacing: Theme.Spacing.cardSpacing) {
             // 电池摘要行（SOC / 续航 / 告警 来自分析域，不重复 SOC Hero）
             VStack(alignment: .leading, spacing: 8) {
@@ -663,7 +665,7 @@ struct HomeView: View {
             .glassLongPressDeform()
 
             // 分析结论详情
-            for line in battSummary.headLines {
+            ForEach(battSummary.headLines) { line in
                 HStack(spacing: 6) {
                     Text(line.label).font(Theme.caption).foregroundStyle(.secondary)
                     Text(line.value).font(Theme.font(.caption as Font).bold()).foregroundStyle(line.cls == "ok" ? Theme.ok : (line.cls == "bad" ? Theme.bad : .primary))
@@ -1094,7 +1096,7 @@ struct LocationMapView: View {
     @State private var annotationsAdded = false
 
     var body: some View {
-        MapView(coordinate: parseCoordinate(), region: $region, hasAnnotation: !annotationsAdded)
+        MapView(coordinate: parseCoordinate() ?? CLLocationCoordinate2D(latitude: 39.9, longitude: 116.4), span: region.span, points: [])
             .frame(height: 190)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .transition(.opacity)

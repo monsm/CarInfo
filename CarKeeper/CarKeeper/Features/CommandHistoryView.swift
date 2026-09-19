@@ -7,7 +7,7 @@ import SwiftUI
 struct CommandHistoryView: View {
     private let store = AppStore.shared
     @State private var filter: String = "all"
-    @State private var expandedCmds: Set<String> = []
+    @State private var expandedCmds: Set<UUID> = []
     
     private let filters = ["全部", "成功", "失败", "进行中"]
     
@@ -191,7 +191,7 @@ struct CommandHistoryView: View {
                     else { expandedCmds.insert(cmd.id) }
                 }
             }
-            .PressFeedback()
+            .pressFeedbackLegacy()
         }
     }
 }

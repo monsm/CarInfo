@@ -134,7 +134,7 @@ struct ServiceReminderRow: View {
                     .fontWeight(.medium)
                 Text(String(format: "距下次 %.0f km / %d 天", kmUntil, max(0, daysUntil)))
                     .font(.caption)
-                    .foregroundColor(isUrgent ? .red : .secondaryLabel)
+                    .foregroundColor(isUrgent ? .red : .secondary)
             }
             
             Spacer()

@@ -3,6 +3,7 @@
 // =============================================================================
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - E63 崩溃日志在线查看
 struct CrashLogViewer: View {
@@ -132,7 +133,9 @@ struct FeatureFlagToggle: View {
             Spacer()
             Toggle("", isOn: Binding(
                 get: { flags.isAvailable(flag) },
-                set: { flags.enable(flag) }
+                set: { (newValue: Bool) in
+                    if newValue { flags.enable(flag) } else { flags.disable(flag) }
+                }
             ))
             .labelsHidden()
         }

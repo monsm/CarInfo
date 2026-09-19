@@ -10,6 +10,11 @@ enum DataEncryption {
     // MARK: - 密钥管理（使用 CryptoKit AES-GCM，存储于 Keychain）
     private static let keychainKey = "carkeeper_encryption_key"
 
+    /// 确保加密密钥已生成（App 启动时调用）
+    static func ensureKey() {
+        if getKey() == nil { _ = generateKey() }
+    }
+
     static func generateKey() -> SymmetricKey? {
         if getKey() != nil { return nil }
         let key = SymmetricKey(size: .bits256)
@@ -26,7 +31,7 @@ enum DataEncryption {
         let query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrApplicationTag as String: "carkeeper_key",
-            kSecValueData as String: key.getBytes()
+            kSecValueData as String: key.withUnsafeBytes { Data($0) }
         ]
         SecItemAdd(query as CFDictionary, nil)
     }

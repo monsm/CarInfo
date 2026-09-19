@@ -37,8 +37,10 @@ class HapticFeedbackManager: ObservableObject {
             relativeTime: 0
         ))
         events.append(CHHapticEvent(
-            eventType: .hapticStop,
-            parameters: [],
+            eventType: .hapticTransient,
+            parameters: [
+                CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5)
+            ],
             relativeTime: 0.1
         ))
         playPattern(events)
@@ -62,7 +64,7 @@ class HapticFeedbackManager: ObservableObject {
     func playACOnHaptic() {
         var events: [CHHapticEvent] = []
         events.append(CHHapticEvent(
-            eventType: .hapticSuccess,
+            eventType: .hapticTransient,
             parameters: [],
             relativeTime: 0
         ))
@@ -74,7 +76,7 @@ class HapticFeedbackManager: ObservableObject {
         var events: [CHHapticEvent] = []
         for i in 0..<3 {
             events.append(CHHapticEvent(
-                eventType: .hapticHeavy,
+                eventType: .hapticTransient,
                 parameters: [
                     CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.9)
                 ],

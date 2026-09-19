@@ -8,6 +8,13 @@ import Charts
 struct DashboardView: View {
     private let store = AppStore.shared
     @State private var period: String = "7天"
+
+    private var energyDict: [String: Any] {
+        (store.car?["energy"] as? [String: Any]) ?? [:]
+    }
+    private var climateDict: [String: Any] {
+        (store.car?["climate"] as? [String: Any]) ?? [:]
+    }
     
     let periods = ["24小时", "7天", "30天"]
     
@@ -25,13 +32,14 @@ struct DashboardView: View {
                 
                 // 核心指标
                 HStack(spacing: Theme.Spacing.sm) {
-                    DashTile(icon: "bolt.fill", label: "SOC", value: "\(store.car?.energy?.socPct ?? 0)%", color: .green)
-                    DashTile(icon: "gauge.low", label: "续航", value: "\(store.car?.energy?.rangeKm ?? 0)km", color: .blue)
-                    DashTile(icon: "thermometer.medium", label: "温度", value: "\(store.car?.climate?.tempC ?? 22)°C", color: .orange)
+                    DashTile(icon: "bolt.fill", label: "SOC", value: "\(energyDict["socPct"] as? Int ?? 0)%", color: .green)
+                    DashTile(icon: "gauge.low", label: "续航", value: "\(energyDict["rangeKm"] as? Int ?? 0)km", color: .blue)
+                    DashTile(icon: "thermometer.medium", label: "温度", value: "\(climateDict["tempC"] as? Int ?? 22)°C", color: .orange)
                 }
                 
                 // 能耗图表
-                if let history = store.energyHistory {
+                let history = store.energyHistory
+                if !history.isEmpty {
                     let last = Array(history.prefix(7))
                     ForEach(last.indices, id: \.self) { i in
                         let r = last[i]

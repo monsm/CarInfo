@@ -141,8 +141,8 @@ struct ReverseLinkageControl: View {
 class GKHomeManager: ObservableObject {
     static let shared = GKHomeManager()
     
-    @Published var homes: [HMKHome] = []
-    @Published var accessories: [HMKAccessory] = []
+    @Published var homes: [HMHome] = []
+    @Published var accessories: [HMAccessory] = []
     
     func requestHomeAccess() {
         // HomeKit访问请求

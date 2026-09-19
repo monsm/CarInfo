@@ -22,8 +22,15 @@ struct DrivingScorePage: View {
     }
     
     var safeSpeedScore: Int {
-        guard let best = store.tripHistory.max(by: { _ , _ in false }) else { return 80 }
-        return min(100, max(0, Int(100 - best.avgSpeed * 0.5)))
+        guard let best = store.tripHistory.max(by: { avgSpeed($0) < avgSpeed($1) }) else { return 80 }
+        return min(100, max(0, Int(100 - avgSpeed(best) * 0.5)))
+    }
+
+    /// 平均车速（km/h）：依据行程距离与时长估算
+    private func avgSpeed(_ trip: AppStore.TripRecord) -> Double {
+        guard let end = trip.endTime else { return 0 }
+        let hours = end.timeIntervalSince(trip.startTime) / 3600
+        return hours > 0 ? trip.distanceKm / hours : 0
     }
     
     var efficiencyScore: Int {
@@ -212,20 +219,22 @@ struct DrivingScorePage: View {
     
     // MARK: - 历史趋势
     private var scoreTrend: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let trips = Array(store.tripHistory.suffix(7))
+        let points = trips.map { calculateTripScore($0) }
+        return VStack(alignment: .leading, spacing: 8) {
             Text("得分趋势").font(Theme.font(.subheadline as Font).bold())
             Chart {
-                ForEach(Array(store.tripHistory.suffix(7).enumerated()), id: \.offset) { idx, trip in
+                ForEach(trips.indices, id: \.self) { i in
                     PointMark(
-                        x: .value("序号", idx + 1),
-                        y: .value("评分", calculateTripScore(trip))
+                        x: .value("序号", i + 1),
+                        y: .value("评分", points[i])
                     )
                     .foregroundStyle(scoreColor)
                 }
-                ForEach(store.tripHistory.suffix(7).enumerated(), id: \.element.id) { i, trip in
+                ForEach(trips.indices, id: \.self) { i in
                     LineMark(
                         x: .value("序号", i + 1),
-                        y: .value("得分", CGFloat(calculateTripScore(trip)))
+                        y: .value("得分", points[i])
                     )
                     .foregroundStyle(scoreColor.opacity(0.5))
                 }

@@ -347,7 +347,7 @@ struct HealthView: View {
 
     private func systemRow(_ sys: HealthSystem, toggle: @escaping () -> Void) -> some View {
         let isOpen = expandedSystems.contains(sys.name)
-        SystemRowView(sys: sys, isOpen: isOpen, onToggle: toggle)
+        return SystemRowView(sys: sys, isOpen: isOpen, onToggle: toggle)
     }
 
     private func toggleExpand(_ name: String) {
@@ -361,11 +361,11 @@ struct HealthView: View {
     }
 
     // MARK: DTC 故障码翻译卡片 (#15)
+    @ViewBuilder
     private func dtcTranslationCard(_ sys: HealthSystem) -> some View {
         let hasDTC = sys.children.contains { $0.name.range(of: "P\\d", options: .regularExpression) != nil }
-        guard hasDTC else { return EmptyView() }
-        
-        return VStack(alignment: .leading, spacing: 6) {
+        if hasDTC {
+        VStack(alignment: .leading, spacing: 6) {
             Text("故障码说明").font(Theme.caption).foregroundStyle(.secondary)
             ForEach(sys.children.filter { $0.name.range(of: "P\\d", options: .regularExpression) != nil }) { item in
                 let dtcCode = item.name
@@ -386,6 +386,7 @@ struct HealthView: View {
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.orange.opacity(0.2), lineWidth: 1))
         .padding(.horizontal, 4)
         .padding(.top, 4)
+        }
     }
 
     // MARK: 数据加载
@@ -445,7 +446,7 @@ struct SystemRowView: View {
                             .animation(.spring(response: 0.45, dampingFraction: 0.8, blendDuration: 0.3), value: isOpen)
                         Image(systemName: isOpen ? "chevron.up" : "chevron.down")
                             .font(Theme.font(.footnote as Font).bold())
-                            .foregroundStyle(isOpen ? Theme.statusColor(sys.statusCls) : .tertiary)
+                            .foregroundStyle(isOpen ? AnyShapeStyle(Theme.statusColor(sys.statusCls)) : AnyShapeStyle(.tertiary))
                             .rotationEffect(.degrees(isOpen ? 0 : 180))
                             .animation(.spring(response: 0.35, dampingFraction: 0.65), value: isOpen)
                     }

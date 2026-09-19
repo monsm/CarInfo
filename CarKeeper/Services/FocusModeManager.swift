@@ -52,7 +52,13 @@ class FocusModeManager: ObservableObject {
 
 // MARK: - 专注模式下的简化视图
 struct FocusModeHomeView: View {
-    let car: CarModel?
+    let car: [String: Any]?
+
+    private var socPct: Int { (car?["energy"] as? [String: Any])?["socPct"] as? Int ?? 0 }
+    private var rangeKm: Int { (car?["energy"] as? [String: Any])?["rangeKm"] as? Int ?? 0 }
+    private var tempC: Int { (car?["climate"] as? [String: Any])?["tempC"] as? Int ?? 22 }
+    private var acOn: Bool { (car?["climate"] as? [String: Any])?["acOn"] as? Bool ?? false }
+    private var doorLocked: Bool { (car?["control"] as? [String: Any])?["doorLocked"] as? Bool ?? false }
     @StateObject private var focusManager = FocusModeManager.shared
     
     var body: some View {
@@ -120,15 +126,15 @@ struct FocusModeHomeView: View {
                         LinearGradient(colors: [.green, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)
                     )
                     .rotationEffect(.degrees(270))
-                    .animation(.easeInOut, value: car?.energy?.socPct)
+                    .animation(.easeInOut, value: socPct)
                 
                 VStack {
-                    Text("\(car?.energy?.socPct ?? 0)%")
+                    Text("\(socPct)%")
                         .font(.system(size: 48, weight: .bold, design: .rounded))
                     Text("剩余续航")
                         .font(.caption)
-                        .foregroundColor(.secondaryLabel)
-                    Text("\(car?.energy?.rangeKm ?? 0) km")
+                        .foregroundColor(.secondary)
+                    Text("\(rangeKm) km")
                         .font(.title3)
                         .fontWeight(.semibold)
                 }
@@ -139,21 +145,21 @@ struct FocusModeHomeView: View {
             HStack {
                 Image(systemName: "fan.fill")
                     .foregroundColor(.blue)
-                Text("\(car?.climate?.tempC ?? 22)°C")
+                Text("\(tempC)°C")
                     .font(.title2)
                     .fontWeight(.semibold)
                 Spacer()
-                Image(systemName: car?.climate?.acOn == true ? "snowflake" : "sun.max.fill")
-                    .foregroundColor(car?.climate?.acOn == true ? .blue : .orange)
+                Image(systemName: acOn ? "snowflake" : "sun.max.fill")
+                    .foregroundColor(acOn ? .blue : .orange)
             }
             .glassCard()
             
             // 锁车状态（必须）
             HStack {
-                Image(systemName: car?.control?.doorLocked == true ? "lock.fill" : "lock.open.fill")
-                    .foregroundColor(car?.control?.doorLocked == true ? .green : .orange)
+                Image(systemName: doorLocked ? "lock.fill" : "lock.open.fill")
+                    .foregroundColor(doorLocked ? .green : .orange)
                     .font(.title2)
-                Text(car?.control?.doorLocked == true ? "已上锁" : "未上锁")
+                Text(doorLocked ? "已上锁" : "未上锁")
                     .font(.subheadline)
                     .foregroundColor(.primary)
             }

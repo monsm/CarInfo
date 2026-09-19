@@ -147,9 +147,4 @@ struct EmptyStateView: View {
 }
 
 // MARK: - N8 下拉刷新涟漪统一（所有 ScrollView）
-
-extension View {
-    func glassRefreshRipple(isRefreshing: Binding<Bool>) -> some View {
-        modifier(GlassRefreshRipple(isRefreshing: isRefreshing))
-    }
-}
+// 注：glassRefreshRipple 已在 Theme.swift 中实现，此处不再重复定义，避免 redeclaration。

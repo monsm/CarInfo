@@ -39,9 +39,9 @@ struct BatteryView: View {
                 verdictCard(cache, b).staggeredEntrance(index: 1)
                 consistencyCard(b).staggeredEntrance(index: 2)
                 // E2 电池健康度 SOH
-                BatteryHealthCard(b).staggeredEntrance(index: 2)
+                BatteryHealthCard(model: b).staggeredEntrance(index: 2)
                 // E7 充电功率曲线
-                ChargePowerChart(b).staggeredEntrance(index: 3)
+                ChargePowerChart(model: b).staggeredEntrance(index: 3)
                 chargeCard(b).staggeredEntrance(index: 4)
                 // #13 能耗历史折线图
                 // E26 充电效率趋势
@@ -440,14 +440,16 @@ struct BatteryView: View {
     }
 
     // MARK: 能耗趋势折线图 (#13 + #NEW-8)
+    @ViewBuilder
     private var energyHistoryChart: some View {
-        guard store.energyHistory.count >= 2 else { return EmptyView() }
-        return VStack(spacing: 0) {
+        if store.energyHistory.count >= 2 {
+        VStack(spacing: 0) {
             // 视图切换胶囊
             HStack(spacing: 6) {
                 ForEach(EnergyTrendPeriod.allCases) { period in
                     Button(period.rawValue) {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        let anim = Animation.spring(response: 0.4, dampingFraction: 0.7)
+                        withAnimation(anim) {
                             energyTrendPeriod = period
                         }
                     }
@@ -490,17 +492,18 @@ struct BatteryView: View {
                     AxisValueLabel(format: timeFormat())
                 }
             }
-            .chartYRangeLimit(.range(0...100))
+            .chartYScale(domain: 0...100)
             .frame(height: 160)
             .padding(.vertical, 4)
         }
         .glassCard(corner: Theme.Radius.card)
+        }
     }
 
-    private func timeFormat() -> any AxisFormatter {
+    private func timeFormat() -> Date.FormatStyle {
         switch energyTrendPeriod {
         case .realtime: return .dateTime.hour()
-        case .week: return .dateTime.hour().weekday(.abbreviated)
+        case .week: return .dateTime.hour().weekday()
         case .month: return .dateTime.month().day()
         }
     }

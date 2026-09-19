@@ -5,8 +5,8 @@
 import Foundation
 import SwiftUI
 
-struct InsurancePolicy: Identifiable {
-    let id = UUID()
+struct InsurancePolicy: Identifiable, Codable {
+    var id = UUID()
     let name: String           // 保险公司
     let type: String           // 交强险/商业险/座位险
     let policyNumber: String   // 保单号
@@ -73,7 +73,7 @@ struct InsuranceCard: View {
                         .fontWeight(.semibold)
                     Text(policy.type)
                         .font(.caption)
-                        .foregroundColor(.secondaryLabel)
+                        .foregroundColor(.secondary)
                 }
                 
                 Spacer()
@@ -103,7 +103,7 @@ struct InsuranceCard: View {
             HStack {
                 Text("保费")
                     .font(.caption)
-                    .foregroundColor(.secondaryLabel)
+                    .foregroundColor(.secondary)
                 Spacer()
                 Text("¥\(policy.premium, specifier: "%.0f")")
                     .font(.callout)
@@ -113,7 +113,7 @@ struct InsuranceCard: View {
             HStack {
                 Text("有效期")
                     .font(.caption)
-                    .foregroundColor(.secondaryLabel)
+                    .foregroundColor(.secondary)
                 Spacer()
                 Text(policy.startDate.formatted(date: .numeric, time: .omitted))
                     .font(.caption)

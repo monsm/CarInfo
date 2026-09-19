@@ -3,9 +3,10 @@
 // =============================================================================
 
 import Foundation
+import SwiftUI
 import Charts
 
-struct ChargeCostRecord: Identifiable {
+struct ChargeCostRecord: Identifiable, Codable {
     let id = UUID()
     let date: Date
     let kWh: Double

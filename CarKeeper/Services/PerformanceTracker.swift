@@ -25,7 +25,12 @@ class PerformanceTracker : ObservableObject {
     private var apiStats: [APIStatistic] = []
     
     private init() {}
-    
+
+    /// 首页最近一次加载耗时（秒），供性能报告展示
+    var homeLoadTime: Double {
+        pageMetrics.last(where: { $0.page == "Home" || $0.page == "首页" })?.duration ?? 0
+    }
+
     /// 开始页面计时
     func startPageTimer(_ page: String) {
         pageStartTimes[page] = Date()

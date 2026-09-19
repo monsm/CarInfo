@@ -22,19 +22,33 @@ struct DrivingRadarChart: View {
             }
             
             // 轴线
-            ForEach(Array(0..<4), id: \.self) { i in
-                LineMark(
-                    x: .value("轴", ""),
-                    y: .value("值", 100),
-                    series: .value("维度", ["加速", "刹车", "平稳", "限速"][i])
-                )
-                .foregroundStyle(Color.secondary.opacity(0.2))
-                .symbol {}
+            let dims = ["加速", "刹车", "平稳", "限速"]
+            Chart {
+                ForEach(0..<4, id: \.self) { i in
+                    LineMark(
+                        x: .value("轴", dims[i]),
+                        y: .value("值", 100)
+                    )
+                    .foregroundStyle(Color.secondary.opacity(0.2))
+                }
             }
-            
-            // 数据多边形
+            .frame(width: 160, height: 160)
+
+            // 数据多边形 (iOS 26: PolygonMark removed — use AreaMark + LineMark)
             Chart {
                 ForEach(radarPoints(), id: \.dimension) { point in
+                    AreaMark(
+                        x: .value("角度", angle(for: point.dimension)),
+                        y: .value("强度", point.value)
+                    )
+                    .foregroundStyle(Theme.Colors.accent.opacity(0.2))
+
+                    LineMark(
+                        x: .value("角度", angle(for: point.dimension)),
+                        y: .value("强度", point.value)
+                    )
+                    .foregroundStyle(Theme.Colors.accent)
+
                     PointMark(
                         x: .value("角度", angle(for: point.dimension)),
                         y: .value("强度", point.value)
@@ -42,14 +56,6 @@ struct DrivingRadarChart: View {
                     .foregroundStyle(accentColor(for: point.dimension))
                     .symbolSize(8)
                 }
-                
-                // 填充区域 (iOS 26: PolygonMark removed — use AreaMark)
-                AreaMark(
-                    x: .value("角度", Array(radarPoints().indices).map { angle(for: radarPoints()[$0].dimension) }),
-                    y: .value("强度", radarPoints().map { $0.value }),
-                    stacking: .none
-                )
-                .foregroundStyle(Theme.Colors.accent.opacity(0.2))
             }
             .chartLegend(.hidden)
             .frame(width: 160, height: 160)
@@ -102,6 +108,19 @@ struct EnergyCompareChart: View {
     let thisWeek: Double
     let lastWeek: Double
     let lastMonth: Double
+
+    init(thisWeek: Double, lastWeek: Double, lastMonth: Double) {
+        self.thisWeek = thisWeek
+        self.lastWeek = lastWeek
+        self.lastMonth = lastMonth
+    }
+
+    /// 便捷初始化：从 AppStore 读取（当前使用示例值，接口接入后替换）
+    init(store: Any) {
+        self.thisWeek = 12
+        self.lastWeek = 14
+        self.lastMonth = 60
+    }
     
     var body: some View {
         Chart {
@@ -168,40 +187,45 @@ struct CostPieChart: View {
     let parkingCost: Double
     let maintenanceCost: Double
     
-    var body: some View {
-        let total = chargeCost + fuelCost + parkingCost + maintenanceCost
-        guard total > 0 else { return Text("暂无数据").font(.caption) }
-        
-        struct Slice: Identifiable {
-            let id = UUID()
-            let name: String
-            let value: Double
-            let color: Color
-        }
-        
-        let slices = [
+    private struct Slice: Identifiable {
+        let id = UUID()
+        let name: String
+        let value: Double
+        let color: Color
+    }
+
+    private var total: Double { chargeCost + fuelCost + parkingCost + maintenanceCost }
+
+    private var slices: [Slice] {
+        [
             Slice(name: "充电", value: chargeCost, color: .green),
             Slice(name: "加油", value: fuelCost, color: .orange),
             Slice(name: "停车", value: parkingCost, color: .blue),
             Slice(name: "保养", value: maintenanceCost, color: .purple)
         ]
-        
-        Chart {
-            ForEach(slices) { slice in
-                SectorMark(
-                    angle: .value("", slice.value),
-                    innerRadius: .ratio(0.55),
-                    outerRadius: .ratio(1)
-                )
-                .foregroundStyle(slice.color)
-                .annotation(position: .overlay) {
-                    Text("\(slice.name)")
-                        .font(.caption2)
-                        .foregroundColor(.white)
+    }
+
+    var body: some View {
+        if total > 0 {
+            Chart {
+                ForEach(slices) { slice in
+                    SectorMark(
+                        angle: .value("金额", slice.value),
+                        innerRadius: .ratio(0.55),
+                        outerRadius: .ratio(1)
+                    )
+                    .foregroundStyle(slice.color)
+                    .annotation(position: .overlay) {
+                        Text("\(slice.name)")
+                            .font(.caption2)
+                            .foregroundColor(.white)
+                    }
                 }
             }
+            .frame(width: 100, height: 100)
+        } else {
+            Text("暂无数据").font(.caption)
         }
-        .frame(width: 100, height: 100)
     }
 }
 
@@ -211,7 +235,8 @@ struct ChargingHeatOverlay: View {
     
     var body: some View {
         ZStack {
-            ForEach(Array(stations.enumerated()), id: \.offset) { idx, station in
+            ForEach(stations.indices, id: \.self) { idx in
+                let station = stations[idx]
                 Circle()
                     .fill(
                         LinearGradient(

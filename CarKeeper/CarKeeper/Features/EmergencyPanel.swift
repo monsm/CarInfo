@@ -104,7 +104,7 @@ struct EmergencyPanel: View {
             .background(color.opacity(0.08))
             .cornerRadius(Theme.Radius.small)
         }
-        .PressFeedback()
+        .pressFeedbackLegacy()
     }
     
     // MARK: - 紧急联系人

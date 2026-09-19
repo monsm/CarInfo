@@ -86,7 +86,8 @@ class CloudSyncManager: ObservableObject {
         
         do {
             let results = try await publicDB.records(matching: query)
-            for (_, record) in results.matchResults {
+            for (_, result) in results.matchResults {
+                guard let record = try? result.get() else { continue }
                 if let startTime = record["startTime"] as? TimeInterval {
                     let trip = TripRecord(
                         startTime: Date(timeIntervalSince1970: startTime),

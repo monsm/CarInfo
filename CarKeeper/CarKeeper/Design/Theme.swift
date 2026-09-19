@@ -27,6 +27,24 @@ extension Color {
 }
 
 enum Theme {
+    // MARK: - 颜色别名（兼容旧代码 Theme.Colors.*）
+    enum Colors {
+        static var accent: Color { Theme.brand }
+        static var brand: Color { Theme.brand }
+        static var brandLight: Color { Theme.brandLight }
+        static var brandDark: Color { Theme.brandDark }
+        static var background: Color { ColorSystem.background }
+        static var cardBg: Color { ColorSystem.cardBg }
+        static var primary: Color { ColorSystem.primary }
+        static var secondary: Color { ColorSystem.secondary }
+        static var tertiary: Color { ColorSystem.tertiary }
+        static var border: Color { ColorSystem.border }
+        static var fill: Color { ColorSystem.fill }
+        static var ok: Color { Theme.ok }
+        static var warn: Color { Theme.warn }
+        static var bad: Color { Theme.bad }
+    }
+
     // MARK: - 品牌色（自适应浅色/深色模式）
 
     /// 主色调：长安品牌蓝，浅暗双模式
@@ -148,9 +166,12 @@ enum Theme {
     // =============================================================================
     enum Radius {
         static let tiny: CGFloat = 8    // 图标按钮、tag
+        static let sm: CGFloat = 8      // tiny 别名
         static let small: CGFloat = 12  // Pill、小卡片
         static let medium: CGFloat = 16 // StatTile、普通卡片
         static let large: CGFloat = 20  // 消息卡片
+        static let lg: CGFloat = 20     // large 别名
+        static let md: CGFloat = 16     // medium 别名
         static let card: CGFloat = 24   // 标准玻璃卡片
         static let hero: CGFloat = 28   // Hero 区域卡片
         static let ultra: CGFloat = 32  // 超大 Hero 卡片
@@ -579,7 +600,7 @@ struct CardBox<Content: View>: View {
     let title: String
     var side: String? = nil
     var sideCls: String = ""
-    let cornerRadius: CGFloat = Theme.Radius.card
+    var cornerRadius: CGFloat = Theme.Radius.card
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -2834,7 +2855,7 @@ extension Font {
 extension View {
     func navBarStyle() -> some View { self }
     /// Default press feedback with spring response 0.4 and damping 0.65
-    func PressFeedback() -> some View {
+    func pressFeedbackLegacy() -> some View {
         self.modifier(PressFeedback(pressScale: 0.93,
                                     glowColor: nil,
                                     glowIntensity: 0.6,

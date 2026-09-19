@@ -117,7 +117,7 @@ struct MileageJournalView: View {
                 
                 // 统计卡片
                 HStack(spacing: Theme.Spacing.sm) {
-                    for type in TripCostType.allCases.prefix(4) {
+                    ForEach(Array(TripCostType.allCases.prefix(4)), id: \.self) { type in
                         CostSummaryTile(type: type, total: tracker.totalByType(type))
                     }
                 }

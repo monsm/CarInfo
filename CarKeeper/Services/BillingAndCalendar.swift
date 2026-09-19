@@ -127,7 +127,7 @@ class VehicleValuation {
 
 // MARK: - N34 年检日历
 struct Inspection: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let vehicleName: String
     let date: Date
     var notes: String = ""
@@ -140,7 +140,7 @@ class InspectionCalendar: ObservableObject {
     private init() {
         if let data = UserDefaults.standard.data(forKey: "carkeeper_inspections"),
            let decoded = try? JSONDecoder().decode([Inspection].self, from: data) {
-            _inspections = decoded
+            inspections = decoded
         }
     }
     
@@ -175,6 +175,14 @@ class InspectionCalendar: ObservableObject {
         if let data = try? JSONEncoder().encode(list) {
             UserDefaults.standard.set(data, forKey: "carkeeper_inspections")
         }
+    }
+    func updateInspection(_ inspection: Inspection) {
+        var list = inspections
+        if let idx = list.firstIndex(where: { $0.id == inspection.id }) {
+            list[idx] = inspection
+        }
+        inspections = list
+        saveInspections(list)
     }
 }
 
@@ -257,11 +265,9 @@ struct InspectionEditForm: View {
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("保存") {
-                    var list = InspectionCalendar.shared.inspections
-                    if let idx = list.firstIndex(where: { $0.id == inspection.id }) {
-                        list[idx] = Inspection(vehicleName: name, date: date, notes: inspection.notes)
-                    }
-                    saveInspections(list)
+                    var updated = inspection
+                    updated = Inspection(id: inspection.id, vehicleName: name, date: date, notes: inspection.notes)
+                    InspectionCalendar.shared.updateInspection(updated)
                     dismiss()
                 }
             }
@@ -307,7 +313,6 @@ struct InspectionCalendarView: View {
                     Button("保存") {
                         guard !vehicleName.isEmpty else { return }
                         calendar.addInspection(Inspection(
-                            id: UUID(),
                             vehicleName: vehicleName,
                             date: inspectionDate,
                             notes: ""
@@ -404,10 +409,10 @@ struct ChargeBillSheet: View {
                         action: {}
                     )
                 } else {
-                    ForEach(chargeRecords) { record in
+                    ForEach(chargeRecords, id: \.date) { record in
                         HStack {
                             VStack(alignment: .leading) {
-                                Text(record.date, format: .dateTime.date().time(.omitted))
+                                Text(record.date, format: .dateTime.day().month())
                                     .font(.subheadline)
                                 Text("¥\(String(format: "%.2f", record.cost))")
                                     .font(.caption)

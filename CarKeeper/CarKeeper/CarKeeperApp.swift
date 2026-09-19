@@ -27,6 +27,29 @@ struct CarKeeperApp: App {
     private let store = AppStore.shared
     @StateObject private var nav = NavState.shared
 
+    /// 深潜页目标视图（独立函数避免巨型 switch 拖慢类型检查）
+    @ViewBuilder
+    private func deeplinkDestination(_ link: Deeplink) -> some View {
+        switch link {
+        case .vehicle: VehicleView().environmentObject(nav)
+        case .health: HealthView().environmentObject(nav)
+        case .battery: BatteryView().environmentObject(nav)
+        case .data: DataView(kind: .status).environmentObject(nav)
+        case .dev: DevView().environmentObject(nav)
+        case .messages: MessagesView().environmentObject(nav)
+        case .control: ControlView().environmentObject(nav)
+        case .dashboard: DashboardView().environmentObject(nav)
+        case .trips: TripAnalyticsView().environmentObject(nav)
+        case .commands: CommandHistoryView().environmentObject(nav)
+        case .service: ServiceHistoryView().environmentObject(nav)
+        case .parking: ParkingMapView().environmentObject(nav)
+        case .export: ExportDataView().environmentObject(nav)
+        case .emergency: EmergencyPanel().environmentObject(nav)
+        case .tips: VehicleTipsView().environmentObject(nav)
+        case .score: DrivingScorePage().environmentObject(nav)
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             root
@@ -122,7 +145,7 @@ struct CarKeeperApp: App {
             // E40 充电状态监控
             _ = ChargingStatusMonitor.shared
             // N10 车牌加密初始化
-            _ = DataEncryption.shared
+            DataEncryption.ensureKey()
         }
         .nightModeBreathing(enabled: store.isNightMode)
     }
@@ -310,10 +333,10 @@ struct NavGlassWrapper<Content: View>: View {
     // 内部状态：首次 onAppear 时触发入场动画，pop 时由 NavigationStack 接管退出转场
     @State private var _shown: Bool = false
 
-    private var cx: CGFloat { Self.params[0].contentX }
-    private var gx: CGFloat { Self.params[0].glassX }
-    private var ox: CGFloat { Self.params[0].glowX }
-    private var delay:   CGFloat { Self.params[0].delay }
+    private var cx: CGFloat { params[0].contentX }
+    private var gx: CGFloat { params[0].glassX }
+    private var ox: CGFloat { params[0].glowX }
+    private var delay:   CGFloat { params[0].delay }
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -431,30 +454,12 @@ struct MainTabView: View {
     // #4 网络状态监测定时器（每 30 秒检查一次）
     private let networkMonitorTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
-    var body: some View {
-        TabView(selection: $nav.selectedTab) {
+    private var homeTab: some View {
             NavigationStack(path: $nav.path) {
                 HomeView()
                     .navigationDestination(for: Deeplink.self) { link in
                         NavGlassWrapper {
-                            switch link {
-                            case .vehicle: VehicleView().environmentObject(nav)
-                            case .health: HealthView().environmentObject(nav)
-                            case .battery: BatteryView().environmentObject(nav)
-                            case .data: DataView(kind: .status).environmentObject(nav)
-                            case .dev: DevView().environmentObject(nav)
-                            case .messages: MessagesView().environmentObject(nav)
-                            case .control: ControlView().environmentObject(nav)
-                            case .dashboard: DashboardView().environmentObject(nav)
-                            case .trips: TripAnalyticsView().environmentObject(nav)
-                            case .commands: CommandHistoryView().environmentObject(nav)
-                            case .service: ServiceHistoryView().environmentObject(nav)
-                            case .parking: ParkingMapView().environmentObject(nav)
-                            case .export: ExportDataView().environmentObject(nav)
-                            case .emergency: EmergencyPanel().environmentObject(nav)
-                            case .tips: VehicleTipsView().environmentObject(nav)
-                            case .score: DrivingScorePage().environmentObject(nav)
-                            }
+                            deeplinkDestination(link)
                         }
                     }
                     .transition(liquidGlassPopTransition)
@@ -529,19 +534,14 @@ struct MainTabView: View {
                 }
             }
 
+    }
+
+    private var controlTab: some View {
             NavigationStack(path: $nav.controlPath) {
                 ControlView()
                     .navigationDestination(for: Deeplink.self) { link in
                         NavGlassWrapper {
-                            switch link {
-                            case .vehicle:  VehicleView().environmentObject(nav)
-                            case .health:   HealthView().environmentObject(nav)
-                            case .battery:  BatteryView().environmentObject(nav)
-                            case .data:     DataView(kind: .status).environmentObject(nav)
-                            case .dev:      DevView().environmentObject(nav)
-                            case .messages: MessagesView().environmentObject(nav)
-                            case .control:  ControlView().environmentObject(nav)
-                            }
+                            deeplinkDestination(link)
                         }
                     }
                     .transition(liquidGlassPopTransition)
@@ -590,19 +590,14 @@ struct MainTabView: View {
                 prevSelectedTab = nav.selectedTab
             }
 
+    }
+
+    private var messagesTab: some View {
             NavigationStack(path: $nav.messagesPath) {
                 MessagesView()
                     .navigationDestination(for: Deeplink.self) { link in
                         NavGlassWrapper {
-                            switch link {
-                            case .vehicle:  VehicleView().environmentObject(nav)
-                            case .health:   HealthView().environmentObject(nav)
-                            case .battery:  BatteryView().environmentObject(nav)
-                            case .data:     DataView(kind: .status).environmentObject(nav)
-                            case .dev:      DevView().environmentObject(nav)
-                            case .messages: MessagesView().environmentObject(nav)
-                            case .control:  ControlView().environmentObject(nav)
-                            }
+                            deeplinkDestination(link)
                         }
                     }
                     .transition(liquidGlassPopTransition)
@@ -651,19 +646,14 @@ struct MainTabView: View {
                 prevSelectedTab = nav.selectedTab
             }
 
+    }
+
+    private var mineTab: some View {
             NavigationStack(path: $nav.minePath) {
                 MineView()
                     .navigationDestination(for: Deeplink.self) { link in
                         NavGlassWrapper {
-                            switch link {
-                            case .vehicle:  VehicleView().environmentObject(nav)
-                            case .health:   HealthView().environmentObject(nav)
-                            case .battery:  BatteryView().environmentObject(nav)
-                            case .data:     DataView(kind: .status).environmentObject(nav)
-                            case .dev:      DevView().environmentObject(nav)
-                            case .messages: MessagesView().environmentObject(nav)
-                            case .control:  ControlView().environmentObject(nav)
-                            }
+                            deeplinkDestination(link)
                         }
                     }
                     .transition(liquidGlassPopTransition)
@@ -711,6 +701,14 @@ struct MainTabView: View {
             .onChange(of: nav.selectedTab) { newTab in
                 prevSelectedTab = nav.selectedTab
             }
+    }
+
+    var body: some View {
+        TabView(selection: $nav.selectedTab) {
+            homeTab
+            controlTab
+            messagesTab
+            mineTab
         }
         // VoiceOver：切换 Tab 时朗读当前页面名称（仅首次切换到新 Tab）
         .onChange(of: nav.selectedTab) { newTab in
@@ -786,7 +784,7 @@ private class TabBarGlowOverlay: UIView {
         super.touchesBegan(touches, with: event)
         guard let tabBar = superview as? UITabBar, let touch = touches.first else { return }
         let point = touch.location(in: self)
-        for (idx, item) in tabBar.items?.enumerated() ?? [] {
+        for (idx, item) in (tabBar.items ?? []).enumerated() {
             let frame = item.frame(in: tabBar)
             if frame.contains(point) {
                 triggerPressGlow(at: frame.midX, y: frame.midY)
@@ -1066,7 +1064,7 @@ private class TabBarGlowOverlay: UIView {
 
     private var items: [CGRect] {
         guard let tabBar = superview as? UITabBar else { return [] }
-        return tabBar.items?.enumerated().map { $1.frame } ?? []
+        return (tabBar.items ?? []).map { $0.frame(in: tabBar) }
     }
 }
 

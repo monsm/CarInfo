@@ -7,15 +7,15 @@ import SwiftUI
 import UIKit
 
 // MARK: - N30 临时共享钥匙
-struct TemporaryKey: Identifiable {
-    let id = UUID()
+struct TemporaryKey: Identifiable, Codable {
+    var id = UUID()
     let recipientName: String
     let code: String           // 6位数字 PIN
     let createdAt: Date
     let expiresAt: Date
     let maxUses: Int
-    let usedCount: Int
-    let isActive: Bool
+    var usedCount: Int
+    var isActive: Bool
     
     var remainingUses: Int { max(0, maxUses - usedCount) }
     var isExpired: Bool { Date() > expiresAt }
@@ -81,8 +81,8 @@ class TempKeyManager: ObservableObject {
 }
 
 // MARK: - N31 家庭多车管理
-struct FamilyMember: Identifiable {
-    let id = UUID()
+struct FamilyMember: Identifiable, Codable {
+    var id = UUID()
     let name: String
     let phone: String
     let avatar: String

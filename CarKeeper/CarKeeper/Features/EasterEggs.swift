@@ -154,7 +154,7 @@ struct FamilyLeaderboard: View {
     @StateObject private var family = FamilyManager.shared
     
     var body: some View {
-        List(family.members.enumerated(), id: \.element.id) { idx, member in
+        List(Array(family.members.enumerated()), id: \.element.id) { idx, member in
             HStack {
                 Text("#\(idx + 1)")
                     .font(.headline)
