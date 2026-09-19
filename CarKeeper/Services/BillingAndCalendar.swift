@@ -75,7 +75,7 @@ class ChargeBillGenerator {
                 formatter.dateFormat = "MM/dd"
                 let dateStr = formatter.string(from: record.date)
                 let row = [dateStr, "\(record.socStart)%", "\(record.socEnd)%",
-                           String(format: "%.1f", record.kWh), String(format: "%.2f", record.cost)
+                           String(format: "%.1f", record.kWh), String(format: "%.2f", record.cost)]
                 row.enumerated().forEach { i, text in
                     text.draw(at: CGPoint(x: colX[i], y: rowY), withAttributes: rowAttrs)
                 }
