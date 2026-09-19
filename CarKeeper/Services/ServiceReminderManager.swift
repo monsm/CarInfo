@@ -80,7 +80,7 @@ class ServiceReminderManager {
         return reminders.filter { $0.nextDate <= thirtyDays }.sorted { $0.nextDate < $1.nextDate }
     }
     
-    private func defaultReminders: [ServiceReminder] {
+    private var defaultReminders: [ServiceReminder] {
         let today = Date()
         let cal = Calendar.current
         return ServiceType.allCases.map { type in

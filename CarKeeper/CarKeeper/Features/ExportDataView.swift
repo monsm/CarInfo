@@ -222,12 +222,8 @@ struct ExportDataView: View {
         try? html.write(to: htmlURL, atomically: true, encoding: .utf8)
         
         let htmlData = html.data(using: .utf8) ?? Data()
-        if let pdfData = try? UIKit.UIGraphicsImageRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842)).image { _ in
-            // Placeholder: basic PDF via data
-        }
         // Simple approach: return the HTML file as-is for sharing
         return htmlURL
-        return pdfURL
     }
     
     private func shareExportedFile() {
