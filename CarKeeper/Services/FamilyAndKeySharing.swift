@@ -202,3 +202,93 @@ struct FamilyMemberRow: View {
         .padding(.vertical, 8)
     }
 }
+
+// MARK: - UI: 临时钥匙列表页
+struct TempKeyListView: View {
+    @StateObject private var manager = TempKeyManager.shared
+    @State private var showCreate = false
+    @State private var recipientName = ""
+    @State private var days = 7
+    @State private var maxUses = 10
+    
+    var body: some View {
+        List {
+            Section("当前有效钥匙") {
+                if manager.keys.isEmpty {
+                    Text("暂无共享钥匙")
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(manager.keys) { key in
+                        TempKeyCard(key: key) {
+                            manager.useKey(key.id)
+                        }
+                    }
+                }
+            }
+            
+            Section("创建新钥匙") {
+                VStack(spacing: 12) {
+                    TextField(" recipient 姓名", text: $recipientName)
+                    HStack {
+                        Text("有效期:")
+                        Slider(value: Binding(
+                            get: { Double(days) },
+                            set: { days = Int($0) }
+                        ), in: 1...30)
+                        Text("\(days)天")
+                    }
+                    Button("生成钥匙") {
+                        let key = manager.createKey(
+                            recipient: recipientName,
+                            days: days,
+                            maxUses: maxUses
+                        )
+                        // 复制 PIN 到剪贴板
+                        UIPasteboard.general.string = key.code
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding(.vertical, 8)
+            }
+        }
+    }
+}
+
+// MARK: - UI: 家庭管理页
+struct FamilyManagementView: View {
+    @StateObject private var manager = FamilyManager.shared
+    @State private var showAdd = false
+    @State private var newName = ""
+    @State private var newPhone = ""
+    
+    var body: some View {
+        List {
+            Section("家庭成员") {
+                ForEach(manager.members) { member in
+                    FamilyMemberRow(member: member)
+                }
+                if manager.members.isEmpty {
+                    Text("暂无成员")
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Section("添加成员") {
+                VStack(spacing: 12) {
+                    TextField("姓名", text: $newName)
+                    TextField("手机号", text: $newPhone)
+                        .keyboardType(.phonePad)
+                    Button("添加成员") {
+                        guard !newName.isEmpty else { return }
+                        manager.addMember(name: newName, phone: newPhone)
+                        newName = ""
+                        newPhone = ""
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(newName.isEmpty)
+                }
+                .padding(.vertical, 8)
+            }
+        }
+    }
+}

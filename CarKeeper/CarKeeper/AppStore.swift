@@ -562,6 +562,10 @@ final class AppStore: @unchecked Sendable {
         // 先更新 carId（触发视图重建，缓存仍在，避免闪烁）
         car = c
         carId = newId
+        // #N10 加密保存车牌号
+        if let plate = ciString(c, ["Plate", "plate", "plateNo"]) {
+            SecureStorage.shared.savePlate(plate)
+        }
         // 再清除旧缓存，后台异步拉新车数据
         clearCache()
         Task { await fetchVehicleData() }

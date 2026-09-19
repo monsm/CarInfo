@@ -87,6 +87,32 @@ struct CarKeeperApp: App {
             }
             // #NEW-111 CloudKit 同步
             Task { await store.triggerCloudSync() }
+            // #N38 崩溃上报初始化
+            CrashReporter.shared.setup()
+            // #N39 内存监控启动
+            MemoryMonitor.shared.startMonitoring(interval: 10)
+            // #N37 网络质量监控
+            _ = NetworkQualityMonitor.shared
+            // #N41 离线模式监听
+            _ = OfflineModeManager.shared
+            // #N15-N20 通知权限请求
+            Task { await SmartNotificationManager.shared.requestAuthorization() }
+            SmartNotificationManager.shared.registerCategories()
+            // #N14 远程锁定监听
+            RemoteLockManager.shared.startMonitoring()
+            // #N46 摇一摇锁车
+            ShakeDetector.shared.startMonitoring()
+            ShakeDetector.shared.onShake = { _ in
+                if store.carId.isEmpty == false {
+                    // 触发锁车提示
+                    EnhancedToastManager.shared.show("摇一摇已触发", icon: "shake")
+                }
+            }
+            // #NEW-118/N119 维保+保险提醒调度器初始化
+            _ = MaintenanceReminderScheduler.shared
+            _ = InsuranceReminderScheduler.shared
+            // #NEW-120 App Intents 注册（Siri 对话入口）
+            _ = AppIntentsManager.shared
         }
         .nightModeBreathing(enabled: store.isNightMode)
     }

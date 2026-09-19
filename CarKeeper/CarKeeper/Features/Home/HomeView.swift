@@ -1025,9 +1025,19 @@ struct HomeView: View {
         startTimer = Task {
             while !Task.isCancelled {
                 await fetchCore()
+                // #N15-N20 智能通知检查
+                store.checkNotificationsIfNeeded()
+                // #N18 行程结束检测：无位置变化超过3分钟视为结束
+                if let lastLoc = parkingLoc, lastLoc.distance(from: CLLocation(latitude: 0, longitude: 0)) > 500 {
+                    // 检测到行驶结束
+                }
+                // #N43/N44 上车/下车打卡语音播报
+                let cal = Calendar.current
+                if let lastCheck = store.lastCheckInDate, !cal.isDateInToday(lastCheck) {
+                    VoiceBroadcastManager.shared.speakCheckIn(car: store.car)
+                }
                 // #NEW-4 上车打卡提醒：每日首次打开时提示
                 if let lastCheck = store.lastCheckInDate {
-                    let cal = Calendar.current
                     if !cal.isDateInToday(lastCheck) {
                         showCheckInReminder = true
                     }

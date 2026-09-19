@@ -19,6 +19,12 @@ struct MineView: View {
     @State private var isChecking = false        // OTA 检查中（不含下载）
     @State private var showMileageJournal = false
     @State private var showOTAChangelog = false
+    @State private var showPrivacyDashboard = false
+    @State private var showTempKeys = false
+    @State private var showFamily = false
+    @State private var showInspection = false
+    @State private var showValuation = false
+    @State private var showChargeBill = false
     @EnvironmentObject var nav: NavState            // C3: 用于 pushNavigation
     // #NEW-115 夜间模式管理
     @StateObject private var nightModeManager = NightModeManager()
@@ -85,6 +91,48 @@ struct MineView: View {
             NavigationStack {
                 OTAChangelogView()
                     .navigationTitle("OTA 版本日志")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .sheet(isPresented: $showPrivacyDashboard) {
+            NavigationStack {
+                PrivacyDashboardView()
+                    .navigationTitle("隐私与数据")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .sheet(isPresented: $showTempKeys) {
+            NavigationStack {
+                TempKeyListView()
+                    .navigationTitle("共享钥匙")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .sheet(isPresented: $showFamily) {
+            NavigationStack {
+                FamilyManagementView()
+                    .navigationTitle("家庭管理")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .sheet(isPresented: $showInspection) {
+            NavigationStack {
+                InspectionCalendarView()
+                    .navigationTitle("年检日历")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .sheet(isPresented: $showValuation) {
+            NavigationStack {
+                VehicleValuationView()
+                    .navigationTitle("车辆估值")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .sheet(isPresented: $showChargeBill) {
+            NavigationStack {
+                ChargeBillSheet()
+                    .navigationTitle("充电账单")
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
@@ -270,6 +318,23 @@ struct MineView: View {
                     tile("tray.fill", "OTA日志", tint: .blue) { showOTAChangelog = true }
                     tile("doc.plaintext.fill", "专注模式", tint: .purple) { nav.pushNavigation(.dashboard, targetTab: 3) }
                 }
+                // #N11 隐私仪表盘 + N43 语音播报
+                HStack(spacing: 10) {
+                    tile("eye.fill", "隐私与数据", tint: .teal) { showPrivacyDashboard = true }
+                    tile("speaker.wave.3.fill", "语音播报", tint: .indigo) { /* VoiceBroadcastManager 已自动启动 */ }
+                }
+                // #N30/N31 临时钥匙 + 家庭管理
+                HStack(spacing: 10) {
+                    tile("key.fill", "共享钥匙", tint: .pink) { showTempKeys = true }
+                    tile("person.2.fill", "家庭管理", tint: .orange) { showFamily = true }
+                }
+                // #N33/N34 车辆估值 + 年检日历
+                HStack(spacing: 10) {
+                    tile("dollarsign.circle.fill", "车辆估值", tint: .green) { showValuation = true }
+                    tile("calendar.fill", "年检日历", tint: .purple) { showInspection = true }
+                }
+                // #N32 充电账单 PDF
+                tile("doc.plaintext.fill", "充电账单", tint: .cyan) { showChargeBill = true }
             }
         }
     }

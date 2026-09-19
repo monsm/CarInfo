@@ -33,6 +33,8 @@ struct ControlView: View {
     @State private var running: RunState? = nil
     @State private var history: [RunState] = []
     @State private var showPin = false
+    @State private var showBiometricLock = false  // #N13 生物识别二次验证
+    @State private var isAuthenticated = false
     @State private var showTemp = false
     @State private var showResult = false
     @State private var showMoreCommands = false
@@ -293,6 +295,19 @@ struct ControlView: View {
             showResult = false
         }
         .sheet(isPresented: $showResult) { resultSheet }
+        // #N13 生物识别验证覆盖层
+        .overlay {
+            if showBiometricLock {
+                BiometricLockOverlay(isAuthenticated: $isAuthenticated)
+                    .onAppear { isAuthenticated = false }
+                    .onChange(of: isAuthenticated) { auth in
+                        if auth {
+                            showBiometricLock = false
+                            showPin = true  // 验证通过后进入 PIN 输入
+                        }
+                    }
+            }
+        }
     }
 
     // MARK: 车辆切换
@@ -517,7 +532,14 @@ struct ControlView: View {
         }
         pendingCmd = key
         if key == "OpenAir" { showTemp = true }
-        else { showPin = true }
+        else {
+            // #N13 敏感操作先验证生物识别
+            if store.canUseBiometric() && store.hasBiometricSetup {
+                showBiometricLock = true
+            } else {
+                showPin = true
+            }
+        }
     }
 
     private func execute(_ pin: String) {
