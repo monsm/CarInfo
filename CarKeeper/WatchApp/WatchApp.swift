@@ -47,7 +47,7 @@ struct WatchRoute: View {
                 }
                 .tag(2)
         }
-        .tint(.accentColor)
+        .tint(.accent)
     }
 }
 
@@ -143,7 +143,7 @@ struct WatchStatusRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundStyle(tint ?? .accentColor)
+                .foregroundStyle(tint ?? .accent)
                 .frame(width: 20)
             Text(value).font(.system(size: 16, weight: .semibold))
             Spacer()
@@ -170,14 +170,14 @@ struct WatchControlView: View {
                 HStack {
                     Button("-") { temperature = max(16, temperature - 1) }
                         .font(.title).frame(width: 40, height: 40)
-                        .background(.thin, in: Circle())
+                        .background(.ultraThinMaterial, in: Circle())
                     VStack {
                         Text("\(temperature)°C").font(.system(size: 32, weight: .bold, design: .monospaced))
                         Text(acOn ? "运行中" : "已关闭").font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                     Button("+") { temperature = min(30, temperature + 1) }
                         .font(.title).frame(width: 40, height: 40)
-                        .background(.thin, in: Circle())
+                        .background(.ultraThinMaterial, in: Circle())
                 }
                 
                 Button(action: toggleAC) {
@@ -247,7 +247,7 @@ struct WatchControlButton: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(.thin, in: RoundedRectangle(cornerRadius: 16))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
         }
         .disabled(disabled)
         .opacity(disabled ? 0.5 : 1)

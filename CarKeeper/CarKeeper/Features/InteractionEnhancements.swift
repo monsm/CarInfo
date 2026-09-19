@@ -99,41 +99,6 @@ class HapticFeedbackManager: ObservableObject {
 }
 
 // MARK: - E18 全局下拉刷新涟漪
-struct GlassRefreshRipple: ViewModifier {
-    @Binding var isRefreshing: Bool
-    @State private var rippleProgress: CGFloat = 0
-    @State private var rippleOpacity: CGFloat = 0
-    
-    func body(content: Content) -> some View {
-        ZStack {
-            content
-                .refreshable {
-                    isRefreshing = true
-                    withAnimation(.linear(duration: 1.0)) {
-                        rippleProgress = 1.0
-                        rippleOpacity = 0.3
-                    }
-                    // 模拟刷新延迟
-                    try? await Task.sleep(nanoseconds: 800_000_000)
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        rippleProgress = 0
-                        rippleOpacity = 0
-                    }
-                    isRefreshing = false
-                }
-            
-            if isRefreshing {
-                GeometryReader { geo in
-                    Circle()
-                        .fill(Color.accentColor.opacity(rippleOpacity))
-                        .frame(width: geo.size.width * rippleProgress, height: geo.size.width * rippleProgress)
-                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
-                        .allowsHitTesting(false)
-                }
-            }
-        }
-    }
-}
 
 extension View {
     func glassRefreshRippleBinding(_ isRefreshing: Binding<Bool>) -> some View {

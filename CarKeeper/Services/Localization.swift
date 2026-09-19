@@ -130,7 +130,7 @@ struct NightBreathingContainer: ViewModifier {
 }
 
 extension View {
-    func nightBreathing(soc: Int, color: Color = .accentColor, size: CGFloat = 200) -> some View {
+    func nightBreathing(soc: Int, color: Color = .accent, size: CGFloat = 200) -> some View {
         modifier(NightBreathingContainer(soc: soc, color: color, size: size))
     }
 }

@@ -54,7 +54,7 @@ struct AppClipEntranceView: View {
                 
                 // 车牌输入框
                 HStack(spacing: 12) {
-                    Image(systemName: "creditcard.fill").font(.title3).foregroundStyle(.accentColor)
+                    Image(systemName: "creditcard.fill").font(.title3).foregroundStyle(.accent)
                     TextField("请输入车牌号", text: $plateInput)
                         .font(.system(size: 18, weight: .medium, design: .monospaced))
                         .textInputAutocapitalization(.characters)
@@ -67,7 +67,7 @@ struct AppClipEntranceView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(.thin, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1))
                 
                 // 加载状态
@@ -82,7 +82,7 @@ struct AppClipEntranceView: View {
                         .font(.system(size: 13)).foregroundStyle(.red.opacity(0.8))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
-                        .background(.thin, in: RoundedRectangle(cornerRadius: 12))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
                 }
                 
                 // 主要操作按钮
@@ -104,7 +104,7 @@ struct AppClipEntranceView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(.accent)
                 }
                 
                 // 已有账号？打开完整 App

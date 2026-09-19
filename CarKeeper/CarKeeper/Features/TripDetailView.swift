@@ -366,7 +366,7 @@ struct MapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = .accentColor
+                renderer.strokeColor = .accent
                 renderer.lineWidth = 3
                 renderer.lineDashPattern = [6, 4]
                 return renderer

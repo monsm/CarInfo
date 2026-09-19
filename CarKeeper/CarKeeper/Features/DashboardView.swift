@@ -46,13 +46,13 @@ struct DashboardView: View {
                                 y: .value("能耗", record.kWh)
                             )
                             .lineStyle(StrokeStyle(lineWidth: 2))
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(.accent)
                             
                             PointMark(
                                 x: .value("日期", record.date),
                                 y: .value("能耗", record.kWh)
                             )
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(.accent)
                         }
                     }
                     .frame(height: 150)

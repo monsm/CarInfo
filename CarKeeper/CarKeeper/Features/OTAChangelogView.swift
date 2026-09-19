@@ -29,7 +29,7 @@ struct OTAChangelogView: View {
                     HStack {
                         Image(systemName: "circle.fill")
                             .font(.system(size: 6))
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(.accent)
                         Text(change)
                             .font(.caption)
                             .foregroundStyle(.primary)

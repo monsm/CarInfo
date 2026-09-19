@@ -62,7 +62,7 @@ private struct ColorGroup: View {
                     }
                     .padding(.horizontal, Theme.Spacing.sm)
                     .padding(.vertical, Theme.Spacing.sm)
-                    .background(.thin, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
@@ -153,7 +153,7 @@ struct DevView: View {
                     ("ok  通过",      .green,         "正常 / 成功"),
                     ("warn  警告",    .orange,        "注意 / 预警"),
                     ("bad  错误",     .red,           "故障 / 异常"),
-                    ("acc  强调",     .accentColor,   "品牌强调色"),
+                    ("acc  强调",     .accent,   "品牌强调色"),
                     ("na   未知",     .secondary,     "无数据 / 未定义"),
                 ])
 
@@ -243,7 +243,7 @@ struct DevView: View {
             .padding(.horizontal, 16)
             .safeAreaPadding(.bottom, 12)
         }
-        .pageBackground(.accentColor)
+        .pageBackground(.accent)
         .navigationTitle("颜色预览").navBarStyle()
     }
 }
@@ -280,7 +280,7 @@ struct PerformanceMetricsCard: View {
                 HStack {
                     Text("指令历史记录").font(Theme.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Text("\(commandCount) 条").font(Theme.monoLg).foregroundStyle(.accentColor)
+                    Text("\(commandCount) 条").font(Theme.monoLg).foregroundStyle(.accent)
                 }
                 ListDivider()
                 HStack {

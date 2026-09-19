@@ -223,7 +223,7 @@ struct CarWidgetButton: View {
         VStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.title3)
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(.accent)
             Text(label).font(.system(size: 9)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)

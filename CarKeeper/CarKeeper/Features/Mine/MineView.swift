@@ -49,7 +49,7 @@ struct MineView: View {
             .adaptiveSafeAreaBottom(12, dynamicTypeSize)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground(.accentColor)
+        .pageBackground(.accent)
         .navigationTitle("我的")
             .navBarStyle()
             .accessibilityLabel(Text("我的"))
@@ -153,10 +153,10 @@ struct MineView: View {
                 // 头像
                 ZStack {
                     Circle()
-                        .fill(LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.65)],
+                        .fill(LinearGradient(colors: [Color.accent, Color.accent.opacity(0.65)],
                                              startPoint: .topLeading, endPoint: .bottomTrailing))
                         .frame(width: 68, height: 68)
-                        .shadow(color: Color.accentColor.opacity(0.35), radius: 12, y: 5)
+                        .shadow(color: Color.accent.opacity(0.35), radius: 12, y: 5)
                     Text(um?.avatar ?? "主")
                         .font(Theme.d4.weight(.bold))
                         .foregroundStyle(.white)
@@ -186,7 +186,7 @@ struct MineView: View {
             // 底部统计
             HStack(spacing: 16) {
                 HStack(spacing: 6) {
-                    Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(Color.accentColor)
+                    Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(Color.accent)
                     Text(String(store.cars?.count ?? 0) + " 辆车")
                         .font(Theme.caption)
                 }
@@ -229,9 +229,9 @@ struct MineView: View {
             HStack(spacing: 14) {
                 Image(systemName: "car.fill")
                     .font(Theme.d4)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.accent)
                     .frame(width: 52, height: 52)
-                    .background(.thin, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(sum?.name ?? "未绑定车辆").font(Theme.h3)
                     Text(sum?.plate ?? "暂无车牌").font(Theme.caption).foregroundStyle(.secondary)
@@ -370,7 +370,7 @@ struct MineView: View {
                 if isChecking {
                     HStack(spacing: 10) {
                         ProgressView()
-                            .tint(.accentColor)
+                            .tint(.accent)
                         Text("正在检查最新版本…")
                             .font(Theme.caption)
                             .foregroundStyle(.secondary)
@@ -380,7 +380,7 @@ struct MineView: View {
                     // 下载中：进度条 + 百分比数字
                     VStack(spacing: 6) {
                         ProgressView(value: downloadPct)
-                            .tint(.accentColor)
+                            .tint(.accent)
                         Text("正在下载… \(downloadPctDisplay)%")
                             .font(Theme.caption).foregroundStyle(.secondary)
                     }
@@ -389,7 +389,7 @@ struct MineView: View {
                     HStack(spacing: 6) {
                         Image(systemName: m.hasPrefix("❌") ? "exclamationmark.triangle" : "info.circle")
                             .font(Theme.caption)
-                            .foregroundStyle(m.hasPrefix("❌") ? Theme.warn : .accentColor)
+                            .foregroundStyle(m.hasPrefix("❌") ? Theme.warn : .accent)
                         Text(m)
                             .font(Theme.caption)
                             .foregroundStyle(.secondary)
@@ -430,7 +430,7 @@ struct MineView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(.thin, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
             .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.8))
         .shadow(color: .black.opacity(0.04), radius: 8, y: 3)
@@ -456,7 +456,7 @@ struct MineView: View {
             }
             .foregroundStyle(.white)
             .adaptivePagePadding(dynamicTypeSize).padding(.vertical, 10)
-            .background(Capsule().fill(Color.accentColor))
+            .background(Capsule().fill(Color.accent))
         }
         .buttonStyle(.plain)
         .disabled(updateBusy)
@@ -470,7 +470,7 @@ struct MineView: View {
             Label("分享安装包", systemImage: "square.and.arrow.up")
                 .font(Theme.caption.bold())
                 .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(.thin, in: Capsule())
+                .background(.ultraThinMaterial, in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -484,7 +484,7 @@ struct MineView: View {
                 .font(Theme.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12).padding(.vertical, 10)
-                .background(.thin, in: Capsule())
+                .background(.ultraThinMaterial, in: Capsule())
         }
         .buttonStyle(.plain)
     }

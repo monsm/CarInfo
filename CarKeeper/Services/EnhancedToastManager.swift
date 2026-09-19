@@ -108,12 +108,12 @@ struct EmptyStateView: View {
             // 动态图标（根据内容变化）
             ZStack {
                 Circle()
-                    .fill(LinearGradient(colors: [.accentColor.opacity(0.2), .accentColor.opacity(0.05)],
+                    .fill(LinearGradient(colors: [.accent.opacity(0.2), .accent.opacity(0.05)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 100, height: 100)
                 Image(systemName: icon)
                     .font(.system(size: 40))
-                    .foregroundColor(.accentColor)
+                    .foregroundColor(.accent)
                     .scaleEffect(1)
                     .animation(.spring(response: 0.5, dampingFraction: 0.5).repeatAutologically(), value: icon)
             }
@@ -137,7 +137,7 @@ struct EmptyStateView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, Theme.Spacing.xl)
                         .padding(.vertical, Theme.Spacing.sm)
-                        .background(.accentColor)
+                        .background(.accent)
                         .cornerRadius(Theme.Radius.md)
                 }
             }
@@ -146,67 +146,7 @@ struct EmptyStateView: View {
     }
 }
 
-struct PageEmptyView: View {
-    let icon: String
-    let title: String
-    let message: String
-    var actionTitle: String?
-    var action: (() -> Void)?
-    
-    var body: some View {
-        EmptyStateView(icon: icon, title: title, message: message,
-                       actionTitle: actionTitle, action: action)
-            .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
 // MARK: - N8 下拉刷新涟漪统一（所有 ScrollView）
-struct GlassRefreshRipple: ViewModifier {
-    @Binding var isRefreshing: Bool
-    @State private var ripplePosition: CGPoint = .zero
-    @State private var rippleRadius: CGFloat = 0
-    @State private var rippleOpacity: CGFloat = 0
-    
-    func body(content: Content) -> some View {
-        content
-            .onAppear {
-                // 注册下拉刷新回调
-            }
-            .overlay(alignment: .top) {
-                if isRefreshing {
-                    GeometryReader { geo in
-                        ZStack {
-                            // 多个同心圆涟漪
-                            ForEach(0..<3, id: \.self) { i in
-                                Circle()
-                                    .fill(Color.accentColor.opacity(0.1 * CGFloat(3 - i)))
-                                    .frame(width: rippleRadius + CGFloat(i) * 40,
-                                           height: rippleRadius + CGFloat(i) * 40)
-                                    .offset(y: -20)
-                            }
-                        }
-                        .position(ripplePosition)
-                        .onAppear {
-                            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
-                                rippleRadius = min(geo.size.width, geo.size.height)
-                                rippleOpacity = 0.3
-                            }
-                        }
-                        .onChange(of: isRefreshing) { refreshing in
-                            if !refreshing {
-                                withAnimation(.easeOut(duration: 0.3)) {
-                                    rippleRadius = 0
-                                    rippleOpacity = 0
-                                }
-                            }
-                        }
-                    }
-                    .allowsHitTesting(false)
-                }
-            }
-    }
-}
 
 extension View {
     func glassRefreshRipple(isRefreshing: Binding<Bool>) -> some View {

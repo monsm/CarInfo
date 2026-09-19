@@ -37,7 +37,7 @@ struct HomeView: View {
     @State private var siriLastAction: String? = nil
     // #NEW-123 全局搜索
     @State private var showSearch = false
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.medium
 
     var body: some View {
         Group {
@@ -79,7 +79,7 @@ struct HomeView: View {
                             store.cardOrder = cardOrder
                         }
                         .font(Theme.caption.weight(.semibold))
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(.accent)
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 4)
@@ -118,7 +118,7 @@ struct HomeView: View {
                                     .foregroundStyle(.secondary)
                             }
                             .padding(8)
-                            .background(.thin, in: RoundedRectangle(cornerRadius: 8))
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
                         }
                     }
                     .offset(y: draggedCard == id ? -60 : 0)
@@ -172,7 +172,7 @@ struct HomeView: View {
         .animation(.spring(response: 0.45, dampingFraction: 0.7, blendDuration: 0.4), value: carVersion)
         .scrollBounceBehavior(.basedOnSize)
         .milestoneCelebration(mileage: mileCount)
-        .pageBackground(.accentColor)
+        .pageBackground(.accent)
         .toolbar {
             // #NEW-130 专注模式切换
             ToolbarItem(placement: .navigationBarLeading) {
@@ -190,7 +190,7 @@ struct HomeView: View {
                     }
                 } label: {
                     Image(systemName: FocusModeManager.shared.config.enabled ? "moon.fill" : "moon.stars.fill")
-                        .foregroundColor(FocusModeManager.shared.config.enabled ? .accentColor : .secondary)
+                        .foregroundColor(FocusModeManager.shared.config.enabled ? .accent : .secondary)
                 }
                 .accessibilityLabel(Text(FocusModeManager.shared.config.enabled ? "退出专注模式" : "启用专注模式"))
             }
@@ -330,7 +330,7 @@ struct HomeView: View {
                 Circle()
                     .trim(from: 0, to: max(0.02, socProgress / 100))
                     .stroke(
-                        AngularGradient(colors: [.green, .green, .accentColor, .orange, .red],
+                        AngularGradient(colors: [.green, .green, .accent, .orange, .red],
                                         center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
                         style: StrokeStyle(lineWidth: 16, lineCap: .round))
                     .rotationEffect(.degrees(-90))
@@ -356,7 +356,7 @@ struct HomeView: View {
                 MetricPill(icon: "point.topleft.down.curvedto.point.bottomright.up",
                            value: e.range == "--" ? "--" : e.range,
                            unit: "km", tint: .green, fluidValue: true)
-                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accentColor, fluidValue: true)
+                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accent, fluidValue: true)
             }
             // #1 充电倒计时
             if let ttf = e.timeToFull {
@@ -367,7 +367,7 @@ struct HomeView: View {
                 HStack {
                     Text("平均能耗").font(Theme.footnote).foregroundStyle(.secondary)
                     Spacer()
-                    Text(cons).font(Theme.caption.weight(.semibold)).foregroundStyle(.accentColor)
+                    Text(cons).font(Theme.caption.weight(.semibold)).foregroundStyle(.accent)
                 }
             }
             if let tte = e.timeToEmpty, tte != "--" {
@@ -420,9 +420,9 @@ struct HomeView: View {
         return HStack(spacing: 12) {
             Image(systemName: "car.2.fill")
                 .font(Theme.bodyMd)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color.accent)
                 .frame(width: 40, height: 40)
-                .background(.thin, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             Picker("车辆", selection: Binding(
                 get: { carSel.index },
                 set: { store.selectCar($0) }
@@ -440,7 +440,7 @@ struct HomeView: View {
                     .font(Theme.footnote.bold())
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(.thin, in: Capsule())
+                    .background(.ultraThinMaterial, in: Capsule())
             }
         }
         .padding(16)
@@ -490,8 +490,8 @@ struct HomeView: View {
             }
             // 速度 + 里程：流体数字字体，随容器宽度自动缩放
             MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: Theme.brand, fluidValue: true)
-            MetricPill(icon: "gauge.full", value: mileCount > 0 ? String(mileCount) : d.mile, unit: "km", tint: .accentColor, fluidValue: true)
-                .valuePulse(tint: .accentColor, watchValue: pulseTrigger)
+            MetricPill(icon: "gauge.full", value: mileCount > 0 ? String(mileCount) : d.mile, unit: "km", tint: .accent, fluidValue: true)
+                .valuePulse(tint: .accent, watchValue: pulseTrigger)
         }            .padding(Theme.Spacing.xl)
             .dynamicTypeCompress()
             .glassCard(corner: 20)
@@ -848,7 +848,7 @@ struct HomeView: View {
                 // 显示已保存的停车位置
                 if let pk = store.parkingLocation, let lastTime = store.lastParkingTime {
                     HStack(spacing: 6) {
-                        Image(systemName: "parkingsign.circle.fill").font(Theme.caption).foregroundStyle(.accentColor)
+                        Image(systemName: "parkingsign.circle.fill").font(Theme.caption).foregroundStyle(.accent)
                         Text("停车点: \(pk.coordinate.latitude, specifier: "%.4f") , \(pk.coordinate.longitude, specifier: "%.4f")")
                             .font(Theme.micro)
                             .foregroundStyle(.secondary)
@@ -872,7 +872,7 @@ struct HomeView: View {
                     .font(Theme.caption)
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(.thin, in: Capsule())
+            .background(.ultraThinMaterial, in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -882,9 +882,9 @@ struct HomeView: View {
         label: {
             Image(systemName: "arrow.up.right")
                 .font(Theme.caption)
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(.accent)
                 .padding(8)
-                .background(.thin, in: Circle())
+                .background(.ultraThinMaterial, in: Circle())
         }
         .buttonStyle(.plain)
     }
@@ -902,9 +902,9 @@ struct HomeView: View {
         } label: {
             Image(systemName: store.parkingLocation != nil ? "parkingsign.circle.fill" : "parkingsign.circle")
                 .font(Theme.caption)
-                .foregroundStyle(store.parkingLocation != nil ? .accentColor : .tertiary)
+                .foregroundStyle(store.parkingLocation != nil ? .accent : .tertiary)
                 .padding(8)
-                .background(.thin, in: Circle())
+                .background(.ultraThinMaterial, in: Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text("保存停车位置"))
@@ -924,9 +924,9 @@ struct HomeView: View {
             Button { fetchCore() } label: {
                 Image(systemName: "arrow.clockwise.circle.fill")
                     .font(Theme.caption)
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(.accent)
                     .padding(6)
-                    .background(.thin, in: Circle())
+                    .background(.ultraThinMaterial, in: Circle())
             }
             .buttonStyle(.plain)
         }
@@ -1112,48 +1112,6 @@ struct LocationMapView: View {
     }
 }
 
-struct MapView: UIViewRepresentable {
-    let coordinate: CLLocationCoordinate2D?
-    @Binding var region: MKCoordinateRegion
-    var hasAnnotation: Bool
-
-    func makeUIView(context: Context) -> MKMapView {
-        let map = MKMapView()
-        map.delegate = context.coordinator
-        map.showsUserLocation = true
-        if let coord = coordinate {
-            map.setRegion(MKCoordinateRegion(center: coord, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)), animated: true)
-        }
-        return map
-    }
-
-    func updateUIView(_ map: MKMapView, context: Context) {
-        context.coordinator.map = map
-        if let coord = coordinate {
-            map.setRegion(region, animated: true)
-            if hasAnnotation {
-                let annotation = MKPointAnnotation()
-                annotation.coordinate = coord
-                annotation.title = addr
-                map.addAnnotation(annotation)
-            }
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
-    class Coordinator: NSObject, MKMapViewDelegate {
-        var map: MKMapView?
-        func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
-            // 显示用户位置
-        }
-    }
-
-    private var addr: String { "" } // placeholder
-}
-
 // MARK: - 位置地图占位（原降级视图）
 struct LocationMapViewPlaceholder: View {
     let addr: String
@@ -1167,7 +1125,7 @@ struct LocationMapViewPlaceholder: View {
             VStack(spacing: 6) {
                 Image(systemName: "map.fill")
                     .font(Theme.d0b)
-                    .foregroundStyle(.accentColor.opacity(0.6))
+                    .foregroundStyle(.accent.opacity(0.6))
                 Text(addr.isEmpty ? "点击导航查看位置" : addr)
                     .font(Theme.caption)
                     .foregroundStyle(.secondary)

@@ -7,7 +7,7 @@ import Photos
 struct VehicleView: View {
     private let store = AppStore.shared
 
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.medium
     @State private var isRefreshing = false         // 下拉刷新涟漪标志
     // #NEW-105 维保相册
     @State private var maintenancePhotos: [String] = []  // Base64 图片
@@ -63,7 +63,7 @@ struct VehicleView: View {
                 PageErrorView("车辆数据解析失败，请重新进入页面") { _ in }
             }
         }
-        .pageBackground(.accentColor)
+        .pageBackground(.accent)
         .navigationTitle("车辆档案")
             .navBarStyle()
             .accessibilityLabel(Text("车辆档案"))
@@ -86,7 +86,7 @@ struct VehicleView: View {
                     showPhotoPicker = true
                 }
                 .font(Theme.caption)
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(.accent)
                 .padding(.vertical, 12)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -108,7 +108,7 @@ struct VehicleView: View {
                                 .font(Theme.body)
                                 .foregroundStyle(.secondary)
                                 .frame(width: 100, height: 75)
-                                .background(.thin, in: RoundedRectangle(cornerRadius: 8))
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
                         }
                     }
                 }
@@ -135,18 +135,18 @@ struct VehicleView: View {
                 // 车牌徽章
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.75)],
+                        .fill(LinearGradient(colors: [Color.accent, Color.accent.opacity(0.75)],
                                              startPoint: .topLeading, endPoint: .bottomTrailing))
                         .frame(width: 96, height: 58)
-                        .shadow(color: Color.accentColor.opacity(0.3), radius: 10, y: 4)
+                        .shadow(color: Color.accent.opacity(0.3), radius: 10, y: 4)
                     VStack(spacing: 3) {
-                        Text("新能源").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.85))
-                        Text(sum.plate).font(.title.weight(.bold).design(.rounded)).foregroundStyle(.white)
+                        Text("新能源").font(.caption).foregroundStyle(.white.opacity(0.85))
+                        Text(sum.plate).font(.title).foregroundStyle(.white)
                     }
                 }
                 VStack(alignment: .leading, spacing: 5) {
                     Text(sum.name.isEmpty ? "未绑定车辆" : sum.name)
-                        .font(Theme.d4.weight(.bold))
+                        .font(Theme.d4)
                     Text(sum.model).font(Theme.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -180,16 +180,16 @@ struct VehicleView: View {
                     let nextServiceMiles = lastMiles + (timesSince + 1) * interval
                     let estPrice = timesSince >= 3 ? AppStore.majorServicePriceEstimate : AppStore.servicePriceEstimate
                     HStack {
-                        Image(systemName: "wrench.and.screwdriver").font(Theme.caption).foregroundStyle(.accentColor)
+                        Image(systemName: "wrench.and.screwdriver").font(Theme.caption).foregroundStyle(.accent)
                         Text("下次保养预计费用")
                             .font(Theme.caption).foregroundStyle(.secondary)
                         Spacer()
                         Text("约 ¥\(estPrice)")
-                            .font(Theme.caption.weight(.semibold)).foregroundStyle(.accentColor)
+                            .font(Theme.caption).foregroundStyle(.accent)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(.thin, in: RoundedRectangle(cornerRadius: 10))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
                 }
             }
         }
@@ -215,10 +215,10 @@ struct VehicleView: View {
                 Spacer()
                 Image(systemName: "doc.on.doc.fill")
                     .font(Theme.caption)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.accent)
             }
             .padding(10)
-            .background(.thin, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -231,7 +231,7 @@ struct VehicleView: View {
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thin, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     // MARK: 档案分组（数据不变）
@@ -331,7 +331,7 @@ struct PhotoPickerSheet: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                        .background(Color.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
                     }
                     Button {
                         selectedImage = nil
@@ -356,7 +356,7 @@ struct PhotoPickerSheet: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                        .background(Color.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
                     }
                 }
                 Spacer()

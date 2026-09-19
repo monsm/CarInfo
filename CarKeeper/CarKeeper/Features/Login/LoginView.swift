@@ -45,7 +45,7 @@ struct LoginView: View {
                 .adaptiveSafeAreaBottom(12, dynamicTypeSize)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .pageBackground(.accentColor)
+            .pageBackground(.accent)
             .navBarStyle()
             .onReceive(countdownTimer) { _ in
                 if countdown > 0 {
@@ -74,18 +74,18 @@ struct LoginView: View {
             ZStack {
                 // 外发光层
                 Circle()
-                    .fill(AngularGradient(colors: [Color.accentColor.opacity(0.25), Color.accentColor.opacity(0.05)],
+                    .fill(AngularGradient(colors: [Color.accent.opacity(0.25), Color.accent.opacity(0.05)],
                                           center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)))
                     .frame(width: 108, height: 108)
                 // 主体圆
                 Circle()
-                    .fill(LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.65)],
+                    .fill(LinearGradient(colors: [Color.accent, Color.accent.opacity(0.65)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 92, height: 92)
-                    .shadow(color: Color.accentColor.opacity(0.4), radius: 20, y: 8)
+                    .shadow(color: Color.accent.opacity(0.4), radius: 20, y: 8)
                 // 图标
                 Image(systemName: "car.side.fill")
-                    .font(Theme.d3.weight(.medium))
+                    .font(Theme.d3)
                     .foregroundStyle(.white)
             }
             VStack(spacing: 6) {
@@ -106,11 +106,11 @@ struct LoginView: View {
             HStack(spacing: 12) {
                 Image(systemName: "phone.fill")
                     .font(Theme.body)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.accent)
                     .frame(width: 24)
                 TextField("手机号", text: $phone)
                     .keyboardType(.numberPad)
-                    .font(.title.design(.rounded))
+                    .font(.title)
                     .onChange(of: phone) { _, _ in loadCaptcha() }
                 if phoneValid {
                     Image(systemName: "checkmark.circle.fill")
@@ -122,21 +122,21 @@ struct LoginView: View {
             HStack(spacing: 12) {
                 Image(systemName: "photo.on.rectangle")
                     .font(Theme.body)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.accent)
                     .frame(width: 24)
                 TextField("图形验证码", text: $picCode)
-                    .font(.title.design(.rounded))
+                    .font(.title)
                 captchaView
             }
             ListDivider()
             HStack(spacing: 12) {
                 Image(systemName: "message.badge.fill")
                     .font(Theme.body)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.accent)
                     .frame(width: 24)
                 TextField("6 位短信验证码", text: $smsCode)
                     .keyboardType(.numberPad)
-                    .font(.title.design(.rounded))
+                    .font(.title)
                 smsButton
             }
         }
@@ -151,9 +151,9 @@ struct LoginView: View {
         } label: {
             Text(smsBtnText)
                 .font(Theme.caption.bold())
-                .foregroundStyle(smsBtnDisabled ? Color.secondary : Color.accentColor)
+                .foregroundStyle(smsBtnDisabled ? Color.secondary : Color.accent)
                 .padding(.horizontal, 14).padding(.vertical, 8)
-                .background(.thin, in: Capsule())
+                .background(.ultraThinMaterial, in: Capsule())
         }
         .buttonStyle(.plain)
         .disabled(smsBtnDisabled)
@@ -191,7 +191,7 @@ struct LoginView: View {
                 .foregroundStyle(statusErr ? Theme.bad : Theme.ok)
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.thin, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
 
@@ -203,17 +203,17 @@ struct LoginView: View {
             HStack(spacing: 8) {
                 if busy { ProgressView().tint(.white) }
                 Text(busy ? "登录中…" : "登 录")
-                    .font(.title.weight(.bold))
+                    .font(.title)
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.72)],
+                    .fill(LinearGradient(colors: [Color.accent, Color.accent.opacity(0.72)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
             )
-            .shadow(color: Color.accentColor.opacity(0.4), radius: 16, y: 6)
+            .shadow(color: Color.accent.opacity(0.4), radius: 16, y: 6)
         }
         .buttonStyle(.plain)
         .disabled(busy)
@@ -232,10 +232,10 @@ struct LoginView: View {
                     .font(Theme.body)
                 Spacer()
             }
-            .foregroundStyle(biometricAvailable ? .accentColor : .secondary)
+            .foregroundStyle(biometricAvailable ? .accent : .secondary)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity)
-            .background(.thin, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
         .opacity(biometricAvailable ? 1.0 : 0.5)

@@ -364,9 +364,9 @@ struct ControlView: View {
                         HStack(spacing: 12) {
                             Image(systemName: scene.symbol)
                                 .font(Theme.bodyMd)
-                                .foregroundStyle(.accentColor)
+                                .foregroundStyle(.accent)
                                 .frame(width: 32, height: 32)
-                                .background(.thin, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(scene.name).font(Theme.body)
                                 if let note = scene.note {
@@ -460,7 +460,7 @@ struct ControlView: View {
                             .foregroundStyle(.tertiary)
                         Text(showMoreCommands ? "收起" : "更多指令")
                             .font(Theme.caption)
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(.accent)
                         Spacer()
                     }
                     .padding(.vertical, 10)
@@ -480,7 +480,7 @@ struct ControlView: View {
                     .font(Theme.bodyMd)
                     .foregroundStyle(Theme.brand)
                     .frame(width: 30, height: 30)
-                    .background(.thin, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name).font(Theme.body)
                     if let note = item.note {
@@ -639,7 +639,7 @@ struct ControlView: View {
         guard let r = lastResult else { return EmptyView().frame(width: 0, height: 0) }
         return VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(r.name).font(Theme.h3.weight(.bold))
+                Text(r.name).font(Theme.h3)
                 Spacer()
                 Pill(text: r.resultText, cls: r.resultCls, dot: false)
             }
@@ -836,15 +836,15 @@ struct PINKeypadView: View {
         VStack(spacing: 22) {
             Capsule().fill(.secondary.opacity(0.4)).frame(width: 40, height: 5)
             VStack(spacing: 4) {
-                Text("输入控车码").font(Theme.h2.weight(.bold))
+                Text("输入控车码").font(Theme.h2)
                 Text("6 位数字 · 输满后自动执行").font(Theme.caption).foregroundStyle(.secondary)
             }
             HStack(spacing: 10) {
                 ForEach(0..<6, id: \.self) { i in
                     Text(i < pin.count ? String(pin[pin.index(pin.startIndex, offsetBy: i)]) : "")
-                        .font(Theme.d4.weight(.semibold).design(.rounded))
+                        .font(Theme.d4)
                         .frame(width: 42, height: 54)
-                        .background(.thin, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(i == pin.count ? Theme.brand : Color(.systemGray4),
                                           lineWidth: i == pin.count ? 2 : 1))
@@ -860,9 +860,9 @@ struct PINKeypadView: View {
                             else if k == "" { Color.clear }
                             else { Text(k) }
                         }
-                        .font(Theme.d4.weight(.medium).design(.rounded))
+                        .font(Theme.d4)
                         .frame(maxWidth: .infinity, minHeight: 56)
-                        .background(.thin, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .foregroundStyle(.primary)
                     }
                     .buttonStyle(.plain)
@@ -909,14 +909,14 @@ struct ACStepperView: View {
         VStack(spacing: 24) {
             Capsule().fill(.secondary.opacity(0.4)).frame(width: 40, height: 5)
             VStack(spacing: 4) {
-                Text("空调温度").font(Theme.h2.weight(.bold))
+                Text("空调温度").font(Theme.h2)
                 Text("设置范围 17 – 33 ℃").font(Theme.caption).foregroundStyle(.secondary)
             }
             HStack(spacing: 32) {
                 tempButton("minus", canDo: temp > 17) { temp -= 1 }
                 VStack(spacing: 0) {
                     Text("\(tempDisplayCount)")
-                        .font(Theme.d1.weight(.bold).design(.rounded))
+                        .font(Theme.d1)
                         .foregroundStyle(Theme.brand)
                         .contentTransition(.numericText())
                     Text("℃").font(Theme.caption).foregroundStyle(.secondary)

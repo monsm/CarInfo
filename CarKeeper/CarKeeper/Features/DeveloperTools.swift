@@ -131,7 +131,7 @@ struct FeatureFlagToggle: View {
             Text(title)
             Spacer()
             Toggle("", isOn: Binding(
-                get: { flags.is-enabled(flag) },
+                get: { flags.isAvailable(flag) },
                 set: { flags.enable(flag) }
             ))
             .labelsHidden()

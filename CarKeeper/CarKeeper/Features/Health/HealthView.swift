@@ -19,7 +19,7 @@ struct HealthView: View {
     @State private var isRefreshing = false            // 下拉刷新涟漪标志
     @State private var pulseTrigger: String = ""        // 触发数值脉冲高亮（评分变化时更新）
     @State private var heroExpanded = false            // Hero 卡片整体展开/收起系统列表
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.medium
 
     var body: some View {
         ScrollView {
@@ -208,7 +208,7 @@ struct HealthView: View {
         let clsColor = Theme.statusColor(c.cls)
         return VStack(spacing: 4) {
             Text(c.n)
-                .font(Theme.d4.weight(.bold).design(.rounded))
+                .font(Theme.d4)
                 .foregroundStyle(clsColor)
             Text(c.key)
                 .font(Theme.footnote)
@@ -216,7 +216,7 @@ struct HealthView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(.thin, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(clsColor.opacity(0.20), lineWidth: 1)
@@ -366,7 +366,7 @@ struct HealthView: View {
         guard hasDTC else { return EmptyView() }
         
         return VStack(alignment: .leading, spacing: 6) {
-            Text("故障码说明").font(Theme.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Text("故障码说明").font(Theme.caption).foregroundStyle(.secondary)
             ForEach(sys.children.filter { $0.name.range(of: "P\\d", options: .regularExpression) != nil }) { item in
                 let dtcCode = item.name
                 let description = DTCDictionary.translate(dtcCode)
@@ -382,7 +382,7 @@ struct HealthView: View {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 8)
-        .background(.thin, in: RoundedRectangle(cornerRadius: 12))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.orange.opacity(0.2), lineWidth: 1))
         .padding(.horizontal, 4)
         .padding(.top, 4)

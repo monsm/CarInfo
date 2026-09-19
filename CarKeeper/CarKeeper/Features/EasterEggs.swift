@@ -68,7 +68,7 @@ struct CheckInStreak: View {
     var body: some View {
         HStack {
             Image(systemName: "calendar.checkmark")
-                .foregroundColor(.accentColor)
+                .foregroundColor(.accent)
             Text("连续打卡 \(streakDays) 天")
                 .font(.subheadline)
             Spacer()
@@ -160,8 +160,8 @@ struct FamilyLeaderboard: View {
                     .font(.headline)
                     .foregroundColor(idx == 0 ? .yellow : idx == 1 ? .gray : idx == 2 ? .orange : .secondary)
                     .frame(width: 30)
-                Circle().fill(Color.accentColor.opacity(0.2)).frame(width: 36, height: 36)
-                    .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(.accentColor))
+                Circle().fill(Color.accent.opacity(0.2)).frame(width: 36, height: 36)
+                    .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(.accent))
                 VStack(alignment: .leading) {
                     Text(member.name).font(.subheadline).fontWeight(.medium)
                     Text(member.roles.joined(separator: " · ")).font(.caption2).foregroundColor(.secondary)
@@ -176,31 +176,4 @@ struct FamilyLeaderboard: View {
 }
 
 // MARK: - E62 里程碑庆祝动效
-struct MilestoneCelebration: View {
-    let milestone: String
-    @State private var show = false
-    
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.7).ignoresSafeArea()
-            VStack(spacing: Theme.Spacing.lg) {
-                Image(systemName: "confetti.middle")
-                    .font(.system(size: 80))
-                    .animation(.spring(response: 0.5), value: show)
-                Text(milestone)
-                    .font(.title).fontWeight(.bold)
-                    .foregroundColor(.white)
-                Text("恭喜解锁新成就！")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                Button("继续") { show = false }
-                    .padding(.horizontal, Theme.Spacing.xl)
-                    .padding(.vertical, Theme.Spacing.md)
-                    .background(Color.accentColor)
-                    .foregroundColor(.white)
-                    .cornerRadius(Theme.Radius.md)
-            }
-        }
-        .onAppear { show = true }
-    }
-}
+

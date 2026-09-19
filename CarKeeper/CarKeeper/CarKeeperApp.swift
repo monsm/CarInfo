@@ -741,7 +741,7 @@ struct MainTabView: View {
         .accessibilityLabel(Text("主导航栏"))
         .accessibilityHint(Text("四个主要功能模块：车况、车控、消息、我的。左右滑动可切换标签页"))
         .accessibilitySortPriority(0)
-        .accentColor(.accentColor)
+        .accent(.accent)
         // #4 网络状态指示器 + #NEW-3 离线模式提示
         .overlay(alignment: .top) {
             if store.networkStatus != .online || store.isOfflineMode {
@@ -807,7 +807,7 @@ private class TabBarGlowOverlay: UIView {
         let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)
         let bounceLayer = CAShapeLayer()
         bounceLayer.path = path
-        bounceLayer.fillColor = UIColor.accentColor.withAlphaComponent(0.25).cgColor
+        bounceLayer.fillColor = UIColor.accent.withAlphaComponent(0.25).cgColor
         bounceLayer.strokeColor = nil
         bounceLayer.opacity = 1.0
 
@@ -851,9 +851,9 @@ private class TabBarGlowOverlay: UIView {
         let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)
         floatRingLayer.path = path
         floatRingLayer.fillColor = UIColor.clear.cgColor
-        floatRingLayer.strokeColor = UIColor.accentColor.withAlphaComponent(0.5).cgColor
+        floatRingLayer.strokeColor = UIColor.accent.withAlphaComponent(0.5).cgColor
         floatRingLayer.lineWidth = 2.0
-        floatRingLayer.shadowColor = UIColor.accentColor.withAlphaComponent(0.6).cgColor
+        floatRingLayer.shadowColor = UIColor.accent.withAlphaComponent(0.6).cgColor
         floatRingLayer.shadowRadius = 8
         floatRingLayer.shadowOffset = .zero
         floatRingLayer.opacity = 0
@@ -905,9 +905,9 @@ private class TabBarGlowOverlay: UIView {
         let radius: CGFloat = 28
         let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)
         pressLayer.path = path
-        pressLayer.fillColor = UIColor.accentColor.withAlphaComponent(0.45).cgColor
+        pressLayer.fillColor = UIColor.accent.withAlphaComponent(0.45).cgColor
         pressLayer.strokeColor = nil
-        pressLayer.shadowColor = UIColor.accentColor.withAlphaComponent(0.8).cgColor
+        pressLayer.shadowColor = UIColor.accent.withAlphaComponent(0.8).cgColor
         pressLayer.shadowRadius = 10
         pressLayer.shadowOffset = .zero
         pressLayer.opacity = 1.0
@@ -1097,8 +1097,8 @@ struct LiquidGlassTabBar: UIViewRepresentable {
         appearance.compactLayoutAppearance = unselected
         // 选中图标 / 文字
         let selected = UITabBarItemAppearance()
-        selected.selected.iconColor = UIColor.accentColor
-        selected.selected.titleTextAttributes = [.foregroundColor: UIColor.accentColor]
+        selected.selected.iconColor = UIColor.accent
+        selected.selected.titleTextAttributes = [.foregroundColor: UIColor.accent]
         appearance.stackedLayoutAppearance = selected
         appearance.inlineLayoutAppearance = selected
         appearance.compactLayoutAppearance = selected

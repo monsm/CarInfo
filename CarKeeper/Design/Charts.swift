@@ -93,7 +93,7 @@ struct DrivingRadarChart: View {
         case "刹车": return .red
         case "平稳": return .green
         case "限速": return .blue
-        default: return .accentColor
+        default: return .accent
         }
     }
 }
@@ -111,7 +111,7 @@ struct EnergyCompareChart: View {
                 y: .value("能耗 kWh", thisWeek),
                 width: .fixed(30)
             )
-            .foregroundStyle(.accentColor)
+            .foregroundStyle(.accent)
             
             BarMark(
                 x: .value("周期", "上周"),

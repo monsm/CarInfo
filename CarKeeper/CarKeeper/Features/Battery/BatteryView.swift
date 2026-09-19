@@ -27,7 +27,7 @@ struct BatteryView: View {
         var id: String { rawValue }
     }
     @State private var energyTrendPeriod: EnergyTrendPeriod = .realtime
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.medium
 
     var body: some View {
         ScrollView {
@@ -135,7 +135,7 @@ struct BatteryView: View {
                 Circle()
                     .trim(from: 0, to: max(0.02, socProgress / 100))
                     .stroke(
-                        AngularGradient(colors: [.green, .green, .accentColor, .orange, .red],
+                        AngularGradient(colors: [.green, .green, .accent, .orange, .red],
                                         center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
                         style: StrokeStyle(lineWidth: 18, lineCap: .round))
                     .rotationEffect(.degrees(-90))
@@ -160,7 +160,7 @@ struct BatteryView: View {
             HStack(spacing: 14) {
                 MetricPill(icon: "point.topleft.down.curvedto.point.bottomright.up",
                            value: e.range == "--" ? "--" : (rangeCount > 0 ? String(rangeCount) : e.range), unit: "km", tint: .green, fluidValue: true)
-                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accentColor)
+                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accent)
             }
             Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5)))")
                 .font(Theme.footnote).foregroundStyle(.secondary)
@@ -357,7 +357,7 @@ struct BatteryView: View {
                             }
                         }
                         .padding(10)
-                        .background(.thin, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                 }
             }
@@ -402,7 +402,7 @@ struct BatteryView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(.thin, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private struct R { let k: String; let v: String; var cls: String = "" }
@@ -454,7 +454,7 @@ struct BatteryView: View {
                     }
                     .font(Theme.micro.bold())
                     .padding(.horizontal, 12).padding(.vertical, 5)
-                    .background(energyTrendPeriod == period ? Color.accentColor : Color.secondary.opacity(0.15), in: Capsule())
+                    .background(energyTrendPeriod == period ? Color.accent : Color.secondary.opacity(0.15), in: Capsule())
                     .foregroundStyle(energyTrendPeriod == period ? .white : .secondary)
                 }
             }
@@ -468,12 +468,12 @@ struct BatteryView: View {
                         y: .value("SOC %", rec.soc)
                     )
                     .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: energyTrendPeriod == .realtime ? [] : [4, 2]))
-                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : .accentColor)
+                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : .accent)
                     PointMark(
                         x: .value("时间", rec.timestamp, unit: .second),
                         y: .value("SOC %", rec.soc)
                     )
-                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : .accentColor)
+                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : .accent)
                     .symbolSize(8)
                 }
                 // 填充区域
@@ -592,7 +592,7 @@ struct DestinationCalculatorView: View {
                 .keyboardType(.decimalPad)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(.thin, in: RoundedRectangle(cornerRadius: 12))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1))
 
             if let reach = canReach {
@@ -612,7 +612,7 @@ struct DestinationCalculatorView: View {
                 calculateReach()
             }
             .buttonStyle(.borderedProminent)
-            .tint(.accentColor)
+            .tint(.accent)
 
             Button("取消") { dismiss() }
                 .font(Theme.body)

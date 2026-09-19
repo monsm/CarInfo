@@ -46,7 +46,7 @@ struct GlobalSearchHUD: View {
                     }
                 }
                 .padding()
-                .background(.thin, in: RoundedRectangle(cornerRadius: 16))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                 .padding(.horizontal)
                 
                 // 搜索结果
@@ -132,7 +132,7 @@ struct SearchResultRow: View {
             HStack(spacing: 12) {
                 Image(systemName: result.icon)
                     .font(.title2)
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(.accent)
                     .frame(width: 36)
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -150,7 +150,7 @@ struct SearchResultRow: View {
                     .foregroundStyle(.tertiary)
             }
             .padding()
-            .background(.thin, in: RoundedRectangle(cornerRadius: 12))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
     }

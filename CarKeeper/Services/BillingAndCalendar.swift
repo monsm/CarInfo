@@ -416,7 +416,7 @@ struct ChargeBillSheet: View {
                             Spacer()
                             Text("\(record.kWh) kWh")
                                 .font(.subheadline)
-                                .foregroundColor(.accentColor)
+                                .foregroundColor(.accent)
                         }
                     }
                 }
@@ -434,7 +434,7 @@ struct ChargeBillSheet: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(.accentColor)
+                        .background(.accent)
                         .foregroundColor(.white)
                         .cornerRadius(Theme.Radius.md)
                 }

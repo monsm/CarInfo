@@ -120,7 +120,7 @@ struct DataView: View {
                 .font(Theme.caption.weight(sel ? .semibold : .regular))
                 .foregroundStyle(sel ? .white : .primary)
                 .padding(.horizontal, 14).padding(.vertical, 9)
-                .background(sel ? Color.accentColor : Color(.tertiarySystemFill), in: Capsule())
+                .background(sel ? Color.accent : Color(.tertiarySystemFill), in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -146,7 +146,7 @@ struct DataView: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 120, alignment: .leading)
                         Text(r.v)
-                            .font(Theme.caption.design(.monospaced))
+                            .font(Theme.caption)
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.trailing).lineLimit(3)
                         Spacer(minLength: 8)

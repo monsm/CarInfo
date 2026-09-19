@@ -130,9 +130,9 @@ struct ShortcutRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.title3)
-                .foregroundStyle(.accentColor)
+                .foregroundStyle(.accent)
                 .frame(width: 36, height: 36)
-                .background(.thin, in: Circle())
+                .background(.ultraThinMaterial, in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(Theme.body).foregroundStyle(.primary)
                 Text(subtitle).font(Theme.caption).foregroundStyle(.secondary)

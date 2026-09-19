@@ -175,7 +175,7 @@ struct CostSummaryTile: View {
         VStack(spacing: Theme.Spacing.xs) {
             Image(systemName: type.icon)
                 .font(.title2)
-                .foregroundColor(.accentColor)
+                .foregroundColor(.accent)
             Text("\(total, specifier: "%.1f")")
                 .font(.callout)
                 .fontWeight(.semibold)
@@ -255,7 +255,7 @@ struct CostEntryRow: View {
             Image(systemName: entry.type.icon)
                 .font(.headline)
                 .frame(width: 36, height: 36)
-                .background(Color.accentColor.opacity(0.15))
+                .background(Color.accent.opacity(0.15))
                 .clipShape(Circle())
             
             VStack(alignment: .leading, spacing: 2) {

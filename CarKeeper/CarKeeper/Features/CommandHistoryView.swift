@@ -86,7 +86,7 @@ struct CommandHistoryView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(filter == f ? Color.accentColor.opacity(0.2) : Color.clear)
+                            .background(filter == f ? Color.accent.opacity(0.2) : Color.clear)
                             .foregroundStyle(filter == f ? .accent : .secondary)
                             .cornerRadius(20)
                     }

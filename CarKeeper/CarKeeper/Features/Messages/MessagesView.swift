@@ -14,7 +14,7 @@ struct MessagesView: View {
     @State private var filterTag: String? = nil
     @State private var showUnreadOnly = false
     @EnvironmentObject var nav: NavState                // C3: 用于 pushNavigation
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.medium
 
     // 本地已读持久化（无服务端 mark-read 接口，用 UserDefaults 记已读消息 ID）。
     private static let readKey = "changan_read_message_ids"
@@ -56,13 +56,13 @@ struct MessagesView: View {
                     Button(action: { filterTag = nil }) {
                         Image(systemName: filterTag != nil ? "xmark.circle.fill" : "line.3.horizontal.decrease")
                             .font(Theme.caption)
-                            .foregroundStyle(filterTag != nil ? .accentColor : .secondary)
+                            .foregroundStyle(filterTag != nil ? .accent : .secondary)
                     }
                     .accessibilityLabel(Text(filterTag != nil ? "清除筛选" : "按标签筛选"))
                     Button(action: { showUnreadOnly.toggle() }) {
                         Image(systemName: showUnreadOnly ? "eye.fill" : "eye.slash.fill")
                             .font(Theme.caption)
-                            .foregroundStyle(showUnreadOnly ? .accentColor : .secondary)
+                            .foregroundStyle(showUnreadOnly ? .accent : .secondary)
                     }
                     .accessibilityLabel(Text(showUnreadOnly ? "显示全部消息" : "仅显示未读"))
                 }
@@ -75,7 +75,7 @@ struct MessagesView: View {
                             }
                             .font(Theme.micro.bold())
                             .padding(.horizontal, 12).padding(.vertical, 5)
-                            .background(filterTag == nil ? Color.accentColor : Color.secondary.opacity(0.15), in: Capsule())
+                            .background(filterTag == nil ? Color.accent : Color.secondary.opacity(0.15), in: Capsule())
                             .foregroundStyle(filterTag == nil ? .white : .secondary)
                             ForEach(allTags.dropFirst(), id: \.self) { tag in
                                 Button(tag) {
@@ -83,7 +83,7 @@ struct MessagesView: View {
                                 }
                                 .font(Theme.micro.bold())
                                 .padding(.horizontal, 12).padding(.vertical, 5)
-                                .background(filterTag == tag ? Color.accentColor : Color.secondary.opacity(0.15), in: Capsule())
+                                .background(filterTag == tag ? Color.accent : Color.secondary.opacity(0.15), in: Capsule())
                                 .foregroundStyle(filterTag == tag ? .white : .secondary)
                             }
                         }
@@ -113,7 +113,7 @@ struct MessagesView: View {
                                         .font(Theme.micro.bold())
                                         .foregroundStyle(.white)
                                         .padding(.horizontal, 7).padding(.vertical, 2)
-                                        .background(Capsule().fill(Color.accentColor))
+                                        .background(Capsule().fill(Color.accent))
                                 }
                                 Spacer()
                             }
@@ -126,7 +126,7 @@ struct MessagesView: View {
             .adaptiveSafeAreaBottom(12, dynamicTypeSize)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground(.accentColor)
+        .pageBackground(.accent)
         .navigationTitle("消息")
             .navBarStyle()
             .accessibilityLabel(Text("消息"))
@@ -139,7 +139,7 @@ struct MessagesView: View {
                 } label: {
                     Text("全部已读")
                         .font(Theme.caption.bold())
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(.accent)
                 }
                 .accessibilityLabel(Text("全部已读"))
             }
@@ -244,9 +244,9 @@ struct MessagesView: View {
             HStack(spacing: 10) {
                 if !item.read {
                     Circle()
-                        .fill(Color.accentColor)
+                        .fill(Color.accent)
                         .frame(width: 10, height: 10)
-                        .shadow(color: Color.accentColor.opacity(0.5), radius: 4)
+                        .shadow(color: Color.accent.opacity(0.5), radius: 4)
                 } else {
                     Circle()
                         .fill(Color.clear)
@@ -301,9 +301,9 @@ struct MessagesView: View {
                     }
                     if !item.plate.isEmpty {
                         HStack(spacing: 8) {
-                            Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(.accentColor)
+                            Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(.accent)
                             Text(item.plate).font(Theme.caption.bold(), design: .monospaced)
-                                .foregroundStyle(.accentColor)
+                                .foregroundStyle(.accent)
                         }
                     }
                 }

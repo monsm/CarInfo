@@ -17,7 +17,7 @@ struct SplashView: View {
             // 背景渐变
             LinearGradient(
                 colors: [
-                    Color.accentColor.opacity(0.3),
+                    Color.accent.opacity(0.3),
                     Color.purple.opacity(0.2),
                     Color.blue.opacity(0.1)
                 ],
@@ -38,7 +38,7 @@ struct SplashView: View {
                             .trim(from: 0, to: progress)
                             .stroke(
                                 AngularGradient(
-                                    colors: [.white, Color.accentColor],
+                                    colors: [.white, Color.accent],
                                     center: .center
                                 ),
                                 style: StrokeStyle(lineWidth: 3, lineCap: .round)
@@ -51,7 +51,7 @@ struct SplashView: View {
                             .font(.system(size: 48))
                             .foregroundStyle(.white)
                     }
-                    .shadow(color: Color.accentColor.opacity(0.5), radius: 20, y: 10)
+                    .shadow(color: Color.accent.opacity(0.5), radius: 20, y: 10)
                     
                     Text("长安车管家")
                         .font(.system(size: 28, weight: .bold))
@@ -70,7 +70,7 @@ struct SplashView: View {
                             .frame(height: 3)
                         Rectangle()
                             .fill(LinearGradient(
-                                colors: [.white, Color.accentColor],
+                                colors: [.white, Color.accent],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             ))
