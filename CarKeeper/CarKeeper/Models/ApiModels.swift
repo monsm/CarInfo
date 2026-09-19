@@ -222,6 +222,12 @@ struct HealthSystem: Identifiable {
     let statusText: String
     let children: [HealthItem]
     var open: Bool
+    /// 计算健康百分比：ok=100, warn=60, bad=20，按子项加权平均
+    var healthPct: Int {
+        guard !children.isEmpty else { return statusCls == "ok" ? 100 : (statusCls == "warn" ? 60 : 20) }
+        let scores = children.map { $0.statusCls == "ok" ? 100 : ($0.statusCls == "warn" ? 60 : 20) }
+        return max(0, min(100, Int(scores.reduce(0, +) / CGFloat(scores.count))))
+    }
 }
 
 struct HealthItem: Identifiable {

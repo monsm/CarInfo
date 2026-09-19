@@ -36,6 +36,7 @@ struct ControlView: View {
     @State private var pollTask: Task<Void, Never>? = nil
     @State private var lastResult: RunState? = nil
     // lastResult 由 resultSheet 直接使用，保留
+    @State private var tempDisplayCount: Int = 0   // HeroDisc 温度数字滚动计数（0→pendingTemp）
 
     struct RunState: Identifiable {
         let id: Int
@@ -71,6 +72,13 @@ struct ControlView: View {
             .adaptiveSafeAreaBottom(12, dynamicTypeSize)
         }
         .scrollBounceBehavior(.basedOnSize)
+        .refreshable {
+            tempDisplayCount = 0            // 数字归零
+            withAnimation(.spring(Theme.Duration.springFast)) {
+                try? await refreshControlCache()
+            }
+            // 数据回来后自动重播计数动画（pendingTemp 不变，onChange 会触发）
+        }
         .pageBackground(Theme.pageBlue)
         .navigationTitle("车控").navBarStyle()
         .sheet(isPresented: $showPin) {
@@ -279,10 +287,11 @@ struct ControlView: View {
 
     // MARK: 主控双盘
     private var heroDiscs: some View {
-        HStack(spacing: 28) {
+        HStack(spacing: 20) {
             ForEach(Array(hero.enumerated()), id: \.element.key) { idx, item in
                 heroDisc(item, idx: idx)
             }
+            ACHeroDisc(pendingTemp: $pendingTemp, displayCount: $tempDisplayCount)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
@@ -553,6 +562,9 @@ struct HeroDiscButton: View {
         Button(action: action) {
             VStack(spacing: 12) {
                 ZStack {
+                    // 第 0.5 层：EKG 心电图描边流动环（首尾相连，沿圆环持续行进）
+                    EKGFloRing(size: 102, color: Theme.brand.opacity(0.45), lineWidth: 1.5, speed: 3.5)
+
                     // 第 1 层：脉冲光环（持续呼吸，模拟 Liquid Glass 生命感）
                     Circle()
                         .strokeBorder(Theme.brand.opacity(0.25), lineWidth: 1.5)
@@ -593,6 +605,74 @@ struct HeroDiscButton: View {
         // 液态玻璃按压反馈（统一 PressFeedback）
         .modifier(PressFeedback(pressScale: 0.88, glowColor: Theme.brand, glowIntensity: 1.0,
                                 springResponse: 0.4, springDamping: 0.65))
+    }
+}
+
+// MARK: - 空调温度 HeroDisc（带心跳脉冲 + EKG 流动环 + 数字滚动）
+struct ACHeroDisc: View {
+    @Binding var pendingTemp: Int
+    @Binding var displayCount: Int
+    @State private var isEntered = false
+
+    var body: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                // 第 0.5 层：EKG 心电图描边流动环
+                EKGFloRing(size: 102, color: Theme.brand.opacity(0.45), lineWidth: 1.5, speed: 3.5)
+
+                // 第 1 层：脉冲光环（持续呼吸）
+                Circle()
+                    .strokeBorder(Theme.brand.opacity(0.25), lineWidth: 1.5)
+                    .frame(width: 96, height: 96)
+                    .blur(radius: 3)
+                    .heartbeatPulse()
+
+                // 第 2 层：底色填充
+                Circle()
+                    .fill(Theme.brand.opacity(0.08))
+                    .frame(width: 92, height: 92)
+
+                // 第 3 层：中层填充
+                Circle()
+                    .fill(Theme.brand.opacity(0.12))
+                    .frame(width: 80, height: 80)
+
+                // 第 4 层：清晰边框
+                Circle()
+                    .strokeBorder(Theme.brand.opacity(0.30), lineWidth: 1.5)
+                    .frame(width: 80, height: 80)
+
+                // 第 5 层：温度数字（滚动计数）
+                VStack(spacing: 2) {
+                    Text("\(displayCount)")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.brand)
+                        .contentTransition(.numericText())
+                    Text("℃")
+                        .font(Theme.micro))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .scaleEffect(isEntered ? 1.0 : 0.82)
+            .opacity(isEntered ? 1.0 : 0.0)
+            .animation(.spring(response: 0.55, dampingFraction: 0.7, blendDuration: 0.35), value: isEntered)
+            Text("空调")
+                .font(Theme.h4))
+                .foregroundStyle(.primary)
+        }
+        .onAppear {
+            isEntered = true
+            // 从 0 弹性计数到目标温度（入场动画）
+            withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
+                displayCount = pendingTemp
+            }
+        }
+        // 温度变化时同步滚动
+        .onChange(of: pendingTemp) { newTemp in
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.6)) {
+                displayCount = newTemp
+            }
+        }
     }
 }
 

@@ -319,6 +319,9 @@ extension View {
         background(PageBackground(tint: tint))
     }
 
+    /// 双拍心跳脉冲效果（ECG 波形呼吸）
+    func heartbeatPulse() -> some View { modifier(HeartbeatPulse()) }
+
     // MARK: - 导航栏样式：iOS 27 Liquid Glass
     // inline 标题 + 玻璃材质背景 + 白色高光描边 + 强调色图标
     func navBarStyle() -> some View {
@@ -852,6 +855,88 @@ struct HeartbeatPulse: ViewModifier {
             .onAppear { t = 0 }
     }
 }
+// =============================================================================
+// EKGFloRing —— EKG 心电图波形沿圆环流动动画
+// 首尾相连的波形沿圆环持续行进，模拟真实心电图监测仪效果
+// =============================================================================
+
+/// EKG 心电图描边流动环
+/// 将经典的 P-QRS-T 波形采样为封闭圆形路径，通过 dashOffset 动画实现首尾相连的流动效果
+struct EKGFloRing: View {
+    let size: CGFloat        // 圆环直径
+    let color: Color         // 波形颜色（随状态变化）
+    let lineWidth: CGFloat   // 描边宽度
+    let speed: Double        // 流动速度（秒/完整周期），默认 3s
+
+    init(size: CGFloat, color: Color, lineWidth: CGFloat = 1.5, speed: Double = 3.0) {
+        self.size = size
+        self.color = color
+        self.lineWidth = lineWidth
+        self.speed = speed
+    }
+
+    var body: some View {
+        Circle()
+            .stroke(
+                color.opacity(0.55),
+                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+            )
+            .frame(width: size, height: size)
+            // dash pattern：波形周期 * 4 个完整 P-QRS-T 波形，总长 = 4 cycles
+            // dashOffset 从周期长度滚动到 0，形成连续流动
+            .animation(
+                .linear(duration: speed).repeatForever(autoreverses: false),
+                value: _animOffset
+            )
+            .overlay(alignment: .center) {
+                // 发光层：与波形同相位，增强视觉深度
+                Circle()
+                    .stroke(color.opacity(0.18), style: StrokeStyle(lineWidth: lineWidth + 3, lineCap: .round))
+                    .frame(width: size + 6, height: size + 6)
+                    .blur(radius: 2)
+                    .animation(
+                        .linear(duration: speed).repeatForever(autoreverses: false),
+                        value: _animOffset
+                    )
+            }
+    }
+
+    // 每周期包含 4 个完整 P-QRS-T 波形的 dash 序列（单位：pt，基于 size=100 基准圆周长 ≈ 314pt）
+    // 每个波形周期约 78.5pt，4 个周期 = 314pt ≈ 2πR
+    private var dashPattern: [CGFloat] {
+        let base = size * .pi  // 圆周长 = 2πr = π·size
+        // 单个 P-QRS-T 波形形状（相对振幅）：
+        // P 波：小幅隆起  |  QRS：尖锐负-正-负  |  T 波：中等隆起  |  基线：平
+        // 采样为 40 段折线，作为 dash array 使用
+        let segments: [CGFloat] = [
+            12.0,   // 平基线
+            2.0,    // P 波起点
+            1.5,    // P 波升支
+            1.0,    // P 波峰
+            1.5,    // P 波降支
+            3.0,    // 平基线到 Q
+            1.0,    // Q 下冲
+            0.8,    // 谷底
+            1.0,    // R 上冲（主峰）
+            1.5,    // R 顶点
+            1.2,    // R 降支
+            1.5,    // S 下冲
+            1.0,    // 谷底
+            2.0,    // 回到基线
+            4.0,    // ST 段平
+            3.0,    // T 波升支
+            2.0,    // T 波峰
+            3.0,    // T 波降支
+            6.0,    // 平基线
+        ]
+        // 缩放到圆周长比例
+        let total = segments.reduce(0, +)
+        let scale = base / total
+        return segments.map { $0 * scale }
+    }
+
+    @State private var _animOffset: CGFloat = 0
+}
 
 // =============================================================================
 // FluidHeroFont —— iOS 27 流体数字字体
@@ -960,6 +1045,68 @@ struct FluidScoreHero: View {
             minSize: minSize,
             maxSize: maxSize
         )
+    }
+}
+
+// MARK: - 健康系统小圆环统计卡（带心跳脉冲）
+struct HealthSystemRing: View {
+    let name: String
+    let statusCls: String
+    let statusText: String
+    let pct: Int
+
+    private var ringColor: Color { Theme.statusColor(statusCls) }
+    private var ringColors: [Color] {
+        switch statusCls {
+        case "bad":   return [.red, .red, .orange]
+        case "warn":  return [.orange, .orange, .yellow]
+        default:      return [.green, .green, .teal]
+        }
+    }
+    private var glowColors: [Color] {
+        switch statusCls {
+        case "bad":   return [.red.opacity(0.6), .clear]
+        case "warn":  return [.orange.opacity(0.5), .clear]
+        default:      return [.green.opacity(0.5), .teal.opacity(0.3)]
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            // 第 1 层：外层扩散光晕
+            Circle()
+                .fill(AngularGradient(colors: glowColors,
+                                      center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)))
+                .frame(width: 48, height: 48)
+                .opacity(0.20)
+                .blur(radius: 4)
+
+            // 第 2 层：心跳脉冲光环
+            Circle()
+                .strokeBorder(ringColor.opacity(0.25), lineWidth: 1.5)
+                .frame(width: 44, height: 44)
+                .heartbeatPulse()
+
+            // 第 3 层：底色轨道
+            Circle()
+                .stroke(Color(.systemGray5).opacity(0.40), lineWidth: 5)
+                .frame(width: 38, height: 38)
+
+            // 第 4 层：彩色进度弧
+            Circle()
+                .trim(from: 0, to: max(0.02, CGFloat(pct) / 100))
+                .stroke(AngularGradient(colors: ringColors,
+                                        center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
+                        style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .frame(width: 38, height: 38)
+
+            // 第 5 层：中心百分比
+            Text("\(pct)%")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(ringColor)
+        }
+        .frame(width: 48, height: 48)
     }
 }
 
@@ -1085,6 +1232,69 @@ struct GlassRefreshRipple: ViewModifier {
                 }
             }
     }
+}
+
+// =============================================================================
+// GlassRefreshHalo —— 下拉刷新时玻璃光晕消散再汇聚过渡动效
+// 效果：页面内容上的柔和玻璃光晕在刷新开始时消散（opacity 1→0），
+// 数据拉取完成后重新汇聚（opacity 0→1，弹簧回弹），形成「液态玻璃呼吸」质感。
+// 与 glassRefreshRipple 配合使用：ripple 提供触点扩散，halo 提供整体氛围。
+// =============================================================================
+
+struct GlassRefreshHalo: ViewModifier {
+    @Binding var isRefreshing: Bool
+    @State private var haloOpacity: CGFloat = 1.0
+
+    func body(content: Content) -> some View {
+        content
+            // 玻璃光晕层：大面积柔和品牌色径向渐变，覆盖整个页面
+            .overlay(alignment: .center) {
+                if haloOpacity > 0.001 {
+                    ZStack {
+                        // 外层大范围柔和散射
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        .white.opacity(0.10),
+                                        .white.opacity(0.04),
+                                        Theme.brand.opacity(0.03),
+                                        .clear
+                                    ],
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: 500
+                                )
+                            )
+                            .frame(width: 700, height: 700)
+                        // 内层高亮核心
+                        Circle()
+                            .fill(Color.white.opacity(0.06))
+                            .frame(width: 280, height: 280)
+                    }
+                    .allowsHitTesting(false)
+                }
+            }
+            .onChange(of: isRefreshing) { refreshing in
+                if refreshing {
+                    // 刷新开始：光晕消散（0.5s ease-in）
+                    withAnimation(.easeIn(duration: 0.5)) {
+                        haloOpacity = 0
+                    }
+                } else {
+                    // 刷新结束：光晕重新汇聚（0.8s 弹簧回弹）
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.65, blendDuration: 0.5)) {
+                        haloOpacity = 1
+                    }
+                }
+            }
+    }
+}
+
+/// 为页面添加下拉刷新玻璃光晕消散/汇聚动效
+/// - Parameter isRefreshing: 绑定刷新状态（true = 开始消散，false = 重新汇聚）
+func glassRefreshHalo(isRefreshing: Binding<Bool>) -> some View {
+    self.modifier(GlassRefreshHalo(isRefreshing: isRefreshing))
 }
 
 /// 为页面添加下拉刷新玻璃涟漪动效

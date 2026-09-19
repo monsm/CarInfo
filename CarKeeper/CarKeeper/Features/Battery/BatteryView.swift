@@ -61,6 +61,9 @@ struct BatteryView: View {
                     .opacity(0.15)
                     .blur(radius: 12)
 
+                // 第 0.5 层：EKG 心电图描边流动环（首尾相连，沿圆环持续行进）
+                EKGFloRing(size: 238, color: .green.opacity(0.50), lineWidth: 1.5, speed: 3.5)
+
                 // 第 1 层：脉冲光环（持续呼吸）
                 Circle()
                     .strokeBorder(AngularGradient(colors: [.green, .teal], center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)), lineWidth: 2)

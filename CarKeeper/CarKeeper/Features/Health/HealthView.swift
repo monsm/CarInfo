@@ -110,6 +110,9 @@ struct HealthView: View {
                 .opacity(0.18)
                 .blur(radius: 12)
 
+            // ── 第 0.5 层：EKG 心电图描边流动环（首尾相连，沿圆环持续行进）────────
+            EKGFloRing(size: 242, color: .green.opacity(0.45), lineWidth: 1.5, speed: 3.5)
+
             // ── 第 1 层：脉冲光环（持续呼吸）───────────────────────
             Circle()
                 .strokeBorder(
@@ -290,9 +293,9 @@ struct HealthView: View {
                     .allowsHitTesting(false)
             }
         }
-        // 弹簧高度 + 弹性缩放：动画作用于整个 ZStack，确保卡片整体形变
-        .animation(.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0.35), value: expandedSystems)
-        .scaleEffect(expandedSystems.isEmpty ? 1.0 : 1.0 + CGFloat(expandedSystems.count) * 0.003)
+        // 弹簧高度 + 弹性缩放：有展开项时卡片轻微压缩（liquid glass 触感 0.98），收起时回弹
+        .scaleEffect(expandedSystems.isEmpty ? 1.0 : 0.98)
+        .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: expandedSystems.isEmpty)
     }
 
     private func systemRow(_ sys: HealthSystem, toggle: @escaping () -> Void) -> some View {
@@ -353,9 +356,9 @@ struct SystemRowView: View {
                     StatusDot(cls: sys.statusCls)
                     Text(sys.name).font(Theme.h4)))
                     Spacer()
-                    Text(sys.statusText)
-                        .font(Theme.caption.bold())))
-                        .foregroundStyle(Theme.statusColor(sys.statusCls))
+                    // 小圆环健康统计卡（带心跳脉冲）
+                    HealthSystemRing(name: sys.name, statusCls: sys.statusCls,
+                                     statusText: sys.statusText, pct: sys.healthPct)
                     // 旋转 Chevron + 玻璃反光条
                     HStack(spacing: 6) {
                         Capsule()
@@ -407,32 +410,72 @@ struct SystemRowView: View {
     }
 }
 
-// MARK: - 检测子项行（交错入场）
+// MARK: - 检测子项行（交错入场 + 液体玻璃拉伸形变 + 反光条流动）
 struct SystemChildRow: View {
     let item: HealthItem
     let idx: Int
 
     @State private var appeared = false
+    @State private var reflectPhase: CGFloat = 0   // 0→1 表示反光条滑过进度
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack {
-                Text(item.name).font(Theme.caption)).foregroundStyle(.secondary)
-                Spacer()
-                Text(item.statusText)
-                    .font(Theme.footnote.bold())))
-                    .foregroundStyle(Theme.statusColor(item.statusCls))
+        GeometryReader { geo in
+            let rowWidth = geo.size.width
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text(item.name).font(Theme.caption)).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(item.statusText)
+                        .font(Theme.footnote.bold())))
+                        .foregroundStyle(Theme.statusColor(item.statusCls))
+                }
+                if let d = item.detect, !d.isEmpty { KVRow(k: "检测值", v: d) }
+                if let s = item.suggest, !s.isEmpty { KVRow(k: "参考范围", v: s) }
+                if let desc = item.desc, !desc.isEmpty {
+                    Text(desc).font(Theme.footnote)).foregroundStyle(.secondary)
+                }
             }
-            if let d = item.detect, !d.isEmpty { KVRow(k: "检测值", v: d) }
-            if let s = item.suggest, !s.isEmpty { KVRow(k: "参考范围", v: s) }
-            if let desc = item.desc, !desc.isEmpty {
-                Text(desc).font(Theme.footnote)).foregroundStyle(.secondary)
+            .padding(.vertical, 8)
+            // 液体玻璃拉伸：垂直方向从 0.85 弹性扩张到 1.0
+            .scaleEffect(y: appeared ? 1.0 : 0.85)
+            // 整体淡入 + 上滑复位
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 10)
+            // 玻璃反光条：从左侧滑入覆盖全行宽度后停止
+            .overlay(alignment: .leading) {
+                if appeared && reflectPhase < 1 {
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    .clear,
+                                    .white.opacity(0.08),
+                                    .white.opacity(0.18),
+                                    .white.opacity(0.08),
+                                    .clear
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: rowWidth * 0.35, height: 2)
+                        .offset(x: reflectPhase * (rowWidth + rowWidth * 0.35) - rowWidth * 0.35)
+                        .cornerRadius(1)
+                }
+            }
+            .animation(.spring(response: 0.45, dampingFraction: 0.65, blendDuration: 0.3)
+                        .delay(Double(idx) * 0.07), value: appeared)
+            .onAppear { appeared = true }
+            // 反光条在卡片出现后延迟滑过（模拟 Liquid Glass 折射光掠过）
+            .onChange(of: appeared) { visible in
+                guard visible else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12 + Double(idx) * 0.07) {
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.7, blendDuration: 0.25)) {
+                        reflectPhase = 1.0
+                    }
+                }
             }
         }
-        .padding(.vertical, 8)
-        .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 10)
-        .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0.25).delay(Double(idx) * 0.07), value: appeared)
-        .onAppear { appeared = true }
+        .frame(height: nil, alignment: .leading)
     }
 }

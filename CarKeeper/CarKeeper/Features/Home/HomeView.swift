@@ -87,6 +87,7 @@ struct HomeView: View {
         }
         .refreshable { isRefreshing = true; await fetchCore(); isRefreshing = false }
         .glassRefreshRipple(isRefreshing: $isRefreshing)
+        .glassRefreshHalo(isRefreshing: $isRefreshing)
     }
 
     // MARK: 问候行
@@ -117,6 +118,9 @@ struct HomeView: View {
                     .frame(width: 232, height: 232)
                     .opacity(0.15)
                     .blur(radius: 12)
+
+                // 第 0.5 层：EKG 心电图描边流动环（首尾相连，沿圆环持续行进）
+                EKGFloRing(size: 224, color: .green.opacity(0.50), lineWidth: 1.5, speed: 3.5)
 
                 // 第 1 层：脉冲光环（持续呼吸）
                 Circle()
@@ -611,10 +615,11 @@ struct HomeView: View {
         }
         lastFetch = Date()
         if isRefreshing {
-            // 下拉刷新：重置并重播 SOC 入场动画
+            // 下拉刷新：重置并重播 SOC + 里程入场动画
             isRefreshing = false
-            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0; socCount = 0 }
+            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0; socCount = 0; mileCount = 0 }
             startSocAnimation()
+            startMileAnimation()
         }
     }
 }
