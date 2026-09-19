@@ -17,6 +17,8 @@ struct MineView: View {
     @State private var shareSheetFlag = false
     @State private var isRefreshing = false     // 下拉刷新标志（触发玻璃涟漪动效）
     @State private var isChecking = false        // OTA 检查中（不含下载）
+    @State private var showMileageJournal = false
+    @State private var showOTAChangelog = false
     @EnvironmentObject var nav: NavState            // C3: 用于 pushNavigation
     // #NEW-115 夜间模式管理
     @StateObject private var nightModeManager = NightModeManager()
@@ -72,6 +74,20 @@ struct MineView: View {
             Button("取消", role: .cancel) { }
         }
         .sheet(isPresented: $shareSheetFlag) { ShareSheet(items: shareItems) }
+        .sheet(isPresented: $showMileageJournal) {
+            NavigationStack {
+                MileageJournalView()
+                    .navigationTitle("里程记账")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .sheet(isPresented: $showOTAChangelog) {
+            NavigationStack {
+                OTAChangelogView()
+                    .navigationTitle("OTA 版本日志")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
     }
 
     // MARK: 身份卡 — Apple Profile Card
@@ -244,6 +260,16 @@ struct MineView: View {
                     .padding(.horizontal, 4)
                 // #39 月度驾驶报告入口
                 MonthlyReportGenerator()
+                // #NEW-128 里程记账本入口
+                HStack(spacing: 10) {
+                    tile("banknote.fill", "里程记账", tint: .green) { showMileageJournal = true }
+                    tile("clock.fill", "维保提醒", tint: .orange) { nav.pushNavigation(.dashboard, targetTab: 3) }
+                }
+                // #NEW-38 OTA 版本日志入口
+                HStack(spacing: 10) {
+                    tile("tray.fill", "OTA日志", tint: .blue) { showOTAChangelog = true }
+                    tile("doc.plaintext.fill", "专注模式", tint: .purple) { nav.pushNavigation(.dashboard, targetTab: 3) }
+                }
             }
         }
     }

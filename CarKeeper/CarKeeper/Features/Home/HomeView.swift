@@ -169,6 +169,26 @@ struct HomeView: View {
         .milestoneCelebration(mileage: mileCount)
         .pageBackground(.accentColor)
         .toolbar {
+            // #NEW-130 专注模式切换
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    let fm = FocusModeManager.shared
+                    withAnimation(.spring()) {
+                        fm.saveConfig(FocusModeConfig(
+                            enabled: !fm.config.enabled,
+                            hideSensitiveData: fm.config.hideSensitiveData,
+                            showEssentialOnly: fm.config.showEssentialOnly,
+                            doNotDisturb: fm.config.doNotDisturb,
+                            autoStartDriving: fm.config.autoStartDriving,
+                            customMessage: fm.config.customMessage
+                        ))
+                    }
+                } label: {
+                    Image(systemName: FocusModeManager.shared.config.enabled ? "moon.fill" : "moon.stars.fill")
+                        .foregroundColor(FocusModeManager.shared.config.enabled ? .accentColor : .secondary)
+                }
+                .accessibilityLabel(Text(FocusModeManager.shared.config.enabled ? "退出专注模式" : "启用专注模式"))
+            }
             // #24 卡片排序编辑按钮
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {

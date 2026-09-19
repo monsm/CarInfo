@@ -19,7 +19,7 @@ extension Notification.Name {
 }
 
 enum Deeplink: Hashable {
-    case vehicle, health, battery, data, dev, messages, control
+    case vehicle, health, battery, data, dev, messages, control, dashboard
 }
 
 @main
@@ -85,7 +85,10 @@ struct CarKeeperApp: App {
             if store.isLoggedIn && store.cars.isEmpty {
                 Task { await store.bootstrap() }
             }
+            // #NEW-111 CloudKit 同步
+            Task { await store.triggerCloudSync() }
         }
+        .nightModeBreathing(enabled: store.isNightMode)
     }
 }
 
@@ -411,6 +414,7 @@ struct MainTabView: View {
                             case .dev: DevView().environmentObject(nav)
                             case .messages: MessagesView().environmentObject(nav)
                             case .control: ControlView().environmentObject(nav)
+                            case .dashboard: DashboardView().environmentObject(nav)
                             }
                         }
                     }
