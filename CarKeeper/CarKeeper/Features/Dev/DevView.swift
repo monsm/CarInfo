@@ -20,9 +20,9 @@ private struct ColorSwatch: View {
                     .fill(color)
                     .frame(width: 36, height: 36)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(name).font(Theme.caption.bold()))).foregroundStyle(.primary)
+                    Text(name).font(Theme.caption.bold()).foregroundStyle(.primary)
                     if let sampleText {
-                        Text(sampleText).font(Theme.footnote)).foregroundStyle(.secondary)
+                        Text(sampleText).font(Theme.footnote).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -52,10 +52,10 @@ private struct ColorGroup: View {
                             .fill(color)
                             .frame(width: 28, height: 28)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(name).font(Theme.caption)))
+                            Text(name).font(Theme.caption)
                                 .foregroundStyle(.primary)
                             if let sample {
-                                Text(sample).font(Theme.micro)).foregroundStyle(.secondary)
+                                Text(sample).font(Theme.micro).foregroundStyle(.secondary)
                             }
                         }
                         Spacer()
@@ -90,7 +90,7 @@ private struct ContrastRow: View {
                             .fill(lightColor)
                             .frame(width: 64, height: 48)
                     )
-                Text("浅色").font(Theme.micro)).foregroundStyle(.secondary)
+                Text("浅色").font(Theme.micro).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
 
@@ -102,14 +102,14 @@ private struct ContrastRow: View {
                             .fill(darkColor)
                             .frame(width: 64, height: 48)
                     )
-                Text("深色").font(Theme.micro)).foregroundStyle(.secondary)
+                Text("深色").font(Theme.micro).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(name).font(Theme.caption.bold()))).foregroundStyle(.primary)
+                Text(name).font(Theme.caption.bold()).foregroundStyle(.primary)
                 Text("light: #\(lightColor.hexString())\ndark:  #\(darkColor.hexString())")
-                    .font(Theme.micro))
+                    .font(Theme.micro)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -130,9 +130,9 @@ struct DevView: View {
             VStack(spacing: Theme.cardSpacing) {
                 // Hero 说明卡
                 VStack(spacing: Theme.Spacing.sm) {
-                    Text("颜色预览").font(Theme.h2) weight: .bold)).foregroundStyle(.primary)
+                    Text("颜色预览").font(Theme.h2.weight(.bold)).foregroundStyle(.primary)
                     Text("iOS 27 Liquid Glass · 深浅双模式一致性检查")
-                        .font(Theme.caption)).foregroundStyle(.secondary)
+                        .font(Theme.caption).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
@@ -236,7 +236,7 @@ struct DevView: View {
 
                 // Footer
                 Text("深色模式下请检查各颜色是否可读，尤其是 tertiary / quaternary 与玻璃背景的对比度")
-                    .font(Theme.footnote)).foregroundStyle(.tertiary)
+                    .font(Theme.footnote).foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Theme.Spacing.xl)
             }

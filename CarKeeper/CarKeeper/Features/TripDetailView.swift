@@ -9,7 +9,7 @@ extension Date {
     var durationText: String {
         let hours = Int(timeIntervalSince1970 / 3600)
         let minutes = Int(timeIntervalSince1970.truncatingRemainder(dividingBy: 3600) / 60)
-        return hours > 0 ? "\(\(hours)h\(minutes)m" : "\(\(minutes)m"
+        return hours > 0 ? "\(hours)h\(minutes)m" : "\(minutes)m"
     }
 }
 

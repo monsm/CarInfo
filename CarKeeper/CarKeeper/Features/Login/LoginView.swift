@@ -85,7 +85,7 @@ struct LoginView: View {
                     .shadow(color: Color.accentColor.opacity(0.4), radius: 20, y: 8)
                 // 图标
                 Image(systemName: "car.side.fill")
-                    .font(Theme.d3) weight: .medium))
+                    .font(Theme.d3.weight(.medium))
                     .foregroundStyle(.white)
             }
             VStack(spacing: 6) {
@@ -93,7 +93,7 @@ struct LoginView: View {
                     .font(Theme.h1)
                     .letterSpacing(2)
                 Text("CHANGAN CONNECT")
-                    .font(Theme.footnote.bold())))
+                    .font(Theme.footnote.bold())
                     .tracking(5)
                     .foregroundStyle(.secondary)
             }
@@ -105,38 +105,38 @@ struct LoginView: View {
         VStack(spacing: 18) {
             HStack(spacing: 12) {
                 Image(systemName: "phone.fill")
-                    .font(Theme.body))
+                    .font(Theme.body)
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 24)
                 TextField("手机号", text: $phone)
                     .keyboardType(.numberPad)
-                    .font(.title.design(.rounded)))
+                    .font(.title.design(.rounded))
                     .onChange(of: phone) { _, _ in loadCaptcha() }
                 if phoneValid {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(Theme.ok)
-                        .font(Theme.body))
+                        .font(Theme.body)
                 }
             }
             ListDivider()
             HStack(spacing: 12) {
                 Image(systemName: "photo.on.rectangle")
-                    .font(Theme.body))
+                    .font(Theme.body)
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 24)
                 TextField("图形验证码", text: $picCode)
-                    .font(.title.design(.rounded)))
+                    .font(.title.design(.rounded))
                 captchaView
             }
             ListDivider()
             HStack(spacing: 12) {
                 Image(systemName: "message.badge.fill")
-                    .font(Theme.body))
+                    .font(Theme.body)
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 24)
                 TextField("6 位短信验证码", text: $smsCode)
                     .keyboardType(.numberPad)
-                    .font(.title.design(.rounded)))
+                    .font(.title.design(.rounded))
                 smsButton
             }
         }
@@ -150,7 +150,7 @@ struct LoginView: View {
             sendSms()
         } label: {
             Text(smsBtnText)
-                .font(Theme.caption.bold())))
+                .font(Theme.caption.bold())
                 .foregroundStyle(smsBtnDisabled ? Color.secondary : Color.accentColor)
                 .padding(.horizontal, 14).padding(.vertical, 8)
                 .background(.thin, in: Capsule())
@@ -174,7 +174,7 @@ struct LoginView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color(.tertiarySystemFill))
                         .frame(height: 40).frame(width: 104)
-                        .overlay(Text("点我刷新").font(Theme.footnote)).foregroundStyle(.secondary))
+                        .overlay(Text("点我刷新").font(Theme.footnote).foregroundStyle(.secondary))
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -187,7 +187,7 @@ struct LoginView: View {
     private var statusBanner: some View {
         if !statusText.isEmpty {
             Label(statusText, systemImage: statusErr ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
-                .font(Theme.caption))
+                .font(Theme.caption)
                 .foregroundStyle(statusErr ? Theme.bad : Theme.ok)
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)

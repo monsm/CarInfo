@@ -288,10 +288,10 @@ struct HomeView: View {
         let dateStr = DateFormatter.relative(Date())
         return HStack {
             Text(greeting)
-                .font(Theme.h4)))
+                .font(Theme.h4)
             Spacer()
             Text(dateStr)
-                .font(Theme.caption)).foregroundStyle(.secondary)
+                .font(Theme.caption).foregroundStyle(.secondary)
         }
         .adaptivePagePadding(dynamicTypeSize)
         .padding(.vertical, 8)
@@ -345,7 +345,7 @@ struct HomeView: View {
                     FluidPercentHero(e.soc == "--" ? "--" : String(socCount))
                         .dynamicTypeLineLimit(1)
                     Text("剩余电量")
-                        .font(Theme.caption)))
+                        .font(Theme.caption)
                         .foregroundStyle(.secondary)
                         .dynamicTypeTextCompress(isTitle: true)
                         .accessibilityLabel(Text("剩余电量"))
@@ -375,7 +375,7 @@ struct HomeView: View {
             }
             // 在线状态
             Text(e.online.text)
-                .font(Theme.footnote)))
+                .font(Theme.footnote)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -419,7 +419,7 @@ struct HomeView: View {
         let carSel = VM.carSel(store.cars, store.carId)
         return HStack(spacing: 12) {
             Image(systemName: "car.2.fill")
-                .font(Theme.bodyMd))
+                .font(Theme.bodyMd)
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 40, height: 40)
                 .background(.thin, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -433,11 +433,11 @@ struct HomeView: View {
             }
             .pickerStyle(.menu)
             .padding(.horizontal, 4)
-            .font(Theme.h4)))
+            .font(Theme.h4)
             Spacer()
             if carSel.count > 1 {
                 Text("\(carSel.count) 辆")
-                    .font(Theme.footnote.bold())))
+                    .font(Theme.footnote.bold())
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(.thin, in: Capsule())
@@ -482,8 +482,8 @@ struct HomeView: View {
                 let fCls = d.fireStatus == "启动" ? "bad" : "ok"
                 VStack(spacing: 2) {
                     Image(systemName: d.fireStatus == "启动" ? "fire.fill" : "battery.100")
-                        .font(Theme.footnote)).foregroundStyle(Theme.statusColor(fCls))
-                    Text(d.fireStatus).font(Theme.micro))).foregroundStyle(Theme.statusColor(fCls))
+                        .font(Theme.footnote).foregroundStyle(Theme.statusColor(fCls))
+                    Text(d.fireStatus).font(Theme.micro).foregroundStyle(Theme.statusColor(fCls))
                 }
                 .frame(width: 52, height: 40)
                 .background(Theme.statusColor(fCls).opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -517,7 +517,7 @@ struct HomeView: View {
                             MetricPill(icon: "thermometer.super", value: d.motorTemp, unit: "℃", tint: .orange)
                         }
                         if !d.batteryNote.isEmpty {
-                            Text(d.batteryNote).font(Theme.footnote)).foregroundStyle(.secondary)
+                            Text(d.batteryNote).font(Theme.footnote).foregroundStyle(.secondary)
                         }
                     }
                     .padding(.horizontal, Theme.Spacing.xl)
@@ -606,15 +606,15 @@ struct HomeView: View {
         let icon = domainIcon(d.key)
         HStack(spacing: 10) {
             Text(icon)
-                .font(Theme.caption))
+                .font(Theme.caption)
                 .foregroundStyle(Theme.statusColor(d.cls))
                 .frame(width: 20)
             Text(d.label)
-                .font(Theme.caption)))
+                .font(Theme.caption)
                 .foregroundStyle(.primary)
             Spacer()
             Text(d.short)
-                .font(Theme.caption.bold())))
+                .font(Theme.caption.bold())
                 .foregroundStyle(Theme.statusColor(d.cls))
         }
         .padding(.vertical, 6)
@@ -641,16 +641,16 @@ struct HomeView: View {
         return VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
             // 电池摘要行（SOC / 续航 / 告警 来自分析域，不重复 SOC Hero）
             VStack(alignment: .leading, spacing: 8) {
-                Text("电池状态").font(Theme.footnote.bold()))).foregroundStyle(.secondary)
+                Text("电池状态").font(Theme.footnote.bold()).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 12) {
                     ForEach(battSummary.headLines, id: \.id) { h in
                         VStack(spacing: 4) {
-                            Text(h.label).font(Theme.footnote)).foregroundStyle(.secondary)
-                            Text(h.value).font(Theme.h3)))
+                            Text(h.label).font(Theme.footnote).foregroundStyle(.secondary)
+                            Text(h.value).font(Theme.h3)
                                 .foregroundStyle(h.cls == "ok" ? Theme.ok : (h.cls == "bad" ? Theme.bad : .primary))
                             if !h.reason.isEmpty {
-                                Text(h.reason).font(Theme.micro)).foregroundStyle(.secondary)
+                                Text(h.reason).font(Theme.micro).foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }
                         }
@@ -666,10 +666,10 @@ struct HomeView: View {
             // 分析结论详情
             for line in battSummary.headLines {
                 HStack(spacing: 6) {
-                    Text(line.label).font(Theme.caption)).foregroundStyle(.secondary)
-                    Text(line.value).font(Theme.caption.bold()))).foregroundStyle(line.cls == "ok" ? Theme.ok : (line.cls == "bad" ? Theme.bad : .primary))
+                    Text(line.label).font(Theme.caption).foregroundStyle(.secondary)
+                    Text(line.value).font(Theme.caption.bold()).foregroundStyle(line.cls == "ok" ? Theme.ok : (line.cls == "bad" ? Theme.bad : .primary))
                     if !line.reason.isEmpty {
-                        Text(line.reason).font(Theme.footnote)).foregroundStyle(.secondary)
+                        Text(line.reason).font(Theme.footnote).foregroundStyle(.secondary)
                         Spacer()
                     }
                 }
@@ -685,9 +685,9 @@ struct HomeView: View {
                         ForEach(cells.enumerated(), id: \.offset) { _, s in
                             VStack(spacing: 2) {
                                 Text(s.num == "--" ? "子" : "S\(s.num!)")
-                                    .font(Theme.micro)).foregroundStyle(.secondary)
+                                    .font(Theme.micro).foregroundStyle(.secondary)
                                 Text(s.maxV.map { String(format: "%.3f", $0) } ?? "--")
-                                    .font(Theme.footnote.bold()), design: .monospaced))
+                                    .font(Theme.footnote.bold(), design: .monospaced)
                                     .foregroundStyle(.primary)
                             }
                             .frame(width: 52)
@@ -695,13 +695,13 @@ struct HomeView: View {
                     }
                     HStack(spacing: 8) {
                         Text("压差 \(String(format: "%.3f", diff))V")
-                            .font(Theme.caption)).foregroundStyle(.secondary)
+                            .font(Theme.caption).foregroundStyle(.secondary)
                         Spacer()
                         Text("最低 \(String(format: "%.3f", minV))V / 最高 \(String(format: "%.3f", maxV))V")
-                            .font(Theme.caption)).foregroundStyle(.secondary)
+                            .font(Theme.caption).foregroundStyle(.secondary)
                     }
                 } else {
-                    Text("接口未上报单体电压").font(Theme.caption)).foregroundStyle(.secondary)
+                    Text("接口未上报单体电压").font(Theme.caption).foregroundStyle(.secondary)
                 }
             }
 
@@ -734,7 +734,7 @@ struct HomeView: View {
                 }
             }
             Text("温度 \(tyre.tempRange)")
-                .font(Theme.footnote)).foregroundStyle(.secondary)
+                .font(Theme.footnote).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
@@ -753,10 +753,10 @@ struct HomeView: View {
                     Divider().padding(.horizontal, Theme.Spacing.xl)
                     VStack(alignment: .leading, spacing: 6) {
                         Text("胎压详情")
-                            .font(Theme.caption.bold())).foregroundStyle(.secondary)
+                            .font(Theme.caption.bold()).foregroundStyle(.secondary)
                         ForEach(Array(tyre.items.enumerated()), id: \.element.id) { idx, item in
                             HStack {
-                                Text(item.label).font(Theme.footnote)).foregroundStyle(.primary)
+                                Text(item.label).font(Theme.footnote).foregroundStyle(.primary)
                                 Spacer()
                                 HStack(spacing: 12) {
                                     Label(item.kpa + " kPa", systemImage: "tire")
@@ -810,7 +810,7 @@ struct HomeView: View {
                     StatTile(icon: "cloud.sun", label: "车外温度", value: comfort.envTemp == "--" ? "--" : String(comfort.envTemp.dropLast()), unit: "℃", tint: Theme.brand)
                 }
                 Text(comfort.acText)
-                    .font(Theme.caption)).foregroundStyle(.secondary)
+                    .font(Theme.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -834,9 +834,9 @@ struct HomeView: View {
                     }
                 }
                 Text(loc.addr.isEmpty ? "暂无定位数据" : loc.addr)
-                    .font(Theme.caption)))
+                    .font(Theme.caption)
                     .lineLimit(1)
-                Text(loc.satAlt).font(Theme.footnote)).foregroundStyle(.secondary)
+                Text(loc.satAlt).font(Theme.footnote).foregroundStyle(.secondary)
                 HStack(spacing: 8) {
                     mapToggleButton
                     if loc.lat != "--" && loc.lng != "--" { navButton(loc) }
@@ -869,7 +869,7 @@ struct HomeView: View {
             HStack(spacing: 4) {
                 Image(systemName: showMap ? "map.fill" : "map")
                 Text(showMap ? "隐藏地图" : "显示地图")
-                    .font(Theme.caption)))
+                    .font(Theme.caption)
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
             .background(.thin, in: Capsule())
@@ -881,7 +881,7 @@ struct HomeView: View {
         Button { openNav(loc) }
         label: {
             Image(systemName: "arrow.up.right")
-                .font(Theme.caption))
+                .font(Theme.caption)
                 .foregroundStyle(.accentColor)
                 .padding(8)
                 .background(.thin, in: Circle())
@@ -901,7 +901,7 @@ struct HomeView: View {
             ToastManager.shared.show("停车位置已保存", icon: "parkingsign.circle.fill")
         } label: {
             Image(systemName: store.parkingLocation != nil ? "parkingsign.circle.fill" : "parkingsign.circle")
-                .font(Theme.caption))
+                .font(Theme.caption)
                 .foregroundStyle(store.parkingLocation != nil ? .accentColor : .tertiary)
                 .padding(8)
                 .background(.thin, in: Circle())
@@ -915,15 +915,15 @@ struct HomeView: View {
         let update = lastFetch.map { DateFormatter.relative($0) } ?? "刚刚"
         return HStack(spacing: 8) {
             Image(systemName: "clock.badge.checkmark")
-                .font(Theme.footnote)).foregroundStyle(.tertiary)
+                .font(Theme.footnote).foregroundStyle(.tertiary)
             Text("更新于 \(update)")
-                .font(Theme.caption)).foregroundStyle(.secondary)
+                .font(Theme.caption).foregroundStyle(.secondary)
             Spacer()
             // #3 数据新鲜度徽章
             DataFreshnessBadge(timestamp: lastFetch)
             Button { fetchCore() } label: {
                 Image(systemName: "arrow.clockwise.circle.fill")
-                    .font(Theme.caption))
+                    .font(Theme.caption)
                     .foregroundStyle(.accentColor)
                     .padding(6)
                     .background(.thin, in: Circle())
@@ -1166,15 +1166,15 @@ struct LocationMapViewPlaceholder: View {
                 .opacity(0.9)
             VStack(spacing: 6) {
                 Image(systemName: "map.fill")
-                    .font(Theme.d0b))
+                    .font(Theme.d0b)
                     .foregroundStyle(.accentColor.opacity(0.6))
                 Text(addr.isEmpty ? "点击导航查看位置" : addr)
-                    .font(Theme.caption))
+                    .font(Theme.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                 if lat != "--" && lng != "--" {
                     Text("\(lat) · \(lng)")
-                        .font(Theme.micro))
+                        .font(Theme.micro)
                         .foregroundStyle(.tertiary)
                 }
             }

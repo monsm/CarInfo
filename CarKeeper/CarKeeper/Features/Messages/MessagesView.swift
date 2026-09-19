@@ -106,11 +106,11 @@ struct MessagesView: View {
                         } header: {
                             HStack(spacing: 8) {
                                 Text(group.label)
-                                    .font(.headline.bold()))
+                                    .font(.headline.bold())
                                     .foregroundStyle(.secondary)
                                 if group.unread > 0 {
                                     Text("\(group.unread) 未读")
-                                        .font(Theme.micro.bold())))
+                                        .font(Theme.micro.bold())
                                         .foregroundStyle(.white)
                                         .padding(.horizontal, 7).padding(.vertical, 2)
                                         .background(Capsule().fill(Color.accentColor))
@@ -255,23 +255,23 @@ struct MessagesView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
                         Text(item.title)
-                            .font(Theme.h4)))
+                            .font(Theme.h4)
                             .lineLimit(1)
                         if !item.tag.isEmpty {
                             Text(item.tag)
-                                .font(Theme.micro.bold())))
+                                .font(Theme.micro.bold())
                                 .padding(.horizontal, 8).padding(.vertical, 3)
                                 .background(Capsule().fill(Theme.statusColor(item.tagCls).opacity(0.12)))
                                 .foregroundStyle(Theme.statusColor(item.tagCls))
                         }
                         Spacer()
                         Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                            .font(Theme.footnote.bold())))
+                            .font(Theme.footnote.bold())
                             .foregroundStyle(.tertiary)
                     }
                     if !item.time.isEmpty {
                         Text(item.time)
-                            .font(Theme.footnote))
+                            .font(Theme.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -279,7 +279,7 @@ struct MessagesView: View {
             // 正文
             if !item.body.isEmpty {
                 Text(item.body)
-                    .font(Theme.caption))
+                    .font(Theme.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(isOpen ? nil : 2)
                     .padding(.top, 8)
@@ -289,20 +289,20 @@ struct MessagesView: View {
                 VStack(spacing: 6) {
                     if !item.location.isEmpty {
                         HStack(spacing: 8) {
-                            Image(systemName: "map.pin").font(Theme.caption)).foregroundStyle(.tertiary)
-                            Text(item.location).font(Theme.caption)).foregroundStyle(.secondary)
+                            Image(systemName: "map.pin").font(Theme.caption).foregroundStyle(.tertiary)
+                            Text(item.location).font(Theme.caption).foregroundStyle(.secondary)
                         }
                     }
                     if !item.time.isEmpty {
                         HStack(spacing: 8) {
-                            Image(systemName: "clock").font(Theme.caption)).foregroundStyle(.tertiary)
-                            Text(item.time).font(Theme.caption)).foregroundStyle(.secondary)
+                            Image(systemName: "clock").font(Theme.caption).foregroundStyle(.tertiary)
+                            Text(item.time).font(Theme.caption).foregroundStyle(.secondary)
                         }
                     }
                     if !item.plate.isEmpty {
                         HStack(spacing: 8) {
-                            Image(systemName: "car.fill").font(Theme.caption)).foregroundStyle(.accentColor)
-                            Text(item.plate).font(Theme.caption.bold()), design: .monospaced))
+                            Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(.accentColor)
+                            Text(item.plate).font(Theme.caption.bold(), design: .monospaced)
                                 .foregroundStyle(.accentColor)
                         }
                     }

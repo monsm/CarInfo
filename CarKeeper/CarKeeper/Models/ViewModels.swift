@@ -263,7 +263,7 @@ enum VM {
             gear: hasCtrl ? (num(control?["ShiftPosition"]) == 0 ? "P" : "D") : "--",
             gearSub: hasCtrl ? (num(control?["ShiftPosition"]) == 0 ? "驻车" : "行驶") : "",
             gearCls: gearCls,
-            motorTemp: motor == nil ? "--" : "\(t == nil ? "--" : "\(Int(t!))℃") / \(ct == nil ? "--" : "\(Int(ct!))℃")",
+            motorTemp: motor == nil ? "--" : (t != nil ? "\(Int(t!))°" : "--") + " / " + (ct != nil ? "\(Int(ct!))°" : "--"),
             batteryNote: note,
             isMoving: hasCtrl && num(control?["VehicleSpeed"]) > 0,
             fireStatus: fireStatus

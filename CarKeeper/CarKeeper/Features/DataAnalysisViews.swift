@@ -92,7 +92,7 @@ struct MileagePrediction: View {
     }
     var daysUntilEmpty: Int {
         guard dailyMileage > 0 else { return 999 }
-        return Int(Double(store.car.flatMap{($0["energy"] as? [String:Any])?)?.["rangeKm"] as? Int ?? 300) / dailyMileage)
+        return Int(Double(store.car.flatMap { $0["energy"] as? [String: Any] }?.["rangeKm"] as? Int ?? 300) / dailyMileage)
     }
     var body: some View {
         HStack {
@@ -149,5 +149,4 @@ struct SiriUsageAnalysis: View {
             }
         }.padding().glassCard()
     }
-}
 }

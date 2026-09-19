@@ -142,11 +142,11 @@ struct DataView: View {
                     let rowDelay = rowAppeared ? 0 : Double(appearedRows[blockId]?.count ?? 0) * 0.05
                     HStack(alignment: .top, spacing: 12) {
                         Text(r.k)
-                            .font(Theme.caption)))
+                            .font(Theme.caption)
                             .foregroundStyle(.secondary)
                             .frame(width: 120, alignment: .leading)
                         Text(r.v)
-                            .font(Theme.caption), design: .monospaced))
+                            .font(Theme.caption.design(.monospaced))
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.trailing).lineLimit(3)
                         Spacer(minLength: 8)

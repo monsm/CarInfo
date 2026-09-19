@@ -157,9 +157,15 @@ struct ExportDataView: View {
         case .trips:
             lines = ["时间,里程(km),能耗(kWh/100km),开始SOC,结束SOC,时长"]
             for t in store.tripHistory {
-                lines.append("""
-                    \(t.startTime),\(String(format:"%.1f",t.distanceKm)),\(t.avgEfficiency.map{String(format:"%.1f",$0)}??"""),\(t.startSoc),\(t.endSoc),\(t.durationText)
-                    """)
+                var parts: [String] = []
+                parts.append("\(t.startTime)")
+                parts.append(String(format: "%.1f", t.distanceKm))
+                let eff = t.avgEfficiency.map { String(format: "%.1f", $0) } ?? ""
+                parts.append(eff)
+                parts.append("\(t.startSoc)")
+                parts.append("\(t.endSoc)")
+                parts.append(t.durationText)
+                lines.append(parts.joined(separator: ","))
             }
         case .commands:
             lines = ["时间,指令名称,状态,耗时"]
@@ -250,15 +256,6 @@ struct ExportDataView: View {
     }
 }
 
-extension ExportDataView {
-    enum ExportType: String, CaseIterable, Identifiable {
-        case trips = "行程记录"
-        case charging = "充电记录"
-        case commands = "指令历史"
-        case diagnostics = "诊断报告"
-        var id: String { rawValue }
-    }
-}
 
 struct ExportDataView_Previews: PreviewProvider {
     static var previews: some View {

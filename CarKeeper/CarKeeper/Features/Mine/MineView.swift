@@ -158,22 +158,22 @@ struct MineView: View {
                         .frame(width: 68, height: 68)
                         .shadow(color: Color.accentColor.opacity(0.35), radius: 12, y: 5)
                     Text(um?.avatar ?? "主")
-                        .font(Theme.d4) weight: .bold))
+                        .font(Theme.d4.weight(.bold))
                         .foregroundStyle(.white)
                 }
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(um?.name ?? "车主").font(Theme.d5) weight: .bold))
+                    Text(um?.name ?? "车主").font(Theme.d5.weight(.bold))
                     HStack(spacing: 10) {
                         Text(um?.mobile ?? "--")
-                            .font(Theme.mono))
+                            .font(Theme.mono)
                             .foregroundStyle(.secondary)
                         if um?.authed == true {
                             HStack(spacing: 4) {
                                 Image(systemName: "checkmark.seal.fill")
-                                    .font(Theme.micro))
+                                    .font(Theme.micro)
                                     .foregroundStyle(Theme.ok)
                                 Text("已实名")
-                                    .font(Theme.footnote.bold())))
+                                    .font(Theme.footnote.bold())
                                     .foregroundStyle(Theme.ok)
                             }
                         }
@@ -186,30 +186,30 @@ struct MineView: View {
             // 底部统计
             HStack(spacing: 16) {
                 HStack(spacing: 6) {
-                    Image(systemName: "car.fill").font(Theme.caption)).foregroundStyle(Color.accentColor)
+                    Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(Color.accentColor)
                     Text(String(store.cars?.count ?? 0) + " 辆车")
-                        .font(Theme.caption)))
+                        .font(Theme.caption)
                 }
                 Spacer()
                 if let gt = um?.gender, !gt.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: gt == "男" ? "person.fill" : "person.circle.fill")
-                            .font(Theme.footnote)).foregroundStyle(.secondary)
-                        Text(gt).font(Theme.caption)).foregroundStyle(.secondary)
+                            .font(Theme.footnote).foregroundStyle(.secondary)
+                        Text(gt).font(Theme.caption).foregroundStyle(.secondary)
                     }
                 }
             }
             HStack(spacing: 12) {
                 if let bt = um.birthday, !bt.isEmpty {
                     HStack(spacing: 4) {
-                        Image(systemName: "calendar").font(Theme.micro)).foregroundStyle(.secondary)
-                        Text(bt).font(Theme.footnote)).foregroundStyle(.secondary)
+                        Image(systemName: "calendar").font(Theme.micro).foregroundStyle(.secondary)
+                        Text(bt).font(Theme.footnote).foregroundStyle(.secondary)
                     }
                 }
                 if let lt = um.lastLoginTime, !lt.isEmpty {
                     HStack(spacing: 4) {
-                        Image(systemName: "clock").font(Theme.micro)).foregroundStyle(.secondary)
-                        Text(lt).font(Theme.footnote)).foregroundStyle(.secondary)
+                        Image(systemName: "clock").font(Theme.micro).foregroundStyle(.secondary)
+                        Text(lt).font(Theme.footnote).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -228,13 +228,13 @@ struct MineView: View {
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: "car.fill")
-                    .font(Theme.d4))
+                    .font(Theme.d4)
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 52, height: 52)
                     .background(.thin, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(sum?.name ?? "未绑定车辆").font(Theme.h3)))
-                    Text(sum?.plate ?? "暂无车牌").font(Theme.caption)).foregroundStyle(.secondary)
+                    Text(sum?.name ?? "未绑定车辆").font(Theme.h3)
+                    Text(sum?.plate ?? "暂无车牌").font(Theme.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 if let d = sum?.insuranceDays {
@@ -242,7 +242,7 @@ struct MineView: View {
                          cls: d < 0 ? "bad" : (d <= 30 ? "warn" : "ok"), dot: false)
                 }
                 Image(systemName: "chevron.right")
-                    .font(Theme.footnote.bold()))).foregroundStyle(.tertiary)
+                    .font(Theme.footnote.bold()).foregroundStyle(.tertiary)
             }
             .padding(16)
             .dynamicTypeCompress()
@@ -365,7 +365,7 @@ struct MineView: View {
         CardBox(title: "检查更新", side: nil) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("下载最新 GitHub 构建的 ipa，分享后用自签工具安装")
-                    .font(Theme.caption)).foregroundStyle(.secondary)
+                    .font(Theme.caption).foregroundStyle(.secondary)
                 // OTA 检查中：骨架旋转指示器
                 if isChecking {
                     HStack(spacing: 10) {
@@ -382,7 +382,7 @@ struct MineView: View {
                         ProgressView(value: downloadPct)
                             .tint(.accentColor)
                         Text("正在下载… \(downloadPctDisplay)%")
-                            .font(Theme.caption)).foregroundStyle(.secondary)
+                            .font(Theme.caption).foregroundStyle(.secondary)
                     }
                 } else if let m = updateMsg {
                     // 错误或提示消息
@@ -418,11 +418,11 @@ struct MineView: View {
                         .fill(tint.opacity(0.10))
                         .frame(width: 48, height: 48)
                     Image(systemName: symbol)
-                        .font(Theme.d5) weight: .medium))
+                        .font(Theme.d5.weight(.medium))
                         .foregroundStyle(tint)
                 }
                 Text(label)
-                    .font(Theme.caption.bold())))
+                    .font(Theme.caption.bold())
                     .foregroundStyle(.primary)
             }
             .frame(maxWidth: .infinity)
@@ -452,7 +452,7 @@ struct MineView: View {
             HStack(spacing: 6) {
                 if updateBusy { ProgressView().controlSize(.mini).tint(.white) }
                 Text(updateBusy ? "检查中…" : "检查更新")
-                    .font(Theme.caption.bold())))
+                    .font(Theme.caption.bold())
             }
             .foregroundStyle(.white)
             .adaptivePagePadding(dynamicTypeSize).padding(.vertical, 10)
@@ -468,7 +468,7 @@ struct MineView: View {
             shareSheetFlag = true
         } label: {
             Label("分享安装包", systemImage: "square.and.arrow.up")
-                .font(Theme.caption.bold())))
+                .font(Theme.caption.bold())
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .background(.thin, in: Capsule())
         }
@@ -481,7 +481,7 @@ struct MineView: View {
             showToken = true
         } label: {
             Label("Token", systemImage: "key.fill")
-                .font(Theme.caption))
+                .font(Theme.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12).padding(.vertical, 10)
                 .background(.thin, in: Capsule())
