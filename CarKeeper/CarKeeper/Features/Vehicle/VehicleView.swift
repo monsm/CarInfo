@@ -7,26 +7,46 @@ struct VehicleView: View {
     private let store = AppStore.shared
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
+
+    private var isLoading: Bool { store.carId.isEmpty }
+    private var isEmpty:   Bool { !store.carId.isEmpty && store.car == nil }
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
-                if let sum = VM.vehicleSummary(store.car) { plateCard(sum) }
-                ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
-                    CardBox(title: group.name) {
-                        VStack(spacing: 0) {
-                            ForEach(Array(group.rows.enumerated()), id: \.offset) { idx, row in
-                                KVRow(k: row.k, v: row.v)
-                                    .padding(.vertical, 8)
-                                if idx < group.rows.count - 1 { ListDivider() }
+        Group {
+            if isLoading {
+                // 加载中：bootstrap 尚未完成或 carId 为空
+                PageLoadingView("正在加载车辆档案…")
+            } else if isEmpty {
+                // 空状态：carId 已设置但未绑定车辆
+                PageEmptyView("未绑定车辆",
+                              subtitle: "请先在「我的」页面绑定车辆后重试",
+                              icon: "car.fill")
+            } else if let sum = VM.vehicleSummary(store.car) {
+                // 正常内容：显示车辆档案
+                ScrollView {
+                    VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
+                        plateCard(sum)
+                        ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
+                            CardBox(title: group.name) {
+                                VStack(spacing: 0) {
+                                    ForEach(Array(group.rows.enumerated()), id: \.offset) { idx, row in
+                                        KVRow(k: row.k, v: row.v)
+                                            .padding(.vertical, 8)
+                                        if idx < group.rows.count - 1 { ListDivider() }
+                                    }
+                                }
                             }
                         }
                     }
+                    .adaptivePagePadding(dynamicTypeSize)
+                    .adaptiveSafeAreaBottom(8, dynamicTypeSize)
                 }
+                .scrollBounceBehavior(.basedOnSize)
+            } else {
+                // 兜底：car 数据解析失败
+                PageErrorView("车辆数据解析失败，请重新进入页面") { _ in }
             }
-            .adaptivePagePadding(dynamicTypeSize)
-            .adaptiveSafeAreaBottom(8, dynamicTypeSize)
         }
-        .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accentColor)
         .navigationTitle("车辆档案").navBarStyle()
     }
@@ -71,13 +91,14 @@ struct VehicleView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .dynamicTypeCompress()
         .glassHeroCard()
+        .glassLongPressDeform()
     }
 
     private func vinBar(_ sum: VehicleSummary) -> some View {
         Button {
             if !sum.vin.isEmpty {
                 UIPasteboard.general.string = sum.vin
-                NotificationCenter.default.post(name: .vinCopied, object: nil)
+                ToastManager.shared.show("VIN 已复制", icon: "doc.on.doc.fill")
             }
         } label: {
             HStack {

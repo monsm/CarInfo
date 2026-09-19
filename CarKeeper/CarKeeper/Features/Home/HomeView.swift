@@ -17,8 +17,10 @@ struct HomeView: View {
     @State private var socCount: Int = 0             // SOC数字滚动计数
     @State private var mileCount: Int = 0            // 里程数字滚动计数
     @State private var isRefreshing = false          // 下拉刷新标志（仅刷新时重播动画）
+    @State private var pulseTrigger: String = ""      // 触发数值脉冲高亮（SOC / 里程变化时更新）
     @State private var expandedDrive = false          // 车速里程行展开状态
     @State private var expandedTyre = false           // 胎压卡展开状态
+    @State private var switchingCar = false           // 切换车辆涟漪标志
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     var body: some View {
@@ -81,6 +83,17 @@ struct HomeView: View {
             withAnimation(.easeInOut(duration: 0.08)) {
                 carVersion += 1
             }
+            // 切换车辆时触发全屏玻璃涟漪扩散动效
+            switchingCar = true
+        }
+        .onChange(of: switchingCar) { switching in
+            guard switching else { return }
+            // 涟漪扩散后自动消散
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    switchingCar = false
+                }
+            }
         }
         .onAppear { startPolling(); startSocAnimation(); startMileAnimation() }
         .onDisappear {
@@ -90,6 +103,7 @@ struct HomeView: View {
         .refreshable { isRefreshing = true; await fetchCore(); isRefreshing = false }
         .glassRefreshRipple(isRefreshing: $isRefreshing)
         .glassRefreshHalo(isRefreshing: $isRefreshing)
+        .glassSwitchRipple(isSwitching: $switchingCar)
     }
 
     // MARK: 问候行
@@ -175,7 +189,9 @@ struct HomeView: View {
         .padding(.vertical, 28)
         .dynamicTypeCompress()
         .glassHeroCard()
+        .glassLongPressDeform()
         .opacity(socCardOpacity)
+        .valuePulse(tint: .green)
     }
 
     // MARK: SOC颜色辅助函数
@@ -236,6 +252,7 @@ struct HomeView: View {
         .padding(16)
         .dynamicTypeCompress()
         .glassCard(corner: 22)
+        .glassLongPressDeform()
     }
 
     // MARK: 电池摘要行（来自 AN.summarize）
@@ -272,17 +289,21 @@ struct HomeView: View {
                 .frame(width: 52, height: 40)
                 .background(Theme.statusColor(fCls).opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
-            MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: Theme.brand)
-            MetricPill(icon: "gauge.full", value: mileCount > 0 ? String(mileCount) : d.mile, unit: "km", tint: .accentColor)
+            // 速度 + 里程：流体数字字体，随容器宽度自动缩放
+            MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: Theme.brand, fluidValue: true)
+            MetricPill(icon: "gauge.full", value: mileCount > 0 ? String(mileCount) : d.mile, unit: "km", tint: .accentColor, fluidValue: true)
+                .valuePulse(tint: .accentColor, watchValue: pulseTrigger)
         }
         .padding(Theme.Spacing.xl)
         .dynamicTypeCompress()
         .glassCard(corner: 20)
+        .glassLongPressDeform()
     }
 
     // MARK: 车速里程展开卡（弹簧高度动画 + 玻璃压缩形变）
     private func driveMetricsExpanded(_ d: DriveModel) -> some View {
-        Button {
+        let chevronAngle: Angle = expandedDrive ? .degrees(90) : .degrees(0)
+        return Button {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.35)) {
                 expandedDrive.toggle()
             }
@@ -308,6 +329,15 @@ struct HomeView: View {
         .buttonStyle(.plain)
         .scaleEffect(expandedDrive ? 0.98 : 1.0)
         .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: expandedDrive)
+        .liquidGlassRipple(cornerRadius: 20)
+        .overlay(alignment: .trailing) {
+            Image(systemName: "chevron.right")
+                .font(Theme.footnote.bold())
+                .foregroundStyle(.tertiary)
+                .rotationEffect(chevronAngle)
+                .animation(.spring(response: 0.35, dampingFraction: 0.6), value: expandedDrive)
+                .padding(.trailing, 14)
+        }
     }
 
     // MARK: 快控 - 2x2 网格大圆钮
@@ -324,6 +354,7 @@ struct HomeView: View {
         .padding(Theme.Spacing.xl)
         .dynamicTypeCompress()
         .glassHeroCard()
+        .glassLongPressDeform()
     }
 
     // MARK: 快捷控制枚举
@@ -429,6 +460,7 @@ struct HomeView: View {
             .padding(Theme.Spacing.xl)
             .dynamicTypeCompress()
             .glassCard(corner: 20)
+            .glassLongPressDeform()
 
             // 分析结论详情
             for line in battSummary.headLines {
@@ -442,8 +474,8 @@ struct HomeView: View {
                 }
             }
 
-            // 电池一致性
-            CardBox(title: "一致性", side: batt.cellStats.map { "\($0.count) 节采样" } ?? "接口未上报", sideCls: "ok") {
+            // 电池一致性（可展开）
+            ExpandingCardBox(title: "一致性", side: batt.cellStats.map { "\($0.count) 节采样" } ?? "接口未上报", sideCls: "ok", cornerRadius: 20) {
                 if let cells = batt.cellStats {
                     let maxV = cells.max { a, b -> Bool in (a.maxV ?? 0) < (b.maxV ?? 0) }?.maxV ?? 0
                     let minV = cells.min { a, b -> Bool in (a.minV ?? 999) > (b.minV ?? 999) }?.minV ?? 999
@@ -472,8 +504,8 @@ struct HomeView: View {
                 }
             }
 
-            // 充电
-            CardBox(title: "充电", side: batt.charging.text, sideCls: batt.charging.cls.isEmpty ? "na" : batt.charging.cls) {
+            // 充电（可展开）
+            ExpandingCardBox(title: "充电", side: batt.charging.text, sideCls: batt.charging.cls.isEmpty ? "na" : batt.charging.cls, cornerRadius: 20) {
                 let rows: [(String, String)] = [
                     ("开始", batt.charging.start),
                     ("结束", batt.charging.end),
@@ -507,7 +539,8 @@ struct HomeView: View {
 
     // MARK: 胎压展开卡（弹簧高度动画 + 玻璃压缩形变）
     private func tyreCardExpanded(_ tyre: TyreModel) -> some View {
-        Button {
+        let chevronAngle: Angle = expandedTyre ? .degrees(90) : .degrees(0)
+        return Button {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.35)) {
                 expandedTyre.toggle()
             }
@@ -543,6 +576,15 @@ struct HomeView: View {
         .buttonStyle(.plain)
         .scaleEffect(expandedTyre ? 0.98 : 1.0)
         .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: expandedTyre)
+        .liquidGlassRipple(cornerRadius: 20)
+        .overlay(alignment: .trailing) {
+            Image(systemName: "chevron.right")
+                .font(Theme.footnote.bold())
+                .foregroundStyle(.tertiary)
+                .rotationEffect(chevronAngle)
+                .animation(.spring(response: 0.35, dampingFraction: 0.6), value: expandedTyre)
+                .padding(.trailing, 14)
+        }
     }
 
     // MARK: 座舱
@@ -654,6 +696,7 @@ struct HomeView: View {
             withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
                 socProgress = CGFloat(target)
                 socCount = target
+                pulseTrigger = String(target)
             }
         }
     }
@@ -666,6 +709,7 @@ struct HomeView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
                 mileCount = target
+                pulseTrigger = String(target)
             }
         }
     }
@@ -689,7 +733,7 @@ struct HomeView: View {
         if isRefreshing {
             // 下拉刷新：重置并重播 SOC + 里程入场动画
             isRefreshing = false
-            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0; socCount = 0; mileCount = 0 }
+            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0; socCount = 0; mileCount = 0; pulseTrigger = "" }
             startSocAnimation()
             startMileAnimation()
         }

@@ -14,7 +14,6 @@ extension Notification.Name {
     static let navToBattery = Notification.Name("navToBattery")
     static let navToMessages = Notification.Name("navToMessages")
     static let navHome = Notification.Name("navHome")
-    static let vinCopied = Notification.Name("vinCopied")
     static let didLogout = Notification.Name("didLogout")
     static let locationUpdated = Notification.Name("locationUpdated")
 }
@@ -45,11 +44,11 @@ struct CarKeeperApp: App {
                     .onReceive(NotificationCenter.default.publisher(for: .navToData)) { _ in nav.path = [.data] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToDev)) { _ in nav.path = [.dev] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToMessages)) { _ in
-                        nav.path = [.messages]
+                        nav.selectedTab = 2
+                        messagesPath = [.messages]
                     }
-                    .onReceive(NotificationCenter.default.publisher(for: .vinCopied)) { _ in
-                        nav.showCopiedToast = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { nav.showCopiedToast = false }
+                    .onReceive(ToastManager.shared.$currentItem) { item in
+                        nav.currentToast = item
                     }
                     .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
                         nav.path = []
@@ -73,7 +72,7 @@ final class NavState: ObservableObject, @unchecked Sendable {
     static let shared = NavState()
     @Published var path: [Deeplink] = []
     @Published var selectedTab: Int = 0
-    @Published var showCopiedToast: Bool = false
+    @Published var currentToast: (text: String, icon: String)? = nil
 
     /// 每个 Tab 的 VoiceOver 描述（用于动态朗读切换时的页面名称）
     static let tabAccessibilityLabels: [Int: String] = [
@@ -191,15 +190,15 @@ struct TabCardTransition: ViewModifier {
     }
 }
 
-// =============================================================================
-// NavGlassWrapper —— 深潜页 Liquid Glass 视差容器
+// =============================================================================// NavGlassWrapper —— 深潜页 Liquid Glass 视差容器
 // 与 TabCardTransition 同款三层视差，方向改为水平（从右侧滑入）
-// 通过 @State _shown 管理触发时机，确保每次导航时仅播放一次入场动画
+// 入场和退场均由 NavigationStack spring transaction 统一驱动，
+// 确保 push 从右侧滑入、pop 从左侧滑出，动画完全对称。
 // =============================================================================
 
 /// 深潜页（VehicleView / HealthView / BatteryView 等）的 Liquid Glass 视差包装器
 /// 外层 ZStack 包含：glowLayer（背景散斑）→ glassLayer（磨砂玻璃卡）→ content（前景页面）
-/// 每层以不同延迟从右侧滑入，形成真实深度感；退出时由 NavigationStack 标准 pop 转场接管。
+/// 每层以不同延迟从右侧滑入；pop 时由 liquidGlassPopTransition 驱动向左滑出。
 struct NavGlassWrapper<Content: View>: View {
     private let content: Content
 
@@ -221,7 +220,7 @@ struct NavGlassWrapper<Content: View>: View {
         self.content = content()
     }
 
-    // 内部状态：首次 onAppear 时触发入场动画，之后保持激活；pop 时由 NavigationStack 接管退出转场
+    // 内部状态：首次 onAppear 时触发入场动画，pop 时由 NavigationStack 接管退出转场
     @State private var _shown: Bool = false
 
     private var cx: CGFloat { params[0].contentX }
@@ -237,7 +236,7 @@ struct NavGlassWrapper<Content: View>: View {
                 Circle().fill(Theme.brand.opacity(0.07)).frame(width: 180, height: 180).offset(x: 60, y: 50)
                 Circle().fill(.white.opacity(0.05)).frame(width: 120, height: 120).offset(x: 100, y: -60)
             }
-            .offset(x: _shown ? 0 : ox)
+            .offset(x: _shown ? 0 : -ox)   // 退出：0 → -96（向左滑出，与入场对称）
             .scaleEffect(_shown ? 1.0 : 0.92)
             .opacity(_shown ? 1.0 : 0.0)
             .animation(
@@ -260,7 +259,7 @@ struct NavGlassWrapper<Content: View>: View {
                         )
                 )
                 .shadow(color: .black.opacity(0.10), radius: 18, y: 6)
-                .offset(x: _shown ? 0 : gx)
+                .offset(x: _shown ? 0 : -gx)   // 退出：0 → -56（向左滑出，与入场对称）
                 .scaleEffect(_shown ? 1.0 : 0.94)
                 .opacity(_shown ? 1.0 : 0.0)
                 .animation(
@@ -268,9 +267,9 @@ struct NavGlassWrapper<Content: View>: View {
                     value: _shown
                 )
 
-            // ── 第 2 层：前景内容（最快，从右侧 24pt 滑入，最接近导航标准）──
+            // ── 第 2 层：前景内容（最快，从右侧 24pt 滑入；退出时向左 -24pt 滑出）──
             content
-                .offset(x: _shown ? 0 : cx)
+                .offset(x: _shown ? 0 : -cx)   // 退出：0 → -24（向左滑出）
                 .scaleEffect(_shown ? 1.0 : 0.96)
                 .opacity(_shown ? 1.0 : 0.0)
                 .animation(
@@ -280,10 +279,63 @@ struct NavGlassWrapper<Content: View>: View {
         }
         .edgesIgnoringSafeArea(.all)
         .onAppear {
-            // 首次出现：延迟 0.05s 后触发入场动画，与导航滑入同步
+            // 首次出现：延迟 50ms 后触发入场动画，与导航滑入同步
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 _shown = true
             }
+        }
+        .onDisappear {
+            // 页面即将被移除：重置 _shown，让三层快速弹回初始位置
+            // 随后 liquidGlassPopTransition 的 removal modifier 统一负责向左滑出
+            _shown = false
+        }
+    }
+}
+
+// MARK: - Liquid Glass 退出转场
+/// pop 时：向左滑出 + 弹性缩放 + 淡出，与入场动画对称
+/// spring spring: response 0.6 / damping 0.7 / blend 0.5s
+private let liquidGlassPopTransition: AnyTransition = .asymmetric(
+    insertion: .modifier { content in
+        content
+            .offset(x: 60)
+            .scaleEffect(0.93)
+            .opacity(0.0)
+    },
+    removal: .modifier { content in
+        // 退出时 offset 由内部 _shown=false 弹簧动画驱动（三层依次从右→左滑出）
+        // 此处仅保留 scale + opacity，不叠加 offset 避免双重位移
+        content
+            .scaleEffect(0.93)
+            .opacity(0.0)
+    }
+)
+
+/// 液态玻璃风格返回按钮（隐藏系统默认，自定义样式）
+struct BackGlassButton: View {
+    @Binding var navigationPath: [Deeplink]
+
+    var body: some View {
+        Button {
+            guard !navigationPath.isEmpty else { return }
+            withAnimation(.spring(response: 0.55, dampingFraction: 0.65, blendDuration: 0.35)) {
+                navigationPath.removeLast()
+            }
+        } label: {
+            Label("返回", systemImage: "chevron.left")
+                .font(Theme.subheadline)
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.25), lineWidth: 0.5)
+                        )
+                        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                )
         }
     }
 }
@@ -293,6 +345,10 @@ struct MainTabView: View {
     @State private var prevSelectedTab: Int = 0
     // VoiceOver：记录上次朗读的 Tab，避免重复播报
     @State private var lastAnnouncedTab: Int = 0
+    // 各 Tab 独立的深潜导航路径（不共享 Home 的 nav.path）
+    @State private var controlPath:  [Deeplink] = []
+    @State private var messagesPath: [Deeplink] = []
+    @State private var minePath:     [Deeplink] = []
 
     var body: some View {
         TabView(selection: $nav.selectedTab) {
@@ -311,11 +367,16 @@ struct MainTabView: View {
                             }
                         }
                     }
-                    // 标准导航转场：push 时从右侧滑入，pop 时返回原位置
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .leading).combined(with: .opacity)
-                    ))
+                    .transition(liquidGlassPopTransition)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            BackGlassButton(navigationPath: $nav.path)
+                        }
+                    }
+                    .navigationBarBackButtonHidden()
+            }
+            .transaction { t in
+                t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
             }
             .tabGlassContainer()
             .tabItem {
@@ -334,8 +395,31 @@ struct MainTabView: View {
                 prevSelectedTab = nav.selectedTab
             }
 
-            NavigationStack {
+            NavigationStack(path: $controlPath) {
                 ControlView()
+                    .navigationDestination(for: Deeplink.self) { link in
+                        NavGlassWrapper {
+                            switch link {
+                            case .vehicle:  VehicleView().environmentObject(nav)
+                            case .health:   HealthView().environmentObject(nav)
+                            case .battery:  BatteryView().environmentObject(nav)
+                            case .data:     DataView(kind: .status).environmentObject(nav)
+                            case .dev:      DevView().environmentObject(nav)
+                            case .messages: MessagesView().environmentObject(nav)
+                            case .control:  ControlView().environmentObject(nav)
+                            }
+                        }
+                    }
+                    .transition(liquidGlassPopTransition)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            BackGlassButton(navigationPath: $controlPath)
+                        }
+                    }
+                    .navigationBarBackButtonHidden()
+            }
+            .transaction { t in
+                t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
             }
             .tabGlassContainer()
             .tabItem {
@@ -354,8 +438,31 @@ struct MainTabView: View {
                 prevSelectedTab = nav.selectedTab
             }
 
-            NavigationStack {
+            NavigationStack(path: $messagesPath) {
                 MessagesView()
+                    .navigationDestination(for: Deeplink.self) { link in
+                        NavGlassWrapper {
+                            switch link {
+                            case .vehicle:  VehicleView().environmentObject(nav)
+                            case .health:   HealthView().environmentObject(nav)
+                            case .battery:  BatteryView().environmentObject(nav)
+                            case .data:     DataView(kind: .status).environmentObject(nav)
+                            case .dev:      DevView().environmentObject(nav)
+                            case .messages: MessagesView().environmentObject(nav)
+                            case .control:  ControlView().environmentObject(nav)
+                            }
+                        }
+                    }
+                    .transition(liquidGlassPopTransition)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            BackGlassButton(navigationPath: $messagesPath)
+                        }
+                    }
+                    .navigationBarBackButtonHidden()
+            }
+            .transaction { t in
+                t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
             }
             .tabGlassContainer()
             .tabItem {
@@ -374,8 +481,31 @@ struct MainTabView: View {
                 prevSelectedTab = nav.selectedTab
             }
 
-            NavigationStack {
+            NavigationStack(path: $minePath) {
                 MineView()
+                    .navigationDestination(for: Deeplink.self) { link in
+                        NavGlassWrapper {
+                            switch link {
+                            case .vehicle:  VehicleView().environmentObject(nav)
+                            case .health:   HealthView().environmentObject(nav)
+                            case .battery:  BatteryView().environmentObject(nav)
+                            case .data:     DataView(kind: .status).environmentObject(nav)
+                            case .dev:      DevView().environmentObject(nav)
+                            case .messages: MessagesView().environmentObject(nav)
+                            case .control:  ControlView().environmentObject(nav)
+                            }
+                        }
+                    }
+                    .transition(liquidGlassPopTransition)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            BackGlassButton(navigationPath: $minePath)
+                        }
+                    }
+                    .navigationBarBackButtonHidden()
+            }
+            .transaction { t in
+                t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
             }
             .tabGlassContainer()
             .tabItem {
@@ -413,22 +543,16 @@ struct MainTabView: View {
                 LiquidGlassTabBar(selectedTab: $nav.selectedTab)
                     .frame(height: 50)
                     .allowsHitTesting(false)
-                if nav.showCopiedToast {
-                    Label("VIN 已复制", systemImage: "checkmark.circle.fill")
-                        .font(Theme.caption.bold())))
-                        .padding(.horizontal, 20).padding(.vertical, 12)
-                        .background(.thin, in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
-                        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
-                        .offset(y: -10)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                if let t = nav.currentToast {
+                    ToastView(text: t.text, icon: t.icon)
+                        .id(UUID())
                 }
             }
         }
         .transaction { t in
             t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
         }
-        .animation(.easeOut(duration: 0.25), value: nav.showCopiedToast)
+        .animation(.easeOut(duration: 0.2), value: nav.currentToast)
     }
 }
 

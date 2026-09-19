@@ -23,6 +23,11 @@ struct DataView: View {
     @State private var loading = true
     @State private var errText = ""
     @State private var loadTask: Task<Void, Never>? = nil
+    @State private var isRefreshing = false     // 下拉刷新标志（触发玻璃涟漪动效）
+    // 记录已出现的数据块 ID（用于块级交错入场动画）
+    @State private var appearedBlockIds: Set<String> = []
+    // 记录每个块内已出现的行索引（用于行级交错入场动画）
+    @State private var appearedRows: [String: Set<Int>] = [:]
 
     init(kind: Kind = .analysis) {
         _kind = State(wrappedValue: kind)
@@ -50,9 +55,10 @@ struct DataView: View {
                             PageEmptyView("暂无数据", subtitle: "下拉或点刷新按钮重试", icon: "doc.text")
                         }
                     } else {
-                        ForEach(blocks) { b in
-                            dataBlock(b)
+                        ForEach(Array(blocks.enumerated()), id: \.element.h) { idx, b in
+                            dataBlock(b, idx: idx)
                         }
+                        .onChange(of: blocks) { _ in appearedBlockIds = []; appearedRows = [:] }
                     }
                 }
                 .adaptivePagePadding(dynamicTypeSize)
@@ -75,6 +81,13 @@ struct DataView: View {
             }
         }
         .onAppear { loadIfNeeded() }
+        .refreshable {
+            isRefreshing = true
+            loadTask?.cancel()
+            loadTask = Task { await load() }
+            isRefreshing = false
+        }
+        .glassRefreshRipple(isRefreshing: $isRefreshing)
     }
 
     // MARK: kind 切换条（横向滚动玻璃胶囊）
@@ -106,11 +119,21 @@ struct DataView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: 数据块
-    private func dataBlock(_ b: Block) -> some View {
-        CardBox(title: b.h) {
+    // MARK: 数据块（交错入场动画）
+    /// 计算块首次出现时的延迟（按出现顺序递增，0.07s/块）
+    private func blockAppearDelay(_ blockId: String, currentIdx: Int) -> Double {
+        let isNew = !appearedBlockIds.contains(blockId)
+        return isNew ? Double(appearedBlockIds.count) * 0.07 : 0
+    }
+
+    private func dataBlock(_ b: Block, idx: Int) -> some View {
+        let blockId = b.h
+        let delay = blockAppearDelay(blockId, currentIdx: idx)
+        return CardBox(title: b.h) {
             VStack(spacing: 0) {
-                ForEach(Array(b.rows.enumerated()), id: \.offset) { idx, r in
+                ForEach(Array(b.rows.enumerated()), id: \.offset) { rowIdx, r in
+                    let rowAppeared = appearedRows[blockId]?.contains(rowIdx) ?? false
+                    let rowDelay = rowAppeared ? 0 : Double(appearedRows[blockId]?.count ?? 0) * 0.05
                     HStack(alignment: .top, spacing: 12) {
                         Text(r.k)
                             .font(Theme.caption)))
@@ -123,18 +146,47 @@ struct DataView: View {
                         Spacer(minLength: 8)
                     }
                     .padding(.vertical, 9)
-                    if idx < b.rows.count - 1 {
+                    // 行级交错入场：从下方滑入 + 淡入 + 轻微缩放回弹
+                    .offset(y: rowAppeared ? 0 : 8)
+                    .opacity(rowAppeared ? 1 : 0)
+                    .scaleEffect(rowAppeared ? 1.0 : 0.96)
+                    .animation(
+                        .spring(response: 0.45, dampingFraction: 0.65, blendDuration: 0.25)
+                            .delay(rowDelay),
+                        value: rowAppeared
+                    )
+                    .onAppear {
+                        guard !rowAppeared else { return }
+                        if appearedRows[blockId] == nil { appearedRows[blockId] = [] }
+                        appearedRows[blockId]?.insert(rowIdx)
+                    }
+                    // 行间隔线（仅非最后一行）
+                    if rowIdx < b.rows.count - 1 {
                         Divider().opacity(0.4).padding(.leading, 120)
                     }
                 }
             }
+        }
+        // 液态玻璃交错入场：从下方滑入 + 淡入，按出现顺序依次延迟
+        .offset(y: appearedBlockIds.contains(blockId) ? 0 : 16)
+        .opacity(appearedBlockIds.contains(blockId) ? 1 : 0)
+        .scaleEffect(appearedBlockIds.contains(blockId) ? 1.0 : 0.94)
+        .animation(
+            .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.35)
+                .delay(delay),
+            value: appearedBlockIds.contains(blockId)
+        )
+        .onAppear {
+            guard !appearedBlockIds.contains(blockId) else { return }
+            appearedBlockIds.insert(blockId)
         }
     }
 
     private func refresh() {
         loadTask?.cancel()
         loading = true
-        loadTask = Task { await load() }
+        isRefreshing = true
+        loadTask = Task { await load(); isRefreshing = false }
     }
 
     private func loadIfNeeded() {
@@ -331,6 +383,7 @@ struct DataView: View {
             for r in b.rows { lines.append("\(r.k) : \(r.v)") }
         }
         UIPasteboard.general.string = lines.joined(separator: "\n")
+        ToastManager.shared.show("数据已复制", icon: "doc.on.doc.fill")
     }
 
     // 导出文本（复制 / 分享共用）。

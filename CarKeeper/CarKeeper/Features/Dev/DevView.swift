@@ -31,6 +31,7 @@ private struct ColorSwatch: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .dynamicTypeCompress()
         .glassCard()
+        .glassLongPressDeform()
     }
 }
 
@@ -117,6 +118,7 @@ private struct ContrastRow: View {
         .padding(.vertical, Theme.Spacing.sm)
         .dynamicTypeCompress()
         .glassCard()
+        .glassLongPressDeform()
     }
 }
 
@@ -137,6 +139,7 @@ struct DevView: View {
                 .padding(.vertical, Theme.Spacing.md)
                 .dynamicTypeCompress()
                 .glassHeroCard()
+                .glassLongPressDeform()
 
                 // 品牌色
                 ColorGroup(groupName: "品牌色", items: [

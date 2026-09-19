@@ -15,8 +15,10 @@ struct MineView: View {
     @State private var downloadFile: URL? = nil
     @State private var shareItems: [Any] = []
     @State private var shareSheetFlag = false
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var isRefreshing = false     // 下拉刷新标志（触发玻璃涟漪动效）
+    @State private var isChecking = false        // OTA 检查中（不含下载）
 
+    // MARK: 生命周期
     var body: some View {
         ScrollView {
             VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
@@ -31,6 +33,22 @@ struct MineView: View {
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(.accentColor)
         .navigationTitle("我的").navBarStyle()
+        .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
+            // 其他 Tab 退出登录时，重置 OTA 状态，避免残留下载进度
+            updateBusy = false
+            updateMsg = nil
+            downloadPct = 0
+            downloadPctDisplay = 0
+            showDownload = false
+            downloadFile = nil
+            shareItems = []
+        }
+        .refreshable {
+            isRefreshing = true
+            try? await Task.sleep(nanoseconds: 600_000_000)  // 0.6s 模拟刷新延迟
+            isRefreshing = false
+        }
+        .glassRefreshRipple(isRefreshing: $isRefreshing)
         .alert("关于 长安车管家", isPresented: $showAboutAlert) {
             Button("关闭", role: .cancel) { }
         } message: {
@@ -122,6 +140,7 @@ struct MineView: View {
         .padding(Theme.Spacing.xl)
         .dynamicTypeCompress()
         .glassHeroCard()
+        .glassLongPressDeform()
     }
 
     // MARK: 车辆卡
@@ -151,6 +170,7 @@ struct MineView: View {
             .padding(16)
             .dynamicTypeCompress()
             .glassCard()
+            .glassLongPressDeform()
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -182,16 +202,35 @@ struct MineView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("下载最新 GitHub 构建的 ipa，分享后用自签工具安装")
                     .font(Theme.caption)).foregroundStyle(.secondary)
-                if showDownload {
+                // OTA 检查中：骨架旋转指示器
+                if isChecking {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .tint(.accentColor)
+                        Text("正在检查最新版本…")
+                            .font(Theme.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                } else if showDownload {
+                    // 下载中：进度条 + 百分比数字
                     VStack(spacing: 6) {
                         ProgressView(value: downloadPct)
                             .tint(.accentColor)
                         Text("正在下载… \(downloadPctDisplay)%")
                             .font(Theme.caption)).foregroundStyle(.secondary)
                     }
-                }
-                if let m = updateMsg {
-                    Text(m).font(Theme.caption)).foregroundStyle(.secondary)
+                } else if let m = updateMsg {
+                    // 错误或提示消息
+                    HStack(spacing: 6) {
+                        Image(systemName: m.hasPrefix("❌") ? "exclamationmark.triangle" : "info.circle")
+                            .font(Theme.caption)
+                            .foregroundStyle(m.hasPrefix("❌") ? Theme.warn : .accentColor)
+                        Text(m)
+                            .font(Theme.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
                 }
                 HStack(spacing: 12) { updateButtons() }
             }
@@ -303,31 +342,37 @@ struct MineView: View {
 
     private func checkUpdate() {
         updateBusy = true
+        isChecking = true
         updateMsg = "正在检查最新构建…"
         shareItems = []
         downloadPct = 0
         downloadPctDisplay = 0
-        showDownload = true
+        showDownload = false
         Task { @MainActor in
             do {
                 if UpdateService.githubToken.isEmpty {
                     updateMsg = "请先点「GitHub Token」填入私库访问 Token"
+                    isChecking = false
                     updateBusy = false
                     return
                 }
                 let rel = try await UpdateService.fetchLatestRelease(token: UpdateService.githubToken)
                 updateMsg = "发现构建 \(rel.name) · \(rel.displaySize)，开始下载…"
+                isChecking = false
                 showDownload = true
                 let file = try await UpdateService.downloadIPA(url: rel.ipaUrl) { pct in downloadPct = pct }
                 downloadFile = file
-                updateMsg = "已下载 \(file.lastPathComponent)，点「分享安装包」弹出系统分享菜单"
+                updateMsg = nil
                 showDownload = false
                 shareItems = [file as Any]
                 shareSheetFlag = true
+                ToastManager.shared.show("下载完成，点分享安装", icon: "checkmark.circle.fill")
             } catch {
                 updateMsg = "❌ \(error.localizedDescription)"
                 showDownload = false
+                ToastManager.shared.show(error.localizedDescription, icon: "xmark.circle.fill")
             }
+            isChecking = false
             updateBusy = false
         }
     }

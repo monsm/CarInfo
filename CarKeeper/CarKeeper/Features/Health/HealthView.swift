@@ -17,6 +17,8 @@ struct HealthView: View {
     @State private var cardSlideY: CGFloat = 24        // 卡片入场下滑
     @State private var pillPhase: Int = -1             // 三项徽章交错动画相位
     @State private var isRefreshing = false            // 下拉刷新涟漪标志
+    @State private var pulseTrigger: String = ""        // 触发数值脉冲高亮（评分变化时更新）
+    @State private var heroExpanded = false            // Hero 卡片整体展开/收起系统列表
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     var body: some View {
@@ -25,8 +27,7 @@ struct HealthView: View {
                 if loading {
                     loadingView
                 } else if let model {
-                    scoreHero(model)
-                    systemList(model)
+                    scoreHeroListWrapper(model)
                 } else if let err = errText {
                     PageErrorView(err) { Task { await load() } }
                 }
@@ -93,8 +94,40 @@ struct HealthView: View {
         .padding(.vertical, 32)
         .dynamicTypeCompress()
         .glassHeroCard(corner: Theme.Radius.hero)
+        .glassLongPressDeform()
         .opacity(cardOpacity)
         .offset(y: cardSlideY)
+    }
+
+    // MARK: Hero 卡片 + 系统列表（整体可展开/收起）
+    /// 点击 scoreHero 区域切换展开状态：系统列表弹簧高度展开 + 整体玻璃压缩形变
+    private func scoreHeroListWrapper(_ m: HealthModel) -> some View {
+        let chevronAngle: Angle = heroExpanded ? .degrees(90) : .degrees(0)
+        return Button {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.35)) {
+                heroExpanded.toggle()
+            }
+        } label: {
+            VStack(spacing: 0) {
+                scoreHero(m)
+                // 展开内容区：系统列表弹簧高度过渡
+                if heroExpanded {
+                    systemList(m)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(heroExpanded ? 0.97 : 1.0)
+        .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: heroExpanded)
+        .overlay(alignment: .bottomTrailing) {
+            // 折叠箭头：始终显示在 hero 卡片右下角，提示可展开
+            Image(systemName: "chevron.down")
+                .font(Theme.footnote.bold())
+                .foregroundStyle(.tertiary)
+                .rotationEffect(chevronAngle)
+                .animation(.spring(response: 0.35, dampingFraction: 0.6), value: heroExpanded)
+                .padding([.bottom, .trailing], 18)
+        }
     }
 
     // MARK: 评分圆环
@@ -154,6 +187,7 @@ struct HealthView: View {
             }
         }
         .frame(width: 216, height: 216)
+        .valuePulse(tint: .green)
     }
 
     // MARK: 三项计数徽章（交错出现）
@@ -335,6 +369,7 @@ struct HealthView: View {
                 cardOpacity = 0
                 cardSlideY = 24
                 pillPhase = -1
+                pulseTrigger = ""
             }
             startAnimations()
         } catch {

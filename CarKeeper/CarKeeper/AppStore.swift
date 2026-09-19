@@ -169,3 +169,26 @@ final class AppStore: @unchecked Sendable {
         Task { await fetchVehicleData() }
     }
 }
+
+// =============================================================================
+// ToastManager —— 全局液态玻璃 Toast 提示单例
+// =============================================================================
+
+@MainActor
+final class ToastManager: ObservableObject {
+    static let shared = ToastManager()
+
+    @Published var currentItem: (text: String, icon: String)? = nil
+
+    private var dismissHandle: DispatchWorkItem?
+
+    private init() {}
+
+    func show(_ text: String, icon: String = "checkmark.circle.fill", duration: Double = 1.8) {
+        dismissHandle?.cancel()
+        currentItem = (text, icon)
+        let work = DispatchWorkItem { [weak self] in self?.currentItem = nil }
+        dismissHandle = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
+    }
+}

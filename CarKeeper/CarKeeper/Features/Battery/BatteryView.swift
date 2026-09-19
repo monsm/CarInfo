@@ -13,6 +13,7 @@ struct BatteryView: View {
     @State private var socCardOpacity: CGFloat = 0   // SOC卡片入场淡入
     @State private var socCount: Int = 0             // SOC数字滚动计数
     @State private var isRefreshing = false          // 下拉刷新涟漪标志
+    @State private var pulseTrigger: String = ""      // 触发数值脉冲高亮（SOC 变化时更新）
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     var body: some View {
@@ -112,7 +113,9 @@ struct BatteryView: View {
         .padding(.vertical, 30)
         .dynamicTypeCompress()
         .glassHeroCard()
+        .glassLongPressDeform()
         .opacity(socCardOpacity)
+        .valuePulse(tint: .green)
     }
 
     // MARK: SOC颜色辅助函数
@@ -138,7 +141,7 @@ struct BatteryView: View {
     private func verdictCard(_ cache: [String: Any?], _ b: BatteryModel) -> some View {
         Group {
             if let batt = AN.summarize(cache, store.car).domains.first(where: { $0.key == "battery" }) {
-                CardBox(title: "分析结论", side: batt.title, sideCls: batt.cls) {
+                ExpandingCardBox(title: "分析结论", side: batt.title, sideCls: batt.cls, cornerRadius: Theme.Radius.card) {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(batt.reasons) { r in
                             HStack(alignment: .top, spacing: 8) {
@@ -154,7 +157,7 @@ struct BatteryView: View {
 
     // MARK: 一致性
     private func consistencyCard(_ b: BatteryModel) -> some View {
-        CardBox(title: "一致性", side: b.cellStats.map { "\($0.count) 节采样" } ?? "接口未上报", sideCls: "ok") {
+        ExpandingCardBox(title: "一致性", side: b.cellStats.map { "\($0.count) 节采样" } ?? "接口未上报", sideCls: "ok", cornerRadius: Theme.Radius.card) {
             VStack(spacing: 12) {
                 if let cell = b.cellStats {
                     VStack(spacing: 6) {
@@ -201,7 +204,7 @@ struct BatteryView: View {
 
     // MARK: 充电
     private func chargeCard(_ b: BatteryModel) -> some View {
-        CardBox(title: "充电", side: b.charging.text, sideCls: b.charging.cls.isEmpty ? "na" : b.charging.cls) {
+        ExpandingCardBox(title: "充电", side: b.charging.text, sideCls: b.charging.cls.isEmpty ? "na" : b.charging.cls, cornerRadius: Theme.Radius.card) {
             VStack(spacing: 0) {
                 let rows = chargeRows(b)
                 ForEach(Array(rows.enumerated()), id: \.offset) { idx, r in
@@ -249,7 +252,7 @@ struct BatteryView: View {
     private func motorCard(_ b: BatteryModel) -> some View {
         Group {
             if !b.motors.isEmpty {
-                CardBox(title: "动力系统", side: "\(b.motors.count) 台电机") {
+                ExpandingCardBox(title: "动力系统", side: "\(b.motors.count) 台电机", cornerRadius: Theme.Radius.card) {
                     VStack(spacing: 12) {
                         ForEach(Array(b.motors.enumerated()), id: \.offset) { _, m in
                             VStack(alignment: .leading, spacing: 6) {
@@ -382,6 +385,7 @@ struct BatteryView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
                 socProgress = CGFloat(target)
+                pulseTrigger = String(target)
             }
         }
     }
@@ -404,7 +408,7 @@ struct BatteryView: View {
             loaded = true
             errText = ""
             // 刷新后重新播放 SOC 液态玻璃入场动画
-            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0; socCount = 0 }
+            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0; socCount = 0; pulseTrigger = "" }
             startSocAnimation()
         } catch {
         } catch {

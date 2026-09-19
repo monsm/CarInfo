@@ -184,7 +184,7 @@ struct ControlView: View {
     }
     
     private func bodyDetailCard(_ bd: (summary: String, cls: String, doorRows: [(String, String, String)], windowRows: [(String, String, String)], extraRows: [(String, String, String)], lampRows: [(String, String)])) -> some View {
-        CardBox(title: "车身状态", side: bd.summary, sideCls: bd.cls) {
+        ExpandingCardBox(title: "车身状态", side: bd.summary, sideCls: bd.cls, cornerRadius: Theme.Radius.card) {
             VStack(spacing: 8) {
                 if !bd.doorRows.isEmpty {
                     sectionLabel("车门")
@@ -283,6 +283,7 @@ struct ControlView: View {
         .adaptivePagePadding(dynamicTypeSize).padding(.vertical, 12)
         .dynamicTypeCompress()
         .glassCard(corner: 20)
+        .glassLongPressDeform()
     }
 
     // MARK: 主控双盘
@@ -297,13 +298,14 @@ struct ControlView: View {
         .padding(.vertical, 24)
         .dynamicTypeCompress()
         .glassCard()
+        .glassLongPressDeform()
     }
 
     private func heroDisc(_ item: (key: String, name: String, symbol: String), idx: Int) -> some View {
         HeroDiscButton(key: item.key, name: item.name, symbol: item.symbol, disabled: busy || running != nil, appearDelay: Double(idx) * 0.08) { onCmd(item.key) }
     }
 
-    // MARK: 执行中
+    // MARK: 执行中（带呼吸光晕）
     private func runningCard(_ run: RunState) -> some View {
         HStack(spacing: 12) {
             ProgressView()
@@ -319,6 +321,9 @@ struct ControlView: View {
         .padding(16)
         .dynamicTypeCompress()
         .glassCard(corner: 20)
+        .glassLongPressDeform()
+        // 液态玻璃呼吸光晕：品牌色从中心向外扩散脉冲，营造"执行中"活跃感
+        .runningGlow(color: Theme.brand)
     }
 
     // MARK: 指令列表
@@ -389,7 +394,7 @@ struct ControlView: View {
 
     // MARK: 记录
     private var historyCard: some View {
-        CardBox(title: "执行记录", side: "\(history.count) 条", sideCls: "na") {
+        ExpandingCardBox(title: "执行记录", side: "\(history.count) 条", sideCls: "na", cornerRadius: Theme.Radius.card) {
             VStack(spacing: 0) {
                 ForEach(Array(history.enumerated()), id: \.element.id) { idx, item in
                     HStack(spacing: 12) {
@@ -613,6 +618,7 @@ struct ACHeroDisc: View {
     @Binding var pendingTemp: Int
     @Binding var displayCount: Int
     @State private var isEntered = false
+    @State private var pulseTrigger: String = ""
 
     var body: some View {
         VStack(spacing: 10) {
@@ -644,6 +650,7 @@ struct ACHeroDisc: View {
 
                 // 第 5 层：温度数字（流体字体，随容器宽度自动缩放）
                 FluidTempHero(String(displayCount))
+                    .valuePulse(tint: Theme.brand, watchValue: pulseTrigger)
             }
             .scaleEffect(isEntered ? 1.0 : 0.82)
             .opacity(isEntered ? 1.0 : 0.0)
@@ -654,13 +661,15 @@ struct ACHeroDisc: View {
         }
         .onAppear {
             isEntered = true
+            pulseTrigger = UUID()
             // 从 0 弹性计数到目标温度（入场动画）
             withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
                 displayCount = pendingTemp
             }
         }
-        // 温度变化时同步滚动
+        // 温度变化时同步滚动 + 触发脉冲
         .onChange(of: pendingTemp) { newTemp in
+            pulseTrigger = UUID()
             withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.6)) {
                 displayCount = newTemp
             }
@@ -788,12 +797,14 @@ struct ACStepperView: View {
         .presentationDragIndicator(.hidden)
         // 入场动画：从 0 弹性计数到目标温度
         .onAppear {
+            pulseTrigger = UUID()
             withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
                 tempDisplayCount = temp
             }
         }
-        // 每次加减按钮触发时同步滚动数字
+        // 每次加减按钮触发时同步滚动数字 + 触发脉冲
         .onChange(of: temp) { newTemp in
+            pulseTrigger = UUID()
             withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.6)) {
                 tempDisplayCount = newTemp
             }

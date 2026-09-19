@@ -322,112 +322,144 @@ extension View {
     /// 双拍心跳脉冲效果（ECG 波形呼吸）
     func heartbeatPulse() -> some View { modifier(HeartbeatPulse()) }
 
-    // MARK: - Tab 整体玻璃容器
-    /// 为 Tab 根视图添加 Liquid Glass 全屏玻璃容器：
-    /// Material.thin 磨砂背景 + 顶部白色高光描边 + 柔和投影
-    /// 底部预留 TabBar 高度（约 116pt：50pt TabBar + 安全区），使卡片悬浮于 TabBar 之上
-    func tabGlassContainer() -> some View {
-        self
-            .background(
-                GeometryReader { geo in
-                    // 计算 TabBar 占用高度（iOS 标准 TabBar 50pt + 底部安全区约 66pt）
-                    let tabBarHeight: CGFloat = 116
-                    let contentHeight = max(0, geo.size.height - tabBarHeight)
-
-                    // 玻璃卡背景（从顶部延伸，底部与 TabBar 顶部对齐）
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .fill(Material.thin)
-                        .frame(width: geo.size.width, height: contentHeight)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [.white.opacity(0.30), .white.opacity(0.06)],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    ),
-                                    lineWidth: 1.0
-                                )
-                        )
-                        .shadow(color: .black.opacity(0.08), radius: 20, y: 4)
-                }
-                .ignoresSafeArea()
-            )
+    // MARK: - 数值变化液态玻璃脉冲高亮
+    /// 当绑定值变化时，触发短暂的边缘发光脉冲（scale 1.0→1.06→1.0 + glow fade）
+    /// 用于 SOC Hero、里程数字、胎压数值等关键数据卡片
+    func valuePulse(tint: Color = .accentColor) -> some View {
+        self.modifier(ValuePulseModifier(tint: tint))
     }
 
-    // MARK: - 导航栏样式：iOS 27 Liquid Glass
-    // inline 标题 + 玻璃材质背景 + 白色高光描边 + 强调色图标
-    func navBarStyle() -> some View {
-        self
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.visible, for: .navigation)
-            .toolbarBackgroundMaterial(.thin)
-            .tint(.accentColor)
-    }
-
-    // ---- 玻璃卡片：深浅双模式自适应材质 + 高光描边 + 水波纹涟漪 ----
+    // MARK: - 玻璃卡片修饰符
+    /// 液态玻璃卡片背景 + 高光描边
     func glassCard(corner: CGFloat = Theme.Radius.card) -> some View {
-        self
-            .background(Material.thin, in: RoundedRectangle(cornerRadius: corner, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: corner, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [.white.opacity(0.28), .white.opacity(0.04)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 0.8
-                    )
-            )
-            .shadow(color: .black.opacity(0.05), radius: 16, y: 6)
-            .liquidGlassRipple(cornerRadius: corner)
+        self.modifier(GlassCardModifier(cornerRadius: corner))
     }
 
-    // ---- Hero 玻璃卡片：深浅双模式自适应 + 更强光晕 + 水波纹涟漪 ----
+    /// Hero 级玻璃卡片（更大圆角 + 更强阴影）
     func glassHeroCard(corner: CGFloat = Theme.Radius.hero) -> some View {
-        self
-            .background(Material.thin, in: RoundedRectangle(cornerRadius: corner, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: corner, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [.white.opacity(0.34), .white.opacity(0.06)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1.0
-                    )
-            )
-            .shadow(color: .black.opacity(0.07), radius: 20, y: 8)
-            .liquidGlassRipple(cornerRadius: corner)
+        self.modifier(GlassCardModifier(cornerRadius: corner, isHero: true))
     }
 
-    // ---- 通用圆角卡片（可选圆角值）----
-    func premiumCard(corner: CGFloat = Theme.Radius.card) -> some View {
-        self
-            .background(Color(.secondarySystemGroupedBackground).opacity(0.85),
-                        in: RoundedRectangle(cornerRadius: corner, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: corner, style: .continuous)
-                    .strokeBorder(Color(.separator).opacity(0.4), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.06), radius: 12, y: 4)
-    }
-
-    // ---- 应用阴影 ----
-    func applyShadow(_ s: ShadowStyle) -> some View {
-        shadow(color: s.color, radius: s.radius, x: s.x, y: s.y)
-    }
-
-    // ---- 应用光晕 ----
-    func applyGlow(_ g: GlowStyle) -> some View {
-        self
-            .shadow(color: g.color.opacity(0.3), radius: g.radius, y: g.offset)
-            .shadow(color: g.color.opacity(0.15), radius: g.radius * 1.5, y: g.offset * 2)
+    /// 长按液态玻璃弹性形变（scale 1→0.94 + 光晕扩散 + 弹簧回弹）
+    func glassLongPressDeform() -> some View {
+        self.modifier(GlassLongPressDeformModifier())
     }
 }
 
+// =============================================================================
+// GlassCardModifier —— 液态玻璃卡片背景
+// =============================================================================
+struct GlassCardModifier: ViewModifier {
+    let cornerRadius: CGFloat
+    let isHero: Bool
+
+    private var shadowY: CGFloat { isHero ? 6 : 3 }
+    private var shadowRadius: CGFloat { isHero ? 22 : 14 }
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Material.thin)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.22), .white.opacity(0.04)],
+                                    startPoint: .top, endPoint: .bottom
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+                    .shadow(color: .black.opacity(isHero ? 0.12 : 0.07), radius: shadowRadius, y: shadowY)
+            )
+    }
+}
+
+// =============================================================================
+// GlassLongPressDeformModifier —— 长按液态玻璃弹性形变
+// 按压时：scale 1→0.94 压缩 + 光晕扩散 + 边框发光
+// 松手时：弹簧回弹（response:0.5, damping:0.6）
+// =============================================================================
+struct GlassLongPressDeformModifier: ViewModifier {
+    @State private var isLongPressed = false
+    @State private var pressScale: CGFloat = 1.0
+    @State private var glowOpacity: CGFloat = 0
+
+    private let pressDuration = 0.18   // 长按判定阈值（秒）
+    private let holdScale: CGFloat = 0.94
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(pressScale)
+            .animation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0.35), value: pressScale)
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                    .fill(Color.clear)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [.white.opacity(glowOpacity * 0.45), .white.opacity(glowOpacity * 0.08)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        ),
+                        lineWidth: glowOpacity * 1.5
+                    )
+                    .shadow(color: .white.opacity(glowOpacity * 0.25), radius: glowOpacity * 10, y: 0)
+            )
+            .onTapGesture(count: 1) { }  // 占位，确保手势接收
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: pressDuration)
+                    .onEnded { _ in
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0.35)) {
+                            pressScale = holdScale
+                            glowOpacity = 1.0
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + pressDuration * 0.5) {
+                            withAnimation(.spring(response: 0.55, dampingFraction: 0.65, blendDuration: 0.4)) {
+                                pressScale = 1.0
+                                glowOpacity = 0.0
+                            }
+                        }
+                    }
+            )
+    }
+}
+
+// =============================================================================
+// ValuePulseModifier —— 数值变化时液态玻璃边缘发光脉冲
+// 绑定值变化 → scale 轻微放大 + 边缘 glow 扩散 + 柔和阴影爆发
+// =============================================================================
+
+// =============================================================================
+// ValuePulseModifier —— 数值变化时液态玻璃边缘发光脉冲
+// 绑定值变化 → scale 轻微放大 + 边缘 glow 扩散 + 柔和阴影爆发
+// =============================================================================
+struct ValuePulseModifier: ViewModifier {
+    @Binding var watchValue: String
+    let tint: Color
+    @State private var pulsePhase: Double = 0
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(1.0 + pulsePhase * 0.04)
+            .shadow(color: tint.opacity(pulsePhase * 0.5), radius: 8 * CGFloat(pulsePhase), y: 0)
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.Radius.medium, style: .continuous)
+                    .strokeBorder(tint.opacity(pulsePhase * 0.35), lineWidth: 1.5)
+                    .blur(radius: 3 * CGFloat(pulsePhase))
+            }
+            .onChange(of: watchValue) { newValue in
+                guard !newValue.isEmpty else { return }
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.55, blendDuration: 0.2)) {
+                    pulsePhase = 1.0
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) {
+                    withAnimation(.easeOut(duration: 0.35)) {
+                        pulsePhase = 0
+                    }
+                }
+            }
+    }
+}
 // MARK: - 浮动装饰粒子（SOC/评分圆环专用）
 struct FloatingParticles: View {
     let size: CGFloat
@@ -544,6 +576,65 @@ struct CardBox<Content: View>: View {
         .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard(corner: Theme.Radius.card)
+    }
+}
+
+// MARK: - 可展开玻璃卡片（标题行点击触发弹簧高度过渡 + 液态玻璃形变）
+struct ExpandingCardBox<Content: View>: View {
+    let title: String
+    var side: String? = nil
+    var sideCls: String = ""
+    let cornerRadius: CGFloat
+    @ViewBuilder var content: () -> Content
+
+    @State private var isExpanded = false
+
+    private var chevronAngle: Angle { isExpanded ? .degrees(90) : .degrees(0) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // ── 标题行（可点击，带液态玻璃按压反馈）──
+            Button {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.35)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(Theme.h4)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if let side, !side.isEmpty {
+                        Pill(text: side, cls: sideCls.isEmpty ? "na" : sideCls, dot: false)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(Theme.footnote.bold())
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(chevronAngle)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.6), value: isExpanded)
+                }
+                .padding(Theme.Spacing.xl)
+            }
+            .buttonStyle(.plain)
+            .glassLongPressDeform()
+            .liquidGlassRipple(cornerRadius: cornerRadius)
+
+            // ── 内容区（弹簧高度过渡）──
+            if isExpanded {
+                content()
+                    .padding(.horizontal, Theme.Spacing.xl)
+                    .padding(.bottom, Theme.Spacing.lg)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(alignment: .topLeading) {
+                        Rectangle()
+                            .fill(Color.secondary.opacity(0.12))
+                            .frame(height: 1)
+                            .padding(.horizontal, -Theme.Spacing.xl)
+                    }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard(corner: cornerRadius)
     }
 }
 
@@ -718,6 +809,44 @@ struct ListDivider: View {
     }
 }
 
+// MARK: - 运行中呼吸光晕
+/// 液态玻璃风格呼吸光晕：卡片出现时从中心向外扩散的柔和光晕脉冲
+/// 用于 ControlView runningCard、HomeView SOC Hero 等需要"活跃"感知的状态
+struct RunningGlow: ViewModifier {
+    let color: Color
+    @State private var pulsePhase: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                // 扩散光晕层（始终在卡片背后）
+                Circle()
+                    .fill(AngularGradient(
+                        colors: [color.opacity(0.35), color.opacity(0.08), .clear],
+                        center: .center,
+                        startAngle: .degrees(0),
+                        endAngle: .degrees(360)
+                    ))
+                    .frame(width: 200, height: 200)
+                    .scaleEffect(1.0 + pulsePhase * 0.3)
+                    .opacity((1.0 - pulsePhase) * 0.6)
+                    .blur(radius: pulsePhase * 8)
+                    .allowsHitTesting(false)
+            }
+            .animation(
+                .easeInOut(duration: 2.0).repeatForever(autoreverses: false),
+                value: pulsePhase
+            )
+            .onAppear { pulsePhase = 0.5 }  // 起始在中间相位，避免闪烁
+    }
+}
+
+/// 为视图添加液态玻璃呼吸光晕效果
+/// - Parameter color: 光晕主色调（默认 accentColor）
+func runningGlow(color: Color = .accentColor) -> some View {
+    self.modifier(RunningGlow(color: color))
+}
+
 // MARK: - 分区标题
 struct SectionHeader: View {
     let title: String
@@ -736,15 +865,22 @@ struct MetricPill: View {
     let value: String
     let unit: String
     var tint: Color = .accentColor
+    /// 是否使用流体数字字体（随容器宽度自动缩放，仅适用于较大数值的 Hero 场景）
+    var fluidValue: Bool = false
 
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(Theme.micro)
                 .foregroundStyle(tint.opacity(0.85))
-            Text(value)
-                .font(Theme.mono)
-                .foregroundStyle(.primary)
+            if fluidValue {
+                FluidHeroFont(value, minSize: 18, maxSize: 32)
+                    .foregroundStyle(.primary)
+            } else {
+                Text(value)
+                    .font(Theme.mono)
+                    .foregroundStyle(.primary)
+            }
             if !unit.isEmpty {
                 Text(unit).font(Theme.caption).foregroundStyle(.secondary)
             }
@@ -1360,6 +1496,72 @@ func glassRefreshRipple(isRefreshing: Binding<Bool>) -> some View {
 }
 
 // =============================================================================
+// GlassSwitchRipple —— 切换车辆时的全屏玻璃涟漪扩散动效
+// 从页面中心向外扩散一圈品牌色光晕，模拟液态玻璃从触点向外扩散的质感
+// 与 glassRefreshHalo 配合：涟漪负责扩散，光晕负责整体氛围切换
+// =============================================================================
+
+/// iOS 27 Liquid Glass 车辆切换涟漪动效
+/// 从页面中心向外扩散品牌色光晕，模拟液态玻璃从触点扩散的质感
+struct GlassSwitchRipple: ViewModifier {
+    @Binding var isSwitching: Bool
+    @State private var ripplePhase: CGFloat = 0  // 0→1 表示扩散进度
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .center) {
+                if ripplePhase > 0 {
+                    ZStack {
+                        // 外层大范围扩散：品牌色径向渐变
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        Theme.brand.opacity(0.25),
+                                        Theme.brand.opacity(0.08),
+                                        .clear
+                                    ],
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: 400
+                                )
+                            )
+                            .scaleEffect(1.0 + ripplePhase * 2.8)
+                            .opacity(max(0, 1 - ripplePhase * 1.0))
+                        // 内层高亮核心：白色光晕
+                        Circle()
+                            .fill(Color.white.opacity(0.20))
+                            .scaleEffect(1.0 + ripplePhase * 1.6)
+                            .opacity(max(0, 1 - ripplePhase * 1.5))
+                    }
+                    .frame(width: UIScreen.main.bounds.width * 1.2,
+                           height: UIScreen.main.bounds.height * 1.2)
+                    .allowsHitTesting(false)
+                }
+            }
+            .onChange(of: isSwitching) { switching in
+                if switching {
+                    // 开始扩散：spring 弹入
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.55, blendDuration: 0.25)) {
+                        ripplePhase = 1.0
+                    }
+                } else {
+                    // 淡出消失：easeOut 消散
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        ripplePhase = 0
+                    }
+                }
+            }
+    }
+}
+
+/// 为页面添加切换车辆时的玻璃涟漪扩散动效
+/// - Parameter isSwitching: 绑定切换标志（true = 触发扩散动画）
+func glassSwitchRipple(isSwitching: Binding<Bool>) -> some View {
+    self.modifier(GlassSwitchRipple(isSwitching: isSwitching))
+}
+
+// =============================================================================
 // Dynamic Type —— 大字体模式自适应工具
 // 根据系统动态类型设置自动缩放间距、边距和字体，确保可读性和布局完整性
 // =============================================================================
@@ -1617,3 +1819,40 @@ struct PageEmptyView: View {
     }
 }
 
+
+// =============================================================================
+// ToastView —— iOS 27 Liquid Glass 全局 Toast 提示
+// 底部胶囊形磨砂玻璃卡片，入场弹簧滑入、退场 easeOut 淡出
+// =============================================================================
+
+/// 全局 Toast 提示（由 NavState.currentItem 驱动，挂载在根视图上）
+struct ToastView: View {
+    let text: String
+    let icon: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(Theme.caption.weight(.semibold))
+                .foregroundStyle(.accentColor)
+            Text(text)
+                .font(Theme.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 11)
+        .background(.thin, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
+        .shadow(color: .black.opacity(0.18), radius: 14, y: 5)
+        .padding(.bottom, 14)
+        .padding(.horizontal, 24)
+        .transition(
+            .asymmetric(
+                insertion: .move(edge: .bottom)
+                    .combined(with: .opacity)
+                    .animation(.spring(response: 0.45, dampingFraction: 0.6, blendDuration: 0.25)),
+                removal: .opacity.animation(.easeOut(duration: 0.2))
+            )
+        )
+    }
+}

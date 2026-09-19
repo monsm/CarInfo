@@ -205,6 +205,7 @@ struct MessagesView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .dynamicTypeCompress()
         .glassCard(corner: 20)
+        .glassLongPressDeform()
         .contentShape(Rectangle())
         .onTapGesture {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
