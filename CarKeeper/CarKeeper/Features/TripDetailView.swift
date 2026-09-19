@@ -322,7 +322,7 @@ struct TripDetailView: View {
     }
     
     // MARK: - 分享
-    private func shareTrip {
+    private func shareTrip() {
         let text = """
 🚗 我的行程
 ━━━━━━━━━━━━━
@@ -346,7 +346,7 @@ struct MapView: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView()
         map.delegate = context.coordinator
-        map region = MKCoordinateRegion(center: coordinate, span: span)
+        let mapRegion = MKCoordinateRegion(center: coordinate, span: span)
         // Add polyline
         if points.count >= 2 {
             let polyline = MKPolyline(coordinates: points, count: points.count)

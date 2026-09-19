@@ -118,7 +118,7 @@ class FeatureFlags {
     
     func enable(_ flag: String) { flags[flag] = true }
     func disable(_ flag: String) { flags[flag] = false }
-    func is-enabled(_ flag: String) -> Bool { flags[flag] ?? false }
+    func isAvailable(_ flag: String) -> Bool { flags[flag] ?? false }
 }
 
 struct FeatureFlagToggle: View {

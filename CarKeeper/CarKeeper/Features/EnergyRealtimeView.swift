@@ -146,10 +146,10 @@ struct TirePressureTrendChart: View {
                 
                 // 正常范围带
                 RuleMark(y: .literal(2.5))
-                    .lineStyle(StrokeStyle dash: [5, 3], lineWidth: 1)
+                    .lineStyle(StrokeStyle(dash: [5, 3], lineWidth: 1))
                     .foregroundStyle(.green.opacity(0.5))
                 RuleMark(y: .literal(3.0))
-                    .lineStyle(StrokeStyle dash: [5, 3], lineWidth: 1)
+                    .lineStyle(StrokeStyle(dash: [5, 3], lineWidth: 1))
                     .foregroundStyle(.green.opacity(0.5))
             }
             .chartYAxis {

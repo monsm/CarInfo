@@ -409,7 +409,8 @@ struct BatteryView: View {
 
     private func chargeRows(_ b: BatteryModel) -> [R] {
         var rows: [R] = []
-        let c = b.charging            if c.text != "未充电" {
+        let c = b.charging
+            if c.text != "未充电" {
             if c.soc != "--" { rows.append(R(k: "当前电量", v: "\(c.soc)%")) }
             if c.range != "--" { rows.append(R(k: "剩余续航", v: "\(c.range) km")) }
             if c.power != "--" { rows.append(R(k: "充电功率", v: c.power)) }

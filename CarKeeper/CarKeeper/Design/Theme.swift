@@ -28,6 +28,7 @@ extension Color {
 
 enum Theme {
     // MARK: - 品牌色（自适应浅色/深色模式）
+
     /// 主色调：长安品牌蓝，浅暗双模式
     static var brand: Color { .blue }                              // iOS 标准蓝
     static var brandLight: Color { Color(hex: "0A84FF") }          // 高亮蓝
@@ -112,8 +113,6 @@ enum Theme {
     // =============================================================================
     // Font 扩展：语义样式便捷方法
     // =============================================================================
-    extension Font {
-        /// 返回跟随 Dynamic Type 的语义字体
         static func headline(weight: Font.Weight = .semibold) -> Font {
             .headline.weight(weight)
         }
@@ -2797,3 +2796,6 @@ private class ImagePickerCoordinator: NSObject, UIImagePickerControllerDelegate,
         picker.dismiss(animated: true)
     }
 }
+
+extension Font {
+    /// 返回跟随 Dynamic Type 的语义字体

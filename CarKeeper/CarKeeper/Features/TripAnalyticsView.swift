@@ -131,7 +131,8 @@ struct TripAnalyticsView: View {
             .chartXAxis {
                 AxisMarks(values: .stride(by: .day, count: 2)) { _ in
                     AxisGridLine.strokeBorder(lineWidth: 0.5)
-                    AxisTick strokeBorder: lineWidth: 0.5
+                    AxisTick().strokeBorder(lineWidth: 0.5)
+
                     AxisValueLabel(format: .dateTime.hour(.default(amPM: .narrow)).minute())
                 }
             }

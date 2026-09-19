@@ -92,13 +92,13 @@ struct MileagePrediction: View {
     }
     var daysUntilEmpty: Int {
         guard dailyMileage > 0 else { return 999 }
-        return Int(Double(store.car.flatMap { $0["energy"] as? [String: Any] }?.["rangeKm"] as? Int ?? 300) / dailyMileage)
+        return Int(Double(store.car.flatMap { $0["energy"] as? [String: Any] }?.flatMap { $0["rangeKm"] as? Int } ?? 300 as? Int ?? 300) / dailyMileage)
     }
     var body: some View {
         HStack {
             VStack(alignment: .leading) { Text("日均里程").font(.caption2).foregroundColor(.secondaryLabel); Text("\(String(format:"%.1f",dailyMileage)) km").font(.title3).fontWeight(.semibold) }
             Spacer()
-            VStack(alignment: .trailing) { Text("预计续航天数").font(.caption2).foregroundColor(.secondaryLabel); Text("\(daysUntilEmpty) 天").font(.title3).fontWeight(.semibold).foregroundColor(daysUntilEmpty<3?.red:.green) }
+            VStack(alignment: .trailing) { Text("预计续航天数").font(.caption2).foregroundColor(.secondaryLabel); Text("\(daysUntilEmpty) 天").font(.title3).fontWeight(.semibold).foregroundColor(daysUntilEmpty<3 ? .red : .green) }
         }.padding().glassCard()
     }
 }
@@ -130,7 +130,7 @@ struct CommandSuccessRate: View {
     var successRate: Double { guard totalCount > 0 else { return 0 }; return Double(successCount)/Double(totalCount)*100 }
     var body: some View {
         HStack {
-            VStack(alignment: .leading) { Text("命令成功率").font(.caption2).foregroundColor(.secondaryLabel); Text("\(String(format:"%.1f%%",successRate))").font(.title3).fontWeight(.semibold).foregroundColor(successRate>=90?.green:.orange) }
+            VStack(alignment: .leading) { Text("命令成功率").font(.caption2).foregroundColor(.secondaryLabel); Text("\(String(format:"%.1f%%",successRate))").font(.title3).fontWeight(.semibold).foregroundColor(successRate>=90 ? .green : .orange) }
             Spacer()
             ProgressView(value: successRate/100).progressViewStyle(LinearProgressViewStyle()).frame(width: 80)
         }.padding().glassCard()

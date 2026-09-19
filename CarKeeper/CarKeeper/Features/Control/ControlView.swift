@@ -68,75 +68,6 @@ struct ControlView: View {
         return { lock.lock(); n += 1; lock.unlock(); return n }
     }()
 
-    var body: some View {
-        ScrollView {
-            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
-                carSelector.staggeredEntrance(index: 0)
-                heroDiscs.staggeredEntrance(index: 1)
-                // #18 快捷预设场景
-                presetScenesCard.staggeredEntrance(index: 2)
-                if let run = running { runningCard(run).staggeredEntrance(index: 3) }
-                SiriShortcutsCard().staggeredEntrance(index: 4)
-                commandCard.staggeredEntrance(index: 5)
-                if let bd = bodyDetail { bodyDetailCard(bd) }
-                if !history.isEmpty { historyCard.staggeredEntrance(index: 0) }
-            }
-            .adaptivePagePadding(dynamicTypeSize)
-            .adaptiveSafeAreaBottom(12, dynamicTypeSize)
-        }
-        .scrollBounceBehavior(.basedOnSize)
-        .refreshable {
-            tempDisplayCount = 0            // 数字归零
-            withAnimation(.spring(Theme.Duration.springFast)) {
-                try? await refreshControlCache()
-            }
-            // 数据回来后自动重播计数动画（pendingTemp 不变，onChange 会触发）
-        }
-        .pageBackground(Theme.pageBlue)
-        .navigationTitle("车控")
-            .navBarStyle()
-            .accessibilityLabel(Text("车控"))
-            .accessibilityHint(Text("远程控制车辆：锁车、解锁、空调、座椅加热"))
-        .glassRefreshRipple(isRefreshing: $isRefreshing)
-        // #35 语音播报入口
-        .toolbar {
-            if !UIAccessibility.isSpeakScreenEnabled {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        speakStatus()
-                    } label: {
-                        Image(systemName: "speaker.wave.3.fill")
-                    }
-                    .accessibilityLabel(Text("语音播报车况"))
-                }
-            }
-        }
-        .sheet(isPresented: $showPin) {
-            PINKeypadView()
-                .onReceive(NotificationCenter.default.publisher(for: .pinConfirmed)) { note in
-                    if let pin = note.object as? String {
-                        pinDigits = pin
-                        showPin = false
-                        // #8 首次输入PIN后保存到Keychain
-                        if store.readPin() == nil {
-                            store.savePin(pin)
-                            EnhancedToastManager.shared.show("PIN码已安全保存", icon: "key.fill")
-                        }
-                        execute(pin)
-                    }
-                }
-        }
-        .sheet(isPresented: $showTemp) {
-            ACStepperView(initialTemp: $pendingTemp)
-                .onReceive(NotificationCenter.default.publisher(for: .tempConfirmed)) { note in
-                    if let t = note.object as? Int {
-                        pendingTemp = t
-                        showTemp = false
-                        showPin = true
-                    }
-                }
-        }
-        // MARK: 车身明细（车门/窗/灯状态）
     private var bodyDetail: (summary: String, cls: String, doorRows: [(String, String, String)], windowRows: [(String, String, String)], extraRows: [(String, String, String)], lampRows: [(String, String)])? {
         guard let ctrl = ciVal(store.caches, "control") else { return nil }
         let hasCtrl = ctrl.count > 0
@@ -217,7 +148,6 @@ struct ControlView: View {
         
         return (summary: summary, cls: cls, doorRows: doorRows, windowRows: windowRows, extraRows: extraRows, lampRows: lampRows)
     }
-    
     private func bodyDetailCard(_ bd: (summary: String, cls: String, doorRows: [(String, String, String)], windowRows: [(String, String, String)], extraRows: [(String, String, String)], lampRows: [(String, String)])) -> some View {
         ExpandingCardBox(title: "车身状态", side: bd.summary, sideCls: bd.cls, cornerRadius: Theme.Radius.card) {
             VStack(spacing: 8) {
@@ -267,11 +197,81 @@ struct ControlView: View {
             }
         }
     }
-    
     private func sectionLabel(_ t: String) -> some View {
         Text(t).font(Theme.footnote.bold()).foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
+    var body: some View {
+        ScrollView {
+            VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
+                carSelector.staggeredEntrance(index: 0)
+                heroDiscs.staggeredEntrance(index: 1)
+                // #18 快捷预设场景
+                presetScenesCard.staggeredEntrance(index: 2)
+                if let run = running { runningCard(run).staggeredEntrance(index: 3) }
+                SiriShortcutsCard().staggeredEntrance(index: 4)
+                commandCard.staggeredEntrance(index: 5)
+                if let bd = bodyDetail { bodyDetailCard(bd) }
+                if !history.isEmpty { historyCard.staggeredEntrance(index: 0) }
+            }
+            .adaptivePagePadding(dynamicTypeSize)
+            .adaptiveSafeAreaBottom(12, dynamicTypeSize)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .refreshable {
+            tempDisplayCount = 0            // 数字归零
+            withAnimation(.spring(Theme.Duration.springFast)) {
+                try? await refreshControlCache()
+            }
+            // 数据回来后自动重播计数动画（pendingTemp 不变，onChange 会触发）
+        }
+        .pageBackground(Theme.pageBlue)
+        .navigationTitle("车控")
+            .navBarStyle()
+            .accessibilityLabel(Text("车控"))
+            .accessibilityHint(Text("远程控制车辆：锁车、解锁、空调、座椅加热"))
+        .glassRefreshRipple(isRefreshing: $isRefreshing)
+        // #35 语音播报入口
+        .toolbar {
+            if !UIAccessibility.isSpeakScreenEnabled {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        speakStatus()
+                    } label: {
+                        Image(systemName: "speaker.wave.3.fill")
+                    }
+                    .accessibilityLabel(Text("语音播报车况"))
+                }
+            }
+        }
+        .sheet(isPresented: $showPin) {
+            PINKeypadView()
+                .onReceive(NotificationCenter.default.publisher(for: .pinConfirmed)) { note in
+                    if let pin = note.object as? String {
+                        pinDigits = pin
+                        showPin = false
+                        // #8 首次输入PIN后保存到Keychain
+                        if store.readPin() == nil {
+                            store.savePin(pin)
+                            EnhancedToastManager.shared.show("PIN码已安全保存", icon: "key.fill")
+                        }
+                        execute(pin)
+                    }
+                }
+        }
+        .sheet(isPresented: $showTemp) {
+            ACStepperView(initialTemp: $pendingTemp)
+                .onReceive(NotificationCenter.default.publisher(for: .tempConfirmed)) { note in
+                    if let t = note.object as? Int {
+                        pendingTemp = t
+                        showTemp = false
+                        showPin = true
+                    }
+                }
+        }
+        // MARK: 车身明细（车门/窗/灯状态）
+    
+    
 
         .onAppear {
             if running != nil && pollTask == nil {
