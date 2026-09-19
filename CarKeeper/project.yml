@@ -20,6 +20,10 @@ targets:
     resources:
     - path: CarKeeper/Resources/Assets.xcassets
       group: Resources/Assets.xcassets
+    - path: CarKeeper/Resources/en.lproj
+      group: Resources/en.lproj
+    - path: CarKeeper/Resources/zh-Hans.lproj
+      group: Resources/zh-Hans.lproj
     info:
       path: CarKeeper/Resources/Info.plist
       properties:
