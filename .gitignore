@@ -1,0 +1,13 @@
+/.freebuff
+# Build artifacts
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+
+# Temp logs
+clogs*.txt
+clogs*.zip
+clog_*.txt
+
+# Generated plans
+CarKeeper/CarKeeper/TODO_FULL_PLAN.md
