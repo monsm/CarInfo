@@ -7,15 +7,6 @@
 
 import SwiftUI
 import UIKit
-import WidgetKit
-
-// MARK: - AppClip 入口 Bundle
-
-struct CarClipBundle: WidgetBundle {
-    var body: some Widget {
-        // AppClip 可以包含 Widget
-    }
-}
 
 // MARK: - AppClip 入口视图
 
@@ -61,7 +52,9 @@ struct AppClipEntranceView: View {
                         .keyboardType(.asciiCapable)
                         .autocorrectionDisabled()
                     if !plateInput.isEmpty {
-                        Button { plateInput = "" }
+                        Button(action: { plateInput = "" }, label: {
+                            Image(systemName: "xmark.circle.fill")
+                        })
                         .foregroundStyle(.secondary)
                     }
                 }
@@ -153,17 +146,19 @@ enum CarClipRoute {
         // 解析 carkeeper://plate/京A12345
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               components.host == "plate",
-              let plate = components.path.trimmingCharacters(in: .characters(in: "/")) else {
+              components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).isEmpty == false else {
             return nil
         }
-        var view = AppClipEntranceView()
         // 通过 binding 传入车牌（需要包装为 StateObject 或 @State）
-        return view
+        return AppClipEntranceView()
     }
 }
 
 // MARK: - AppClipAppDelegate
 
+// AppClip 是 application 类型 target，必须有一个入口点（否则链接期缺 _main）。
+// @main 配合 UIApplicationDelegate 会合成 main()，无需额外的 App struct。
+@main
 class CarClipAppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
         if let route = CarClipRoute.handle(url: url) {

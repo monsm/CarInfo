@@ -73,7 +73,7 @@ struct CarWidgetSmall: Widget {
     let kind: String = "CarWidgetSmall"
     
     var body: some WidgetConfiguration {
-        StaticWidgetConfiguration(kind: kind, provider: CarWidgetProvider()) { entry in
+        StaticConfiguration(kind: kind, provider: CarWidgetProvider()) { entry in
             CarWidgetSmallView(entry: entry)
         }
         .configurationDisplayName("车况概览")
@@ -143,7 +143,7 @@ struct CarWidgetMedium: Widget {
     let kind: String = "CarWidgetMedium"
     
     var body: some WidgetConfiguration {
-        StaticWidgetConfiguration(kind: kind, provider: CarWidgetProvider()) { entry in
+        StaticConfiguration(kind: kind, provider: CarWidgetProvider()) { entry in
             CarWidgetMediumView(entry: entry)
         }
         .configurationDisplayName("车辆详情")

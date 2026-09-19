@@ -6,11 +6,12 @@
 import SwiftUI
 import WidgetKit
 import Foundation
+import ActivityKit
 
 // MARK: - Live Activity Attributes
 
-struct ChargingLiveAttributes: LiveActivityAttributes {
-    // 静态属性（不随时间变化）
+struct ChargingLiveAttributes: ActivityAttributes {
+    // 动态内容（随时间变化）：嵌套的 ContentState
     struct ContentState: Codable, Hashable {
         var soc: Int
         var range: Int
@@ -19,7 +20,7 @@ struct ChargingLiveAttributes: LiveActivityAttributes {
         var isActive: Bool
     }
     
-    // 动态内容（随时间变化）
+    // 静态属性（活动生命周期内不变）
     var soc: Int
     var range: Int
     var isCharging: Bool
@@ -29,7 +30,7 @@ struct ChargingLiveAttributes: LiveActivityAttributes {
 
 /// 负责启动/更新/停止 Live Activity
 enum ChargingLiveActivityManager {
-    private static var activity: Activity<ChargingLiveAttributes, ChargingLiveAttributes.ContentState>?
+    private static var activity: Activity<ChargingLiveAttributes>?
     
     /// 开始充电 Live Activity
     static func start(soc: Int, range: Int, power: String) async {
@@ -40,11 +41,11 @@ enum ChargingLiveActivityManager {
             isActive: true
         )
         let attributes = ChargingLiveAttributes(soc: soc, range: range, isCharging: true)
-        
+
         do {
-            activity = try await Activity<ChargingLiveAttributes, ChargingLiveAttributes.ContentState>.begin(attributes) {
-                ChargingLiveAttributes.ContentState(soc: soc, range: range, timeToFull: initialState.timeToFull, chargingPower: power, isActive: true)
-            }
+            // ActivityKit 没有 begin(...)；正确入口是 Activity.request(attributes:content:pushType:)
+            let content = ActivityContent(state: initialState, staleDate: nil)
+            activity = try Activity.request(attributes: attributes, content: content, pushType: nil)
         } catch {
             print("Failed to start Live Activity: \(error)")
         }
@@ -59,14 +60,16 @@ enum ChargingLiveActivityManager {
             chargingPower: power,
             isActive: true
         )
-        activity.update(newState, staleDate: Calendar.current.date(byAdding: .minute, value: 30, to: Date()))
+        let staleDate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())
+        Task { await activity.update(ActivityContent(state: newState, staleDate: staleDate)) }
     }
     
     /// 停止充电 Live Activity
     static func end() {
         guard let activity = activity else { return }
-        activity.end(.default, dismissalPolicy: .after(Date().addingTimeInterval(60)))
-        self.activity = nil
+        let dismissAt = Date().addingTimeInterval(60)
+        Task { await activity.end(nil, dismissalPolicy: .after(dismissAt)) }
+        Self.activity = nil
     }
     
     /// 计算充满时间

@@ -137,7 +137,8 @@ struct WatchStatusRow: View {
     let icon: String
     let value: String
     let label: String
-    let tint: Color? = nil
+    // 用 var 而非 let：带默认值的 let 不会进入 memberwise init，调用处的 tint: 会报“extra argument”
+    var tint: Color? = nil
     
     var body: some View {
         HStack(spacing: 12) {

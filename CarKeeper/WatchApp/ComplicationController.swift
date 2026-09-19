@@ -20,20 +20,20 @@ class ComplicationController: NSObject, CLKComplicationDataSource {
         let range = defaults.integer(forKey: "widget_range")
         
         let template = CLKComplicationTemplateModularLargeStandardBody()
-        template.headerTextProvider = .static(text: "EV")
-        template.body1TextProvider = .static(text: "\(soc)%")
-        template.body2TextProvider = .static(text: "\(range)km")
+        template.headerTextProvider = CLKSimpleTextProvider(text: "EV")
+        template.body1TextProvider = CLKSimpleTextProvider(text: "\(soc)%")
+        template.body2TextProvider = CLKSimpleTextProvider(text: "\(range)km")
         
-        let entry = CLKComplicationTimelineEntry(date: Date, complicationTemplate: template)
+        let entry = CLKComplicationTimelineEntry(date: Date(), complicationTemplate: template)
         handler(entry)
     }
     
     // MARK: - Placeholder & Preview Templates
     func getLocalizableSampleTemplate(for complication: CLKComplication, withHandler handler: @escaping (CLKComplicationTemplate?) -> Void) {
         let template = CLKComplicationTemplateModularLargeStandardBody()
-        template.headerTextProvider = .static(text: "EV")
-        template.body1TextProvider = .static(text: "78%")
-        template.body2TextProvider = .static(text: "380km")
+        template.headerTextProvider = CLKSimpleTextProvider(text: "EV")
+        template.body1TextProvider = CLKSimpleTextProvider(text: "78%")
+        template.body2TextProvider = CLKSimpleTextProvider(text: "380km")
         handler(template)
     }
     
@@ -47,9 +47,9 @@ class ComplicationController: NSObject, CLKComplicationDataSource {
         for offset in 0..<limit {
             let time = date.addingTimeInterval(Double(offset) * 300) // 每5分钟
             let template = CLKComplicationTemplateModularLargeStandardBody()
-            template.headerTextProvider = .static(text: "EV")
-            template.body1TextProvider = .static(text: "\(soc)%")
-            template.body2TextProvider = .static(text: "\(range)km")
+            template.headerTextProvider = CLKSimpleTextProvider(text: "EV")
+            template.body1TextProvider = CLKSimpleTextProvider(text: "\(soc)%")
+            template.body2TextProvider = CLKSimpleTextProvider(text: "\(range)km")
             entries.append(CLKComplicationTimelineEntry(date: time, complicationTemplate: template))
         }
         handler(entries)

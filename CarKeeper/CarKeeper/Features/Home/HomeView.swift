@@ -175,10 +175,12 @@ struct HomeView: View {
     }
 
     // #NEW-123 下滑触发全局搜索
+    // 注：DragGesture.Value 没有 changedLocation，用 translation.height 判断手势位移
+    // （向下拖动 height 为正）。若要改成“上滑触发”，把条件换成 translation.height < -100。
     private var swipeDownToSearch: some Gesture {
-        DragGesture()
+        DragGesture(minimumDistance: 30)
             .onEnded { value in
-                if value.startLocation.y - value.changedLocation.y > 100 {
+                if value.translation.height > 100 {
                     showSearch = true
                 }
             }
