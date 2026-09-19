@@ -233,20 +233,30 @@ struct CostPieChart: View {
 // MARK: - N22 充电站热力图（简化版，使用 MKCircle）
 struct ChargingHeatOverlay: View {
     let stations: [(lat: Double, lng: Double, count: Int)]
-    
+
+    private struct HeatPoint: Identifiable {
+        let id: Int
+        let diameter: CGFloat
+        let centerX: CGFloat
+    }
+
+    private var points: [HeatPoint] {
+        stations.enumerated().map { idx, station in
+            HeatPoint(id: idx,
+                      diameter: CGFloat(station.count) * 30 + 20,
+                      centerX: CGFloat(idx) * 50 + 25)
+        }
+    }
+
     var body: some View {
         ZStack {
-            ForEach(Array(stations.enumerated()), id: \.offset) { idx, station in
+            ForEach(points) { p in
                 Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.red.opacity(0.6), .orange.opacity(0.2), .clear],
-                            startPoint: .center, endPoint: .outerEdge
-                        )
-                    )
-                    .frame(width: CGFloat(station.count) * 30 + 20,
-                           height: CGFloat(station.count) * 30 + 20)
-                    .position(x: CGFloat(idx) * 50 + 25, y: 25)
+                    .fill(LinearGradient(colors: [Color.red.opacity(0.6), Color.orange.opacity(0.2), Color.clear],
+                                         startPoint: .center,
+                                         endPoint: .bottom))
+                    .frame(width: p.diameter, height: p.diameter)
+                    .position(x: p.centerX, y: 25)
             }
         }
         .frame(height: 100)

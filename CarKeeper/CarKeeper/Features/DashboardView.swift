@@ -41,18 +41,19 @@ struct DashboardView: View {
                 let history = store.energyHistory
                 if !history.isEmpty {
                     let last = Array(history.prefix(7))
-                    ForEach(last.indices, id: \.self) { i in
-                        let r = last[i]
-                        LineMark(
-                            x: .value("日期", r.timestamp),
-                            y: .value("SOC", CGFloat(r.soc))
-                        )
-                        .lineStyle(StrokeStyle(lineWidth: 2))
-                        .foregroundStyle(Theme.Colors.accent)
+                    Chart {
+                        ForEach(last.indices, id: \.self) { i in
+                            LineMark(
+                                x: .value("日期", last[i].timestamp),
+                                y: .value("SOC", Double(last[i].soc))
+                            )
+                            .lineStyle(StrokeStyle(lineWidth: 2))
+                            .foregroundStyle(Theme.Colors.accent)
+                        }
                     }
+                    .frame(height: 150)
+                    .glassCard()
                 }
-                .frame(height: 150)
-                .glassCard()
                 
                 // 驾驶评分
                 let score = store.drivingScore

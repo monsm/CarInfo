@@ -168,9 +168,9 @@ struct DevView: View {
                 // 系统填充色
                 ColorGroup(groupName: "系统填充色", items: [
                     ("systemFill",       Color(.systemFill),       "通用填充"),
-                    ("secondaryFill",    Color(.secondaryFill),    "次级填充"),
-                    ("tertiaryFill",     Color(.tertiaryFill),     "三级填充"),
-                    ("quaternaryFill",   Color(.quaternaryFill),   "四级填充"),
+                    ("secondaryFill",    Color(.secondarySystemFill),    "次级填充"),
+                    ("tertiaryFill",     Color(.tertiarySystemFill),     "三级填充"),
+                    ("quaternaryFill",   Color(.quaternarySystemFill),   "四级填充"),
                 ])
 
                 // 玻璃材质

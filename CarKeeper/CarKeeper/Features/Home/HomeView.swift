@@ -118,12 +118,7 @@ struct HomeView: View {
         .toolbar {
             // #19 分享按钮
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    shareStatus()
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .accessibilityLabel(Text("分享车况"))
+                shareToolbarButton
             }
         }
         .onChange(of: store.carId) { newId in
@@ -488,7 +483,7 @@ struct HomeView: View {
             // 速度 + 里程：流体数字字体，随容器宽度自动缩放
             MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: Theme.brand, fluidValue: true)
             MetricPill(icon: "gauge.full", value: mileCount > 0 ? String(mileCount) : d.mile, unit: "km", tint: Theme.Colors.accent, fluidValue: true)
-                .valuePulse(tint: Theme.Colors.accent, watchValue: pulseTrigger)
+                .valuePulse(tint: Theme.Colors.accent, watchValue: Binding(get: { pulseTrigger }, set: { _ in }))
         }            .padding(Theme.Spacing.xl)
             .dynamicTypeCompress()
             .glassCard(corner: 20)
@@ -1047,6 +1042,16 @@ struct HomeView: View {
                 try? await Task.sleep(for: .seconds(60))
             }
         }
+    }
+
+    /// 分享按钮（独立视图，避免巨型 ViewBuilder 类型检查超时）
+    private var shareToolbarButton: some View {
+        Button {
+            shareStatus()
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+        }
+        .accessibilityLabel(Text("分享车况"))
     }
 
     /// 切车涟漪自动消散（独立方法，避免巨型 ViewBuilder 类型检查超时）

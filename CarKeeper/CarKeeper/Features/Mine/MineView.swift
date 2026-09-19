@@ -200,13 +200,13 @@ struct MineView: View {
                 }
             }
             HStack(spacing: 12) {
-                if let bt = um.birthday, !bt.isEmpty {
+                if let bt = um?.birthday, !bt.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "calendar").font(Theme.micro).foregroundStyle(.secondary)
                         Text(bt).font(Theme.footnote).foregroundStyle(.secondary)
                     }
                 }
-                if let lt = um.lastLoginTime, !lt.isEmpty {
+                if let lt = um?.lastLoginTime, !lt.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "clock").font(Theme.micro).foregroundStyle(.secondary)
                         Text(lt).font(Theme.footnote).foregroundStyle(.secondary)

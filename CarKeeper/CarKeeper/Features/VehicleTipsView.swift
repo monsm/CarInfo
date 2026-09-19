@@ -7,81 +7,82 @@ import SwiftUI
 struct VehicleTipsView: View {
     private let store = AppStore.shared
     @State private var selectedCategory: TipCategory = .all
-    @State private var dismissedTips: Set<String> = UserDefaults.standard.stringArray(forKey: "dismissed_tips") ?? []
-    
-    enum TipCategory: String, CaseIterable, Identifiable {
-        case all = "全部"
-        case safety = "安全"
-        case efficiency = "节能"
-        case maintenance = "维保"
-        case weather = "天气"
-        var id: String { rawValue }
-    }
+    @State private var dismissedTips: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "dismissed_tips") ?? [])
     
     // 智能提示引擎
     var tips: [VehicleTip] {
         var result: [VehicleTip] = []
         
-        // 根据车况生成个性化建议
-        if let summary = store.carSummary {
-            if summary.socPct < 20 {
-                result.append(VehicleTip(
-                    category: .efficiency,
-                    icon: "bolt.fill",
-                    title: "电量较低",
-                    body: "当前SOC \(summary.socPct)%，建议尽快充电",
-                    action: "去充电",
-                    severity: .warning
-                ))
-            }
-            if summary.hasFault {
-                result.append(VehicleTip(
-                    category: .safety,
-                    icon: "exclamation.triangle.fill",
-                    title: "故障警告",
-                    body: "检测到 \(summary.faultCount) 个故障码，建议检查",
-                    action: "查看详情",
-                    severity: .critical
-                ))
-            }
-            if summary.doorOpen || summary.windowOpen {
-                result.append(VehicleTip(
-                    category: .safety,
-                    icon: "door.closed.fill",
-                    title: "门窗未关",
-                    body: "检测到车门或车窗未关闭，请及时处理",
-                    action: "远程关闭",
-                    severity: .warning
-                ))
-            }
-        }
-        
-        // 胎压检查
-        if let tyres = store.tyres, tyres.isEmpty == false {
-            let lowPressure = tyres.filter { $0.warn }
-            if !lowPressure.isEmpty {
-                result.append(VehicleTip(
-                    category: .safety,
-                    icon: "circle.fill",
-                    title: "胎压异常",
-                    body: "\(lowPressure.count)个轮胎胎压不足",
-                    action: "充气建议",
-                    severity: .warning
-                ))
-            }
-        }
-        
-        // 维保提醒
-        let kmToService = store.serviceReminder
-        if kmToService > 0 && kmToService < 1000 {
+        let cache = store.caches
+
+        // 电量
+        let energy = VM.energy(cache, store.car)
+        if energy.socPct < 20 {
             result.append(VehicleTip(
-                category: .maintenance,
-                icon: "wrench.fill",
-                title: "即将保养",
-                body: "距下次保养仅剩 \(kmToService) km",
-                action: "预约保养",
-                severity: .info
+                category: .efficiency,
+                icon: "bolt.fill",
+                title: "电量较低",
+                body: "当前SOC \(energy.socPct)%，建议尽快充电",
+                action: "去充电",
+                severity: .warning
             ))
+        }
+
+        // 故障码
+        let batt = batteryModel(cache)
+        if batt.faultTotal > 0 {
+            result.append(VehicleTip(
+                category: .safety,
+                icon: "exclamationmark.triangle.fill",
+                title: "故障警告",
+                body: "检测到 \(batt.faultTotal) 个故障码，建议检查",
+                action: "查看详情",
+                severity: .critical
+            ))
+        }
+
+        // 门窗
+        let control = ciVal(cache, "control")
+        let doorOpen = (ciNumber(control, ["Door"]) ?? 0) > 0
+        let windowOpen = (ciNumber(control, ["Window"]) ?? 0) > 0
+        if doorOpen || windowOpen {
+            result.append(VehicleTip(
+                category: .safety,
+                icon: "door.closed.fill",
+                title: "门窗未关",
+                body: "检测到车门或车窗未关闭，请及时处理",
+                action: "远程关闭",
+                severity: .warning
+            ))
+        }
+
+        // 胎压
+        let tyres = VM.tyreStatus(cache)
+        if tyres.warnAny {
+            let lowCount = tyres.items.filter { $0.warn }.count
+            result.append(VehicleTip(
+                category: .safety,
+                icon: "circle.fill",
+                title: "胎压异常",
+                body: "\(lowCount)个轮胎胎压不足",
+                action: "充气建议",
+                severity: .warning
+            ))
+        }
+
+        // 维保提醒（取最近一次保养周期）
+        if let next = ServiceReminderManager.shared.reminders.map({ $0.nextMileageKm }).min() {
+            let kmToService = Int(next) - store.totalMileage
+            if kmToService > 0 && kmToService < 1000 {
+                result.append(VehicleTip(
+                    category: .maintenance,
+                    icon: "wrench.fill",
+                    title: "即将保养",
+                    body: "距下次保养仅剩 \(kmToService) km",
+                    action: "预约保养",
+                    severity: .info
+                ))
+            }
         }
         
         // 天气相关
@@ -233,15 +234,17 @@ struct VehicleTipsView: View {
     
     // MARK: - 操作
     private func dismiss(_ tip: VehicleTip) {
-        var dismissed = dismissedTips
-        dismissed.insert(tip.id)
-        UserDefaults.standard.set(Array(dismissed), forKey: "dismissed_tips")
+        dismissedTips.insert(tip.id)
+        persistDismissed()
     }
     
     private func dismissAll() {
-        dismissedTips.forEach { id in
-            if let tip = tips.first(where: { $0.id == id }) { dismiss(tip) }
-        }
+        for tip in filteredTips { dismissedTips.insert(tip.id) }
+        persistDismissed()
+    }
+    
+    private func persistDismissed() {
+        UserDefaults.standard.set(Array(dismissedTips), forKey: "dismissed_tips")
     }
     
     private func handleAction(_ tip: VehicleTip) {
@@ -257,6 +260,16 @@ struct VehicleTipsView: View {
         }
         dismiss(tip)
     }
+}
+
+// MARK: - 提示分类
+enum TipCategory: String, CaseIterable, Identifiable {
+    case all = "全部"
+    case safety = "安全"
+    case efficiency = "节能"
+    case maintenance = "维保"
+    case weather = "天气"
+    var id: String { rawValue }
 }
 
 // MARK: - Vehicle Tip Model

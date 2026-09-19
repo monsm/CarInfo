@@ -57,7 +57,7 @@ final class AppStore: @unchecked Sendable {
     }
 
     // #16 维保里程记录（UserDefaults 持久化）
-    private static let lastServiceMileageKey = "carkeeper_last_service_mileage"
+    static let lastServiceMileageKey = "carkeeper_last_service_mileage"
     var lastServiceMileage: Int {
         get { UserDefaults.standard.integer(forKey: Self.lastServiceMileageKey) }
         set { UserDefaults.standard.set(newValue, forKey: Self.lastServiceMileageKey) }

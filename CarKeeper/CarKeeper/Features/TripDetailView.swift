@@ -13,6 +13,16 @@ extension Date {
     }
 }
 
+/// 时长格式化（行程详情用）
+enum DurationFormatter {
+    static func string(from interval: TimeInterval) -> String {
+        let total = max(0, Int(interval.rounded()))
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        return hours > 0 ? "\(hours) 小时 \(minutes) 分" : "\(minutes) 分钟"
+    }
+}
+
 struct TripDetailView: View {
     let store = AppStore.shared
     let trip: TripRecord
@@ -27,7 +37,7 @@ struct TripDetailView: View {
         return f
     }()
     
-    private let speedFormatter: MassFormatter = {
+    private let speedFormatter: NumberFormatter = {
         let f = NumberFormatter()
         f.numberStyle = .decimal
         f.maximumFractionDigits = 0
@@ -109,7 +119,7 @@ struct TripDetailView: View {
             Divider().opacity(0.3)
             
             HStack(spacing: 20) {
-                statItem(icon: "distance.walk", value: "\(trip.distanceKm, format: .number.precision(.significantDigits(3)))", unit: "km", label: "里程")
+                statItem(icon: "distance.walk", value: String(format: "%.1f", trip.distanceKm), unit: "km", label: "里程")
                 statItem(icon: "bolt.fill", value: "\(trip.socChange)%", unit: "", label: "SOC变化")
                 statItem(icon: "gauge.high", value: efficiencyText, unit: "", label: "能耗")
             }
@@ -195,7 +205,7 @@ struct TripDetailView: View {
                 .foregroundStyle(Theme.Colors.accent)
             VStack(alignment: .leading) {
                 Text(text).font(.caption2).foregroundStyle(.secondary)
-                Text(String(format: "%.4f, %.4f", coord.latitude, coord.longitude))
+                Text(String(format: "%.4f, %.4f", coord.coordinate.latitude, coord.coordinate.longitude))
                     .font(.caption2.monospaced())
                     .foregroundStyle(.tertiary)
             }
@@ -332,8 +342,8 @@ struct TripDetailView: View {
 ⏱️ 时长：\(DurationFormatter.string(from: max((trip.endTime ?? Date()).timeIntervalSince(trip.startTime), 1)))
 📍 \(trip.startTime, style: .date)
 """
-        NotificationCenter.default.post(name: .showToast, object: nil, userInfo: ["text": "行程已复制", "icon": "checkmark.circle.fill"])
         UIPasteboard.general.string = text
+        ToastManager.shared.show("行程已复制", icon: "checkmark.circle.fill")
     }
 }
 
@@ -366,7 +376,7 @@ struct MapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = Theme.Colors.accent
+                renderer.strokeColor = UIColor(Theme.Colors.accent)
                 renderer.lineWidth = 3
                 renderer.lineDashPattern = [6, 4]
                 return renderer
@@ -404,8 +414,9 @@ struct TripDetailView_Previews: PreviewProvider {
             TripDetailView(trip: TripRecord(
                 startTime: Date().addingTimeInterval(-7200),
                 endTime: Date(),
-                startSoc: 85, endSoc: 78,
                 distanceKm: 42.5,
+                startSoc: 85,
+                endSoc: 78,
                 avgEfficiency: 14.2
             ))
         }

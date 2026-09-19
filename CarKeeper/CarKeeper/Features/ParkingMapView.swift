@@ -69,6 +69,13 @@ struct ParkingMapView: View {
         .accessibilityLabel(Text("停车位置地图"))
     }
     
+    private var parkingTimeText: String {
+        guard let t = store.lastParkingTime else { return "未知时间" }
+        let f = DateFormatter()
+        f.dateFormat = "MM-dd HH:mm"
+        return f.string(from: t)
+    }
+    
     private func parkingInfoCard(_ loc: CLLocation) -> some View {
         VStack(spacing: 12) {
             HStack {
@@ -96,7 +103,7 @@ struct ParkingMapView: View {
             Divider().opacity(0.3)
             
             HStack(spacing: 12) {
-                infoChip(icon: "clock.fill", text: store.lastParkingTimeText)
+                infoChip(icon: "clock.fill", text: parkingTimeText)
                 infoChip(icon: "figure.walk", text: "\(Int(loc.horizontalAccuracy))m 精度")
             }
         }
@@ -134,7 +141,7 @@ struct ParkingMapView: View {
                                 Image(systemName: "mappin").foregroundStyle(Theme.Colors.accent)
                                 VStack(alignment: .leading) {
                                     Text(p.address ?? "未知位置").font(.subheadline)
-                                    Text(p.date, style: .date).font(.caption).foregroundStyle(.secondary)
+                                    Text(p.time, style: .date).font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
                             }

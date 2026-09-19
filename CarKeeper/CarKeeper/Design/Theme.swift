@@ -102,6 +102,9 @@ enum Theme {
     static let d1 = Font.system(size: 80, weight: .bold, design: .rounded)
     static let d2 = Font.system(size: 52, weight: .semibold, design: .rounded)
     static let d3 = Font.system(size: 34, weight: .medium, design: .rounded)
+    /// Hero 数字（行程/统计大数值）
+    static let heroNum = Font.system(size: 22, weight: .semibold, design: .rounded)
+
     static let d4 = Font.system(size: 26, weight: .semibold, design: .monospaced)
     static let d5 = Font.system(size: 20, weight: .semibold, design: .rounded)
 
@@ -186,12 +189,12 @@ enum Theme {
         // ---- 表面色（Surface）----
         static let background: Color = Color(.systemGroupedBackground)
         static let cardBg: Color = Color(.secondarySystemGroupedBackground)
-        static let overlay: Color = Color(.thinMaterial)
-        static let glass: Color = Color(.thinMaterial)      // 与 overlay 统一，深色模式可见度更好
+        static let overlay: Color = Color(Material.thinMaterial)
+        static let glass: Color = Color(Material.thinMaterial)   // 与 overlay 统一，深色模式可见度更好
 
         // ---- 文字色（Text）----
         static let primary: Color = Color(.label)
-        static let secondary: Color = Color(.secondary)
+        static let secondary: Color = Color(.secondaryLabel)
         static let tertiary: Color = Color(.tertiaryLabel)
         static let quaternary: Color = Color(.quaternaryLabel)
 
@@ -775,7 +778,9 @@ private struct PressGlow: View {
         ZStack {
             // 柔和光晕圆：跟随触摸点，尺寸随 press 状态放大
             Circle()
-                .fill(color?.opacity(glowOpacity).scaledToWidth(80 + (isPressed ? 40 : 0), of: size))
+                .fill(color?.opacity(glowOpacity) ?? .clear)
+                .frame(width: (80 + (isPressed ? 40 : 0)) / 390 * size.width,
+                       height: (80 + (isPressed ? 40 : 0)) / 390 * size.width)
                 .blur(radius: blurRadius)
                 .offset(x: glowCenter.x * size.width - size.width / 2,
                         y: glowCenter.y * size.height - size.height / 2)
@@ -831,7 +836,7 @@ struct PressFeedback: ViewModifier {
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .strokeBorder(
-                            glowColor?.opacity(isPressed ? glowIntensity * 0.5 : isHovered ? glowIntensity * 0.25 : 0),
+                            glowColor?.opacity(isPressed ? glowIntensity * 0.5 : isHovered ? glowIntensity * 0.25 : 0) ?? .clear,
                             lineWidth: isPressed ? 1.5 : isHovered ? 1.0 : 0
                         )
                 )
@@ -1034,7 +1039,7 @@ struct TyreCell: View {
                 Text(kpa)
                     .font(Theme.d4)
                     .foregroundStyle(cls == "bad" ? .red : .primary)
-                    .valuePulse(tint: barColor, watchValue: watchValue)
+                    .valuePulse(tint: barColor, watchValue: Binding(get: { watchValue }, set: { _ in }))
                 Text("kPa")
                     .font(Theme.micro)
                     .foregroundStyle(.secondary)
@@ -1663,8 +1668,6 @@ enum DynamicTypeScale {
             return 1.3
         case .accessibilityExtraExtraExtraLarge:
             return 1.5
-        case .accessibilityExtraExtraExtraExtraLarge:
-            return 1.7
         @unknown default:
             return 1.0
         }
@@ -1714,9 +1717,9 @@ struct DynamicTypeCompressModifier: ViewModifier {
     private var compressRatio: CGFloat {
         guard isCompressThreshold else { return 1.0 }
         switch size {
-        case .accessibilityMedium, .large, .extraLarge:
+        case .accessibility1, .large, .xLarge:
             return 0.75
-        case .accessibilityLarge:
+        case .accessibility2:
             return 0.60
         default:
             return 0.45
@@ -1740,7 +1743,7 @@ struct DynamicTypeTextCompressModifier: ViewModifier {
         guard size.isLargeOrBigger else { return 3 }
         if isTitle {
             switch size {
-            case .accessibilityMedium, .large, .extraLarge:
+            case .accessibility1, .large, .xLarge:
                 return 2
             default:
                 return 1
@@ -1776,7 +1779,7 @@ extension ContentSizeCategory {
         case .large, .extraLarge,
              .accessibilityMedium, .accessibilityLarge,
              .accessibilityExtraLarge, .accessibilityExtraExtraLarge,
-             .accessibilityExtraExtraExtraLarge, .accessibilityExtraExtraExtraExtraLarge:
+             .accessibilityExtraExtraExtraLarge:
             return true
         default:
             return false
@@ -1812,7 +1815,7 @@ extension ContentSizeCategory {
 #if swift(>=5.9)
 extension DynamicTypeSize {
     var isLargeOrBigger: Bool {
-        self != .xxSmall && self != .small
+        self != .xSmall && self != .small
     }
 }
 #endif
@@ -2083,7 +2086,7 @@ extension View {
 extension View {
     @ViewBuilder
     func reduceMotionIfRequired<V: View>(_ content: () -> V) -> some View {
-        if UIDevice.current.isReducingTransparency || UIAccessibility.isReduceMotionEnabled {
+        if UIAccessibility.isReduceTransparencyEnabled || UIAccessibility.isReduceMotionEnabled {
             content()
                 .animation(nil, value: 0)
         } else {
@@ -2166,7 +2169,7 @@ extension View {
 // 当省电模式开启时，禁用所有动画和背景任务
 // =============================================================================
 enum PowerSavingMode {
-    static var isEnabled: Bool { AppStore.shared.isPowerSaving }
+    static var isEnabled: Bool { UserDefaults.standard.bool(forKey: "carkeeper_power_saving") }
 
     static func animation(_ anim: Animation?) -> Animation? {
         isEnabled ? nil : anim
@@ -2391,12 +2394,15 @@ struct ChargingStationFinder: View {
         search.start { response, error in
             isLoading = false
             guard let response else { return }
+            let origin = CLLocation(latitude: 39.9042, longitude: 116.4074)
             stations = response.mapItems.prefix(10).map { item in
-                ChargingStation(
+                let meters = item.placemark.location?.distance(from: origin) ?? 0
+                let coord = item.placemark.coordinate
+                return ChargingStation(
                     name: item.name ?? "充电站",
-                    distance: "\(Int(item.distance / 1000)) km",
-                    address: item.thoroughfare ?? "未知地址",
-                    type: item.placemark.pointOfInterestCategory == .chargingStation ? "快充" : "慢充"
+                    distance: "\(Int(meters / 1000)) km",
+                    address: String(format: "%.4f, %.4f", coord.latitude, coord.longitude),
+                    type: item.pointOfInterestCategory == .chargingStation ? "快充" : "慢充"
                 )
             }
             showMap = true
@@ -2405,7 +2411,7 @@ struct ChargingStationFinder: View {
 }
 
 struct ChargingStationMapView: View {
-    let stations: [ChargingStation]
+    let stations: [ChargingStationFinder.ChargingStation]
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -2535,7 +2541,7 @@ struct MonthlyReportView: View {
         let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
         if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
             vc.popoverPresentationController?.sourceView = scene.windows.first
-            scene.windows.first?.present(vc, animated: true)
+            scene.windows.first?.rootViewController?.present(vc, animated: true)
         }
     }
     
@@ -2564,14 +2570,19 @@ struct MonthlyReportView: View {
     }
 }
 
-struct ReportSection: View {
+struct ReportSection<Content: View>: View {
     let title: String
-    let content: () -> View
-    
+    let content: Content
+
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title).font(Theme.h4).foregroundStyle(.secondary)
-            content()
+            content
         }
         .padding()
         .glassCard()
@@ -2664,9 +2675,9 @@ func calculateDriveBehaviorScore(_ cache: [String: Any?]) -> DriveBehaviorScore?
 enum HapticFeedback {
     /// 轻触反馈（用于按钮点击）
     static func lightTap() {
-        let engine = CHHapticEngine()
+        guard let engine = try? CHHapticEngine() else { return }
         do {
-            let pattern = try CHHapticEvent(eventType: .hapticContinuous, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3), relativeTime: 0, duration: 0.05)
+            let pattern = try CHHapticEvent(eventType: .hapticContinuous, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3)], relativeTime: 0, duration: 0.05)
             let event = try CHHapticPattern(events: [pattern], parameters: [])
             try engine.start()
             let player = try engine.makePlayer(with: event)
@@ -2678,10 +2689,10 @@ enum HapticFeedback {
 
     /// 成功反馈（用于操作成功）
     static func success() {
-        let engine = CHHapticEngine()
+        guard let engine = try? CHHapticEngine() else { return }
         do {
-            let event1 = try CHHapticEvent(eventType: .hapticLight, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5), relativeTime: 0, duration: 0.1)
-            let event2 = try CHHapticEvent(eventType: .hapticSoft, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3), relativeTime: 0.1, duration: 0.15)
+            let event1 = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5)], relativeTime: 0, duration: 0.1)
+            let event2 = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3)], relativeTime: 0.1, duration: 0.15)
             let pattern = try CHHapticPattern(events: [event1, event2], parameters: [])
             try engine.start()
             let player = try engine.makePlayer(with: pattern)
@@ -2693,11 +2704,11 @@ enum HapticFeedback {
 
     /// 警告反馈（用于告警）
     static func warning() {
-        let engine = CHHapticEngine()
+        guard let engine = try? CHHapticEngine() else { return }
         do {
-            let event1 = try CHHapticEvent(eventType: .hapticHard, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8), relativeTime: 0, duration: 0.15)
-            let event2 = try CHHapticEvent(eventType: .hapticLight, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6), relativeTime: 0.12, duration: 0.15)
-            let event3 = try CHHapticEvent(eventType: .hapticHard, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8), relativeTime: 0.24, duration: 0.15)
+            let event1 = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8)], relativeTime: 0, duration: 0.15)
+            let event2 = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6)], relativeTime: 0.12, duration: 0.15)
+            let event3 = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8)], relativeTime: 0.24, duration: 0.15)
             let pattern = try CHHapticPattern(events: [event1, event2, event3], parameters: [])
             try engine.start()
             let player = try engine.makePlayer(with: pattern)
@@ -2709,9 +2720,9 @@ enum HapticFeedback {
 
     /// 解锁反馈
     static func unlock() {
-        let engine = CHHapticEngine()
+        guard let engine = try? CHHapticEngine() else { return }
         do {
-            let event = try CHHapticEvent(eventType: .hapticSoft, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.4), relativeTime: 0, duration: 0.2)
+            let event = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.4)], relativeTime: 0, duration: 0.2)
             let pattern = try CHHapticPattern(events: [event], parameters: [])
             try engine.start()
             let player = try engine.makePlayer(with: pattern)
@@ -2721,9 +2732,9 @@ enum HapticFeedback {
 
     /// 锁车反馈
     static func lock() {
-        let engine = CHHapticEngine()
+        guard let engine = try? CHHapticEngine() else { return }
         do {
-            let event = try CHHapticEvent(eventType: .hapticLight, parameter: CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6), relativeTime: 0, duration: 0.15)
+            let event = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6)], relativeTime: 0, duration: 0.15)
             let pattern = try CHHapticPattern(events: [event], parameters: [])
             try engine.start()
             let player = try engine.makePlayer(with: pattern)

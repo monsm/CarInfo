@@ -103,10 +103,13 @@ class OfflineModeManager: ObservableObject {
             .sink { [weak self] reachable in
                 guard let self = self else { return }
                 self.isOffline = !reachable
-                self.offlineMessage = reachable ? "" : "网络连接已断开，显示缓存数据"
-                // 更新 AppStore 离线状态
-                AppStore.shared.isOfflineMode = !reachable
-                AppStore.shared.offlineMessage = self.offlineMessage
+                let message = reachable ? "" : "网络连接已断开，显示缓存数据"
+                self.offlineMessage = message
+                // 更新 AppStore 离线状态（AppStore 是 MainActor 隔离的）
+                Task { @MainActor in
+                    AppStore.shared.isOfflineMode = !reachable
+                    AppStore.shared.offlineMessage = message
+                }
             }
             .store(in: &cancellables)
     }

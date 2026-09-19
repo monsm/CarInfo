@@ -32,34 +32,8 @@ struct BatteryView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Spacing.cardSpacing) {
-                let cache = store.caches
-                let b = batteryModel(cache)
-                let e = VM.energy(cache, store.car)
-                socHero(e).staggeredEntrance(index: 0)
-                verdictCard(cache, b).staggeredEntrance(index: 1)
-                consistencyCard(b).staggeredEntrance(index: 2)
-                // E2 电池健康度 SOH
-                BatteryHealthCard(model: b).staggeredEntrance(index: 2)
-                // E7 充电功率曲线
-                ChargePowerChart(model: b).staggeredEntrance(index: 3)
-                chargeCard(b).staggeredEntrance(index: 4)
-                // #13 能耗历史折线图
-                // E26 充电效率趋势
-                ChargeEfficiencyTrend(store: store).staggeredEntrance(index: 3)
-                // E22 能耗对比柱状图
-                EnergyCompareChart(store: store).staggeredEntrance(index: 5)
-                energyHistoryChart.staggeredEntrance(index: 6)
-                subsystemCard(b).staggeredEntrance(index: 5)
-                motorCard(b).staggeredEntrance(index: 5)
-                faultCard(b).staggeredEntrance(index: 6)
-                // E56 SOC历史曲线
-                SOCHistoryChart(store: store).staggeredEntrance(index: 8)
-                // E3 胎压趋势折线图
-                TireTrendChart(checkRaw: store.caches["check"] as? [String: Any] ?? {}).staggeredEntrance(index: 10)
-                alarmCard(b).staggeredEntrance(index: 11)
+                sections
             }
-            
-            
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(Theme.pageGreen)
@@ -100,6 +74,35 @@ struct BatteryView: View {
                 PageErrorView(errText) { Task { await load() } }
             }
         }
+    }
+
+    // MARK: 卡片列表（独立 ViewBuilder，避免整个 body 类型检查超时）
+    @ViewBuilder
+    private var sections: some View {
+        let cache = store.caches
+        let b = batteryModel(cache)
+        let e = VM.energy(cache, store.car)
+        socHero(e).staggeredEntrance(index: 0)
+        verdictCard(cache, b).staggeredEntrance(index: 1)
+        consistencyCard(b).staggeredEntrance(index: 2)
+        // E2 电池健康度 SOH
+        BatteryHealthCard(model: b).staggeredEntrance(index: 2)
+        // E7 充电功率曲线
+        ChargePowerChart(model: b).staggeredEntrance(index: 3)
+        chargeCard(b).staggeredEntrance(index: 4)
+        // #13 能耗历史折线图 / E26 充电效率趋势
+        ChargeEfficiencyTrend(store: store).staggeredEntrance(index: 3)
+        // E22 能耗对比柱状图
+        EnergyCompareChart(store: store).staggeredEntrance(index: 5)
+        energyHistoryChart.staggeredEntrance(index: 6)
+        subsystemCard(b).staggeredEntrance(index: 5)
+        motorCard(b).staggeredEntrance(index: 5)
+        faultCard(b).staggeredEntrance(index: 6)
+        // E56 SOC历史曲线
+        SOCHistoryChart(store: store).staggeredEntrance(index: 8)
+        // E3 胎压趋势折线图
+        TireTrendChart(checkRaw: store.caches["check"] as? [String: Any] ?? [:]).staggeredEntrance(index: 10)
+        alarmCard(b).staggeredEntrance(index: 11)
     }
 
     // MARK: SOC Hero — Apple Watch 风格大圆环 + 入场动画 + 浮动粒子

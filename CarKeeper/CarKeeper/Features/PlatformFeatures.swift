@@ -88,8 +88,7 @@ struct SiriSuggestionProvider: AppIntent {
     var carId: String
     
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let dialog = "正在查看车辆状态..."
-        return .result(dialog: dialog)
+        return .result(dialog: "正在查看车辆状态...")
     }
 }
 
@@ -122,10 +121,7 @@ private struct DetailView: View {
 
 struct iPadSplitView: View {
     var body: some View {
-        SplitView {
-            SidebarView()
-            DetailView()
-        }
+        SplitView(sidebar: { SidebarView() }, detail: { DetailView() })
     }
 }
 

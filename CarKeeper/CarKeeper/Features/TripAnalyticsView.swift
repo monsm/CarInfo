@@ -85,9 +85,9 @@ struct TripAnalyticsView: View {
     // MARK: - 统计网格
     private var statsGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            statTile(icon: "speedometer", label: "总里程", value: "\(tripStats.totalKm, format: .number.precision(.significantDigits(4))) km", tint: .blue)
+            statTile(icon: "speedometer", label: "总里程", value: String(format: "%.1f", tripStats.totalKm) + " km", tint: .blue)
             statTile(icon: "car.fill", label: "行程数", value: "\(tripStats.totalTrips)", tint: .green)
-            statTile(icon: "gauge", label: "平均单次", value: "\(tripStats.avgKm, format: .number.precision(.significantDigits(3))) km", tint: .orange)
+            statTile(icon: "gauge", label: "平均单次", value: String(format: "%.1f", tripStats.avgKm) + " km", tint: .orange)
             if let eff = tripStats.avgEfficiency {
                 statTile(icon: "bolt.fill", label: "平均能耗", value: String(format: "%.1f", eff) + " kWh", tint: .purple)
             }
@@ -130,8 +130,8 @@ struct TripAnalyticsView: View {
             }
             .chartXAxis {
                 AxisMarks(values: .stride(by: .day, count: 2)) { _ in
-                    AxisGridLine.strokeBorder(lineWidth: 0.5)
-                    AxisTick().strokeBorder(lineWidth: 0.5)
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                    AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
 
                     AxisValueLabel(format: .dateTime.hour(.default(amPM: .narrow)).minute())
                 }
@@ -173,11 +173,11 @@ struct TripAnalyticsView: View {
                 ForEach(Array(0..<min(3, store.tripHistory.count)), id: \.self) { i in
                     let trip = store.tripHistory[i]
                     HStack {
-                        Text((i + 1)).font(.caption.monospaced()).foregroundStyle(.secondary)
+                        Text(String(i + 1)).font(.caption.monospaced()).foregroundStyle(.secondary)
                         VStack(alignment: .leading) {
-                            Text(trip.endTime.map { "\($0, style: .date)" } ?? "")
+                            Text(trip.endTime.map { $0.formatted(date: .abbreviated, time: .omitted) } ?? "")
                                 .font(.subheadline)
-                            Text("\(trip.distanceKm, format: .number.precision(.significantDigits(3))) km")
+                            Text(String(format: "%.1f", trip.distanceKm) + " km")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()

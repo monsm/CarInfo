@@ -360,35 +360,6 @@ struct HealthView: View {
         }
     }
 
-    // MARK: DTC 故障码翻译卡片 (#15)
-    @ViewBuilder
-    private func dtcTranslationCard(_ sys: HealthSystem) -> some View {
-        let hasDTC = sys.children.contains { $0.name.range(of: "P\\d", options: .regularExpression) != nil }
-        if hasDTC {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("故障码说明").font(Theme.caption).foregroundStyle(.secondary)
-            ForEach(sys.children.filter { $0.name.range(of: "P\\d", options: .regularExpression) != nil }) { item in
-                let dtcCode = item.name
-                let description = DTCDictionary.translate(dtcCode)
-                HStack {
-                    Text(dtcCode).font(Theme.mono).foregroundStyle(.orange)
-                    Spacer()
-                    Text(description).font(Theme.caption).foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
-            }
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.orange.opacity(0.2), lineWidth: 1))
-        .padding(.horizontal, 4)
-        .padding(.top, 4)
-        }
-    }
-
     // MARK: 数据加载
     private func loadIfNeeded() {
         guard model == nil || store.isCacheExpired("check") else { return }
@@ -418,6 +389,39 @@ struct HealthView: View {
             errText = error.localizedDescription
         }
     }
+
+// MARK: - #15 DTC 故障码翻译卡片（供 SystemRowView 复用）
+struct DTCCard: View {
+    let sys: HealthSystem
+
+    private var dtcItems: [HealthItem] {
+        sys.children.filter { $0.name.range(of: "P\\d", options: .regularExpression) != nil }
+    }
+
+    var body: some View {
+        if !dtcItems.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("故障码说明").font(Theme.caption).foregroundStyle(.secondary)
+                ForEach(dtcItems) { item in
+                    HStack {
+                        Text(item.name).font(Theme.mono).foregroundStyle(.orange)
+                        Spacer()
+                        Text(DTCDictionary.translate(item.name)).font(Theme.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+                }
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 8)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.orange.opacity(0.2), lineWidth: 1))
+            .padding(.horizontal, 4)
+            .padding(.top, 4)
+        }
+    }
+}
 
 // MARK: - 检测系统行（液态玻璃形变动效）
 struct SystemRowView: View {
@@ -465,7 +469,7 @@ struct SystemRowView: View {
                         }
                         // #15 DTC 故障码翻译提示
                         if sys.name.contains("故障") || sys.name.contains("DTC") {
-                            dtcTranslationCard(sys)
+                            DTCCard(sys: sys)
                         }
                     }
                     .padding(.leading, 22)

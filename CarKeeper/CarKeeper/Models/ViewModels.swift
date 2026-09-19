@@ -145,8 +145,8 @@ enum VM {
         // #1 充电倒计时：(100 - socPct) / power(kW) * 60 = 分钟
         var timeToFull: String? = nil
         if chargeSt == "1" || chargeSt == "2" {
-            if let pow = pow, pow > 0.1, socPct < 100 {
-                let minutes = Int(Double(100 - socPct) / pow * 60)
+            if let powerKw = pow, powerKw > 0.1, socPct < 100 {
+                let minutes = Int(Double(100 - socPct) / powerKw * 60)
                 if minutes > 0 {
                     let h = minutes / 60
                     let m = minutes % 60
@@ -160,7 +160,7 @@ enum VM {
         var avgCons: String? = nil
         if let r = Double(range), r > 0, socPct > 0 {
             // 百公里能耗 = socPct / range * 15 (假设电池容量约15kWh，估算)
-            let cons = (Double(socPct) / r * 15).rounded(to: 1)
+            let cons = (Double(socPct) / r * 15 * 10).rounded() / 10
             avgCons = "\(cons) kWh/100km"
             let hoursToEmpty = Int(r / 40.0)
             if hoursToEmpty > 0 {
@@ -479,24 +479,22 @@ enum VM {
         let parts = [s(c["ModelCode"]) ?? "", s(c["ConfName"]) ?? ""].filter { !$0.isEmpty }
         let vmodel = parts.isEmpty ? "--" : parts.joined(separator: " · ")
         // #16 维保里程提醒：从 control 缓存中读取当前里程，计算距下次保养剩余
-        let currentMileage = ciNumber(c, ["Mileage", "mileage", "TotalMileage"]).map { Int($0.rounded()) }
-        let lastService = AppStore.shared.lastServiceMileage
+        let mileageNow = ciNumber(c, ["Mileage", "mileage", "TotalMileage"]).map { Int($0.rounded()) }
+        let lastService = UserDefaults.standard.integer(forKey: AppStore.lastServiceMileageKey)
         let interval = AppStore.defaultServiceInterval
         var serviceReminder: String? = nil
-        if let里程 = currentMileage, 里程 > 0, lastService > 0 {
-            let remaining = interval - (里程 - lastService)
+        if let miles = mileageNow, miles > 0, lastService > 0 {
+            let remaining = interval - (miles - lastService)
             if remaining > 0 && remaining < 5000 {
                 serviceReminder = "下次保养：再跑 \(remaining) km"
             } else if remaining <= 0 {
                 serviceReminder = "已到保养里程！"
             }
-        } else if let里程 = currentMileage, 里程 > 0 {
+        } else if let miles = mileageNow, miles > 0 {
             // 首次设置：记录当前里程为上次保养里程
-            UserDefaults.standard.set(里程, forKey: AppStore.lastServiceMileageKey)
+            UserDefaults.standard.set(miles, forKey: AppStore.lastServiceMileageKey)
             serviceReminder = "\(interval) km 后保养"
         }
-        // #40 获取当前里程用于维保估算
-        let currentMileage = ciNumber(c, ["Mileage", "mileage", "TotalMileage"]).map { Int($0.rounded()) }
         
         return VehicleSummary(
             name: vname,
@@ -512,7 +510,7 @@ enum VM {
             serviceEnd: serviceEnd,
             serviceDays: daysUntil(c["TserviceEndtime"]),
             serviceReminder: serviceReminder,
-            mileage: currentMileage
+            mileage: mileageNow
         )
     }
 }

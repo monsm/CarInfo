@@ -510,7 +510,6 @@ struct MainTabView: View {
             .tag(0)
             .transaction { t in
                 t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
-                t.labelSize = .medium
             }
             .modifier(TabCardTransition(tabId: 0, isActive: nav.selectedTab == 0 && prevSelectedTab != 0))
             .onChange(of: nav.selectedTab) { newTab in
@@ -584,7 +583,6 @@ struct MainTabView: View {
             .tag(1)
             .transaction { t in
                 t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
-                t.labelSize = .medium
             }
             .modifier(TabCardTransition(tabId: 1, isActive: nav.selectedTab == 1 && prevSelectedTab != 1))
             .onChange(of: nav.selectedTab) { newTab in
@@ -640,7 +638,6 @@ struct MainTabView: View {
             .tag(2)
             .transaction { t in
                 t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
-                t.labelSize = .medium
             }
             .modifier(TabCardTransition(tabId: 2, isActive: nav.selectedTab == 2 && prevSelectedTab != 2))
             .onChange(of: nav.selectedTab) { newTab in
@@ -696,7 +693,6 @@ struct MainTabView: View {
             .tag(3)
             .transaction { t in
                 t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
-                t.labelSize = .medium
             }
             .modifier(TabCardTransition(tabId: 3, isActive: nav.selectedTab == 3 && prevSelectedTab != 3))
             .onChange(of: nav.selectedTab) { newTab in

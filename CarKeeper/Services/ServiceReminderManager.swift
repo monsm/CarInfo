@@ -5,7 +5,7 @@
 import Foundation
 import SwiftUI
 
-enum ServiceType: String, CaseIterable {
+enum ServiceType: String, CaseIterable, Codable {
     case oil = "机油保养"
     case filter = "空滤更换"
     case spark = "火花塞更换"

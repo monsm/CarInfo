@@ -37,16 +37,8 @@ struct VehicleView: View {
                 ScrollView {
                     VStack(spacing: Theme.Spacing.cardSpacing) {
                         plateCard(sum)
-                        ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
-                            CardBox(title: group.name) {
-                                VStack(spacing: 0) {
-                                    ForEach(Array(group.rows.enumerated()), id: \.offset) { idx, row in
-                                        KVRow(k: row.k, v: row.v)
-                                            .padding(.vertical, 8)
-                                        if idx < group.rows.count - 1 { ListDivider() }
-                                    }
-                                }
-                            }
+                        ForEach(groups.indices, id: \.self) { gi in
+                            groupCard(groups[gi])
                         }
                     }
                     
@@ -235,6 +227,18 @@ struct VehicleView: View {
     }
 
     // MARK: 档案分组（数据不变）
+    private func groupCard(_ group: Grp) -> some View {
+        CardBox(title: group.name) {
+            VStack(spacing: 0) {
+                ForEach(group.rows.indices, id: \.self) { idx in
+                    KVRow(k: group.rows[idx].k, v: group.rows[idx].v)
+                        .padding(.vertical, 8)
+                    if idx < group.rows.count - 1 { ListDivider() }
+                }
+            }
+        }
+    }
+
     private struct Row { let k: String; let v: String }
     private struct Grp { let name: String; let rows: [Row] }
 
@@ -274,7 +278,7 @@ struct VehicleView: View {
 
         let extra = [
             ("IsCaCar", "是否CA车辆", { let v = ciString(c, ["IsCaCar"]); return (v == "true" || v == "1") ? "是" : "否" }),
-            ("BindedJD", "绑定京东", { let v = ciBool(c, ["BindedJD"]); return v ? "已绑定" : "未绑定" }),
+            ("BindedJD", "绑定京东", { let v = ciBool(c, ["BindedJD"]); return (v ?? false) ? "已绑定" : "未绑定" }),
             ("RealnameAuthStatus", "实名认证", { let v = ciString(c, ["RealnameAuthStatus"]); return (v == "AUTHED" || v == "authed") ? "已认证" : "未认证" })
         ].compactMap { k, label, fn in
             let v = fn()

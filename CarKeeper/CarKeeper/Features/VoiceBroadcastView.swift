@@ -6,18 +6,18 @@ import Foundation
 import AVFoundation
 import SwiftUI
 
-class VoiceBroadcastManager: ObservableObject {
+class VoiceBroadcastManager: NSObject, ObservableObject {
     static let shared = VoiceBroadcastManager()
     
     @Published var isSpeaking: Bool = false
     @Published var currentMessage: String = ""
     
     private let synthesizer = AVSpeechSynthesizer()
+    override init() { super.init() }
     private var enabled: Bool {
         UserDefaults.standard.bool(forKey: "carkeeper_voice_enabled")
     }
     
-    private init() {}
     
     // N43 上车打卡语音播报
     func speakCheckIn(car: [String: Any]?) {
@@ -80,7 +80,7 @@ extension VoiceBroadcastManager: AVSpeechSynthesizerDelegate {
         DispatchQueue.main.async { self.isSpeaking = false }
     }
     
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didContinue utterance: AVSpeechUtterate) {
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didContinue utterance: AVSpeechUtterance) {
         DispatchQueue.main.async { self.isSpeaking = true }
     }
 }

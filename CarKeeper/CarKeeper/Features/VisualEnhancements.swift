@@ -23,8 +23,11 @@ struct ConfettiAnimation: View {
     }
     
     func spawnParticles() {
-        for i in 0..<50 {
-            particles.append(ConfettiParticle(index: i))
+        particles = (0..<50).map { ConfettiParticle(index: $0) }
+        withAnimation(.linear(duration: 2.5)) {
+            for i in particles.indices {
+                particles[i].animate()
+            }
         }
     }
 }
@@ -32,23 +35,26 @@ struct ConfettiAnimation: View {
 struct ConfettiParticle: Identifiable {
     let id = UUID()
     let index: Int
-    let color: Color = [.red, .blue, .green, .yellow, .purple, .orange][index % 6]
-    let size: CGFloat = CGFloat.random(in: 4...12)
-    var x: CGFloat = CGFloat.random(in: 100...300)
-    var y: CGFloat = -20
-    var opacity: Double = 1
+    let color: Color
+    let size: CGFloat
+    var x: CGFloat
+    var y: CGFloat
+    var opacity: Double
     
     init(index: Int) {
+        let palette: [Color] = [.red, .blue, .green, .yellow, .purple, .orange]
         self.index = index
-        animate()
+        self.color = palette[index % palette.count]
+        self.size = CGFloat.random(in: 4...12)
+        self.x = CGFloat.random(in: 100...300)
+        self.y = -20
+        self.opacity = 1
     }
     
-    func animate() {
-        withAnimation(.linear(duration: CGFloat.random(in: 1...3)).delay(Double(index) * 0.02)) {
-            y = CGFloat.random(in: 400...600)
-            x += CGFloat.random(in: -50...50)
-            opacity = 0
-        }
+    mutating func animate() {
+        y = CGFloat.random(in: 400...600)
+        x += CGFloat.random(in: -50...50)
+        opacity = 0
     }
 }
 
