@@ -642,16 +642,8 @@ struct ACHeroDisc: View {
                     .strokeBorder(Theme.brand.opacity(0.30), lineWidth: 1.5)
                     .frame(width: 80, height: 80)
 
-                // 第 5 层：温度数字（滚动计数）
-                VStack(spacing: 2) {
-                    Text("\(displayCount)")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(Theme.brand)
-                        .contentTransition(.numericText())
-                    Text("℃")
-                        .font(Theme.micro))
-                        .foregroundStyle(.secondary)
-                }
+                // 第 5 层：温度数字（流体字体，随容器宽度自动缩放）
+                FluidTempHero(String(displayCount))
             }
             .scaleEffect(isEntered ? 1.0 : 0.82)
             .opacity(isEntered ? 1.0 : 0.0)

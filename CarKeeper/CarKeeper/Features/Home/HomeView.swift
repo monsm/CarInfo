@@ -17,6 +17,8 @@ struct HomeView: View {
     @State private var socCount: Int = 0             // SOC数字滚动计数
     @State private var mileCount: Int = 0            // 里程数字滚动计数
     @State private var isRefreshing = false          // 下拉刷新标志（仅刷新时重播动画）
+    @State private var expandedDrive = false          // 车速里程行展开状态
+    @State private var expandedTyre = false           // 胎压卡展开状态
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     var body: some View {
@@ -46,12 +48,12 @@ struct HomeView: View {
             VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
                 greetingRow(energy)
                 socHero(energy)
-                driveMetricsRow(drive)
+                driveMetricsExpanded(drive)
                 carSelector
                 quickControl
                 domainCard(summary)
                 if hasData { batterySection(cache) }
-                tyreCard(tyre)
+                tyreCardExpanded(tyre)
                 comfortCard(comfort)
                 locationCard(loc)
                 footerNote(energy)
@@ -278,6 +280,36 @@ struct HomeView: View {
         .glassCard(corner: 20)
     }
 
+    // MARK: 车速里程展开卡（弹簧高度动画 + 玻璃压缩形变）
+    private func driveMetricsExpanded(_ d: DriveModel) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.35)) {
+                expandedDrive.toggle()
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                driveMetricsRow(d)
+                if expandedDrive {
+                    Divider().padding(.horizontal, Theme.Spacing.xl)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            MetricPill(icon: "gearshape.fill", value: d.gear, unit: d.gearSub, tint: .purple)
+                            MetricPill(icon: "thermometer.super", value: d.motorTemp, unit: "℃", tint: .orange)
+                        }
+                        if !d.batteryNote.isEmpty {
+                            Text(d.batteryNote).font(Theme.footnote)).foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.horizontal, Theme.Spacing.xl)
+                    .padding(.bottom, Theme.Spacing.lg)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(expandedDrive ? 0.98 : 1.0)
+        .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: expandedDrive)
+    }
+
     // MARK: 快控 - 2x2 网格大圆钮
     private var quickControl: some View {
         VStack(spacing: 12) {
@@ -471,6 +503,46 @@ struct HomeView: View {
                 .font(Theme.footnote)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
+    }
+
+    // MARK: 胎压展开卡（弹簧高度动画 + 玻璃压缩形变）
+    private func tyreCardExpanded(_ tyre: TyreModel) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.35)) {
+                expandedTyre.toggle()
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                tyreCard(tyre)
+                if expandedTyre {
+                    Divider().padding(.horizontal, Theme.Spacing.xl)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("胎压详情")
+                            .font(Theme.caption.bold())).foregroundStyle(.secondary)
+                        ForEach(tyre.items) { item in
+                            HStack {
+                                Text(item.label).font(Theme.footnote)).foregroundStyle(.primary)
+                                Spacer()
+                                HStack(spacing: 12) {
+                                    Label(item.kpa + " kPa", systemImage: "tire")
+                                        .font(Theme.caption)
+                                        .foregroundStyle(item.cls == "bad" ? .red : .primary)
+                                    Label(item.temp + " °C", systemImage: "thermometer")
+                                        .font(Theme.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            if item != tyre.items.last { ListDivider().padding(.leading, 4) }
+                        }
+                    }
+                    .padding(.horizontal, Theme.Spacing.xl)
+                    .padding(.bottom, Theme.Spacing.lg)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(expandedTyre ? 0.98 : 1.0)
+        .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: expandedTyre)
     }
 
     // MARK: 座舱

@@ -322,6 +322,39 @@ extension View {
     /// 双拍心跳脉冲效果（ECG 波形呼吸）
     func heartbeatPulse() -> some View { modifier(HeartbeatPulse()) }
 
+    // MARK: - Tab 整体玻璃容器
+    /// 为 Tab 根视图添加 Liquid Glass 全屏玻璃容器：
+    /// Material.thin 磨砂背景 + 顶部白色高光描边 + 柔和投影
+    /// 底部预留 TabBar 高度（约 116pt：50pt TabBar + 安全区），使卡片悬浮于 TabBar 之上
+    func tabGlassContainer() -> some View {
+        self
+            .background(
+                GeometryReader { geo in
+                    // 计算 TabBar 占用高度（iOS 标准 TabBar 50pt + 底部安全区约 66pt）
+                    let tabBarHeight: CGFloat = 116
+                    let contentHeight = max(0, geo.size.height - tabBarHeight)
+
+                    // 玻璃卡背景（从顶部延伸，底部与 TabBar 顶部对齐）
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .fill(Material.thin)
+                        .frame(width: geo.size.width, height: contentHeight)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.30), .white.opacity(0.06)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 1.0
+                                )
+                        )
+                        .shadow(color: .black.opacity(0.08), radius: 20, y: 4)
+                }
+                .ignoresSafeArea()
+            )
+    }
+
     // MARK: - 导航栏样式：iOS 27 Liquid Glass
     // inline 标题 + 玻璃材质背景 + 白色高光描边 + 强调色图标
     func navBarStyle() -> some View {
@@ -1042,6 +1075,29 @@ struct FluidScoreHero: View {
         FluidHeroFont(
             text,
             unit: "分",
+            minSize: minSize,
+            maxSize: maxSize
+        )
+    }
+}
+
+/// 流体温度数字（空调 HeroDisc 专用）
+/// 在 80pt 圆形容器内自适应缩放，最小 30pt / 最大 44pt
+struct FluidTempHero: View {
+    let text: String
+    let minSize: CGFloat
+    let maxSize: CGFloat
+
+    init(_ text: String, minSize: CGFloat = 30, maxSize: CGFloat = 44) {
+        self.text = text
+        self.minSize = minSize
+        self.maxSize = maxSize
+    }
+
+    var body: some View {
+        FluidHeroFont(
+            text,
+            unit: nil,
             minSize: minSize,
             maxSize: maxSize
         )
