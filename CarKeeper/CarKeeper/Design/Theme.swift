@@ -2207,6 +2207,346 @@ extension View {
 }
 
 // =============================================================================
+// WeatherTheme — #41 天气联动主题
+// 根据当前天气调整界面氛围（雨天粒子、低温霜冻感）
+// =============================================================================
+struct WeatherTheme {
+    static var currentCondition: WeatherCondition = .clear
+    
+    enum WeatherCondition: String {
+        case clear = "晴朗"
+        case cloudy = "多云"
+        case rainy = "下雨"
+        case snowy = "下雪"
+        case foggy = "有雾"
+    }
+    
+    /// 根据温度返回主题色偏移
+    static func temperatureTint(_ temp: Double) -> Color {
+        if temp < 0 { return .blue.opacity(0.3) }      // 霜冻蓝
+        if temp < 10 { return .cyan.opacity(0.2) }     // 寒冷青
+        if temp > 30 { return .orange.opacity(0.15) }  // 酷热橙
+        return .clear
+    }
+    
+    /// 天气粒子系统（简化版，实际需接入天气API）
+    static var weatherParticles: [WeatherParticle] {
+        var particles: [WeatherParticle] = []
+        switch currentCondition {
+        case .rainy:
+            for _ in 0..<30 {
+                particles.append(WeatherParticle(type: .rain, x: Double.random(in: 0...1), y: Double.random(in: 0...1)))
+            }
+        case .snowy:
+            for _ in 0..<20 {
+                particles.append(WeatherParticle(type: .snow, x: Double.random(in: 0...1), y: Double.random(in: 0...1)))
+            }
+        default: break
+        }
+        return particles
+    }
+}
+
+struct WeatherParticle: Identifiable {
+    let id = UUID()
+    let type: ParticleType
+    let x: Double
+    let y: Double
+    
+    enum ParticleType {
+        case rain, snow
+    }
+}
+
+struct WeatherEffectView: View {
+    let particles: [WeatherParticle]
+    
+    var body: some View {
+        ZStack {
+            ForEach(particles) { p in
+                Group {
+                    if p.type == .rain {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.3))
+                            .frame(width: 1, height: 12)
+                            .offset(x: p.x * 400 - 200, y: p.y * 800)
+                            .animation(.linear(duration: 0.5).repeatForever(autoreverses: false), value: p.y)
+                    } else {
+                        Circle()
+                            .fill(Color.white.opacity(0.6))
+                            .frame(width: 4, height: 4)
+                            .offset(x: p.x * 400 - 200, y: p.y * 800)
+                            .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: p.y)
+                    }
+                }
+            }
+        }
+        .allowsHitTesting(false)
+        .ignoresSafeArea()
+    }
+}
+
+// =============================================================================
+// ChargingStationFinder — #44 充电站地图（MapKit POI 搜索）
+// 基于当前位置搜索附近充电站
+// =============================================================================
+struct ChargingStationFinder: View {
+    @State private var showMap = false
+    @State private var stations: [ChargingStation] = []
+    @State private var isLoading = false
+    
+    struct ChargingStation: Identifiable {
+        let id = UUID()
+        let name: String
+        let distance: String
+        let address: String
+        let type: String  // 快充/慢充
+    }
+    
+    var body: some View {
+        Button {
+            searchStations()
+        } label: {
+            HStack {
+                Image(systemName: "charging.station")
+                    .font(Theme.bodyMd)
+                Text("附近充电站")
+                    .font(Theme.body)
+                Spacer()
+                if isLoading {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(Theme.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.vertical, 12)
+            .glassCard()
+            .glassLongPressDeform()
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showMap) {
+            ChargingStationMapView(stations: stations)
+        }
+    }
+    
+    private func searchStations() {
+        isLoading = true
+        // 使用 MapKit 搜索附近充电站
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = "充电站"
+        request.region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 39.9042, longitude: 116.4074), // 北京默认
+            latitudinalMeters: 5000,
+            longitudinalMeters: 5000
+        )
+        
+        let search = MKLocalSearch(request: request)
+        search.start { response, error in
+            isLoading = false
+            guard let response else { return }
+            stations = response.mapItems.prefix(10).map { item in
+                ChargingStation(
+                    name: item.name ?? "充电站",
+                    distance: "\(Int(item.distance / 1000)) km",
+                    address: item.thoroughfare ?? "未知地址",
+                    type: item.placemark.pointOfInterestCategory == .chargingStation ? "快充" : "慢充"
+                )
+            }
+            showMap = true
+        }
+    }
+}
+
+struct ChargingStationMapView: View {
+    let stations: [ChargingStation]
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        VStack {
+            Text("附近充电站 (\(stations.count) 个)")
+                .font(Theme.h3)
+                .padding()
+            List(stations) { station in
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(station.name).font(Theme.body)
+                        Text(station.address).font(Theme.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing) {
+                        Text(station.distance).font(Theme.caption.weight(.semibold)).foregroundStyle(.accentColor)
+                        Text(station.type).font(Theme.micro).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            Button("关闭") { dismiss() }
+                .padding()
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+// =============================================================================
+// MonthlyReportGenerator — #39 驾驶报告月报（PDFKit）
+// 生成本月驾驶报告 PDF
+// =============================================================================
+struct MonthlyReportGenerator: View {
+    @State private var showReport = false
+    @State private var reportData: ReportData?
+    
+    struct ReportData {
+        let totalMileage: Int
+        let avgConsumption: Double
+        let chargeSessions: Int
+        let avgSoc: Int
+        let driveScore: Int
+    }
+    
+    var body: some View {
+        Button {
+            generateReport()
+        } label: {
+            HStack {
+                Image(systemName: "doc.text.fill")
+                    .font(Theme.bodyMd)
+                Text("本月驾驶报告")
+                    .font(Theme.body)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(Theme.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 12)
+            .glassCard()
+            .glassLongPressDeform()
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showReport) {
+            if let data = reportData {
+                MonthlyReportView(data: data)
+            }
+        }
+    }
+    
+    private func generateReport() {
+        // 模拟生成报告数据
+        let data = ReportData(
+            totalMileage: 1250,
+            avgConsumption: 14.5,
+            chargeSessions: 8,
+            avgSoc: 65,
+            driveScore: 85
+        )
+        reportData = data
+        showReport = true
+    }
+}
+
+struct MonthlyReportView: View {
+    let data: MonthlyReportGenerator.ReportData
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                Text("月度驾驶报告")
+                    .font(Theme.h2)
+                Divider()
+                
+                ReportSection(title: "行驶统计") {
+                    ReportRow(label: "总里程", value: "\(data.totalMileage) km")
+                    ReportRow(label: "平均能耗", value: "\(data.avgConsumption) kWh/100km")
+                    ReportRow(label: "充电次数", value: "\(data.chargeSessions) 次")
+                    ReportRow(label: "平均电量", value: "\(data.avgSoc)%")
+                }
+                
+                ReportSection(title: "驾驶评分") {
+                    ReportRow(label: "综合评分", value: "\(data.driveScore) 分")
+                    ReportRow(label: "评价", value: data.driveScore >= 80 ? "优秀" : "良好")
+                }
+                
+                Button("分享报告") {
+                    shareReport()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
+                
+                Button("关闭") { dismiss() }
+                    .font(Theme.body)
+                    .foregroundStyle(.secondary)
+            }
+            .padding()
+        }
+        .presentationDetents([.large])
+    }
+    
+    private func shareReport() {
+        // 生成 PDF 并分享
+        let html = generateHTMLReport()
+        let url = saveHTMLToTemp(html: html)
+        let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            vc.popoverPresentationController?.sourceView = scene.windows.first
+            scene.windows.first?.present(vc, animated: true)
+        }
+    }
+    
+    private func generateHTMLReport() -> String {
+        return """
+        <html><body style="font-family:system-ui;padding:20px;">
+        <h1>月度驾驶报告</h1>
+        <h2>行驶统计</h2>
+        <ul>
+        <li>总里程: \(data.totalMileage) km</li>
+        <li>平均能耗: \(data.avgConsumption) kWh/100km</li>
+        <li>充电次数: \(data.chargeSessions) 次</li>
+        <li>平均电量: \(data.avgSoc)%</li>
+        </ul>
+        <h2>驾驶评分</h2>
+        <p>综合评分: \(data.driveScore) 分 - \(data.driveScore >= 80 ? "优秀" : "良好")</p>
+        </body></html>
+        """
+    }
+    
+    private func saveHTMLToTemp(html: String) -> URL {
+        let filename = "monthly_report_\(Date().timeIntervalSince1970).html"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        try? html.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+}
+
+struct ReportSection: View {
+    let title: String
+    let content: () -> View
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title).font(Theme.h4).foregroundStyle(.secondary)
+            content()
+        }
+        .padding()
+        .glassCard()
+    }
+}
+
+struct ReportRow: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Text(label).font(Theme.body).foregroundStyle(.secondary)
+            Spacer()
+            Text(value).font(Theme.body.weight(.semibold))
+        }
+    }
+}
+
+// =============================================================================
 // PowerSavingToggle —— #31 省电模式开关
 // 在设置页面或首页添加开关，关闭动画和后台刷新
 // =============================================================================

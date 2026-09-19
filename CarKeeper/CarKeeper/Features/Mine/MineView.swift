@@ -219,6 +219,11 @@ struct MineView: View {
                     .glassCard()
                     .glassLongPressDeform()
                 }
+                // #44 充电站地图入口
+                ChargingStationFinder()
+                    .padding(.horizontal, 4)
+                // #39 月度驾驶报告入口
+                MonthlyReportGenerator()
             }
         }
     }

@@ -193,6 +193,18 @@ final class AppStore: @unchecked Sendable {
 
     // #21 冷启动预加载：App 启动时异步预取核心数据
     private var preloadTask: Task<Void, Never>? = nil
+    
+    // #28 Dynamic Island / Live Activity 状态
+    var isCharging: Bool {
+        guard let charge = caches["charge"] as? [String: Any] else { return false }
+        let status = charge["ChrgStatus"] as? String ?? ""
+        return status == "1" || status == "2"
+    }
+    var chargingProgress: Double {
+        guard let charge = caches["charge"] as? [String: Any] else { return 0 }
+        let soc = Double(charge["RemainPower"] as? String ?? "0") ?? 0
+        return min(1.0, max(0.0, soc / 100.0))
+    }
 
     func bootstrap() async {
         let api = APIClient.shared

@@ -79,6 +79,13 @@ struct HomeView: View {
         .scrollBounceBehavior(.basedOnSize)
         .milestoneCelebration(mileage: mileCount)
         .pageBackground(.accentColor)
+        .overlay(alignment: .top) {
+            // #41 天气联动主题 - 雨天粒子效果
+            if WeatherTheme.currentCondition == .rainy {
+                WeatherEffectView(particles: WeatherTheme.weatherParticles)
+                    .opacity(0.3)
+            }
+        }
         .navigationTitle("车况").navBarStyle()
         .toolbar {
             // #19 分享按钮
