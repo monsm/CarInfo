@@ -39,6 +39,13 @@ struct HomeView: View {
     @State private var showSearch = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    // #NEW-4 上车打卡提示按钮（抽出为独立 @ViewBuilder，降低 body 的类型推断压力）
+    @ViewBuilder
+    private var checkInAlertButtons: some View {
+        Button(action: { store.checkIn() }, label: { Text("已上车，检查车况") })
+        Button(role: .cancel, action: {}, label: { Text("稍后再说") })
+    }
+
     var body: some View {
         Group {
             if let cfg = TokenStore.read(), !cfg.accessToken.isEmpty {
@@ -138,8 +145,7 @@ struct HomeView: View {
         }
         .onAppear { startPolling(); startSocAnimation(); startMileAnimation(); tyreWatchValue = UUID().uuidString }
         .alert("上车打卡", isPresented: $showCheckInReminder) {
-            Button("已上车，检查车况") { store.checkIn() }
-            Button("稍后再说", role: .cancel) {}
+            checkInAlertButtons
         } message: {
             Text("今天还没检查车况，建议上车前确认胎压、电量是否正常。")
         }

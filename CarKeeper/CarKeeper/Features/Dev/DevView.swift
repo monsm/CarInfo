@@ -173,13 +173,13 @@ struct DevView: View {
                     ("quaternaryFill",   Color(.quaternarySystemFill),   "四级填充"),
                 ])
 
-                // 玻璃材质
+                // 玻璃材质（Material 不能直接当 Color 预览，这里用等同的近似色展示）
                 ColorGroup(groupName: "玻璃材质", items: [
-                    ("thin",       Material.thin,       "卡片材质（默认）"),
-                    ("prominent",  Material.prominent,  "模态背景"),
-                    ("ultraThin",  Material.ultraThin,  "极淡材质"),
-                    ("sidebar",    Material.sidebar,    "侧栏背景"),
-                    ("content",    Material.content,    "内容背景"),
+                    ("thin",       Theme.ColorSystem.overlay,      "卡片材质（默认）"),
+                    ("regular",    Theme.ColorSystem.glass,        "常规材质"),
+                    ("ultraThin",  Theme.ColorSystem.fillSubtle,   "极淡材质"),
+                    ("bar",        Theme.ColorSystem.background,   "导航栏背景"),
+                    ("content",    Theme.ColorSystem.cardBg,       "内容背景"),
                 ])
 
                 // 页面背景色

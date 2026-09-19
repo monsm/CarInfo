@@ -145,7 +145,7 @@ enum VM {
         // #1 充电倒计时：(100 - socPct) / power(kW) * 60 = 分钟
         var timeToFull: String? = nil
         if chargeSt == "1" || chargeSt == "2" {
-            if let powerKw = pow, powerKw > 0.1, socPct < 100 {
+            if let powerKw = ciNumber(charge, ["ChargPower", "ChargingPower"]), powerKw > 0.1, socPct < 100 {
                 let minutes = Int(Double(100 - socPct) / powerKw * 60)
                 if minutes > 0 {
                     let h = minutes / 60

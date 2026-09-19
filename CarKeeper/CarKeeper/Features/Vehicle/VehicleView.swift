@@ -22,6 +22,11 @@ struct VehicleView: View {
         return Int(mileageStr)
     }
 
+    /// 车辆数据解析失败时的重试入口
+    private func reloadVehicle() {
+        Task { await store.fetchVehicleData() }
+    }
+
     var body: some View {
         Group {
             if isLoading {
@@ -52,7 +57,7 @@ struct VehicleView: View {
                 }
             } else {
                 // 兜底：car 数据解析失败
-                PageErrorView("车辆数据解析失败，请重新进入页面") { _ in }
+                PageErrorView("车辆数据解析失败，请重新进入页面") { reloadVehicle() }
             }
         }
         .pageBackground(Theme.Colors.accent)

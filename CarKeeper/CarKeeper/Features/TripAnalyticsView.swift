@@ -133,7 +133,7 @@ struct TripAnalyticsView: View {
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                     AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
 
-                    AxisValueLabel(format: .dateTime.hour(.default(amPM: .narrow)).minute())
+                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
                 }
             }
             .frame(height: 160)

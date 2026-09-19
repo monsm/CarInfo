@@ -97,9 +97,10 @@ targets:
     type: bundle
     platform: watchOS
     sources:
-    - path: WatchApp/
-      excludes:
-      - '**/.*'
+    # 只编译扩展自身的两个文件；WatchApp/WatchApp/Sources 属于 WatchKitApp target，
+    # 若整个目录递归收录会出现同名类型重复声明。
+    - path: WatchApp/WatchApp.swift
+    - path: WatchApp/ComplicationController.swift
     info:
       path: WatchApp/Info.plist
       properties:

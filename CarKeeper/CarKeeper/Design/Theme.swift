@@ -189,8 +189,8 @@ enum Theme {
         // ---- 表面色（Surface）----
         static let background: Color = Color(.systemGroupedBackground)
         static let cardBg: Color = Color(.secondarySystemGroupedBackground)
-        static let overlay: Color = Color(Material.thinMaterial)
-        static let glass: Color = Color(Material.thinMaterial)   // 与 overlay 统一，深色模式可见度更好
+        static let overlay: Color = Color(.systemBackground).opacity(0.82)
+        static let glass: Color = Color(.systemBackground).opacity(0.82)   // 与 overlay 统一，深色模式可见度更好
 
         // ---- 文字色（Text）----
         static let primary: Color = Color(.label)
@@ -786,7 +786,7 @@ private struct PressGlow: View {
                         y: glowCenter.y * size.height - size.height / 2)
             // 边缘高光描边（跟随手指，press 时更亮）
             Circle()
-                .stroke(color?.opacity(isPressed ? intensity : isHovered ? intensity * 0.45 : 0),
+                .stroke(color?.opacity(isPressed ? intensity : isHovered ? intensity * 0.45 : 0) ?? .clear,
                         lineWidth: isPressed ? 2.2 : isHovered ? 1.4 : 0)
                 .frame(width: isPressed ? 72 : 56, height: isPressed ? 72 : 56)
                 .offset(x: glowCenter.x * size.width - size.width / 2,
@@ -1049,7 +1049,7 @@ struct TyreCell: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(Color.systemGray5)
+                        .fill(Color(.systemGray5))
                         .frame(height: 4)
                     RoundedRectangle(cornerRadius: 2, style: .continuous)
                         .fill(barColor.opacity(0.8))
@@ -1660,7 +1660,9 @@ extension View {
 enum DynamicTypeScale {
     static func factor(for size: ContentSizeCategory) -> CGFloat {
         switch size {
-        case .medium, .large, .extraLarge, .accessibilityMedium, .accessibilityLarge:
+        case .extraSmall, .small, .medium, .large, .extraLarge,
+             .extraExtraLarge, .extraExtraExtraLarge,
+             .accessibilityMedium, .accessibilityLarge:
             return 1.0
         case .accessibilityExtraLarge:
             return 1.15
@@ -2402,7 +2404,7 @@ struct ChargingStationFinder: View {
                     name: item.name ?? "充电站",
                     distance: "\(Int(meters / 1000)) km",
                     address: String(format: "%.4f, %.4f", coord.latitude, coord.longitude),
-                    type: item.pointOfInterestCategory == .chargingStation ? "快充" : "慢充"
+                    type: item.pointOfInterestCategory == .evCharger ? "快充" : "慢充"
                 )
             }
             showMap = true

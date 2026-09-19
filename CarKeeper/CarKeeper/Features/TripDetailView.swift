@@ -340,7 +340,7 @@ struct TripDetailView: View {
 🔋 SOC变化：\(trip.socChange)%
 ⚡ 能耗：\(efficiencyText)
 ⏱️ 时长：\(DurationFormatter.string(from: max((trip.endTime ?? Date()).timeIntervalSince(trip.startTime), 1)))
-📍 \(trip.startTime, style: .date)
+📍 出发：\(trip.startTime.formatted(date: .numeric, time: .omitted))
 """
         UIPasteboard.general.string = text
         ToastManager.shared.show("行程已复制", icon: "checkmark.circle.fill")
