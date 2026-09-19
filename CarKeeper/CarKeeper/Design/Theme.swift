@@ -408,6 +408,8 @@ struct GlassLongPressDeformModifier: ViewModifier {
     private let holdScale: CGFloat = 0.94
 
     func body(content: Content) -> some View {
+        // 深色模式下使用 accentColor 折射光，浅色模式使用白色光
+        let glowTint: Color = Color.red == .accentColor ? .white : .accentColor
         content
             .scaleEffect(pressScale)
             .animation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0.35), value: pressScale)
@@ -416,12 +418,12 @@ struct GlassLongPressDeformModifier: ViewModifier {
                     .fill(Color.clear)
                     .strokeBorder(
                         LinearGradient(
-                            colors: [.white.opacity(glowOpacity * 0.45), .white.opacity(glowOpacity * 0.08)],
+                            colors: [glowTint.opacity(glowOpacity * 0.45), glowTint.opacity(glowOpacity * 0.08)],
                             startPoint: .topLeading, endPoint: .bottomTrailing
                         ),
                         lineWidth: glowOpacity * 1.5
                     )
-                    .shadow(color: .white.opacity(glowOpacity * 0.25), radius: glowOpacity * 10, y: 0)
+                    .shadow(color: glowTint.opacity(glowOpacity * 0.25), radius: glowOpacity * 10, y: 0)
             )
             .onTapGesture(count: 1) { }  // 占位，确保手势接收
             .simultaneousGesture(
@@ -606,12 +608,36 @@ struct ExpandingCardBox<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     @State private var isExpanded = false
+    @State private var tapCount = 0
+    @State private var lastTapTime: Date? = nil
 
     private var chevronAngle: Angle { isExpanded ? .degrees(90) : .degrees(0) }
+    /// 双击标题行时批量切换所有子卡片的展开状态
+    private func onDoubleTap() {
+        let now = Date()
+        if let last = lastTapTime, now.timeIntervalSince(last) < 0.35 {
+            // 双击：切换所有子卡片的展开状态（反向）
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.35)) {
+                isExpanded.toggle()
+            }
+            tapCount = 0
+            lastTapTime = nil
+        } else {
+            tapCount = 1
+            lastTapTime = now
+            // 延迟 0.4s 重置（如未触发双击则视为单tap）
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                if self.tapCount == 1 {
+                    self.tapCount = 0
+                    self.lastTapTime = nil
+                }
+            }
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // ── 标题行（可点击，带液态玻璃按压反馈）──
+            // ── 标题行（单击展开/收起；双击批量切换）──
             Button {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.35)) {
                     isExpanded.toggle()
@@ -954,6 +980,7 @@ struct TyreCell: View {
     let temp: String
     let cls: String
     let minSafePressure: Double
+    var watchValue: String = ""  // B7: 数值变化脉冲触发器
     var body: some View {
         let pressurePercent = min(1.0, max(0.0,
             (Double(kpa) ?? 220) - minSafePressure) / (280 - minSafePressure))
@@ -976,6 +1003,7 @@ struct TyreCell: View {
                 Text(kpa)
                     .font(Theme.d4)
                     .foregroundStyle(cls == "bad" ? .red : .primary)
+                    .valuePulse(tint: barColor, watchValue: watchValue)
                 Text("kPa")
                     .font(Theme.micro)
                     .foregroundStyle(.secondary)

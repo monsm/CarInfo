@@ -12,7 +12,9 @@ struct BatteryView: View {
     @State private var socProgress: CGFloat = 0      // SOC圆环进度 0→socPct
     @State private var socCardOpacity: CGFloat = 0   // SOC卡片入场淡入
     @State private var socCount: Int = 0             // SOC数字滚动计数
+    @State private var rangeCount: Int = 0            // B2: 续航数字滚动计数
     @State private var isRefreshing = false          // 下拉刷新涟漪标志
+    @State private var switchingCar = false           // 切换车辆涟漪标志
     @State private var pulseTrigger: String = ""      // 触发数值脉冲高亮（SOC 变化时更新）
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
@@ -37,6 +39,7 @@ struct BatteryView: View {
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground(Theme.pageGreen)
         .navigationTitle("电池与充电")
+        .glassSwitchRipple(isSwitching: $switchingCar)
             .navBarStyle()
             .accessibilityLabel(Text("电池与充电"))
             .accessibilityHint(Text("电池状态、充电历史与诊断报告"))
@@ -44,6 +47,13 @@ struct BatteryView: View {
         .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { isRefreshing = true; await load(); isRefreshing = false }
         .glassRefreshRipple(isRefreshing: $isRefreshing)
+        .onChange(of: store.carId) { newId in
+            guard !newId.isEmpty else { return }
+            switchingCar = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeOut(duration: 0.3)) { switchingCar = false }
+            }
+        }
         .overlay(alignment: .center) {
             if !loaded && errText.isEmpty {
                 PageLoadingView("正在同步电池数据…")
@@ -109,7 +119,7 @@ struct BatteryView: View {
             // 续航 + 充电状态
             HStack(spacing: 14) {
                 MetricPill(icon: "point.topleft.down.curvedto.point.bottomright.up",
-                           value: e.range == "--" ? "--" : e.range, unit: "km", tint: .green)
+                           value: e.range == "--" ? "--" : (rangeCount > 0 ? String(rangeCount) : e.range), unit: "km", tint: .green, fluidValue: true)
                 MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accentColor)
             }
             Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5)))")
@@ -120,6 +130,7 @@ struct BatteryView: View {
         .dynamicTypeCompress()
         .glassHeroCard()
         .glassLongPressDeform()
+        .runningGlow(color: .green)
         .opacity(socCardOpacity)
         .valuePulse(tint: .green)
     }
@@ -392,6 +403,15 @@ struct BatteryView: View {
             withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
                 socProgress = CGFloat(target)
                 pulseTrigger = String(target)
+            }
+        }
+        // B2: 续航数字滚动计数
+        let rangeTarget = Int(e.range) ?? 0
+        if rangeTarget > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
+                    rangeCount = rangeTarget
+                }
             }
         }
     }

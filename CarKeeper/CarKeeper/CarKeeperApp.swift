@@ -87,11 +87,7 @@ final class NavState: ObservableObject, @unchecked Sendable {
     /// - Parameters:
     ///   - link: 目标深潜页
     ///   - targetTab: 目标 Tab 索引（nil = 保持当前 Tab）
-    ///   - paths: 各 Tab 的路径绑定（调用方传入 $controlPath / $messagesPath / $minePath）
-    func pushNavigation(_ link: Deeplink, targetTab: Int? = nil,
-                        controlPath: inout [Deeplink],
-                        messagesPath: inout [Deeplink],
-                        minePath: inout [Deeplink]) {
+    func pushNavigation(_ link: Deeplink, targetTab: Int? = nil) {
         // 先切换到目标 Tab（如有）
         if let t = targetTab { selectedTab = t }
         // 根据当前 Tab 写入对应路径
@@ -370,6 +366,10 @@ struct MainTabView: View {
     @State private var controlPath:  [Deeplink] = []
     @State private var messagesPath: [Deeplink] = []
     @State private var minePath:     [Deeplink] = []
+    // NavBar 液态玻璃反光扫过相位（周期性动画）
+    @State private var navBarSweepPhase: CGFloat = 0
+    // 定时刷新反射扫过相位
+    private let sweepTimer = Timer.publish(every: 4, on: .main, in: .common).autoconnect()
 
     var body: some View {
         TabView(selection: $nav.selectedTab) {
@@ -395,6 +395,27 @@ struct MainTabView: View {
                         }
                     }
                     .navigationBarBackButtonHidden()
+                    // D1: NavBar 液态玻璃反光扫过
+                    .overlay(alignment: .top) {
+                        if navBarSweepPhase > 0 {
+                            LinearGradient(colors: [.clear, .white.opacity(0.06 * navBarSweepPhase), .white.opacity(0.10 * navBarSweepPhase), .white.opacity(0.06 * navBarSweepPhase), .clear],
+                                           startPoint: .leading, endPoint: .trailing)
+                            .frame(height: 44)
+                            .offset(x: navBarSweepPhase * UIScreen.main.bounds.width - UIScreen.main.bounds.width / 2)
+                        }
+                    }
+                    .gesture(
+                        // C2: swipe-to-back 手势（从左边滑出触发返回）
+                        DragGesture(minimumDistance: 50, coordinateSpace: .global)
+                            .onEnded { v in
+                                if v.startLocation.x < 30 && v.location.x > v.startLocation.x + 50 {
+                                    // 从左侧向右滑动，触发返回
+                                    var newPath = nav.path
+                                    if !newPath.isEmpty { newPath.removeLast() }
+                                    nav.path = newPath
+                                }
+                            }
+                    )
             }
             .transaction { t in
                 t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
@@ -438,6 +459,24 @@ struct MainTabView: View {
                         }
                     }
                     .navigationBarBackButtonHidden()
+                    .overlay(alignment: .top) {
+                        if navBarSweepPhase > 0 {
+                            LinearGradient(colors: [.clear, .white.opacity(0.06 * navBarSweepPhase), .white.opacity(0.10 * navBarSweepPhase), .white.opacity(0.06 * navBarSweepPhase), .clear],
+                                           startPoint: .leading, endPoint: .trailing)
+                            .frame(height: 44)
+                            .offset(x: navBarSweepPhase * UIScreen.main.bounds.width - UIScreen.main.bounds.width / 2)
+                        }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 50, coordinateSpace: .global)
+                            .onEnded { v in
+                                if v.startLocation.x < 30 && v.location.x > v.startLocation.x + 50 {
+                                    var newPath = controlPath
+                                    if !newPath.isEmpty { newPath.removeLast() }
+                                    controlPath = newPath
+                                }
+                            }
+                    )
             }
             .transaction { t in
                 t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
@@ -481,6 +520,24 @@ struct MainTabView: View {
                         }
                     }
                     .navigationBarBackButtonHidden()
+                    .overlay(alignment: .top) {
+                        if navBarSweepPhase > 0 {
+                            LinearGradient(colors: [.clear, .white.opacity(0.06 * navBarSweepPhase), .white.opacity(0.10 * navBarSweepPhase), .white.opacity(0.06 * navBarSweepPhase), .clear],
+                                           startPoint: .leading, endPoint: .trailing)
+                            .frame(height: 44)
+                            .offset(x: navBarSweepPhase * UIScreen.main.bounds.width - UIScreen.main.bounds.width / 2)
+                        }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 50, coordinateSpace: .global)
+                            .onEnded { v in
+                                if v.startLocation.x < 30 && v.location.x > v.startLocation.x + 50 {
+                                    var newPath = messagesPath
+                                    if !newPath.isEmpty { newPath.removeLast() }
+                                    messagesPath = newPath
+                                }
+                            }
+                    )
             }
             .transaction { t in
                 t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
@@ -524,6 +581,24 @@ struct MainTabView: View {
                         }
                     }
                     .navigationBarBackButtonHidden()
+                    .overlay(alignment: .top) {
+                        if navBarSweepPhase > 0 {
+                            LinearGradient(colors: [.clear, .white.opacity(0.06 * navBarSweepPhase), .white.opacity(0.10 * navBarSweepPhase), .white.opacity(0.06 * navBarSweepPhase), .clear],
+                                           startPoint: .leading, endPoint: .trailing)
+                            .frame(height: 44)
+                            .offset(x: navBarSweepPhase * UIScreen.main.bounds.width - UIScreen.main.bounds.width / 2)
+                        }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 50, coordinateSpace: .global)
+                            .onEnded { v in
+                                if v.startLocation.x < 30 && v.location.x > v.startLocation.x + 50 {
+                                    var newPath = minePath
+                                    if !newPath.isEmpty { newPath.removeLast() }
+                                    minePath = newPath
+                                }
+                            }
+                    )
             }
             .transaction { t in
                 t.animation = .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
@@ -551,6 +626,12 @@ struct MainTabView: View {
                 lastAnnouncedTab = newTab
                 let label = NavState.tabAccessibilityLabels[newTab] ?? "Tab \(newTab)"
                 UIAccessibility.post(notification: .announcement, argument: "已切换到\(label)页")
+            }
+        }
+        // NavBar 反光扫过定时器
+        .onReceive(sweepTimer) { _ in
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
+                navBarSweepPhase = 1.0
             }
         }
         // 设置 TabView 整体无障碍描述和朗读顺序

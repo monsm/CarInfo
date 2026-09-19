@@ -17,6 +17,7 @@ struct MineView: View {
     @State private var shareSheetFlag = false
     @State private var isRefreshing = false     // 下拉刷新标志（触发玻璃涟漪动效）
     @State private var isChecking = false        // OTA 检查中（不含下载）
+    @EnvironmentObject var nav: NavState            // C3: 用于 pushNavigation
 
     // MARK: 生命周期
     var body: some View {
@@ -184,16 +185,16 @@ struct MineView: View {
         CardBox(title: "常用功能") {
             VStack(spacing: 12) {
                 HStack(spacing: 10) {
-                    tile("shield.lefthalf.filled", "健康报告", tint: .green) { post(.navToHealth) }
-                    tile("battery.100", "电池充电", tint: .green) { post(.navToBattery) }
+                    tile("shield.lefthalf.filled", "健康报告", tint: .green) { nav.pushNavigation(.health, targetTab: 0) }
+                    tile("battery.100", "电池充电", tint: .green) { nav.pushNavigation(.battery, targetTab: 0) }
                 }
                 HStack(spacing: 10) {
-                    tile("chart.bar.xaxis", "全量数据", tint: .indigo) { post(.navToData) }
-                    tile("doc.text.fill", "车辆档案", tint: .orange) { post(.navToVehicle) }
+                    tile("chart.bar.xaxis", "全量数据", tint: .indigo) { nav.pushNavigation(.data, targetTab: 0) }
+                    tile("doc.text.fill", "车辆档案", tint: .orange) { nav.pushNavigation(.vehicle, targetTab: 0) }
                 }
                 HStack(spacing: 10) {
-                    tile("bubble.left.fill", "消息中心", tint: .blue) { post(.navToMessages) }
-                    tile("wrench.adjustable", "开发者工具", tint: .purple) { post(.navToDev) }
+                    tile("bubble.left.fill", "消息中心", tint: .blue) { nav.pushNavigation(.messages, targetTab: 2) }
+                    tile("wrench.adjustable", "开发者工具", tint: .purple) { nav.pushNavigation(.dev, targetTab: 0) }
                 }
             }
         }

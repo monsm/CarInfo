@@ -38,6 +38,7 @@ struct ControlView: View {
     // lastResult 由 resultSheet 直接使用，保留
     @State private var tempDisplayCount: Int = 0   // HeroDisc 温度数字滚动计数（0→pendingTemp）
     @State private var isRefreshing = false         // 下拉刷新涟漪标志
+    @EnvironmentObject var nav: NavState            // C3: 用于 pushNavigation
 
     struct RunState: Identifiable {
         let id: Int
@@ -567,6 +568,8 @@ struct HeroDiscButton: View {
     let appearDelay: CGFloat
     let action: () -> Void
     @State private var isEntered = false
+    @State private var isPressed = false
+    @State private var iconRotation: Angle = .degrees(0)
 
     var body: some View {
         Button(action: action) {
@@ -593,22 +596,36 @@ struct HeroDiscButton: View {
                     Circle()
                         .strokeBorder(Theme.brand.opacity(0.30), lineWidth: 1.5)
                         .frame(width: 80, height: 80)
-                    // 第 5 层：图标
+                    // 第 5 层：图标（按压时旋转 + 颜色反转）
                     Image(systemName: symbol)
                         .font(Theme.d3))
-                        .foregroundStyle(Theme.brand)
+                        .foregroundStyle(isPressed ? .white : Theme.brand)
+                        .rotationEffect(iconRotation)
                 }
                 .opacity(disabled ? 0.45 : 1)
                 .animation(.easeInOut(duration: 0.2), value: disabled)
                 Text(name)
                     .font(Theme.h4)))
-                    .foregroundStyle(disabled ? .secondary : .primary)
+                    .foregroundStyle(isPressed ? .white : (disabled ? .secondary : .primary))
             }
         }
         .buttonStyle(.plain)
         .disabled(disabled)
         .accessibilityLabel(Text(name))
         .accessibilityHint(Text(disabled ? "此功能当前不可用" : "点击" + name + "控制车辆"))
+        // 按压时图标旋转 + 文字颜色反转
+        .onTapGesture {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6, blendDuration: 0.2)) {
+                iconRotation = .degrees(symbol.contains("lock") ? -30 : 0)
+                isPressed = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.65, blendDuration: 0.25)) {
+                    iconRotation = .degrees(0)
+                    isPressed = false
+                }
+            }
+        }
         // 入场动画：交错淡入 + 缩放回弹
         .opacity(isEntered ? 1 : 0)
         .scaleEffect(isEntered ? 1.0 : 0.85)
@@ -627,6 +644,16 @@ struct ACHeroDisc: View {
     @State private var isEntered = false
     @State private var pulseTrigger: String = ""
 
+    // B4: 温度渐变颜色（低温蓝→高温红，16~32℃映射）
+    private var tempGradientColor: Color {
+        let t = Double(pendingTemp)
+        if t <= 18 { return .blue }
+        if t <= 24 { return .cyan }
+        if t <= 28 { return .green }
+        if t <= 30 { return .yellow }
+        return .orange
+    }
+
     var body: some View {
         VStack(spacing: 10) {
             ZStack {
@@ -640,14 +667,14 @@ struct ACHeroDisc: View {
                     .blur(radius: 3)
                     .heartbeatPulse()
 
-                // 第 2 层：底色填充
+                // 第 2 层：底色填充（B4: 随温度渐变：低温蓝→高温红）
                 Circle()
-                    .fill(Theme.brand.opacity(0.08))
+                    .fill(tempGradientColor.opacity(0.10))
                     .frame(width: 92, height: 92)
 
                 // 第 3 层：中层填充
                 Circle()
-                    .fill(Theme.brand.opacity(0.12))
+                    .fill(tempGradientColor.opacity(0.15))
                     .frame(width: 80, height: 80)
 
                 // 第 4 层：清晰边框

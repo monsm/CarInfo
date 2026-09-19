@@ -8,6 +8,7 @@ struct MessagesView: View {
     @State private var expanded: Set<String> = []
     @State private var loadTask: Task<Void, Never>? = nil
     @State private var isRefreshing = false            // 下拉刷新涟漪标志
+    @EnvironmentObject var nav: NavState                // C3: 用于 pushNavigation
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     // 本地已读持久化（无服务端 mark-read 接口，用 UserDefaults 记已读消息 ID）。

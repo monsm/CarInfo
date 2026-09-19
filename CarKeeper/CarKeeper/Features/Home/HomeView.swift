@@ -20,6 +20,7 @@ struct HomeView: View {
     @State private var pulseTrigger: String = ""      // 触发数值脉冲高亮（SOC / 里程变化时更新）
     @State private var expandedDrive = false          // 车速里程行展开状态
     @State private var expandedTyre = false           // 胎压卡展开状态
+    @State private var tyreWatchValue: String = ""    // B7: 胎压数值变化脉冲触发器
     @State private var switchingCar = false           // 切换车辆涟漪标志
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
@@ -85,6 +86,8 @@ struct HomeView: View {
             }
             // 切换车辆时触发全屏玻璃涟漪扩散动效
             switchingCar = true
+            // B7: 胎压数值变化脉冲
+            tyreWatchValue = UUID().uuidString
         }
         .onChange(of: switchingCar) { switching in
             guard switching else { return }
@@ -95,7 +98,7 @@ struct HomeView: View {
                 }
             }
         }
-        .onAppear { startPolling(); startSocAnimation(); startMileAnimation() }
+        .onAppear { startPolling(); startSocAnimation(); startMileAnimation(); tyreWatchValue = UUID().uuidString }
         .onDisappear {
             startTimer?.cancel()
             startTimer = nil
@@ -180,8 +183,8 @@ struct HomeView: View {
             HStack(spacing: 16) {
                 MetricPill(icon: "point.topleft.down.curvedto.point.bottomright.up",
                            value: e.range == "--" ? "--" : e.range,
-                           unit: "km", tint: .green)
-                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accentColor)
+                           unit: "km", tint: .green, fluidValue: true)
+                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accentColor, fluidValue: true)
             }
             // 在线状态
             Text(e.online.text)
@@ -193,6 +196,7 @@ struct HomeView: View {
         .dynamicTypeCompress()
         .glassHeroCard()
         .glassLongPressDeform()
+        .runningGlow(color: .green)
         .opacity(socCardOpacity)
         .valuePulse(tint: .green)
     }
@@ -279,9 +283,14 @@ struct HomeView: View {
         let reason: String
     }
 
-    // MARK: 车速里程行
+    // MARK: 车速里程行（带 EKG 波形背景）
     private func driveMetricsRow(_ d: DriveModel) -> some View {
-        HStack(spacing: 12) {
+        ZStack(alignment: .leading) {
+            // EKG 波形背景（微透明流动描边，模拟速度波动）
+            EKGFloRingDynamic(size: 200, lineWidth: 1.0, speed: 4.0, percentage: min(1.0, max(0.0, Double(d.speed) / 200)))
+                .opacity(0.18)
+                .allowsHitTesting(false)
+            HStack(spacing: 12) {
             if !d.fireStatus.isEmpty {
                 let fCls = d.fireStatus == "启动" ? "bad" : "ok"
                 VStack(spacing: 2) {
@@ -296,11 +305,11 @@ struct HomeView: View {
             MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: Theme.brand, fluidValue: true)
             MetricPill(icon: "gauge.full", value: mileCount > 0 ? String(mileCount) : d.mile, unit: "km", tint: .accentColor, fluidValue: true)
                 .valuePulse(tint: .accentColor, watchValue: pulseTrigger)
+        }            .padding(Theme.Spacing.xl)
+            .dynamicTypeCompress()
+            .glassCard(corner: 20)
+            .glassLongPressDeform()
         }
-        .padding(Theme.Spacing.xl)
-        .dynamicTypeCompress()
-        .glassCard(corner: 20)
-        .glassLongPressDeform()
     }
 
     // MARK: 车速里程展开卡（弹簧高度动画 + 玻璃压缩形变）
@@ -393,9 +402,9 @@ struct HomeView: View {
         }
     }
 
-    // MARK: 状态域
+    // MARK: 状态域（可展开）
     private func domainCard(_ summary: Summary) -> some View {
-        CardBox(title: "车辆状态", side: summary.overall.title, sideCls: summary.overall.cls) {
+        ExpandingCardBox(title: "车辆状态", side: summary.overall.title, sideCls: summary.overall.cls, cornerRadius: 20) {
             VStack(spacing: 2) {
                 let rows = summary.domains.filter { $0.key != "service" }
                 ForEach(Array(rows.enumerated()), id: \.element.id) { idx, d in
@@ -533,7 +542,8 @@ struct HomeView: View {
                                 GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 ForEach(tyre.items) { item in
                     TyreCell(label: item.label, kpa: item.kpa, temp: item.temp,
-                             cls: item.cls, minSafePressure: 200)
+                             cls: item.cls, minSafePressure: 200,
+                             watchValue: tyreWatchValue)
                 }
             }
             Text("温度 \(tyre.tempRange)")
@@ -557,7 +567,7 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("胎压详情")
                             .font(Theme.caption.bold())).foregroundStyle(.secondary)
-                        ForEach(tyre.items) { item in
+                        ForEach(Array(tyre.items.enumerated()), id: \.element.id) { idx, item in
                             HStack {
                                 Text(item.label).font(Theme.footnote)).foregroundStyle(.primary)
                                 Spacer()
@@ -570,6 +580,11 @@ struct HomeView: View {
                                         .foregroundStyle(.secondary)
                                 }
                             }
+                            // 行级交错滑入
+                            .offset(y: idx > 0 ? (expandedTyre ? 0 : 8) : 0)
+                            .opacity(idx > 0 ? (expandedTyre ? 1 : 0) : 1)
+                            .scaleEffect(idx > 0 ? (expandedTyre ? 1.0 : 0.96) : 1.0)
+                            .animation(.spring(response: 0.45, dampingFraction: 0.65, blendDuration: 0.25).delay(Double(idx) * 0.05), value: expandedTyre)
                             if item != tyre.items.last { ListDivider().padding(.leading, 4) }
                         }
                     }
@@ -594,10 +609,10 @@ struct HomeView: View {
         }
     }
 
-    // MARK: 座舱
+    // MARK: 座舱（可展开，含空调/净化器/PM2.5 详情）
     private func comfortCard(_ comfort: ComfortModel) -> some View {
-        CardBox(title: "座舱", side: comfort.acText.isEmpty ? "--" : (comfort.acCls == "ok" ? "空调运行中" : "空调关闭"),
-                sideCls: comfort.acCls == "ok" ? "ok" : "na") {
+        ExpandingCardBox(title: "座舱", side: comfort.acText.isEmpty ? "--" : (comfort.acCls == "ok" ? "空调运行中" : "空调关闭"),
+                sideCls: comfort.acCls == "ok" ? "ok" : "na", cornerRadius: 20) {
             VStack(spacing: 10) {
                 HStack(spacing: 10) {
                     StatTile(icon: "thermometer.medium", label: "车内温度", value: comfort.cabinTemp == "--" ? "--" : String(comfort.cabinTemp.dropLast()), unit: "℃", tint: .orange)
@@ -614,9 +629,9 @@ struct HomeView: View {
         }
     }
 
-    // MARK: 位置
+    // MARK: 位置（可展开，含地图 + 导航按钮）
     private func locationCard(_ loc: LocModel) -> some View {
-        CardBox(title: "位置", side: loc.deg != "--" ? loc.dir : nil) {
+        ExpandingCardBox(title: "位置", side: loc.deg != "--" ? loc.dir : nil, cornerRadius: 20) {
             VStack(alignment: .leading, spacing: 10) {
                 if showMap {
                     LocationMapViewPlaceholder(addr: loc.addr, lat: loc.lat, lng: loc.lng)
@@ -740,9 +755,10 @@ struct HomeView: View {
         if isRefreshing {
             // 下拉刷新：重置并重播 SOC + 里程入场动画
             isRefreshing = false
-            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0; socCount = 0; mileCount = 0; pulseTrigger = "" }
+            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0; socCount = 0; mileCount = 0; pulseTrigger = ""; tyreWatchValue = "" }
             startSocAnimation()
             startMileAnimation()
+            tyreWatchValue = UUID().uuidString
         }
     }
 }

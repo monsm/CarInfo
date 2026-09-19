@@ -110,6 +110,7 @@ struct HealthView: View {
         } label: {
             VStack(spacing: 0) {
                 scoreHero(m)
+                    .runningGlow(color: .green)
                 // 展开内容区：系统列表弹簧高度过渡
                 if heroExpanded {
                     systemList(m)
@@ -517,5 +518,6 @@ struct SystemChildRow: View {
             }
         }
         .frame(height: nil, alignment: .leading)
+        .liquidGlassRipple(cornerRadius: Theme.Radius.small)
     }
 }
