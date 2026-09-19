@@ -16,6 +16,9 @@ struct BatteryView: View {
     @State private var isRefreshing = false          // 下拉刷新涟漪标志
     @State private var switchingCar = false           // 切换车辆涟漪标志
     @State private var pulseTrigger: String = ""      // 触发数值脉冲高亮（SOC 变化时更新）
+    @State private var showDestinationCalc = false
+    @State private var destinationDistance: String = ""
+    @State private var canReach: Bool?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     var body: some View {
@@ -50,6 +53,20 @@ struct BatteryView: View {
         .refreshable { isRefreshing = true; await load(); isRefreshing = false }
         .glassRefreshRipple(isRefreshing: $isRefreshing)
         .refreshProgressRing(progress: $isRefreshing)
+        .toolbar {
+            // #20 目的地续航计算器入口
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showDestinationCalc = true
+                } label: {
+                    Image(systemName: "map.pin")
+                }
+                .accessibilityLabel(Text("目的地续航计算"))
+            }
+        }
+        .sheet(isPresented: $showDestinationCalc) {
+            DestinationCalculatorView(distance: $destinationDistance, canReach: $canReach)
+        }
         .onChange(of: store.carId) { newId in
             guard !newId.isEmpty else { return }
             switchingCar = true
@@ -513,6 +530,64 @@ struct BatteryView: View {
                 await MainActor.run { AppStore.shared.logout() }
             }
         }
+    }
+}
+
+// MARK: - #20 目的地续航计算器
+struct DestinationCalculatorView: View {
+    @Binding var distance: String
+    @Binding var canReach: Bool?
+    @Environment(\.dismiss) private var dismiss
+    private let store = AppStore.shared
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("目的地续航计算").font(Theme.h3).foregroundStyle(.primary)
+            Text("输入目的地距离，估算当前电量是否足够到达")
+                .font(Theme.caption).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            TextField("目的地距离 (km)", text: $distance)
+                .keyboardType(.decimalPad)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(.thin, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1))
+
+            if let reach = canReach {
+                HStack {
+                    Image(systemName: reach ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(reach ? .green : .red)
+                    Text(reach ? "电量足够到达" : "电量不足，建议充电")
+                        .font(Theme.body.weight(.semibold))
+                        .foregroundStyle(reach ? .green : .red)
+                }
+                .padding()
+                .background(reach ? .green.opacity(0.1) : .red.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+            }
+
+            Button("计算") {
+                calculateReach()
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.accentColor)
+
+            Button("取消") { dismiss() }
+                .font(Theme.body)
+                .foregroundStyle(.secondary)
+        }
+        .padding(Theme.Spacing.xxl)
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.hidden)
+    }
+
+    private func calculateReach() {
+        guard let dist = Double(distance), dist > 0 else { return }
+        let e = VM.energy(store.caches, store.car)
+        // 保守估算：续航 * 0.85（考虑空调、路况等损耗）
+        let effectiveRange = e.socPct > 0 ? Int(Double(e.socPct) / 100.0 * Double(Int(e.range) ?? 0) * 0.85) : 0
+        canReach = effectiveRange >= Int(dist)
     }
 }
 

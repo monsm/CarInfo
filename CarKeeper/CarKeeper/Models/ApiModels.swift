@@ -361,6 +361,10 @@ struct VehicleSummary {
     var insuranceDays: Int?
     var serviceEnd: String
     var serviceDays: Int?
+    // #16 维保提醒
+    var serviceReminder: String? = nil
+    // #40 维保价格估算
+    var mileage: Int? = nil  // 当前里程
 }
 
 struct FaultItem: Identifiable {

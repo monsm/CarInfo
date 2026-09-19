@@ -196,6 +196,29 @@ struct MineView: View {
                     tile("bubble.left.fill", "消息中心", tint: .blue) { nav.pushNavigation(.messages, targetTab: 2) }
                     tile("wrench.adjustable", "开发者工具", tint: .purple) { nav.pushNavigation(.dev, targetTab: 0) }
                 }
+                // #31 省电模式
+                PowerSavingToggle()
+                    .padding(.horizontal, 4)
+                // #45 驾驶行为评分
+                if let score = calculateDriveBehaviorScore(store.caches) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("驾驶行为评分").font(Theme.h4)
+                            Text("急加速 \(score.aggressiveAccel) 次 · 急刹车 \(score.harshBrake) 次")
+                                .font(Theme.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("\(score.score)")
+                                .font(Theme.d4).foregroundStyle(score.color)
+                            Text(score.label)
+                                .font(Theme.caption).foregroundStyle(score.color)
+                        }
+                    }
+                    .padding(16)
+                    .glassCard()
+                    .glassLongPressDeform()
+                }
             }
         }
     }

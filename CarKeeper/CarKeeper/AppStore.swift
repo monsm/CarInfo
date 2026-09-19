@@ -53,6 +53,10 @@ final class AppStore: @unchecked Sendable {
     }
     static let defaultServiceInterval: Int = 10000  // 默认保养间隔 10000 km
 
+    // #40 维保价格估算
+    static let servicePriceEstimate: Int = 800  // 默认保养价格 800 元
+    static let majorServicePriceEstimate: Int = 2500  // 大保养价格 2500 元
+
     // #13 能耗历史（每次刷新记录 SOC + range）
     struct EnergyRecord: Identifiable {
         let id = UUID()

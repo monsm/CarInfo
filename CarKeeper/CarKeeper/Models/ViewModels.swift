@@ -495,6 +495,9 @@ enum VM {
             UserDefaults.standard.set(里程, forKey: AppStore.lastServiceMileageKey)
             serviceReminder = "\(interval) km 后保养"
         }
+        // #40 获取当前里程用于维保估算
+        let currentMileage = ciNumber(c, ["Mileage", "mileage", "TotalMileage"]).map { Int($0.rounded()) }
+        
         return VehicleSummary(
             name: vname,
             plate: vplate.isEmpty ? "未上牌" : vplate,
@@ -508,7 +511,8 @@ enum VM {
             insuranceDays: daysUntil(c["InsuranceEndDate"]),
             serviceEnd: serviceEnd,
             serviceDays: daysUntil(c["TserviceEndtime"]),
-            serviceReminder: serviceReminder
+            serviceReminder: serviceReminder,
+            mileage: currentMileage
         )
     }
 }

@@ -80,6 +80,17 @@ struct HomeView: View {
         .milestoneCelebration(mileage: mileCount)
         .pageBackground(.accentColor)
         .navigationTitle("车况").navBarStyle()
+        .toolbar {
+            // #19 分享按钮
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    shareStatus()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .accessibilityLabel(Text("分享车况"))
+            }
+        }
         .onChange(of: store.carId) { newId in
             guard !newId.isEmpty else { return }
             withAnimation(.easeInOut(duration: 0.08)) {
@@ -114,7 +125,7 @@ struct HomeView: View {
     // MARK: 问候行
     private func greetingRow(_ e: EnergyModel) -> some View {
         let hour = Calendar.current.component(.hour, from: Date())
-        let greeting = hour < 6 ? "🌙 深夜了" : hour < 12 ? "☀️ 上午好" : hour < 18 ? "☀️ 下午好" : "🌙 晚上好"
+        let greeting = localizedGreeting
         let dateStr = DateFormatter.relative(Date())
         return HStack {
             Text(greeting)
@@ -722,9 +733,45 @@ struct HomeView: View {
 
     // #3 数据新鲜度徽章 — 返回缓存时间戳
     private func freshnessTimestamp(for key: String) -> Date? {
-        // 缓存时间戳存储在 AppStore 私有变量中，通过 needsRefresh 反推
-        // 这里简化处理：直接返回 lastFetch
         lastFetch
+    }
+
+    // #36 多语言国际化
+    private var localizedGreeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let lang = Locale.current.languageCode ?? "zh"
+        switch lang {
+        case "en":
+            return hour < 6 ? "🌙 Good Night" : hour < 12 ? "☀️ Good Morning" : hour < 18 ? "☀️ Good Afternoon" : "🌙 Good Evening"
+        default:
+            return hour < 6 ? "🌙 深夜了" : hour < 12 ? "☀️ 上午好" : hour < 18 ? "☀️ 下午好" : "🌙 晚上好"
+        }
+    }
+
+    // #19 车况快照分享
+    private func shareStatus() {
+        let e = VM.energy(store.caches, store.car)
+        let tyre = VM.tyreStatus(store.caches)
+        let comfort = VM.comfortStatus(store.caches)
+        let summary = AN.summarize(store.caches, store.car)
+        let scoreText = summary.overall.title
+        let tireStatus = tyre.warnAny ? "⚠ 有异常" : "✓ 正常"
+        let cabinTemp = comfort.cabinTemp == "--" ? "--" : comfort.cabinTemp + "℃"
+        let info = ShareableStatusInfo(
+            soc: "\(e.socPct)%",
+            range: e.range,
+            tireStatus: tireStatus,
+            healthScore: scoreText,
+            cabinTemp: cabinTemp
+        )
+        let text = generateShareableStatus(info: info)
+        let vc = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            let rc = UIUserInterfaceStyle(rawValue: UserDefaults.standard.integer(forKey: "ui_interface_style")) ?? .unspecified
+            vc.preferredContentSize = CGSize(width: 375, height: 200)
+            let rootVC = windowScene.windows.first?.rootViewController
+            rootVC?.present(vc, animated: true)
+        }
     }
 
     private func openNav(_ loc: LocModel) {

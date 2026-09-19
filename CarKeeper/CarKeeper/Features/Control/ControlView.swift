@@ -95,12 +95,30 @@ struct ControlView: View {
             .accessibilityLabel(Text("车控"))
             .accessibilityHint(Text("远程控制车辆：锁车、解锁、空调、座椅加热"))
         .glassRefreshRipple(isRefreshing: $isRefreshing)
+        // #35 语音播报入口
+        .toolbar {
+            if !UIAccessibility.isSpeakScreenEnabled {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        speakStatus()
+                    } label: {
+                        Image(systemName: "speaker.wave.3.fill")
+                    }
+                    .accessibilityLabel(Text("语音播报车况"))
+                }
+            }
+        }
         .sheet(isPresented: $showPin) {
             PINKeypadView()
                 .onReceive(NotificationCenter.default.publisher(for: .pinConfirmed)) { note in
                     if let pin = note.object as? String {
                         pinDigits = pin
                         showPin = false
+                        // #8 首次输入PIN后保存到Keychain
+                        if store.readPin() == nil {
+                            store.savePin(pin)
+                            ToastManager.shared.show("PIN码已安全保存", icon: "key.fill")
+                        }
                         execute(pin)
                     }
                 }
@@ -369,6 +387,14 @@ struct ControlView: View {
                 execute(pinDigits, cmd: cmd, temp: pendingTemp)
             }
         }
+    }
+
+    // #35 语音播报车况
+    private func speakStatus() {
+        let utterance = AVSpeechUtterance(string: "当前车况：电量 \(store.caches["control"] != nil ? "在线" : "离线")，请查看详细报告")
+        utterance.rate = 0.5
+        utterance.pitchMultiplier = 0.9
+        AVSpeechSynthesizer().speak(utterance)
     }
 
     // MARK: 执行中（带呼吸光晕）

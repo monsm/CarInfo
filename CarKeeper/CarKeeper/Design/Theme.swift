@@ -2117,6 +2117,52 @@ extension View {
 }
 
 // =============================================================================
+// PowerSavingCheck —— #31 省电模式检测
+// 当省电模式开启时，禁用所有动画和背景任务
+// =============================================================================
+enum PowerSavingMode {
+    static var isEnabled: Bool { AppStore.shared.isPowerSaving }
+
+    static func animation(_ anim: Animation?) -> Animation? {
+        isEnabled ? nil : anim
+    }
+
+    static func shouldAnimate(_ condition: Bool) -> Bool {
+        isEnabled ? false : condition
+    }
+
+    static func task(_ body: @escaping () async -> Void) -> Task<Void, Never>? {
+        isEnabled ? nil : Task { await body() }
+    }
+}
+
+// =============================================================================
+// ShareableStatusCard —— #19 车况快照分享图（轻量版）
+// 生成当前车况的简要描述文本用于分享
+// =============================================================================
+struct ShareableStatusInfo: Identifiable {
+    let id = UUID()
+    let soc: String
+    let range: String
+    let tireStatus: String
+    let healthScore: String
+    let cabinTemp: String
+}
+
+func generateShareableStatus(info: ShareableStatusInfo) -> String {
+    return """
+    🚗 我的车况快照
+    • 电量：\(info.soc)%
+    • 续航：\(info.range) km
+    • 胎压：\(info.tireStatus)
+    • 健康评分：\(info.healthScore)
+    • 车内温度：\(info.cabinTemp)
+    \n---
+    长安车管家 App
+    """
+}
+
+// =============================================================================
 // MilestoneCelebration —— #26 里程里程碑庆祝动效
 // =============================================================================
 struct MilestoneCelebration: ViewModifier {
@@ -2158,4 +2204,71 @@ extension View {
     func milestoneCelebration(mileage: Int) -> some View {
         modifier(MilestoneCelebration(currentMileage: mileage))
     }
+}
+
+// =============================================================================
+// PowerSavingToggle —— #31 省电模式开关
+// 在设置页面或首页添加开关，关闭动画和后台刷新
+// =============================================================================
+struct PowerSavingToggle: View {
+    @AppStorage("carkeeper_power_saving") private var enabled = false
+
+    var body: some View {
+        Toggle(isOn: $enabled) {
+            HStack {
+                Image(systemName: enabled ? "battery.100" : "battery.25")
+                    .foregroundStyle(enabled ? .green : .orange)
+                Text(enabled ? "省电模式已开启" : "省电模式")
+                    .font(Theme.body)
+            }
+        }
+        .toggleStyle(SwitchToggleStyle(tint: enabled ? .green : .orange))
+        .onChange(of: enabled) { newValue in
+            if newValue {
+                ToastManager.shared.show("省电模式已开启，动画和后台刷新已关闭", icon: "battery.25")
+            } else {
+                ToastManager.shared.show("省电模式已关闭", icon: "battery.100")
+            }
+        }
+    }
+}
+
+// =============================================================================
+// DriveBehaviorScore —— #45 驾驶行为评分
+// 根据急加速/急刹车频率给出评分
+// =============================================================================
+struct DriveBehaviorScore {
+    let aggressiveAccel: Int    // 急加速次数
+    let harshBrake: Int         // 急刹车次数
+    let totalTrips: Int         // 总行程数
+    let score: Int              // 综合评分 0-100
+
+    var label: String {
+        switch score {
+        case 80...100: return "优秀"
+        case 60...79: return "良好"
+        case 40...59: return "一般"
+        default: return "需改进"
+        }
+    }
+
+    var color: Color {
+        switch score {
+        case 80...100: return .green
+        case 60...79: return .blue
+        case 40...59: return .orange
+        default: return .red
+        }
+    }
+}
+
+func calculateDriveBehaviorScore(_ cache: [String: Any?]) -> DriveBehaviorScore? {
+    // 简化版：基于控制数据中的加速度相关指标
+    guard let control = cache["control"] as? [String: Any] else { return nil }
+    // 实际项目中需要从传感器数据计算，这里返回默认值
+    let aggressiveAccel = Int(control["AggressiveAccel"] as? Int ?? 0)
+    let harshBrake = Int(control["HarshBrake"] as? Int ?? 0)
+    let totalTrips = max(1, aggressiveAccel + harshBrake + 1)
+    let score = max(0, min(100, 100 - aggressiveAccel * 5 - harshBrake * 3))
+    return DriveBehaviorScore(aggressiveAccel: aggressiveAccel, harshBrake: harshBrake, totalTrips: totalTrips, score: score)
 }

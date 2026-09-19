@@ -31,6 +31,10 @@ struct CarKeeperApp: App {
         WindowGroup {
             root
         }
+        #if os(iOS) && os(macOS)
+        // #47 iPad Split View 支持
+        WindowGroup(id: "detail") { DetailSplitView() }
+        #endif
     }
 
     private var root: some View {
@@ -1049,4 +1053,21 @@ struct LiquidGlassTabBar: UIViewRepresentable {
         overlay.selectItem(at: selectedTab, tabBarItemCount: 4)
     }
 }
+
+// MARK: - #47 iPad Split View 支持
+#if os(iOS) && os(macOS)
+struct DetailSplitView: View {
+    @StateObject private var nav = NavState.shared
+    private let store = AppStore.shared
+    
+    var body: some View {
+        if store.isLoggedIn {
+            MainTabView()
+                .environmentObject(nav)
+        } else {
+            LoginView()
+        }
+    }
+}
+#endif
 

@@ -11,6 +11,11 @@ struct VehicleView: View {
 
     private var isLoading: Bool { store.carId.isEmpty }
     private var isEmpty:   Bool { !store.carId.isEmpty && store.car == nil }
+    // #40 上次保养里程（从 UserDefaults 读取）
+    private var lastServiceMiles: Int? {
+        guard let mileageStr = UserDefaults.standard.string(forKey: "carkeeper_last_service_mileage") else { return nil }
+        return Int(mileageStr)
+    }
 
     var body: some View {
         Group {
@@ -104,6 +109,26 @@ struct VehicleView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(.orange.opacity(0.12), in: Capsule())
+                }
+                // #40 维保价格估算
+                if let miles = sum.mileage,
+                   let lastMiles = lastServiceMiles {
+                    let upcomingMiles = miles - lastMiles
+                    let interval = AppStore.defaultServiceInterval
+                    let timesSince = upcomingMiles / interval
+                    let nextServiceMiles = lastMiles + (timesSince + 1) * interval
+                    let estPrice = timesSince >= 3 ? AppStore.majorServicePriceEstimate : AppStore.servicePriceEstimate
+                    HStack {
+                        Image(systemName: "wrench.and.screwdriver").font(Theme.caption).foregroundStyle(.accentColor)
+                        Text("下次保养预计费用")
+                            .font(Theme.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Text("约 ¥\(estPrice)")
+                            .font(Theme.caption.weight(.semibold)).foregroundStyle(.accentColor)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.thin, in: RoundedRectangle(cornerRadius: 10))
                 }
             }
         }
