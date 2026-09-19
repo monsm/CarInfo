@@ -37,9 +37,27 @@ struct CarKeeperApp: App {
         #endif
     }
 
+    // #NEW-112 启动画面控制
+    @State private var showSplash = true
+    @State private var isAppLoading = false
+    // #NEW-113 Onboarding 引导状态
+    @AppStorage("carkeeper_onboarding_seen") private var onboardingSeen = false
+    
     private var root: some View {
         Group {
-            if store.isLoggedIn {
+            if showSplash {
+                SplashView()
+                    .ignoresSafeArea()
+                    .onAppear { isAppLoading = true }
+                    .task {
+                        // 模拟加载延迟后显示主界面
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        showSplash = false
+                    }
+            } else if !onboardingSeen && !store.isLoggedIn {
+                // #NEW-113 Onboarding 引导
+                OnboardingView()
+            } else if store.isLoggedIn {
                 MainTabView()
                     .environmentObject(nav)
                     .onReceive(NotificationCenter.default.publisher(for: .navToVehicle)) { _ in nav.path = [.vehicle] }

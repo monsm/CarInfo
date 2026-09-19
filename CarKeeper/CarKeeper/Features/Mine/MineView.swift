@@ -18,6 +18,8 @@ struct MineView: View {
     @State private var isRefreshing = false     // 下拉刷新标志（触发玻璃涟漪动效）
     @State private var isChecking = false        // OTA 检查中（不含下载）
     @EnvironmentObject var nav: NavState            // C3: 用于 pushNavigation
+    // #NEW-115 夜间模式管理
+    @StateObject private var nightModeManager = NightModeManager()
 
     // MARK: 生命周期
     var body: some View {
@@ -199,6 +201,24 @@ struct MineView: View {
                 // #31 省电模式
                 PowerSavingToggle()
                     .padding(.horizontal, 4)
+                // #NEW-115 夜间模式切换
+                HStack {
+                    Text("夜间模式").font(Theme.h4)
+                    Spacer()
+                    Picker("主题", selection: $nightModeManager.currentMode) {
+                        Text("自动").tag(NightModeMode.auto)
+                        Text("浅色").tag(NightModeMode.light)
+                        Text("深色").tag(NightModeMode.dark)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .onChange(of: nightModeManager.currentMode) { mode in
+                        nightModeManager.setMode(mode)
+                    }
+                }
+                .padding(16)
+                .glassCard()
+                .glassLongPressDeform()
+
                 // #45 驾驶行为评分
                 if let score = calculateDriveBehaviorScore(store.caches) {
                     HStack {

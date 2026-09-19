@@ -1,0 +1,187 @@
+// =============================================================================
+// #NEW-113 Onboarding 引导 — 首次使用 3 页引导流程
+// =============================================================================
+
+import SwiftUI
+
+enum OnboardingPage: String, CaseIterable, Identifiable {
+    case connect = "connect"
+    case location = "location"
+    case pin = "pin"
+    
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .connect: return "绑定车辆"
+        case .location: return "开启定位"
+        case .pin: return "设置密码"
+        }
+    }
+    var description: String {
+        switch self {
+        case .connect: return "输入车牌号绑定您的爱车"
+        case .location: return "开启定位以查看车辆位置"
+        case .pin: return "设置 PIN 码保护车辆控制"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .connect: return "car.fill"
+        case .location: return "location.fill"
+        case .pin: return "lock.fill"
+        }
+    }
+}
+
+struct OnboardingView: View {
+    @State private var currentPage = 0
+    @State private var isLastPage = false
+    @AppStorage("carkeeper_onboarding_seen") private var onboardingSeen = false
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // 页面内容
+            TabView(selection: $currentPage) {
+                ForEach(OnboardingPage.allCases) { page in
+                    onboardingPage(page)
+                        .tag(page.rawValue)
+                }
+            }
+            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
+            .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
+            
+            // 底部操作区
+            VStack(spacing: 20) {
+                Text(isLastPage ? "准备好了吗？" : "")
+                    .font(Theme.h3)
+                    .foregroundStyle(.primary)
+                
+                if isLastPage {
+                    Button("开始使用") {
+                        onboardingSeen = true
+                    }
+                    .font(Theme.body.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: Color.accentColor.opacity(0.3), radius: 8, y: 4)
+                    
+                    Button("跳过引导") {
+                        onboardingSeen = true
+                    }
+                    .font(Theme.caption)
+                    .foregroundStyle(.secondary)
+                } else {
+                    HStack {
+                        Button("跳过") {
+                            onboardingSeen = true
+                        }
+                        .font(Theme.caption)
+                        .foregroundStyle(.secondary)
+                        
+                        Spacer()
+                        
+                        Button(currentPage < OnboardingPage.allCases.count - 1 ? "下一步" : "完成") {
+                            withAnimation(.spring(response: 0.3)) {
+                                if currentPage < OnboardingPage.allCases.count - 1 {
+                                    currentPage += 1
+                                } else {
+                                    onboardingSeen = true
+                                }
+                            }
+                        }
+                        .font(Theme.body.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+            }
+            .padding(.horizontal, 32)
+            .padding(.vertical, 24)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .padding(.top, 20)
+        }
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.15),
+                    Color.purple.opacity(0.1),
+                    Color.blue.opacity(0.05)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+        )
+    }
+    
+    private func onboardingPage(_ page: OnboardingPage) -> some View {
+        VStack(spacing: 24) {
+            // 图标
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        colors: [Color.accentColor.opacity(0.3), Color.accentColor.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 120, height: 120)
+                Image(systemName: page.icon)
+                    .font(.system(size: 56))
+                    .foregroundStyle(.accentColor)
+            }
+            
+            // 标题和描述
+            VStack(spacing: 12) {
+                Text(page.title)
+                    .font(Theme.h2)
+                    .foregroundStyle(.primary)
+                
+                Text(page.description)
+                    .font(Theme.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+            
+            // 示例内容
+            if page == .connect {
+                ExampleCard(title: "示例车牌", value: "京A·12345")
+            } else if page == .location {
+                ExampleCard(title: "定位权限", value: "用于显示车辆位置")
+            } else {
+                ExampleCard(title: "PIN 码长度", value: "4-6 位数字")
+            }
+        }
+        .padding()
+    }
+}
+
+struct ExampleCard: View {
+    let title: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(Theme.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(Theme.body.monospaced())
+                .foregroundStyle(.accentColor)
+        }
+        .padding()
+        .background(.thin, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 40)
+    }
+}
+
+struct OnboardingView_Previews: PreviewProvider {
+    static var previews: some View {
+        OnboardingView()
+    }
+}

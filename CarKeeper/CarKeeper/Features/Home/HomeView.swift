@@ -35,6 +35,8 @@ struct HomeView: View {
     @State private var showCheckInReminder = false
     // #NEW-6 Siri快捷指令
     @State private var siriLastAction: String? = nil
+    // #NEW-123 全局搜索
+    @State private var showSearch = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     var body: some View {
@@ -60,6 +62,8 @@ struct HomeView: View {
         let loc = VM.locStatus(cache)
         let hasData = cache["control"] != nil
         let drive = VM.driveStatus(cache)
+        // #NEW-107 碳减排统计
+        let carbonStats = CarbonSavingsTracker.shared.getTodayStats()
 
         return ScrollView {
             VStack(spacing: 8) {
@@ -94,6 +98,7 @@ struct HomeView: View {
                             case "batterySection": if hasData { batterySection(cache) }
                             case "tyreCard": tyreCardExpanded(tyre)
                             case "comfortCard": comfortCard(comfort)
+                            case "carbonSavings": CarbonSavingsCard(stats: carbonStats)
                             default: locationCard(loc)
                             }
                         }
@@ -223,6 +228,22 @@ struct HomeView: View {
             Button("稍后再说", role: .cancel) {}
         } message: {
             Text("今天还没检查车况，建议上车前确认胎压、电量是否正常。")
+        }
+        // #NEW-123 下滑触发全局搜索
+        .gesture(
+            DragGesture()
+                .onEnded { value in
+                    if value.startLocation.y - value.changedLocation.y > 100 {
+                        showSearch = true
+                    }
+                }
+        )
+        .sheet(isPresented: $showSearch) {
+            NavigationStack {
+                GlobalSearchHUD(isPresented: $showSearch)
+                    .navigationTitle("搜索")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
         }
         .onDisappear {
             startTimer?.cancel()
@@ -891,7 +912,7 @@ struct HomeView: View {
     // #24 卡片排序：定义卡片ID映射
     private let cardIds: [String] = [
         "socHero", "driveMetrics", "carSelector", "quickControl", "domainCard",
-        "batterySection", "tyreCard", "comfortCard", "locationCard"
+        "batterySection", "tyreCard", "comfortCard", "carbonSavings", "locationCard"
     ]
 
     // #3 数据新鲜度徽章 — 返回缓存时间戳
