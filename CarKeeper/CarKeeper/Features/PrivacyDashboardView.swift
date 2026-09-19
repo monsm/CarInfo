@@ -56,7 +56,7 @@ struct PrivacyDashboardView: View {
                     VStack(spacing: Theme.Spacing.sm) {
                         Image(systemName: "shield.checkered")
                             .font(.system(size: 48))
-                            .foregroundColor(.accent)
+                            .foregroundColor(Color.accent)
                         Text("数据透明度")
                             .font(.title2)
                             .fontWeight(.bold)
@@ -84,7 +84,7 @@ struct PrivacyDashboardView: View {
                                 .padding()
                                 .background(Color.red.opacity(0.15))
                                 .foregroundColor(.red)
-                                .cornerRadius(Theme.Radius.md)
+                                .cornerRadius(Theme.Radius.medium)
                         }
                         
                         Button {
@@ -99,7 +99,7 @@ struct PrivacyDashboardView: View {
                                 .padding()
                                 .background(Color.orange.opacity(0.1))
                                 .foregroundColor(.orange)
-                                .cornerRadius(Theme.Radius.md)
+                                .cornerRadius(Theme.Radius.medium)
                         }
                     }
                     .padding(.top, Theme.Spacing.sm)

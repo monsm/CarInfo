@@ -78,7 +78,7 @@ struct EmergencyPanel: View {
     // MARK: - 快捷操作
     private var quickActions: some View {
         VStack(spacing: 12) {
-            Text("快捷操作").font(Theme.font(.subheadline).bold())
+            Text("快捷操作").font(Theme.font(.subheadline as Font).bold())
             HStack(spacing: 12) {
                 actionButton(icon: "car.fill", title: "远程锁车", color: .blue, action: lockCar)
                 actionButton(icon: "horn.fill", title: "鸣笛寻车", color: .orange, action: honkCar)
@@ -110,10 +110,10 @@ struct EmergencyPanel: View {
     // MARK: - 紧急联系人
     private var contactCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("紧急联系人").font(Theme.font(.subheadline).bold())
+            Text("紧急联系人").font(Theme.font(.subheadline as Font).bold())
             HStack {
                 Image(systemName: "person.fill")
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.accent)
                 TextField("输入紧急电话", text: $emergencyContact)
                     .keyboardType(.phonePad)
                 Button(action: saveContact) {
@@ -136,7 +136,7 @@ struct EmergencyPanel: View {
                     .foregroundStyle(.red)
                 VStack(alignment: .leading) {
                     Text("共享当前位置")
-                        .font(Theme.font(.subheadline).bold())
+                        .font(Theme.font(.subheadline as Font).bold())
                     Text("发送坐标给紧急联系人")
                         .font(.caption)
                         .foregroundStyle(.secondary)

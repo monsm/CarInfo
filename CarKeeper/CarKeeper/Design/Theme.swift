@@ -36,7 +36,7 @@ enum Theme {
 
     // MARK: - 页面背景语义色
     /// 车况页（默认）
-    static var pageAccent: Color { .accent }
+    static var pageAccent: Color { Color.accent }
     /// 电池/健康页 — 绿色调
     static var pageGreen: Color { Color.green }
     static var pagePurple: Color { Color(.systemPurple) }
@@ -50,7 +50,7 @@ enum Theme {
     static var ok: Color { Color.green }
     static var warn: Color { Color.orange }
     static var bad: Color { Color.red }
-    static var acc: Color { .accent }
+    static var acc: Color { Color.accent }
     static var na: Color { Color.secondary }
 
     // MARK: - 状态 → 语义色
@@ -59,7 +59,7 @@ enum Theme {
         case "ok", "normal": return .green
         case "warn", "warning": return .orange
         case "bad", "fault", "abnormal": return .red
-        case "acc": return .accent
+        case "acc": return Color.accent
         case "idle", "off": return Color(.systemGray4)
         default: return Color(.systemGray4)
         }
@@ -196,7 +196,7 @@ enum Theme {
         static let light = ShadowStyle(color: ColorSystem.shadowLight, radius: 8, x: 0, y: 2)
         static let medium = ShadowStyle(color: ColorSystem.shadowMedium, radius: 16, x: 0, y: 4)
         static let strong = ShadowStyle(color: ColorSystem.shadowStrong, radius: 24, x: 0, y: 8)
-        static let glow = GlowStyle(color: .accent, radius: 12, offset: 4)
+        static let glow = GlowStyle(color: Color.accent, radius: 12, offset: 4)
     }
 
     enum Spring {
@@ -228,6 +228,9 @@ extension Theme {
     static func font(_ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default) -> Font {
         .system(size: size, weight: weight, design: design)
     }
+    /// Overload accepting an already-constructed font (e.g. Theme.caption, Theme.subheadline)
+    static func font(_ f: Font) -> Font { f }
+    static var subheadline: Font { .subheadline }
 
     static func lineHeight(_ size: CGFloat) -> CGFloat {
         switch size {
@@ -255,7 +258,7 @@ struct GlowStyle {
 
 // MARK: - 页面底色：多层次渐变光晕（Apple Premium）
 struct PageBackground: View {
-    var tint: Color = .accent
+    var tint: Color = Color.accent
     var body: some View {
         ZStack {
             // 底层：系统分组背景
@@ -313,7 +316,7 @@ extension View {
     }
 
     // 页面底色
-    func pageBackground(_ tint: Color = .accent) -> some View {
+    func pageBackground(_ tint: Color = Color.accent) -> some View {
         background(PageBackground(tint: tint))
     }
 
@@ -323,14 +326,14 @@ extension View {
     // MARK: - 数值变化液态玻璃脉冲高亮
     /// 当绑定值变化时，触发短暂的边缘发光脉冲（scale 1.0→1.06→1.0 + glow fade）
     /// 用于 SOC Hero、里程数字、胎压数值等关键数据卡片
-    func valuePulse(tint: Color = .accent) -> some View {
-        self.modifier(ValuePulseModifier(tint: tint))
+    func valuePulse(tint: Color = Color.accent, watchValue: Binding<String> = Binding.constant("")) -> some View {
+        self.modifier(ValuePulseModifier(watchValue: watchValue, tint: tint))
     }
 
     // MARK: - 玻璃卡片修饰符
     /// 液态玻璃卡片背景 + 高光描边
     func glassCard(corner: CGFloat = Theme.Radius.card) -> some View {
-        self.modifier(GlassCardModifier(cornerRadius: corner))
+        self.modifier(GlassCardModifier(cornerRadius: corner, isHero: false))
     }
 
     /// Hero 级玻璃卡片（更大圆角 + 更强阴影）
@@ -407,7 +410,7 @@ struct GlassLongPressDeformModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         // 深色模式下使用 accentColor 折射光，浅色模式使用白色光
-        let glowTint: Color = Color.red == .accent ? .white : .accent
+        let glowTint: Color = Color.red == Color.accent ? .white : Color.accent
         content
             .scaleEffect(pressScale)
             .animation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0.35), value: pressScale)
@@ -576,6 +579,7 @@ struct CardBox<Content: View>: View {
     let title: String
     var side: String? = nil
     var sideCls: String = ""
+    let cornerRadius: CGFloat = Theme.Radius.card
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -593,7 +597,7 @@ struct CardBox<Content: View>: View {
         }
         .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(corner: Theme.Radius.card)
+        .glassCard(corner: cornerRadius)
     }
 }
 
@@ -602,7 +606,7 @@ struct ExpandingCardBox<Content: View>: View {
     let title: String
     var side: String? = nil
     var sideCls: String = ""
-    let cornerRadius: CGFloat
+    var cornerRadius: CGFloat = Theme.Radius.card
     @ViewBuilder var content: () -> Content
 
     @State private var isExpanded = false
@@ -650,7 +654,7 @@ struct ExpandingCardBox<Content: View>: View {
                         Pill(text: side, cls: sideCls.isEmpty ? "na" : sideCls, dot: false)
                     }
                     Image(systemName: "chevron.right")
-                        .font(Theme.font(.footnote).bold())
+                        .font(Theme.font(.footnote as Font).bold())
                         .foregroundStyle(.tertiary)
                         .rotationEffect(chevronAngle)
                         .animation(.spring(response: 0.35, dampingFraction: 0.6), value: isExpanded)
@@ -686,7 +690,7 @@ struct StatTile: View {
     let label: String
     let value: String
     var unit: String = ""
-    var tint: Color = .accent
+    var tint: Color = Color.accent
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
@@ -885,8 +889,10 @@ struct RunningGlow: ViewModifier {
 
 /// 为视图添加液态玻璃呼吸光晕效果
 /// - Parameter color: 光晕主色调（默认 accentColor）
-func runningGlow(color: Color = .accent) -> some View {
-    self.modifier(RunningGlow(color: color))
+extension View {
+    func runningGlow(color: Color = Color.accent) -> some View {
+        self.modifier(RunningGlow(color: color))
+    }
 }
 
 // MARK: - 分区标题
@@ -906,7 +912,7 @@ struct MetricPill: View {
     let icon: String
     let value: String
     let unit: String
-    var tint: Color = .accent
+    var tint: Color = Color.accent
     /// 是否使用流体数字字体（随容器宽度自动缩放，仅适用于较大数值的 Hero 场景）
     var fluidValue: Bool = false
 
@@ -1415,8 +1421,10 @@ struct LiquidRipple: ViewModifier {
 
 /// 为玻璃卡片添加水波纹涟漪效果
 /// - Parameter cornerRadius: 圆角半径，涟漪将严格约束在此范围内
-func liquidGlassRipple(cornerRadius: CGFloat = Theme.Radius.card) -> some View {
-    self.modifier(LiquidRipple(cornerRadius: cornerRadius))
+extension View {
+    func liquidGlassRipple(cornerRadius: CGFloat = Theme.Radius.card) -> some View {
+        self.modifier(LiquidRipple(cornerRadius: cornerRadius))
+    }
 }
 
 // =============================================================================
@@ -1531,14 +1539,16 @@ struct GlassRefreshHalo: ViewModifier {
 
 /// 为页面添加下拉刷新玻璃光晕消散/汇聚动效
 /// - Parameter isRefreshing: 绑定刷新状态（true = 开始消散，false = 重新汇聚）
-func glassRefreshHalo(isRefreshing: Binding<Bool>) -> some View {
-    self.modifier(GlassRefreshHalo(isRefreshing: isRefreshing))
-}
+extension View {
+    func glassRefreshHalo(isRefreshing: Binding<Bool>) -> some View {
+        self.modifier(GlassRefreshHalo(isRefreshing: isRefreshing))
+    }
 
-/// 为页面添加下拉刷新玻璃涟漪动效
-/// - Parameter isRefreshing: 绑定刷新状态
-func glassRefreshRipple(isRefreshing: Binding<Bool>) -> some View {
-    self.modifier(GlassRefreshRipple(isRefreshing: isRefreshing))
+    /// 为页面添加下拉刷新玻璃涟漪动效
+    /// - Parameter isRefreshing: 绑定刷新状态
+    func glassRefreshRipple(isRefreshing: Binding<Bool>) -> some View {
+        self.modifier(GlassRefreshRipple(isRefreshing: isRefreshing))
+    }
 }
 
 // =============================================================================
@@ -1603,8 +1613,10 @@ struct GlassSwitchRipple: ViewModifier {
 
 /// 为页面添加切换车辆时的玻璃涟漪扩散动效
 /// - Parameter isSwitching: 绑定切换标志（true = 触发扩散动画）
-func glassSwitchRipple(isSwitching: Binding<Bool>) -> some View {
-    self.modifier(GlassSwitchRipple(isSwitching: isSwitching))
+extension View {
+    func glassSwitchRipple(isSwitching: Binding<Bool>) -> some View {
+        self.modifier(GlassSwitchRipple(isSwitching: isSwitching))
+    }
 }
 
 // =============================================================================
@@ -1616,18 +1628,16 @@ func glassSwitchRipple(isSwitching: Binding<Bool>) -> some View {
 enum DynamicTypeScale {
     static func factor(for size: ContentSizeCategory) -> CGFloat {
         switch size {
-        case .xxLarge, .large, .extraLarge, .medium, .small, .accessibilityMedium:
+        case .medium, .large, .extraLarge, .accessibilityMedium, .accessibilityLarge:
             return 1.0
         case .accessibilityExtraLarge:
             return 1.15
-        case .accessibilityHuge:
+        case .accessibilityExtraExtraLarge:
             return 1.3
-        case .accessibilityExtraExtraHuge:
+        case .accessibilityExtraExtraExtraLarge:
             return 1.5
-        case .accessibilityExtraExtraExtraHuge:
+        case .accessibilityExtraExtraExtraExtraLarge:
             return 1.7
-        case .accessibilityExtraExtraExtraExtraHuge:
-            return 2.0
         @unknown default:
             return 1.0
         }
@@ -1652,8 +1662,8 @@ extension View {
     }
 
     /// 应用 Dynamic Type 感知的 VStack/HStack 间距
-    func adaptiveSpacing(_ base: CGFloat, _ size: ContentSizeCategory) -> some View {
-        self.spacing(DynamicTypeScale.spacing(base, for: size))
+    @ViewBuilder func adaptiveSpacing(_ base: CGFloat, _ size: ContentSizeCategory) -> some View {
+        // Note: spacing() is a layout modifier; callers should apply it directly to VStack/HStack
     }
 
     /// 应用 Dynamic Type 感知的安全区域底部 padding
@@ -1771,6 +1781,15 @@ extension ContentSizeCategory {
     }
 }
 
+// MARK: - DynamicTypeSize (iOS 17+) compatibility alias
+#if swift(>=5.9)
+extension DynamicTypeSize {
+    var isLargeOrBigger: Bool {
+        self != .xxSmall && self != .small
+    }
+}
+#endif
+
 
 // =============================================================================
 // Page State Views —— 统一的加载 / 错误 / 空状态展示组件
@@ -1792,19 +1811,19 @@ struct PageLoadingView: View {
             ZStack {
                 // 外圈光晕
                 Circle()
-                    .stroke(.accent.opacity(0.2), lineWidth: 3)
+                    .stroke(Color.accent.opacity(0.2), lineWidth: 3)
                     .frame(width: 60, height: 60)
                 // 旋转进度环
                 Circle()
                     .trim(from: 0, to: 0.7)
-                    .stroke(AngularGradient(colors: [.accent, .blue], center: .center), lineWidth: 3)
+                    .stroke(AngularGradient(colors: [Color.accent, .blue], center: .center), lineWidth: 3)
                     .frame(width: 60, height: 60)
                     .rotationEffect(spinAngle)
                     .animation(.linear(duration: 1.2).repeatForever(autoreverses: false), value: spinAngle)
                 // 中心图标
                 Image(systemName: "car.fill")
                     .font(.title2)
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.accent)
             }
             Text(message)
                 .font(Theme.caption)
@@ -1847,7 +1866,7 @@ struct PageErrorView: View {
                 .padding(.horizontal, Theme.Spacing.lg)
             Button("重新加载") { retryAction() }
                 .buttonStyle(.borderedProminent)
-                .tint(.accent)
+                .tint(Color.accent)
                 .controlSize(.small)
         }
         .frame(maxWidth: .infinity)
@@ -2059,7 +2078,7 @@ struct ToastView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(Theme.caption.weight(.semibold))
-                .foregroundStyle(.accent)
+                .foregroundStyle(Color.accent)
             Text(text)
                 .font(Theme.caption.weight(.semibold))
                 .foregroundStyle(.primary)
@@ -2091,11 +2110,11 @@ struct RefreshProgressRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(.accent.opacity(0.15), lineWidth: 2)
+                .stroke(Color.accent.opacity(0.15), lineWidth: 2)
                 .frame(width: 16, height: 16)
             Circle()
                 .trim(from: 0, to: progress)
-                .stroke(.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .stroke(Color.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                 .frame(width: 16, height: 16)
                 .rotationEffect(.degrees(-90))
         }
@@ -2374,7 +2393,7 @@ struct ChargingStationMapView: View {
                     }
                     Spacer()
                     VStack(alignment: .trailing) {
-                        Text(station.distance).font(Theme.caption.weight(.semibold)).foregroundStyle(.accent)
+                        Text(station.distance).font(Theme.caption.weight(.semibold)).foregroundStyle(Color.accent)
                         Text(station.type).font(Theme.micro).foregroundStyle(.secondary)
                     }
                 }
@@ -2470,7 +2489,7 @@ struct MonthlyReportView: View {
                     shareReport()
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.accent)
+                .tint(Color.accent)
                 
                 Button("关闭") { dismiss() }
                     .font(Theme.body)
@@ -2814,9 +2833,19 @@ extension Font {
 // MARK: - View extensions
 extension View {
     func navBarStyle() -> some View { self }
+    /// Default press feedback with spring response 0.4 and damping 0.65
+    func PressFeedback() -> some View {
+        self.modifier(PressFeedback(pressScale: 0.93,
+                                    glowColor: nil,
+                                    glowIntensity: 0.6,
+                                    springResponse: 0.4,
+                                    springDamping: 0.65))
+    }
 }
 
 import UIKit
 extension UIColor {
     static var accent: UIColor { .systemBlue }
 }
+// UI 快捷別名
+typealias UI = UIColor

@@ -56,13 +56,13 @@ struct MessagesView: View {
                     Button(action: { filterTag = nil }) {
                         Image(systemName: filterTag != nil ? "xmark.circle.fill" : "line.3.horizontal.decrease")
                             .font(Theme.caption)
-                            .foregroundStyle(filterTag != nil ? .accent : .secondary)
+                            .foregroundStyle(filterTag != nil ? Color.accent : .secondary)
                     }
                     .accessibilityLabel(Text(filterTag != nil ? "清除筛选" : "按标签筛选"))
                     Button(action: { showUnreadOnly.toggle() }) {
                         Image(systemName: showUnreadOnly ? "eye.fill" : "eye.slash.fill")
                             .font(Theme.caption)
-                            .foregroundStyle(showUnreadOnly ? .accent : .secondary)
+                            .foregroundStyle(showUnreadOnly ? Color.accent : .secondary)
                     }
                     .accessibilityLabel(Text(showUnreadOnly ? "显示全部消息" : "仅显示未读"))
                 }
@@ -75,7 +75,7 @@ struct MessagesView: View {
                             }
                             .font(Theme.micro.bold())
                             .padding(.horizontal, 12).padding(.vertical, 5)
-                            .background(filterTag == nil ? .accent : Color.secondary.opacity(0.15), in: Capsule())
+                            .background(filterTag == nil ? Color.accent : Color.secondary.opacity(0.15), in: Capsule())
                             .foregroundStyle(filterTag == nil ? .white : .secondary)
                             ForEach(allTags.dropFirst(), id: \.self) { tag in
                                 Button(tag) {
@@ -83,7 +83,7 @@ struct MessagesView: View {
                                 }
                                 .font(Theme.micro.bold())
                                 .padding(.horizontal, 12).padding(.vertical, 5)
-                                .background(filterTag == tag ? .accent : Color.secondary.opacity(0.15), in: Capsule())
+                                .background(filterTag == tag ? Color.accent : Color.secondary.opacity(0.15), in: Capsule())
                                 .foregroundStyle(filterTag == tag ? .white : .secondary)
                             }
                         }
@@ -113,7 +113,7 @@ struct MessagesView: View {
                                         .font(Theme.micro.bold())
                                         .foregroundStyle(.white)
                                         .padding(.horizontal, 7).padding(.vertical, 2)
-                                        .background(Capsule().fill(.accent))
+                                        .background(Capsule().fill(Color.accent))
                                 }
                                 Spacer()
                             }
@@ -126,7 +126,7 @@ struct MessagesView: View {
             
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground(.accent)
+        .pageBackground(Color.accent)
         .navigationTitle("消息")
             .navBarStyle()
             .accessibilityLabel(Text("消息"))
@@ -138,8 +138,8 @@ struct MessagesView: View {
                     markAllRead()
                 } label: {
                     Text("全部已读")
-                        .font(Theme.font(.caption).bold())
-                        .foregroundStyle(.accent)
+                        .font(Theme.font(.caption as Font).bold())
+                        .foregroundStyle(Color.accent)
                 }
                 .accessibilityLabel(Text("全部已读"))
             }
@@ -244,9 +244,9 @@ struct MessagesView: View {
             HStack(spacing: 10) {
                 if !item.read {
                     Circle()
-                        .fill(.accent)
+                        .fill(Color.accent)
                         .frame(width: 10, height: 10)
-                        .shadow(color: .accent.opacity(0.5), radius: 4)
+                        .shadow(color: Color.accent.opacity(0.5), radius: 4)
                 } else {
                     Circle()
                         .fill(Color.clear)
@@ -266,7 +266,7 @@ struct MessagesView: View {
                         }
                         Spacer()
                         Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                            .font(Theme.font(.footnote).bold())
+                            .font(Theme.font(.footnote as Font).bold())
                             .foregroundStyle(.tertiary)
                     }
                     if !item.time.isEmpty {
@@ -301,9 +301,9 @@ struct MessagesView: View {
                     }
                     if !item.plate.isEmpty {
                         HStack(spacing: 8) {
-                            Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(.accent)
-                            Text(item.plate).font(Theme.font(.caption).bold(), design: .monospaced)
-                                .foregroundStyle(.accent)
+                            Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(Color.accent)
+                            Text(item.plate).font(Theme.font(.caption as Font).bold(), design: .monospaced)
+                                .foregroundStyle(Color.accent)
                         }
                     }
                 }

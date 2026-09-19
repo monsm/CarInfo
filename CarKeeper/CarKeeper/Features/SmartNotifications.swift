@@ -108,7 +108,7 @@ struct LowBatteryRoutePlan: View {
                         .font(.caption)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(.accent)
+                        .background(Color.accent)
                         .foregroundColor(.white)
                         .cornerRadius(8)
                 }

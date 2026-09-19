@@ -187,7 +187,7 @@ struct FamilyMemberRow: View {
             Circle()
                 .fill(Color.accent.opacity(0.2))
                 .frame(width: 40, height: 40)
-                .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(.accent))
+                .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(Color.accent))
             
             VStack(alignment: .leading) {
                 Text(member.name)

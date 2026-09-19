@@ -77,7 +77,7 @@ struct ChargingHabitsAnalysis: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             Text("充电习惯分析").font(.subheadline).fontWeight(.semibold)
-            HStack { Image(systemName:"clock").foregroundColor(.accent); Text("高峰时段: \(peakHours.first ?? 0):00").font(.subheadline) }
+            HStack { Image(systemName:"clock").foregroundColor(Color.accent); Text("高峰时段: \(peakHours.first ?? 0):00").font(.subheadline) }
         }.padding().glassCard()
     }
 }

@@ -86,8 +86,8 @@ struct CommandHistoryView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(filter == f ? .accent.opacity(0.2) : Color.clear)
-                            .foregroundStyle(filter == f ? .accent : .secondary)
+                            .background(filter == f ? Color.accent.opacity(0.2) : Color.clear)
+                            .foregroundStyle(filter == f ? Color.accent : .secondary)
                             .cornerRadius(20)
                     }
                 }
@@ -191,7 +191,7 @@ struct CommandHistoryView: View {
                     else { expandedCmds.insert(cmd.id) }
                 }
             }
-            . PressFeedback()
+            .PressFeedback()
         }
     }
 }
@@ -219,7 +219,7 @@ struct SpinningSymbolModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .rotationEffect(.init(degrees: 360))
-            .animation(.linear(1.5).repeatForever(autoreverses: false), value: UUID())
+            .animation(.linear(duration: 1.5).repeatForever(autoreverses: false), value: UUID())
     }
 }
 

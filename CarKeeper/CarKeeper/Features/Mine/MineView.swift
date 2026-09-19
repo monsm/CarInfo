@@ -39,7 +39,7 @@ struct MineView: View {
     // MARK: 生命周期
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.Spacing.card) {
+            VStack(spacing: Theme.Spacing.cardSpacing) {
                 profileCard
                 if let car = store.car { carCard(car) }
                 tilesCard
@@ -49,7 +49,7 @@ struct MineView: View {
             
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground(.accent)
+        .pageBackground(Color.accent)
         .navigationTitle("我的")
             .navBarStyle()
             .accessibilityLabel(Text("我的"))
@@ -153,10 +153,10 @@ struct MineView: View {
                 // 头像
                 ZStack {
                     Circle()
-                        .fill(LinearGradient(colors: [.accent, .accent.opacity(0.65)],
+                        .fill(LinearGradient(colors: [Color.accent, Color.accent.opacity(0.65)],
                                              startPoint: .topLeading, endPoint: .bottomTrailing))
                         .frame(width: 68, height: 68)
-                        .shadow(color: .accent.opacity(0.35), radius: 12, y: 5)
+                        .shadow(color: Color.accent.opacity(0.35), radius: 12, y: 5)
                     Text(um?.avatar ?? "主")
                         .font(Theme.d4.bold())
                         .foregroundStyle(.white)
@@ -173,7 +173,7 @@ struct MineView: View {
                                     .font(Theme.micro)
                                     .foregroundStyle(Theme.ok)
                                 Text("已实名")
-                                    .font(Theme.font(.footnote).bold())
+                                    .font(Theme.font(.footnote as Font).bold())
                                     .foregroundStyle(Theme.ok)
                             }
                         }
@@ -186,7 +186,7 @@ struct MineView: View {
             // 底部统计
             HStack(spacing: 16) {
                 HStack(spacing: 6) {
-                    Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(.accent)
+                    Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(Color.accent)
                     Text(String(store.cars?.count ?? 0) + " 辆车")
                         .font(Theme.caption)
                 }
@@ -229,7 +229,7 @@ struct MineView: View {
             HStack(spacing: 14) {
                 Image(systemName: "car.fill")
                     .font(Theme.d4)
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.accent)
                     .frame(width: 52, height: 52)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
@@ -242,7 +242,7 @@ struct MineView: View {
                          cls: d < 0 ? "bad" : (d <= 30 ? "warn" : "ok"), dot: false)
                 }
                 Image(systemName: "chevron.right")
-                    .font(Theme.font(.footnote).bold()).foregroundStyle(.tertiary)
+                    .font(Theme.font(.footnote as Font).bold()).foregroundStyle(.tertiary)
             }
             .padding(16)
             .dynamicTypeCompress()
@@ -355,7 +355,7 @@ struct MineView: View {
                     tile("siren.fill", "紧急求助", tint: .red) { showEmergency = true }
                     tile("lightbulb.fill", "车辆提示", tint: .yellow) { showVehicleTips = true }
                 }
-                tile("trophy.fill", "驾驶评分", tint: .accent) { showDrivingScore = true }
+                tile("trophy.fill", "驾驶评分", tint: Color.accent) { showDrivingScore = true }
             }
         }
     }
@@ -370,7 +370,7 @@ struct MineView: View {
                 if isChecking {
                     HStack(spacing: 10) {
                         ProgressView()
-                            .tint(.accent)
+                            .tint(Color.accent)
                         Text("正在检查最新版本…")
                             .font(Theme.caption)
                             .foregroundStyle(.secondary)
@@ -380,7 +380,7 @@ struct MineView: View {
                     // 下载中：进度条 + 百分比数字
                     VStack(spacing: 6) {
                         ProgressView(value: downloadPct)
-                            .tint(.accent)
+                            .tint(Color.accent)
                         Text("正在下载… \(downloadPctDisplay)%")
                             .font(Theme.caption).foregroundStyle(.secondary)
                     }
@@ -389,7 +389,7 @@ struct MineView: View {
                     HStack(spacing: 6) {
                         Image(systemName: m.hasPrefix("❌") ? "exclamationmark.triangle" : "info.circle")
                             .font(Theme.caption)
-                            .foregroundStyle(m.hasPrefix("❌") ? Theme.warn : .accent)
+                            .foregroundStyle(m.hasPrefix("❌") ? Theme.warn : Color.accent)
                         Text(m)
                             .font(Theme.caption)
                             .foregroundStyle(.secondary)
@@ -422,7 +422,7 @@ struct MineView: View {
                         .foregroundStyle(tint)
                 }
                 Text(label)
-                    .font(Theme.font(.caption).bold())
+                    .font(Theme.font(.caption as Font).bold())
                     .foregroundStyle(.primary)
             }
             .frame(maxWidth: .infinity)
@@ -452,11 +452,11 @@ struct MineView: View {
             HStack(spacing: 6) {
                 if updateBusy { ProgressView().controlSize(.mini).tint(.white) }
                 Text(updateBusy ? "检查中…" : "检查更新")
-                    .font(Theme.font(.caption).bold())
+                    .font(Theme.font(.caption as Font).bold())
             }
             .foregroundStyle(.white)
             .padding(.vertical, 10)
-            .background(Capsule().fill(.accent))
+            .background(Capsule().fill(Color.accent))
         }
         .buttonStyle(.plain)
         .disabled(updateBusy)
@@ -468,7 +468,7 @@ struct MineView: View {
             shareSheetFlag = true
         } label: {
             Label("分享安装包", systemImage: "square.and.arrow.up")
-                .font(Theme.font(.caption).bold())
+                .font(Theme.font(.caption as Font).bold())
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .background(.ultraThinMaterial, in: Capsule())
         }

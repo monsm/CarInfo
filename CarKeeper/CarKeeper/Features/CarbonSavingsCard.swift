@@ -50,7 +50,7 @@ struct CarbonSavingsCard: View {
                         CarbonSavingsTracker.shared.simulateDailySteps()
                     }
                     .font(Theme.caption)
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.accent)
                 }
             }
         }

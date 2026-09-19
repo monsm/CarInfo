@@ -54,7 +54,7 @@ struct AppClipEntranceView: View {
                 
                 // 车牌输入框
                 HStack(spacing: 12) {
-                    Image(systemName: "creditcard.fill").font(.title3).foregroundStyle(.accent)
+                    Image(systemName: "creditcard.fill").font(.title3).foregroundStyle(Color.accent)
                     TextField("请输入车牌号", text: $plateInput)
                         .font(.system(size: 18, weight: .medium, design: .monospaced))
                         .textInputAutocapitalization(.characters)
@@ -104,7 +104,7 @@ struct AppClipEntranceView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(Color.accent)
                 }
                 
                 // 已有账号？打开完整 App

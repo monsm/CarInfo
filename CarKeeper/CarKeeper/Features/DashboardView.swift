@@ -39,25 +39,19 @@ struct DashboardView: View {
                 
                 // 能耗图表
                 if let history = store.energyHistory {
-                    Chart {
-                        ForEach(history.prefix(7).enumerated(), id: \.offset) { idx, record in
-                            LineMark(
-                                x: .value("日期", record.date),
-                                y: .value("能耗", record.kWh)
-                            )
-                            .lineStyle(StrokeStyle(lineWidth: 2))
-                            .foregroundStyle(.accent)
-                            
-                            PointMark(
-                                x: .value("日期", record.date),
-                                y: .value("能耗", record.kWh)
-                            )
-                            .foregroundStyle(.accent)
-                        }
+                    let last = Array(history.prefix(7))
+                    ForEach(last.indices, id: \.self) { i in
+                        let r = last[i]
+                        LineMark(
+                            x: .value("日期", r.timestamp),
+                            y: .value("SOC", CGFloat(r.soc))
+                        )
+                        .lineStyle(StrokeStyle(lineWidth: 2))
+                        .foregroundStyle(Color.accent)
                     }
-                    .frame(height: 150)
-                    .glassCard()
                 }
+                .frame(height: 150)
+                .glassCard()
                 
                 // 驾驶评分
                 let score = store.drivingScore

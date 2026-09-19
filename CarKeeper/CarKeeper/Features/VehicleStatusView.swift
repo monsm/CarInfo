@@ -119,9 +119,9 @@ struct DriveModeDisplay: View {
                     .frame(width: 56, height: 56)
                     .background(mode == currentMode ? mode.color : Color.clear)
                     .foregroundColor(mode == currentMode ? .white : mode.color)
-                    .cornerRadius(Theme.Radius.md)
+                    .cornerRadius(Theme.Radius.medium)
                     .overlay(
-                        RoundedRectangle(cornerRadius: Theme.Radius.md)
+                        RoundedRectangle(cornerRadius: Theme.Radius.medium)
                             .stroke(mode == currentMode ? mode.color : Color.clear, lineWidth: 2)
                     )
                 }

@@ -130,7 +130,7 @@ struct DrivingScorePage: View {
     // MARK: - 雷达图
     private var radarChart: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("驾驶能力雷达").font(Theme.font(.subheadline).bold())
+            Text("驾驶能力雷达").font(Theme.font(.subheadline as Font).bold())
             Chart {
                 RadarSlice(value: smoothDrivingScore, label: "平稳", color: .green)
                 RadarSlice(value: safeSpeedScore, label: "守规", color: .blue)
@@ -177,7 +177,7 @@ struct DrivingScorePage: View {
             .frame(maxWidth: 100)
             
             Text("\(value)")
-                .font(Theme.font(.subheadline).bold())
+                .font(Theme.font(.subheadline as Font).bold())
                 .foregroundStyle(color)
                 .frame(width: 30)
         }
@@ -190,14 +190,14 @@ struct DrivingScorePage: View {
                 Image(systemName: "lightbulb.fill")
                     .font(.caption)
                     .foregroundStyle(.yellow)
-                Text("改进建议").font(Theme.font(.subheadline).bold())
+                Text("改进建议").font(Theme.font(.subheadline as Font).bold())
             }
             
             ForEach(improvementTips, id: \.self) { tip in
                 HStack {
                     Image(systemName: "chevron.right.circle.fill")
                         .font(.caption2)
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(Color.accent)
                     Text(tip)
                         .font(.caption)
                         .foregroundStyle(.primary)
@@ -212,7 +212,7 @@ struct DrivingScorePage: View {
     // MARK: - 历史趋势
     private var scoreTrend: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("得分趋势").font(Theme.font(.subheadline).bold())
+            Text("得分趋势").font(Theme.font(.subheadline as Font).bold())
             Chart {
                 ForEach(Array(store.tripHistory.suffix(7).enumerated()), id: \.offset) { idx, trip in
                     PointMark(

@@ -123,7 +123,7 @@ struct TripDetailView: View {
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.caption)
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.accent)
                 Text(value)
                     .font(Theme.heroNum)
                     .foregroundStyle(.primary)
@@ -145,14 +145,14 @@ struct TripDetailView: View {
             HStack {
                 Image(systemName: "map.fill")
                     .font(.caption)
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.accent)
                 Text("行驶路线")
-                    .font(Theme.font(.subheadline).bold())
+                    .font(Theme.font(.subheadline as Font).bold())
                 Spacer()
                 Button(action: { showMap.toggle() }) {
                     Text(showMap ? "收起" : "展开")
                         .font(.caption)
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(Color.accent)
                 }
             }
             
@@ -192,7 +192,7 @@ struct TripDetailView: View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.caption)
-                .foregroundStyle(.accent)
+                .foregroundStyle(Color.accent)
             VStack(alignment: .leading) {
                 Text(text).font(.caption2).foregroundStyle(.secondary)
                 Text(String(format: "%.4f, %.4f", coord.latitude, coord.longitude))
@@ -214,7 +214,7 @@ struct TripDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.green)
                 Text("能耗分析")
-                    .font(Theme.font(.subheadline).bold())
+                    .font(Theme.font(.subheadline as Font).bold())
                 Spacer()
             }
             
@@ -246,7 +246,7 @@ struct TripDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
                 Text("驾驶行为")
-                    .font(Theme.font(.subheadline).bold())
+                    .font(Theme.font(.subheadline as Font).bold())
                 Spacer()
                 Text(DurationFormatter.string(from: max((trip.endTime ?? Date()).timeIntervalSince(trip.startTime), 1)))
                     .font(.caption)
@@ -290,7 +290,7 @@ struct TripDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.blue)
                 Text("时间线")
-                    .font(Theme.font(.subheadline).bold())
+                    .font(Theme.font(.subheadline as Font).bold())
                 Spacer()
             }
             
@@ -366,7 +366,7 @@ struct MapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = .accent
+                renderer.strokeColor = Color.accent
                 renderer.lineWidth = 3
                 renderer.lineDashPattern = [6, 4]
                 return renderer

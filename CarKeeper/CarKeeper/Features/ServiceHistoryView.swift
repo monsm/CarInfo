@@ -78,7 +78,7 @@ struct ServiceHistoryView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showAddService = true }) {
                     Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(Color.accent)
                 }
             }
         }
@@ -113,7 +113,7 @@ struct ServiceHistoryView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
-                Text("即将到期").font(Theme.font(.subheadline).bold())
+                Text("即将到期").font(Theme.font(.subheadline as Font).bold())
                 Spacer()
             }
             
@@ -153,9 +153,9 @@ struct ServiceHistoryView: View {
         }
         return Image(systemName: icon)
             .font(.caption)
-            .foregroundStyle(.accent)
+            .foregroundStyle(Color.accent)
             .frame(width: 28, height: 28)
-            .background(.accent.opacity(0.1))
+            .background(Color.accent.opacity(0.1))
             .cornerRadius(6)
     }
     
@@ -172,8 +172,8 @@ struct ServiceHistoryView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(selectedYear == y ? .accent.opacity(0.2) : Color.clear)
-                            .foregroundStyle(selectedYear == y ? .accent : .secondary)
+                            .background(selectedYear == y ? Color.accent.opacity(0.2) : Color.clear)
+                            .foregroundStyle(selectedYear == y ? Color.accent : .secondary)
                             .cornerRadius(16)
                     }
                 }
@@ -219,8 +219,8 @@ struct ServiceHistoryView: View {
                 }
                 Spacer()
                 Text("¥\(Int(entry.cost))")
-                    .font(Theme.font(.subheadline).bold())
-                    .foregroundStyle(.accent)
+                    .font(Theme.font(.subheadline as Font).bold())
+                    .foregroundStyle(Color.accent)
             }
             HStack {
                 Text(entry.date, style: .date)

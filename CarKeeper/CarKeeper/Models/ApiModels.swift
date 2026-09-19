@@ -426,18 +426,19 @@ struct MotorModel {
 }
 
 struct ChargeDetail {
-    var text: String
-    var cls: String
-    var soc: String
-    var range: String
-    var power: String
-    var durMin: String
-    var start: String
-    var end: String
-    var powerLine: String
-    var heating: String
-    var reservation: String
-    var reserveTime: String
+    var text: String = "--"
+    var cls: String = ""
+    var soc: String = "--"
+    var range: String = "--"
+    var power: String = "--"
+    var durMin: String = "--"
+    var start: String = "--"
+    var end: String = "--"
+    var powerLine: String = "--"
+    var heating: String = "--"
+    var reservation: String = "--"
+    var reserveTime: String = "--"
+    var timeToFull: String? = nil
 }
 
 // MARK: - 统一分析层（8 域 verdict + overall）

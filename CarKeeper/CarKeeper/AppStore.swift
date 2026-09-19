@@ -89,7 +89,10 @@ final class AppStore: @unchecked Sendable {
         let startLocation: CLLocation?
         let endLocation: CLLocation?
         let distanceKm: Double
-        var durationText: String { duration > 0 ? "\(Int(duration/60))min" : "--" }
+        var durationText: String {
+            let dur = (endTime?.timeIntervalSince(startTime) ?? 0) / 60
+            return dur > 0 ? "\(Int(dur))min" : "--"
+        }
         let startSoc: Int
         let endSoc: Int
         let avgEfficiency: Double?  // kWh/100km
@@ -224,7 +227,7 @@ final class AppStore: @unchecked Sendable {
         let rangeStr = charge["RemainedPowerMile"] as? String ?? "--"
         let ctrl = caches["control"] as? [String: Any]
         let locked = (ciBool(ctrl, ["DoorLocked", "doorLocked"]) ?? true)
-        let temp = VM.n0(ctrl, ["InteriorTemperature", "interiorTemperature"]) ?? "--"
+        let temp = VM.n0(ctrl?["InteriorTemperature"] ?? ctrl?["interiorTemperature"]) ?? "--"
         let charging = soc < 100
         return CCQuickStatus(soc: soc, range: rangeStr, locked: locked, cabinTemp: "\(temp)℃", charging: charging, online: "在线")
     }
@@ -584,6 +587,54 @@ final class AppStore: @unchecked Sendable {
     // #NEW-111 CloudKit 同步触发（后台）
     func triggerCloudSync() async {
         await CloudSyncManager.shared.syncIfNeeded()
+    }
+
+    // #车控命令发送
+    func sendControlCommand(_ cmd: String) async -> Bool {
+        guard isLoggedIn, !carId.isEmpty else { return false }
+        let pin = readPin() ?? ""
+        do {
+            _ = try await APIClient.shared.sendControlCommand(cmd: cmd, carId: carId, pin: pin)
+            addCommandHistory(cmd: cmd, name: cmd, success: true, duration: 0)
+            return true
+        } catch {
+            addCommandHistory(cmd: cmd, name: cmd, success: false, duration: 0)
+            return false
+        }
+    }
+
+    // 当前位置（从缓存 location 取）
+    var currentLocation: CLLocation? {
+        guard let loc = caches["location"] as? [String: Any],
+              let lat = loc["latitude"] as? Double,
+              let lng = loc["longitude"] as? Double else { return nil }
+        return CLLocation(latitude: lat, longitude: lng)
+    }
+
+    // 停车历史
+    struct ParkingRecord: Identifiable {
+        let id = UUID()
+        let location: CLLocation
+        let time: Date
+        let address: String
+    }
+    var parkingHistory: [ParkingRecord] = []
+
+    // 通知检查
+    func checkNotificationsIfNeeded() {
+        _ = SmartNotificationManager.shared
+    }
+
+    // 总里程
+    var totalMileage: Int {
+        get { UserDefaults.standard.integer(forKey: "carkeeper_total_mileage") }
+        set { UserDefaults.standard.set(newValue, forKey: "carkeeper_total_mileage") }
+    }
+
+    // 维保时间戳
+    var serviceTimestamp: TimeInterval {
+        get { UserDefaults.standard.double(forKey: "carkeeper_service_timestamp") }
+        set { UserDefaults.standard.set(newValue, forKey: "carkeeper_service_timestamp") }
     }
 }
 

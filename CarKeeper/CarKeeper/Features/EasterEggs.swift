@@ -68,7 +68,7 @@ struct CheckInStreak: View {
     var body: some View {
         HStack {
             Image(systemName: "calendar.checkmark")
-                .foregroundColor(.accent)
+                .foregroundColor(Color.accent)
             Text("连续打卡 \(streakDays) 天")
                 .font(.subheadline)
             Spacer()
@@ -160,8 +160,8 @@ struct FamilyLeaderboard: View {
                     .font(.headline)
                     .foregroundColor(idx == 0 ? .yellow : idx == 1 ? .gray : idx == 2 ? .orange : .secondary)
                     .frame(width: 30)
-                Circle().fill(.accent.opacity(0.2)).frame(width: 36, height: 36)
-                    .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(.accent))
+                Circle().fill(Color.accent.opacity(0.2)).frame(width: 36, height: 36)
+                    .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(Color.accent))
                 VStack(alignment: .leading) {
                     Text(member.name).font(.subheadline).fontWeight(.medium)
                     Text(member.roles.joined(separator: " · ")).font(.caption2).foregroundColor(.secondary)

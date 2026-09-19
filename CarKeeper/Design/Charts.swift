@@ -93,7 +93,7 @@ struct DrivingRadarChart: View {
         case "刹车": return .red
         case "平稳": return .green
         case "限速": return .blue
-        default: return .accent
+        default: return Color.accent
         }
     }
 }
@@ -111,7 +111,7 @@ struct EnergyCompareChart: View {
                 y: .value("能耗 kWh", thisWeek),
                 width: .fixed(30)
             )
-            .foregroundStyle(.accent)
+            .foregroundStyle(Color.accent)
             
             BarMark(
                 x: .value("周期", "上周"),
@@ -226,5 +226,91 @@ struct ChargingHeatOverlay: View {
             }
         }
         .frame(height: 100)
+    }
+}
+
+// MARK: - 缺失的圖表組件存根（用於編譯通過）
+
+struct BatteryHealthCard: View {
+    let model: Any
+    var body: some View {
+        Text("電池健康度卡片")
+            .font(.title3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+    }
+}
+
+struct ChargePowerChart: View {
+    let model: Any
+    var body: some View {
+        Text("充電功率曲線")
+            .font(.title3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+    }
+}
+
+struct SOCHistoryChart: View {
+    let store: Any
+    var body: some View {
+        Text("SOC 歷史曲線")
+            .font(.title3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+    }
+}
+
+struct TireTrendChart: View {
+    let checkRaw: [String: Any]
+    var body: some View {
+        Text("車胎趨勢圖")
+            .font(.title3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+    }
+}
+
+struct DrivingStyleHeatmap: View {
+    let store: Any
+    var body: some View {
+        Text("駕駛風格熱力圖")
+            .font(.title3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+    }
+}
+
+struct ChargeCostChart: View {
+    let store: Any
+    var body: some View {
+        Text("充電成本圖")
+            .font(.title3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+    }
+}
+
+struct SiriInsightView: View {
+    let store: Any
+    var body: some View {
+        Text("Siri 使用洞察")
+            .font(.title3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
     }
 }

@@ -23,7 +23,7 @@ struct HealthView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.Spacing.card) {
+            VStack(spacing: Theme.Spacing.cardSpacing) {
                 if loading {
                     loadingView
                 } else if let model {
@@ -66,14 +66,14 @@ struct HealthView: View {
             withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
             }
         }
-        withAnimation(.spring(Theme.Duration.springNormal)) {
+        withAnimation(Theme.Duration.springNormal) {
             cardOpacity = 1
             cardSlideY = 0
         }
         // 三项计数徽章交错出现
-        withAnimation(.spring(Theme.Duration.springFast).delay(0.35)) { pillPhase = 0 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.48) { withAnimation(.spring(Theme.Duration.springFast).delay(0.08)) { pillPhase = 1 } }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.61) { withAnimation(.spring(Theme.Duration.springFast).delay(0.08)) { pillPhase = 2 } }
+        withAnimation(Theme.Duration.springFast.delay(0.35)) { pillPhase = 0 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.48) { withAnimation(Theme.Duration.springFast.delay(0.08)) { pillPhase = 1 } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.61) { withAnimation(Theme.Duration.springFast.delay(0.08)) { pillPhase = 2 } }
     }
 
     // MARK: 加载状态
@@ -132,7 +132,7 @@ struct HealthView: View {
         .staggeredEntrance(index: 0)
         .overlay(alignment: .bottomTrailing) {
             Image(systemName: "chevron.down")
-                .font(Theme.font(.footnote).bold())
+                .font(Theme.font(.footnote as Font).bold())
                 .foregroundStyle(.tertiary)
                 .rotationEffect(chevronAngle)
                 .animation(.spring(response: 0.35, dampingFraction: 0.6), value: heroExpanded)
@@ -154,7 +154,7 @@ struct HealthView: View {
                 .blur(radius: 12)
 
             // ── 第 0.5 层：EKG 心电图描边流动环（首尾相连，沿圆环持续行进）────────
-            EKGFloRingDynamic(size: 242, lineWidth: 1.5, speed: 3.5, percentage: m.scorePct / 100.0)
+            EKGFloRingDynamic(size: 242, lineWidth: 1.5, speed: 3.5, percentage: Double(m.scorePct) / 100.0)
 
             // ── 第 1 层：脉冲光环（持续呼吸）───────────────────────
             Circle()
@@ -223,7 +223,7 @@ struct HealthView: View {
         )
         .opacity(active ? 1 : 0)
         .offset(y: active ? 0 : 16)
-        .animation(.spring(Theme.Duration.springFast).delay(Double(phase) * 0.08), value: active)
+        .animation(Theme.Duration.springFast.delay(Double(phase) * 0.08), value: active)
     }
 
     // MARK: 时间信息行
@@ -405,7 +405,7 @@ struct HealthView: View {
             model = VM.healthModel(store.caches["check"] as? [String: Any])
             errText = nil
             // 刷新后重置并重播入场动画
-            withAnimation(.spring(Theme.Duration.springFast)) {
+            withAnimation(Theme.Duration.springFast) {
                 scoreProgress = 0
                 cardOpacity = 0
                 cardSlideY = 24
@@ -442,9 +442,9 @@ struct SystemRowView: View {
                                   ? Theme.statusColor(sys.statusCls).opacity(0.35)
                                   : Color.white.opacity(0.0))
                             .frame(width: isOpen ? 18 : 0, height: 2)
-                            .animation(.spring(.duration(0.3)), value: isOpen)
+                            .animation(.spring(response: 0.45, dampingFraction: 0.8, blendDuration: 0.3), value: isOpen)
                         Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                            .font(Theme.font(.footnote).bold())
+                            .font(Theme.font(.footnote as Font).bold())
                             .foregroundStyle(isOpen ? Theme.statusColor(sys.statusCls) : .tertiary)
                             .rotationEffect(.degrees(isOpen ? 0 : 180))
                             .animation(.spring(response: 0.35, dampingFraction: 0.65), value: isOpen)
@@ -506,7 +506,7 @@ struct SystemChildRow: View {
                     Text(item.name).font(Theme.caption).foregroundStyle(.secondary)
                     Spacer()
                     Text(item.statusText)
-                        .font(Theme.font(.footnote).bold())
+                        .font(Theme.font(.footnote as Font).bold())
                         .foregroundStyle(Theme.statusColor(item.statusCls))
                 }
                 if let d = item.detect, !d.isEmpty { KVRow(k: "检测值", v: d) }

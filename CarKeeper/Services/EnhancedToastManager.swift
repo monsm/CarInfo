@@ -108,12 +108,12 @@ struct EmptyStateView: View {
             // 动态图标（根据内容变化）
             ZStack {
                 Circle()
-                    .fill(LinearGradient(colors: [.accent.opacity(0.2), .accent.opacity(0.05)],
+                    .fill(LinearGradient(colors: [Color.accent.opacity(0.2), Color.accent.opacity(0.05)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 100, height: 100)
                 Image(systemName: icon)
                     .font(.system(size: 40))
-                    .foregroundColor(.accent)
+                    .foregroundColor(Color.accent)
                     .scaleEffect(1)
                     .animation(.spring(response: 0.5, dampingFraction: 0.5).repeatAutologically(), value: icon)
             }
@@ -137,8 +137,8 @@ struct EmptyStateView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, Theme.Spacing.xl)
                         .padding(.vertical, Theme.Spacing.sm)
-                        .background(.accent)
-                        .cornerRadius(Theme.Radius.md)
+                        .background(Color.accent)
+                        .cornerRadius(Theme.Radius.medium)
                 }
             }
         }

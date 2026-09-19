@@ -67,7 +67,7 @@ struct CarKeeperApp: App {
                     .onReceive(NotificationCenter.default.publisher(for: .navToDev)) { _ in nav.path = [.dev] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToMessages)) { _ in
                         nav.selectedTab = 2
-                        messagesPath = [.messages]
+                        nav.messagesPath = [.messages]
                     }
                     .onReceive(ToastManager.shared.$currentItem) { item in
                         nav.currentToast = item
@@ -134,6 +134,9 @@ final class NavState: ObservableObject, @unchecked Sendable {
     @Published var path: [Deeplink] = []
     @Published var selectedTab: Int = 0
     @Published var currentToast: (text: String, icon: String)? = nil
+    @Published var controlPath: [Deeplink] = []
+    @Published var messagesPath: [Deeplink] = []
+    @Published var minePath: [Deeplink] = []
 
     /// 每个 Tab 的 VoiceOver 描述（用于动态朗读切换时的页面名称）
     static let tabAccessibilityLabels: [Int: String] = [
@@ -159,6 +162,12 @@ final class NavState: ObservableObject, @unchecked Sendable {
         case 3: minePath.append(link)
         default: path.append(link)
         }
+    }
+
+    func clearTabPaths() {
+        controlPath = []
+        messagesPath = []
+        minePath = []
     }
 
     /// 获取当前选中 Tab 的无障碍朗读文本
@@ -194,10 +203,10 @@ struct TabCardTransition: ViewModifier {
         (0,   54, 108,  0.06),
     ]
 
-    private var contentY: CGFloat { layers[tabId].contentY }
-    private var glassY:   CGFloat { layers[tabId].glassY   }
-    private var glowY:    CGFloat { layers[tabId].glowY    }
-    private var delay:    CGFloat { layers[tabId].delay    }
+    private var contentY: CGFloat { Self.layers[tabId].contentY }
+    private var glassY:   CGFloat { Self.layers[tabId].glassY   }
+    private var glowY:    CGFloat { Self.layers[tabId].glowY    }
+    private var delay:    CGFloat { Self.layers[tabId].delay    }
 
     func body(content: Content) -> some View {
         ZStack(alignment: .top) {
@@ -301,10 +310,10 @@ struct NavGlassWrapper<Content: View>: View {
     // 内部状态：首次 onAppear 时触发入场动画，pop 时由 NavigationStack 接管退出转场
     @State private var _shown: Bool = false
 
-    private var cx: CGFloat { params[0].contentX }
-    private var gx: CGFloat { params[0].glassX }
-    private var ox: CGFloat { params[0].glowX }
-    private var delay:   CGFloat { params[0].delay }
+    private var cx: CGFloat { Self.params[0].contentX }
+    private var gx: CGFloat { Self.params[0].glassX }
+    private var ox: CGFloat { Self.params[0].glowX }
+    private var delay:   CGFloat { Self.params[0].delay }
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -374,19 +383,8 @@ struct NavGlassWrapper<Content: View>: View {
 /// pop 时：向左滑出 + 弹性缩放 + 淡出，与入场动画对称
 /// spring spring: response 0.6 / damping 0.7 / blend 0.5s
 private let liquidGlassPopTransition: AnyTransition = .asymmetric(
-    insertion: .modifier { content in
-        content
-            .offset(x: 60)
-            .scaleEffect(0.93)
-            .opacity(0.0)
-    },
-    removal: .modifier { content in
-        // 退出时 offset 由内部 _shown=false 弹簧动画驱动（三层依次从右→左滑出）
-        // 此处仅保留 scale + opacity，不叠加 offset 避免双重位移
-        content
-            .scaleEffect(0.93)
-            .opacity(0.0)
-    }
+    insertion: .scale().combined(with: .opacity).animation(.spring(response: 0.5, dampingFraction: 0.7)),
+    removal: .scale().combined(with: .opacity).animation(.easeInOut(duration: 0.25))
 )
 
 /// 液态玻璃风格返回按钮（隐藏系统默认，自定义样式）
@@ -423,10 +421,7 @@ struct MainTabView: View {
     @State private var prevSelectedTab: Int = 0
     // VoiceOver：记录上次朗读的 Tab，避免重复播报
     @State private var lastAnnouncedTab: Int = 0
-    // 各 Tab 独立的深潜导航路径（不共享 Home 的 nav.path）
-    @State private var controlPath:  [Deeplink] = []
-    @State private var messagesPath: [Deeplink] = []
-    @State private var minePath:     [Deeplink] = []
+    private let store = AppStore.shared
     // NavBar 液态玻璃反光扫过相位（周期性动画）
     @State private var navBarSweepPhase: CGFloat = 0
     // 定时刷新反射扫过相位
@@ -534,7 +529,7 @@ struct MainTabView: View {
                 }
             }
 
-            NavigationStack(path: $controlPath) {
+            NavigationStack(path: $nav.controlPath) {
                 ControlView()
                     .navigationDestination(for: Deeplink.self) { link in
                         NavGlassWrapper {
@@ -552,7 +547,7 @@ struct MainTabView: View {
                     .transition(liquidGlassPopTransition)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarLeading) {
-                            BackGlassButton(navigationPath: $controlPath)
+                            BackGlassButton(navigationPath: $nav.controlPath)
                         }
                     }
                     .navigationBarBackButtonHidden()
@@ -568,9 +563,9 @@ struct MainTabView: View {
                         DragGesture(minimumDistance: 50, coordinateSpace: .global)
                             .onEnded { v in
                                 if v.startLocation.x < 30 && v.location.x > v.startLocation.x + 50 {
-                                    var newPath = controlPath
+                                    var newPath = nav.controlPath
                                     if !newPath.isEmpty { newPath.removeLast() }
-                                    controlPath = newPath
+                                    nav.controlPath = newPath
                                 }
                             }
                     )
@@ -595,7 +590,7 @@ struct MainTabView: View {
                 prevSelectedTab = nav.selectedTab
             }
 
-            NavigationStack(path: $messagesPath) {
+            NavigationStack(path: $nav.messagesPath) {
                 MessagesView()
                     .navigationDestination(for: Deeplink.self) { link in
                         NavGlassWrapper {
@@ -613,7 +608,7 @@ struct MainTabView: View {
                     .transition(liquidGlassPopTransition)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarLeading) {
-                            BackGlassButton(navigationPath: $messagesPath)
+                            BackGlassButton(navigationPath: $nav.messagesPath)
                         }
                     }
                     .navigationBarBackButtonHidden()
@@ -629,9 +624,9 @@ struct MainTabView: View {
                         DragGesture(minimumDistance: 50, coordinateSpace: .global)
                             .onEnded { v in
                                 if v.startLocation.x < 30 && v.location.x > v.startLocation.x + 50 {
-                                    var newPath = messagesPath
+                                    var newPath = nav.messagesPath
                                     if !newPath.isEmpty { newPath.removeLast() }
-                                    messagesPath = newPath
+                                    nav.messagesPath = newPath
                                 }
                             }
                     )
@@ -656,7 +651,7 @@ struct MainTabView: View {
                 prevSelectedTab = nav.selectedTab
             }
 
-            NavigationStack(path: $minePath) {
+            NavigationStack(path: $nav.minePath) {
                 MineView()
                     .navigationDestination(for: Deeplink.self) { link in
                         NavGlassWrapper {
@@ -674,7 +669,7 @@ struct MainTabView: View {
                     .transition(liquidGlassPopTransition)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarLeading) {
-                            BackGlassButton(navigationPath: $minePath)
+                            BackGlassButton(navigationPath: $nav.minePath)
                         }
                     }
                     .navigationBarBackButtonHidden()
@@ -690,9 +685,9 @@ struct MainTabView: View {
                         DragGesture(minimumDistance: 50, coordinateSpace: .global)
                             .onEnded { v in
                                 if v.startLocation.x < 30 && v.location.x > v.startLocation.x + 50 {
-                                    var newPath = minePath
+                                    var newPath = nav.minePath
                                     if !newPath.isEmpty { newPath.removeLast() }
-                                    minePath = newPath
+                                    nav.minePath = newPath
                                 }
                             }
                     )
@@ -741,7 +736,7 @@ struct MainTabView: View {
         .accessibilityLabel(Text("主导航栏"))
         .accessibilityHint(Text("四个主要功能模块：车况、车控、消息、我的。左右滑动可切换标签页"))
         .accessibilitySortPriority(0)
-        .accent(.accent)
+        Color.accent(Color.accent)
         // #4 网络状态指示器 + #NEW-3 离线模式提示
         .overlay(alignment: .top) {
             if store.networkStatus != .online || store.isOfflineMode {
@@ -900,7 +895,7 @@ private class TabBarGlowOverlay: UIView {
 
     private func triggerPressGlow(at cx: CGFloat, y cy: CGFloat) {
         // 取消上一次按压动画（若有）
-        pressAnimation?.removeFromSuperlayer()
+        pressAnimation?.remove(from: pressLayer)
 
         let radius: CGFloat = 28
         let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)
@@ -1094,14 +1089,12 @@ struct LiquidGlassTabBar: UIViewRepresentable {
         unselected.normal.titleTextAttributes = [.foregroundColor: UIColor.secondaryLabel]
         appearance.stackedLayoutAppearance = unselected
         appearance.inlineLayoutAppearance = unselected
-        appearance.compactLayoutAppearance = unselected
         // 选中图标 / 文字
         let selected = UITabBarItemAppearance()
         selected.selected.iconColor = UI.accent
         selected.selected.titleTextAttributes = [.foregroundColor: UI.accent]
         appearance.stackedLayoutAppearance = selected
         appearance.inlineLayoutAppearance = selected
-        appearance.compactLayoutAppearance = selected
         UITabBar.appearance().standardAppearance = appearance
         if #available(iOS 15.0, *) {
             UITabBar.appearance().scrollEdgeAppearance = appearance

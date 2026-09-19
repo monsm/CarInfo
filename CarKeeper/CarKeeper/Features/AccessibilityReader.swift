@@ -25,7 +25,7 @@ struct ColorBlindModeView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("色彩辅助模式").font(Theme.h4)
             Picker("模式", selection: $mode) {
-                ForEach(Array(options.enumerated()), id: \.offset) { idx, item in
+                ForEach(Array(options.enumerated()), id: \.offset) { (_ idx, item) in
                     Text(item.0).tag(item.1)
                 }
             }

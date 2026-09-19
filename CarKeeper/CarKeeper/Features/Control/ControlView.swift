@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 // 车控 —— iOS 27 Liquid Glass：
 // 渐变主控双盘 + 玻璃指令列表 + 执行进度卡 + PIN 数字键盘 / 温度弹层。
@@ -198,12 +199,12 @@ struct ControlView: View {
         }
     }
     private func sectionLabel(_ t: String) -> some View {
-        Text(t).font(Theme.font(.footnote).bold()).foregroundStyle(.secondary)
+        Text(t).font(Theme.font(.footnote as Font).bold()).foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.Spacing.card) {
+            VStack(spacing: Theme.Spacing.cardSpacing) {
                 carSelector.staggeredEntrance(index: 0)
                 heroDiscs.staggeredEntrance(index: 1)
                 // #18 快捷预设场景
@@ -220,7 +221,7 @@ struct ControlView: View {
         .scrollBounceBehavior(.basedOnSize)
         .refreshable {
             tempDisplayCount = 0            // 数字归零
-            withAnimation(.spring(Theme.Duration.springFast)) {
+            withAnimation(Theme.Duration.springFast) {
                 try? await refreshControlCache()
             }
             // 数据回来后自动重播计数动画（pendingTemp 不变，onChange 会触发）
@@ -364,7 +365,7 @@ struct ControlView: View {
                         HStack(spacing: 12) {
                             Image(systemName: scene.symbol)
                                 .font(Theme.bodyMd)
-                                .foregroundStyle(.accent)
+                                .foregroundStyle(Color.accent)
                                 .frame(width: 32, height: 32)
                                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                             VStack(alignment: .leading, spacing: 2) {
@@ -398,7 +399,7 @@ struct ControlView: View {
 
     private func onPresetScene(_ scene: (key: String, name: String, symbol: String, commands: [String], note: String?)) {
         // 执行场景内的所有指令（按顺序）
-        for cmd in scene.commands {
+        for _ in scene.commands {
             if !busy && running == nil {
                 execute(pinDigits)
             }
@@ -452,15 +453,15 @@ struct ControlView: View {
                 }
                 // 展开/收起按钮
                 Button {
-                    withAnimation(.spring(Theme.Duration.springFast)) { showMoreCommands.toggle() }
+                    withAnimation(Theme.Duration.springFast) { showMoreCommands.toggle() }
                 } label: {
                     HStack {
                         Image(systemName: showMoreCommands ? "chevron.up" : "chevron.down")
-                            .font(Theme.font(.footnote).bold())
+                            .font(Theme.font(.footnote as Font).bold())
                             .foregroundStyle(.tertiary)
                         Text(showMoreCommands ? "收起" : "更多指令")
                             .font(Theme.caption)
-                            .foregroundStyle(.accent)
+                            .foregroundStyle(Color.accent)
                         Spacer()
                     }
                     .padding(.vertical, 10)
@@ -489,7 +490,7 @@ struct ControlView: View {
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(Theme.font(.footnote).bold())
+                    .font(Theme.font(.footnote as Font).bold())
                     .foregroundStyle(.tertiary)
             }
             .padding(.vertical, 10)
@@ -756,7 +757,7 @@ struct ACHeroDisc: View {
     @Binding var pendingTemp: Int
     @Binding var displayCount: Int
     @State private var isEntered = false
-    @State private var pulseTrigger: String = ""
+    @State private var pulseTrigger = UUID()
 
     // B4: 温度渐变颜色（低温蓝→高温红，16~32℃映射）
     private var tempGradientColor: Color {
@@ -798,7 +799,7 @@ struct ACHeroDisc: View {
 
                 // 第 5 层：温度数字（流体字体，随容器宽度自动缩放）
                 FluidTempHero(String(displayCount))
-                    .valuePulse(tint: Theme.brand, watchValue: pulseTrigger)
+                    .valuePulse(tint: Theme.brand, watchValue: Binding(get: { String(pulseTrigger) }, set: { _ in }))
             }
             .scaleEffect(isEntered ? 1.0 : 0.82)
             .opacity(isEntered ? 1.0 : 0.0)

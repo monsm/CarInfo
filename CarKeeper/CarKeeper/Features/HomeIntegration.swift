@@ -32,7 +32,7 @@ struct GarageDoorStatus: View {
             } label: {
                 Image(systemName: garageOpen ? "lock.fill" : "lock.open.fill")
                     .font(.title3)
-                    .foregroundColor(.accent)
+                    .foregroundColor(Color.accent)
             }
         }
         .padding()
@@ -83,9 +83,9 @@ struct HomeSceneControl: View {
                     }
                     .padding(.horizontal, Theme.Spacing.md)
                     .padding(.vertical, Theme.Spacing.sm)
-                    .background(.accent.opacity(0.2))
-                    .foregroundColor(.accent)
-                    .cornerRadius(Theme.Radius.md)
+                    .background(Color.accent.opacity(0.2))
+                    .foregroundColor(Color.accent)
+                    .cornerRadius(Theme.Radius.medium)
                 }
             }
         }
@@ -114,7 +114,7 @@ struct ReverseLinkageControl: View {
         VStack(spacing: Theme.Spacing.sm) {
             HStack {
                 Image(systemName: "car.fill")
-                    .foregroundColor(.accent)
+                    .foregroundColor(Color.accent)
                 Text("到家自动解锁")
                     .font(.subheadline)
                 Spacer()

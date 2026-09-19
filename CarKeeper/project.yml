@@ -17,6 +17,11 @@ targets:
     platform: iOS
     sources:
     - path: CarKeeper/
+    - path: Design
+    - path: Services
+    - path: Models
+    - path: CarKeeper/Models
+    - path: HealthKit
     resources:
     - path: CarKeeper/Resources/Assets.xcassets
       group: Resources/Assets.xcassets

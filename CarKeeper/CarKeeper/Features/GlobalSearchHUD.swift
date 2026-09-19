@@ -54,7 +54,7 @@ struct GlobalSearchHUD: View {
                     VStack(spacing: 8) {
                         ForEach(searchResults) { result in
                             SearchResultRow(result: result) {
-                                action()
+                                result.action()
                                 isPresented = false
                             }
                         }
@@ -132,7 +132,7 @@ struct SearchResultRow: View {
             HStack(spacing: 12) {
                 Image(systemName: result.icon)
                     .font(.title2)
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Theme.Colors.accent)
                     .frame(width: 36)
                 
                 VStack(alignment: .leading, spacing: 4) {

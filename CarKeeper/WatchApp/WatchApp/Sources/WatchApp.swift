@@ -47,7 +47,7 @@ struct WatchRoute: View {
                 }
                 .tag(2)
         }
-        .tint(.accent)
+        .tint(Color.accent)
     }
 }
 
@@ -143,7 +143,7 @@ struct WatchStatusRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundStyle(tint ?? .accent)
+                .foregroundStyle(tint ?? Color.accent)
                 .frame(width: 20)
             Text(value).font(.system(size: 16, weight: .semibold))
             Spacer()

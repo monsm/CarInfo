@@ -126,7 +126,7 @@ struct InsuranceCard: View {
         }
         .glassCard()
         .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.md)
+            RoundedRectangle(cornerRadius: Theme.Radius.medium)
                 .stroke(isExpired ? Color.red : isExpiring ? Color.orange : Color.clear, lineWidth: 2)
         )
     }

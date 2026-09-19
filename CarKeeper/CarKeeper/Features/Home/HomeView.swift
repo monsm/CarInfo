@@ -79,7 +79,7 @@ struct HomeView: View {
                             store.cardOrder = cardOrder
                         }
                         .font(Theme.caption.weight(.semibold))
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(Color.accent)
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 4)
@@ -172,7 +172,7 @@ struct HomeView: View {
         .animation(.spring(response: 0.45, dampingFraction: 0.7, blendDuration: 0.4), value: carVersion)
         .scrollBounceBehavior(.basedOnSize)
         .milestoneCelebration(mileage: mileCount)
-        .pageBackground(.accent)
+        .pageBackground(Color.accent)
         .toolbar {
             // #NEW-130 专注模式切换
             ToolbarItem(placement: .navigationBarLeading) {
@@ -190,7 +190,7 @@ struct HomeView: View {
                     }
                 } label: {
                     Image(systemName: FocusModeManager.shared.config.enabled ? "moon.fill" : "moon.stars.fill")
-                        .foregroundColor(FocusModeManager.shared.config.enabled ? .accent : .secondary)
+                        .foregroundColor(FocusModeManager.shared.config.enabled ? Color.accent : .secondary)
                 }
                 .accessibilityLabel(Text(FocusModeManager.shared.config.enabled ? "退出专注模式" : "启用专注模式"))
             }
@@ -311,7 +311,7 @@ struct HomeView: View {
                     .blur(radius: 12)
 
                 // 第 0.5 层：EKG 心电图描边流动环（颜色随 SOC 动态变化：低电量红→高电量绿）
-                EKGFloRingDynamic(size: 224, lineWidth: 1.5, speed: 3.5, percentage: e.socPct)
+                EKGFloRingDynamic(size: 224, lineWidth: 1.5, speed: 3.5, percentage: Double(e.socPct))
 
                 // 第 1 层：脉冲光环（持续呼吸）
                 Circle()
@@ -330,7 +330,7 @@ struct HomeView: View {
                 Circle()
                     .trim(from: 0, to: max(0.02, socProgress / 100))
                     .stroke(
-                        AngularGradient(colors: [.green, .green, .accent, .orange, .red],
+                        AngularGradient(colors: [.green, .green, Color.accent, .orange, .red],
                                         center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
                         style: StrokeStyle(lineWidth: 16, lineCap: .round))
                     .rotationEffect(.degrees(-90))
@@ -356,7 +356,7 @@ struct HomeView: View {
                 MetricPill(icon: "point.topleft.down.curvedto.point.bottomright.up",
                            value: e.range == "--" ? "--" : e.range,
                            unit: "km", tint: .green, fluidValue: true)
-                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accent, fluidValue: true)
+                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: Color.accent, fluidValue: true)
             }
             // #1 充电倒计时
             if let ttf = e.timeToFull {
@@ -367,7 +367,7 @@ struct HomeView: View {
                 HStack {
                     Text("平均能耗").font(Theme.footnote).foregroundStyle(.secondary)
                     Spacer()
-                    Text(cons).font(Theme.caption.weight(.semibold)).foregroundStyle(.accent)
+                    Text(cons).font(Theme.caption.weight(.semibold)).foregroundStyle(Color.accent)
                 }
             }
             if let tte = e.timeToEmpty, tte != "--" {
@@ -420,7 +420,7 @@ struct HomeView: View {
         return HStack(spacing: 12) {
             Image(systemName: "car.2.fill")
                 .font(Theme.bodyMd)
-                .foregroundStyle(.accent)
+                .foregroundStyle(Color.accent)
                 .frame(width: 40, height: 40)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             Picker("车辆", selection: Binding(
@@ -437,7 +437,7 @@ struct HomeView: View {
             Spacer()
             if carSel.count > 1 {
                 Text("\(carSel.count) 辆")
-                    .font(Theme.font(.footnote).bold())
+                    .font(Theme.font(.footnote as Font).bold())
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(.ultraThinMaterial, in: Capsule())
@@ -490,8 +490,8 @@ struct HomeView: View {
             }
             // 速度 + 里程：流体数字字体，随容器宽度自动缩放
             MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: Theme.brand, fluidValue: true)
-            MetricPill(icon: "gauge.full", value: mileCount > 0 ? String(mileCount) : d.mile, unit: "km", tint: .accent, fluidValue: true)
-                .valuePulse(tint: .accent, watchValue: pulseTrigger)
+            MetricPill(icon: "gauge.full", value: mileCount > 0 ? String(mileCount) : d.mile, unit: "km", tint: Color.accent, fluidValue: true)
+                .valuePulse(tint: Color.accent, watchValue: pulseTrigger)
         }            .padding(Theme.Spacing.xl)
             .dynamicTypeCompress()
             .glassCard(corner: 20)
@@ -533,7 +533,7 @@ struct HomeView: View {
         .accessibilityHint(Text(expandedDrive ? "点击收起详细数据" : "点击展开车速、档位、电机温度等行驶详情"))
         .overlay(alignment: .trailing) {
             Image(systemName: "chevron.right")
-                .font(Theme.font(.footnote).bold())
+                .font(Theme.font(.footnote as Font).bold())
                 .foregroundStyle(.tertiary)
                 .rotationEffect(chevronAngle)
                 .animation(.spring(response: 0.35, dampingFraction: 0.6), value: expandedDrive)
@@ -614,7 +614,7 @@ struct HomeView: View {
                 .foregroundStyle(.primary)
             Spacer()
             Text(d.short)
-                .font(Theme.font(.caption).bold())
+                .font(Theme.font(.caption as Font).bold())
                 .foregroundStyle(Theme.statusColor(d.cls))
         }
         .padding(.vertical, 6)
@@ -638,10 +638,10 @@ struct HomeView: View {
     // MARK: 电池区
     private func batterySection(_ cache: [String: Any?]) -> some View {
         let batt = VM.batteryModel(cache)
-        return VStack(spacing: Theme.Spacing.card) {
+        return VStack(spacing: Theme.Spacing.cardSpacing) {
             // 电池摘要行（SOC / 续航 / 告警 来自分析域，不重复 SOC Hero）
             VStack(alignment: .leading, spacing: 8) {
-                Text("电池状态").font(Theme.font(.footnote).bold()).foregroundStyle(.secondary)
+                Text("电池状态").font(Theme.font(.footnote as Font).bold()).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 12) {
                     ForEach(battSummary.headLines, id: \.id) { h in
@@ -667,7 +667,7 @@ struct HomeView: View {
             for line in battSummary.headLines {
                 HStack(spacing: 6) {
                     Text(line.label).font(Theme.caption).foregroundStyle(.secondary)
-                    Text(line.value).font(Theme.font(.caption).bold()).foregroundStyle(line.cls == "ok" ? Theme.ok : (line.cls == "bad" ? Theme.bad : .primary))
+                    Text(line.value).font(Theme.font(.caption as Font).bold()).foregroundStyle(line.cls == "ok" ? Theme.ok : (line.cls == "bad" ? Theme.bad : .primary))
                     if !line.reason.isEmpty {
                         Text(line.reason).font(Theme.footnote).foregroundStyle(.secondary)
                         Spacer()
@@ -687,7 +687,7 @@ struct HomeView: View {
                                 Text(s.num == "--" ? "子" : "S\(s.num!)")
                                     .font(Theme.micro).foregroundStyle(.secondary)
                                 Text(s.maxV.map { String(format: "%.3f", $0) } ?? "--")
-                                    .font(Theme.font(.footnote).bold(), design: .monospaced)
+                                    .font(Theme.font(.footnote as Font).bold(), design: .monospaced)
                                     .foregroundStyle(.primary)
                             }
                             .frame(width: 52)
@@ -753,7 +753,7 @@ struct HomeView: View {
                     Divider().padding(.horizontal, Theme.Spacing.xl)
                     VStack(alignment: .leading, spacing: 6) {
                         Text("胎压详情")
-                            .font(Theme.font(.caption).bold()).foregroundStyle(.secondary)
+                            .font(Theme.font(.caption as Font).bold()).foregroundStyle(.secondary)
                         ForEach(Array(tyre.items.enumerated()), id: \.element.id) { idx, item in
                             HStack {
                                 Text(item.label).font(Theme.footnote).foregroundStyle(.primary)
@@ -788,7 +788,7 @@ struct HomeView: View {
         .accessibilityHint(Text(expandedTyre ? "点击收起胎压详情" : "点击展开四个轮胎的胎压和温度详情"))
         .overlay(alignment: .trailing) {
             Image(systemName: "chevron.right")
-                .font(Theme.font(.footnote).bold())
+                .font(Theme.font(.footnote as Font).bold())
                 .foregroundStyle(.tertiary)
                 .rotationEffect(chevronAngle)
                 .animation(.spring(response: 0.35, dampingFraction: 0.6), value: expandedTyre)
@@ -848,7 +848,7 @@ struct HomeView: View {
                 // 显示已保存的停车位置
                 if let pk = store.parkingLocation, let lastTime = store.lastParkingTime {
                     HStack(spacing: 6) {
-                        Image(systemName: "parkingsign.circle.fill").font(Theme.caption).foregroundStyle(.accent)
+                        Image(systemName: "parkingsign.circle.fill").font(Theme.caption).foregroundStyle(Color.accent)
                         Text("停车点: \(pk.coordinate.latitude, specifier: "%.4f") , \(pk.coordinate.longitude, specifier: "%.4f")")
                             .font(Theme.micro)
                             .foregroundStyle(.secondary)
@@ -864,7 +864,7 @@ struct HomeView: View {
     }
 
     private var mapToggleButton: some View {
-        Button { withAnimation(.spring(Theme.Duration.springFast)) { showMap.toggle() } }
+        Button { withAnimation(Theme.Duration.springFast) { showMap.toggle() } }
         label: {
             HStack(spacing: 4) {
                 Image(systemName: showMap ? "map.fill" : "map")
@@ -882,7 +882,7 @@ struct HomeView: View {
         label: {
             Image(systemName: "arrow.up.right")
                 .font(Theme.caption)
-                .foregroundStyle(.accent)
+                .foregroundStyle(Color.accent)
                 .padding(8)
                 .background(.ultraThinMaterial, in: Circle())
         }
@@ -902,7 +902,7 @@ struct HomeView: View {
         } label: {
             Image(systemName: store.parkingLocation != nil ? "parkingsign.circle.fill" : "parkingsign.circle")
                 .font(Theme.caption)
-                .foregroundStyle(store.parkingLocation != nil ? .accent : .tertiary)
+                .foregroundStyle(store.parkingLocation != nil ? Color.accent : .tertiary)
                 .padding(8)
                 .background(.ultraThinMaterial, in: Circle())
         }
@@ -924,7 +924,7 @@ struct HomeView: View {
             Button { fetchCore() } label: {
                 Image(systemName: "arrow.clockwise.circle.fill")
                     .font(Theme.caption)
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.accent)
                     .padding(6)
                     .background(.ultraThinMaterial, in: Circle())
             }
@@ -999,7 +999,7 @@ struct HomeView: View {
 
     // MARK: SOC入场动画
     private func startSocAnimation() {
-        withAnimation(.spring(Theme.Duration.springNormal)) { socCardOpacity = 1 }
+        withAnimation(Theme.Duration.springNormal) { socCardOpacity = 1 }
         let target = max(0, min(100, VM.energy(store.caches, store.car).socPct))
         // 数字滚动：从 0 弹性计数到目标值（与圆环动画同步）
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -1066,7 +1066,7 @@ struct HomeView: View {
         if isRefreshing {
             // 下拉刷新：重置并重播 SOC + 里程入场动画
             isRefreshing = false
-            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0; socCount = 0; mileCount = 0; pulseTrigger = ""; tyreWatchValue = "" }
+            withAnimation(Theme.Duration.springFast) { socCardOpacity = 0; socProgress = 0; socCount = 0; mileCount = 0; pulseTrigger = ""; tyreWatchValue = "" }
             startSocAnimation()
             startMileAnimation()
             tyreWatchValue = UUID().uuidString
@@ -1125,7 +1125,7 @@ struct LocationMapViewPlaceholder: View {
             VStack(spacing: 6) {
                 Image(systemName: "map.fill")
                     .font(Theme.d0b)
-                    .foregroundStyle(.accent.opacity(0.6))
+                    .foregroundStyle(Color.accent.opacity(0.6))
                 Text(addr.isEmpty ? "点击导航查看位置" : addr)
                     .font(Theme.caption)
                     .foregroundStyle(.secondary)

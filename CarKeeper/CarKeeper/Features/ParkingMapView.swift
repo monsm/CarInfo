@@ -68,7 +68,7 @@ struct ParkingMapView: View {
                     .foregroundStyle(.red)
                 VStack(alignment: .leading) {
                     Text(addressText)
-                        .font(Theme.font(.subheadline).bold())
+                        .font(Theme.font(.subheadline as Font).bold())
                         .foregroundStyle(.primary)
                     Text(loc.formattedDistance(to: store.currentLocation))
                         .font(.caption)
@@ -79,7 +79,7 @@ struct ParkingMapView: View {
                     Image(systemName: "car.fill")
                         .font(.caption)
                         .padding(8)
-                        .background(.accent.opacity(0.15))
+                        .background(Color.accent.opacity(0.15))
                         .cornerRadius(8)
                 }
             }
@@ -123,7 +123,7 @@ struct ParkingMapView: View {
                         ForEach(0..<min(3, store.parkingHistory.count), id: \.self) { i in
                             let p = store.parkingHistory[i]
                             HStack {
-                                Image(systemName: "mappin").foregroundStyle(.accent)
+                                Image(systemName: "mappin").foregroundStyle(Color.accent)
                                 VStack(alignment: .leading) {
                                     Text(p.address ?? "未知位置").font(.subheadline)
                                     Text(p.date, style: .date).font(.caption).foregroundStyle(.secondary)
@@ -144,11 +144,11 @@ struct ParkingMapView: View {
                     HStack {
                         Image(systemName: "car.fill")
                         Text("导航到停车点")
-                            .font(Theme.font(.subheadline).bold())
+                            .font(Theme.font(.subheadline as Font).bold())
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(.accent)
+                    .background(Color.accent)
                     .foregroundStyle(.white)
                     .cornerRadius(12)
                 }

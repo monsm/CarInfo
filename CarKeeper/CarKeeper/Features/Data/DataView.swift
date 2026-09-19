@@ -33,10 +33,6 @@ struct DataView: View {
         _kind = State(wrappedValue: kind)
     }
 
-    deinit {
-        loadTask?.cancel()
-    }
-
     struct Block: Identifiable {
         let h: String
         let rows: [(k: String, v: String)]
@@ -53,7 +49,7 @@ struct DataView: View {
             SiriInsightView(store: store).staggeredEntrance(index: 1)
             kindSwitcher
             ScrollView {
-                VStack(spacing: Theme.Spacing.card) {
+                VStack(spacing: Theme.Spacing.cardSpacing) {
                     if !loading && blocks.isEmpty {
                         if !errText.isEmpty {
                             PageErrorView(errText) { Task { await load() } }
@@ -120,7 +116,7 @@ struct DataView: View {
                 .font(Theme.caption.weight(sel ? .semibold : .regular))
                 .foregroundStyle(sel ? .white : .primary)
                 .padding(.horizontal, 14).padding(.vertical, 9)
-                .background(sel ? .accent : Color(.tertiarySystemFill), in: Capsule())
+                .background(sel ? Color.accent : Color(.tertiarySystemFill), in: Capsule())
         }
         .buttonStyle(.plain)
     }

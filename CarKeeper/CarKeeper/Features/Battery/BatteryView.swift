@@ -31,7 +31,7 @@ struct BatteryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.Spacing.card) {
+            VStack(spacing: Theme.Spacing.cardSpacing) {
                 let cache = store.caches
                 let b = batteryModel(cache)
                 let e = VM.energy(cache, store.car)
@@ -116,7 +116,7 @@ struct BatteryView: View {
                     .blur(radius: 12)
 
                 // 第 0.5 层：EKG 心电图描边流动环（首尾相连，沿圆环持续行进）
-                EKGFloRingDynamic(size: 238, lineWidth: 1.5, speed: 3.5, percentage: e.socPct)
+                EKGFloRingDynamic(size: 238, lineWidth: 1.5, speed: 3.5, percentage: CGFloat(e.socPct) / 100)
 
                 // 第 1 层：脉冲光环（持续呼吸）
                 Circle()
@@ -135,7 +135,7 @@ struct BatteryView: View {
                 Circle()
                     .trim(from: 0, to: max(0.02, socProgress / 100))
                     .stroke(
-                        AngularGradient(colors: [.green, .green, .accent, .orange, .red],
+                        AngularGradient(colors: [.green, .green, Color.accent, .orange, .red],
                                         center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
                         style: StrokeStyle(lineWidth: 18, lineCap: .round))
                     .rotationEffect(.degrees(-90))
@@ -160,7 +160,7 @@ struct BatteryView: View {
             HStack(spacing: 14) {
                 MetricPill(icon: "point.topleft.down.curvedto.point.bottomright.up",
                            value: e.range == "--" ? "--" : (rangeCount > 0 ? String(rangeCount) : e.range), unit: "km", tint: .green, fluidValue: true)
-                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accent)
+                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: Color.accent)
             }
             Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5)))")
                 .font(Theme.footnote).foregroundStyle(.secondary)
@@ -223,7 +223,7 @@ struct BatteryView: View {
                 if let cell = b.cellStats {
                     VStack(spacing: 6) {
                         sectionLabel("单体电压 (V)")
-                        Chart(Array(cell.bars.enumerated()), id: \.offset) { idx, v in
+                        Chart(Array(cell.bars.enumerated()), id: \.offset) { (_ idx, v) in
                             BarMark(x: .value("序号", idx), y: .value("V", v))
                                 .foregroundStyle(Theme.ok.opacity(0.7))
                                 .cornerRadius(1.5)
@@ -243,7 +243,7 @@ struct BatteryView: View {
                 if let probe = b.probeStats {
                     VStack(spacing: 6) {
                         sectionLabel("温度探针 (℃)")
-                        Chart(Array(probe.bars.enumerated()), id: \.offset) { idx, v in
+                        Chart(Array(probe.bars.enumerated()), id: \.offset) { (_ idx, v) in
                             BarMark(x: .value("序号", idx), y: .value("℃", v))
                                 .foregroundStyle(Theme.brand.opacity(0.55))
                                 .cornerRadius(1.5)
@@ -268,7 +268,7 @@ struct BatteryView: View {
         ExpandingCardBox(title: "充电", side: b.charging.text, sideCls: b.charging.cls.isEmpty ? "na" : b.charging.cls, cornerRadius: Theme.Radius.card) {
             VStack(spacing: 0) {
                 let rows = chargeRows(b)
-                ForEach(Array(rows.enumerated()), id: \.offset) { idx, r in
+                ForEach(Array(rows.enumerated()), id: \.offset) { (_ idx, r) in
                     KVRow(k: r.k, v: r.v)
                         .padding(.vertical, 8)
                     if idx < rows.count - 1 { ListDivider() }
@@ -315,12 +315,12 @@ struct BatteryView: View {
             if !b.motors.isEmpty {
                 ExpandingCardBox(title: "动力系统", side: "\(b.motors.count) 台电机", cornerRadius: Theme.Radius.card) {
                     VStack(spacing: 12) {
-                        ForEach(Array(b.motors.enumerated()), id: \.offset) { _, m in
+                        ForEach(Array(b.motors.enumerated()), id: \.offset) { (_ idx, m) in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(m.num == "--" ? "驱动电机" : "驱动电机 #\(m.num)")
-                                    .font(Theme.font(.caption).bold()).foregroundStyle(.secondary)
+                                    .font(Theme.font(.caption as Font).bold()).foregroundStyle(.secondary)
                                 let rows = motorRows(m)
-                                ForEach(Array(rows.enumerated()), id: \.offset) { idx, r in
+                                ForEach(Array(rows.enumerated()), id: \.offset) { (_ idx, r) in
                                     KVRow(k: r.k, v: r.v)
                                     if idx < rows.count - 1 { ListDivider().opacity(0.4) }
                                 }
@@ -345,9 +345,9 @@ struct BatteryView: View {
                     ForEach(b.faults.filter { $0.count > 0 }) { f in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(f.name).font(Theme.font(.caption).bold())
+                                Text(f.name).font(Theme.font(.caption as Font).bold())
                                 Spacer()
-                                Text("\(f.count) 条").font(Theme.font(.caption).bold())
+                                Text("\(f.count) 条").font(Theme.font(.caption as Font).bold())
                                     .foregroundStyle(Theme.bad)
                             }
                             if !f.codes.isEmpty {
@@ -370,12 +370,12 @@ struct BatteryView: View {
             if !b.alarms.isEmpty {
                 CardBox(title: "电池告警", side: "共 \(b.alarms.count) 项", sideCls: "bad") {
                     VStack(spacing: 0) {
-                        ForEach(Array(b.alarms.enumerated()), id: \.offset) { idx, a in
+                        ForEach(Array(b.alarms.enumerated()), id: \.offset) { (_ idx, a) in
                             HStack {
                                 StatusDot(cls: "bad")
                                 Text(a).font(Theme.caption)
                                 Spacer()
-                                Text("触发").font(Theme.font(.footnote).bold())
+                                Text("触发").font(Theme.font(.footnote as Font).bold())
                                     .foregroundStyle(Theme.bad)
                             }
                             .padding(.vertical, 6)
@@ -389,14 +389,14 @@ struct BatteryView: View {
 
     // MARK: 辅助
     private func sectionLabel(_ t: String) -> some View {
-        Text(t).font(Theme.font(.footnote).bold()).foregroundStyle(.secondary)
+        Text(t).font(Theme.font(.footnote as Font).bold()).foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func miniStat(_ k: String, _ v: String, _ unit: String, warn: Bool = false) -> some View {
         HStack(spacing: 4) {
             Text(k).font(Theme.footnote).foregroundStyle(.secondary)
-            Text(v).font(Theme.font(.caption).bold(), design: .monospaced)
+            Text(v).font(Theme.font(.caption as Font).bold()).monospacedDigit()
                 .foregroundStyle(warn ? Theme.bad : .primary)
             Text(unit).font(Theme.micro).foregroundStyle(.secondary)
         }
@@ -454,7 +454,7 @@ struct BatteryView: View {
                     }
                     .font(Theme.micro.bold())
                     .padding(.horizontal, 12).padding(.vertical, 5)
-                    .background(energyTrendPeriod == period ? .accent : Color.secondary.opacity(0.15), in: Capsule())
+                    .background(energyTrendPeriod == period ? Color.accent : Color.secondary.opacity(0.15), in: Capsule())
                     .foregroundStyle(energyTrendPeriod == period ? .white : .secondary)
                 }
             }
@@ -468,12 +468,12 @@ struct BatteryView: View {
                         y: .value("SOC %", rec.soc)
                     )
                     .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: energyTrendPeriod == .realtime ? [] : [4, 2]))
-                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : .accent)
+                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : Color.accent)
                     PointMark(
                         x: .value("时间", rec.timestamp, unit: .second),
                         y: .value("SOC %", rec.soc)
                     )
-                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : .accent)
+                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : Color.accent)
                     .symbolSize(8)
                 }
                 // 填充区域
@@ -498,7 +498,7 @@ struct BatteryView: View {
         .glassCard(corner: Theme.Radius.card)
     }
 
-    private func timeFormat() -> AxisValueLabelFormat {
+    private func timeFormat() -> any AxisFormatter {
         switch energyTrendPeriod {
         case .realtime: return .dateTime.hour()
         case .week: return .dateTime.hour().weekday(.abbreviated)
@@ -522,7 +522,7 @@ struct BatteryView: View {
 
     // MARK: SOC入场动画
     private func startSocAnimation() {
-        withAnimation(.spring(Theme.Duration.springNormal)) { socCardOpacity = 1 }
+        withAnimation(Theme.Duration.springNormal) { socCardOpacity = 1 }
         let e = VM.energy(store.caches, store.car)
         let target = max(0, min(100, e.socPct))
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -560,7 +560,7 @@ struct BatteryView: View {
             loaded = true
             errText = ""
             // 刷新后重新播放 SOC 液态玻璃入场动画
-            withAnimation(.spring(Theme.Duration.springFast)) { socCardOpacity = 0; socProgress = 0; socCount = 0; pulseTrigger = "" }
+            withAnimation(Theme.Duration.springFast) { socCardOpacity = 0; socProgress = 0; socCount = 0; pulseTrigger = "" }
             startSocAnimation()
         } catch {
         } catch {
@@ -612,7 +612,7 @@ struct DestinationCalculatorView: View {
                 calculateReach()
             }
             .buttonStyle(.borderedProminent)
-            .tint(.accent)
+            .tint(Color.accent)
 
             Button("取消") { dismiss() }
                 .font(Theme.body)

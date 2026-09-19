@@ -20,7 +20,7 @@ private struct ColorSwatch: View {
                     .fill(color)
                     .frame(width: 36, height: 36)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(name).font(Theme.font(.caption).bold()).foregroundStyle(.primary)
+                    Text(name).font(Theme.font(.caption as Font).bold()).foregroundStyle(.primary)
                     if let sampleText {
                         Text(sampleText).font(Theme.footnote).foregroundStyle(.secondary)
                     }
@@ -107,7 +107,7 @@ private struct ContrastRow: View {
             .frame(maxWidth: .infinity)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(name).font(Theme.font(.caption).bold()).foregroundStyle(.primary)
+                Text(name).font(Theme.font(.caption as Font).bold()).foregroundStyle(.primary)
                 Text("light: #\(lightColor.hexString())\ndark:  #\(darkColor.hexString())")
                     .font(Theme.micro)
                     .foregroundStyle(.secondary)
@@ -127,7 +127,7 @@ private struct ContrastRow: View {
 struct DevView: View {
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.Spacing.card) {
+            VStack(spacing: Theme.Spacing.cardSpacing) {
                 // Hero 说明卡
                 VStack(spacing: Theme.Spacing.sm) {
                     Text("颜色预览").font(Theme.h2.bold()).foregroundStyle(.primary)
@@ -153,7 +153,7 @@ struct DevView: View {
                     ("ok  通过",      .green,         "正常 / 成功"),
                     ("warn  警告",    .orange,        "注意 / 预警"),
                     ("bad  错误",     .red,           "故障 / 异常"),
-                    ("acc  强调",     .accent,   "品牌强调色"),
+                    ("acc  强调",     Color.accent,   "品牌强调色"),
                     ("na   未知",     .secondary,     "无数据 / 未定义"),
                 ])
 
@@ -243,7 +243,7 @@ struct DevView: View {
             .padding(.horizontal, 16)
             .safeAreaPadding(.bottom, 12)
         }
-        .pageBackground(.accent)
+        .pageBackground(Color.accent)
         .navigationTitle("颜色预览").navBarStyle()
     }
 }
@@ -280,7 +280,7 @@ struct PerformanceMetricsCard: View {
                 HStack {
                     Text("指令历史记录").font(Theme.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Text("\(commandCount) 条").font(Theme.monoLg).foregroundStyle(.accent)
+                    Text("\(commandCount) 条").font(Theme.monoLg).foregroundStyle(Color.accent)
                 }
                 ListDivider()
                 HStack {
