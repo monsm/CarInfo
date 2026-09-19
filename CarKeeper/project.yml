@@ -47,7 +47,6 @@ targets:
     - target: WidgetBundle
     - target: ChargingLiveActivity
     - target: CarPlay
-    - target: AppClip
   WidgetBundle:
     type: bundle
     platform: iOS
