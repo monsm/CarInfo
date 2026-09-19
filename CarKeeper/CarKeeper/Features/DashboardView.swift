@@ -86,6 +86,16 @@ struct DashboardView: View {
         .navigationTitle("仪表盘")
         .navigationBarTitleDisplayMode(.inline)
     }
+
+    private func periodChip(text: String, selected: Bool) -> some View {
+        Text(text)
+            .font(.subheadline)
+            .foregroundColor(selected ? .white : .secondary)
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(selected ? Theme.Colors.accent : Color.clear)
+            .cornerRadius(Theme.Radius.sm)
+    }
 }
 
 struct DashTile: View {
@@ -109,17 +119,6 @@ struct DashTile: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, Theme.Spacing.sm)
         .glassCard()
-    }
-}
-
-    private func periodChip(text: String, selected: Bool) -> some View {
-        Text(text)
-            .font(.subheadline)
-            .foregroundColor(selected ? .white : .secondary)
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.vertical, Theme.Spacing.xs)
-            .background(selected ? Theme.Colors.accent : Color.clear)
-            .cornerRadius(Theme.Radius.sm)
     }
 }
 
