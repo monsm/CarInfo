@@ -60,66 +60,65 @@ struct HomeView: View {
     }
 
     private var content: some View {
+        contentBehavior
+            .alert("上车打卡", isPresented: $showCheckInReminder) {
+                checkInAlertButtons
+            } message: {
+                Text("今天还没检查车况，建议上车前确认胎压、电量是否正常。")
+            }
+            .sheet(isPresented: $showSearch) { searchSheet }
+            .gesture(swipeDownToSearch)
+            .glassRefreshRipple(isRefreshing: $isRefreshing)
+            .glassRefreshHalo(isRefreshing: $isRefreshing)
+            .glassSwitchRipple(isSwitching: $switchingCar)
+    }
+
+    /// 生命周期与下拉刷新（第二段链，独立成类型检查单元）
+    private var contentBehavior: some View {
+        contentVisual
+            .onChange(of: store.carId) { newId in
+                guard !newId.isEmpty else { return }
+                withAnimation(.easeInOut(duration: 0.08)) {
+                    carVersion += 1
+                }
+                // 切换车辆时触发全屏玻璃涟漪扩散动效
+                switchingCar = true
+                // B7: 胎压数值变化脉冲
+                tyreWatchValue = UUID().uuidString
+            }
+            .onChange(of: switchingCar) { switching in
+                guard switching else { return }
+                // 涟漪扩散后自动消散
+                scheduleSwitchingReset()
+            }
+            .onAppear { startPolling(); startSocAnimation(); startMileAnimation(); tyreWatchValue = UUID().uuidString }
+            .onDisappear {
+                startTimer?.cancel()
+                startTimer = nil
+            }
+            .refreshable { isRefreshing = true; await fetchCore(); isRefreshing = false }
+    }
+
+    /// 视觉与工具栏（第一段链）
+    private var contentVisual: some View {
         ScrollView {
             cardStack
         }
         .id(carVersion)
-        .transition(
-            .asymmetric(
-                insertion: .move(edge: .trailing)
-                    .combined(with: .opacity)
-                    .combined(with: .scale(scale: 0.96, anchor: .center)),
-                removal: .move(edge: .leading)
-                    .combined(with: .opacity)
-                    .combined(with: .scale(scale: 0.96, anchor: .center))
-            )
-        )
-        .animation(.spring(response: 0.45, dampingFraction: 0.7, blendDuration: 0.4), value: carVersion)
+        .transition(carSwitchTransition)
+        .animation(carSwitchAnimation, value: carVersion)
         .scrollBounceBehavior(.basedOnSize)
         .milestoneCelebration(mileage: mileCount)
         .pageBackground(Theme.Colors.accent)
         .toolbar {
             // #NEW-130 专注模式切换
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    let fm = FocusModeManager.shared
-                    withAnimation(.spring()) {
-                        fm.saveConfig(FocusModeConfig(
-                            enabled: !fm.config.enabled,
-                            hideSensitiveData: fm.config.hideSensitiveData,
-                            showEssentialOnly: fm.config.showEssentialOnly,
-                            doNotDisturb: fm.config.doNotDisturb,
-                            autoStartDriving: fm.config.autoStartDriving,
-                            customMessage: fm.config.customMessage
-                        ))
-                    }
-                } label: {
-                    Image(systemName: FocusModeManager.shared.config.enabled ? "moon.fill" : "moon.stars.fill")
-                        .foregroundColor(FocusModeManager.shared.config.enabled ? Theme.Colors.accent : .secondary)
-                }
-                .accessibilityLabel(Text(FocusModeManager.shared.config.enabled ? "退出专注模式" : "启用专注模式"))
-            }
+            ToolbarItem(placement: .navigationBarLeading) { focusModeToolbarItem }
             // #24 卡片排序编辑按钮
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    isEditingOrder.toggle()
-                } label: {
-                    if isEditingOrder {
-                        Text("完成")
-                            .font(Theme.caption.weight(.semibold))
-                    } else {
-                        Image(systemName: "arrow.up.arrow.down")
-                    }
-                }
-                .accessibilityLabel(Text(isEditingOrder ? "完成排序" : "编辑卡片顺序"))
-            }
+            ToolbarItem(placement: .navigationBarTrailing) { orderToolbarItem }
         }
         .overlay(alignment: .top) {
             // #41 天气联动主题 - 雨天粒子效果
-            if WeatherTheme.currentCondition == .rainy {
-                WeatherEffectView(particles: WeatherTheme.weatherParticles)
-                    .opacity(0.3)
-            }
+            rainOverlay
         }
         .navigationTitle("车况").navBarStyle()
         .toolbar {
@@ -128,51 +127,84 @@ struct HomeView: View {
                 shareToolbarButton
             }
         }
-        .onChange(of: store.carId) { newId in
-            guard !newId.isEmpty else { return }
-            withAnimation(.easeInOut(duration: 0.08)) {
-                carVersion += 1
-            }
-            // 切换车辆时触发全屏玻璃涟漪扩散动效
-            switchingCar = true
-            // B7: 胎压数值变化脉冲
-            tyreWatchValue = UUID().uuidString
-        }
-        .onChange(of: switchingCar) { switching in
-            guard switching else { return }
-            // 涟漪扩散后自动消散
-            scheduleSwitchingReset()
-        }
-        .onAppear { startPolling(); startSocAnimation(); startMileAnimation(); tyreWatchValue = UUID().uuidString }
-        .alert("上车打卡", isPresented: $showCheckInReminder) {
-            checkInAlertButtons
-        } message: {
-            Text("今天还没检查车况，建议上车前确认胎压、电量是否正常。")
-        }
-        // #NEW-123 下滑触发全局搜索
-        .gesture(
-            DragGesture()
-                .onEnded { value in
-                    if value.startLocation.y - value.changedLocation.y > 100 {
-                        showSearch = true
-                    }
-                }
+    }
+
+    // #NEW-130 专注模式切换
+    private var focusModeToolbarItem: some View {
+        Button(action: { toggleFocusMode() }, label: {
+            Image(systemName: FocusModeManager.shared.config.enabled ? "moon.fill" : "moon.stars.fill")
+                .foregroundColor(FocusModeManager.shared.config.enabled ? Theme.Colors.accent : .secondary)
+        })
+        .accessibilityLabel(Text(FocusModeManager.shared.config.enabled ? "退出专注模式" : "启用专注模式"))
+    }
+
+    private func toggleFocusMode() {
+        let fm = FocusModeManager.shared
+        let next = FocusModeConfig(
+            enabled: !fm.config.enabled,
+            hideSensitiveData: fm.config.hideSensitiveData,
+            showEssentialOnly: fm.config.showEssentialOnly,
+            doNotDisturb: fm.config.doNotDisturb,
+            autoStartDriving: fm.config.autoStartDriving,
+            customMessage: fm.config.customMessage
         )
-        .sheet(isPresented: $showSearch) {
-            NavigationStack {
-                GlobalSearchHUD(isPresented: $showSearch)
-                    .navigationTitle("搜索")
-                    .navigationBarTitleDisplayMode(.inline)
+        withAnimation(.spring()) {
+            fm.saveConfig(next)
+        }
+    }
+
+    // #24 卡片排序编辑按钮
+    private var orderToolbarItem: some View {
+        Button(action: { isEditingOrder.toggle() }, label: {
+            if isEditingOrder {
+                Text("完成").font(Theme.caption.weight(.semibold))
+            } else {
+                Image(systemName: "arrow.up.arrow.down")
             }
+        })
+        .accessibilityLabel(Text(isEditingOrder ? "完成排序" : "编辑卡片顺序"))
+    }
+
+    // #41 天气联动主题 - 雨天粒子效果
+    @ViewBuilder
+    private var rainOverlay: some View {
+        if WeatherTheme.currentCondition == .rainy {
+            WeatherEffectView(particles: WeatherTheme.weatherParticles)
+                .opacity(0.3)
         }
-        .onDisappear {
-            startTimer?.cancel()
-            startTimer = nil
+    }
+
+    // #NEW-123 下滑触发全局搜索
+    private var swipeDownToSearch: some Gesture {
+        DragGesture()
+            .onEnded { value in
+                if value.startLocation.y - value.changedLocation.y > 100 {
+                    showSearch = true
+                }
+            }
+    }
+
+    private var searchSheet: some View {
+        NavigationStack {
+            GlobalSearchHUD(isPresented: $showSearch)
+                .navigationTitle("搜索")
+                .navigationBarTitleDisplayMode(.inline)
         }
-        .refreshable { isRefreshing = true; await fetchCore(); isRefreshing = false }
-        .glassRefreshRipple(isRefreshing: $isRefreshing)
-        .glassRefreshHalo(isRefreshing: $isRefreshing)
-        .glassSwitchRipple(isSwitching: $switchingCar)
+    }
+
+    private var carSwitchTransition: AnyTransition {
+        .asymmetric(
+            insertion: .move(edge: .trailing)
+                .combined(with: .opacity)
+                .combined(with: .scale(scale: 0.96, anchor: .center)),
+            removal: .move(edge: .leading)
+                .combined(with: .opacity)
+                .combined(with: .scale(scale: 0.96, anchor: .center))
+        )
+    }
+
+    private var carSwitchAnimation: Animation {
+        .spring(response: 0.45, dampingFraction: 0.7, blendDuration: 0.4)
     }
 
 
