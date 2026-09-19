@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 
 // 消息中心：日期分组 + 就地展开详情 + 未读计数
 struct MessagesView: View {
@@ -8,6 +9,10 @@ struct MessagesView: View {
     @State private var expanded: Set<String> = []
     @State private var loadTask: Task<Void, Never>? = nil
     @State private var isRefreshing = false            // 下拉刷新涟漪标志
+    // #NEW-5 搜索和筛选
+    @State private var searchText = ""
+    @State private var filterTag: String? = nil
+    @State private var showUnreadOnly = false
     @EnvironmentObject var nav: NavState                // C3: 用于 pushNavigation
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
@@ -42,13 +47,58 @@ struct MessagesView: View {
 
     var body: some View {
         ScrollView {
+            // #NEW-5 搜索和筛选栏
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
+                    TextField("搜索消息…", text: $searchText)
+                        .textFieldStyle(.roundedBorder)
+                        .font(Theme.caption)
+                    Button(action: { filterTag = nil }) {
+                        Image(systemName: filterTag != nil ? "xmark.circle.fill" : "line.3.horizontal.decrease")
+                            .font(Theme.caption)
+                            .foregroundStyle(filterTag != nil ? .accentColor : .secondary)
+                    }
+                    .accessibilityLabel(Text(filterTag != nil ? "清除筛选" : "按标签筛选"))
+                    Button(action: { showUnreadOnly.toggle() }) {
+                        Image(systemName: showUnreadOnly ? "eye.fill" : "eye.slash.fill")
+                            .font(Theme.caption)
+                            .foregroundStyle(showUnreadOnly ? .accentColor : .secondary)
+                    }
+                    .accessibilityLabel(Text(showUnreadOnly ? "显示全部消息" : "仅显示未读"))
+                }
+                // 筛选标签胶囊
+                if !allTags.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            Button(filterTag == nil ? "全部" : allTags.first ?? "全部") {
+                                filterTag = nil
+                            }
+                            .font(Theme.micro.bold())
+                            .padding(.horizontal, 12).padding(.vertical, 5)
+                            .background(filterTag == nil ? Color.accentColor : Color.secondary.opacity(0.15), in: Capsule())
+                            .foregroundStyle(filterTag == nil ? .white : .secondary)
+                            ForEach(allTags.dropFirst(), id: \.self) { tag in
+                                Button(tag) {
+                                    filterTag = filterTag == tag ? nil : tag
+                                }
+                                .font(Theme.micro.bold())
+                                .padding(.horizontal, 12).padding(.vertical, 5)
+                                .background(filterTag == tag ? Color.accentColor : Color.secondary.opacity(0.15), in: Capsule())
+                                .foregroundStyle(filterTag == tag ? .white : .secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal)
+
             if loading {
                 PageLoadingView("正在加载消息…")
-            } else if items.isEmpty {
-                PageEmptyView("暂无消息", subtitle: "车辆暂无推送消息", icon: "bubble.left.and.bubble.right")
+            } else if filteredItems.isEmpty {
+                PageEmptyView("暂无消息", subtitle: searchText.isEmpty ? "车辆暂无推送消息" : "没有找到匹配的消息", icon: "bubble.left.and.bubble.right")
             } else {
                 LazyVStack(spacing: 10) {
-                    ForEach(Array(grouped.enumerated()), id: \.offset) { _, group in
+                    ForEach(Array(filteredGrouped.enumerated()), id: \.offset) { _, group in
                         Section {
                             ForEach(group.items) { item in
                                 messageRow(item)
@@ -80,11 +130,67 @@ struct MessagesView: View {
         .navigationTitle("消息")
             .navBarStyle()
             .accessibilityLabel(Text("消息"))
-            .accessibilityHint(Text("车辆通知和历史消息列表"))
+            .accessibilityHint(Text("车辆通知和历史消息列表，支持搜索和筛选"))
+        .toolbar {
+            // #NEW-5 全部已读按钮
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    markAllRead()
+                } label: {
+                    Text("全部已读")
+                        .font(Theme.caption.bold())
+                        .foregroundStyle(.accentColor)
+                }
+                .accessibilityLabel(Text("全部已读"))
+            }
+        }
         .onAppear { loadIfNeeded() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { isRefreshing = true; await load(); isRefreshing = false }
         .glassRefreshRipple(isRefreshing: $isRefreshing)
+    }
+
+    // #NEW-5 过滤后的消息列表
+    private var filteredItems: [MessageItem] {
+        items.filter { item in
+            let matchSearch = searchText.isEmpty ||
+                item.title.localizedCaseInsensitiveContains(searchText) ||
+                item.body.localizedCaseInsensitiveContains(searchText)
+            let matchTag = filterTag == nil || item.tag == filterTag
+            let matchUnread = !showUnreadOnly || !item.read
+            return matchSearch && matchTag && matchUnread
+        }
+    }
+
+    private var allTags: [String] {
+        let tags = Set(items.map { $0.tag }).filter { !$0.isEmpty }
+        return Array(tags).sorted()
+    }
+
+    private var filteredGrouped: [(label: String, items: [MessageItem], unread: Int)] {
+        let map: [String: [MessageItem]] = Dictionary(grouping: filteredItems) { dayKey($0.time) }
+        let dated = map
+            .map { key, its in
+                (label: dayLabel(key), items: its, unread: its.filter { !$0.read }.count,
+                 sortKey: its.first?.time ?? "")
+            }
+            .filter { $0.label != "更早" }
+            .sorted { a, b in a.sortKey > b.sortKey }
+        let earlier = map
+            .map { key, its in
+                (label: dayLabel(key), items: its, unread: its.filter { !$0.read }.count)
+            }
+            .filter { $0.label == "更早" }
+        return dated.map { ($0.label, $0.items, $0.unread) } + earlier.map { ($0.label, $0.items, $0.unread) }
+    }
+
+    // #NEW-5 全部已读
+    private func markAllRead() {
+        var s = Self.localRead
+        items.forEach { s.insert($0.id) }
+        Self.localRead = s
+        for i in items.indices { items[i].read = true }
+        ToastManager.shared.show("已全部标为已读", icon: "checkmark.circle.fill")
     }
 
     // MARK: 分组（今天/昨天/前天/M月d日/更早）

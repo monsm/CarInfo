@@ -74,7 +74,8 @@ struct ControlView: View {
                 // #18 快捷预设场景
                 presetScenesCard.staggeredEntrance(index: 2)
                 if let run = running { runningCard(run).staggeredEntrance(index: 3) }
-                commandCard.staggeredEntrance(index: 4)
+                SiriShortcutsCard().staggeredEntrance(index: 4)
+                commandCard.staggeredEntrance(index: 5)
                 if let bd = bodyDetail { bodyDetailCard(bd) }
                 if !history.isEmpty { historyCard.staggeredEntrance(index: 0) }
             }

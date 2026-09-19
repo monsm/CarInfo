@@ -3,30 +3,236 @@ options:
   bundleIdPrefix: com.you
   deploymentTarget:
     iOS: "26.0"
+    watchOS: "10.0"
   createIntermediateGroups: true
 settings:
   base:
     SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    WATCHOS_DEPLOYMENT_TARGET: "10.0"
     CURRENT_PROJECT_VERSION: 1
     MARKETING_VERSION: 1.0.0
+    APPLICATION_EXTENSION_API_ONLY: "YES"
+
 targets:
+  # =============================================================================
+  # Main App Target
+  # =============================================================================
   CarKeeper:
     type: application
     platform: iOS
     sources:
-      - CarKeeper/
+      - path: CarKeeper/
     resources:
-      - CarKeeper/Resources/Assets.xcassets
+      - path: CarKeeper/Resources/
+        group: Resources
+      - path: CarKeeper/Resources/Assets.xcassets
+        group: Resources/Assets.xcassets
     info:
-      path: CarKeeper/Resources/Info.plist
+      path: CarKeeper/CarKeeper/Resources/Info.plist
+      properties:
+        CFBundleURLSchemes:
+          - carkeeper
+        NSLocationWhenInUseUsageDescription: 用于显示车辆当前位置
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        ITSAppUsesNonExemptEncryption: false
     settings:
       base:
-        SWIFT_VERSION: "5.0"
         PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper
         PRODUCT_NAME: CarKeeper
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: "NO"
-        SWIFT_EMIT_LOC_STRINGS: "NO"
         TARGETED_DEVICE_FAMILY: "1,2"
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+        CODE_SIGN_ENTITLEMENTS: CarKeeper/CarKeeper/CarKeeper.entitlements
+    dependencies:
+      - target: CarKeeper/Widgets/WidgetBundle
+      - target: CarKeeper/LiveActivities/ChargingLiveActivity
+      - target: CarKeeper/WatchApp/WatchApp
+      - target: CarKeeper/CarPlay/CPParentViewController
+      - target: CarKeeper/AppClip/AppClipEntrance
+    preBuildScripts:
+      - name: "Strip unused symbols"
+        script: |
+          echo "No pre-build scripts needed"
+        executionScope: whenNeeded
+
+  # =============================================================================
+  # Widget Extension — Today Extension (锁屏/桌面 Widget)
+  # =============================================================================
+  WidgetBundle:
+    type: bundle
+    platform: iOS
+    sources:
+      - path: Widgets/
+        excludes:
+          - "**/.*"
+    info:
+      path: Widgets/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).CarKeeperWidgetBundle
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper.widget
+        PRODUCT_NAME: WidgetBundle
+        GENERATE_INFOPLIST_FILE: "YES"
+        ENABLE_PREVIEWS: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+    dependencies:
+      - target: CarKeeper
+
+  # =============================================================================
+  # Live Activity Extension — Dynamic Island (充电状态实时推送)
+  # =============================================================================
+  ChargingLiveActivity:
+    type: bundle
+    platform: iOS
+    sources:
+      - path: LiveActivities/
+        excludes:
+          - "**/.*"
+    info:
+      path: LiveActivities/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.liveactivity
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ChargingLiveActivityView
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper.liveactivity
+        PRODUCT_NAME: ChargingLiveActivity
+        GENERATE_INFOPLIST_FILE: "YES"
+        ENABLE_PREVIEWS: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+    dependencies:
+      - target: CarKeeper
+
+  # =============================================================================
+  # WatchKit Extension — Apple Watch App
+  # =============================================================================
+  WatchApp:
+    type: bundle
+    platform: watchOS
+    sources:
+      - path: WatchApp/
+        excludes:
+          - "**/.*"
+    info:
+      path: WatchApp/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.watchkit
+          NSExtensionAttributes:
+            WKAppBundleIdentifier: com.you.CarKeeper.watchkitapp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper.watchkitextension
+        PRODUCT_NAME: WatchApp
+        GENERATE_INFOPLIST_FILE: "YES"
+        ENABLE_PREVIEWS: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+        WATCHOS_DEPLOYMENT_TARGET: "10.0"
+    dependencies:
+      - target: CarKeeper
+
+  # =============================================================================
+  # Watch App (the actual watch app binary)
+  # =============================================================================
+  WatchKitApp:
+    type: application
+    platform: watchOS
+    sources:
+      - path: WatchApp/WatchApp/
+        excludes:
+          - "**/.*"
+    info:
+      path: WatchApp/WatchApp/Info.plist
+      properties:
+        WKCompanionAppBundleIdentifier: com.you.CarKeeper
+        WKWatchKitApp: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper.watchkitapp
+        PRODUCT_NAME: WatchKitApp
+        CODE_SIGN_ENTITLEMENTS: WatchApp/WatchApp.entitlements
+        WATCHOS_DEPLOYMENT_TARGET: "10.0"
+        GENERATE_INFOPLIST_FILE: "NO"
+    dependencies:
+      - target: WatchApp
+
+  # =============================================================================
+  # CarPlay Extension — 车载屏幕
+  # =============================================================================
+  CarPlay:
+    type: bundle
+    platform: iOS
+    sources:
+      - path: CarPlay/
+        excludes:
+          - "**/.*"
+    info:
+      path: CarPlay/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.carplay.app-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).CPParentViewController
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper.carplay
+        PRODUCT_NAME: CarPlay
+        GENERATE_INFOPLIST_FILE: "YES"
+        ENABLE_PREVIEWS: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+    dependencies:
+      - target: CarKeeper
+
+  # =============================================================================
+  # AppClip — 扫码车牌快速体验
+  # =============================================================================
+  AppClip:
+    type: application
+    platform: iOS
+    sources:
+      - path: AppClip/
+        excludes:
+          - "**/.*"
+    resources:
+      - path: AppClip/AppClipIcon.imagestack
+        group: AppClipIcon
+    info:
+      path: AppClip/Info.plist
+      properties:
+        NSAppClip:
+          NSAppClipRequestEphemeralUserNotification: false
+          NSAppClipRequestLocationConfirmation: false
+        CFBundleURLSchemes:
+          - carkeeper-clip
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper.clip
+        PRODUCT_NAME: AppClip
+        CODE_SIGN_ENTITLEMENTS: AppClip/AppClip.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppClipIcon
+        GENERATE_INFOPLIST_FILE: "NO"
+        APP_CLIP: true
+    dependencies:
+      - target: CarKeeper
+
+# =============================================================================
+# Shared Settings
+# =============================================================================
+settings:
+  base:
+    # App Group for sharing data across targets
+    APPLICATION_GROUP_IDENTIFIER: "group.com.you.CarKeeper"
+    # Common build settings
+    SWIFT_EMIT_LOC_STRINGS: "YES"
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: "1.0.0"

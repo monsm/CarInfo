@@ -2,12 +2,15 @@
 // AppClip — #46 完整实现
 // 扫码车牌直接进入车辆页面，无需安装完整 App
 // 使用方法：创建 AppClip Target，使用相同 Bundle ID 前缀
+// 支持的 URL Scheme：carkeeper://plate/京A12345
 // =============================================================================
 
 import SwiftUI
 import UIKit
+import WidgetKit
 
-/// AppClip 入口 Bundle
+// MARK: - AppClip 入口 Bundle
+
 struct CarClipBundle: WidgetBundle {
     var body: some Widget {
         // AppClip 可以包含 Widget
@@ -15,11 +18,13 @@ struct CarClipBundle: WidgetBundle {
 }
 
 // MARK: - AppClip 入口视图
+
 struct AppClipEntranceView: View {
     @State private var plateInput: String = ""
     @State private var isLoading = false
     @State private var hasError = false
     @State private var showMainApp = false
+    @State private var carData: [String: Any]? = nil
     
     var body: some View {
         ZStack {
@@ -39,167 +44,144 @@ struct AppClipEntranceView: View {
                         .frame(width: 80, height: 80)
                         .overlay(Circle().strokeBorder(Color.white.opacity(0.2), lineWidth: 1))
                     Image(systemName: "car.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.accentColor)
+                        .font(.system(size: 36))
+                        .foregroundStyle(.white)
                 }
                 
-                Text("长安车管家")
-                    .font(.system(size: 24, weight: .bold))
+                Text("CarKeeper").font(.system(size: 24, weight: .bold)).foregroundStyle(.white)
+                Text("扫码车牌，快速查看车辆状态").font(.system(size: 14)).foregroundStyle(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
                 
-                Text("快速查看您的车辆状态")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                
-                Divider()
-                
-                // 车牌输入
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("输入车牌号")
-                        .font(.system(size: 14, weight: .semibold))
-                    
-                    TextField("例如：京A·12345", text: $plateInput)
-                        .font(.system(size: 18))
+                // 车牌输入框
+                HStack(spacing: 12) {
+                    Image(systemName: "creditcard.fill").font(.title3).foregroundStyle(.accentColor)
+                    TextField("请输入车牌号", text: $plateInput)
+                        .font(.system(size: 18, weight: .medium, design: .monospaced))
                         .textInputAutocapitalization(.characters)
-                        .padding()
-                        .background(.thin, in: RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
-                        )
+                        .keyboardType(.asciiCapable)
+                        .autocorrectionDisabled()
+                    if !plateInput.isEmpty {
+                        Button { plateInput = "" }
+                        .foregroundStyle(.secondary)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(.thin, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1))
                 
+                // 加载状态
                 if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .accentColor))
+                    ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    Text("正在查询车辆信息...").font(.system(size: 13)).foregroundStyle(.white.opacity(0.6))
                 }
                 
+                // 错误提示
                 if hasError {
-                    Text("未找到该车辆，请检查车牌号或安装完整应用")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.red)
-                        .padding()
-                        .background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                    Text("未找到该车辆，请检查车牌号或下载完整 App")
+                        .font(.system(size: 13)).foregroundStyle(.red.opacity(0.8))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(.thin, in: RoundedRectangle(cornerRadius: 12))
                 }
                 
                 // 主要操作按钮
                 Button {
-                    handleLogin()
+                    isLoading = true
+                    hasError = false
+                    // 模拟查询（实际需调用 API）
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        isLoading = false
+                        if plateInput.count >= 7 {
+                            carData = ["name": "特斯拉 Model 3", "soc": 85, "range": 420, "temp": "21℃", "locked": true]
+                        } else {
+                            hasError = true
+                        }
+                    }
                 } label: {
-                    Text("查看车辆")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                    Text("查询车辆")
+                        .font(.system(size: 17, weight: .semibold))
                         .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(AngularGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.vertical, 16)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
+                        .foregroundStyle(.accentColor)
                 }
                 
+                // 已有账号？打开完整 App
                 Button {
                     showMainApp = true
                 } label: {
-                    HStack {
-                        Image(systemName: "square.and.arrow.down")
-                        Text("安装完整应用")
-                    }
-                    .font(.system(size: 14))
-                    .foregroundStyle(.accentColor)
+                    Text("打开完整 App")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.white.opacity(0.6))
                 }
                 
                 Spacer()
                 
                 // 功能说明
                 VStack(spacing: 12) {
-                    FeatureRow(icon: "bolt.fill", title: "实时电量", desc: "SOC、续航")
-                    FeatureRow(icon: "lock.fill", title: "远程控车", desc: "锁车/解锁")
-                    FeatureRow(icon: "thermometer", title: "空调控制", desc: "远程制冷/制热")
+                    FeatureItem(icon: "battery.100.fill", label: "实时电量")
+                    FeatureItem(icon: "thermometer", label: "车内温度")
+                    FeatureItem(icon: "lock.fill", label: "门锁状态")
                 }
-                .padding(.horizontal, 20)
-                
-                Spacer()
+                .padding(.top, 20)
             }
-            .padding()
+            .padding(.horizontal, 24)
         }
         .sheet(isPresented: $showMainApp) {
-            MainAppRedirectView()
-        }
-    }
-    
-    private func handleLogin() {
-        guard !plateInput.isEmpty else { return }
-        isLoading = true
-        hasError = false
-        
-        // 模拟登录验证
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            isLoading = false
-            // 实际项目中应调用 API 验证车牌
-            hasError = plateInput.count < 5
-            if !hasError {
-                // 跳转到主 App
-                showMainApp = true
-            }
+            Text("跳转到主 App（需已安装）")
         }
     }
 }
 
-struct FeatureRow: View {
+struct FeatureItem: View {
     let icon: String
-    let title: String
-    let desc: String
+    let label: String
     
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundStyle(.accentColor)
-                .frame(width: 32, height: 32)
-                .background(.thin, in: RoundedRectangle(cornerRadius: 8))
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                Text(desc)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            
-            Spacer()
+        HStack(spacing: 10) {
+            Image(systemName: icon).font(.title3).foregroundStyle(.white.opacity(0.8))
+            Text(label).font(.system(size: 14)).foregroundStyle(.white.opacity(0.8))
         }
     }
 }
 
-struct MainAppRedirectView: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "square.and.arrow.up.on.square")
-                .font(.system(size: 60))
-                .foregroundStyle(.accentColor)
-            
-            Text("正在跳转到主应用...")
-                .font(.system(size: 18, weight: .semibold))
-            
-            Text("如果未自动跳转，请手动打开长安车管家 App")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            
-            Button("打开 App Store") {
-                // 跳转到 App Store
-                if let url = URL(string: "https://apps.apple.com/app/id") {
-                    UIApplication.shared.open(url)
-                }
-                dismiss()
-            }
-            .buttonStyle(.borderedProminent)
-            
-            Button("返回") {
-                dismiss()
-            }
-            .font(.system(size: 14))
-            .foregroundStyle(.secondary)
+// MARK: - AppClip 路由处理
+
+enum CarClipRoute {
+    static func handle(url: URL) -> AppClipEntranceView? {
+        // 解析 carkeeper://plate/京A12345
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.host == "plate",
+              let plate = components.path.trimmingCharacters(in: .characters(in: "/")) else {
+            return nil
         }
-        .padding()
-        .presentationDetents([.medium])
+        var view = AppClipEntranceView()
+        // 通过 binding 传入车牌（需要包装为 StateObject 或 @State）
+        return view
+    }
+}
+
+// MARK: - AppClipAppDelegate
+
+class CarClipAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        if let route = CarClipRoute.handle(url: url) {
+            // 这里应该切换根视图，实际需要更复杂的处理
+            print("AppClip opened for plate: \(url.absoluteString)")
+        }
+        return true
+    }
+    
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        return true
+    }
+}
+
+// MARK: - 预览
+
+struct AppClipEntrance_Previews: PreviewProvider {
+    static var previews: some View {
+        AppClipEntranceView()
     }
 }

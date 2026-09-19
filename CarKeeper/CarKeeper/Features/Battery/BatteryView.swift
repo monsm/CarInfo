@@ -19,6 +19,14 @@ struct BatteryView: View {
     @State private var showDestinationCalc = false
     @State private var destinationDistance: String = ""
     @State private var canReach: Bool?
+    // #NEW-8 能耗趋势视图切换（实时/本周/本月）
+    enum EnergyTrendPeriod: String, CaseIterable, Identifiable {
+        case realtime = "实时"
+        case week = "本周"
+        case month = "本月"
+        var id: String { rawValue }
+    }
+    @State private var energyTrendPeriod: EnergyTrendPeriod = .realtime
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     var body: some View {
@@ -244,36 +252,6 @@ struct BatteryView: View {
     }
 
     // MARK: 能耗历史折线图 (#13)
-    private var energyHistoryChart: some View {
-        guard store.energyHistory.count >= 2 else { return EmptyView() }
-        return CardBox(title: "能耗趋势", side: "\(store.energyHistory.count) 次记录", cornerRadius: Theme.Radius.card) {
-            Chart {
-                ForEach(store.energyHistory, id: \.id) { rec in
-                    LineMark(
-                        x: .value("时间", rec.timestamp, unit: .minute),
-                        y: .value("SOC %", rec.soc)
-                    )
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    .foregroundStyle(.green)
-                    PointMark(
-                        x: .value("时间", rec.timestamp, unit: .minute),
-                        y: .value("SOC %", rec.soc)
-                    )
-                    .foregroundStyle(.green)
-                }
-            }
-            .chartXAxis { axis in
-                AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: .dateTime.hour())
-                }
-            }
-            .frame(height: 140)
-            .padding(.vertical, 8)
-        }
-    }
-
-    // MARK: 充电
     private func chargeCard(_ b: BatteryModel) -> some View {
         ExpandingCardBox(title: "充电", side: b.charging.text, sideCls: b.charging.cls.isEmpty ? "na" : b.charging.cls, cornerRadius: Theme.Radius.card) {
             VStack(spacing: 0) {
@@ -449,33 +427,83 @@ struct BatteryView: View {
         return rows
     }
 
-    // MARK: 能耗历史折线图 (#13)
+    // MARK: 能耗趋势折线图 (#13 + #NEW-8)
     private var energyHistoryChart: some View {
         guard store.energyHistory.count >= 2 else { return EmptyView() }
-        return CardBox(title: "能耗趋势", side: "\(store.energyHistory.count) 次记录", cornerRadius: Theme.Radius.card) {
+        return VStack(spacing: 0) {
+            // 视图切换胶囊
+            HStack(spacing: 6) {
+                ForEach(EnergyTrendPeriod.allCases) { period in
+                    Button(period.rawValue) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                            energyTrendPeriod = period
+                        }
+                    }
+                    .font(Theme.micro.bold())
+                    .padding(.horizontal, 12).padding(.vertical, 5)
+                    .background(energyTrendPeriod == period ? Color.accentColor : Color.secondary.opacity(0.15), in: Capsule())
+                    .foregroundStyle(energyTrendPeriod == period ? .white : .secondary)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 4)
+            // 图表
             Chart {
-                ForEach(store.energyHistory, id: \.id) { rec in
+                ForEach(filteredEnergyRecords, id: \.id) { rec in
                     LineMark(
-                        x: .value("时间", rec.timestamp, unit: .minute),
+                        x: .value("时间", rec.timestamp, unit: .second),
                         y: .value("SOC %", rec.soc)
                     )
-                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                    .foregroundStyle(.green)
+                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: energyTrendPeriod == .realtime ? [] : [4, 2]))
+                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : .accentColor)
                     PointMark(
-                        x: .value("时间", rec.timestamp, unit: .minute),
+                        x: .value("时间", rec.timestamp, unit: .second),
                         y: .value("SOC %", rec.soc)
                     )
-                    .foregroundStyle(.green)
+                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : .accentColor)
+                    .symbolSize(8)
+                }
+                // 填充区域
+                ForEach(filteredEnergyRecords, id: \.id) { rec in
+                    AreaMark(
+                        x: .value("时间", rec.timestamp, unit: .second),
+                        y: .value("SOC %", rec.soc)
+                    )
+                    .foregroundStyle(LinearGradient(colors: [.green.opacity(0.2), .green.opacity(0.02)], startPoint: .top, endPoint: .bottom))
                 }
             }
             .chartXAxis { axis in
                 AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: .dateTime.hour())
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
+                    AxisValueLabel(format: timeFormat())
                 }
             }
-            .frame(height: 140)
-            .padding(.vertical, 8)
+            .chartYRangeLimit(.range(0...100))
+            .frame(height: 160)
+            .padding(.vertical, 4)
+        }
+        .glassCard(corner: Theme.Radius.card)
+    }
+
+    private func timeFormat() -> AxisValueLabelFormat {
+        switch energyTrendPeriod {
+        case .realtime: return .dateTime.hour()
+        case .week: return .dateTime.hour().weekday(.abbreviated)
+        case .month: return .dateTime.month().day()
+        }
+    }
+
+    private var filteredEnergyRecords: [AppStore.EnergyRecord] {
+        let now = Date()
+        switch energyTrendPeriod {
+        case .realtime:
+            return store.energyHistory.filter { now.timeIntervalSince($0.timestamp) < 3600 }
+        case .week:
+            let weekStart = Calendar.current.date(byAdding: .day, value: -Calendar.current.component(.weekday, from: now), to: now) ?? now
+            return store.energyHistory.filter { $0.timestamp >= weekStart }
+        case .month:
+            let monthStart = Calendar.current.date(from: Calendar.current.dateComponents([.year, .month], from: now)) ?? now
+            return store.energyHistory.filter { $0.timestamp >= monthStart }
         }
     }
 

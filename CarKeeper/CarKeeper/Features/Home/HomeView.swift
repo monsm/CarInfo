@@ -1,4 +1,7 @@
 import SwiftUI
+import CoreLocation
+import UserNotifications
+import Intents
 import UIKit
 
 // 车况首页 —— iOS 27 Liquid Glass：
@@ -25,6 +28,12 @@ struct HomeView: View {
     @State private var isEditingOrder = false         // #24 卡片排序编辑模式
     @State private var draggedCard: String? = nil     // 当前拖拽的卡片ID
     @State private var cardOrder: [String] = []       // #24 卡片顺序
+    // #NEW-1 停车位置
+    @State private var parkingLoc: CLLocation?
+    // #NEW-4 上车打卡提醒
+    @State private var showCheckInReminder = false
+    // #NEW-6 Siri快捷指令
+    @State private var siriLastAction: String? = nil
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize = ContentSizeCategory.med
 
     var body: some View {
@@ -208,6 +217,12 @@ struct HomeView: View {
             }
         }
         .onAppear { startPolling(); startSocAnimation(); startMileAnimation(); tyreWatchValue = UUID().uuidString }
+        .alert("上车打卡", isPresented: $showCheckInReminder) {
+            Button("已上车，检查车况") { store.checkIn() }
+            Button("稍后再说", role: .cancel) {}
+        } message: {
+            Text("今天还没检查车况，建议上车前确认胎压、电量是否正常。")
+        }
         .onDisappear {
             startTimer?.cancel()
             startTimer = nil
@@ -771,8 +786,24 @@ struct HomeView: View {
                 HStack(spacing: 8) {
                     mapToggleButton
                     if loc.lat != "--" && loc.lng != "--" { navButton(loc) }
+                    // #NEW-1 保存停车位置
+                    saveParkingButton(loc)
                     Spacer()
                     Pill(text: loc.gpsText, cls: loc.gpsCls)
+                }
+                // 显示已保存的停车位置
+                if let pk = store.parkingLocation, let lastTime = store.lastParkingTime {
+                    HStack(spacing: 6) {
+                        Image(systemName: "parkingsign.circle.fill").font(Theme.caption).foregroundStyle(.accentColor)
+                        Text("停车点: \(pk.coordinate.latitude, specifier: "%.4f") , \(pk.coordinate.longitude, specifier: "%.4f")")
+                            .font(Theme.micro)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(DateFormatter.relative(lastTime))
+                            .font(Theme.micro)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.top, 4)
                 }
             }
         }
@@ -802,6 +833,27 @@ struct HomeView: View {
                 .background(.thin, in: Circle())
         }
         .buttonStyle(.plain)
+    }
+
+    // #NEW-1 保存停车位置按钮
+    private func saveParkingButton(_ loc: LocModel) -> some View {
+        Button {
+            guard loc.lat != "--", loc.lng != "--" else { return }
+            let lat = Double(loc.lat) ?? 0
+            let lng = Double(loc.lng) ?? 0
+            let cl = CLLocation(latitude: lat, longitude: lng)
+            store.saveParkingLocation(cl)
+            parkingLoc = cl
+            ToastManager.shared.show("停车位置已保存", icon: "parkingsign.circle.fill")
+        } label: {
+            Image(systemName: store.parkingLocation != nil ? "parkingsign.circle.fill" : "parkingsign.circle")
+                .font(Theme.caption))
+                .foregroundStyle(store.parkingLocation != nil ? .accentColor : .tertiary)
+                .padding(8)
+                .background(.thin, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("保存停车位置"))
     }
 
     // MARK: Footer
@@ -924,6 +976,15 @@ struct HomeView: View {
         startTimer = Task {
             while !Task.isCancelled {
                 await fetchCore()
+                // #NEW-4 上车打卡提醒：每日首次打开时提示
+                if let lastCheck = store.lastCheckInDate {
+                    let cal = Calendar.current
+                    if !cal.isDateInToday(lastCheck) {
+                        showCheckInReminder = true
+                    }
+                } else {
+                    showCheckInReminder = true
+                }
                 try? await Task.sleep(for: .seconds(60))
             }
         }

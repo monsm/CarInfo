@@ -676,10 +676,10 @@ struct MainTabView: View {
         .accessibilityHint(Text("四个主要功能模块：车况、车控、消息、我的。左右滑动可切换标签页"))
         .accessibilitySortPriority(0)
         .accentColor(.accentColor)
-        // #4 网络状态指示器
+        // #4 网络状态指示器 + #NEW-3 离线模式提示
         .overlay(alignment: .top) {
-            if case .offline = store.networkStatus {
-                NetworkStatusIndicator(status: store.networkStatus)
+            if store.networkStatus != .online || store.isOfflineMode {
+                NetworkStatusIndicator(status: store.isOfflineMode ? .offline : store.networkStatus)
                     .padding(.top, 0)
             }
         }
