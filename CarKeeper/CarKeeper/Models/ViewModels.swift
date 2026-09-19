@@ -450,7 +450,7 @@ enum VM {
         let genderCN: [String: String] = ["m": "男", "f": "女"]
         let gender = genderCN[genderRaw] ?? genderRaw
         let lastLogin = s(u["LastLoginTime"]) ?? ""
-        let lastLoginClean = lastLogin.replacingOccurrences(of: "\.0$", with: "")
+        let lastLoginClean = lastLogin.replacingOccurrences(of: "\\.0$", with: "")
         let source = s(u["Source"]) ?? ""
         return UserVM(
             name: nameFinal,

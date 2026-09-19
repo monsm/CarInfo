@@ -228,7 +228,9 @@ enum Theme {
         static let springSlow = Spring(response: 0.6, dampingFraction: 0.9)
     }
 
-    // MARK: - 辅助工具
+
+extension Theme {
+    // MARK: - 字体尺寸
     static func font(_ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default) -> Font {
         .system(size: size, weight: weight, design: design)
     }
@@ -2799,3 +2801,4 @@ private class ImagePickerCoordinator: NSObject, UIImagePickerControllerDelegate,
 
 extension Font {
     /// 返回跟随 Dynamic Type 的语义字体
+}
