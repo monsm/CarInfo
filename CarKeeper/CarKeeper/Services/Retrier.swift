@@ -30,14 +30,15 @@ struct RetryPolicy {
         self.jitter = jitter
     }
 
-    /// 全局默认：2 次（首次 + 1 重试）、固定 1.5s、无退避、无抖动。
-    /// 弱网下单请求最坏 ≈ 15s(超时) + 1.5s + 15s ≈ 31.5s，可接受；
-    /// 强网下基本一发即中，不会累积 30s+ 拖死 UI。
-    static let `default` = RetryPolicy(maxAttempts: 2, baseDelay: 1.5, backoff: 1.0, maxDelay: 1.5, jitter: 0.0)
+    /// 全局默认：#10 指数退避加固 — 1s→2s→4s→8s，最多 4 次重试
+    /// 弱网下单请求最坏 ≈ 15s + 1s + 2s + 4s + 8s + 15s ≈ 45s，比原来 31.5s 更宽容
+    static let `default` = RetryPolicy(maxAttempts: 4, baseDelay: 1.0, backoff: 2.0, maxDelay: 8.0, jitter: 0.3)
     /// 只跑一次，绝不重试。用于有副作用的接口（发短信、车控）。
     static let none = RetryPolicy(maxAttempts: 1, baseDelay: 0, backoff: 1, maxDelay: 0, jitter: 0)
     /// 激进一点：更多次数，适合弱网环境的数据拉取。
     static let aggressive = RetryPolicy(maxAttempts: 6, baseDelay: 0.5, backoff: 1.8, maxDelay: 12.0, jitter: 0.5)
+    /// 仅数据拉取用：3 次，2s→4s→8s 退避，适合对实时性要求不高但需要可靠性的接口
+    static let dataReliable = RetryPolicy(maxAttempts: 3, baseDelay: 2.0, backoff: 2.0, maxDelay: 8.0, jitter: 0.2)
 }
 
 /// 判断一个错误是否「可重试」。

@@ -1779,9 +1779,11 @@ extension ContentSizeCategory {
 // 所有 Feature 页面统一使用，确保深浅双模式下视觉一致
 // =============================================================================
 
-/// 页面加载中状态（全屏玻璃卡片 + 旋转进度指示）
+/// 页面加载中状态（全屏玻璃卡片 + 旋转进度指示）— #25 带入场动画
 struct PageLoadingView: View {
     let message: String
+    @State private var opacity: CGFloat = 0
+    @State private var spinAngle: Angle = .zero
 
     init(_ message: String = "正在加载…") {
         self.message = message
@@ -1789,17 +1791,38 @@ struct PageLoadingView: View {
 
     var body: some View {
         VStack(spacing: Theme.Spacing.lg) {
-            ProgressView()
-                .controlSize(.large)
-                .tint(.accentColor)
-                .scaleEffect(1.1)
+            ZStack {
+                // 外圈光晕
+                Circle()
+                    .stroke(Color.accentColor.opacity(0.2), lineWidth: 3)
+                    .frame(width: 60, height: 60)
+                // 旋转进度环
+                Circle()
+                    .trim(from: 0, to: 0.7)
+                    .stroke(AngularGradient(colors: [.accentColor, .blue], center: .center), lineWidth: 3)
+                    .frame(width: 60, height: 60)
+                    .rotationEffect(spinAngle)
+                    .animation(.linear(duration: 1.2).repeatForever(autoreverses: false), value: spinAngle)
+                // 中心图标
+                Image(systemName: "car.fill")
+                    .font(.title2)
+                    .foregroundStyle(.accentColor)
+            }
             Text(message)
                 .font(Theme.caption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Theme.Spacing.xxl)
-        .glassCard()
+        .glassCard(corner: 24)
+        .opacity(opacity)
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) { opacity = 1 }
+            withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) {
+                spinAngle = .degrees(360)
+            }
+        }
+        .padding(.horizontal, Theme.Spacing.xl)
     }
 }
 
@@ -1835,7 +1858,7 @@ struct PageErrorView: View {
     }
 }
 
-/// 页面空状态（无数据但无错误）
+/// 页面空状态（无数据但无错误）— #25 带液态玻璃插画风格
 struct PageEmptyView: View {
     let title: String
     let subtitle: String
@@ -1848,10 +1871,20 @@ struct PageEmptyView: View {
     }
 
     var body: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: icon)
-                .font(.system(size: 36, weight: .medium))
-                .foregroundStyle(.tertiary)
+        VStack(spacing: Theme.Spacing.lg) {
+            // 液态玻璃风格图标容器
+            ZStack {
+                Circle()
+                    .fill(Material.thin)
+                    .frame(width: 80, height: 80)
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.2), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+                Image(systemName: icon)
+                    .font(.system(size: 32, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .scaleEffect(1.0)
+            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: icon)
             Text(title)
                 .font(Theme.h4)
                 .foregroundStyle(.primary)
@@ -1859,11 +1892,14 @@ struct PageEmptyView: View {
                 Text(subtitle)
                     .font(Theme.caption)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Theme.Spacing.xxl)
-        .glassCard()
+        .glassCard(corner: 24)
+        .padding(.horizontal, Theme.Spacing.xl)
     }
 }
 
@@ -1892,6 +1928,122 @@ struct EKGFloRingDynamic: View {
 
     var body: some View {
         EKGFloRing(size: size, color: dynamicColor, lineWidth: lineWidth, speed: speed)
+    }
+}
+
+// =============================================================================
+// DataFreshnessBadge —— #3 数据新鲜度徽章
+// 根据时间差显示 🟢/🟡/🔴 颜色角标
+// =============================================================================
+struct DataFreshnessBadge: View {
+    let timestamp: Date?
+    let fontSize: CGFloat = 10
+
+    var body: some View {
+        if let ts = timestamp, Date().timeIntervalSince(ts) < 300 {
+            let age = Int(Date().timeIntervalSince(ts) / 60)
+            let color: Color = age < 3 ? .green : (age < 15 ? .orange : .red)
+            let label: String = age < 1 ? "刚" : "\(age)分"
+            HStack(spacing: 3) {
+                Circle().fill(color).frame(width: 5, height: 5)
+                Text(label).font(.system(size: fontSize, weight: .medium))
+                    .foregroundStyle(color)
+            }
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.12), in: Capsule())
+        }
+    }
+}
+
+// =============================================================================
+// NetworkStatusIndicator —— #4 网络状态顶部微条
+// =============================================================================
+struct NetworkStatusIndicator: View {
+    let status: AppStore.NetworkStatus
+    var body: some View {
+        switch status {
+        case .online:
+            EmptyView()
+        case .weak:
+            HStack {
+                Image(systemName: "wifi.exclamationmark").font(.system(size: 10))
+                Text("弱网").font(.system(size: 10, weight: .medium))
+            }
+            .foregroundStyle(.orange)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(.orange.opacity(0.12), in: Capsule())
+            .frame(maxWidth: .infinity, alignment: .leading)
+        case .offline:
+            HStack {
+                Image(systemName: "wifi.slash").font(.system(size: 10))
+                Text("离线").font(.system(size: 10, weight: .medium))
+            }
+            .foregroundStyle(.red)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(.red.opacity(0.12), in: Capsule())
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+// =============================================================================
+// LowBatteryBadge —— #5 低电量 Tab 角标
+// =============================================================================
+struct LowBatteryBadge: View {
+    let socPct: Int
+    var body: some View {
+        if socPct < 20 {
+            ZStack {
+                Circle()
+                    .fill(.red)
+                    .frame(width: 8, height: 8)
+                Circle()
+                    .strokeBorder(.red, lineWidth: 1.5)
+                    .frame(width: 12, height: 12)
+                    .opacity(0.5)
+                    .heartbeatPulse()
+            }
+            .offset(x: 10, y: -4)
+        }
+    }
+}
+
+// =============================================================================
+// StaggeredEntrance —— #11 卡片入场序列动画修饰符
+// =============================================================================
+struct StaggeredEntranceModifier: ViewModifier {
+    let index: Int
+    let delay: CGFloat = 0.08
+    @State private var appeared = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(appeared ? 1.0 : 0.0)
+            .offset(y: appeared ? 0 : 20)
+            .onAppear { DispatchQueue.main.asyncAfter(deadline: .now() + delay * CGFloat(index)) { appeared = true } }
+    }
+}
+
+extension View {
+    func staggeredEntrance(index: Int) -> some View {
+        modifier(StaggeredEntranceModifier(index: index))
+    }
+}
+
+// =============================================================================
+// ReduceMotionAware —— #6 降低动态效果检测
+// =============================================================================
+extension View {
+    func reduceMotionIfRequired<V: View>(_ content: () -> V) -> some View {
+        if UIDevice.current.isReducingTransparency || UIAccessibility.isReduceMotionEnabled {
+            content()
+                .animation(nil, value: 0)
+        } else {
+            self
+        }
     }
 }
 
@@ -1929,5 +2081,81 @@ struct ToastView: View {
                 removal: .opacity.animation(.easeOut(duration: 0.2))
             )
         )
+    }
+}
+
+// =============================================================================
+// ScrollBounceBehavior —— #12 自定义下拉刷新环形进度条
+// 在每个 ScrollView 顶部注入一个 Liquid Glass 风格的环形进度指示器
+// =============================================================================
+struct RefreshProgressRing: View {
+    let progress: Double
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.accentColor.opacity(0.15), lineWidth: 2)
+                .frame(width: 16, height: 16)
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .frame(width: 16, height: 16)
+                .rotationEffect(.degrees(-90))
+        }
+    }
+}
+
+extension View {
+    /// #12 下拉刷新环形进度条
+    func refreshProgressRing(progress: Binding<CGFloat>) -> some View {
+        self.overlay(alignment: .top) {
+            if progress.wrappedValue > 0 {
+                RefreshProgressRing(progress: Double(progress.wrappedValue))
+                    .frame(width: 20, height: 20)
+            }
+        }
+    }
+}
+
+// =============================================================================
+// MilestoneCelebration —— #26 里程里程碑庆祝动效
+// =============================================================================
+struct MilestoneCelebration: ViewModifier {
+    let currentMileage: Int
+    @State private var showCelebration = false
+    @State private var celebrationText = ""
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: currentMileage) { newMileage in
+                let milestones = [5000, 10000, 15000, 20000, 25000, 30000, 50000, 100000]
+                if let prev = milestones.enumerated().first(where: { $0.element < newMileage })?.offset,
+                   prev > 0 && milestones[prev - 1] < newMileage {
+                    let milestone = milestones[min(prev, milestones.count - 1)]
+                    celebrationText = "🎉 恭喜！已突破 \(milestone) km 里程碑！"
+                    showCelebration = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        showCelebration = false
+                    }
+                }
+            }
+            .overlay(alignment: .top) {
+                if showCelebration {
+                    Text(celebrationText)
+                        .font(Theme.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.green.opacity(0.12), in: Capsule())
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: showCelebration)
+                        .padding(.top, 60)
+                }
+            }
+    }
+}
+
+extension View {
+    func milestoneCelebration(mileage: Int) -> some View {
+        modifier(MilestoneCelebration(currentMileage: mileage))
     }
 }

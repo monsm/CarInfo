@@ -370,6 +370,10 @@ struct MainTabView: View {
     @State private var navBarSweepPhase: CGFloat = 0
     // 定时刷新反射扫过相位
     private let sweepTimer = Timer.publish(every: 4, on: .main, in: .common).autoconnect()
+    // #5 低电量 Tab 角标：SOC < 20% 时红色脉冲
+    @State private var lowBatteryBadge: Bool = false
+    // #4 网络状态监测定时器（每 30 秒检查一次）
+    private let networkMonitorTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     var body: some View {
         TabView(selection: $nav.selectedTab) {
@@ -422,9 +426,14 @@ struct MainTabView: View {
             }
             .tabGlassContainer()
             .tabItem {
-                Label("车况", systemImage: "car.fill")
-                    .accessibilityLabel(Text("车况"))
-                    .accessibilityHint(Text("车辆状态概览，包含行驶里程、胎压、SOC 电量等关键信息"))
+                ZStack(alignment: .topTrailing) {
+                    Label("车况", systemImage: "car.fill")
+                        .accessibilityLabel(Text("车况"))
+                        .accessibilityHint(Text("车辆状态概览，包含行驶里程、胎压、SOC 电量等关键信息"))
+                    if lowBatteryBadge {
+                        LowBatteryBadge(socPct: 0)
+                    }
+                }
             }
             .accessibilitySortPriority(0)
             .tag(0)
@@ -435,6 +444,24 @@ struct MainTabView: View {
             .modifier(TabCardTransition(tabId: 0, isActive: nav.selectedTab == 0 && prevSelectedTab != 0))
             .onChange(of: nav.selectedTab) { newTab in
                 prevSelectedTab = nav.selectedTab
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
+                // #5 更新低电量角标状态
+                let energy = VM.energy(store.caches, store.car)
+                lowBatteryBadge = energy.socPct < 20
+            }
+            .onReceive(networkMonitorTimer) { _ in
+                // #4 简单网络检测：尝试 ping 一个已知端点
+                let api = APIClient.shared
+                Task { @MainActor in
+                    do {
+                        _ = try await api.getCars()
+                        store.updateNetworkStatus(.online)
+                    } catch {
+                        let isNetwork = (error as? APIError)?.statusCode != nil || error is URLError
+                        store.updateNetworkStatus(isNetwork ? .weak : .offline)
+                    }
+                }
             }
 
             NavigationStack(path: $controlPath) {
@@ -634,11 +661,24 @@ struct MainTabView: View {
                 navBarSweepPhase = 1.0
             }
         }
+        // #5 低电量角标检测：每次车控数据更新时检查
+        .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
+            let energy = VM.energy(store.caches, store.car)
+            lowBatteryBadge = energy.socPct < 20
+        }
+        .task { await store.bootstrap() }
         // 设置 TabView 整体无障碍描述和朗读顺序
         .accessibilityLabel(Text("主导航栏"))
         .accessibilityHint(Text("四个主要功能模块：车况、车控、消息、我的。左右滑动可切换标签页"))
         .accessibilitySortPriority(0)
         .accentColor(.accentColor)
+        // #4 网络状态指示器
+        .overlay(alignment: .top) {
+            if case .offline = store.networkStatus {
+                NetworkStatusIndicator(status: store.networkStatus)
+                    .padding(.top, 0)
+            }
+        }
         // 液态玻璃 TabBar：磨砂背景 + 选中态脉冲光晕
         .overlay(alignment: .bottom) {
             ZStack(alignment: .bottom) {

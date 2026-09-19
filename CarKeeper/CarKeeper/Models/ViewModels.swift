@@ -142,13 +142,42 @@ enum VM {
             carName = "未绑定车辆"
         }
 
+        // #1 充电倒计时：(100 - socPct) / power(kW) * 60 = 分钟
+        var timeToFull: String? = nil
+        if chargeSt == "1" || chargeSt == "2" {
+            if let pow = pow, pow > 0.1, socPct < 100 {
+                let minutes = Int(Double(100 - socPct) / pow * 60)
+                if minutes > 0 {
+                    let h = minutes / 60
+                    let m = minutes % 60
+                    timeToFull = h > 0 ? "约\(h)小时\(m)分钟" : "约\(m)分钟"
+                    charging?.timeToFull = timeToFull
+                }
+            }
+        }
+        // #2 SOC耗尽预测：基于当前续航估算行驶时间（假设平均时速40km/h）
+        var timeToEmpty: String? = nil
+        var avgCons: String? = nil
+        if let r = Double(range), r > 0, socPct > 0 {
+            // 百公里能耗 = socPct / range * 15 (假设电池容量约15kWh，估算)
+            let cons = (Double(socPct) / r * 15).rounded(to: 1)
+            avgCons = "\(cons) kWh/100km"
+            let hoursToEmpty = Int(r / 40.0)
+            if hoursToEmpty > 0 {
+                timeToEmpty = "约\(hoursToEmpty)小时" // 按40km/h平均时速估算
+            }
+        }
+
         return EnergyModel(
             soc: socStr, socPct: socPct,
             socCls: socPct >= 15 ? "ok" : "bad", socWarn: (socPct < 30 && socPct >= 15) ? "low" : "",
             range: range, chargeText: chargeText, chargeCls: chargeCls,
             chargePct: socStr == "--" ? "--" : socStr,
             charging: charging, voltAmp: voltAmp, battTemp: battTemp, insulate: insulate,
-            online: online, updated: updated, carName: carName
+            online: online, updated: updated, carName: carName,
+            timeToFull: timeToFull,
+            timeToEmpty: timeToEmpty,
+            avgConsumption: avgCons
         )
     }
 
@@ -449,6 +478,23 @@ enum VM {
         let vcolor = s(c["Color"]) ?? ""
         let parts = [s(c["ModelCode"]) ?? "", s(c["ConfName"]) ?? ""].filter { !$0.isEmpty }
         let vmodel = parts.isEmpty ? "--" : parts.joined(separator: " · ")
+        // #16 维保里程提醒：从 control 缓存中读取当前里程，计算距下次保养剩余
+        let currentMileage = ciNumber(c, ["Mileage", "mileage", "TotalMileage"]).map { Int($0.rounded()) }
+        let lastService = AppStore.shared.lastServiceMileage
+        let interval = AppStore.defaultServiceInterval
+        var serviceReminder: String? = nil
+        if let里程 = currentMileage, 里程 > 0, lastService > 0 {
+            let remaining = interval - (里程 - lastService)
+            if remaining > 0 && remaining < 5000 {
+                serviceReminder = "下次保养：再跑 \(remaining) km"
+            } else if remaining <= 0 {
+                serviceReminder = "已到保养里程！"
+            }
+        } else if let里程 = currentMileage, 里程 > 0 {
+            // 首次设置：记录当前里程为上次保养里程
+            UserDefaults.standard.set(里程, forKey: AppStore.lastServiceMileageKey)
+            serviceReminder = "\(interval) km 后保养"
+        }
         return VehicleSummary(
             name: vname,
             plate: vplate.isEmpty ? "未上牌" : vplate,
@@ -461,7 +507,8 @@ enum VM {
             insuranceEnd: insuranceEnd,
             insuranceDays: daysUntil(c["InsuranceEndDate"]),
             serviceEnd: serviceEnd,
-            serviceDays: daysUntil(c["TserviceEndtime"])
+            serviceDays: daysUntil(c["TserviceEndtime"]),
+            serviceReminder: serviceReminder
         )
     }
 }

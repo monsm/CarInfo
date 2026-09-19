@@ -94,7 +94,16 @@ struct VehicleView: View {
                     badgeRow("保险", d < 0 ? "已到期" : "剩 \(d) 天", cls: d < 0 ? "bad" : "ok")
                 }
                 if let d = sum.serviceDays {
-                    badgeRow("服务", d < 0 ? "已到期" : "剩 \(d) 天", cls: d < 0 ? "bad" : "ok")
+                    badgeRow("服务", d < 0 ? "已到期" : "剩 \(d) 天", cls: d < 0 ? "bad" : (d < 60 ? "warn" : "ok"))
+                }
+                // #16 维保提醒
+                if let reminder = sum.serviceReminder {
+                    Text(reminder)
+                        .font(Theme.caption)
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.orange.opacity(0.12), in: Capsule())
                 }
             }
         }

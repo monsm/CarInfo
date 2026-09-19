@@ -122,8 +122,8 @@ struct HealthView: View {
         .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: heroExpanded)
         .accessibilityLabel(Text("健康评分报告"))
         .accessibilityHint(Text(heroExpanded ? "点击收起系统详情" : "点击展开系统详情，查看各子系统状态"))
+        .staggeredEntrance(index: 0)
         .overlay(alignment: .bottomTrailing) {
-            // 折叠箭头：始终显示在 hero 卡片右下角，提示可展开
             Image(systemName: "chevron.down")
                 .font(Theme.footnote.bold())
                 .foregroundStyle(.tertiary)
@@ -353,6 +353,34 @@ struct HealthView: View {
         }
     }
 
+    // MARK: DTC 故障码翻译卡片 (#15)
+    private func dtcTranslationCard(_ sys: HealthSystem) -> some View {
+        let hasDTC = sys.children.contains { $0.name.range(of: "P\\d", options: .regularExpression) != nil }
+        guard hasDTC else { return EmptyView() }
+        
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("故障码说明").font(Theme.caption.weight(.semibold)).foregroundStyle(.secondary)
+            ForEach(sys.children.filter { $0.name.range(of: "P\\d", options: .regularExpression) != nil }) { item in
+                let dtcCode = item.name
+                let description = DTCDictionary.translate(dtcCode)
+                HStack {
+                    Text(dtcCode).font(Theme.mono).foregroundStyle(.orange)
+                    Spacer()
+                    Text(description).font(Theme.caption).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .background(.thin, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.orange.opacity(0.2), lineWidth: 1))
+        .padding(.horizontal, 4)
+        .padding(.top, 4)
+    }
+
     // MARK: 数据加载
     private func loadIfNeeded() {
         guard model == nil || store.isCacheExpired("check") else { return }
@@ -426,6 +454,10 @@ struct SystemRowView: View {
                             if idx < sys.children.count - 1 {
                                 ListDivider().padding(.leading, 4)
                             }
+                        }
+                        // #15 DTC 故障码翻译提示
+                        if sys.name.contains("故障") || sys.name.contains("DTC") {
+                            dtcTranslationCard(sys)
                         }
                     }
                     .padding(.leading, 22)

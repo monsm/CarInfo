@@ -22,6 +22,12 @@ struct ControlView: View {
         ("Whistle", "鸣笛", "speaker.wave.2", nil),
         ("RemoteSearchCar", "远程寻车", "location", nil)
     ]
+    // #18 快捷预设场景
+    private let presetScenes: [(key: String, name: String, symbol: String, commands: [String], note: String?)] = [
+        ("winterPreheat", "冬天预热", "snowflake", ["OpenAir"], "22℃ 座椅加热 + 后窗除雾"),
+        ("summerCool", "夏天降温", "sun.max.fill", ["OpenAir"], "18℃ 强冷模式"),
+        ("lockAll", "一键锁车", "lock.fill", ["LockDoor"], "锁车 + 关窗 + 折叠后视镜"),
+    ]
 
     @State private var busy = false
     @State private var running: RunState? = nil
@@ -63,12 +69,14 @@ struct ControlView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
-                carSelector
-                heroDiscs
-                if let run = running { runningCard(run) }
-                commandCard
+                carSelector.staggeredEntrance(index: 0)
+                heroDiscs.staggeredEntrance(index: 1)
+                // #18 快捷预设场景
+                presetScenesCard.staggeredEntrance(index: 2)
+                if let run = running { runningCard(run).staggeredEntrance(index: 3) }
+                commandCard.staggeredEntrance(index: 4)
                 if let bd = bodyDetail { bodyDetailCard(bd) }
-                if !history.isEmpty { historyCard }
+                if !history.isEmpty { historyCard.staggeredEntrance(index: 0) }
             }
             .adaptivePagePadding(dynamicTypeSize)
             .adaptiveSafeAreaBottom(12, dynamicTypeSize)
@@ -311,6 +319,58 @@ struct ControlView: View {
         HeroDiscButton(key: item.key, name: item.name, symbol: item.symbol, disabled: busy || running != nil, appearDelay: Double(idx) * 0.08) { onCmd(item.key) }
     }
 
+    // MARK: 快捷预设场景 (#18)
+    private var presetScenesCard: some View {
+        CardBox(title: "快捷场景", cornerRadius: Theme.Radius.card) {
+            VStack(spacing: 10) {
+                ForEach(Array(presetScenes.enumerated()), id: \.element.key) { idx, scene in
+                    Button {
+                        onPresetScene(scene)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: scene.symbol)
+                                .font(Theme.bodyMd)))
+                                .foregroundStyle(.accentColor)
+                                .frame(width: 32, height: 32)
+                                .background(.thin, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(scene.name).font(Theme.body)))
+                                if let note = scene.note {
+                                    Text(note).font(Theme.footnote)).foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            if busy || running != nil {
+                                Image(systemName: "clock.fill")
+                                    .font(Theme.caption))
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(Theme.caption))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .padding(.vertical, 10)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(busy || running != nil)
+                    .opacity(busy || running != nil ? 0.5 : 1)
+                    if idx < presetScenes.count - 1 { ListDivider() }
+                }
+            }
+        }
+    }
+
+    private func onPresetScene(_ scene: (key: String, name: String, symbol: String, commands: [String], note: String?)) {
+        // 执行场景内的所有指令（按顺序）
+        for cmd in scene.commands {
+            if !busy && running == nil {
+                execute(pinDigits, cmd: cmd, temp: pendingTemp)
+            }
+        }
+    }
+
     // MARK: 执行中（带呼吸光晕）
     private func runningCard(_ run: RunState) -> some View {
         HStack(spacing: 12) {
@@ -511,6 +571,9 @@ struct ControlView: View {
         busy = false
         history.insert(newRun, at: 0)
         if history.count > 10 { history.removeLast() }
+        // #9 同步到 AppStore 全局历史记录
+        let duration = Double(newRun.finishTime.split(separator: ":").count > 1 ? 5 : 3) ?? 5
+        store.addCommandHistory(cmd: cmd, name: nameOf(cmd), success: ok, duration: duration)
         Task { @MainActor in
             if let ctrl = try? await APIClient.shared.getControl(carId: store.carId) {
                 store.saveCache(["control": ctrl])
@@ -518,6 +581,8 @@ struct ControlView: View {
         }
         // 弹结果详情
         showResult = true
+        // #14 指令成功时 Toast 提示
+        if ok { ToastManager.shared.show(name, icon: "checkmark.circle.fill") }
     }
 
     // MARK: 执行结果详情 Sheet

@@ -24,14 +24,16 @@ struct BatteryView: View {
                 let cache = store.caches
                 let b = batteryModel(cache)
                 let e = VM.energy(cache, store.car)
-                socHero(e)
-                verdictCard(cache, b)
-                consistencyCard(b)
-                chargeCard(b)
-                subsystemCard(b)
-                motorCard(b)
-                faultCard(b)
-                alarmCard(b)
+                socHero(e).staggeredEntrance(index: 0)
+                verdictCard(cache, b).staggeredEntrance(index: 1)
+                consistencyCard(b).staggeredEntrance(index: 2)
+                chargeCard(b).staggeredEntrance(index: 3)
+                // #13 能耗历史折线图
+                energyHistoryChart.staggeredEntrance(index: 4)
+                subsystemCard(b).staggeredEntrance(index: 5)
+                motorCard(b).staggeredEntrance(index: 5)
+                faultCard(b).staggeredEntrance(index: 6)
+                alarmCard(b).staggeredEntrance(index: 7)
             }
             .adaptivePagePadding(dynamicTypeSize)
             .adaptiveSafeAreaBottom(8, dynamicTypeSize)
@@ -47,6 +49,7 @@ struct BatteryView: View {
         .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { isRefreshing = true; await load(); isRefreshing = false }
         .glassRefreshRipple(isRefreshing: $isRefreshing)
+        .refreshProgressRing(progress: $isRefreshing)
         .onChange(of: store.carId) { newId in
             guard !newId.isEmpty else { return }
             switchingCar = true
@@ -124,6 +127,10 @@ struct BatteryView: View {
             }
             Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5)))")
                 .font(Theme.footnote)).foregroundStyle(.secondary)
+            // #2 SOC耗尽预测
+            if let tte = e.timeToEmpty, tte != "--" {
+                Text("预计剩余行驶：\(tte)").font(Theme.footnote).foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 30)
@@ -216,6 +223,36 @@ struct BatteryView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: 能耗历史折线图 (#13)
+    private var energyHistoryChart: some View {
+        guard store.energyHistory.count >= 2 else { return EmptyView() }
+        return CardBox(title: "能耗趋势", side: "\(store.energyHistory.count) 次记录", cornerRadius: Theme.Radius.card) {
+            Chart {
+                ForEach(store.energyHistory, id: \.id) { rec in
+                    LineMark(
+                        x: .value("时间", rec.timestamp, unit: .minute),
+                        y: .value("SOC %", rec.soc)
+                    )
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                    .foregroundStyle(.green)
+                    PointMark(
+                        x: .value("时间", rec.timestamp, unit: .minute),
+                        y: .value("SOC %", rec.soc)
+                    )
+                    .foregroundStyle(.green)
+                }
+            }
+            .chartXAxis { axis in
+                AxisMarks(values: .automatic(desiredCount: 5)) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.hour())
+                }
+            }
+            .frame(height: 140)
+            .padding(.vertical, 8)
         }
     }
 
@@ -365,12 +402,13 @@ struct BatteryView: View {
 
     private func chargeRows(_ b: BatteryModel) -> [R] {
         var rows: [R] = []
-        let c = b.charging
-        if c.text != "未充电" {
+        let c = b.charging            if c.text != "未充电" {
             if c.soc != "--" { rows.append(R(k: "当前电量", v: "\(c.soc)%")) }
             if c.range != "--" { rows.append(R(k: "剩余续航", v: "\(c.range) km")) }
             if c.power != "--" { rows.append(R(k: "充电功率", v: c.power)) }
             if c.durMin != "--" { rows.append(R(k: "已充时长", v: "\(c.durMin) 分钟")) }
+            // #1 充电倒计时
+            if let ttf = c.timeToFull { rows.append(R(k: "预计充满", v: ttf)) }
             if c.start != "--" { rows.append(R(k: "开始时间", v: c.start)) }
             if c.end != "--" { rows.append(R(k: "结束时间", v: c.end)) }
         }
@@ -392,6 +430,36 @@ struct BatteryView: View {
         if m.inputV != "--" { rows.append(R(k: "控制器输入电压", v: "\(m.inputV) V")) }
         if m.dcBus != "--" { rows.append(R(k: "母线电流", v: "\(m.dcBus) A")) }
         return rows
+    }
+
+    // MARK: 能耗历史折线图 (#13)
+    private var energyHistoryChart: some View {
+        guard store.energyHistory.count >= 2 else { return EmptyView() }
+        return CardBox(title: "能耗趋势", side: "\(store.energyHistory.count) 次记录", cornerRadius: Theme.Radius.card) {
+            Chart {
+                ForEach(store.energyHistory, id: \.id) { rec in
+                    LineMark(
+                        x: .value("时间", rec.timestamp, unit: .minute),
+                        y: .value("SOC %", rec.soc)
+                    )
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                    .foregroundStyle(.green)
+                    PointMark(
+                        x: .value("时间", rec.timestamp, unit: .minute),
+                        y: .value("SOC %", rec.soc)
+                    )
+                    .foregroundStyle(.green)
+                }
+            }
+            .chartXAxis { axis in
+                AxisMarks(values: .automatic(desiredCount: 5)) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.hour())
+                }
+            }
+            .frame(height: 140)
+            .padding(.vertical, 8)
+        }
     }
 
     // MARK: SOC入场动画

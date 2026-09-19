@@ -138,6 +138,12 @@ struct EnergyModel {
     var online: OnlineState
     var updated: String
     var carName: String
+    // #1 充电倒计时（充电中时显示还需多久充满）
+    var timeToFull: String? = nil
+    // #2 SOC耗尽预测（未充电时显示预计剩余行驶时间）
+    var timeToEmpty: String? = nil
+    // #23 百公里能耗（kWh/100km）
+    var avgConsumption: String? = nil
 }
 
 struct ChargingSession {
@@ -145,6 +151,74 @@ struct ChargingSession {
     var end: String
     var durMin: String
     var power: String
+    // #1 计算出的充满倒计时
+    var timeToFull: String? = nil
+}
+
+// #15 DTC故障码字典（常见故障码 → 中文描述）
+struct DTCFault {
+    let code: String
+    let description: String
+    let severity: String  // "info" / "warn" / "bad"
+}
+
+enum DTCDictionary {
+    static let faults: [DTCFault] = [
+        // 动力系统
+        ("P0AAA", "电机控制器故障", "bad"),
+        ("P0A01", "电机控制器内部温度过高", "warn"),
+        ("P0A0A", "电机控制器直流母线过流", "bad"),
+        ("P0A0B", "电机控制器直流母线过压", "warn"),
+        ("P0A0C", "电机控制器直流母线欠压", "bad"),
+        ("P0A0D", "电机控制器直流母线预充电失败", "bad"),
+        ("P0A10", "电机控制器绝缘电阻过低", "bad"),
+        // 储能系统
+        ("P0A14", "电池管理系统通信故障", "bad"),
+        ("P0A15", "电池管理系统温度传感器故障", "warn"),
+        ("P0A17", "电池单体电压不一致超限", "warn"),
+        ("P0A18", "电池 SOC 计算异常", "warn"),
+        ("P0A19", "电池绝缘电阻过低", "bad"),
+        ("P0A20", "电池加热系统故障", "warn"),
+        ("P0A21", "电池冷却系统故障", "warn"),
+        ("P0A22", "电池充电超时", "warn"),
+        // 发动机系统
+        ("P0300", "随机/多缸检测不到点火", "bad"),
+        ("P0301", "1 缸检测不到点火", "bad"),
+        ("P0302", "2 缸检测不到点火", "bad"),
+        ("P0303", "3 缸检测不到点火", "bad"),
+        ("P0304", "4 缸检测不到点火", "bad"),
+        ("P0401", "EGR 流通量不足", "warn"),
+        ("P0420", "催化转化器效率低于阈值", "warn"),
+        ("P0440", "燃油蒸发系统控制回路故障", "warn"),
+        ("P0446", "燃油蒸发系统通风控制回路故障", "info"),
+        // 制动系统
+        ("C0035", "左前轮速传感器电路故障", "bad"),
+        ("C0040", "右前轮速传感器电路故障", "bad"),
+        ("C0110", "制动压力传感器电路故障", "warn"),
+        ("C0200", "制动踏板位置传感器电路故障", "warn"),
+        // 通用
+        ("U0100", "与 ECM/PCM 通信丢失", "bad"),
+        ("U0101", "与 TCM 通信丢失", "warn"),
+        ("U0121", "与 ABS 模块通信丢失", "warn"),
+        ("U0155", "与组合仪表通信丢失", "warn"),
+    ]
+
+    static func lookup(_ code: String) -> DTCFault? {
+        faults.first { $0.code.uppercased() == code.uppercased() }
+    }
+
+    static func translate(_ code: String) -> String {
+        if let dtc = lookup(code) { return dtc.description }
+        return "未知故障码（\(code)）"
+    }
+
+    static func severityColor(_ severity: String) -> String {
+        switch severity {
+        case "bad": return "bad"
+        case "warn": return "warn"
+        default: return "na"
+        }
+    }
 }
 
 struct OnlineState {

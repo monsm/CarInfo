@@ -50,16 +50,16 @@ struct HomeView: View {
         return ScrollView {
             VStack(spacing: DynamicTypeScale.spacing(Theme.cardSpacing, dynamicTypeSize)) {
                 greetingRow(energy)
-                socHero(energy)
-                driveMetricsExpanded(drive)
-                carSelector
-                quickControl
-                domainCard(summary)
-                if hasData { batterySection(cache) }
-                tyreCardExpanded(tyre)
-                comfortCard(comfort)
-                locationCard(loc)
-                footerNote(energy)
+                socHero(energy).staggeredEntrance(index: 0)
+                driveMetricsExpanded(drive).staggeredEntrance(index: 1)
+                carSelector.staggeredEntrance(index: 2)
+                quickControl.staggeredEntrance(index: 3)
+                domainCard(summary).staggeredEntrance(index: 4)
+                if hasData { batterySection(cache).staggeredEntrance(index: 5) }
+                tyreCardExpanded(tyre).staggeredEntrance(index: 6)
+                comfortCard(comfort).staggeredEntrance(index: 7)
+                locationCard(loc).staggeredEntrance(index: 8)
+                footerNote(energy).staggeredEntrance(index: 9)
             }
             .adaptivePagePadding(dynamicTypeSize)
             .adaptiveSafeAreaBottom(12, dynamicTypeSize)
@@ -77,6 +77,7 @@ struct HomeView: View {
         )
         .animation(.spring(response: 0.45, dampingFraction: 0.7, blendDuration: 0.4), value: carVersion)
         .scrollBounceBehavior(.basedOnSize)
+        .milestoneCelebration(mileage: mileCount)
         .pageBackground(.accentColor)
         .navigationTitle("车况").navBarStyle()
         .onChange(of: store.carId) { newId in
@@ -106,6 +107,7 @@ struct HomeView: View {
         .refreshable { isRefreshing = true; await fetchCore(); isRefreshing = false }
         .glassRefreshRipple(isRefreshing: $isRefreshing)
         .glassRefreshHalo(isRefreshing: $isRefreshing)
+        .refreshProgressRing(progress: $isRefreshing)
         .glassSwitchRipple(isSwitching: $switchingCar)
     }
 
@@ -185,6 +187,21 @@ struct HomeView: View {
                            value: e.range == "--" ? "--" : e.range,
                            unit: "km", tint: .green, fluidValue: true)
                 MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: .accentColor, fluidValue: true)
+            }
+            // #1 充电倒计时
+            if let ttf = e.timeToFull {
+                Text("预计充满：\(ttf)").font(Theme.footnote).foregroundStyle(.secondary)
+            }
+            // #2 #23 能耗统计 + SOC耗尽预测
+            if let cons = e.avgConsumption, cons != "--" {
+                HStack {
+                    Text("平均能耗").font(Theme.footnote).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(cons).font(Theme.caption.weight(.semibold)).foregroundStyle(.accentColor)
+                }
+            }
+            if let tte = e.timeToEmpty, tte != "--" {
+                Text("预计剩余行驶：\(tte)").font(Theme.footnote).foregroundStyle(.secondary)
             }
             // 在线状态
             Text(e.online.text)
@@ -688,6 +705,8 @@ struct HomeView: View {
             Text("更新于 \(update)")
                 .font(Theme.caption)).foregroundStyle(.secondary)
             Spacer()
+            // #3 数据新鲜度徽章
+            DataFreshnessBadge(timestamp: lastFetch)
             Button { fetchCore() } label: {
                 Image(systemName: "arrow.clockwise.circle.fill")
                     .font(Theme.caption))
@@ -699,6 +718,13 @@ struct HomeView: View {
         }
         .adaptivePagePadding(dynamicTypeSize)
         .padding(.vertical, 8)
+    }
+
+    // #3 数据新鲜度徽章 — 返回缓存时间戳
+    private func freshnessTimestamp(for key: String) -> Date? {
+        // 缓存时间戳存储在 AppStore 私有变量中，通过 needsRefresh 反推
+        // 这里简化处理：直接返回 lastFetch
+        lastFetch
     }
 
     private func openNav(_ loc: LocModel) {
@@ -748,10 +774,14 @@ struct HomeView: View {
     }
 
     private func fetchCore() async {
+        let startTime = Date()
         await withTaskGroup(of: Void.self) { g in
             g.addTask { await store.fetchCore() }
         }
         lastFetch = Date()
+        // #22 页面加载耗时埋点（写入 UserDefaults，DevView 可读取）
+        let elapsed = Date().timeIntervalSince(startTime)
+        UserDefaults.standard.set(elapsed, forKey: "carkeeper_home_load_time")
         if isRefreshing {
             // 下拉刷新：重置并重播 SOC + 里程入场动画
             isRefreshing = false

@@ -231,6 +231,9 @@ struct DevView: View {
                     ("#0056CC", Color(hex: "0056CC"), "深色蓝"),
                 ])
 
+                // #22 性能指标
+                PerformanceMetricsCard()
+
                 // Footer
                 Text("深色模式下请检查各颜色是否可读，尤其是 tertiary / quaternary 与玻璃背景的对比度")
                     .font(Theme.footnote)).foregroundStyle(.tertiary)
@@ -255,6 +258,39 @@ extension Color {
         let g = Int(components[1] * 255)
         let b = Int(components[2] * 255)
         return String(format: "%02X%02X%02X", r, g, b)
+    }
+}
+
+// MARK: - 性能指标卡片 (#22)
+struct PerformanceMetricsCard: View {
+    private let homeLoadTime = UserDefaults.standard.double(forKey: "carkeeper_home_load_time")
+    private let commandCount = AppStore.shared.commandHistory.count
+    private let energyRecords = AppStore.shared.energyHistory.count
+
+    var body: some View {
+        CardBox(title: "性能指标", cornerRadius: Theme.Radius.card) {
+            VStack(spacing: 10) {
+                HStack {
+                    Text("首页加载耗时").font(Theme.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(homeLoadTime > 0 ? String(format: "%.2fs", homeLoadTime) : "—")
+                        .font(Theme.monoLg).foregroundStyle(homeLoadTime > 1.5 ? .orange : .green)
+                }
+                ListDivider()
+                HStack {
+                    Text("指令历史记录").font(Theme.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(commandCount) 条").font(Theme.monoLg).foregroundStyle(.accentColor)
+                }
+                ListDivider()
+                HStack {
+                    Text("能耗记录次数").font(Theme.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(energyRecords) 次").font(Theme.monoLg).foregroundStyle(.green)
+                }
+            }
+            .padding(.vertical, 4)
+        }
     }
 }
 
