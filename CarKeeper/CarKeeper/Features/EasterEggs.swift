@@ -20,11 +20,16 @@ class AchievementManager: ObservableObject {
     @Published var unlockedAchievements: Set<UUID> = []
 
     let achievements: [Achievement] = [
-        Achievement(title: "首次充电", description: "完成第一次充电", icon: "bolt.fill", unlocked: false, unlockCondition: "完成1次充电"),
-        Achievement(title: "环保先锋", description: "累计减碳100kg", icon: "leaf.fill", unlocked: false, unlockCondition: "碳减排100kg"),
-        Achievement(title: "里程达人", description: "累计行驶1000km", icon: "tachometer", unlocked: false, unlockCondition: "行驶1000km"),
-        Achievement(title: "完美驾驶", description: "驾驶评分90分以上", icon: "star.fill", unlocked: false, unlockCondition: "评分>=90"),
-        Achievement(title: "连续打卡", description: "连续7天上车打卡", icon: "calendar.checkmark", unlocked: false, unlockCondition: "连续7天打卡"),
+        Achievement(title: "首次充电", description: "完成第一次充电", icon: "bolt.fill", unlocked: false,
+         unlockCondition: "完成1次充电"),
+        Achievement(title: "环保先锋", description: "累计减碳100kg", icon: "leaf.fill", unlocked: false,
+         unlockCondition: "碳减排100kg"),
+        Achievement(title: "里程达人", description: "累计行驶1000km", icon: "tachometer", unlocked: false,
+         unlockCondition: "行驶1000km"),
+        Achievement(title: "完美驾驶", description: "驾驶评分90分以上", icon: "star.fill", unlocked: false,
+         unlockCondition: "评分>=90"),
+        Achievement(title: "连续打卡", description: "连续7天上车打卡", icon: "calendar.checkmark", unlocked: false,
+         unlockCondition: "连续7天打卡"),
     ]
 
     func unlock(_ achievement: Achievement) {
