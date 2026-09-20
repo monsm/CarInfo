@@ -53,7 +53,8 @@ struct DashboardView: View {
                     DSTrendEmpty(
                         icon: "chart.xyaxis.line",
                         title: "正在积累 SOC 数据",
-                        message: "服务端没有历史接口，曲线由 App 每 \(Int(HistoryStore.socInterval / 60)) 分钟采样一次。已记录 \(socPoints.count) 个点。"
+                        message: "服务端没有历史接口，曲线由 App 每 \(Int(HistoryStore.socInterval / 60)) 分钟采样一次。"
+                        + "已记录 \(socPoints.count) 个点。"
                     )
                 }
 
