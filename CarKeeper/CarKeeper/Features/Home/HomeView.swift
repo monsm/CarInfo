@@ -813,8 +813,8 @@ struct HomeView: View {
                     if let pk = store.parkingLocation, let t = store.lastParkingTime {
                         DSSeparator()
                         DSRow(icon: "parkingsign.circle.fill", title: "停车点",
-                              value: String(format: "%.4f, %.4f", pk.coordinate.latitude, pk.coordinate.longitude),
-                              subtitle: "保存于 \(DateFormatter.relative(t))")
+                              subtitle: "保存于 \(DateFormatter.relative(t))",
+                              value: String(format: "%.4f, %.4f", pk.coordinate.latitude, pk.coordinate.longitude))
                     }
                 }
             }

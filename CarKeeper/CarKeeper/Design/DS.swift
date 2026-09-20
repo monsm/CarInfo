@@ -140,6 +140,12 @@ enum DS {
         /// 行内数字（列表数值，iOS 正文尺寸）
         static let data = Font.system(size: 17).monospacedDigit()
         static let dataSmall = Font.system(size: 15).monospacedDigit()
+        /// 指定尺寸的等宽数字：图例、次要读数这类"比 dataSmall 还要小但必须等宽"的地方。
+        /// ⚠️ data / dataSmall 是**属性**（固定尺寸），digits 是**函数**（带尺寸参数）——
+        /// 写成 DS.Typo.data(13) 会编译报错（cannot call value of non-function type 'Font'）。
+        static func digits(_ size: CGFloat) -> Font {
+            .system(size: size).monospacedDigit()
+        }
 
         // ---- 文本：系统语义样式 → 自动跟随 Dynamic Type ----
         static let largeTitle = Font.largeTitle.weight(.bold)      // 34 / 700

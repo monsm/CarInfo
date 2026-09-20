@@ -149,25 +149,46 @@ struct DSTyreTrendChart: View {
         }
     }
 
-    /// 一条待绘制的序列。写成小结构体而不是元组：
+    /// 一条待绘制的曲线段。写成小结构体而不是元组：
     /// Chart 的 `ForEach` 需要 Identifiable/键路径，而 Swift 的键路径不能指向元组元素。
-    private struct Series: Identifiable {
+    /// ⚠️ `id` 必须**逐点唯一**（ForEach 的硬要求），而 `series` 必须**逐轮位相同**
+    /// —— 两者写反了，四条线会被并成一条，或者一条线被拆成一段段。
+    private struct Mark: Identifiable {
         let id: String
-        let value: Double
+        let series: String
+        let t: Date
+        let v: Double
         let dash: [CGFloat]
         let opacity: Double
     }
 
-    private func series(in p: HistoryStore.TyrePoint) -> [Series] {
-        Wheel.allCases.compactMap { wheel in
-            wheel.value(p).map {
-                Series(id: wheel.rawValue, value: $0, dash: wheel.dash, opacity: wheel.opacity)
+    /// 先把四条曲线摊平成一维再交给 Chart。
+    /// 原来是 `ForEach(points) { ForEach(series(in:)) { … } }` 的嵌套写法，
+    /// 内层那个 LineMark 表达式让类型检查器直接超时：
+    /// `error: the compiler is unable to type-check this expression in reasonable time`。
+    /// 摊平后内层只剩纯粹的成员读取，编译器不必再做嵌套重载推断。
+    private var marks: [Mark] {
+        var out: [Mark] = []
+        out.reserveCapacity(points.count * Wheel.allCases.count)
+        for p in points {
+            let stamp = p.t.timeIntervalSince1970
+            for wheel in Wheel.allCases {
+                guard let v = wheel.value(p) else { continue }
+                out.append(
+                    Mark(id: "\(wheel.rawValue)@\(stamp)",
+                         series: wheel.rawValue,
+                         t: p.t,
+                         v: v,
+                         dash: wheel.dash,
+                         opacity: wheel.opacity)
+                )
             }
         }
+        return out
     }
 
     private var allValues: [Double] {
-        points.flatMap { $0.values.map(\.v) }
+        marks.map(\.v)
     }
 
     private var domain: ClosedRange<Double> {
@@ -179,17 +200,15 @@ struct DSTyreTrendChart: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.sm) {
             Chart {
-                ForEach(points) { p in
-                    ForEach(series(in: p)) { s in
-                        LineMark(
-                            x: .value("时间", p.t),
-                            y: .value("kPa", s.value),
-                            series: .value("轮位", s.id)
-                        )
-                        .foregroundStyle(tint.opacity(s.opacity))
-                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, dash: s.dash))
-                        .interpolationMethod(.monotone)
-                    }
+                ForEach(marks) { m in
+                    LineMark(
+                        x: .value("时间", m.t),
+                        y: .value("kPa", m.v),
+                        series: .value("轮位", m.series)
+                    )
+                    .foregroundStyle(tint.opacity(m.opacity))
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, dash: m.dash))
+                    .interpolationMethod(.monotone)
                 }
             }
             .chartYScale(domain: domain)
@@ -233,7 +252,7 @@ struct DSTyreTrendChart: View {
                             .font(DS.Typo.caption2)
                             .foregroundStyle(DS.Palette.labelSecondary)
                         Text(last.map { String(format: "%.0f", $0) } ?? "--")
-                            .font(DS.Typo.data(11))
+                            .font(DS.Typo.digits(11))
                             .foregroundStyle(DS.Palette.label)
                     }
                 }

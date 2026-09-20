@@ -438,7 +438,7 @@ struct BatteryView: View {
                         .foregroundStyle(DS.Palette.label)
                     Spacer(minLength: DS.Space.sm)
                     Text("当前 \(e.socPct)%")
-                        .font(DS.Typo.data(13))
+                        .font(DS.Typo.digits(13))
                         .foregroundStyle(DS.Palette.labelSecondary)
                 }
                 if socPoints.count >= 2 {
@@ -465,7 +465,7 @@ struct BatteryView: View {
                     Spacer(minLength: DS.Space.sm)
                     if let c = e.charging {
                         Text(c.power)
-                            .font(DS.Typo.data(13))
+                            .font(DS.Typo.digits(13))
                             .foregroundStyle(DS.Palette.charge)
                     }
                 }
