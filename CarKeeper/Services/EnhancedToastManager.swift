@@ -1,5 +1,5 @@
 // =============================================================================
-// N6 全局 Toast 动画增强 + N7 空状态插画升级 + N8 下拉刷新涟漪统一
+// N6 全局 Toast + N7 空状态插画
 // =============================================================================
 
 import SwiftUI
@@ -106,17 +106,14 @@ struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: Theme.Spacing.lg) {
             // 动态图标（根据内容变化）
-            ZStack {
-                Circle()
-                    .fill(LinearGradient(colors: [Theme.Colors.accent.opacity(0.2), Theme.Colors.accent.opacity(0.05)],
-                                         startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 100, height: 100)
-                Image(safeSymbol: icon, fallback: "checkmark.circle.fill")
-                    .font(.system(size: 40))
-                    .foregroundColor(Theme.Colors.accent)
-                    .scaleEffect(1)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.5).repeatForever(autoreverses: true), value: icon)
-            }
+            // 旧版：渐变圆 + 持续重复的缩放动画（提示图标一直在跳）。
+            // 新版：一个扁平色块承载图标，提示本身不需要动。
+            Image(safeSymbol: icon, fallback: "checkmark.circle.fill")
+                .font(.system(size: 32, weight: .regular))
+                .foregroundStyle(DS.Palette.tint)
+                .frame(width: 72, height: 72)
+                .background(RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(DS.Palette.tintSoft))
             
             Text(title)
                 .font(.title3)
@@ -145,6 +142,3 @@ struct EmptyStateView: View {
         .padding(.vertical, Theme.Spacing.xl)
     }
 }
-
-// MARK: - N8 下拉刷新涟漪统一（所有 ScrollView）
-// 注：glassRefreshRipple 已在 Theme.swift 中实现，此处不再重复定义，避免 redeclaration。

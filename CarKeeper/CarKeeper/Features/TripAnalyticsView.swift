@@ -65,7 +65,7 @@ struct TripAnalyticsView: View {
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.vertical, Theme.Spacing.md)
         }
-        .pageBackground(Theme.pageBlue)
+        .pageBackground()
         .navigationTitle("行程分析")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityLabel(Text("行程数据分析"))

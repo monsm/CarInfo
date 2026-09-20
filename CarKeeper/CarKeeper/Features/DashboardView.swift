@@ -18,7 +18,7 @@ struct DashboardView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.Spacing.md) {
+            VStack(spacing: DS.Space.gap) {
                 // 周期选择
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: Theme.Spacing.sm) {
@@ -90,8 +90,9 @@ struct DashboardView: View {
                     .glassCard()
                 }
             }
-            .padding(.vertical)
+            .padding(.vertical, DS.Space.sm)
         }
+        .dsCanvas()
         .navigationTitle("仪表盘")
         .navigationBarTitleDisplayMode(.inline)
     }

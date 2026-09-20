@@ -108,6 +108,7 @@ struct PrivacyDashboardView: View {
                 }
                 .padding()
             }
+            .dsCanvas()
             .navigationTitle("隐私与数据")
             .navigationBarTitleDisplayMode(.inline)
             .alert("确认清除", isPresented: $showClearConfirm) {

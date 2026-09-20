@@ -93,7 +93,7 @@ struct DrivingScorePage: View {
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.vertical, Theme.Spacing.md)
         }
-        .pageBackground(Theme.pagePurple)
+        .pageBackground()
         .navigationTitle("驾驶评分")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityLabel(Text("驾驶评分详情"))

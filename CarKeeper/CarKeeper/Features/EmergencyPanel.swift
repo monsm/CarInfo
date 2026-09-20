@@ -29,7 +29,7 @@ struct EmergencyPanel: View {
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.vertical, Theme.Spacing.md)
         }
-        .pageBackground(Color(.systemRed).opacity(0.05))
+        .pageBackground()
         .navigationTitle("紧急求助")
         .navigationBarTitleDisplayMode(.inline)
         .alert("确认拨打", isPresented: $showConfirm) {
@@ -59,7 +59,7 @@ struct EmergencyPanel: View {
                     .strokeBorder(Color.red, lineWidth: 3)
                     .frame(width: 100, height: 100)
                     .opacity(activeEmergency ? 0.3 : 1)
-                    .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: activeEmergency)
+                    .animation(.easeInOut(duration: 0.2), value: activeEmergency)
                 
                 VStack(spacing: 4) {
                     Image(systemName: "exclamationmark.octagon.fill")
@@ -104,7 +104,7 @@ struct EmergencyPanel: View {
             .background(color.opacity(0.08))
             .cornerRadius(Theme.Radius.small)
         }
-        .pressFeedbackLegacy()
+        .pressFeedback()
     }
     
     // MARK: - 紧急联系人
@@ -158,7 +158,6 @@ struct EmergencyPanel: View {
                 Image(systemName: "exclamationmark.octagon.fill")
                     .font(.system(size: 64))
                     .foregroundStyle(.red)
-                    .animation(.spring(response: 0.4).repeatForever(autoreverses: true), value: activeEmergency)
                 
                 Text("紧急呼叫中...")
                     .font(Theme.h2.bold())

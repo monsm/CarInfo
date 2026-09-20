@@ -8,7 +8,7 @@ struct MessagesView: View {
     @State private var loading = true
     @State private var expanded: Set<String> = []
     @State private var loadTask: Task<Void, Never>? = nil
-    @State private var isRefreshing = false            // 下拉刷新涟漪标志
+    @State private var isRefreshing = false            // 下拉刷新进行中标志
     // #NEW-5 搜索和筛选
     @State private var searchText = ""
     @State private var filterTag: String? = nil
@@ -90,7 +90,6 @@ struct MessagesView: View {
                     }
                 }
             }
-            .padding(.horizontal)
 
             if loading {
                 PageLoadingView("正在加载消息…")
@@ -126,9 +125,8 @@ struct MessagesView: View {
             
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground(Theme.Colors.accent)
+        .pageBackground()
         .navigationTitle("消息")
-            .navBarStyle()
             .accessibilityLabel(Text("消息"))
             .accessibilityHint(Text("车辆通知和历史消息列表，支持搜索和筛选"))
         .toolbar {
@@ -147,7 +145,6 @@ struct MessagesView: View {
         .onAppear { loadIfNeeded() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { isRefreshing = true; await load(); isRefreshing = false }
-        .glassRefreshRipple(isRefreshing: $isRefreshing)
     }
 
     // #NEW-5 过滤后的消息列表
@@ -311,7 +308,6 @@ struct MessagesView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .dynamicTypeCompress()
         .glassCard(corner: 20)
-        .glassLongPressDeform()
         .contentShape(Rectangle())
         .onTapGesture {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {

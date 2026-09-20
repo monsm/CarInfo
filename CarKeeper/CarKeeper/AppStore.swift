@@ -375,7 +375,7 @@ final class AppStore: @unchecked Sendable {
         }
     }
 
-    // #NEW-115 夜间模式状态（用于 NightModeBreathing 呼吸灯）
+    // #NEW-115 夜间模式状态（跟随系统外观）
     var isNightMode: Bool {
         shouldUseDarkMode()
     }

@@ -71,7 +71,7 @@ struct ServiceHistoryView: View {
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.vertical, Theme.Spacing.md)
         }
-        .pageBackground(Theme.pageOrange)
+        .pageBackground()
         .navigationTitle("维保记录")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

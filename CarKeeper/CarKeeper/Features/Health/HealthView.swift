@@ -1,7 +1,8 @@
 import SwiftUI
 
-// 健康报告 —— iOS 27 Liquid Glass：
-// 评分圆环入场动画 + 脉冲外发光 + 浮动粒子 + 交错计数徽章 + 玻璃展开列表。
+// 健康报告 —— DS 设计系统：
+// 评分单色弧 + 三项计数徽章 + 系统列表（可展开）+ 历史趋势。
+// 只有一条轨道、一段进度和一组计数：所有信息都由排版与颜色表达。
 
 struct HealthView: View {
     private let store = AppStore.shared
@@ -12,12 +13,7 @@ struct HealthView: View {
     @State private var loadTask: Task<Void, Never>? = nil
 
     // MARK: 动画状态
-    @State private var scoreProgress: CGFloat = 0      // 圆环进度 0→scorePct
-    @State private var cardOpacity: CGFloat = 0        // 卡片入场淡入
-    @State private var cardSlideY: CGFloat = 24        // 卡片入场下滑
-    @State private var pillPhase: Int = -1             // 三项徽章交错动画相位
-    @State private var isRefreshing = false            // 下拉刷新涟漪标志
-    @State private var pulseTrigger: String = ""        // 触发数值脉冲高亮（评分变化时更新）
+    @State private var isRefreshing = false            // 下拉刷新进行中
     @State private var heroExpanded = false            // Hero 卡片整体展开/收起系统列表
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -29,13 +25,13 @@ struct HealthView: View {
                 } else if let model {
                     scoreHeroListWrapper(model)
                     // E54 胎压趋势折线图
-                    TireTrendChart(checkRaw: store.caches["check"] as? [String: Any] ?? [:]).staggeredEntrance(index: 2)
+                    TireTrendChart(checkRaw: store.caches["check"] as? [String: Any] ?? [:])
                     // E55 实时能耗率显示
-                    RealtimeEnergyDisplay(store: store).staggeredEntrance(index: 3)
+                    RealtimeEnergyDisplay(store: store)
                     // E56 SOC历史曲线
-                    SOCHistoryChart(store: store).staggeredEntrance(index: 4)
+                    SOCHistoryChart(store: store)
                     // E62 驾驶风格热力图
-                    DrivingStyleHeatmap(store: store).staggeredEntrance(index: 5)
+                    DrivingStyleHeatmap(store: store)
                 } else if let err = errText {
                     PageErrorView(err) { Task { await load() } }
                 }
@@ -44,36 +40,16 @@ struct HealthView: View {
             
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground(Theme.pageGreen)
-        .navigationTitle("健康报告").navBarStyle()
+        .pageBackground()
+        .navigationTitle("健康报告")
         .onAppear {
             if expandedSystems.isEmpty, let m = model {
                 for sys in m.systems where sys.statusCls == "bad" { expandedSystems.insert(sys.name) }
             }
             loadIfNeeded()
-            startAnimations()
         }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { isRefreshing = true; await load(); isRefreshing = false }
-        .glassRefreshRipple(isRefreshing: $isRefreshing)
-    }
-
-    // MARK: 入场动画
-    private func startAnimations() {
-        // 圆环从 0 动画到目标分数
-        guard let m = model else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
-            }
-        }
-        withAnimation(Theme.Duration.springNormal) {
-            cardOpacity = 1
-            cardSlideY = 0
-        }
-        // 三项计数徽章交错出现
-        withAnimation(Theme.Duration.springFast.delay(0.35)) { pillPhase = 0 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.48) { withAnimation(Theme.Duration.springFast.delay(0.08)) { pillPhase = 1 } }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.61) { withAnimation(Theme.Duration.springFast.delay(0.08)) { pillPhase = 2 } }
     }
 
     // MARK: 加载状态
@@ -87,10 +63,10 @@ struct HealthView: View {
             // 评分圆环
             scoreRing(m)
 
-            // 三项计数徽章（交错出现）
-            HStack(spacing: 12) {
-                ForEach(Array(m.counts.enumerated()), id: \ .offset) { idx, c in
-                    countPill(c, phase: idx, active: pillPhase >= idx)
+            // 三项计数徽章
+            HStack(spacing: DS.Space.md) {
+                ForEach(Array(m.counts.enumerated()), id: \ .offset) { _, c in
+                    countPill(c)
                 }
             }
 
@@ -98,12 +74,8 @@ struct HealthView: View {
             infoRow(m)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 32)
-        .dynamicTypeCompress()
+        .padding(.vertical, DS.Space.xxxl)
         .glassHeroCard(corner: Theme.Radius.hero)
-        .glassLongPressDeform()
-        .opacity(cardOpacity)
-        .offset(y: cardSlideY)
     }
 
     // MARK: Hero 卡片 + 系统列表（整体可展开/收起）
@@ -117,7 +89,6 @@ struct HealthView: View {
         } label: {
             VStack(spacing: 0) {
                 scoreHero(m)
-                    .runningGlow(color: .green)
                 // 展开内容区：系统列表弹簧高度过渡
                 if heroExpanded {
                     systemList(m)
@@ -129,7 +100,6 @@ struct HealthView: View {
         .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: heroExpanded)
         .accessibilityLabel(Text("健康评分报告"))
         .accessibilityHint(Text(heroExpanded ? "点击收起系统详情" : "点击展开系统详情，查看各子系统状态"))
-        .staggeredEntrance(index: 0)
         .overlay(alignment: .bottomTrailing) {
             Image(systemName: "chevron.down")
                 .font(Theme.font(.footnote as Font).bold())
@@ -140,73 +110,22 @@ struct HealthView: View {
         }
     }
 
-    // MARK: 评分圆环
+    // MARK: 健康评分环
+    // 规则：一条单色轨道 + 一条单色进度。环只负责「读数刻度」，颜色只表达健康度分级。
     private func scoreRing(_ m: HealthModel) -> some View {
-        ZStack {
-            // ── 第 0 层：外扩散光晕（呼吸脉冲）───────────────────────
-            Circle()
-                .fill(AngularGradient(
-                    colors: scoreGlowColors(m.scorePct),
-                    center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)
-                ))
-                .frame(width: 248, height: 248)
-                .opacity(0.18)
-                .blur(radius: 12)
-
-            // ── 第 0.5 层：EKG 心电图描边流动环（首尾相连，沿圆环持续行进）────────
-            EKGFloRingDynamic(size: 242, lineWidth: 1.5, speed: 3.5, percentage: Double(m.scorePct) / 100.0)
-
-            // ── 第 1 层：脉冲光环（持续呼吸）───────────────────────
-            Circle()
-                .strokeBorder(
-                    AngularGradient(colors: [.green, .teal], center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
-                    lineWidth: 2
-                )
-                .frame(width: 236, height: 236)
-                .opacity(0.12)
-                .blur(radius: 6)
-                .heartbeatPulse()
-
-            // ── 第 2 层：浅色底轨 ─────────────────────────────────
-            Circle()
-                .stroke(Color(.systemGray5).opacity(0.45), lineWidth: 22)
-                .frame(width: 216, height: 216)
-
-            // ── 第 3 层：彩色进度弧 ────────────────────────────────
-            Circle()
-                .trim(from: 0, to: max(0.015, scoreProgress / 100))
-                .stroke(
-                    AngularGradient(colors: scoreRingColors(m.scorePct),
-                                    center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
-                    style: StrokeStyle(lineWidth: 22, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-                .frame(width: 216, height: 216)
-                .shadow(color: scoreShadowColor(m.scorePct).opacity(0.35), radius: 12, y: 4)
-
-            // ── 第 4 层：浮动装饰粒子 ──────────────────────────────
-            FloatingParticles(size: 216)
-
-            // ── 第 5 层：中心数字（流体字体，随容器宽度自适应）────────────
-            VStack(spacing: 3) {
-                FluidScoreHero(m.score)
-                    .foregroundStyle(scoreForeground(m.scorePct))
-                    .dynamicTypeLineLimit(1)
-                Text("健康评分")
-                    .font(Theme.caption)
-                    .foregroundStyle(.secondary)
-                    .dynamicTypeTextCompress(isTitle: true)
-                    .accessibilityLabel(Text("健康评分"))
-            }
-        }
+        DSGauge(progress: Double(m.scorePct) / 100.0,
+                lineWidth: 16,
+                tint: scoreShadowColor(m.scorePct),
+                value: m.score,
+                caption: "健康评分",
+                size: 200)
         .frame(width: 216, height: 216)
-        .valuePulse(tint: .green)
     }
 
-    // MARK: 三项计数徽章（交错出现）
-    private func countPill(_ c: CountPill, phase: Int, active: Bool) -> some View {
-        let clsColor = Theme.statusColor(c.cls)
-        return VStack(spacing: 4) {
+    // MARK: 三项计数徽章
+    private func countPill(_ c: CountPill) -> some View {
+        let clsColor = DS.Palette.status(c.cls)
+        return VStack(spacing: DS.Space.xs) {
             // 补齐图标：原来这一格只有数字 + 颜色，没有图标
             Image(safeSymbol: c.iconName, fallback: "info.circle.fill")
                 .font(Theme.footnote.weight(.semibold))
@@ -219,15 +138,14 @@ struct HealthView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.vertical, DS.Space.md)
+        .background(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+            .fill(DS.Palette.surfaceRaised))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(clsColor.opacity(0.20), lineWidth: 1)
+            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                .strokeBorder(clsColor.opacity(0.20), lineWidth: DS.Hair.line)
         )
-        .opacity(active ? 1 : 0)
-        .offset(y: active ? 0 : 16)
-        .animation(Theme.Duration.springFast.delay(Double(phase) * 0.08), value: active)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: 时间信息行
@@ -290,25 +208,7 @@ struct HealthView: View {
         }
     }
 
-    private func scoreGlowColors(_ pct: Int) -> [Color] {
-        switch pct {
-        case 0...39:   return [.red.opacity(0.6), .clear]
-        case 40...69:  return [.orange.opacity(0.5), .clear]
-        case 70...89:  return [.yellow.opacity(0.5), .green.opacity(0.3)]
-        default:       return [.green.opacity(0.5), .teal.opacity(0.3)]
-        }
-    }
-
     private func scoreShadowColor(_ pct: Int) -> Color {
-        switch pct {
-        case 0...39: return .red
-        case 40...69: return .orange
-        case 70...89: return .yellow
-        default: return .green
-        }
-    }
-
-    private func scoreForeground(_ pct: Int) -> Color {
         switch pct {
         case 0...39: return .red
         case 40...69: return .orange
@@ -319,32 +219,15 @@ struct HealthView: View {
 
     // MARK: 检测系统列表
     private func systemList(_ m: HealthModel) -> some View {
-        // 整体卡片：弹簧高度动画 + 玻璃形变光晕 + 弹性缩放
-        ZStack(alignment: .center) {
-            CardBox(title: "检测系统", side: "\(m.systems.count) 项", sideCls: "na") {
-                VStack(spacing: 0) {
-                    ForEach(Array(m.systems.enumerated()), id: \.element.id) { idx, sys in
-                        systemRow(sys) { toggleExpand(sys.name) }
-                        if idx < m.systems.count - 1 { ListDivider().padding(.vertical, 4) }
-                    }
+        // 展开由内容高度 + 发丝线表达；卡片只做轻微的压缩/回弹
+        CardBox(title: "检测系统", side: "\(m.systems.count) 项", sideCls: "na") {
+            VStack(spacing: 0) {
+                ForEach(Array(m.systems.enumerated()), id: \.element.id) { idx, sys in
+                    systemRow(sys) { toggleExpand(sys.name) }
+                    if idx < m.systems.count - 1 { ListDivider().padding(.vertical, 4) }
                 }
             }
-            // 玻璃形变光晕：有展开项时叠加柔和色扩散
-            if !expandedSystems.isEmpty {
-                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-                    .fill(
-                        AngularGradient(
-                            colors: [Theme.ok.opacity(0.08), Theme.ok.opacity(0.02), .clear],
-                            center: .center,
-                            startAngle: .degrees(0),
-                            endAngle: .degrees(360)
-                        )
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .allowsHitTesting(false)
-            }
         }
-        // 弹簧高度 + 弹性缩放：有展开项时卡片轻微压缩（liquid glass 触感 0.98），收起时回弹
         .scaleEffect(expandedSystems.isEmpty ? 1.0 : 0.98)
         .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: expandedSystems.isEmpty)
     }
@@ -381,15 +264,6 @@ struct HealthView: View {
             store.saveCache(["check": checkRaw])
             model = VM.healthModel(store.caches["check"] as? [String: Any])
             errText = nil
-            // 刷新后重置并重播入场动画
-            withAnimation(Theme.Duration.springFast) {
-                scoreProgress = 0
-                cardOpacity = 0
-                cardSlideY = 24
-                pillPhase = -1
-                pulseTrigger = ""
-            }
-            startAnimations()
         } catch {
             errText = error.localizedDescription
             let errDesc = error.localizedDescription.lowercased()
@@ -442,33 +316,23 @@ struct SystemRowView: View {
     var body: some View {
         Button(action: onToggle) {
             VStack(spacing: 0) {
-                // 标题行：带玻璃形变高亮
-                HStack(spacing: 10) {
+                // 标题行：状态点 + 名称 + 健康小环 + 展开箭头
+                HStack(spacing: DS.Space.sm) {
                     StatusDot(cls: sys.statusCls)
-                    Text(sys.name).font(Theme.h4)
-                    Spacer()
-                    // 小圆环健康统计卡（带心跳脉冲）
+                    Text(sys.name).font(DS.Typo.headline)
+                    Spacer(minLength: DS.Space.sm)
                     HealthSystemRing(name: sys.name, statusCls: sys.statusCls,
                                      statusText: sys.statusText, pct: sys.healthPct)
-                    // 旋转 Chevron + 玻璃反光条
-                    HStack(spacing: 6) {
-                        Capsule()
-                            .fill(isOpen
-                                  ? Theme.statusColor(sys.statusCls).opacity(0.35)
-                                  : Color.white.opacity(0.0))
-                            .frame(width: isOpen ? 18 : 0, height: 2)
-                            .animation(.spring(response: 0.45, dampingFraction: 0.8, blendDuration: 0.3), value: isOpen)
-                        Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                            .font(Theme.font(.footnote as Font).bold())
-                            .foregroundStyle(isOpen ? AnyShapeStyle(Theme.statusColor(sys.statusCls)) : AnyShapeStyle(.tertiary))
-                            .rotationEffect(.degrees(isOpen ? 0 : 180))
-                            .animation(.spring(response: 0.35, dampingFraction: 0.65), value: isOpen)
-                    }
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(DS.Palette.labelTertiary)
+                        .rotationEffect(.degrees(isOpen ? 180 : 0))
+                        .animation(DS.Motion.press, value: isOpen)
                 }
-                .padding(.vertical, 12)
-                .padding(.horizontal, 4)
+                .padding(.vertical, DS.Space.md)
+                .padding(.horizontal, DS.Space.xs)
 
-                // 展开内容：交错淡入
+                // 展开内容
                 if isOpen {
                     VStack(spacing: 0) {
                         ForEach(Array(sys.children.enumerated()), id: \.element.id) { idx, item in
@@ -505,74 +369,33 @@ struct SystemRowView: View {
     }
 }
 
-// MARK: - 检测子项行（交错入场 + 液体玻璃拉伸形变 + 反光条流动）
+// MARK: - 检测子项行
 struct SystemChildRow: View {
     let item: HealthItem
     let idx: Int
 
-    @State private var appeared = false
-    @State private var reflectPhase: CGFloat = 0   // 0→1 表示反光条滑过进度
-
     var body: some View {
-        GeometryReader { geo in
-            let rowWidth = geo.size.width
-            VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    Text(item.name).font(Theme.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Text(item.statusText)
-                        .font(Theme.font(.footnote as Font).bold())
-                        .foregroundStyle(Theme.statusColor(item.statusCls))
-                }
-                if let d = item.detect, !d.isEmpty { KVRow(k: "检测值", v: d) }
-                if let s = item.suggest, !s.isEmpty { KVRow(k: "参考范围", v: s) }
-                if let desc = item.desc, !desc.isEmpty {
-                    Text(desc).font(Theme.footnote).foregroundStyle(.secondary)
-                }
+        VStack(alignment: .leading, spacing: DS.Space.xs) {
+            HStack(spacing: DS.Space.sm) {
+                Text(item.name)
+                    .font(DS.Typo.caption)
+                    .foregroundStyle(DS.Palette.labelSecondary)
+                Spacer(minLength: DS.Space.sm)
+                Text(item.statusText)
+                    .font(DS.Typo.footnote.weight(.semibold))
+                    .foregroundStyle(DS.Palette.status(item.statusCls))
             }
-            .padding(.vertical, 8)
-            // 液体玻璃拉伸：垂直方向从 0.85 弹性扩张到 1.0
-            .scaleEffect(y: appeared ? 1.0 : 0.85)
-            // 整体淡入 + 上滑复位
-            .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : 10)
-            // 玻璃反光条：从左侧滑入覆盖全行宽度后停止
-            .overlay(alignment: .leading) {
-                if appeared && reflectPhase < 1 {
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    .clear,
-                                    .white.opacity(0.08),
-                                    .white.opacity(0.18),
-                                    .white.opacity(0.08),
-                                    .clear
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: rowWidth * 0.35, height: 2)
-                        .offset(x: reflectPhase * (rowWidth + rowWidth * 0.35) - rowWidth * 0.35)
-                        .cornerRadius(1)
-                }
-            }
-            .animation(.spring(response: 0.45, dampingFraction: 0.65, blendDuration: 0.3)
-                        .delay(Double(idx) * 0.07), value: appeared)
-            .onAppear { appeared = true }
-            // 反光条在卡片出现后延迟滑过（模拟 Liquid Glass 折射光掠过）
-            .onChange(of: appeared) { visible in
-                guard visible else { return }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12 + Double(idx) * 0.07) {
-                    withAnimation(.spring(response: 0.55, dampingFraction: 0.7, blendDuration: 0.25)) {
-                        reflectPhase = 1.0
-                    }
-                }
+            if let d = item.detect, !d.isEmpty { KVRow(k: "检测值", v: d) }
+            if let s = item.suggest, !s.isEmpty { KVRow(k: "参考范围", v: s) }
+            if let desc = item.desc, !desc.isEmpty {
+                Text(desc)
+                    .font(DS.Typo.footnote)
+                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .frame(height: nil, alignment: .leading)
-        .liquidGlassRipple(cornerRadius: Theme.Radius.small)
+        .padding(.vertical, DS.Space.sm)
+        .accessibilityElement(children: .combine)
     }
 }
 }

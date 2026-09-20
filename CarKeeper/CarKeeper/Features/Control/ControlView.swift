@@ -46,7 +46,7 @@ struct ControlView: View {
     @State private var lastResult: RunState? = nil
     // lastResult 由 resultSheet 直接使用，保留
     @State private var tempDisplayCount: Int = 0   // HeroDisc 温度数字滚动计数（0→pendingTemp）
-    @State private var isRefreshing = false         // 下拉刷新涟漪标志
+    @State private var isRefreshing = false         // 下拉刷新进行中
     @EnvironmentObject var nav: NavState            // C3: 用于 pushNavigation
 
     struct RunState: Identifiable {
@@ -204,19 +204,18 @@ struct ControlView: View {
     }
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.Spacing.cardSpacing) {
-                carSelector.staggeredEntrance(index: 0)
-                heroDiscs.staggeredEntrance(index: 1)
+            VStack(spacing: DS.Space.gap) {
+                carSelector
+                heroDiscs
                 // #18 快捷预设场景
-                presetScenesCard.staggeredEntrance(index: 2)
-                if let run = running { runningCard(run).staggeredEntrance(index: 3) }
-                SiriShortcutsCard().staggeredEntrance(index: 4)
-                commandCard.staggeredEntrance(index: 5)
+                presetScenesCard
+                if let run = running { runningCard(run) }
+                SiriShortcutsCard()
+                commandCard
                 if let bd = bodyDetail { bodyDetailCard(bd) }
-                if !history.isEmpty { historyCard.staggeredEntrance(index: 0) }
+                if !history.isEmpty { historyCard }
             }
-            
-            
+            .padding(.bottom, DS.Space.xxl)
         }
         .scrollBounceBehavior(.basedOnSize)
         .refreshable {
@@ -226,12 +225,10 @@ struct ControlView: View {
             }
             // 数据回来后自动重播计数动画（pendingTemp 不变，onChange 会触发）
         }
-        .pageBackground(Theme.pageBlue)
+        .dsCanvas()
         .navigationTitle("车控")
-            .navBarStyle()
             .accessibilityLabel(Text("车控"))
             .accessibilityHint(Text("远程控制车辆：锁车、解锁、空调、座椅加热"))
-        .glassRefreshRipple(isRefreshing: $isRefreshing)
         // #35 语音播报入口
         .toolbar {
             if !UIAccessibility.isSpeakScreenEnabled {
@@ -329,29 +326,23 @@ struct ControlView: View {
             .font(Theme.h4)
             Spacer()
         }
-        .padding(.vertical, 12)
-        .dynamicTypeCompress()
-        .glassCard(corner: 20)
-        .glassLongPressDeform()
+        .dsSurface(padding: DS.Space.lg, radius: DS.Radius.card)
     }
 
     // MARK: 主控双盘
     private var heroDiscs: some View {
         HStack(spacing: 20) {
-            ForEach(Array(hero.enumerated()), id: \.element.key) { idx, item in
-                heroDisc(item, idx: idx)
+            ForEach(hero, id: \.key) { item in
+                heroDisc(item)
             }
             ACHeroDisc(pendingTemp: $pendingTemp, displayCount: $tempDisplayCount)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
-        .dynamicTypeCompress()
-        .glassCard()
-        .glassLongPressDeform()
+        .dsSurface(padding: DS.Space.xl, radius: DS.Radius.card)
     }
 
-    private func heroDisc(_ item: (key: String, name: String, symbol: String), idx: Int) -> some View {
-        HeroDiscButton(key: item.key, name: item.name, symbol: item.symbol, disabled: busy || running != nil, appearDelay: Double(idx) * 0.08) { onCmd(item.key) }
+    private func heroDisc(_ item: (key: String, name: String, symbol: String)) -> some View {
+        HeroDiscButton(key: item.key, name: item.name, symbol: item.symbol, disabled: busy || running != nil) { onCmd(item.key) }
     }
 
     // MARK: 快捷预设场景 (#18)
@@ -414,7 +405,7 @@ struct ControlView: View {
         AVSpeechSynthesizer().speak(utterance)
     }
 
-    // MARK: 执行中（带呼吸光晕）
+    // MARK: 指令执行中
     private func runningCard(_ run: RunState) -> some View {
         HStack(spacing: 12) {
             ProgressView()
@@ -427,12 +418,7 @@ struct ControlView: View {
             }
             Spacer()
         }
-        .padding(16)
-        .dynamicTypeCompress()
-        .glassCard(corner: 20)
-        .glassLongPressDeform()
-        // 液态玻璃呼吸光晕：品牌色从中心向外扩散脉冲，营造"执行中"活跃感
-        .runningGlow(color: Theme.brand)
+        .dsSurface(padding: DS.Space.lg, radius: DS.Radius.card)
     }
 
     // MARK: 指令列表
@@ -675,90 +661,58 @@ struct ControlView: View {
     }
 }
 
-// MARK: - 主控双盘按钮（液态玻璃按压回弹）
+// MARK: - 主控双盘按钮（按压回弹）
 struct HeroDiscButton: View {
     let key: String
     let name: String
     let symbol: String
     let disabled: Bool
-    let appearDelay: CGFloat
     let action: () -> Void
-    @State private var isEntered = false
     @State private var isPressed = false
-    @State private var iconRotation: Angle = .degrees(0)
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 12) {
-                ZStack {
-                    // 第 0.5 层：EKG 心电图描边流动环（首尾相连，沿圆环持续行进）
-                    EKGFloRing(size: 102, color: Theme.brand.opacity(0.45), lineWidth: 1.5, speed: 3.5)
-
-                    // 第 1 层：脉冲光环（持续呼吸，模拟 Liquid Glass 生命感）
-                    Circle()
-                        .strokeBorder(Theme.brand.opacity(0.25), lineWidth: 1.5)
-                        .frame(width: 96, height: 96)
-                        .blur(radius: 3)
-                        .heartbeatPulse()
-                    // 第 2 层：底色填充
-                    Circle()
-                        .fill(Theme.brand.opacity(0.08))
-                        .frame(width: 92, height: 92)
-                    // 第 3 层：中层填充
-                    Circle()
-                        .fill(Theme.brand.opacity(0.12))
-                        .frame(width: 80, height: 80)
-                    // 第 4 层：清晰边框
-                    Circle()
-                        .strokeBorder(Theme.brand.opacity(0.30), lineWidth: 1.5)
-                        .frame(width: 80, height: 80)
-                    // 第 5 层：图标（按压时旋转 + 颜色反转）
-                    Image(safeSymbol: symbol, fallback: "bolt.fill")
-                        .font(Theme.d3)
-                        .foregroundStyle(isPressed ? .white : Theme.brand)
-                        .rotationEffect(iconRotation)
-                }
-                .opacity(disabled ? 0.45 : 1)
-                .animation(.easeInOut(duration: 0.2), value: disabled)
+            // Tesla 式磁贴：一张圆角表面 + 左上图标 + 下方标签。
+            // 一屏多个动作时，磁贴矩阵才是车内控制台该有的读数方式。
+            VStack(alignment: .leading, spacing: DS.Space.sm) {
+                Image(safeSymbol: symbol, fallback: "bolt.fill")
+                    .font(.system(size: DS.Size.tileIcon, weight: .regular))
+                    .foregroundStyle(isPressed ? DS.Palette.labelOnTint : Theme.brand)
+                    .frame(height: 30)
                 Text(name)
-                    .font(Theme.h4)
-                    .foregroundStyle(isPressed ? .white : (disabled ? .secondary : .primary))
+                    .font(DS.Typo.subheadline.weight(.semibold))
+                    .foregroundStyle(isPressed ? DS.Palette.labelOnTint : DS.Palette.label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(DS.Space.md)
+            .frame(minHeight: 84)
+            .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                .fill(isPressed ? Theme.brand : DS.Palette.surface))
+            .overlay(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                .strokeBorder(isPressed ? Color.clear : DS.Palette.hairline, lineWidth: DS.Hair.line))
+            .opacity(disabled ? 0.45 : 1)
+            .animation(.easeInOut(duration: 0.2), value: disabled)
+            .animation(DS.Motion.press, value: isPressed)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(DSCardButtonStyle())
         .disabled(disabled)
         .accessibilityLabel(Text(name))
         .accessibilityHint(Text(disabled ? "此功能当前不可用" : "点击" + name + "控制车辆"))
-        // 按压时图标旋转 + 文字颜色反转
-        .onTapGesture {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6, blendDuration: 0.2)) {
-                iconRotation = .degrees(symbol.contains("lock") ? -30 : 0)
-                isPressed = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.65, blendDuration: 0.25)) {
-                    iconRotation = .degrees(0)
-                    isPressed = false
-                }
-            }
-        }
-        // 入场动画：交错淡入 + 缩放回弹
-        .opacity(isEntered ? 1 : 0)
-        .scaleEffect(isEntered ? 1.0 : 0.85)
-        .animation(.spring(response: 0.55, dampingFraction: 0.7, blendDuration: 0.35).delay(appearDelay), value: isEntered)
-        .onAppear { isEntered = true }
-        // 液态玻璃按压反馈（统一 PressFeedback）
-        .modifier(PressFeedback(pressScale: 0.88, glowColor: Theme.brand, glowIntensity: 1.0,
-                                springResponse: 0.4, springDamping: 0.65))
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in if !isPressed { isPressed = true } }
+                .onEnded { _ in isPressed = false }
+        )
+        // 磁贴直接到位：按下反馈只由上面的填充/描边过渡表达。
     }
 }
 
-// MARK: - 空调温度 HeroDisc（带心跳脉冲 + EKG 流动环 + 数字滚动）
+// MARK: - 空调温度 HeroDisc（单一圆盘 + 数字滚动）
 struct ACHeroDisc: View {
     @Binding var pendingTemp: Int
     @Binding var displayCount: Int
-    @State private var isEntered = false
-    @State private var pulseTrigger = UUID()
 
     // B4: 温度渐变颜色（低温蓝→高温红，16~32℃映射）
     private var tempGradientColor: Color {
@@ -771,55 +725,30 @@ struct ACHeroDisc: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: DS.Space.sm) {
             ZStack {
-                // 第 0.5 层：EKG 心电图描边流动环
-                EKGFloRing(size: 102, color: Theme.brand.opacity(0.45), lineWidth: 1.5, speed: 3.5)
-
-                // 第 1 层：脉冲光环（持续呼吸）
+                // 单一圆盘：温度只靠颜色表达。
                 Circle()
-                    .strokeBorder(Theme.brand.opacity(0.25), lineWidth: 1.5)
-                    .frame(width: 96, height: 96)
-                    .blur(radius: 3)
-                    .heartbeatPulse()
-
-                // 第 2 层：底色填充（B4: 随温度渐变：低温蓝→高温红）
-                Circle()
-                    .fill(tempGradientColor.opacity(0.10))
+                    .fill(tempGradientColor.opacity(0.12))
                     .frame(width: 92, height: 92)
-
-                // 第 3 层：中层填充
                 Circle()
-                    .fill(tempGradientColor.opacity(0.15))
-                    .frame(width: 80, height: 80)
-
-                // 第 4 层：清晰边框
-                Circle()
-                    .strokeBorder(Theme.brand.opacity(0.30), lineWidth: 1.5)
-                    .frame(width: 80, height: 80)
-
-                // 第 5 层：温度数字（流体字体，随容器宽度自动缩放）
+                    .strokeBorder(tempGradientColor.opacity(0.35), lineWidth: 1)
+                    .frame(width: 92, height: 92)
+                // 温度数字（流体字体，随容器宽度自动缩放）
                 FluidTempHero(String(displayCount))
-                    .valuePulse(tint: Theme.brand, watchValue: Binding(get: { pulseTrigger.uuidString }, set: { _ in }))
             }
-            .scaleEffect(isEntered ? 1.0 : 0.82)
-            .opacity(isEntered ? 1.0 : 0.0)
-            .animation(.spring(response: 0.55, dampingFraction: 0.7, blendDuration: 0.35), value: isEntered)
             Text("空调")
-                .font(Theme.h4)
-                .foregroundStyle(.primary)
+                .font(DS.Typo.subheadline.weight(.semibold))
+                .foregroundStyle(DS.Palette.labelSecondary)
         }
         .onAppear {
-            isEntered = true
-            pulseTrigger = UUID()
-            // 从 0 弹性计数到目标温度（入场动画）
+            // 首次出现时把数字对齐到当前温度（一次性对齐，不是反复播放的动画）
             withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
                 displayCount = pendingTemp
             }
         }
-        // 温度变化时同步滚动 + 触发脉冲
+        // 温度变化时同步滚动
         .onChange(of: pendingTemp) { newTemp in
-            pulseTrigger = UUID()
             withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.6)) {
                 displayCount = newTemp
             }
@@ -900,9 +829,8 @@ struct PINKeypadView: View {
 struct ACStepperView: View {
     @Environment(\.dismiss) private var dismiss
     @State var temp: Int
-    // 数字滚动：从 0 弹性计数到目标温度（入场动画 + 每次变化同步滚动）
+    // 数字滚动：首次对齐目标温度，之后每次变化同步滚动
     @State private var tempDisplayCount = 0
-    @State private var pulseTrigger = UUID()
 
     init(initialTemp: Binding<Int>) {
         _temp = State(initialValue: initialTemp.wrappedValue)
@@ -946,16 +874,14 @@ struct ACStepperView: View {
         .padding(Theme.Spacing.xxl)
         .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
-        // 入场动画：从 0 弹性计数到目标温度
+        // 首次对齐目标温度
         .onAppear {
-            pulseTrigger = UUID()
             withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
                 tempDisplayCount = temp
             }
         }
-        // 每次加减按钮触发时同步滚动数字 + 触发脉冲
+        // 每次加减按钮触发时同步滚动数字
         .onChange(of: temp) { newTemp in
-            pulseTrigger = UUID()
             withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.6)) {
                 tempDisplayCount = newTemp
             }

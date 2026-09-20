@@ -1,6 +1,5 @@
 // =============================================================================
 // N42 国际化字符串提取
-// N9 夜间呼吸灯增强（SOC 绑定频率）
 // =============================================================================
 
 import Foundation
@@ -94,43 +93,3 @@ struct I18n {
     static let year          = t("Year")
 }
 
-// MARK: - N9 夜间呼吸灯增强
-struct BreathingGlowView: View {
-    let soc: Int
-    let size: CGFloat
-    let color: Color
-
-    private var pulsePeriod: Double {
-        guard soc > 0 else { return 0.6 }
-        return max(0.4, Double(soc) / 100.0)
-    }
-
-    var body: some View {
-        Circle()
-            .fill(color.opacity(0.12))
-            .frame(width: size, height: size)
-            .scaleEffect(1 + sin(Date().timeIntervalSince1970 * .pi * 2 / pulsePeriod) * 0.08)
-            .opacity(0.5 + sin(Date().timeIntervalSince1970 * .pi * 2 / pulsePeriod) * 0.5)
-            .animation(.linear(duration: pulsePeriod).repeatForever(autoreverses: false), value: soc)
-    }
-}
-
-struct NightBreathingContainer: ViewModifier {
-    let soc: Int
-    let color: Color
-    let size: CGFloat
-
-    func body(content: Content) -> some View {
-        ZStack {
-            BreathingGlowView(soc: soc, size: size, color: color)
-                .position(x: size / 2, y: size / 2)
-            content
-        }
-    }
-}
-
-extension View {
-    func nightBreathing(soc: Int, color: Color = Theme.Colors.accent, size: CGFloat = 200) -> some View {
-        modifier(NightBreathingContainer(soc: soc, color: color, size: size))
-    }
-}

@@ -9,13 +9,10 @@ struct BatteryView: View {
     @State private var loaded = false
     @State private var errText: String = ""
     @State private var loadTask: Task<Void, Never>? = nil
-    @State private var socProgress: CGFloat = 0      // SOC圆环进度 0→socPct
-    @State private var socCardOpacity: CGFloat = 0   // SOC卡片入场淡入
-    @State private var socCount: Int = 0             // SOC数字滚动计数
-    @State private var rangeCount: Int = 0            // B2: 续航数字滚动计数
-    @State private var isRefreshing = false          // 下拉刷新涟漪标志
-    @State private var switchingCar = false           // 切换车辆涟漪标志
-    @State private var pulseTrigger: String = ""      // 触发数值脉冲高亮（SOC 变化时更新）
+    @State private var socProgress: CGFloat = 0      // SOC 环进度 0→socPct
+    @State private var socCount: Int = 0             // SOC 数字计数
+    @State private var rangeCount: Int = 0           // 续航数字计数
+    @State private var isRefreshing = false          // 下拉刷新进行中
     @State private var showDestinationCalc = false
     @State private var destinationDistance: String = ""
     @State private var canReach: Bool?
@@ -36,16 +33,13 @@ struct BatteryView: View {
             }
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground(Theme.pageGreen)
+        .pageBackground()
         .navigationTitle("电池与充电")
-        .glassSwitchRipple(isSwitching: $switchingCar)
-            .navBarStyle()
             .accessibilityLabel(Text("电池与充电"))
             .accessibilityHint(Text("电池状态、充电历史与诊断报告"))
         .onAppear { loadIfNeeded(); startSocAnimation() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { isRefreshing = true; await load(); isRefreshing = false }
-        .glassRefreshRipple(isRefreshing: $isRefreshing)
         .toolbar {
             // #20 目的地续航计算器入口
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -62,10 +56,8 @@ struct BatteryView: View {
         }
         .onChange(of: store.carId) { newId in
             guard !newId.isEmpty else { return }
-            switchingCar = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.easeOut(duration: 0.3)) { switchingCar = false }
-            }
+            // 切车后重新拉一次数据
+            Task { await load() }
         }
         .overlay(alignment: .center) {
             if !loaded && errText.isEmpty {
@@ -82,121 +74,94 @@ struct BatteryView: View {
         let cache = store.caches
         let b = batteryModel(cache)
         let e = VM.energy(cache, store.car)
-        socHero(e).staggeredEntrance(index: 0)
-        verdictCard(cache, b).staggeredEntrance(index: 1)
-        consistencyCard(b).staggeredEntrance(index: 2)
+        socHero(e)
+        verdictCard(cache, b)
+        consistencyCard(b)
         // E2 电池健康度 SOH
-        BatteryHealthCard(model: b).staggeredEntrance(index: 2)
+        BatteryHealthCard(model: b)
         // E7 充电功率曲线
-        ChargePowerChart(model: b).staggeredEntrance(index: 3)
-        chargeCard(b).staggeredEntrance(index: 4)
+        ChargePowerChart(model: b)
+        chargeCard(b)
         // #13 能耗历史折线图 / E26 充电效率趋势
-        ChargeEfficiencyTrend(store: store).staggeredEntrance(index: 3)
+        ChargeEfficiencyTrend(store: store)
         // E22 能耗对比柱状图
-        EnergyCompareChart(store: store).staggeredEntrance(index: 5)
-        energyHistoryChart.staggeredEntrance(index: 6)
-        subsystemCard(b).staggeredEntrance(index: 5)
-        motorCard(b).staggeredEntrance(index: 5)
-        faultCard(b).staggeredEntrance(index: 6)
+        EnergyCompareChart(store: store)
+        energyHistoryChart
+        subsystemCard(b)
+        motorCard(b)
+        faultCard(b)
         // E56 SOC历史曲线
-        SOCHistoryChart(store: store).staggeredEntrance(index: 8)
+        SOCHistoryChart(store: store)
         // E3 胎压趋势折线图
-        TireTrendChart(checkRaw: store.caches["check"] as? [String: Any] ?? [:]).staggeredEntrance(index: 10)
-        alarmCard(b).staggeredEntrance(index: 11)
+        TireTrendChart(checkRaw: store.caches["check"] as? [String: Any] ?? [:])
+        alarmCard(b)
     }
 
-    // MARK: SOC Hero — Apple Watch 风格大圆环 + 入场动画 + 浮动粒子
+    // MARK: 电池 Hero（Tesla 式：大数字 + 单色电量条 + 关键数据格）
     private func socHero(_ e: EnergyModel) -> some View {
-        VStack(spacing: 18) {
-            ZStack {
-                // 第 0 层：外扩散光晕（呼吸脉冲）
-                Circle()
-                    .fill(AngularGradient(colors: socGlowColors(e.socPct),
-                                          center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)))
-                    .frame(width: 248, height: 248)
-                    .opacity(0.15)
-                    .blur(radius: 12)
+        let tint = socTint(e.socPct)
+        let socText = e.soc == "--" ? "--" : "\(socCount)"
 
-                // 第 0.5 层：EKG 心电图描边流动环（首尾相连，沿圆环持续行进）
-                EKGFloRingDynamic(size: 238, lineWidth: 1.5, speed: 3.5, percentage: CGFloat(e.socPct) / 100)
-
-                // 第 1 层：脉冲光环（持续呼吸）
-                Circle()
-                    .strokeBorder(AngularGradient(colors: [.green, .teal], center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)), lineWidth: 2)
-                    .frame(width: 232, height: 232)
-                    .opacity(0.10)
-                    .blur(radius: 5)
-                    .heartbeatPulse()
-
-                // 第 2 层：底色轨道
-                Circle()
-                    .stroke(Color(.systemGray5).opacity(0.5), lineWidth: 18)
-                    .frame(width: 208, height: 208)
-
-                // 第 3 层：彩色进度弧（动画展开）
-                Circle()
-                    .trim(from: 0, to: max(0.02, socProgress / 100))
-                    .stroke(
-                        AngularGradient(colors: [.green, .green, Theme.Colors.accent, .orange, .red],
-                                        center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
-                        style: StrokeStyle(lineWidth: 18, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: 208, height: 208)
-                    .shadow(color: socShadowColor(e.socPct).opacity(0.35), radius: 14, y: 5)
-
-                // 第 4 层：浮动装饰粒子
-                FloatingParticles(size: 208)
-
-                // 第 5 层：中心数字（流体字体，随容器宽度自适应）
-                VStack(spacing: 2) {
-                    FluidPercentHero(e.soc == "--" ? "--" : String(socCount))
-                        .dynamicTypeLineLimit(1)
-                    Text("电池电量")
-                        .font(Theme.caption)
-                        .foregroundStyle(.secondary)
-                        .dynamicTypeTextCompress(isTitle: true)
-                        .accessibilityLabel(Text("电池电量"))
+        return DSCard(padding: DS.Space.xl, radius: DS.Radius.hero) {
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
+                HStack(alignment: .top) {
+                    DSMetric(value: socText, unit: "%", caption: "电池电量", size: 64, tint: tint)
+                    Spacer(minLength: DS.Space.md)
+                    VStack(alignment: .trailing, spacing: DS.Space.sm) {
+                        DSChip(text: e.online.text, cls: e.online.cls)
+                        if !e.socWarn.isEmpty {
+                            DSChip(text: e.socWarn, cls: e.socCls)
+                        }
+                    }
                 }
-            }
-            // 续航 + 充电状态
-            HStack(spacing: 14) {
-                MetricPill(icon: "point.topleft.down.curvedto.point.bottomright.up",
-                           value: e.range == "--" ? "--" : (rangeCount > 0 ? String(rangeCount) : e.range), unit: "km", tint: .green, fluidValue: true)
-                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: Theme.Colors.accent)
-            }
-            Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5)))")
-                .font(Theme.footnote).foregroundStyle(.secondary)
-            // #2 SOC耗尽预测
-            if let tte = e.timeToEmpty, tte != "--" {
-                Text("预计剩余行驶：\(tte)").font(Theme.footnote).foregroundStyle(.secondary)
+                .dynamicTypeCompress()
+
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(DS.Palette.surfaceSunken)
+                        Capsule()
+                            .fill(tint)
+                            .frame(width: max(6, geo.size.width * min(1, max(0, socProgress / 100))))
+                            .animation(DS.Motion.value, value: socProgress)
+                    }
+                }
+                .frame(height: 10)
+                .accessibilityElement()
+                .accessibilityLabel(Text("电池电量 \(e.socPct)%"))
+
+                DSDivider()
+
+                HStack(alignment: .top, spacing: DS.Space.md) {
+                    DSStatTile(label: "续航",
+                               value: e.range == "--" ? "--" : (rangeCount > 0 ? String(rangeCount) : e.range),
+                               unit: "km",
+                               icon: "road.lanes")
+                    DSStatTile(label: "充电状态", value: e.chargeText, cls: e.chargeCls, icon: "bolt.fill")
+                    DSStatTile(label: "电压/电流", value: e.voltAmp, icon: "waveform.path.ecg")
+                }
+
+                HStack(spacing: DS.Space.lg) {
+                    Text("电池温度 \(e.battTemp)")
+                    if let tte = e.timeToEmpty, tte != "--" {
+                        Text("预计可行驶 \(tte)")
+                    }
+                    Spacer(minLength: 0)
+                    Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5)))")
+                }
+                .font(DS.Typo.footnote)
+                .foregroundStyle(DS.Palette.labelSecondary)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 30)
         .dynamicTypeCompress()
-        .glassHeroCard()
-        .glassLongPressDeform()
-        .runningGlow(color: .green)
-        .opacity(socCardOpacity)
-        .valuePulse(tint: .green)
+        .accessibilityElement(children: .contain)
     }
 
-    // MARK: SOC颜色辅助函数
-    private func socGlowColors(_ pct: Int) -> [Color] {
+    // MARK: SOC 语义色（不用渐变，颜色只表达健康度）
+    private func socTint(_ pct: Int) -> Color {
         switch pct {
-        case 0...39: return [.red.opacity(0.5), .clear]
-        case 40...69: return [.orange.opacity(0.45), .clear]
-        case 70...89: return [.yellow.opacity(0.45), .green.opacity(0.25)]
-        default: return [.green.opacity(0.45), .teal.opacity(0.25)]
-        }
-    }
-
-    private func socShadowColor(_ pct: Int) -> Color {
-        switch pct {
-        case 0...39: return .red
-        case 40...69: return .orange
-        case 70...89: return .yellow
-        default: return .green
+        case ..<20: return DS.Palette.bad
+        case ..<40: return DS.Palette.warn
+        default: return DS.Palette.ok
         }
     }
 
@@ -525,15 +490,13 @@ struct BatteryView: View {
         }
     }
 
-    // MARK: SOC入场动画
+    // MARK: SOC 环进度对齐（只做状态变化动画）
     private func startSocAnimation() {
-        withAnimation(Theme.Duration.springNormal) { socCardOpacity = 1 }
         let e = VM.energy(store.caches, store.car)
         let target = max(0, min(100, e.socPct))
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
                 socProgress = CGFloat(target)
-                pulseTrigger = String(target)
             }
         }
         // B2: 续航数字滚动计数
@@ -568,8 +531,9 @@ struct BatteryView: View {
             store.saveCache(["control": control])
             loaded = true
             errText = ""
-            // 刷新后重新播放 SOC 液态玻璃入场动画
-            withAnimation(Theme.Duration.springFast) { socCardOpacity = 0; socProgress = 0; socCount = 0; pulseTrigger = "" }
+            // 刷新后重新对齐 SOC / 续航读数
+            socCount = 0
+            rangeCount = 0
             startSocAnimation()
         } catch {
             errText = error.localizedDescription

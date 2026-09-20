@@ -18,6 +18,7 @@ struct CrashLogViewer: View {
             }
         }
         .listStyle(.plain)
+        .dsCanvas()
         .navigationTitle("崩溃日志")
         .toolbar {
             Button("清除日志") { reporter.clearCrashHistory() }

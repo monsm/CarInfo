@@ -31,7 +31,6 @@ private struct ColorSwatch: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .dynamicTypeCompress()
         .glassCard()
-        .glassLongPressDeform()
     }
 }
 
@@ -118,7 +117,6 @@ private struct ContrastRow: View {
         .padding(.vertical, Theme.Spacing.sm)
         .dynamicTypeCompress()
         .glassCard()
-        .glassLongPressDeform()
     }
 }
 
@@ -139,8 +137,7 @@ struct DevView: View {
                 .padding(.vertical, Theme.Spacing.md)
                 .dynamicTypeCompress()
                 .glassHeroCard()
-                .glassLongPressDeform()
-
+        
                 // 品牌色
                 ColorGroup(groupName: "品牌色", items: [
                     ("brand",         .blue,          "系统蓝色"),
@@ -180,14 +177,6 @@ struct DevView: View {
                     ("ultraThin",  Theme.ColorSystem.fillSubtle,   "极淡材质"),
                     ("bar",        Theme.ColorSystem.background,   "导航栏背景"),
                     ("content",    Theme.ColorSystem.cardBg,       "内容背景"),
-                ])
-
-                // 页面背景色
-                ColorGroup(groupName: "页面背景", items: [
-                    ("pageAccent",    Theme.pageAccent,    "车况页（默认）"),
-                    ("pageGreen",     Theme.pageGreen,     "电池/健康页"),
-                    ("pageBlue",      Theme.pageBlue,      "车控页"),
-                    ("pageIndigo",    Theme.pageIndigo,    "全量数据页"),
                 ])
 
                 // 表面色（ColorSystem）
@@ -243,8 +232,8 @@ struct DevView: View {
             .padding(.horizontal, 16)
             .safeAreaPadding(.bottom, 12)
         }
-        .pageBackground(Theme.Colors.accent)
-        .navigationTitle("颜色预览").navBarStyle()
+        .pageBackground()
+        .navigationTitle("颜色预览")
     }
 }
 

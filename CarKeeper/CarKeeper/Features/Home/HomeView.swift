@@ -1,672 +1,394 @@
 import SwiftUI
 import CoreLocation
 import UserNotifications
-import Intents
 import UIKit
 import MapKit
 
-// 车况首页 —— iOS 27 Liquid Glass：
-// SOC Hero + 车速里程 + 快控按钮 + 状态域 + 电池 + 胎压 + 座舱 + 位置
-// 轮询 60s（fetchCore）+ 位置 8s
+// =============================================================================
+//  车况首页 — Tesla 式信息架构
+// =============================================================================
+//  结构（自上而下，按「用户在车外最关心什么」排序）：
+//    ① 车辆标识（哪辆车 / 在线状态）
+//    ② 电量 Hero（一个巨大数字 + 续航环 + 充电状态）
+//    ③ 快捷操作（锁车 / 解锁 / 空调 / 寻车）
+//    ④ 关键指标（里程 / 车速 / 车内温度 / PM2.5）
+//    ⑤ 车身状态（门窗锁等安全项）
+//    ⑥ 系统健康（8 个状态域，语义色直读）
+//    ⑦~⑨ 电池 / 胎压 / 座舱明细
+//    ⑩ 位置（地址 + 地图 + 导航）
+//    ⑪ 数据来源（更新时间 + 手动刷新）
+//
+//  视觉：DS 设计系统。单一画布、不透明卡片、发丝分隔、语义色。
+//  没有任何铺底装饰与入场动画 —— 打开即到位。
+// =============================================================================
 
 struct HomeView: View {
+
     private let store = AppStore.shared
-    @State private var showLoginAlert = false
+
     @State private var startTimer: Task<Void, Never>? = nil
     @State private var lastFetch: Date?
-    @State private var showMap = true
-    @State private var carVersion: Int = 0          // 切换车辆时 +1，驱动过渡动画
-    @State private var socProgress: CGFloat = 0      // SOC圆环进度 0→socPct
-    @State private var socCardOpacity: CGFloat = 0   // SOC卡片入场淡入
-    @State private var socCount: Int = 0             // SOC数字滚动计数
-    @State private var mileCount: Int = 0            // 里程数字滚动计数
-    @State private var isRefreshing = false          // 下拉刷新标志（仅刷新时重播动画）
-    @State private var pulseTrigger: String = ""      // 触发数值脉冲高亮（SOC / 里程变化时更新）
-    @State private var expandedDrive = false          // 车速里程行展开状态
-    @State private var expandedTyre = false           // 胎压卡展开状态
-    @State private var tyreWatchValue: String = ""    // B7: 胎压数值变化脉冲触发器
-    @State private var switchingCar = false           // 切换车辆涟漪标志
-    @State private var isEditingOrder = false         // #24 卡片排序编辑模式
-    @State private var draggedCard: String? = nil     // 当前拖拽的卡片ID
-    @State private var cardOrder: [String] = []       // #24 卡片顺序
-    // #NEW-1 停车位置
-    @State private var parkingLoc: CLLocation?
-    // #NEW-4 上车打卡提醒
+    @State private var isRefreshing = false
     @State private var showCheckInReminder = false
-    // #NEW-6 Siri快捷指令
-    @State private var siriLastAction: String? = nil
-    // #NEW-123 全局搜索
     @State private var showSearch = false
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var showMap = true
+    @State private var focusEnabled = FocusModeManager.shared.config.enabled
 
-    // #NEW-4 上车打卡提示按钮（抽出为独立 @ViewBuilder，降低 body 的类型推断压力）
-    @ViewBuilder
-    private var checkInAlertButtons: some View {
-        Button(action: { store.checkIn() }, label: { Text("已上车，检查车况") })
-        Button(role: .cancel, action: {}, label: { Text("稍后再说") })
-    }
+    /// 当前缓存（一次取值，多处复用，避免每个卡片各读一遍）
+    private var cache: [String: Any?] { store.caches }
+
+    // MARK: - 根
 
     var body: some View {
         Group {
             if let cfg = TokenStore.read(), !cfg.accessToken.isEmpty {
                 content
             } else {
-                ContentUnavailableView("请先登录", systemImage: "lock.rectangle", description: Text("点击下方登录"))
-                    .padding(.top, 100)
+                DSPlaceholder(
+                    icon: "lock.fill",
+                    title: "请先登录",
+                    message: "登录后即可查看车辆状态"
+                )
             }
         }
-        .sheet(isPresented: $showLoginAlert) { LoginView() }
-        .task { cardOrder = store.cardOrder }
+        .sheet(isPresented: $showSearch) {
+            NavigationStack {
+                GlobalSearchHUD(isPresented: $showSearch)
+                    .navigationTitle("搜索")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
     }
 
     private var content: some View {
-        contentBehavior
-            .alert("上车打卡", isPresented: $showCheckInReminder) {
-                checkInAlertButtons
-            } message: {
-                Text("今天还没检查车况，建议上车前确认胎压、电量是否正常。")
-            }
-            .sheet(isPresented: $showSearch) { searchSheet }
-            .gesture(swipeDownToSearch)
-            .glassRefreshRipple(isRefreshing: $isRefreshing)
-            .glassRefreshHalo(isRefreshing: $isRefreshing)
-            .glassSwitchRipple(isSwitching: $switchingCar)
-    }
-
-    /// 生命周期与下拉刷新（第二段链，独立成类型检查单元）
-    private var contentBehavior: some View {
-        contentVisual
-            .onChange(of: store.carId) { newId in
-                guard !newId.isEmpty else { return }
-                withAnimation(.easeInOut(duration: 0.08)) {
-                    carVersion += 1
-                }
-                // 切换车辆时触发全屏玻璃涟漪扩散动效
-                switchingCar = true
-                // B7: 胎压数值变化脉冲
-                tyreWatchValue = UUID().uuidString
-            }
-            .onChange(of: switchingCar) { switching in
-                guard switching else { return }
-                // 涟漪扩散后自动消散
-                scheduleSwitchingReset()
-            }
-            .onAppear { startPolling(); startSocAnimation(); startMileAnimation(); tyreWatchValue = UUID().uuidString }
-            .onDisappear {
-                startTimer?.cancel()
-                startTimer = nil
-            }
-            .refreshable { isRefreshing = true; await fetchCore(); isRefreshing = false }
-    }
-
-    /// 视觉与工具栏（第一段链）
-    private var contentVisual: some View {
         ScrollView {
-            cardStack
-        }
-        .id(carVersion)
-        .transition(carSwitchTransition)
-        .animation(carSwitchAnimation, value: carVersion)
-        .scrollBounceBehavior(.basedOnSize)
-        .milestoneCelebration(mileage: mileCount)
-        .pageBackground(Theme.Colors.accent)
-        .toolbar {
-            // #NEW-130 专注模式切换
-            ToolbarItem(placement: .navigationBarLeading) { focusModeToolbarItem }
-            // #24 卡片排序编辑按钮
-            ToolbarItem(placement: .navigationBarTrailing) { orderToolbarItem }
-        }
-        .overlay(alignment: .top) {
-            // #41 天气联动主题 - 雨天粒子效果
-            rainOverlay
-        }
-        .navigationTitle("车况").navBarStyle()
-        .toolbar {
-            // #19 分享按钮
-            ToolbarItem(placement: .navigationBarTrailing) {
-                shareToolbarButton
-            }
-        }
-    }
+            VStack(spacing: DS.Space.gap) {
 
-    // #NEW-130 专注模式切换
-    private var focusModeToolbarItem: some View {
-        Button(action: { toggleFocusMode() }, label: {
-            Image(systemName: FocusModeManager.shared.config.enabled ? "moon.fill" : "moon.stars.fill")
-                .foregroundColor(FocusModeManager.shared.config.enabled ? Theme.Colors.accent : .secondary)
-        })
-        .accessibilityLabel(Text(FocusModeManager.shared.config.enabled ? "退出专注模式" : "启用专注模式"))
-    }
-
-    private func toggleFocusMode() {
-        let fm = FocusModeManager.shared
-        let next = FocusModeConfig(
-            enabled: !fm.config.enabled,
-            hideSensitiveData: fm.config.hideSensitiveData,
-            showEssentialOnly: fm.config.showEssentialOnly,
-            doNotDisturb: fm.config.doNotDisturb,
-            autoStartDriving: fm.config.autoStartDriving,
-            customMessage: fm.config.customMessage
-        )
-        withAnimation(.spring()) {
-            fm.saveConfig(next)
-        }
-    }
-
-    // #24 卡片排序编辑按钮
-    private var orderToolbarItem: some View {
-        Button(action: { isEditingOrder.toggle() }, label: {
-            if isEditingOrder {
-                Text("完成").font(Theme.caption.weight(.semibold))
-            } else {
-                Image(systemName: "arrow.up.arrow.down")
-            }
-        })
-        .accessibilityLabel(Text(isEditingOrder ? "完成排序" : "编辑卡片顺序"))
-    }
-
-    // #41 天气联动主题 - 雨天粒子效果
-    @ViewBuilder
-    private var rainOverlay: some View {
-        if WeatherTheme.currentCondition == .rainy {
-            WeatherEffectView(particles: WeatherTheme.weatherParticles)
-                .opacity(0.3)
-        }
-    }
-
-    // #NEW-123 下滑触发全局搜索
-    // 注：DragGesture.Value 没有 changedLocation，用 translation.height 判断手势位移
-    // （向下拖动 height 为正）。若要改成“上滑触发”，把条件换成 translation.height < -100。
-    private var swipeDownToSearch: some Gesture {
-        DragGesture(minimumDistance: 30)
-            .onEnded { value in
-                if value.translation.height > 100 {
-                    showSearch = true
-                }
-            }
-    }
-
-    private var searchSheet: some View {
-        NavigationStack {
-            GlobalSearchHUD(isPresented: $showSearch)
-                .navigationTitle("搜索")
-                .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-
-    private var carSwitchTransition: AnyTransition {
-        .asymmetric(
-            insertion: .move(edge: .trailing)
-                .combined(with: .opacity)
-                .combined(with: .scale(scale: 0.96, anchor: .center)),
-            removal: .move(edge: .leading)
-                .combined(with: .opacity)
-                .combined(with: .scale(scale: 0.96, anchor: .center))
-        )
-    }
-
-    private var carSwitchAnimation: Animation {
-        .spring(response: 0.45, dampingFraction: 0.7, blendDuration: 0.4)
-    }
-
-
-    /// 卡片列表（抽出以降低巨型 ViewBuilder 的类型检查负担）
-    private var cardStack: some View {
-        let cache = store.caches
-        let car = store.car
-        let energy = VM.energy(cache, car)
-        let summary = AN.summarize(cache, car)
-        let tyre = VM.tyreStatus(cache)
-        let comfort = VM.comfortStatus(cache)
-        let loc = VM.locStatus(cache)
-        let hasData = cache["control"] != nil
-        let drive = VM.driveStatus(cache)
-        // #NEW-107 碳减排统计
-        let carbonStats = CarbonSavingsTracker.shared.getTodayStats()
-        return VStack(spacing: 8) {
-                // 编辑模式工具栏
-                if isEditingOrder {
-                    HStack {
-                        Text("按住卡片拖拽排序")
-                            .font(Theme.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("完成") {
-                            isEditingOrder = false
-                            store.cardOrder = cardOrder
-                        }
-                        .font(Theme.caption.weight(.semibold))
-                        .foregroundStyle(Theme.Colors.accent)
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 4)
-                }
-                // 按排序渲染卡片
-                ForEach(cardOrder.indices, id: \.self) { idx in
-                    let id = cardOrder[idx]
-                    ZStack(alignment: .topTrailing) {
-                        Group {
-                            switch id {
-                            case "socHero": socHero(energy)
-                            case "driveMetrics": driveMetricsExpanded(drive)
-                            case "carSelector": carSelector
-                            case "quickControl": quickControl
-                            case "domainCard": domainCard(summary)
-                            case "batterySection": if hasData { batterySection(cache) }
-                            case "tyreCard": tyreCardExpanded(tyre)
-                            case "comfortCard": comfortCard(comfort)
-                            case "carbonSavings": CarbonSavingsCard(stats: carbonStats)
-                            // E1-E8 实时车况增强
-                            case "realtimeEnergy": RealtimeEnergyDisplay(store: store)
-                            case "sohDashboard": SOHDashboard(store: store)
-                            case "driveMode": DriveModeDisplay(currentMode: .eco, availableModes: [.eco, .comfort, .sport], onModeChange: {_ in })
-                            case "vehicle2D": Vehicle2DStatusView(control: store.caches["control"] as? [String: Any])
-                            case "locationCard": locationCard(loc)
-                            // ⚠️ 不再用 default 兜位置卡：任何未实现的 id（历史上是 energyGauge）
-                            // 都会在这里再画一张位置卡，首页就多出一个重复的「位置」。
-                            default: EmptyView()
-                            }
-                        }
-                        // 编辑模式：显示拖拽手柄和移除指示
-                        if isEditingOrder {
-                            VStack {
-                                Image(systemName: "line.3.horizontal")
-                                    .font(Theme.caption)
-                                    .foregroundStyle(.tertiary)
-                                Text("\(idx + 1)")
-                                    .font(Theme.micro)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(8)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
-                        }
-                    }
-                    .offset(y: draggedCard == id ? -60 : 0)
-                    .scaleEffect(draggedCard == id ? 1.02 : 1.0)
-                    .opacity(draggedCard != nil && draggedCard != id ? 0.5 : 1.0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: draggedCard)
-                    .gesture(
-                        isEditingOrder ? DragGesture(minimumDistance: 10)
-                            .onChanged { value in
-                                if draggedCard == nil { draggedCard = id }
-                                // 检测是否应该交换位置
-                                if let currentCard = draggedCard,
-                                   currentCard != id {
-                                    let currentIdx = cardOrder.firstIndex(of: currentCard) ?? 0
-                                    let targetIdx = idx
-                                    var newOrder = cardOrder
-                                    if currentIdx < targetIdx {
-                                        newOrder.remove(at: currentIdx)
-                                        newOrder.insert(currentCard, at: targetIdx)
-                                    } else {
-                                        newOrder.remove(at: currentIdx)
-                                        newOrder.insert(currentCard, at: targetIdx)
-                                    }
-                                    cardOrder = newOrder
-                                }
-                            }
-                            .onEnded { _ in
-                                draggedCard = nil
-                                store.cardOrder = cardOrder
-                                ToastManager.shared.show("卡片顺序已保存", icon: "checkmark.circle.fill")
-                            }
-                        : nil
+                if store.isOfflineMode || store.networkStatus != .online {
+                    DSNotice(
+                        kind: store.isOfflineMode ? .warning : .info,
+                        text: store.isOfflineMode
+                            ? "离线模式：当前显示最后一次同步的数据"
+                            : "网络不稳定，数据可能不是最新"
                     )
-                    .staggeredEntrance(index: idx)
                 }
+
+                vehicleHeader
+                hero
+                quickActions
+                metricsGrid
+                bodyStatusCard
+                healthCard
+                batteryCard
+                tyreCard
+                comfortCard
+                carbonCard
+                locationCard
+                footer
             }
-    }
-    // MARK: 问候行
-    private func greetingRow(_ e: EnergyModel) -> some View {
-        let hour = Calendar.current.component(.hour, from: Date())
-        let greeting = localizedGreeting
-        let dateStr = DateFormatter.relative(Date())
-        return HStack {
-            // 原来问候语里塞的是 emoji（🌙/☀️），改成真正的 SF Symbol 图标
-            Image(safeSymbol: greetingSymbol(hour), fallback: "sun.max.fill")
-                .font(Theme.h4)
-                .foregroundStyle(Theme.Colors.accent)
-            Text(greeting)
-                .font(Theme.h4)
-            Spacer()
-            Text(dateStr)
-                .font(Theme.caption).foregroundStyle(.secondary)
+            .padding(.top, DS.Space.xs)
+            .padding(.bottom, DS.Space.xxl)
         }
-        
-        .padding(.vertical, 8)
-    }
-
-    // MARK: SOC Hero — 渐变圆环 + 入场动画 + 浮动粒子
-    private func socHero(_ e: EnergyModel) -> some View {
-        VStack(spacing: 18) {
-            // 大尺寸 SOC 光环 Hero（带脉冲发光 + 浮动粒子）
-            ZStack {
-                // 第 0 层：外扩散光晕（呼吸脉冲）
-                Circle()
-                    .fill(AngularGradient(colors: socGlowColors(e.socPct),
-                                          center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)))
-                    .frame(width: 232, height: 232)
-                    .opacity(0.15)
-                    .blur(radius: 12)
-
-                // 第 0.5 层：EKG 心电图描边流动环（颜色随 SOC 动态变化：低电量红→高电量绿）
-                EKGFloRingDynamic(size: 224, lineWidth: 1.5, speed: 3.5, percentage: Double(e.socPct))
-
-                // 第 1 层：脉冲光环（持续呼吸）
-                Circle()
-                    .strokeBorder(AngularGradient(colors: [.green, .teal], center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)), lineWidth: 2)
-                    .frame(width: 218, height: 218)
-                    .opacity(0.10)
-                    .blur(radius: 5)
-                    .heartbeatPulse()
-
-                // 第 2 层：底色轨道
-                Circle()
-                    .stroke(Color(.systemGray5).opacity(0.55), lineWidth: 16)
-                    .frame(width: 196, height: 196)
-
-                // 第 3 层：彩色进度弧（动画展开）
-                Circle()
-                    .trim(from: 0, to: max(0.02, socProgress / 100))
-                    .stroke(
-                        AngularGradient(colors: [.green, .green, Theme.Colors.accent, .orange, .red],
-                                        center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
-                        style: StrokeStyle(lineWidth: 16, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: 196, height: 196)
-                    .shadow(color: socShadowColor(e.socPct).opacity(0.35), radius: 12, y: 4)
-
-                // 第 4 层：浮动装饰粒子
-                FloatingParticles(size: 196)
-
-                // 第 5 层：中心数字（流体字体，随容器宽度自适应）
-                VStack(spacing: 2) {
-                    FluidPercentHero(e.soc == "--" ? "--" : String(socCount))
-                        .dynamicTypeLineLimit(1)
-                    Text("剩余电量")
-                        .font(Theme.caption)
-                        .foregroundStyle(.secondary)
-                        .dynamicTypeTextCompress(isTitle: true)
-                        .accessibilityLabel(Text("剩余电量"))
-                }
-            }
-            // 续航 + 充电状态
-            HStack(spacing: 16) {
-                MetricPill(icon: "point.topleft.down.curvedto.point.bottomright.up",
-                           value: e.range == "--" ? "--" : e.range,
-                           unit: "km", tint: .green, fluidValue: true)
-                MetricPill(icon: "bolt.fill", value: e.chargeText, unit: "", tint: Theme.Colors.accent, fluidValue: true)
-            }
-            // #1 充电倒计时
-            if let ttf = e.timeToFull {
-                Text("预计充满：\(ttf)").font(Theme.footnote).foregroundStyle(.secondary)
-            }
-            // #2 #23 能耗统计 + SOC耗尽预测
-            if let cons = e.avgConsumption, cons != "--" {
-                HStack {
-                    Text("平均能耗").font(Theme.footnote).foregroundStyle(.secondary)
-                    Spacer()
-                    Text(cons).font(Theme.caption.weight(.semibold)).foregroundStyle(Theme.Colors.accent)
-                }
-            }
-            if let tte = e.timeToEmpty, tte != "--" {
-                Text("预计剩余行驶：\(tte)").font(Theme.footnote).foregroundStyle(.secondary)
-            }
-            // 在线状态
-            Text(e.online.text)
-                .font(Theme.footnote)
-                .foregroundStyle(.secondary)
+        .dsCanvas()
+        .scrollBounceBehavior(.basedOnSize)
+        .refreshable {
+            isRefreshing = true
+            await fetchCore()
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .dynamicTypeCompress()
-        .glassHeroCard()
-        .glassLongPressDeform()
-        .runningGlow(color: .green)
-        .opacity(socCardOpacity)
-        .valuePulse(tint: .green)
+        .navigationTitle("车况")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Button { showSearch = true } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+                .accessibilityLabel(Text("搜索"))
+
+                Button {
+                    toggleFocusMode()
+                } label: {
+                    Image(systemName: focusEnabled ? "moon.fill" : "moon.stars")
+                }
+                .accessibilityLabel(Text(focusEnabled ? "退出专注模式" : "启用专注模式"))
+
+                Button { shareStatus() } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .accessibilityLabel(Text("分享车况"))
+            }
+        }
+        .alert("上车打卡", isPresented: $showCheckInReminder) {
+            Button("已上车，检查车况") { store.checkIn() }
+            Button("稍后再说", role: .cancel) { }
+        } message: {
+            Text("今天还没检查车况，建议上车前确认胎压、电量是否正常。")
+        }
+        .task { startPolling() }
+        .onDisappear {
+            startTimer?.cancel()
+            startTimer = nil
+        }
     }
 
-    // MARK: SOC颜色辅助函数
-    private func socGlowColors(_ pct: Int) -> [Color] {
+    // MARK: - ① 车辆标识
+
+    private var vehicleHeader: some View {
+        let sel = VM.carSel(store.cars, store.carId)
+        let e = VM.energy(cache, store.car)
+        let name = sel.options.indices.contains(sel.index) ? sel.options[sel.index].name : "未绑定车辆"
+
+        return HStack(spacing: DS.Space.md) {
+            Image(systemName: "car.fill")
+                .font(.system(size: DS.Size.iconLg, weight: .medium))
+                .foregroundStyle(DS.Palette.label)
+                .frame(width: 46, height: 46)
+                .background(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                    .fill(DS.Palette.surface))
+
+            VStack(alignment: .leading, spacing: 2) {
+                if sel.count > 1 {
+                    Picker("选择车辆", selection: Binding(
+                        get: { sel.index },
+                        set: { store.selectCar($0) }
+                    )) {
+                        ForEach(Array(sel.options.enumerated()), id: \.offset) { idx, opt in
+                            Text(opt.name).tag(idx)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .font(DS.Typo.headline)
+                    .tint(DS.Palette.label)
+                } else {
+                    Text(name)
+                        .font(DS.Typo.headline)
+                        .foregroundStyle(DS.Palette.label)
+                        .lineLimit(1)
+                }
+                Text(e.updated == "--" ? "暂无上报" : "最近上报 \(e.updated)")
+                    .font(DS.Typo.caption)
+                    .foregroundStyle(DS.Palette.labelTertiary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: DS.Space.sm)
+
+            DSChip(text: e.online.cls == "ok" ? "在线" : "离线", cls: e.online.cls)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    // MARK: - ② 电量 Hero
+
+    private var hero: some View {
+        let e = VM.energy(cache, store.car)
+        let tint = socTint(e.socPct)
+        let progress = Double(e.socPct) / 100.0
+
+        return DSCard(padding: DS.Space.xl, radius: DS.Radius.hero) {
+            VStack(spacing: DS.Space.lg) {
+                HStack(alignment: .center, spacing: DS.Space.lg) {
+                    VStack(alignment: .leading, spacing: DS.Space.sm) {
+                        DSMetric(
+                            value: e.soc,
+                            unit: "%",
+                            caption: "剩余电量",
+                            size: 58,
+                            tint: tint
+                        )
+                        HStack(spacing: DS.Space.xs) {
+                            DSChip(text: e.chargeText, cls: e.chargeCls, icon: chargeIcon(e.chargeCls))
+                            if !e.socWarn.isEmpty {
+                                DSChip(text: e.socPct < 15 ? "电量偏低" : "建议补电", cls: e.socPct < 15 ? "bad" : "warn")
+                            }
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    DSGauge(
+                        progress: progress,
+                        lineWidth: 11,
+                        tint: tint,
+                        value: e.range,
+                        unit: "km",
+                        caption: "剩余续航",
+                        size: 132
+                    )
+                }
+
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(DS.Palette.surfaceSunken)
+                        Capsule()
+                            .fill(tint)
+                            .frame(width: max(8, geo.size.width * CGFloat(min(1, max(0, progress)))))
+                            .animation(DS.Motion.value, value: progress)
+                    }
+                }
+                .frame(height: 8)
+                .accessibilityElement()
+                .accessibilityLabel(Text("剩余电量 \(e.socPct)%"))
+
+                DSDivider()
+
+                HStack(alignment: .top, spacing: DS.Space.md) {
+                    DSStatTile(label: "电压 / 电流", value: e.voltAmp, icon: "waveform.path.ecg")
+                    DSStatTile(label: "电池温度", value: e.battTemp, icon: "thermometer.medium")
+                    if let ttf = e.timeToFull {
+                        DSStatTile(label: "预计充满", value: ttf, icon: "hourglass")
+                    } else if let tte = e.timeToEmpty, tte != "--" {
+                        DSStatTile(label: "预计可行驶", value: tte, icon: "hourglass")
+                    } else {
+                        DSStatTile(label: "平均能耗", value: e.avgConsumption ?? "--", icon: "leaf.fill")
+                    }
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func chargeIcon(_ cls: String) -> String? {
+        cls == "ok" ? "bolt.fill" : nil
+    }
+
+    /// SOC 语义色：只表达健康度，不做渐变
+    private func socTint(_ pct: Int) -> Color {
         switch pct {
-        case 0...39: return [.red.opacity(0.5), .clear]
-        case 40...69: return [.orange.opacity(0.45), .clear]
-        case 70...89: return [.yellow.opacity(0.45), .green.opacity(0.25)]
-        default: return [.green.opacity(0.45), .teal.opacity(0.25)]
+        case ..<15: return DS.Palette.bad
+        case ..<30: return DS.Palette.warn
+        default: return DS.Palette.ok
         }
     }
 
-    private func socShadowColor(_ pct: Int) -> Color {
-        switch pct {
-        case 0...39: return .red
-        case 40...69: return .orange
-        case 70...89: return .yellow
-        default: return .green
+    // MARK: - ③ 快捷操作
+
+    private var quickActions: some View {
+        let body = VM.bodyStatus(cache)
+        let lockChip = body.first { $0.label == "车锁" }
+        let acOn = VM.comfortStatus(cache).acOn
+
+        return HStack(spacing: DS.Space.sm) {
+            DSTile(
+                icon: "lock.fill",
+                title: "锁车",
+                subtitle: lockChip?.text ?? "--",
+                isActive: lockChip?.text == "已锁",
+                cls: "ok"
+            ) { quick("LockDoor") }
+
+            DSTile(
+                icon: "lock.open.fill",
+                title: "解锁",
+                subtitle: lockChip?.text == "未锁" ? "当前未锁" : "当前已锁",
+                isActive: lockChip?.text == "未锁",
+                cls: "warn"
+            ) { quick("UnLockDoor") }
+
+            DSTile(
+                icon: "snowflake",
+                title: "空调",
+                subtitle: acOn == nil ? "--" : (acOn! ? "运行中" : "已关闭"),
+                isActive: acOn == true,
+                cls: "ok"
+            ) { quick("OpenAir") }
+
+            DSTile(
+                icon: "location.fill",
+                title: "寻车",
+                subtitle: "鸣笛闪灯",
+                isActive: false,
+                cls: "acc"
+            ) { quick("RemoteSearchCar") }
         }
     }
 
-    // MARK: 快控按钮动作
-    private func onQuickCtrl(_ q: QuickCtrl) {
-        store.pendingQuickCtrl = q.rawValue
+    /// 快捷操作统一走「车控页执行」路径：写入 pendingQuickCtrl 后切到车控 Tab
+    private func quick(_ raw: String) {
+        DSHaptic.tap()
+        store.pendingQuickCtrl = raw
         NotificationCenter.default.post(name: .navToMessages, object: nil)
-        // 穿透到车控页自动执行（见 ControlView.onAppear）
     }
 
-    // MARK: 车辆切换
-    private var carSelector: some View {
-        let carSel = VM.carSel(store.cars, store.carId)
-        return HStack(spacing: 12) {
-            Image(systemName: "car.2.fill")
-                .font(Theme.bodyMd)
-                .foregroundStyle(Theme.Colors.accent)
-                .frame(width: 40, height: 40)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            Picker("车辆", selection: Binding(
-                get: { carSel.index },
-                set: { store.selectCar($0) }
-            )) {
-                ForEach(Array(carSel.options.enumerated()), id: \.offset) { idx, opt in
-                    Text(opt.name).tag(idx)
+    // MARK: - ④ 关键指标
+
+    private var metricsGrid: some View {
+        let d = VM.driveStatus(cache)
+        let comfort = VM.comfortStatus(cache)
+        let columns = [GridItem(.flexible(), spacing: DS.Space.md),
+                       GridItem(.flexible(), spacing: DS.Space.md)]
+
+        return DSCard {
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
+                DSSectionHeader(title: "行驶")
+                LazyVGrid(columns: columns, spacing: DS.Space.lg) {
+                    DSStatTile(label: "总里程", value: d.mile, unit: "km", icon: "road.lanes")
+                    DSStatTile(label: "车速", value: d.speed, unit: "km/h", icon: "speedometer")
+                    DSStatTile(label: "档位", value: d.gear,
+                               cls: d.gearCls.isEmpty ? "na" : d.gearCls,
+                               icon: "gearshape.fill")
+                    DSStatTile(label: "电机温度", value: motorTempShort(d.motorTemp), icon: "thermometer.medium")
                 }
-            }
-            .pickerStyle(.menu)
-            .padding(.horizontal, 4)
-            .font(Theme.h4)
-            Spacer()
-            if carSel.count > 1 {
-                Text("\(carSel.count) 辆")
-                    .font(Theme.font(.footnote as Font).bold())
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(.ultraThinMaterial, in: Capsule())
-            }
-        }
-        .padding(16)
-        .dynamicTypeCompress()
-        .glassCard(corner: 22)
-        .glassLongPressDeform()
-    }
-
-    // MARK: 电池摘要行（来自 AN.summarize）
-    private var battSummary: (headLines: [HeadLine], cls: String, title: String) {
-        guard let battDomain = AN.summarize(store.caches, store.car).domains.first(where: { $0.key == "battery" }) else {
-            return ([], "na", "--")
-        }
-        let lines: [HeadLine] = [
-            HeadLine(id: "soc", label: "SOC", value: battDomain.metrics.first { $0.k == "SOC" }?.v ?? "--", cls: battDomain.cls, reason: ""),
-            HeadLine(id: "range", label: "续航", value: VM.energy(store.caches, store.car).range + " km", cls: battDomain.cls, reason: ""),
-            HeadLine(id: "alarm", label: "告警", value: battDomain.reasons.isEmpty ? "无" : "\(battDomain.reasons.count) 项", cls: battDomain.cls, reason: battDomain.reasons.isEmpty ? "" : battDomain.reasons.map { $0.t }.joined(separator: " · "))
-        ].filter { !$0.value.contains("--") }
-        return (lines, battDomain.cls, battDomain.title)
-    }
-
-    private struct HeadLine: Identifiable {
-        let id: String
-        let label: String
-        let value: String
-        let cls: String
-        let reason: String
-    }
-
-    // MARK: 车速里程行（带 EKG 波形背景）
-    private func driveMetricsRow(_ d: DriveModel) -> some View {
-        ZStack(alignment: .leading) {
-            // EKG 波形背景（微透明流动描边，模拟速度波动）
-            EKGFloRingDynamic(size: 200, lineWidth: 1.0, speed: 4.0, percentage: min(1.0, max(0.0, (Double(d.speed) ?? 0) / 200)))
-                .opacity(0.18)
-                .allowsHitTesting(false)
-            HStack(spacing: 12) {
-            if let fireStatus = d.fireStatus, !fireStatus.isEmpty {
-                let fCls = fireStatus == "启动" ? "bad" : "ok"
-                VStack(spacing: 2) {
-                    Image(systemName: fireStatus == "启动" ? "fire.fill" : "battery.100")
-                        .font(Theme.footnote).foregroundStyle(Theme.statusColor(fCls))
-                    Text(fireStatus).font(Theme.micro).foregroundStyle(Theme.statusColor(fCls))
+                if !d.batteryNote.isEmpty {
+                    Text(d.batteryNote)
+                        .font(DS.Typo.caption)
+                        .foregroundStyle(DS.Palette.labelTertiary)
                 }
-                .frame(width: 52, height: 40)
-                .background(Theme.statusColor(fCls).opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            }
-            // 速度 + 里程：流体数字字体，随容器宽度自动缩放
-            MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: Theme.brand, fluidValue: true)
-            MetricPill(icon: "gauge", value: mileCount > 0 ? String(mileCount) : d.mile, unit: "km", tint: Theme.Colors.accent, fluidValue: true)
-                .valuePulse(tint: Theme.Colors.accent, watchValue: Binding(get: { pulseTrigger }, set: { _ in }))
-        }            .padding(Theme.Spacing.xl)
-            .dynamicTypeCompress()
-            .glassCard(corner: 20)
-            .glassLongPressDeform()
-        }
-    }
-
-    // MARK: 车速里程展开卡（弹簧高度动画 + 玻璃压缩形变）
-    private func driveMetricsExpanded(_ d: DriveModel) -> some View {
-        let chevronAngle: Angle = expandedDrive ? .degrees(90) : .degrees(0)
-        return Button {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.35)) {
-                expandedDrive.toggle()
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                driveMetricsRow(d)
-                if expandedDrive {
-                    Divider().padding(.horizontal, Theme.Spacing.xl)
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            MetricPill(icon: "gearshape.fill", value: d.gear, unit: d.gearSub, tint: .purple)
-                            MetricPill(icon: "thermometer", value: d.motorTemp, unit: "℃", tint: .orange)
-                        }
-                        if !d.batteryNote.isEmpty {
-                            Text(d.batteryNote).font(Theme.footnote).foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.horizontal, Theme.Spacing.xl)
-                    .padding(.bottom, Theme.Spacing.lg)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .scaleEffect(expandedDrive ? 0.98 : 1.0)
-        .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: expandedDrive)
-        .liquidGlassRipple(cornerRadius: 20)
-        .accessibilityLabel(Text("车速里程详情"))
-        .accessibilityHint(Text(expandedDrive ? "点击收起详细数据" : "点击展开车速、档位、电机温度等行驶详情"))
-        .overlay(alignment: .trailing) {
-            Image(systemName: "chevron.right")
-                .font(Theme.font(.footnote as Font).bold())
-                .foregroundStyle(.tertiary)
-                .rotationEffect(chevronAngle)
-                .animation(.spring(response: 0.35, dampingFraction: 0.6), value: expandedDrive)
-                .padding(.trailing, 14)
-        }
-    }
-
-    // MARK: 快控 - 2x2 网格大圆钮
-    private var quickControl: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 12) {
-                ForEach(Array(QuickCtrl.allCases.enumerated()), id: \.element) { idx, q in
-                    QuickControlButton(icon: q.symbol, label: q.title, tint: q.accent) {
-                        onQuickCtrl(q)
+                if comfort.cabinTemp != "--" || comfort.pmIn != "--" {
+                    DSDivider()
+                    HStack(alignment: .top, spacing: DS.Space.md) {
+                        DSStatTile(label: "车内温度", value: comfort.cabinTemp, icon: "thermometer.low")
+                        DSStatTile(label: "车内 PM2.5", value: comfort.pmIn, unit: "μg/m³", icon: "aqi.low")
                     }
                 }
             }
         }
-        .padding(Theme.Spacing.xl)
-        .dynamicTypeCompress()
-        .glassHeroCard()
-        .glassLongPressDeform()
     }
 
-    // MARK: 快捷控制枚举
-    private enum QuickCtrl: String, CaseIterable {
-        case lock = "LockDoor"
-        case unlock = "UnLockDoor"
-        case air = "OpenAir"
-        case search = "RemoteSearchCar"
-        var symbol: String {
-            switch self {
-            case .lock: return "lock.fill"
-            case .unlock: return "lock.open.fill"
-            case .air: return "snowflake"
-            case .search: return "location"
-            }
-        }
-        var title: String {
-            switch self {
-            case .lock: return "锁车"
-            case .unlock: return "解锁"
-            case .air: return "开空调"
-            case .search: return "寻车"
-            }
-        }
-        var accent: Color {
-            switch self {
-            case .lock, .unlock: return .blue
-            case .air: return .teal
-            case .search: return .orange
+    /// "45℃ / 38℃" → "45℃"（磁贴里只放主读数，全量在车控页）
+    private func motorTempShort(_ raw: String) -> String {
+        guard raw != "--" else { return "--" }
+        return raw.components(separatedBy: "/").first?.trimmingCharacters(in: .whitespaces) ?? raw
+    }
+
+    // MARK: - ⑤ 车身状态
+
+    private var bodyStatusCard: some View {
+        let chips = VM.bodyStatus(cache)
+        let columns = [GridItem(.adaptive(minimum: 92), spacing: DS.Space.sm)]
+
+        return DSCard {
+            VStack(alignment: .leading, spacing: DS.Space.md) {
+                DSSectionHeader(title: "车身")
+                LazyVGrid(columns: columns, alignment: .leading, spacing: DS.Space.sm) {
+                    ForEach(chips) { c in
+                        DSChip(text: "\(c.label) \(c.text)", cls: c.cls)
+                    }
+                }
             }
         }
     }
 
-    // MARK: 状态域（可展开）
-    private func domainCard(_ summary: Summary) -> some View {
-        ExpandingCardBox(title: "车辆状态", side: summary.overall.title, sideCls: summary.overall.cls, cornerRadius: 20) {
-            VStack(spacing: 2) {
-                let rows = summary.domains.filter { $0.key != "service" }
+    // MARK: - ⑥ 系统健康
+
+    private var healthCard: some View {
+        let summary = AN.summarize(cache, store.car)
+        let rows = summary.domains
+
+        return DSCard {
+            VStack(alignment: .leading, spacing: DS.Space.sm) {
+                DSSectionHeader(title: "系统状态", trailing: summary.overall.title)
                 ForEach(Array(rows.enumerated()), id: \.element.id) { idx, d in
-                    domainRow(d)
-                    if idx < rows.count - 1 { ListDivider() }
+                    DSStatRow(
+                        label: d.label,
+                        value: d.short,
+                        valueCls: d.cls,
+                        icon: domainIcon(d.key)
+                    )
+                    if idx < rows.count - 1 { DSDivider() }
                 }
             }
         }
     }
 
-    private func domainRow(_ d: DomainVerdict) -> some View {
-        let icon = domainIcon(d.key)
-        return HStack(spacing: 10) {
-            // ⚠️ 这里原来写的是 Text(icon)：把 symbol 名当成普通文字渲染，
-            //    所以整行看不到任何图标（只会显示 "battery.75" 这类字符串）。
-            //    正确做法是用 Image(safeSymbol:)，名字无效时还能退回默认图标。
-            Image(safeSymbol: icon, fallback: "info.circle.fill")
-                .font(Theme.caption)
-                .foregroundStyle(Theme.statusColor(d.cls))
-                .frame(width: 20)
-            Text(d.label)
-                .font(Theme.caption)
-                .foregroundStyle(.primary)
-            Spacer()
-            Text(d.short)
-                .font(Theme.font(.caption as Font).bold())
-                .foregroundStyle(Theme.statusColor(d.cls))
-        }
-        .padding(.vertical, 6)
-    }
-
-    /// 每个状态域对应的图标。
-    /// ⚠️ 这里的历史取值里有好几个并不存在的 symbol（"battery.3quarter.fill"、
-    ///    "lightning.bolt.fill"、"car.door"、"tire.flattraction"、
-    ///    "shield.lefthalf.fill"、"circle.fill"），Image(systemName:) 遇到无效名字
-    ///    会渲染成空白 —— 界面上就是「图标缺失」。已全部换成真实存在的 symbol。
     private func domainIcon(_ key: String) -> String {
         switch key {
         case "battery": return "battery.75"
@@ -682,477 +404,313 @@ struct HomeView: View {
         }
     }
 
-    // MARK: 电池区
-    private func batterySection(_ cache: [String: Any?]) -> some View {
-        let batt = batteryModel(cache)
-        return VStack(spacing: Theme.Spacing.cardSpacing) {
-            // 电池摘要行（SOC / 续航 / 告警 来自分析域，不重复 SOC Hero）
-            VStack(alignment: .leading, spacing: 8) {
-                Text("电池状态").font(Theme.font(.footnote as Font).bold()).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                HStack(spacing: 12) {
-                    ForEach(battSummary.headLines, id: \.id) { h in
-                        VStack(spacing: 4) {
-                            Text(h.label).font(Theme.footnote).foregroundStyle(.secondary)
-                            Text(h.value).font(Theme.h3)
-                                .foregroundStyle(h.cls == "ok" ? Theme.ok : (h.cls == "bad" ? Theme.bad : .primary))
-                            if !h.reason.isEmpty {
-                                Text(h.reason).font(Theme.micro).foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-                        Spacer()
-                    }
-                }
-            }
-            .padding(Theme.Spacing.xl)
-            .dynamicTypeCompress()
-            .glassCard(corner: 20)
-            .glassLongPressDeform()
+    // MARK: - ⑦ 电池
 
-            // 分析结论详情
-            ForEach(battSummary.headLines) { line in
-                HStack(spacing: 6) {
-                    Text(line.label).font(Theme.caption).foregroundStyle(.secondary)
-                    Text(line.value).font(Theme.font(.caption as Font).bold()).foregroundStyle(line.cls == "ok" ? Theme.ok : (line.cls == "bad" ? Theme.bad : .primary))
-                    if !line.reason.isEmpty {
-                        Text(line.reason).font(Theme.footnote).foregroundStyle(.secondary)
-                        Spacer()
-                    }
-                }
-            }
+    private var batteryCard: some View {
+        let e = VM.energy(cache, store.car)
 
-            // 电池一致性（可展开）
-            ExpandingCardBox(title: "一致性", side: batt.cellStats.map { "\($0.count) 节采样" } ?? "接口未上报", sideCls: "ok", cornerRadius: 20) {
-                if let cells = batt.cellStats {
-                    let maxV = cells.max
-                    let minV = cells.min
-                    let diff = maxV - minV
-                    HStack(spacing: 8) {
-                        ForEach(Array(cells.bars.enumerated()), id: \.offset) { _, v in
-                            VStack(spacing: 2) {
-                                Text("S\(String(format: "%.3f", v))")
-                                    .font(Font.system(.footnote, design: .monospaced).bold())
-                                    .foregroundStyle(.primary)
-                            }
-                            .frame(width: 52)
-                        }
+        return DSCard {
+            VStack(alignment: .leading, spacing: DS.Space.sm) {
+                DSSectionHeader(title: "电池", trailing: e.chargeText)
+                DSStatRow(label: "剩余电量", value: "\(e.soc)%", valueCls: e.socCls, icon: "battery.75")
+                DSDivider()
+                DSStatRow(label: "剩余续航", value: "\(e.range) km", icon: "road.lanes")
+                DSDivider()
+                DSStatRow(label: "电压 / 电流", value: e.voltAmp, icon: "waveform.path.ecg")
+                DSDivider()
+                DSStatRow(label: "电池温度", value: e.battTemp, icon: "thermometer.medium")
+                DSDivider()
+                DSStatRow(label: "绝缘电阻", value: e.insulate, icon: "shield.lefthalf.filled")
+                if let c = e.charging {
+                    DSDivider()
+                    DSStatRow(label: "充电功率", value: c.power, icon: "bolt.fill")
+                    DSDivider()
+                    DSStatRow(label: "充电时长", value: "\(c.durMin) 分钟", icon: "clock")
+                    if let ttf = c.timeToFull {
+                        DSDivider()
+                        DSStatRow(label: "预计充满", value: ttf, icon: "hourglass")
                     }
-                    HStack(spacing: 8) {
-                        Text("压差 \(String(format: "%.3f", diff))V")
-                            .font(Theme.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        Text("最低 \(String(format: "%.3f", minV))V / 最高 \(String(format: "%.3f", maxV))V")
-                            .font(Theme.caption).foregroundStyle(.secondary)
-                    }
-                } else {
-                    Text("接口未上报单体电压").font(Theme.caption).foregroundStyle(.secondary)
-                }
-            }
-
-            // 充电（可展开）
-            ExpandingCardBox(title: "充电", side: batt.charging.text, sideCls: batt.charging.cls.isEmpty ? "na" : batt.charging.cls, cornerRadius: 20) {
-                let rows: [(String, String)] = [
-                    ("开始", batt.charging.start),
-                    ("结束", batt.charging.end),
-                    ("时长", batt.charging.durMin),
-                    ("功率", batt.charging.power),
-                    ("状态", batt.charging.text)
-                ]
-                ForEach(Array(rows.enumerated()), id: \.offset) { idx, r in
-                    KVRow(k: r.0, v: r.1)
-                    if idx < rows.count - 1 { ListDivider() }
                 }
             }
         }
     }
 
-    // MARK: 胎压四宫格
-    private func tyreCard(_ tyre: TyreModel) -> some View {
-        CardBox(title: "胎压", side: tyre.alarmText, sideCls: tyre.alarmCls) {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()),
-                                GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach(tyre.items) { item in
-                    TyreCell(label: item.label, kpa: item.kpa, temp: item.temp,
-                             cls: item.cls, minSafePressure: 200,
-                             watchValue: tyreWatchValue)
-                }
-            }
-            Text("温度 \(tyre.tempRange)")
-                .font(Theme.footnote).foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-        }
-    }
+    // MARK: - ⑧ 胎压
 
-    // MARK: 胎压展开卡（弹簧高度动画 + 玻璃压缩形变）
-    private func tyreCardExpanded(_ tyre: TyreModel) -> some View {
-        let chevronAngle: Angle = expandedTyre ? .degrees(90) : .degrees(0)
-        return Button {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.35)) {
-                expandedTyre.toggle()
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                tyreCard(tyre)
-                if expandedTyre {
-                    Divider().padding(.horizontal, Theme.Spacing.xl)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("胎压详情")
-                            .font(Theme.font(.caption as Font).bold()).foregroundStyle(.secondary)
-                        ForEach(Array(tyre.items.enumerated()), id: \.element.id) { idx, item in
-                            HStack {
-                                Text(item.label).font(Theme.footnote).foregroundStyle(.primary)
-                                Spacer()
-                                HStack(spacing: 12) {
-                                    Label {
-                                        Text(item.kpa + " kPa")
-                                    } icon: {
-                                        Image(safeSymbol: "circle.dashed", fallback: "car.fill")
-                                    }
-                                        .font(Theme.caption)
-                                        .foregroundStyle(item.cls == "bad" ? .red : .primary)
-                                    Label(item.temp + " °C", systemImage: "thermometer")
-                                        .font(Theme.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            // 行级交错滑入
-                            .offset(y: idx > 0 ? (expandedTyre ? 0 : 8) : 0)
-                            .opacity(idx > 0 ? (expandedTyre ? 1 : 0) : 1)
-                            .scaleEffect(idx > 0 ? (expandedTyre ? 1.0 : 0.96) : 1.0)
-                            .animation(.spring(response: 0.45, dampingFraction: 0.65, blendDuration: 0.25).delay(Double(idx) * 0.05), value: expandedTyre)
-                            if item != tyre.items.last { ListDivider().padding(.leading, 4) }
-                        }
-                    }
-                    .padding(.horizontal, Theme.Spacing.xl)
-                    .padding(.bottom, Theme.Spacing.lg)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .scaleEffect(expandedTyre ? 0.98 : 1.0)
-        .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: expandedTyre)
-        .liquidGlassRipple(cornerRadius: 20)
-        .accessibilityLabel(Text("胎压详情"))
-        .accessibilityHint(Text(expandedTyre ? "点击收起胎压详情" : "点击展开四个轮胎的胎压和温度详情"))
-        .overlay(alignment: .trailing) {
-            Image(systemName: "chevron.right")
-                .font(Theme.font(.footnote as Font).bold())
-                .foregroundStyle(.tertiary)
-                .rotationEffect(chevronAngle)
-                .animation(.spring(response: 0.35, dampingFraction: 0.6), value: expandedTyre)
-                .padding(.trailing, 14)
-        }
-    }
+    private var tyreCard: some View {
+        let tyre = VM.tyreStatus(cache)
 
-    // MARK: 座舱（可展开，含空调/净化器/PM2.5 详情）
-    private func comfortCard(_ comfort: ComfortModel) -> some View {
-        ExpandingCardBox(title: "座舱", side: comfort.acText.isEmpty ? "--" : (comfort.acCls == "ok" ? "空调运行中" : "空调关闭"),
-                sideCls: comfort.acCls == "ok" ? "ok" : "na", cornerRadius: 20) {
-            VStack(spacing: 10) {
-                HStack(spacing: 10) {
-                    StatTile(icon: "thermometer", label: "车内温度", value: comfort.cabinTemp == "--" ? "--" : String(comfort.cabinTemp.dropLast()), unit: "℃", tint: .orange)
-                    StatTile(icon: "wind", label: "车内 PM2.5", value: comfort.pmIn, unit: "", tint: .teal)
-                }
-                HStack(spacing: 10) {
-                    StatTile(icon: "wind", label: "净化器", value: comfort.purifier, tint: .purple)
-                    StatTile(icon: "cloud.sun", label: "车外温度", value: comfort.envTemp == "--" ? "--" : String(comfort.envTemp.dropLast()), unit: "℃", tint: Theme.brand)
-                }
-                Text(comfort.acText)
-                    .font(Theme.caption).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-
-    // MARK: 位置（可展开，含地图 + 导航按钮）
-    private func locationCard(_ loc: LocModel) -> some View {
-        ExpandingCardBox(title: "位置", side: loc.deg != "--" ? loc.dir : nil, cornerRadius: 20) {
-            VStack(alignment: .leading, spacing: 10) {
-                if showMap {
-                    if loc.lat != "--" && loc.lng != "--" {
-                        LocationMapView(addr: loc.addr, lat: loc.lat, lng: loc.lng)
-                            .frame(height: 190)
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .transition(.opacity)
-                    } else {
-                        LocationMapViewPlaceholder(addr: loc.addr, lat: loc.lat, lng: loc.lng)
-                            .frame(height: 190)
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .transition(.opacity)
+        return DSCard {
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
+                DSSectionHeader(title: "胎压", trailing: tyre.alarmText)
+                HStack(alignment: .top, spacing: DS.Space.md) {
+                    ForEach(tyre.items.prefix(2)) { item in
+                        tyreItem(item)
                     }
                 }
-                Text(loc.addr.isEmpty ? "暂无定位数据" : loc.addr)
-                    .font(Theme.caption)
-                    .lineLimit(1)
-                Text(loc.satAlt).font(Theme.footnote).foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    mapToggleButton
-                    if loc.lat != "--" && loc.lng != "--" { navButton(loc) }
-                    // #NEW-1 保存停车位置
-                    saveParkingButton(loc)
-                    Spacer()
-                    Pill(text: loc.gpsText, cls: loc.gpsCls)
-                }
-                // 显示已保存的停车位置
-                if let pk = store.parkingLocation, let lastTime = store.lastParkingTime {
-                    HStack(spacing: 6) {
-                        Image(systemName: "parkingsign.circle.fill").font(Theme.caption).foregroundStyle(Theme.Colors.accent)
-                        Text("停车点: \(pk.coordinate.latitude, specifier: "%.4f") , \(pk.coordinate.longitude, specifier: "%.4f")")
-                            .font(Theme.micro)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(DateFormatter.relative(lastTime))
-                            .font(Theme.micro)
-                            .foregroundStyle(.tertiary)
+                HStack(alignment: .top, spacing: DS.Space.md) {
+                    ForEach(Array(tyre.items.dropFirst(2).prefix(2))) { item in
+                        tyreItem(item)
                     }
-                    .padding(.top, 4)
                 }
+                DSDivider()
+                DSStatRow(label: "胎温区间", value: tyre.tempRange, icon: "thermometer.medium")
             }
         }
     }
 
-    private var mapToggleButton: some View {
-        Button { withAnimation(Theme.Duration.springFast) { showMap.toggle() } }
-        label: {
+    private func tyreItem(_ item: TyreItem) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
-                Image(systemName: showMap ? "map.fill" : "map")
-                Text(showMap ? "隐藏地图" : "显示地图")
-                    .font(Theme.caption)
+                Image(safeSymbol: "circle.dashed", fallback: "circle")
+                    .font(.system(size: 11, weight: .medium))
+                Text(item.label)
+                    .font(DS.Typo.caption2.weight(.medium))
             }
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(.ultraThinMaterial, in: Capsule())
+            .foregroundStyle(DS.Palette.labelTertiary)
+
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(item.kpa)
+                    .font(DS.Typo.metric(22))
+                    .foregroundStyle(item.cls == "ok" ? DS.Palette.label : DS.Palette.status(item.cls))
+                    .contentTransition(.numericText())
+                Text("kPa")
+                    .font(DS.Typo.caption)
+                    .foregroundStyle(DS.Palette.labelSecondary)
+            }
+            Text("\(item.temp)℃")
+                .font(DS.Typo.dataSmall)
+                .foregroundStyle(DS.Palette.labelSecondary)
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 
-    private func navButton(_ loc: LocModel) -> some View {
-        Button { openNav(loc) }
-        label: {
-            Image(systemName: "arrow.up.right")
-                .font(Theme.caption)
-                .foregroundStyle(Theme.Colors.accent)
-                .padding(8)
-                .background(.ultraThinMaterial, in: Circle())
+    // MARK: - ⑨ 座舱
+
+    private var comfortCard: some View {
+        let c = VM.comfortStatus(cache)
+
+        return DSCard {
+            VStack(alignment: .leading, spacing: DS.Space.sm) {
+                DSSectionHeader(title: "座舱", trailing: c.acOn == true ? "空调运行" : "空调关闭")
+                DSStatRow(label: "空调", value: c.acText, icon: "snowflake")
+                DSDivider()
+                DSStatRow(label: "车内温度", value: c.cabinTemp, icon: "thermometer.low")
+                DSDivider()
+                DSStatRow(label: "车外温度", value: c.envTemp, icon: "thermometer.high")
+                DSDivider()
+                DSStatRow(label: "车内 PM2.5", value: c.pmIn, icon: "aqi.low")
+                DSDivider()
+                DSStatRow(label: "车外 PM2.5", value: c.pmOut, icon: "aqi.medium")
+                DSDivider()
+                DSStatRow(label: "空气净化", value: c.purifier, icon: "wind")
+                DSDivider()
+                DSStatRow(label: "主驾座椅", value: c.seatD, icon: "carseat.left.fill")
+                DSDivider()
+                DSStatRow(label: "副驾座椅", value: c.seatP, icon: "carseat.right.fill")
+            }
         }
-        .buttonStyle(.plain)
     }
 
-    // #NEW-1 保存停车位置按钮
-    private func saveParkingButton(_ loc: LocModel) -> some View {
-        Button {
-            guard loc.lat != "--", loc.lng != "--" else { return }
-            let lat = Double(loc.lat) ?? 0
-            let lng = Double(loc.lng) ?? 0
-            let cl = CLLocation(latitude: lat, longitude: lng)
-            store.saveParkingLocation(cl)
-            parkingLoc = cl
-            ToastManager.shared.show("停车位置已保存", icon: "parkingsign.circle.fill")
-        } label: {
-            Image(systemName: store.parkingLocation != nil ? "parkingsign.circle.fill" : "parkingsign.circle")
-                .font(Theme.caption)
-                .foregroundStyle(store.parkingLocation != nil ? AnyShapeStyle(Theme.Colors.accent) : AnyShapeStyle(.tertiary))
-                .padding(8)
-                .background(.ultraThinMaterial, in: Circle())
+    // MARK: - ⑩ 碳减排
+
+    @ViewBuilder
+    private var carbonCard: some View {
+        let stats = CarbonSavingsTracker.shared.getTodayStats()
+        if stats.todaySteps > 0 {
+            DSCard {
+                VStack(alignment: .leading, spacing: DS.Space.sm) {
+                    DSSectionHeader(title: "碳减排", trailing: "\(stats.equivalentTrees) 棵树")
+                    DSStatRow(label: "今日步行", value: "\(stats.todaySteps) 步", icon: "figure.walk")
+                    DSDivider()
+                    DSStatRow(label: "今日减碳", value: String(format: "%.2f kg", stats.todayCarbonKg), icon: "leaf.fill")
+                    DSDivider()
+                    DSStatRow(label: "累计减碳", value: String(format: "%.2f kg", stats.totalCarbonKg), icon: "leaf.arrow.triangle.circlepath")
+                }
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text("保存停车位置"))
     }
 
-    // MARK: Footer
-    private var footerNote: some View {
-        let update = lastFetch.map { DateFormatter.relative($0) } ?? "刚刚"
-        return HStack(spacing: 8) {
+    // MARK: - ⑪ 位置
+
+    private var locationCard: some View {
+        let loc = VM.locStatus(cache)
+        let hasCoord = loc.lat != "--" && loc.lng != "--"
+
+        return DSCard {
+            VStack(alignment: .leading, spacing: DS.Space.md) {
+                DSSectionHeader(title: "位置", trailing: loc.dir != "--" ? loc.dir : nil)
+
+                Text(loc.addr.isEmpty ? "暂无定位数据" : loc.addr)
+                    .font(DS.Typo.headline)
+                    .foregroundStyle(loc.addr.isEmpty ? DS.Palette.labelSecondary : DS.Palette.label)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if showMap {
+                    Group {
+                        if hasCoord {
+                            LocationMapView(addr: loc.addr, lat: loc.lat, lng: loc.lng)
+                        } else {
+                            LocationMapViewPlaceholder(addr: loc.addr, lat: loc.lat, lng: loc.lng)
+                        }
+                    }
+                    .frame(height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous))
+                }
+
+                HStack(spacing: DS.Space.sm) {
+                    if hasCoord {
+                        Button("导航") { openNav(loc) }
+                            .buttonStyle(DSSecondaryButtonStyle())
+                    }
+                    Button(showMap ? "隐藏地图" : "显示地图") {
+                        withAnimation(DS.Motion.fade) { showMap.toggle() }
+                    }
+                    .buttonStyle(DSSecondaryButtonStyle())
+
+                    Button {
+                        saveParking(loc)
+                    } label: {
+                        Image(systemName: store.parkingLocation != nil ? "parkingsign.circle.fill" : "parkingsign.circle")
+                    }
+                    .buttonStyle(DSIconButtonStyle(size: DS.Size.button))
+                    .accessibilityLabel(Text("保存停车位置"))
+                }
+
+                DSDivider()
+
+                DSStatRow(label: "GPS", value: loc.gpsText, valueCls: loc.gpsCls, icon: "location.fill")
+                DSDivider()
+                DSStatRow(label: "方位", value: "\(loc.dir) \(loc.deg)", icon: "location.north.fill")
+                DSDivider()
+                DSStatRow(label: "卫星", value: loc.satAlt, icon: "antenna.radiowaves.left.and.right")
+                DSDivider()
+                DSStatRow(label: "坐标", value: hasCoord ? "\(loc.lat), \(loc.lng)" : "--", icon: "mappin.and.ellipse")
+
+                if let pk = store.parkingLocation, let t = store.lastParkingTime {
+                    DSDivider()
+                    DSStatRow(
+                        label: "停车点",
+                        value: String(format: "%.4f, %.4f", pk.coordinate.latitude, pk.coordinate.longitude),
+                        icon: "parkingsign.circle.fill"
+                    )
+                    Text("保存于 \(DateFormatter.relative(t))")
+                        .font(DS.Typo.caption)
+                        .foregroundStyle(DS.Palette.labelTertiary)
+                }
+            }
+        }
+    }
+
+    // MARK: - ⑫ 数据来源
+
+    private var footer: some View {
+        let update = lastFetch.map { DateFormatter.relative($0) } ?? "--"
+        return HStack(spacing: DS.Space.sm) {
             Image(safeSymbol: "clock.badge.checkmark", fallback: "clock.fill")
-                .font(Theme.footnote).foregroundStyle(.tertiary)
+                .font(.system(size: DS.Size.iconSm, weight: .medium))
+                .foregroundStyle(DS.Palette.labelTertiary)
             Text("更新于 \(update)")
-                .font(Theme.caption).foregroundStyle(.secondary)
-            Spacer()
-            // #3 数据新鲜度徽章
-            DataFreshnessBadge(timestamp: lastFetch)
-            Button { Task { await fetchCore() } } label: {
-                Image(systemName: "arrow.clockwise.circle.fill")
-                    .font(Theme.caption)
-                    .foregroundStyle(Theme.Colors.accent)
-                    .padding(6)
-                    .background(.ultraThinMaterial, in: Circle())
+                .font(DS.Typo.caption)
+                .foregroundStyle(DS.Palette.labelSecondary)
+            Spacer(minLength: DS.Space.sm)
+            if isRefreshing {
+                ProgressView().controlSize(.small)
+            } else {
+                Button {
+                    DSHaptic.tap()
+                    Task { await fetchCore() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(DSIconButtonStyle(size: 36, tint: DS.Palette.tint))
+                .accessibilityLabel(Text("刷新"))
             }
-            .buttonStyle(.plain)
         }
-        
-        .padding(.vertical, 8)
+        .padding(.vertical, DS.Space.sm)
     }
 
-    // #24 卡片排序：id 全集以 AppStore.knownCardIds 为唯一真源（避免两处列表漂移）
+    // MARK: - 动作
 
-    // #3 数据新鲜度徽章 — 返回缓存时间戳
-    private func freshnessTimestamp(for key: String) -> Date? {
-        lastFetch
-    }
-
-    // #24 根据排序返回卡片索引
-    private func cardIndex(id: String) -> Int {
-        guard let idx = cardOrder.firstIndex(of: id) else { return 0 }
-        return idx
-    }
-
-    // #36 多语言国际化
-    // 注：文字里不再夹 emoji，时段感由 greetingSymbol(_:) 提供的图标表达
-    private var localizedGreeting: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        // languageCode 在 iOS 16 起已废弃，改用 language.languageCode.identifier
-        let lang = Locale.current.language.languageCode?.identifier ?? "zh"
-        switch lang {
-        case "en":
-            return hour < 6 ? "Good Night" : hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening"
-        default:
-            return hour < 6 ? "深夜了" : hour < 12 ? "上午好" : hour < 18 ? "下午好" : "晚上好"
-        }
-    }
-
-    /// 问候语旁的时段图标（替代原来的 emoji）
-    private func greetingSymbol(_ hour: Int) -> String {
-        if hour < 6 { return "moon.stars.fill" }
-        if hour < 12 { return "sunrise.fill" }
-        if hour < 18 { return "sun.max.fill" }
-        return "moon.fill"
-    }
-
-    // #19 车况快照分享
-    private func shareStatus() {
-        let e = VM.energy(store.caches, store.car)
-        let tyre = VM.tyreStatus(store.caches)
-        let comfort = VM.comfortStatus(store.caches)
-        let summary = AN.summarize(store.caches, store.car)
-        let scoreText = summary.overall.title
-        let tireStatus = tyre.warnAny ? "⚠ 有异常" : "✓ 正常"
-        let cabinTemp = comfort.cabinTemp == "--" ? "--" : comfort.cabinTemp + "℃"
-        let info = ShareableStatusInfo(
-            soc: "\(e.socPct)%",
-            range: e.range,
-            tireStatus: tireStatus,
-            healthScore: scoreText,
-            cabinTemp: cabinTemp
+    private func toggleFocusMode() {
+        let fm = FocusModeManager.shared
+        let next = FocusModeConfig(
+            enabled: !fm.config.enabled,
+            hideSensitiveData: fm.config.hideSensitiveData,
+            showEssentialOnly: fm.config.showEssentialOnly,
+            doNotDisturb: fm.config.doNotDisturb,
+            autoStartDriving: fm.config.autoStartDriving,
+            customMessage: fm.config.customMessage
         )
-        let text = generateShareableStatus(info: info)
-        let vc = UIActivityViewController(activityItems: [text], applicationActivities: nil)
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-            let rc = UIUserInterfaceStyle(rawValue: UserDefaults.standard.integer(forKey: "ui_interface_style")) ?? .unspecified
-            vc.preferredContentSize = CGSize(width: 375, height: 200)
-            let rootVC = windowScene.windows.first?.rootViewController
-            rootVC?.present(vc, animated: true)
-        }
+        fm.saveConfig(next)
+        withAnimation(DS.Motion.press) { focusEnabled = next.enabled }
     }
 
     private func openNav(_ loc: LocModel) {
         guard loc.lat != "--", loc.lng != "--" else { return }
-        let url = "http://uri.amap.com/navigation?to=\(loc.lng),\(loc.lat)&mode=car"
-        if let u = URL(string: url) {
-            UIApplication.shared.open(u, options: [:], completionHandler: nil)
-        }
+        guard let url = URL(string: "http://uri.amap.com/navigation?to=\(loc.lng),\(loc.lat)&mode=car") else { return }
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
     }
 
-    // MARK: SOC入场动画
-    private func startSocAnimation() {
-        withAnimation(Theme.Duration.springNormal) { socCardOpacity = 1 }
-        let target = max(0, min(100, VM.energy(store.caches, store.car).socPct))
-        // 数字滚动：从 0 弹性计数到目标值（与圆环动画同步）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
-                socProgress = CGFloat(target)
-                socCount = target
-                pulseTrigger = String(target)
-            }
-        }
+    private func saveParking(_ loc: LocModel) {
+        guard let lat = Double(loc.lat), let lng = Double(loc.lng) else { return }
+        store.saveParkingLocation(CLLocation(latitude: lat, longitude: lng))
+        ToastManager.shared.show("停车位置已保存", icon: "parkingsign.circle.fill")
     }
 
-    // MARK: 里程入场动画
-    private func startMileAnimation() {
-        let drive = VM.driveStatus(store.caches)
-        let target = Int(drive.mile) ?? 0
-        // 延迟 0.2s 后开始计数，与 SOC 错开避免冲突
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
-                mileCount = target
-                pulseTrigger = String(target)
-            }
-        }
+    private func shareStatus() {
+        let e = VM.energy(cache, store.car)
+        let tyre = VM.tyreStatus(cache)
+        let comfort = VM.comfortStatus(cache)
+        let summary = AN.summarize(cache, store.car)
+        let info = ShareableStatusInfo(
+            soc: "\(e.socPct)%",
+            range: e.range,
+            tireStatus: tyre.warnAny ? "有异常" : "正常",
+            healthScore: summary.overall.title,
+            cabinTemp: comfort.cabinTemp
+        )
+        let vc = UIActivityViewController(activityItems: [generateShareableStatus(info: info)], applicationActivities: nil)
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let root = scene.windows.first?.rootViewController else { return }
+        root.present(vc, animated: true)
     }
 
-    // MARK: 轮询
+    // MARK: - 轮询
+
     private func startPolling() {
         startTimer?.cancel()
         startTimer = Task {
+            await fetchCore()
             while !Task.isCancelled {
-                await fetchCore()
-                // #N15-N20 智能通知检查
+                // 智能通知：低电量 / 充满 / 胎压 / 到期等
                 store.checkNotificationsIfNeeded()
-                // #N18 行程结束检测：无位置变化超过3分钟视为结束
-                if let lastLoc = parkingLoc, lastLoc.distance(from: CLLocation(latitude: 0, longitude: 0)) > 500 {
-                    // 检测到行驶结束
-                }
-                // #N43/N44 上车/下车打卡语音播报
+                // 上车打卡提醒：每日首次进入提示一次
                 let cal = Calendar.current
-                if let lastCheck = store.lastCheckInDate, !cal.isDateInToday(lastCheck) {
-                    VoiceBroadcastManager.shared.speakCheckIn(car: store.car)
-                }
-                // #NEW-4 上车打卡提醒：每日首次打开时提示
-                if let lastCheck = store.lastCheckInDate {
-                    if !cal.isDateInToday(lastCheck) {
-                        showCheckInReminder = true
-                    }
+                if let last = store.lastCheckInDate {
+                    if !cal.isDateInToday(last) { showCheckInReminder = true }
                 } else {
                     showCheckInReminder = true
                 }
                 try? await Task.sleep(for: .seconds(60))
-            }
-        }
-    }
-
-    /// 分享按钮（独立视图，避免巨型 ViewBuilder 类型检查超时）
-    private var shareToolbarButton: some View {
-        Button {
-            shareStatus()
-        } label: {
-            Image(systemName: "square.and.arrow.up")
-        }
-        .accessibilityLabel(Text("分享车况"))
-    }
-
-    /// 切车涟漪自动消散（独立方法，避免巨型 ViewBuilder 类型检查超时）
-    private func scheduleSwitchingReset() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.easeOut(duration: 0.3)) {
-                switchingCar = false
+                await fetchCore()
             }
         }
     }
 
     private func fetchCore() async {
-        let startTime = Date()
-        await withTaskGroup(of: Void.self) { g in
-            g.addTask { await store.fetchCore() }
-        }
+        await store.fetchCore()
         lastFetch = Date()
-        // #22 页面加载耗时埋点（写入 UserDefaults，DevView 可读取）
-        let elapsed = Date().timeIntervalSince(startTime)
-        UserDefaults.standard.set(elapsed, forKey: "carkeeper_home_load_time")
-        if isRefreshing {
-            // 下拉刷新：重置并重播 SOC + 里程入场动画
-            isRefreshing = false
-            withAnimation(Theme.Duration.springFast) { socCardOpacity = 0; socProgress = 0; socCount = 0; mileCount = 0; pulseTrigger = ""; tyreWatchValue = "" }
-            startSocAnimation()
-            startMileAnimation()
-            tyreWatchValue = UUID().uuidString
-        }
+        isRefreshing = false
     }
 }
 
-// MARK: - 辅助
+// MARK: - 相对时间
+
 extension DateFormatter {
     static func relative(_ date: Date) -> String {
-        let now = Date()
-        let diff = Int(now.timeIntervalSince(date))
+        let diff = Int(Date().timeIntervalSince(date))
         if diff < 60 { return "刚刚" }
         if diff < 3600 { return "\(diff / 60) 分钟前" }
         if diff < 86400 { return "\(diff / 3600) 小时前" }
@@ -1161,23 +719,22 @@ extension DateFormatter {
 }
 
 // MARK: - 位置地图（#NEW-102 内嵌 MapKit 实时地图）
+
 struct LocationMapView: View {
     let addr: String
     let lat: String
     let lng: String
-    @State private var region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 39.9, longitude: 116.4), span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01))
-    @State private var annotationsAdded = false
+    @State private var region = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 39.9, longitude: 116.4),
+        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+    )
 
     var body: some View {
-        MapView(coordinate: parseCoordinate() ?? CLLocationCoordinate2D(latitude: 39.9, longitude: 116.4), span: region.span, points: [])
-            .frame(height: 190)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .transition(.opacity)
-            .onAppear {
-                if !annotationsAdded, let coord = parseCoordinate() {
-                    annotationsAdded = true
-                }
-            }
+        MapView(
+            coordinate: parseCoordinate() ?? CLLocationCoordinate2D(latitude: 39.9, longitude: 116.4),
+            span: region.span,
+            points: []
+        )
     }
 
     private func parseCoordinate() -> CLLocationCoordinate2D? {
@@ -1186,29 +743,26 @@ struct LocationMapView: View {
     }
 }
 
-// MARK: - 位置地图占位（原降级视图）
+// MARK: - 位置地图占位（坐标缺失时）
+
 struct LocationMapViewPlaceholder: View {
     let addr: String
     let lat: String
     let lng: String
+
     var body: some View {
         ZStack {
-            LinearGradient(colors: [.blue.opacity(0.12), .teal.opacity(0.06)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-                .opacity(0.9)
-            VStack(spacing: 6) {
-                Image(systemName: "map.fill")
-                    .font(Theme.d0b)
-                    .foregroundStyle(Theme.Colors.accent.opacity(0.6))
-                Text(addr.isEmpty ? "点击导航查看位置" : addr)
-                    .font(Theme.caption)
-                    .foregroundStyle(.secondary)
+            DS.Palette.surfaceSunken
+            VStack(spacing: DS.Space.sm) {
+                Image(systemName: "map")
+                    .font(.system(size: 26, weight: .light))
+                    .foregroundStyle(DS.Palette.labelTertiary)
+                Text(addr.isEmpty ? "暂无定位" : addr)
+                    .font(DS.Typo.footnote)
+                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .multilineTextAlignment(.center)
                     .lineLimit(2)
-                if lat != "--" && lng != "--" {
-                    Text("\(lat) · \(lng)")
-                        .font(Theme.micro)
-                        .foregroundStyle(.tertiary)
-                }
+                    .padding(.horizontal, DS.Space.lg)
             }
         }
     }
@@ -1216,8 +770,6 @@ struct LocationMapViewPlaceholder: View {
 
 struct HomeView_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationStack {
-            HomeView()
-        }
+        NavigationStack { HomeView() }
     }
 }

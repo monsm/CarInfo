@@ -189,10 +189,8 @@ struct CarKeeperApp: App {
         .onOpenURL { url in
             openDeeplink(url)
         }
-        // ⚠️ 这里原本挂着 .nightModeBreathing(enabled: store.isNightMode)：那个修饰符会把「整个 App」的
-        // 透明度按 sin(时间) 在 0.7~1.0 之间反复抖动，而且每次渲染都会重启动画、让整棵视图树反复失效。
-        // 它的本意是 TabBar 图标的夜间呼吸微光，不该套在根视图上 —— 深色模式下整屏发暗发黏就是它干的。
-        // 需要呼吸效果时，请只对具体图标使用 NightModeBreathing.swift 里的修饰符。
+        // 注意：根视图上不得再挂任何「无限循环动画」修饰符。
+        // 它们会让整棵视图树反复失效，深色模式下表现为整屏发暗发黏，且持续耗电。
     }
 }
 
@@ -246,249 +244,19 @@ final class NavState: ObservableObject, @unchecked Sendable {
 
 // MARK: - 主 Tab
 
-// =============================================================================
-// TabCardTransition —— iOS 27 Liquid Glass 视差位移动效
-// 三层深度：前景内容层 + 玻璃背景卡层 + 品牌光晕散斑层
-// 各层以不同速率/延迟响应同一 spring 事务，形成真实视差深度感
-// =============================================================================
-
-/// 三层视差转场：contentLayer(快) / glassLayer(中) / glowLayer(慢)
-/// 当 isActive 为 true 时，三层依次从下方滑入，形成深度差；
-/// 关闭时三层同步滑出，保留玻璃质感。
-struct TabCardTransition: ViewModifier {
-    let tabId: Int
-    let isActive: Bool
-
-    // 各层位移量（pt）：越靠后的层起始位置越低，视觉越靠后
-    private static let layers: [(contentY: CGFloat, glassY: CGFloat, glowY: CGFloat, delay: CGFloat)] = [
-        // tab 0: 车况（最前）
-        (0,   36,  72,  0.0),
-        // tab 1: 车控
-        (0,   42,  84,  0.02),
-        // tab 2: 消息
-        (0,   48,  96,  0.04),
-        // tab 3: 我的（最后）
-        (0,   54, 108,  0.06),
-    ]
-
-    private var contentY: CGFloat { Self.layers[tabId].contentY }
-    private var glassY:   CGFloat { Self.layers[tabId].glassY   }
-    private var glowY:    CGFloat { Self.layers[tabId].glowY    }
-    private var delay:    CGFloat { Self.layers[tabId].delay    }
-
-    func body(content: Content) -> some View {
-        // ⚠️ 这里只能做「背景装饰」，绝不能再把 content 包进容器、更不能改动它的 opacity：
-        // 1) content.opacity 原本绑在「本次选中的 Tab 且 上次不是它」这个条件上，而首次进入时
-        //    两个条件相等（selectedTab == prevSelectedTab == 0）→ 透明度 0 → 首页整屏全黑，
-        //    登录成功后看到的黑屏就是这么来的；
-        // 2) 外层 ZStack 会让 TabView 读不到子视图上的 .tabItem / .tag（trait 不穿透容器）→
-        //    标题丢失、点其他 Tab 后被弹回第一个。
-        content
-            .background {
-                ZStack(alignment: .top) {
-                    // ── 第 0 层：品牌光晕散斑（最慢、最深，仅在选中时淡入）──
-                    if isActive {
-                        ZStack {
-                            // 左上角青色散斑
-                            Circle()
-                                .fill(.green.opacity(0.08))
-                                .frame(width: 200, height: 200)
-                                .offset(x: -60, y: -30)
-                            // 右下角品牌色散斑
-                            Circle()
-                                .fill(Theme.brand.opacity(0.07))
-                                .frame(width: 180, height: 180)
-                                .offset(x: 50, y: 40)
-                            // 右上角微光
-                            Circle()
-                                .fill(.white.opacity(0.05))
-                                .frame(width: 120, height: 120)
-                                .offset(x: 70, y: -50)
-                        }
-                        .offset(y: glowY)
-                        .scaleEffect(isActive ? 1.0 : 0.88)
-                        .animation(
-                            .spring(response: 0.6, dampingFraction: 0.7, blendDuration: 0.5).delay(delay + 0.08),
-                            value: isActive
-                        )
-                    }
-
-                    // ── 第 1 层：Liquid Glass 背景卡（中等速度）──
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(Material.thin)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [.white.opacity(0.22), .white.opacity(0.04)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 0.9
-                                )
-                        )
-                        .shadow(color: .black.opacity(0.10), radius: 18, y: 6)
-                        .offset(y: glassY)
-                        .scaleEffect(isActive ? 1.0 : 0.94)
-                        .opacity(isActive ? 1.0 : 0.0)
-                        .animation(
-                            .spring(response: 0.55, dampingFraction: 0.65, blendDuration: 0.4).delay(delay + 0.03),
-                            value: isActive
-                        )
-                }
-            }
-    }
-}
-
-// =============================================================================// NavGlassWrapper —— 深潜页 Liquid Glass 视差容器
-// 与 TabCardTransition 同款三层视差，方向改为水平（从右侧滑入）
-// 入场和退场均由 NavigationStack spring transaction 统一驱动，
-// 确保 push 从右侧滑入、pop 从左侧滑出，动画完全对称。
-// =============================================================================
-
-/// 深潜页（VehicleView / HealthView / BatteryView 等）的 Liquid Glass 视差包装器
-/// 外层 ZStack 包含：glowLayer（背景散斑）→ glassLayer（磨砂玻璃卡）→ content（前景页面）
-/// 每层以不同延迟从右侧滑入；pop 时由 liquidGlassPopTransition 驱动向左滑出。
-struct NavGlassWrapper<Content: View>: View {
-    private let content: Content
-
-    // 深潜页方向参数（水平而非垂直）：
-    //   contentX: 内容位移（快、最近）
-    //   glassX:   玻璃卡位移（中）
-    //   glowX:    光晕位移（慢、最远）
-    private var params: [(contentX: CGFloat, glassX: CGFloat, glowX: CGFloat, delay: CGFloat)] { [
-        (24,  56,  96,  0.0),   // 车辆档案（第一级）
-        (28,  64, 112,  0.02),  // 健康报告
-        (32,  72, 128,  0.04),  // 电池充电
-        (36,  80, 140,  0.06),  // 全量数据
-        (40,  88, 152,  0.08),  // 开发者工具
-        (24,  56,  96,  0.0),   // 消息
-        (24,  56,  96,  0.0),   // 车控（直接从 Tab 打开）
-    ] }
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    // 内部状态：首次 onAppear 时触发入场动画，pop 时由 NavigationStack 接管退出转场
-    @State private var _shown: Bool = false
-
-    private var cx: CGFloat { params[0].contentX }
-    private var gx: CGFloat { params[0].glassX }
-    private var ox: CGFloat { params[0].glowX }
-    private var delay:   CGFloat { params[0].delay }
-
-    var body: some View {
-        ZStack(alignment: .leading) {
-            // ── 第 0 层：品牌光晕散斑（最深、最慢，从右侧 96pt 滑入）──
-            ZStack {
-                Circle().fill(.green.opacity(0.08)).frame(width: 200, height: 200).offset(x: 80, y: -40)
-                Circle().fill(Theme.brand.opacity(0.07)).frame(width: 180, height: 180).offset(x: 60, y: 50)
-                Circle().fill(.white.opacity(0.05)).frame(width: 120, height: 120).offset(x: 100, y: -60)
-            }
-            .offset(x: _shown ? 0 : -ox)   // 退出：0 → -96（向左滑出，与入场对称）
-            .scaleEffect(_shown ? 1.0 : 0.92)
-            .opacity(_shown ? 1.0 : 0.0)
-            .animation(
-                .spring(response: 0.6, dampingFraction: 0.7, blendDuration: 0.5).delay(delay + 0.08),
-                value: _shown
-            )
-
-            // ── 第 1 层：Liquid Glass 玻璃背景卡（中等速度，从右侧 56pt 滑入）──
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Material.thin)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [.white.opacity(0.22), .white.opacity(0.04)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 0.9
-                        )
-                )
-                .shadow(color: .black.opacity(0.10), radius: 18, y: 6)
-                .offset(x: _shown ? 0 : -gx)   // 退出：0 → -56（向左滑出，与入场对称）
-                .scaleEffect(_shown ? 1.0 : 0.94)
-                .opacity(_shown ? 1.0 : 0.0)
-                .animation(
-                    .spring(response: 0.55, dampingFraction: 0.65, blendDuration: 0.4).delay(delay + 0.03),
-                    value: _shown
-                )
-
-            // ── 第 2 层：前景内容（最快，从右侧 24pt 滑入；退出时向左 -24pt 滑出）──
-            content
-                .offset(x: _shown ? 0 : -cx)   // 退出：0 → -24（向左滑出）
-                .scaleEffect(_shown ? 1.0 : 0.96)
-                .opacity(_shown ? 1.0 : 0.0)
-                .animation(
-                    .spring(response: 0.55, dampingFraction: 0.62, blendDuration: 0.35).delay(delay),
-                    value: _shown
-                )
-        }
-        .edgesIgnoringSafeArea(.all)
-        .onAppear {
-            // 首次出现：延迟 50ms 后触发入场动画，与导航滑入同步
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                _shown = true
-            }
-        }
-        .onDisappear {
-            // 页面即将被移除：重置 _shown，让三层快速弹回初始位置
-            // 随后 liquidGlassPopTransition 的 removal modifier 统一负责向左滑出
-            _shown = false
-        }
-    }
-}
-
-// MARK: - Liquid Glass 退出转场
-/// pop 时：向左滑出 + 弹性缩放 + 淡出，与入场动画对称
-/// spring spring: response 0.6 / damping 0.7 / blend 0.5s
-private let liquidGlassPopTransition: AnyTransition = .asymmetric(
-    insertion: .scale(scale: 1.0).combined(with: .opacity).animation(.spring(response: 0.5, dampingFraction: 0.7)),
-    removal: .scale(scale: 1.0).combined(with: .opacity).animation(.easeInOut(duration: 0.25))
-)
-
-/// 液态玻璃风格返回按钮（隐藏系统默认，自定义样式）
-struct BackGlassButton: View {
-    @Binding var navigationPath: [Deeplink]
-
-    var body: some View {
-        Button {
-            guard !navigationPath.isEmpty else { return }
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.65, blendDuration: 0.35)) {
-                navigationPath.removeLast()
-            }
-        } label: {
-            Label("返回", systemImage: "chevron.left")
-                .font(Theme.subheadline)
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.25), lineWidth: 0.5)
-                        )
-                        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-                )
-        }
-    }
-}
+// 壳层约定：
+//   • Tab 内容直接作为画布，不套任何自定义容器（容器会让 TabView 读不到 .tabItem/.tag），
+//     否则底部导航会丢标题、点其他 Tab 又被弹回第一个。
+//   • 每个 Tab 是标准 NavigationStack + navigationDestination
+//   • 返回手势、返回按钮、转场动画全部交给系统（系统同款动画做得更稳）
+//   • 导航栏用系统液态玻璃材质（浮在内容之上，是玻璃唯一该出现的地方）
 
 struct MainTabView: View {
     @StateObject private var nav = NavState.shared
     // VoiceOver：记录上次朗读的 Tab，避免重复播报
     @State private var lastAnnouncedTab: Int = 0
     private let store = AppStore.shared
-    // NavBar 液态玻璃反光扫过相位（周期性动画）
-    @State private var navBarSweepPhase: CGFloat = 0
-    // 定时刷新反射扫过相位
-    private let sweepTimer = Timer.publish(every: 4, on: .main, in: .common).autoconnect()
-    // #5 低电量 Tab 角标：SOC < 20% 时红色脉冲
+    // #5 低电量 Tab 角标：SOC < 20% 时显示
     @State private var lowBatteryBadge: Bool = false
     // #4 网络状态监测定时器（每 30 秒检查一次）
     private let networkMonitorTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
@@ -517,49 +285,18 @@ struct MainTabView: View {
     }
 
     private var homeTab: some View {
-            NavigationStack(path: $nav.path) {
-                HomeView()
-                    .navigationDestination(for: Deeplink.self) { link in
-                        NavGlassWrapper {
-                            deeplinkDestination(link)
-                        }
-                    }
-                    .transition(liquidGlassPopTransition)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            BackGlassButton(navigationPath: $nav.path)
-                        }
-                    }
-                    .navigationBarBackButtonHidden()
-                    // D1: NavBar 液态玻璃反光扫过
-                    .overlay(alignment: .top) {
-                        if navBarSweepPhase > 0 {
-                            LinearGradient(colors: [.clear, .white.opacity(0.06 * navBarSweepPhase), .white.opacity(0.10 * navBarSweepPhase), .white.opacity(0.06 * navBarSweepPhase), .clear],
-                                           startPoint: .leading, endPoint: .trailing)
-                            .frame(height: 44)
-                            .offset(x: navBarSweepPhase * UIScreen.main.bounds.width - UIScreen.main.bounds.width / 2)
-                        }
-                    }
-                    .gesture(
-                        // C2: swipe-to-back 手势（从左边滑出触发返回）
-                        DragGesture(minimumDistance: 50, coordinateSpace: .global)
-                            .onEnded { v in
-                                if v.startLocation.x < 30 && v.location.x > v.startLocation.x + 50 {
-                                    // 从左侧向右滑动，触发返回
-                                    var newPath = nav.path
-                                    if !newPath.isEmpty { newPath.removeLast() }
-                                    nav.path = newPath
-                                }
-                            }
-                    )
-            }
-            .transaction { t in
-                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
-            }
-            .tabGlassContainer()
-            .modifier(TabCardTransition(tabId: 0, isActive: nav.selectedTab == 0))
+        NavigationStack(path: $nav.path) {
+            HomeView()
+                .navigationDestination(for: Deeplink.self) { link in
+                    deeplinkDestination(link)
+                }
+                // iOS 26/27：导航栏用系统原生液态玻璃材质。
+                // 它是浮在内容之上的层，玻璃只用在这里才是层级正确的。
+                .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+        }
+            // #5 低电量角标：由统一的数据变更通知驱动
             .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
-                // #5 更新低电量角标状态
                 let energy = VM.energy(store.caches, store.car)
                 lowBatteryBadge = energy.socPct < 20
             }
@@ -586,6 +323,8 @@ struct MainTabView: View {
                     .accessibilityLabel(Text("车况"))
                     .accessibilityHint(Text("车辆状态概览，包含行驶里程、胎压、SOC 电量等关键信息"))
             }
+            // 低电量时在 Tab 上给出角标（只有真需要用户注意时才出现）
+            .badge(lowBatteryBadge ? Text("低电量") : nil)
             .tag(0)
     }
 
@@ -593,41 +332,11 @@ struct MainTabView: View {
             NavigationStack(path: $nav.controlPath) {
                 ControlView()
                     .navigationDestination(for: Deeplink.self) { link in
-                        NavGlassWrapper {
-                            deeplinkDestination(link)
-                        }
+                        deeplinkDestination(link)
                     }
-                    .transition(liquidGlassPopTransition)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            BackGlassButton(navigationPath: $nav.controlPath)
-                        }
-                    }
-                    .navigationBarBackButtonHidden()
-                    .overlay(alignment: .top) {
-                        if navBarSweepPhase > 0 {
-                            LinearGradient(colors: [.clear, .white.opacity(0.06 * navBarSweepPhase), .white.opacity(0.10 * navBarSweepPhase), .white.opacity(0.06 * navBarSweepPhase), .clear],
-                                           startPoint: .leading, endPoint: .trailing)
-                            .frame(height: 44)
-                            .offset(x: navBarSweepPhase * UIScreen.main.bounds.width - UIScreen.main.bounds.width / 2)
-                        }
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 50, coordinateSpace: .global)
-                            .onEnded { v in
-                                if v.startLocation.x < 30 && v.location.x > v.startLocation.x + 50 {
-                                    var newPath = nav.controlPath
-                                    if !newPath.isEmpty { newPath.removeLast() }
-                                    nav.controlPath = newPath
-                                }
-                            }
-                    )
+                    .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+                    .toolbarBackground(.visible, for: .navigationBar)
             }
-            .transaction { t in
-                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
-            }
-            .tabGlassContainer()
-            .modifier(TabCardTransition(tabId: 1, isActive: nav.selectedTab == 1))
             .accessibilitySortPriority(1)
             // ⚠️ 同 tab 0：.tabItem / .tag 必须最外层，否则标题与选中态都会失效
             .tabItem {
@@ -643,41 +352,11 @@ struct MainTabView: View {
             NavigationStack(path: $nav.messagesPath) {
                 MessagesView()
                     .navigationDestination(for: Deeplink.self) { link in
-                        NavGlassWrapper {
-                            deeplinkDestination(link)
-                        }
+                        deeplinkDestination(link)
                     }
-                    .transition(liquidGlassPopTransition)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            BackGlassButton(navigationPath: $nav.messagesPath)
-                        }
-                    }
-                    .navigationBarBackButtonHidden()
-                    .overlay(alignment: .top) {
-                        if navBarSweepPhase > 0 {
-                            LinearGradient(colors: [.clear, .white.opacity(0.06 * navBarSweepPhase), .white.opacity(0.10 * navBarSweepPhase), .white.opacity(0.06 * navBarSweepPhase), .clear],
-                                           startPoint: .leading, endPoint: .trailing)
-                            .frame(height: 44)
-                            .offset(x: navBarSweepPhase * UIScreen.main.bounds.width - UIScreen.main.bounds.width / 2)
-                        }
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 50, coordinateSpace: .global)
-                            .onEnded { v in
-                                if v.startLocation.x < 30 && v.location.x > v.startLocation.x + 50 {
-                                    var newPath = nav.messagesPath
-                                    if !newPath.isEmpty { newPath.removeLast() }
-                                    nav.messagesPath = newPath
-                                }
-                            }
-                    )
+                    .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+                    .toolbarBackground(.visible, for: .navigationBar)
             }
-            .transaction { t in
-                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
-            }
-            .tabGlassContainer()
-            .modifier(TabCardTransition(tabId: 2, isActive: nav.selectedTab == 2))
             .accessibilitySortPriority(2)
             // ⚠️ 同 tab 0：.tabItem / .tag 必须最外层
             .tabItem {
@@ -693,41 +372,11 @@ struct MainTabView: View {
             NavigationStack(path: $nav.minePath) {
                 MineView()
                     .navigationDestination(for: Deeplink.self) { link in
-                        NavGlassWrapper {
-                            deeplinkDestination(link)
-                        }
+                        deeplinkDestination(link)
                     }
-                    .transition(liquidGlassPopTransition)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            BackGlassButton(navigationPath: $nav.minePath)
-                        }
-                    }
-                    .navigationBarBackButtonHidden()
-                    .overlay(alignment: .top) {
-                        if navBarSweepPhase > 0 {
-                            LinearGradient(colors: [.clear, .white.opacity(0.06 * navBarSweepPhase), .white.opacity(0.10 * navBarSweepPhase), .white.opacity(0.06 * navBarSweepPhase), .clear],
-                                           startPoint: .leading, endPoint: .trailing)
-                            .frame(height: 44)
-                            .offset(x: navBarSweepPhase * UIScreen.main.bounds.width - UIScreen.main.bounds.width / 2)
-                        }
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 50, coordinateSpace: .global)
-                            .onEnded { v in
-                                if v.startLocation.x < 30 && v.location.x > v.startLocation.x + 50 {
-                                    var newPath = nav.minePath
-                                    if !newPath.isEmpty { newPath.removeLast() }
-                                    nav.minePath = newPath
-                                }
-                            }
-                    )
+                    .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+                    .toolbarBackground(.visible, for: .navigationBar)
             }
-            .transaction { t in
-                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
-            }
-            .tabGlassContainer()
-            .modifier(TabCardTransition(tabId: 3, isActive: nav.selectedTab == 3))
             .accessibilitySortPriority(3)
             // ⚠️ 同 tab 0：.tabItem / .tag 必须最外层
             .tabItem {
@@ -745,20 +394,14 @@ struct MainTabView: View {
             messagesTab
             mineTab
         }
-        // 选中态颜色交给 SwiftUI，避免再去动 UITabBar.appearance()
-        .tint(Theme.Colors.accent)
+        // 选中色交给 SwiftUI（TabBar 保持系统原生液态玻璃外观）
+        .tint(DS.Palette.tint)
         // VoiceOver：切换 Tab 时朗读当前页面名称（仅首次切换到新 Tab）
         .onChange(of: nav.selectedTab) { newTab in
             if newTab != lastAnnouncedTab {
                 lastAnnouncedTab = newTab
                 let label = NavState.tabAccessibilityLabels[newTab] ?? "Tab \(newTab)"
                 UIAccessibility.post(notification: .announcement, argument: "已切换到\(label)页")
-            }
-        }
-        // NavBar 反光扫过定时器
-        .onReceive(sweepTimer) { _ in
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
-                navBarSweepPhase = 1.0
             }
         }
         // #5 低电量角标检测：每次车控数据更新时检查
@@ -778,148 +421,14 @@ struct MainTabView: View {
                     .padding(.top, 0)
             }
         }
-        // 液态玻璃 TabBar：磨砂背景 + 选中态脉冲光晕
+        // Toast 浮层：底部中央的液态玻璃胶囊（由 NavState.currentToast 驱动）
         .overlay(alignment: .bottom) {
-            ZStack(alignment: .bottom) {
-                LiquidGlassTabBar(selectedTab: $nav.selectedTab)
-                    .frame(height: 50)
-                    .allowsHitTesting(false)
-                if let t = nav.currentToast {
-                    ToastView(text: t.text, icon: t.icon)
-                        .id(UUID())
-                }
+            if let t = nav.currentToast {
+                ToastView(text: t.text, icon: t.icon)
+                    .id(UUID())
             }
         }
-        .transaction { t in
-            t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
-        }
         .animation(.easeOut(duration: 0.2), value: nav.currentToast?.text)
-    }
-}
-
-// =============================================================================
-// LiquidGlassTabBar —— iOS 27 液态玻璃 TabBar
-// 选中态图标带脉冲光晕，未选中态带微光，整体磨砂玻璃背景
-// =============================================================================
-
-/// TabBar 底部脉冲光晕 + 液态玻璃指示条视图
-private class TabBarGlowOverlay: UIView {
-    private let indicatorLayer = CAShapeLayer()   // Liquid Glass 胶囊指示条
-    private var selectedItemIndex: Int = -1
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        // 只重绘选中指示条。原本这里还会画「选中图标光晕圆」
-        guard selectedItemIndex >= 0 else { return }
-        slideIndicator(from: selectedItemIndex, to: selectedItemIndex)
-    }
-
-    // ⚠️ 这里原本重写了 touchesBegan，在 TabBar 被点时画出
-    //   ①「按压光圈」triggerPressGlow ②「图标弹跳圈」triggerIconBounce
-    // 两者都属于「点一下就出圈」的特效，已按需求整体移除。
-
-    func selectItem(at index: Int, tabBarItemCount count: Int) {
-        guard index != selectedItemIndex else { return }
-        let prevIndex = selectedItemIndex
-        selectedItemIndex = index
-        slideIndicator(from: prevIndex, to: index)
-    }
-
-    // ⚠️ 已移除的三个「圈」特效，勿再添加：
-    //   animateFloatRing —— 选中图标外圈持续呼吸的光环
-    //   triggerPressGlow —— 点击时膨胀并淡出的按压光圈
-    //   updateGlow       —— 选中项上方常驻的脉冲光晕圆
-
-    private func slideIndicator(from prevIndex: Int, to newIndex: Int) {
-        guard prevIndex >= 0, prevIndex < items.count, newIndex >= 0, newIndex < items.count else { return }
-        let fromFrame = items[prevIndex]
-        let toFrame = items[newIndex]
-        let tabBarHeight = bounds.height
-
-        // 指示条尺寸：宽度 40pt，高度 4pt，胶囊形
-        let barWidth: CGFloat = 40.0
-        let barHeight: CGFloat = 4.0
-        let barRadius: CGFloat = barHeight / 2
-
-        // 位置：位于图标正下方，距 TabBar 底边约 8pt
-        let targetY = tabBarHeight - 12 - barHeight / 2
-        let targetX = toFrame.midX
-
-        // 创建胶囊形路径（椭圆近似）
-        let path = CGPath(ellipseIn: CGRect(x: targetX - barWidth / 2, y: targetY - barRadius, width: barWidth, height: barHeight), transform: nil)
-
-        // ── 主指示条层 ──
-        indicatorLayer.removeAllAnimations()
-        indicatorLayer.path = path
-        // Liquid Glass 风格：白色填充 + 高光描边 + 柔和阴影
-        indicatorLayer.fillColor = UIColor.white.withAlphaComponent(0.85).cgColor
-        indicatorLayer.strokeColor = UIColor.white.withAlphaComponent(0.5).cgColor
-        indicatorLayer.lineWidth = 0.5
-        indicatorLayer.opacity = 1.0
-
-        // 光晕扩散层已移除（不再有第二层圈）
-        if layer.sublayers?.contains(indicatorLayer) == false {
-            layer.addSublayer(indicatorLayer)
-        }
-
-        // ── 弹簧滑动动画（CAKeyframeAnimation 实现过冲 + 回弹）──
-        let prevY = tabBarHeight - 12 - barHeight / 2
-        let prevX = fromFrame.midX
-
-        let keyTimes: [CGFloat] = [0.0, 0.5, 0.75, 1.0]
-        let values: [NSValue] = [
-            NSValue(cgPoint: CGPoint(x: prevX, y: prevY)),
-            NSValue(cgPoint: CGPoint(x: targetX, y: targetY)),
-            NSValue(cgPoint: CGPoint(x: targetX, y: targetY)),
-            NSValue(cgPoint: CGPoint(x: targetX, y: targetY)),
-        ]
-        let posAnim = CAKeyframeAnimation(keyPath: "position")
-        posAnim.values = values
-        posAnim.keyTimes = keyTimes.map { $0 as NSNumber }
-        posAnim.duration = 0.45
-        posAnim.fillMode = .both
-        posAnim.isRemovedOnCompletion = false
-        indicatorLayer.add(posAnim, forKey: "slidePos")
-
-        // 缩放弹性：0.6 → 1.05 → 0.98 → 1.0
-        let scaleAnim = CABasicAnimation(keyPath: "transform.scale")
-        scaleAnim.fromValue = 0.65
-        scaleAnim.toValue = 1.0
-        scaleAnim.duration = 0.45
-        scaleAnim.fillMode = .both
-        scaleAnim.isRemovedOnCompletion = false
-        indicatorLayer.add(scaleAnim, forKey: "slideScale")
-    }
-
-    private var items: [CGRect] {
-        guard let tabBar = superview as? UITabBar else { return [] }
-        return (tabBar.items ?? []).map { $0.frame(in: tabBar) ?? .zero }
-    }
-}
-
-/// 液态玻璃 TabBar —— 通过 UITabBarController 注入到 TabView
-struct LiquidGlassTabBar: UIViewRepresentable {
-    @Binding var selectedTab: Int
-
-    func makeUIView(context: Context) -> UIView {
-        // ⚠️ 这里刻意不再设置 UITabBar.appearance()：
-        // 原实现先 `stackedLayoutAppearance = unselected`，紧接着又被 `= selected` 覆盖，
-        // 未选中态的样式整段丢失；在 iOS 26 的 Liquid Glass TabBar 上，标题就变成低对比度 ——
-        // 看起来正是「底部导航没文字」。系统默认样式本身就是磨砂玻璃，
-        // 选中色改用 SwiftUI 的 .tint()（见 MainTabView.body），这样风险最低。
-
-        // 光晕 + 指示条叠加层
-        let overlay = TabBarGlowOverlay()
-        overlay.isHidden = true
-        // 它纯粹是绘制层，绝不能抢走 TabBar 的点击（否则整个底部导航会点不动）
-        overlay.isUserInteractionEnabled = false
-        return overlay
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {
-        guard let overlay = uiView as? TabBarGlowOverlay else { return }
-        overlay.isHidden = false
-        overlay.selectItem(at: selectedTab, tabBarItemCount: 4)
     }
 }
 

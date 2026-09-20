@@ -79,7 +79,7 @@ struct TripDetailView: View {
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.vertical, Theme.Spacing.md)
         }
-        .pageBackground(Theme.pageGreen)
+        .pageBackground()
         .navigationTitle("行程详情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

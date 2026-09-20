@@ -48,7 +48,7 @@ struct CommandHistoryView: View {
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.vertical, Theme.Spacing.md)
         }
-        .pageBackground(Theme.pageBlue)
+        .pageBackground()
         .navigationTitle("指令历史")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityLabel(Text("指令历史"))
@@ -164,7 +164,6 @@ struct CommandHistoryView: View {
                         Image(systemName: "circle.dashed")
                             .font(.caption)
                             .foregroundStyle(.orange)
-                            .spinSymbol()
                     }
                 }
                 .padding(.horizontal, 12)
@@ -194,7 +193,7 @@ struct CommandHistoryView: View {
                     else { expandedCmds.insert(cmd.id) }
                 }
             }
-            .pressFeedbackLegacy()
+            .pressFeedback()
         }
     }
 }
@@ -208,21 +207,6 @@ struct DetailRow: View {
             Spacer()
             Text(value).foregroundStyle(.primary)
         }
-    }
-}
-
-// MARK: - Spin Symbol
-extension View {
-    func spinSymbol() -> some View {
-        self.modifier(SpinningSymbolModifier())
-    }
-}
-
-struct SpinningSymbolModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .rotationEffect(.init(degrees: 360))
-            .animation(.linear(duration: 1.5).repeatForever(autoreverses: false), value: UUID())
     }
 }
 

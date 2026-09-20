@@ -34,7 +34,7 @@ class FocusModeManager: ObservableObject {
     
     /// 检测是否正在驾驶（基于速度）
     var isDriving: Bool {
-        // 简化：检查最近一次心跳速度
+        // 简化：检查最近一次上报的车速
         UserDefaults.standard.double(forKey: "carkeeper_current_speed") > 5
     }
     
@@ -127,11 +127,9 @@ struct FocusModeHomeView: View {
                 Circle()
                     .stroke(Color.secondary.opacity(0.2), lineWidth: 8)
                 Circle()
-                    .stroke(style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .foregroundStyle(
-                        LinearGradient(colors: [.green, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
-                    .rotationEffect(.degrees(270))
+                    .trim(from: 0, to: min(1, max(0, Double(socPct) / 100)))
+                    .stroke(DS.Palette.tint, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
                     .animation(.easeInOut, value: socPct)
                 
                 VStack {

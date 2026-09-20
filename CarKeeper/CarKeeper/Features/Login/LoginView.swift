@@ -2,8 +2,9 @@ import SwiftUI
 import Combine
 import LocalAuthentication
 
-// 登录：手机号 + 图形验证码 + 短信验证码（60s 倒计时）
-// iOS 27 视觉：品牌区 + 玻璃表单卡 + 渐变登录大按钮，直连长安官方接口。
+// 登录页
+// 设计：Tesla 式极简 —— 单一画布、扁平品牌标、发丝线分隔的表单行、一个主色按钮。
+// 品牌感来自留白与排版，而不是装饰层。
 
 struct LoginView: View {
     @State private var phone: String = ""
@@ -21,6 +22,9 @@ struct LoginView: View {
     @State private var biometricAuthPending = false
     @State private var showBiometricPrompt = false
 
+    private enum Field: Hashable { case phone, pic, sms }
+    @FocusState private var focused: Field?
+
     private var countdownTimer: Publishers.Autoconnect<Timer.TimerPublisher> {
         Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     }
@@ -31,22 +35,23 @@ struct LoginView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 28) {
+                VStack(alignment: .leading, spacing: DS.Space.xxl) {
                     brandHeader
-                        .padding(.top, 56)
+                        .padding(.top, DS.Space.xxxl)
                     formCard
-                    if !statusText.isEmpty { statusBanner }
-                    loginButton
-                    // #NEW-101 FaceID 快捷登录
-                    if biometricAvailable { biometricButton }
-                    Spacer(minLength: 12)
+                    if !statusText.isEmpty {
+                        DSNotice(kind: statusErr ? .error : .success, text: statusText)
+                    }
+                    VStack(spacing: DS.Space.md) {
+                        loginButton
+                        if biometricAvailable { biometricButton }
+                    }
                 }
-                .padding(16)
-                
+                .padding(.bottom, DS.Space.xxxl)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .pageBackground(Theme.Colors.accent)
-            .navBarStyle()
+            .scrollDismissesKeyboard(.interactively)
+            .dsCanvas()
             .onReceive(countdownTimer) { _ in
                 if countdown > 0 {
                     countdown -= 1
@@ -68,81 +73,95 @@ struct LoginView: View {
         }
     }
 
-    // MARK: 品牌区 — Apple Store Style
+    // MARK: 品牌区（扁平标 + 字标）
     private var brandHeader: some View {
-        VStack(spacing: 16) {
-            ZStack {
-                // 外发光层
-                Circle()
-                    .fill(AngularGradient(colors: [Theme.Colors.accent.opacity(0.25), Theme.Colors.accent.opacity(0.05)],
-                                          center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)))
-                    .frame(width: 108, height: 108)
-                // 主体圆
-                Circle()
-                    .fill(LinearGradient(colors: [Theme.Colors.accent, Theme.Colors.accent.opacity(0.65)],
-                                         startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 92, height: 92)
-                    .shadow(color: Theme.Colors.accent.opacity(0.4), radius: 20, y: 8)
-                // 图标
-                Image(systemName: "car.side.fill")
-                    .font(Theme.d3)
-                    .foregroundStyle(.white)
-            }
-            VStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: DS.Space.lg) {
+            Image(systemName: "car.side.fill")
+                .font(.system(size: 30, weight: .regular))
+                .foregroundStyle(DS.Palette.labelOnTint)
+                .frame(width: 60, height: 60)
+                .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                    .fill(DS.Palette.tint))
+
+            VStack(alignment: .leading, spacing: DS.Space.xs) {
                 Text("长安车管家")
-                    .font(Theme.h1)
-                    .tracking(2)
+                    .font(DS.Typo.largeTitle)
+                    .foregroundStyle(DS.Palette.label)
                 Text("CHANGAN CONNECT")
-                    .font(Theme.font(.footnote as Font).bold())
-                    .tracking(5)
-                    .foregroundStyle(.secondary)
+                    .font(DS.Typo.caption.weight(.semibold))
+                    .tracking(2.4)
+                    .foregroundStyle(DS.Palette.labelTertiary)
             }
+            Text("登录后即可远程查看车辆状态、控制车锁与空调。")
+                .font(DS.Typo.subheadline)
+                .foregroundStyle(DS.Palette.labelSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: 表单玻璃卡
+    // MARK: 表单卡（分组行 + 发丝分隔线）
     private var formCard: some View {
-        VStack(spacing: 18) {
-            HStack(spacing: 12) {
-                Image(systemName: "phone.fill")
-                    .font(Theme.body)
-                    .foregroundStyle(Theme.Colors.accent)
-                    .frame(width: 24)
-                TextField("手机号", text: $phone)
-                    .keyboardType(.numberPad)
-                    .font(.title)
-                    .onChange(of: phone) { _, _ in loadCaptcha() }
-                if phoneValid {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Theme.ok)
-                        .font(Theme.body)
+        DSCard(padding: 0, radius: DS.Radius.card) {
+            VStack(spacing: 0) {
+                fieldRow(icon: "phone.fill", focused: focused == .phone, valid: phoneValid) {
+                    TextField("手机号", text: $phone)
+                        .keyboardType(.numberPad)
+                        .textContentType(.telephoneNumber)
+                        .font(DS.Typo.data)
+                        .focused($focused, equals: .phone)
+                        .onChange(of: phone) { _, _ in loadCaptcha() }
+                }
+
+                DSDivider(inset: DS.Space.cardPadding)
+
+                fieldRow(icon: "photo.on.rectangle", focused: focused == .pic, valid: nil) {
+                    HStack(spacing: DS.Space.md) {
+                        TextField("图形验证码", text: $picCode)
+                            .font(DS.Typo.data)
+                            .textInputAutocapitalization(.never)
+                            .focused($focused, equals: .pic)
+                        captchaView
+                    }
+                }
+
+                DSDivider(inset: DS.Space.cardPadding)
+
+                fieldRow(icon: "ellipsis.message", focused: focused == .sms, valid: nil) {
+                    HStack(spacing: DS.Space.md) {
+                        TextField("6 位短信验证码", text: $smsCode)
+                            .keyboardType(.numberPad)
+                            .textContentType(.oneTimeCode)
+                            .font(DS.Typo.data)
+                            .focused($focused, equals: .sms)
+                        smsButton
+                    }
                 }
             }
-            ListDivider()
-            HStack(spacing: 12) {
-                Image(systemName: "photo.on.rectangle")
-                    .font(Theme.body)
-                    .foregroundStyle(Theme.Colors.accent)
-                    .frame(width: 24)
-                TextField("图形验证码", text: $picCode)
-                    .font(.title)
-                captchaView
-            }
-            ListDivider()
-            HStack(spacing: 12) {
-                Image(systemName: "message.badge.fill")
-                    .font(Theme.body)
-                    .foregroundStyle(Theme.Colors.accent)
-                    .frame(width: 24)
-                TextField("6 位短信验证码", text: $smsCode)
-                    .keyboardType(.numberPad)
-                    .font(.title)
-                smsButton
+        }
+        .dynamicTypeCompress()
+    }
+
+    @ViewBuilder
+    private func fieldRow<Content: View>(icon: String,
+                                         focused: Bool,
+                                         valid: Bool?,
+                                         @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: DS.Space.md) {
+            Image(systemName: icon)
+                .font(.system(size: DS.Size.icon, weight: .regular))
+                .foregroundStyle(focused ? DS.Palette.tint : DS.Palette.labelTertiary)
+                .frame(width: 22)
+            content()
+            if valid == true {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: DS.Size.iconSm))
+                    .foregroundStyle(DS.Palette.ok)
             }
         }
-        .padding(Theme.Spacing.xl)
-        .dynamicTypeCompress()
-        .glassCard()
+        .padding(.horizontal, DS.Space.cardPadding)
+        .frame(minHeight: 60)
+        .animation(DS.Motion.fade, value: focused)
     }
 
     private var smsButton: some View {
@@ -150,10 +169,11 @@ struct LoginView: View {
             sendSms()
         } label: {
             Text(smsBtnText)
-                .font(Theme.font(.caption as Font).bold())
-                .foregroundStyle(smsBtnDisabled ? Color.secondary : Theme.Colors.accent)
-                .padding(.horizontal, 14).padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: Capsule())
+                .font(DS.Typo.footnote.weight(.semibold))
+                .foregroundStyle(smsBtnDisabled ? DS.Palette.labelTertiary : DS.Palette.tint)
+                .padding(.horizontal, DS.Space.md)
+                .frame(height: 34)
+                .background(Capsule().fill(smsBtnDisabled ? DS.Palette.surfaceSunken : DS.Palette.tintSoft))
         }
         .buttonStyle(.plain)
         .disabled(smsBtnDisabled)
@@ -169,77 +189,57 @@ struct LoginView: View {
                     Image(uiImage: img)
                         .resizable()
                         .interpolation(.none)
-                        .frame(height: 40).frame(width: 104)
+                        .frame(height: 36).frame(width: 96)
                 } else {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(.tertiarySystemFill))
-                        .frame(height: 40).frame(width: 104)
-                        .overlay(Text("点我刷新").font(Theme.footnote).foregroundStyle(.secondary))
+                    RoundedRectangle(cornerRadius: DS.Radius.small - 2, style: .continuous)
+                        .fill(DS.Palette.surfaceSunken)
+                        .frame(height: 36).frame(width: 96)
+                        .overlay(Text("点我刷新")
+                            .font(DS.Typo.caption2)
+                            .foregroundStyle(DS.Palette.labelSecondary))
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: DS.Radius.small - 2, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: DS.Radius.small - 2, style: .continuous)
+                .strokeBorder(DS.Palette.hairline, lineWidth: DS.Hair.line))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Text("刷新图形验证码"))
     }
 
-    // MARK: 状态条
-    @ViewBuilder
-    private var statusBanner: some View {
-        if !statusText.isEmpty {
-            Label(statusText, systemImage: statusErr ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
-                .font(Theme.caption)
-                .foregroundStyle(statusErr ? Theme.bad : Theme.ok)
-                .padding(.horizontal, 14).padding(.vertical, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        }
-    }
-
-    // MARK: 登录按钮
+    // MARK: 主操作按钮
     private var loginButton: some View {
         Button {
+            DSHaptic.tap()
             doLogin()
         } label: {
-            HStack(spacing: 8) {
-                if busy { ProgressView().tint(.white) }
-                Text(busy ? "登录中…" : "登 录")
-                    .font(.title)
+            HStack(spacing: DS.Space.sm) {
+                if busy { ProgressView().tint(DS.Palette.labelOnTint) }
+                Text(busy ? "登录中…" : "登录")
             }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(LinearGradient(colors: [Theme.Colors.accent, Theme.Colors.accent.opacity(0.72)],
-                                         startPoint: .topLeading, endPoint: .bottomTrailing))
-            )
-            .shadow(color: Theme.Colors.accent.opacity(0.4), radius: 16, y: 6)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(DSPrimaryButtonStyle())
         .disabled(busy)
-        .padding(.top, 4)
+        .opacity(busy ? 0.7 : 1)
     }
 
-    // #NEW-101 FaceID 快捷登录按钮
+    // #NEW-101 FaceID 快捷登录
     private var biometricButton: some View {
         Button {
             showBiometricPrompt = true
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: DS.Space.sm) {
                 Image(safeSymbol: biometricAvailable ? "faceid" : "lock.fill", fallback: "faceid")
-                    .font(.title3)
+                    .font(.system(size: DS.Size.icon, weight: .medium))
                 Text(biometricAvailable ? "Face ID 快速登录" : "未启用 Face ID")
-                    .font(Theme.body)
-                Spacer()
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(DS.Palette.labelTertiary)
             }
-            .foregroundStyle(biometricAvailable ? Theme.Colors.accent : .secondary)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(DSSecondaryButtonStyle())
         .opacity(biometricAvailable ? 1.0 : 0.5)
-        .padding(.top, 8)
     }
 
     private func checkBiometric() {

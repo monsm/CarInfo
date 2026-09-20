@@ -18,7 +18,7 @@ struct MineView: View {
     @State private var downloadFile: URL? = nil
     @State private var shareItems: [Any] = []
     @State private var shareSheetFlag = false
-    @State private var isRefreshing = false     // 下拉刷新标志（触发玻璃涟漪动效）
+    @State private var isRefreshing = false     // 下拉刷新进行中标志
     @State private var isChecking = false        // OTA 检查中（不含下载）
     @State private var showMileageJournal = false
     @State private var showOTAChangelog = false
@@ -52,9 +52,8 @@ struct MineView: View {
             
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground(Theme.Colors.accent)
+        .pageBackground()
         .navigationTitle("我的")
-            .navBarStyle()
             .accessibilityLabel(Text("我的"))
             .accessibilityHint(Text("账号设置、个人信息和应用程序管理"))
         .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
@@ -73,7 +72,6 @@ struct MineView: View {
             try? await Task.sleep(nanoseconds: 600_000_000)  // 0.6s 模拟刷新延迟
             isRefreshing = false
         }
-        .glassRefreshRipple(isRefreshing: $isRefreshing)
         .alert("关于 长安车管家", isPresented: $showAboutAlert) {
             Button("关闭", role: .cancel) { }
         } message: {
@@ -153,76 +151,75 @@ struct MineView: View {
     // MARK: 身份卡 — Apple Profile Card
     private var profileCard: some View {
         let um = VM.userModel(store.user)
-        return VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 16) {
-                // 头像
-                ZStack {
-                    Circle()
-                        .fill(LinearGradient(colors: [Theme.Colors.accent, Theme.Colors.accent.opacity(0.65)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: 68, height: 68)
-                        .shadow(color: Theme.Colors.accent.opacity(0.35), radius: 12, y: 5)
+        return DSCard(padding: DS.Space.cardPadding, radius: DS.Radius.hero) {
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
+                HStack(spacing: DS.Space.lg) {
+                    // 头像：扁平色块 + 首字（不用渐变球 + 投影）
                     Text(um?.avatar ?? "主")
-                        .font(Theme.d4.bold())
-                        .foregroundStyle(.white)
-                }
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(um?.name ?? "车主").font(Theme.d5.bold())
-                    HStack(spacing: 10) {
+                        .font(DS.Typo.title.weight(.semibold))
+                        .foregroundStyle(DS.Palette.labelOnTint)
+                        .frame(width: 56, height: 56)
+                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(DS.Palette.tint))
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(um?.name ?? "车主")
+                            .font(DS.Typo.title3)
+                            .foregroundStyle(DS.Palette.label)
                         Text(um?.mobile ?? "--")
-                            .font(Theme.mono)
-                            .foregroundStyle(.secondary)
-                        if um?.authed == true {
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .font(Theme.micro)
-                                    .foregroundStyle(Theme.ok)
-                                Text("已实名")
-                                    .font(Theme.font(.footnote as Font).bold())
-                                    .foregroundStyle(Theme.ok)
-                            }
-                        }
+                            .font(DS.Typo.dataSmall)
+                            .foregroundStyle(DS.Palette.labelSecondary)
+                    }
+                    Spacer(minLength: DS.Space.sm)
+                    if um?.authed == true {
+                        DSChip(text: "已实名", cls: "ok", icon: "checkmark.seal.fill")
                     }
                 }
-                Spacer()
-            }
-            // 分割线
-            Divider().opacity(0.4)
-            // 底部统计
-            HStack(spacing: 16) {
-                HStack(spacing: 6) {
-                    Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(Theme.Colors.accent)
-                    Text(String(store.cars.count) + " 辆车")
-                        .font(Theme.caption)
-                }
-                Spacer()
-                if let gt = um?.gender, !gt.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: gt == "男" ? "person.fill" : "person.circle.fill")
-                            .font(Theme.footnote).foregroundStyle(.secondary)
-                        Text(gt).font(Theme.caption).foregroundStyle(.secondary)
+
+                DSDivider()
+
+                HStack(spacing: DS.Space.xl) {
+                    profileStat(label: "车辆", value: "\(store.cars.count)", unit: "辆")
+                    if let gt = um?.gender, !gt.isEmpty {
+                        profileStat(label: "性别", value: gt, unit: nil)
                     }
-                }
-            }
-            HStack(spacing: 12) {
-                if let bt = um?.birthday, !bt.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "calendar").font(Theme.micro).foregroundStyle(.secondary)
-                        Text(bt).font(Theme.footnote).foregroundStyle(.secondary)
+                    if let bt = um?.birthday, !bt.isEmpty {
+                        profileStat(label: "生日", value: bt, unit: nil)
                     }
+                    Spacer(minLength: 0)
                 }
+
                 if let lt = um?.lastLoginTime, !lt.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock").font(Theme.micro).foregroundStyle(.secondary)
-                        Text(lt).font(Theme.footnote).foregroundStyle(.secondary)
+                    HStack(spacing: DS.Space.xs) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 11))
+                        Text("上次登录 \(lt)")
                     }
+                    .font(DS.Typo.caption)
+                    .foregroundStyle(DS.Palette.labelTertiary)
                 }
             }
         }
-        .padding(Theme.Spacing.xl)
         .dynamicTypeCompress()
-        .glassHeroCard()
-        .glassLongPressDeform()
+    }
+
+    private func profileStat(label: String, value: String, unit: String?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(DS.Typo.caption2.weight(.medium))
+                .foregroundStyle(DS.Palette.labelTertiary)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(value)
+                    .font(DS.Typo.metric(20))
+                    .foregroundStyle(DS.Palette.label)
+                if let unit {
+                    Text(unit)
+                        .font(DS.Typo.caption)
+                        .foregroundStyle(DS.Palette.labelSecondary)
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: 车辆卡
@@ -231,28 +228,33 @@ struct MineView: View {
         return Button {
             NotificationCenter.default.post(name: .navToVehicle, object: nil)
         } label: {
-            HStack(spacing: 14) {
+            HStack(spacing: DS.Space.lg) {
                 Image(systemName: "car.fill")
-                    .font(Theme.d4)
-                    .foregroundStyle(Theme.Colors.accent)
-                    .frame(width: 52, height: 52)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(sum?.name ?? "未绑定车辆").font(Theme.h3)
-                    Text(sum?.plate ?? "暂无车牌").font(Theme.caption).foregroundStyle(.secondary)
+                    .font(.system(size: DS.Size.iconLg, weight: .regular))
+                    .foregroundStyle(DS.Palette.tint)
+                    .frame(width: 48, height: 48)
+                    .background(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                        .fill(DS.Palette.tintSoft))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(sum?.name ?? "未绑定车辆")
+                        .font(DS.Typo.headline)
+                        .foregroundStyle(DS.Palette.label)
+                    Text(sum?.plate ?? "暂无车牌")
+                        .font(DS.Typo.dataSmall)
+                        .foregroundStyle(DS.Palette.labelSecondary)
                 }
-                Spacer()
+                Spacer(minLength: DS.Space.sm)
                 if let d = sum?.insuranceDays {
-                    Pill(text: d < 0 ? "保险到期" : "保险剩 \(d) 天",
-                         cls: d < 0 ? "bad" : (d <= 30 ? "warn" : "ok"), dot: false)
+                    DSChip(text: d < 0 ? "保险到期" : "保险剩 \(d) 天",
+                           cls: d < 0 ? "bad" : (d <= 30 ? "warn" : "ok"))
                 }
                 Image(systemName: "chevron.right")
-                    .font(Theme.font(.footnote as Font).bold()).foregroundStyle(.tertiary)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(DS.Palette.labelTertiary)
             }
-            .padding(16)
+            .padding(DS.Space.cardPadding)
+            .dsSurface(padding: 0)
             .dynamicTypeCompress()
-            .glassCard()
-            .glassLongPressDeform()
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -296,7 +298,6 @@ struct MineView: View {
                 }
                 .padding(16)
                 .glassCard()
-                .glassLongPressDeform()
 
                 // #45 驾驶行为评分
                 if let score = calculateDriveBehaviorScore(store.caches) {
@@ -316,7 +317,6 @@ struct MineView: View {
                     }
                     .padding(16)
                     .glassCard()
-                    .glassLongPressDeform()
                 }
                 // #44 充电站地图入口
                 ChargingStationFinder()
@@ -421,28 +421,28 @@ struct MineView: View {
     private func tile(_ symbol: String, _ label: String, tint: Color,
                       _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(tint.opacity(0.10))
-                        .frame(width: 48, height: 48)
-                    Image(safeSymbol: symbol, fallback: "car.fill")
-                        .font(Theme.d5.weight(.medium))
-                        .foregroundStyle(tint)
-                }
+            // Tesla 式磁贴：图标左上 + 标签在左下，表面色不用玻璃、不用圆形底盘。
+            VStack(alignment: .leading, spacing: DS.Space.sm) {
+                Image(safeSymbol: symbol, fallback: "car.fill")
+                    .font(.system(size: DS.Size.tileIcon, weight: .regular))
+                    .foregroundStyle(tint)
+                    .frame(height: 30)
                 Text(label)
-                    .font(Theme.font(.caption as Font).bold())
-                    .foregroundStyle(.primary)
+                    .font(DS.Typo.subheadline.weight(.semibold))
+                    .foregroundStyle(DS.Palette.label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(DS.Space.md)
+            .frame(minHeight: 84)
+            .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                .fill(DS.Palette.surface))
+            .overlay(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                .strokeBorder(DS.Palette.hairline, lineWidth: DS.Hair.line))
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.8))
-        .shadow(color: .black.opacity(0.04), radius: 8, y: 3)
+        .buttonStyle(DSCardButtonStyle())
     }
 
     @ViewBuilder

@@ -53,7 +53,7 @@ struct ParkingMapView: View {
                 }
             }
         }
-        .pageBackground(Theme.pageBlue)
+        .pageBackground()
         .navigationTitle("停车位置")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

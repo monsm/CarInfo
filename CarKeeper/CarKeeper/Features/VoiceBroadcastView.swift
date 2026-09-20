@@ -110,7 +110,6 @@ struct VoiceBroadcastCard: View {
                     HStack {
                         Image(systemName: "speaker.wave.3.fill")
                             .foregroundColor(Theme.Colors.accent)
-                            .pulseAnimation()
                         Text(vm.currentMessage)
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -122,8 +121,3 @@ struct VoiceBroadcastCard: View {
     }
 }
 
-extension View {
-    func pulseAnimation() -> some View {
-        self.animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: true)
-    }
-}

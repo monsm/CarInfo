@@ -23,11 +23,7 @@ struct DataView: View {
     @State private var loading = true
     @State private var errText = ""
     @State private var loadTask: Task<Void, Never>? = nil
-    @State private var isRefreshing = false     // 下拉刷新标志（触发玻璃涟漪动效）
-    // 记录已出现的数据块 ID（用于块级交错入场动画）
-    @State private var appearedBlockIds: Set<String> = []
-    // 记录每个块内已出现的行索引（用于行级交错入场动画）
-    @State private var appearedRows: [String: Set<Int>] = [:]
+    @State private var isRefreshing = false     // 下拉刷新进行中
 
     init(kind: Kind = .analysis) {
         _kind = State(wrappedValue: kind)
@@ -42,11 +38,11 @@ struct DataView: View {
     var body: some View {
         VStack(spacing: 0) {
             // E21 驾驶行为雷达图
-            DrivingRadarChart(aggressiveAccel: store.drivingScore/3, harshBrake: store.drivingScore/3, smoothDrive: store.drivingScore/3+10, speedLimit: store.drivingScore/3+20).staggeredEntrance(index: 0)
+            DrivingRadarChart(aggressiveAccel: store.drivingScore/3, harshBrake: store.drivingScore/3, smoothDrive: store.drivingScore/3+10, speedLimit: store.drivingScore/3+20)
             // E32 充电成本饼图
-            ChargeCostChart(store: store).staggeredEntrance(index: 1)
+            ChargeCostChart(store: store)
             // E33 Siri 使用洞察
-            SiriInsightView(store: store).staggeredEntrance(index: 1)
+            SiriInsightView(store: store)
             kindSwitcher
             ScrollView {
                 VStack(spacing: Theme.Spacing.cardSpacing) {
@@ -60,7 +56,6 @@ struct DataView: View {
                         ForEach(Array(blocks.enumerated()), id: \.element.h) { idx, b in
                             dataBlock(b, idx: idx)
                         }
-                        .onChange(of: blocks.map(\.h)) { _ in appearedBlockIds = []; appearedRows = [:] }
                     }
                 }
                 
@@ -68,8 +63,8 @@ struct DataView: View {
                 .frame(maxWidth: .infinity, alignment: .top)
             }
         }
-        .pageBackground(Theme.pageIndigo)
-        .navigationTitle(kind.title).navBarStyle()
+        .pageBackground()
+        .navigationTitle(kind.title)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 16) {
@@ -89,7 +84,6 @@ struct DataView: View {
             loadTask = Task { await load() }
             isRefreshing = false
         }
-        .glassRefreshRipple(isRefreshing: $isRefreshing)
     }
 
     // MARK: kind 切换条（横向滚动玻璃胶囊）
@@ -121,22 +115,12 @@ struct DataView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: 数据块（交错入场动画）
-    /// 计算块首次出现时的延迟（按出现顺序递增，0.07s/块）
-    private func blockAppearDelay(_ blockId: String, currentIdx: Int) -> Double {
-        let isNew = !appearedBlockIds.contains(blockId)
-        return isNew ? Double(appearedBlockIds.count) * 0.07 : 0
-    }
-
+    // MARK: 数据块
     private func dataBlock(_ b: Block, idx: Int) -> some View {
-        let blockId = b.h
-        let delay = blockAppearDelay(blockId, currentIdx: idx)
-        return CardBox(title: b.h) {
+        CardBox(title: b.h) {
             VStack(spacing: 0) {
                 ForEach(Array(b.rows.enumerated()), id: \.offset) { rowIdx, r in
-                    let rowAppeared = appearedRows[blockId]?.contains(rowIdx) ?? false
-                    let rowDelay = rowAppeared ? 0 : Double(appearedRows[blockId]?.count ?? 0) * 0.05
-                    HStack(alignment: .top, spacing: 12) {
+                    HStack(alignment: .top, spacing: DS.Space.md) {
                         Text(r.k)
                             .font(Theme.caption)
                             .foregroundStyle(.secondary)
@@ -147,40 +131,13 @@ struct DataView: View {
                             .multilineTextAlignment(.trailing).lineLimit(3)
                         Spacer(minLength: 8)
                     }
-                    .padding(.vertical, 9)
-                    // 行级交错入场：从下方滑入 + 淡入 + 轻微缩放回弹
-                    .offset(y: rowAppeared ? 0 : 8)
-                    .opacity(rowAppeared ? 1 : 0)
-                    .scaleEffect(rowAppeared ? 1.0 : 0.96)
-                    .animation(
-                        .spring(response: 0.45, dampingFraction: 0.65, blendDuration: 0.25)
-                            .delay(rowDelay),
-                        value: rowAppeared
-                    )
-                    .onAppear {
-                        guard !rowAppeared else { return }
-                        if appearedRows[blockId] == nil { appearedRows[blockId] = [] }
-                        appearedRows[blockId]?.insert(rowIdx)
-                    }
+                    .padding(.vertical, DS.Space.sm)
                     // 行间隔线（仅非最后一行）
                     if rowIdx < b.rows.count - 1 {
                         Divider().opacity(0.4).padding(.leading, 120)
                     }
                 }
             }
-        }
-        // 液态玻璃交错入场：从下方滑入 + 淡入，按出现顺序依次延迟
-        .offset(y: appearedBlockIds.contains(blockId) ? 0 : 16)
-        .opacity(appearedBlockIds.contains(blockId) ? 1 : 0)
-        .scaleEffect(appearedBlockIds.contains(blockId) ? 1.0 : 0.94)
-        .animation(
-            .spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.35)
-                .delay(delay),
-            value: appearedBlockIds.contains(blockId)
-        )
-        .onAppear {
-            guard !appearedBlockIds.contains(blockId) else { return }
-            appearedBlockIds.insert(blockId)
         }
     }
 

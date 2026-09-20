@@ -154,6 +154,5 @@ struct ShortcutRow: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .contentShape(Rectangle())
-        .glassLongPressDeform()
     }
 }

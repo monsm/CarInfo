@@ -8,7 +8,7 @@ struct VehicleView: View {
     private let store = AppStore.shared
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var isRefreshing = false         // 下拉刷新涟漪标志
+    @State private var isRefreshing = false         // 下拉刷新进行中标志
     // #NEW-105 维保相册
     @State private var maintenancePhotos: [String] = []  // Base64 图片
     @State private var showPhotoPicker = false
@@ -53,16 +53,14 @@ struct VehicleView: View {
                 // #NEW-105 维保相册
                 if !isLoading && !isEmpty {
                     maintenanceSection
-                        .padding(.horizontal)
                 }
             } else {
                 // 兜底：car 数据解析失败
                 PageErrorView("车辆数据解析失败，请重新进入页面") { reloadVehicle() }
             }
         }
-        .pageBackground(Theme.Colors.accent)
+        .pageBackground()
         .navigationTitle("车辆档案")
-            .navBarStyle()
             .accessibilityLabel(Text("车辆档案"))
             .accessibilityHint(Text("车牌、VIN、车型配置与保险保养信息"))
         .refreshable {
@@ -71,7 +69,6 @@ struct VehicleView: View {
             Task { await store.fetchVehicleData() }
             isRefreshing = false
         }
-        .glassRefreshRipple(isRefreshing: $isRefreshing)
         .onAppear { loadMaintenancePhotos() }
     }
 
@@ -131,14 +128,17 @@ struct VehicleView: View {
             HStack(spacing: 16) {
                 // 车牌徽章
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(LinearGradient(colors: [Theme.Colors.accent, Theme.Colors.accent.opacity(0.75)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                    // 车牌：单一主色块（旧版是渐变色块 + 主色投影）
+                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                        .fill(DS.Palette.tint)
                         .frame(width: 96, height: 58)
-                        .shadow(color: Theme.Colors.accent.opacity(0.3), radius: 10, y: 4)
                     VStack(spacing: 3) {
-                        Text("新能源").font(.caption).foregroundStyle(.white.opacity(0.85))
-                        Text(sum.plate).font(.title).foregroundStyle(.white)
+                        Text("新能源")
+                            .font(DS.Typo.caption2.weight(.medium))
+                            .foregroundStyle(DS.Palette.labelOnTint.opacity(0.85))
+                        Text(sum.plate)
+                            .font(DS.Typo.title3)
+                            .foregroundStyle(DS.Palette.labelOnTint)
                     }
                 }
                 VStack(alignment: .leading, spacing: 5) {
@@ -194,7 +194,6 @@ struct VehicleView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .dynamicTypeCompress()
         .glassHeroCard()
-        .glassLongPressDeform()
     }
 
     private func vinBar(_ sum: VehicleSummary) -> some View {

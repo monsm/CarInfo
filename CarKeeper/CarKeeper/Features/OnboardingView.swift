@@ -99,39 +99,29 @@ struct OnboardingView: View {
                     }
                 }
             }
-            .padding(.horizontal, 32)
-            .padding(.vertical, 24)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .padding(.top, 20)
+            .padding(.horizontal, DS.Space.xxxl)
+            .padding(.vertical, DS.Space.xxl)
+            .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                .fill(DS.Palette.surface))
+            .overlay(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                .strokeBorder(DS.Palette.hairline, lineWidth: DS.Hair.line))
+            .padding(.top, DS.Space.xl)
         }
-        .background(
-            LinearGradient(
-                colors: [
-                    Theme.Colors.accent.opacity(0.15),
-                    Color.purple.opacity(0.1),
-                    Color.blue.opacity(0.05)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-        )
+        // 旧版：整屏三色渐变（主色 + 紫 + 蓝）。新版：单一画布色。
+        .dsCanvas()
     }
     
     private func onboardingPage(_ page: OnboardingPage) -> some View {
         VStack(spacing: 24) {
             // 图标
             ZStack {
-                Circle()
-                    .fill(LinearGradient(
-                        colors: [Theme.Colors.accent.opacity(0.3), Theme.Colors.accent.opacity(0.1)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .frame(width: 120, height: 120)
+                // 旧版：渐变色圆 + 超大图标。新版：扁平色块（与登录页品牌标同一套语言）。
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(DS.Palette.tintSoft)
+                    .frame(width: 96, height: 96)
                 Image(safeSymbol: page.icon, fallback: "car.fill")
-                    .font(.system(size: 56))
-                    .foregroundStyle(Theme.Colors.accent)
+                    .font(.system(size: 40, weight: .regular))
+                    .foregroundStyle(DS.Palette.tint)
             }
             
             // 标题和描述

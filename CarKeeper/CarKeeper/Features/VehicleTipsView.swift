@@ -132,7 +132,7 @@ struct VehicleTipsView: View {
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.vertical, Theme.Spacing.md)
         }
-        .pageBackground(Theme.pageOrange)
+        .pageBackground()
         .navigationTitle("车辆提示")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
