@@ -74,8 +74,8 @@ struct LivingCarView: View {
             .fill(
                 LinearGradient(
                     colors: [
-                        Kansei.Color.primary.opacity(0.95),
-                        Kansei.Color.primary.opacity(0.7)
+                        Kansei.Color.primary.dsOpacity(0.95),
+                        Kansei.Color.primary.dsOpacity(0.7)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -90,7 +90,7 @@ struct LivingCarView: View {
                 path.addLine(to: CGPoint(x: 115, y: 100))
                 path.closeSubpath()
             }
-            .fill(Kansei.Color.nightSurface.opacity(0.8))
+            .fill(Kansei.Color.nightSurface.dsOpacity(0.8))
 
             // 车轮
             Circle()
@@ -109,7 +109,7 @@ struct LivingCarView: View {
                     LinearGradient(
                         colors: [
                             Kansei.Color.ambient,
-                            Kansei.Color.ambient.opacity(0.3)
+                            Kansei.Color.ambient.dsOpacity(0.3)
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -124,8 +124,9 @@ struct LivingCarView: View {
 
     // MARK: - 充电特效
     private var chargingBurst: some View {
+        EmptyView()
         Circle()
-            .fill(Kansei.Color.info.opacity(0.3))
+            .fill(Kansei.Color.info.dsOpacity(0.3))
             .frame(width: 60, height: 60)
             .position(x: 250, y: 120)
             .blur(radius: 20)
@@ -141,12 +142,12 @@ struct LivingCarView: View {
     private var interactiveZones: some View {
         GeometryReader { geo in
             ZStack {
-                ForEach(zones, id: \.self) { zone in
+                ForEach(Array(zones.enumerated()), id: \.offset) { _, zone in
                     let area = zone.tapArea
                     RoundedRectangle(cornerRadius: 8)
                         .fill(
                             selectedZone == zone
-                                ? Kansei.Color.ambient.opacity(0.3)
+                                ? Kansei.Color.ambient.dsOpacity(0.3)
                                 : Color.clear
                         )
                         .frame(width: geo.size.width * area.width)

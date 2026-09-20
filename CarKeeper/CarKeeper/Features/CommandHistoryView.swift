@@ -87,7 +87,7 @@ struct CommandHistoryView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(filter == f ? Kansei.Color.ambient.opacity(0.2) : Color.clear)
+                            .background(filter == f ? Kansei.Color.ambient.dsOpacity(0.2) : Color.clear)
                             .foregroundStyle(filter == f ? Kansei.Color.ambient : Kansei.Color.secondary)
                             .cornerRadius(20)
                     }

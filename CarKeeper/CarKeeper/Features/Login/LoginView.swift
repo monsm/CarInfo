@@ -91,7 +91,7 @@ struct LoginView: View {
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .fill(Kansei.Color.ambient)
                     )
-                    .shadow(color: Kansei.Color.ambient.opacity(0.4), radius: 12, y: 4)
+                    .shadow(color: Kansei.Color.ambient.dsOpacity(0.4), radius: 12, y: 4)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("长安车管家")
@@ -196,7 +196,7 @@ struct LoginView: View {
                                 .padding(.horizontal, Kansei.Spacing.md)
                                 .padding(.vertical, Kansei.Spacing.sm)
                                 .background(
-                                    Kansei.Color.ambient.opacity(smsBtnDisabled ? 0.3 : 1)
+                                    Kansei.Color.ambient.dsOpacity(smsBtnDisabled ? 0.3 : 1)
                                 )
                                 .cornerRadius(Kansei.Radius.small)
                         }
@@ -226,7 +226,7 @@ struct LoginView: View {
             .padding(.vertical, Kansei.Spacing.lg)
             .background(Kansei.Color.ambient)
             .cornerRadius(Kansei.Radius.medium)
-            .shadow(color: Kansei.Color.ambient.opacity(0.4), radius: 12, y: 4)
+            .shadow(color: Kansei.Color.ambient.dsOpacity(0.4), radius: 12, y: 4)
         }
         .buttonStyle(.plain)
         .disabled(busy || !phoneValid)

@@ -190,7 +190,7 @@ struct HealthView: View {
                         }
                     }
                 }
-                .background(Kansei.Color.nightSurface.opacity(0.6))
+                .background(Kansei.Color.nightSurface.dsOpacity(0.6))
             }
 
             if showsSeparator { DSSeparator(inset: 0) }

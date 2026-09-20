@@ -88,7 +88,7 @@ struct GlassNavBar: View {
         HStack {
             if #available(iOS 15, *) {
                 Text(title)
-                    .font(Kansei.Type.title.weight(.semibold))
+                    .font(Kansei.Type.title).fontWeight(.semibold)
                     .foregroundColor(Kansei.Color.primary)
 
                 if let subtitle {
@@ -104,7 +104,7 @@ struct GlassNavBar: View {
                 }
             } else {
                 Text(title)
-                    .font(Kansei.Type.title.weight(.semibold))
+                    .font(Kansei.Type.title).fontWeight(.semibold)
                     .foregroundColor(Kansei.Color.primary)
 
                 Spacer()
@@ -191,7 +191,7 @@ struct ButtonBackground: ViewModifier {
                 .background(
                     Kansei.Color.ambient
                         .cornerRadius(Kansei.Radius.medium)
-                        .shadow(color: Kansei.Color.ambient.opacity(0.4), radius: 12, y: 4)
+                        .shadow(color: Kansei.Color.ambient.dsOpacity(0.4), radius: 12, y: 4)
                 )
         case .secondary:
             content

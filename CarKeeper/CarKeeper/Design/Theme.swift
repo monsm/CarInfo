@@ -211,11 +211,11 @@ enum Theme {
         static let primary: Color = Kansei.Color.primary
         static let secondary: Color = Kansei.Color.secondary
         static let tertiary: Color = Kansei.Color.tertiary
-        static let quaternary: Color = Kansei.Color.tertiary.opacity(0.6)
+        static let quaternary: Color = Kansei.Color.tertiary.dsOpacity(0.6)
 
         // ---- 边框色（Border）：发丝线 ----
         static let border: Color = Kansei.Color.glassBorder
-        static let borderSubtle: Color = Kansei.Color.glassBorder.opacity(0.6)
+        static let borderSubtle: Color = Kansei.Color.glassBorder.dsOpacity(0.6)
 
         // ---- 填充色（Fill）----
         static let fill: Color = Kansei.Color.nightSurface

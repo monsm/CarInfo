@@ -89,7 +89,7 @@ struct DSTrendChart: View {
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { value in
                 AxisGridLine()
-                    .foregroundStyle(Kansei.Color.glassBorder.opacity(0.6))
+                    .foregroundStyle(Kansei.Color.glassBorder.dsOpacity(0.6))
                 AxisValueLabel {
                     if let d = value.as(Date.self) {
                         Text(Self.axisTime(d))
@@ -228,7 +228,7 @@ struct DSTyreTrendChart: View {
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 4)) { value in
                     AxisGridLine()
-                        .foregroundStyle(Kansei.Color.glassBorder.opacity(0.6))
+                        .foregroundStyle(Kansei.Color.glassBorder.dsOpacity(0.6))
                     AxisValueLabel {
                         if let d = value.as(Date.self) {
                             Text(d.formatted(.dateTime.month().day().hour()))

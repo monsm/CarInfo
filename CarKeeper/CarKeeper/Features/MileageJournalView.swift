@@ -262,7 +262,7 @@ struct CostEntryRow: View {
             Image(safeSymbol: entry.type.icon, fallback: "doc.text.fill")
                 .font(.headline)
                 .frame(width: 36, height: 36)
-                .background(Kansei.Color.ambient.opacity(0.15))
+                .background(Kansei.Color.ambient.dsOpacity(0.15))
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 2) {

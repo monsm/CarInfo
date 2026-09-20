@@ -155,7 +155,7 @@ struct ServiceHistoryView: View {
             .font(.caption)
             .foregroundStyle(Kansei.Color.ambient)
             .frame(width: 28, height: 28)
-            .background(Kansei.Color.ambient.opacity(0.1))
+            .background(Kansei.Color.ambient.dsOpacity(0.1))
             .cornerRadius(6)
     }
 
@@ -172,7 +172,7 @@ struct ServiceHistoryView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(selectedYear == y ? Kansei.Color.ambient.opacity(0.2) : Color.clear)
+                            .background(selectedYear == y ? Kansei.Color.ambient.dsOpacity(0.2) : Color.clear)
                             .foregroundStyle(selectedYear == y ? Kansei.Color.ambient : Kansei.Color.secondary)
                             .cornerRadius(16)
                     }

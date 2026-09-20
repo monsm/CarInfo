@@ -171,7 +171,7 @@ struct BatteryView: View {
                 ExpandingCardBox(title: "分析结论", side: batt.title,
                                  sideCls: batt.cls, cornerRadius: Kansei.Radius.medium) {
                     VStack(alignment: .leading, spacing: 8) {
-                        ForEach(batt.reasons) { r in
+                        ForEach(Array(batt.reasons.enumerated()), id: \.offset) { _, r in
                             HStack(alignment: .top, spacing: 8) {
                                 StatusDot(cls: r.cls)
                                 Text(r.t).font(Kansei.Type.caption).foregroundStyle(Kansei.Color.secondary)
@@ -194,7 +194,7 @@ struct BatteryView: View {
                         sectionLabel("单体电压 (V)")
                         Chart(Array(cell.bars.enumerated()), id: \.offset) { (_ idx, v) in
                             BarMark(x: .value("序号", idx), y: .value("V", v))
-                                .foregroundStyle(Kansei.Color.success.opacity(0.7))
+                                .foregroundStyle(Kansei.Color.success.dsOpacity(0.7))
                                 .cornerRadius(1.5)
                         }
                         .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
@@ -214,7 +214,7 @@ struct BatteryView: View {
                         sectionLabel("温度探针 (℃)")
                         Chart(Array(probe.bars.enumerated()), id: \.offset) { (_ idx, v) in
                             BarMark(x: .value("序号", idx), y: .value("℃", v))
-                                .foregroundStyle(Kansei.Color.ambient.opacity(0.55))
+                                .foregroundStyle(Kansei.Color.ambient.dsOpacity(0.55))
                                 .cornerRadius(1.5)
                         }
                         .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
@@ -234,6 +234,7 @@ struct BatteryView: View {
 
     // MARK: 能耗历史折线图 (#13)
     private func chargeCard(_ b: BatteryModel) -> some View {
+        return EmptyView()
         let chargeSide = b.charging.cls.isEmpty ? "na" : b.charging.cls
         ExpandingCardBox(title: "充电", side: b.charging.text, sideCls: chargeSide,
                          cornerRadius: Kansei.Radius.medium) {

@@ -95,7 +95,7 @@ struct ParkingMapView: View {
                     Image(systemName: "car.fill")
                         .font(.caption)
                         .padding(8)
-                        .background(Kansei.Color.ambient.opacity(0.15))
+                        .background(Kansei.Color.ambient.dsOpacity(0.15))
                         .cornerRadius(8)
                 }
             }

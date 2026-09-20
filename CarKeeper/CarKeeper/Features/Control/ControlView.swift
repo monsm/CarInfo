@@ -792,9 +792,9 @@ struct CarTopView: View {
                 Path(CGRect(origin: .zero, size: size)),
                 with: .radialGradient(
                     Gradient(colors: [
-                        Kansei.Color.primary.opacity(0.06),
-                        Kansei.Color.primary.opacity(0.015),
-                        Kansei.Color.primary.opacity(0.0)
+                        Kansei.Color.primary.dsOpacity(0.06),
+                        Kansei.Color.primary.dsOpacity(0.015),
+                        Kansei.Color.primary.dsOpacity(0.0)
                     ]),
                     center: CGPoint(x: size.width / 2, y: size.height * 0.52),
                     startRadius: 0,
@@ -832,7 +832,7 @@ struct CarTopView: View {
             control1: CGPoint(x: 80, y: 34),
             control2: CGPoint(x: 114, y: 26))
             outline.closeSubpath()
-            ctx.stroke(xf(outline), with: .color(Kansei.Color.primary.opacity(0.85)),
+            ctx.stroke(xf(outline), with: .color(Kansei.Color.primary.dsOpacity(0.85)),
                        style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
 
             // 风挡 / 天窗 / 后风挡
@@ -922,9 +922,9 @@ struct CarTopView: View {
                 var wr = Path()
                 wr.move(to: CGPoint(x: 267, y: 96))
                 wr.addLine(to: CGPoint(x: 267, y: 250))
-                ctx.stroke(xf(wl), with: .color(Kansei.Color.warning.opacity(0.45)),
+                ctx.stroke(xf(wl), with: .color(Kansei.Color.warning.dsOpacity(0.45)),
                            style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                ctx.stroke(xf(wr), with: .color(Kansei.Color.warning.opacity(0.45)),
+                ctx.stroke(xf(wr), with: .color(Kansei.Color.warning.dsOpacity(0.45)),
                            style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
             }
         }

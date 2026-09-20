@@ -96,7 +96,7 @@ struct DSArcProgress: View {
 
             if showValue {
                 Circle()
-                    .fill(Kansei.Color.nightSurface.opacity(0.8))
+                    .fill(Kansei.Color.nightSurface.dsOpacity(0.8))
                     .frame(width: size * 0.7, height: size * 0.7)
             }
         }
@@ -158,7 +158,7 @@ struct DSStatStrip: View {
         }
         .background(
             RoundedRectangle(cornerRadius: Kansei.Radius.medium, style: .continuous)
-                .fill(Kansei.Color.nightSurface.opacity(0.4))
+                .fill(Kansei.Color.nightSurface.dsOpacity(0.4))
         )
     }
 

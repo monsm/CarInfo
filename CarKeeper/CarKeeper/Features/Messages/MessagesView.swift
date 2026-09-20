@@ -139,7 +139,7 @@ struct MessagesView: View {
                 .foregroundStyle(selected ? Kansei.Color.ambient : Kansei.Color.secondary)
                 .padding(.horizontal, Kansei.Spacing.md)
                 .frame(height: 30)
-                .background(Capsule().fill(selected ? Kansei.Color.ambient.opacity(0.15) : Kansei.Color.glassLight))
+                .background(Capsule().fill(selected ? Kansei.Color.ambient.dsOpacity(0.15) : Kansei.Color.glassLight))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? [.isSelected] : [])

@@ -562,7 +562,7 @@ struct DSStatStrip: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+            ForEach(items, id: \.id) { item in
                 if idx > 0 {
                     Rectangle()
                         .fill(Kansei.Color.glassBorder)
@@ -865,7 +865,7 @@ struct DSSegmented<T: Hashable>: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(options, id: \.value) { option in
+            ForEach(Array(options.enumerated()), id: \.offset) { _, option in
                 let selected = option.value == selection
                 Button {
                     withAnimation(DS.Motion.value) { selection = option.value }
@@ -1000,3 +1000,11 @@ struct DSSkeleton: View {
 
 /// 顶部导航栏容器（浮在内容之上 → 玻璃合法）
 /// 底部悬浮操作条（浮在内容之上 → 玻璃合法）
+// MARK: - Haptic feedback (backward compatibility alias)
+enum DSHaptic {
+    static func tap() { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+    static func result(_ success: Bool) { 
+    UINotificationFeedbackGenerator().notificationOccurred(success ? .success : .error) }
+    static func select() { UISelectionFeedbackGenerator().selectionChanged() }
+}
+

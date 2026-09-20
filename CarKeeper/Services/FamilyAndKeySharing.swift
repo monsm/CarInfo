@@ -198,7 +198,7 @@ struct FamilyMemberRow: View {
     var body: some View {
         HStack {
             Circle()
-                .fill(Kansei.Color.ambient.opacity(0.2))
+                .fill(Kansei.Color.ambient.dsOpacity(0.2))
                 .frame(width: 40, height: 40)
                 .overlay(Text(member.avatar).font(.title3).fontWeight(.bold)                .foregroundColor(Kansei.Color.ambient))
 

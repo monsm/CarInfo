@@ -65,7 +65,7 @@ struct OnboardingView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(Kansei.Color.ambient, in: RoundedRectangle(cornerRadius: Kansei.Radius.medium))
-                    .shadow(color: Kansei.Color.ambient.opacity(0.3), radius: 8, y: 4)
+                    .shadow(color: Kansei.Color.ambient.dsOpacity(0.3), radius: 8, y: 4)
 
                     Button("跳过引导") {
                         onboardingSeen = true

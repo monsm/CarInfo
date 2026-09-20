@@ -165,7 +165,7 @@ struct FamilyLeaderboard: View {
                     .font(.headline)
                     .foregroundColor(idx == 0 ? .yellow : idx == 1 ? .gray : idx == 2 ? .orange : .secondary)
                     .frame(width: 30)
-                Circle().fill(Kansei.Color.ambient.opacity(0.2)).frame(width: 36, height: 36)
+                Circle().fill(Kansei.Color.ambient.dsOpacity(0.2)).frame(width: 36, height: 36)
                     .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(Kansei.Color.ambient))
                 VStack(alignment: .leading) {
                     Text(member.name).font(.subheadline).fontWeight(.medium)
