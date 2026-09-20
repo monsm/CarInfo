@@ -7,9 +7,9 @@ import SwiftUI
 struct CarbonSavingsCard: View {
     let stats: CarbonSavingStats
     let showDetails: Bool = false
-    
+
     var body: some View {
-        CardBox(title: "碳减排", side: "\(stats.equivalentTrees) 棵树", cornerRadius: Theme.Radius.card) {
+        CardBox(title: "碳减排", side: "\(stats.equivalentTrees) 棵树", cornerRadius: Kansei.Radius.medium) {
             VStack(spacing: 12) {
                 // 主统计
                 HStack {
@@ -21,9 +21,9 @@ struct CarbonSavingsCard: View {
                             .font(Theme.d3)
                             .foregroundStyle(.primary)
                     }
-                    
+
                     Spacer()
-                    
+
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("减碳量")
                             .font(Theme.caption)
@@ -33,7 +33,7 @@ struct CarbonSavingsCard: View {
                             .foregroundStyle(.green)
                     }
                 }
-                
+
                 // 等效树木
                 HStack {
                     Image(safeSymbol: "leaf.fill", fallback: "leaf.fill")
@@ -43,14 +43,14 @@ struct CarbonSavingsCard: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
-                
+
                 // 模拟按钮（测试用）
                 if showDetails {
                     Button("模拟今日步数") {
                         CarbonSavingsTracker.shared.simulateDailySteps()
                     }
                     .font(Theme.caption)
-                    .foregroundStyle(Theme.Colors.accent)
+                    .foregroundStyle(Kansei.Color.ambient)
                 }
             }
         }

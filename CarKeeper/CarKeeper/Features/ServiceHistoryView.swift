@@ -8,10 +8,10 @@ struct ServiceHistoryView: View {
     private let store = AppStore.shared
     @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
     @State private var showAddService = false
-    
+
     // 维保记录（本地持久化）
     @AppStorage("serviceHistory") private var services: String = "[]"
-    
+
     struct ServiceEntry: Codable, Identifiable, Equatable {
         var id = UUID()
         let date: Date
@@ -21,7 +21,7 @@ struct ServiceHistoryView: View {
         let description: String
         let nextMileage: Int?  // 下次建议
     }
-    
+
     var entries: [ServiceEntry] {
         if let data = services.data(using: .utf8),
            let list = try? JSONDecoder().decode([ServiceEntry].self, from: data) {
@@ -29,7 +29,7 @@ struct ServiceHistoryView: View {
         }
         return []
     }
-    
+
     var upcomingServices: [ServiceEntry] {
         entries.filter { e in
             if let next = e.nextMileage {
@@ -38,11 +38,11 @@ struct ServiceHistoryView: View {
             return false
         }
     }
-    
+
     var totalCost: Double {
         entries.reduce(0) { $0 + $1.cost }
     }
-    
+
     var avgAnnualCost: Double {
         guard let first = entries.first?.date,
               let last = entries.last?.date,
@@ -50,35 +50,35 @@ struct ServiceHistoryView: View {
         let years = max(last.timeIntervalSince(first) / (365 * 24 * 3600), 1)
         return totalCost / years
     }
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 // 统计卡
                 statsCard
-                
+
                 // 即将到期提醒
                 if !upcomingServices.isEmpty {
                     upcomingCard
                 }
-                
+
                 // 年份筛选
                 yearFilter
-                
+
                 // 时间线
                 timelineCard
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.vertical, Theme.Spacing.md)
+            .padding(.horizontal, Kansei.Spacing.lg)
+            .padding(.vertical, Kansei.Spacing.md)
         }
-        .pageBackground()
+        .background(Kansei.Color.background)
         .navigationTitle("维保记录")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showAddService = true }) {
                     Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(Theme.Colors.accent)
+                        .foregroundStyle(Kansei.Color.ambient)
                 }
             }
         }
@@ -87,7 +87,7 @@ struct ServiceHistoryView: View {
         }
         .accessibilityLabel(Text("维保历史记录"))
     }
-    
+
     // MARK: - 统计卡
     private var statsCard: some View {
         HStack(spacing: 0) {
@@ -95,9 +95,9 @@ struct ServiceHistoryView: View {
             statCell(label: "年均花费", value: "¥\(Int(avgAnnualCost))/年", tint: .green)
             statCell(label: "记录次数", value: "\(entries.count)", tint: .orange)
         }
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Kansei.Radius.medium)
     }
-    
+
     private func statCell(label: String, value: String, tint: Color) -> some View {
         VStack(spacing: 4) {
             Text(value).font(Theme.h3).foregroundStyle(tint)
@@ -105,7 +105,7 @@ struct ServiceHistoryView: View {
         }
         .frame(maxWidth: .infinity)
     }
-    
+
     // MARK: - 即将到期
     private var upcomingCard: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -116,7 +116,7 @@ struct ServiceHistoryView: View {
                 Text("即将到期").font(Theme.font(.subheadline as Font).bold())
                 Spacer()
             }
-            
+
             ForEach(upcomingServices.prefix(3)) { entry in
                 HStack {
                     typeIcon(entry.type)
@@ -138,10 +138,10 @@ struct ServiceHistoryView: View {
             }
         }
         .padding()
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Kansei.Radius.medium)
         .background(Color.orange.opacity(0.05))
     }
-    
+
     private func typeIcon(_ type: String) -> some View {
         let icon: String
         switch type {
@@ -153,12 +153,12 @@ struct ServiceHistoryView: View {
         }
         return Image(safeSymbol: icon, fallback: "wrench.and.screwdriver.fill")
             .font(.caption)
-            .foregroundStyle(Theme.Colors.accent)
+            .foregroundStyle(Kansei.Color.ambient)
             .frame(width: 28, height: 28)
-            .background(Theme.Colors.accent.opacity(0.1))
+            .background(Kansei.Color.ambient.opacity(0.1))
             .cornerRadius(6)
     }
-    
+
     // MARK: - 年份筛选
     private var yearFilter: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -172,21 +172,21 @@ struct ServiceHistoryView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(selectedYear == y ? Theme.Colors.accent.opacity(0.2) : Color.clear)
-                            .foregroundStyle(selectedYear == y ? Theme.Colors.accent : .secondary)
+                            .background(selectedYear == y ? Kansei.Color.ambient.opacity(0.2) : Color.clear)
+                            .foregroundStyle(selectedYear == y ? Kansei.Color.ambient : Kansei.Color.secondary)
                             .cornerRadius(16)
                     }
                 }
             }
         }
     }
-    
+
     // MARK: - 时间线
     private var timelineCard: some View {
         let filtered = entries
             .filter { Calendar.current.component(.year, from: $0.date) == selectedYear }
             .sorted { $0.date > $1.date }
-        
+
         return VStack(spacing: 0) {
             if filtered.isEmpty {
                 VStack(spacing: 12) {
@@ -203,9 +203,9 @@ struct ServiceHistoryView: View {
                 }
             }
         }
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Kansei.Radius.medium)
     }
-    
+
     @ViewBuilder
     private func timelineRow(_ entry: ServiceEntry, idx: Int, total: Int) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -221,7 +221,7 @@ struct ServiceHistoryView: View {
                 Spacer()
                 Text("¥\(Int(entry.cost))")
                     .font(Theme.font(.subheadline as Font).bold())
-                    .foregroundStyle(Theme.Colors.accent)
+                    .foregroundStyle(Kansei.Color.ambient)
             }
             HStack {
                 Text(entry.date, style: .date)
@@ -238,7 +238,7 @@ struct ServiceHistoryView: View {
             Divider().padding(.leading, 44)
         }
     }
-    
+
     // MARK: - 添加记录
     private func addEntry(_ entry: ServiceEntry) {
         var list = entries
@@ -260,9 +260,9 @@ struct AddServiceView: View {
     @State private var cost = ""
     @State private var description = ""
     @State private var nextMileage = ""
-    
+
     let types = ["保养", "年检", "保险", "轮胎"]
-    
+
     var body: some View {
         NavigationStack {
             Form {
@@ -294,7 +294,7 @@ struct AddServiceView: View {
             }
         }
     }
-    
+
     private func save() {
         let entry = ServiceHistoryView.ServiceEntry(
             date: Date(),

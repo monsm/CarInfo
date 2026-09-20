@@ -83,7 +83,7 @@ final class AppStore: @unchecked Sendable {
         let range: Int
     }
     var energyHistory: [EnergyRecord] = []
-    
+
     // E7 充电功率历史记录
     struct ChargingPowerRecord: Identifiable {
         let id = UUID()
@@ -420,7 +420,7 @@ final class AppStore: @unchecked Sendable {
 
     // #21 冷启动预加载：App 启动时异步预取核心数据
     private var preloadTask: Task<Void, Never>? = nil
-    
+
     // #28 Dynamic Island / Live Activity 状态
     var isCharging: Bool {
         guard let charge = caches["charge"] as? [String: Any] else { return false }
@@ -793,7 +793,6 @@ final class AppStore: @unchecked Sendable {
         let address: String
     }
     var parkingHistory: [ParkingRecord] = []
-
 
     // 总里程
     var totalMileage: Int {

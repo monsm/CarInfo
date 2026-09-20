@@ -14,7 +14,7 @@ struct ParkingMapView: View {
     @State private var addressText = "获取中..."
     @State private var searchQuery = ""
     @State private var showSearch = false
-    
+
     var hasLocation: Bool {
         store.parkingLocation != nil
     }
@@ -27,13 +27,13 @@ struct ParkingMapView: View {
             ? String(format: "%.0f m", meters)
             : String(format: "%.1f km", meters / 1000)
     }
-    
+
     var body: some View {
         ZStack {
             if hasLocation, let loc = store.parkingLocation {
                 MapView(coordinate: loc.coordinate, span: region.span, points: [])
                     .ignoresSafeArea()
-                
+
                 // 地址覆盖层
                 VStack {
                     Spacer()
@@ -53,7 +53,7 @@ struct ParkingMapView: View {
                 }
             }
         }
-        .pageBackground()
+        .background(Kansei.Color.background)
         .navigationTitle("停车位置")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -68,14 +68,14 @@ struct ParkingMapView: View {
         }
         .accessibilityLabel(Text("停车位置地图"))
     }
-    
+
     private var parkingTimeText: String {
         guard let t = store.lastParkingTime else { return "未知时间" }
         let f = DateFormatter()
         f.dateFormat = "MM-dd HH:mm"
         return f.string(from: t)
     }
-    
+
     private func parkingInfoCard(_ loc: CLLocation) -> some View {
         VStack(spacing: 12) {
             HStack {
@@ -95,13 +95,13 @@ struct ParkingMapView: View {
                     Image(systemName: "car.fill")
                         .font(.caption)
                         .padding(8)
-                        .background(Theme.Colors.accent.opacity(0.15))
+                        .background(Kansei.Color.ambient.opacity(0.15))
                         .cornerRadius(8)
                 }
             }
-            
+
             Divider().opacity(0.3)
-            
+
             HStack(spacing: 12) {
                 infoChip(icon: "clock.fill", text: parkingTimeText)
                 infoChip(icon: "figure.walk", text: "\(Int(loc.horizontalAccuracy))m 精度")
@@ -113,7 +113,7 @@ struct ParkingMapView: View {
         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
         .padding()
     }
-    
+
     private func infoChip(icon: String, text: String) -> some View {
         HStack(spacing: 4) {
             Image(safeSymbol: icon, fallback: "map.fill")
@@ -128,7 +128,7 @@ struct ParkingMapView: View {
         .background(Color.secondary.opacity(0.1))
         .cornerRadius(8)
     }
-    
+
     private var searchSheet: some View {
         NavigationStack {
             VStack(spacing: 16) {
@@ -138,7 +138,7 @@ struct ParkingMapView: View {
                         Text("最近停车点").font(.headline)
                         ForEach(Array(store.parkingHistory.prefix(3).enumerated()), id: \.offset) { i, p in
                             HStack {
-                                Image(systemName: "mappin").foregroundStyle(Theme.Colors.accent)
+                                Image(systemName: "mappin").foregroundStyle(Kansei.Color.ambient)
                                 VStack(alignment: .leading) {
                                     // address 是非可选 String，?? 永远不会生效；空串时兜底显示
                                     Text(p.address.isEmpty ? "未知位置" : p.address).font(.subheadline)
@@ -153,9 +153,9 @@ struct ParkingMapView: View {
                         }
                     }
                     .padding()
-                    .glassCard(corner: Theme.Radius.medium)
+                    .glassCard(corner: Kansei.Radius.medium)
                 }
-                
+
                 Button(action: navToParking) {
                     HStack {
                         Image(systemName: "car.fill")
@@ -164,7 +164,7 @@ struct ParkingMapView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Theme.Colors.accent)
+                    .background(Kansei.Color.ambient)
                     .foregroundStyle(.white)
                     .cornerRadius(12)
                 }
@@ -174,7 +174,7 @@ struct ParkingMapView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
     }
-    
+
     private func openMaps() {
         guard let loc = store.parkingLocation else { return }
         let lt = loc.coordinate.latitude
@@ -183,7 +183,7 @@ struct ParkingMapView: View {
             UIApplication.shared.open(url)
         }
     }
-    
+
     private func navToParking() {
         guard let loc = store.parkingLocation else { return }
         showSearch = false

@@ -10,26 +10,26 @@ struct EmergencyPanel: View {
     @State private var showConfirm = false
     @State private var emergencyContact: String = UserDefaults.standard.string(forKey: "emergency_contact") ?? "110"
     @State private var activeEmergency = false
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // SOS 紧急呼叫
                 sosButton
-                
+
                 // 快捷操作
                 quickActions
-                
+
                 // 紧急联系人
                 contactCard
-                
+
                 // 位置共享
                 locationShareCard
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.vertical, Theme.Spacing.md)
+            .padding(.horizontal, Kansei.Spacing.lg)
+            .padding(.vertical, Kansei.Spacing.md)
         }
-        .pageBackground()
+        .background(Kansei.Color.background)
         .navigationTitle("紧急求助")
         .navigationBarTitleDisplayMode(.inline)
         .alert("确认拨打", isPresented: $showConfirm) {
@@ -47,7 +47,7 @@ struct EmergencyPanel: View {
         )
         .accessibilityLabel(Text("紧急求助面板"))
     }
-    
+
     // MARK: - SOS 按钮
     private var sosButton: some View {
         Button(action: { showConfirm = true }) {
@@ -60,7 +60,7 @@ struct EmergencyPanel: View {
                     .frame(width: 100, height: 100)
                     .opacity(activeEmergency ? 0.3 : 1)
                     .animation(.easeInOut(duration: 0.2), value: activeEmergency)
-                
+
                 VStack(spacing: 4) {
                     Image(systemName: "exclamationmark.octagon.fill")
                         .font(.system(size: 28))
@@ -74,7 +74,7 @@ struct EmergencyPanel: View {
         .accessibilityLabel(Text("紧急呼叫"))
         .accessibilityHint(Text("长按拨打紧急电话"))
     }
-    
+
     // MARK: - 快捷操作
     private var quickActions: some View {
         VStack(spacing: 12) {
@@ -86,9 +86,9 @@ struct EmergencyPanel: View {
                 actionButton(icon: "fan.fill", title: "开空调", color: .cyan) { Task { await turnOnAC() } }
             }
         }
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Kansei.Radius.medium)
     }
-    
+
     private func actionButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 6) {
@@ -106,14 +106,14 @@ struct EmergencyPanel: View {
         }
         .pressFeedback()
     }
-    
+
     // MARK: - 紧急联系人
     private var contactCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("紧急联系人").font(Theme.font(.subheadline as Font).bold())
             HStack {
                 Image(systemName: "person.fill")
-                    .foregroundStyle(Theme.Colors.accent)
+                    .foregroundStyle(Kansei.Color.ambient)
                 TextField("输入紧急电话", text: $emergencyContact)
                     .keyboardType(.phonePad)
                 Button(action: saveContact) {
@@ -125,9 +125,9 @@ struct EmergencyPanel: View {
             .background(Color.primary.opacity(0.05))
             .cornerRadius(Theme.Radius.small)
         }
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Kansei.Radius.medium)
     }
-    
+
     // MARK: - 位置共享
     private var locationShareCard: some View {
         Button(action: shareLocation) {
@@ -147,9 +147,9 @@ struct EmergencyPanel: View {
             }
             .padding()
         }
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Kansei.Radius.medium)
     }
-    
+
     // MARK: - 紧急叠加层
     private var emergencyOverlay: some View {
         ZStack {
@@ -158,15 +158,15 @@ struct EmergencyPanel: View {
                 Image(systemName: "exclamationmark.octagon.fill")
                     .font(.system(size: 64))
                     .foregroundStyle(.red)
-                
+
                 Text("紧急呼叫中...")
                     .font(Theme.h2.bold())
                     .foregroundStyle(.white)
-                
+
                 Text("正在联系 \(emergencyContact)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                
+
                 Button(action: cancelEmergency) {
                     Text("取消")
                         .font(.headline)
@@ -179,7 +179,7 @@ struct EmergencyPanel: View {
             }
         }
     }
-    
+
     // MARK: - 操作
     private func makeCall() {
         activeEmergency = true
@@ -188,36 +188,36 @@ struct EmergencyPanel: View {
             UIApplication.shared.open(url)
         }
     }
-    
+
     private func cancelEmergency() {
         activeEmergency = false
     }
-    
+
     private func lockCar() async {
         _ = await store.sendControlCommand("lock")
         EnhancedToastManager.shared.show("锁车指令已发送", icon: "lock.fill")
     }
-    
+
     private func honkCar() async {
         _ = await store.sendControlCommand("honk")
         EnhancedToastManager.shared.show("鸣笛中...", icon: "speaker.wave.3.fill")
     }
-    
+
     private func flashLights() async {
         _ = await store.sendControlCommand("flash")
         EnhancedToastManager.shared.show("闪灯中...", icon: "lightbulb.fill")
     }
-    
+
     private func turnOnAC() async {
         _ = await store.sendControlCommand("ac_on")
         EnhancedToastManager.shared.show("空调已开启", icon: "fan.fill")
     }
-    
+
     private func saveContact() {
         UserDefaults.standard.set(emergencyContact, forKey: "emergency_contact")
         EnhancedToastManager.shared.show("联系人已保存", icon: "checkmark.circle.fill")
     }
-    
+
     private func shareLocation() {
         guard let loc = store.currentLocation else {
             EnhancedToastManager.shared.show("暂无位置数据", icon: "location.slash")

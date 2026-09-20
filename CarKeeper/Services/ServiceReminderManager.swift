@@ -13,7 +13,7 @@ enum ServiceType: String, CaseIterable, Codable {
     case tire = "轮胎换位"
     case coolant = "冷却液更换"
     case inspection = "年检"
-    
+
     var icon: String {
         switch self {
         case .oil: return "gearshape.fill"
@@ -41,7 +41,7 @@ struct ServiceReminder: Identifiable, Codable {
 
 class ServiceReminderManager {
     static let shared = ServiceReminderManager()
-    
+
     var reminders: [ServiceReminder] {
         if let data = UserDefaults.standard.data(forKey: "carkeeper_service_reminders"),
            let decoded = try? JSONDecoder().decode([ServiceReminder].self, from: data) {
@@ -49,19 +49,19 @@ class ServiceReminderManager {
         }
         return defaultReminders
     }
-    
+
     func saveReminders(_ reminders: [ServiceReminder]) {
         if let data = try? JSONEncoder().encode(reminders) {
             UserDefaults.standard.set(data, forKey: "carkeeper_service_reminders")
         }
     }
-    
+
     func addReminder(_ reminder: ServiceReminder) {
         var list = reminders
         list.append(reminder)
         saveReminders(list)
     }
-    
+
     func completeService(_ id: UUID, currentMileage: Double, currentDate: Date) {
         var list = reminders
         if let idx = list.firstIndex(where: { $0.id == id }) {
@@ -74,14 +74,14 @@ class ServiceReminderManager {
             saveReminders(list)
         }
     }
-    
+
     /// 获取即将到期的提醒（30天内或500km内）
     var upcomingReminders: [ServiceReminder] {
         let now = Date()
         let thirtyDays = Calendar.current.date(byAdding: .day, value: 30, to: now)!
         return reminders.filter { $0.nextDate <= thirtyDays }.sorted { $0.nextDate < $1.nextDate }
     }
-    
+
     private var defaultReminders: [ServiceReminder] {
         let today = Date()
         let cal = Calendar.current
@@ -96,7 +96,7 @@ class ServiceReminderManager {
             )
         }
     }
-    
+
     private func serviceIntervalMiles(_ type: ServiceType) -> (km: Double, months: Int) {
         switch type {
         case .oil: return (5000, 6)
@@ -108,7 +108,7 @@ class ServiceReminderManager {
         case .inspection: return (60000, 36)
         }
     }
-    
+
     private func serviceIntervalMonths(_ type: ServiceType) -> Int {
         serviceIntervalMiles(type).months
     }
@@ -121,15 +121,15 @@ struct ServiceReminderRow: View {
         let daysUntil = Calendar.current.dateComponents([.day], from: Date(), to: reminder.nextDate).day ?? 0
         let kmUntil = reminder.nextMileageKm - currentMileage
         let isUrgent = daysUntil <= 7 || kmUntil <= 500
-        
-        HStack(spacing: Theme.Spacing.sm) {
+
+        HStack(spacing: Kansei.Spacing.sm) {
             Image(safeSymbol: reminder.type.icon, fallback: "wrench.and.screwdriver.fill")
                 .font(.title2)
                 .frame(width: 40, height: 40)
                 .background(isUrgent ? Color.red.opacity(0.15) : Color.blue.opacity(0.15))
                 .foregroundColor(isUrgent ? .red : .blue)
                 .clipShape(Circle())
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(reminder.type.rawValue)
                     .font(.subheadline)
@@ -138,14 +138,14 @@ struct ServiceReminderRow: View {
                     .font(.caption)
                     .foregroundColor(isUrgent ? .red : .secondary)
             }
-            
+
             Spacer()
-            
+
             Button("已完成") {
                 // 触发完成操作
             }
             .font(.caption)
-            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.horizontal, Kansei.Spacing.md)
             .padding(.vertical, Theme.Spacing.xs)
             .background(isUrgent ? Color.orange : Color.blue.opacity(0.2))
             .foregroundColor(isUrgent ? .white : .blue)

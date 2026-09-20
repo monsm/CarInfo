@@ -23,7 +23,7 @@ class TripRecord {
     var endSoc: Int
     var avgEfficiency: Double?
     var notes: String?
-    
+
     init(startTime: Date, distanceKm: Double, startSoc: Int, endSoc: Int) {
         self.id = UUID()
         self.startTime = startTime
@@ -72,7 +72,7 @@ class EnergySnapshot {
     var timestamp: Date
     var soc: Int
     var range: Int
-    
+
     init(timestamp: Date, soc: Int, range: Int) {
         self.id = UUID()
         self.timestamp = timestamp
@@ -87,7 +87,7 @@ class MaintenancePhoto {
     var imageData: Data?
     var capturedAt: Date
     var notes: String?
-    
+
     init(imageData: Data?, capturedAt: Date, notes: String?) {
         self.id = UUID()
         self.imageData = imageData
@@ -106,7 +106,7 @@ class UserSettings {
     var nightModeEndHour: Int = 7
     var lastServiceMileage: Int = 0
     var defaultTemperature: Int = 22
-    
+
     init() {}
 }
 
@@ -134,21 +134,21 @@ enum AppModelContainer {
 
 class TripRepository {
     private let container: ModelContainer
-    
+
     init(container: ModelContainer = AppModelContainer.shared) {
         self.container = container
     }
-    
+
     @MainActor func fetchAll() -> [TripRecord] {
         let descriptor = FetchDescriptor<TripRecord>(sortBy: [SortDescriptor(\.startTime, order: .reverse)])
         return (try? container.mainContext.fetch(descriptor)) ?? []
     }
-    
+
     @MainActor func add(_ trip: TripRecord) {
         container.mainContext.insert(trip)
         try? container.mainContext.save()
     }
-    
+
     @MainActor func delete(_ trip: TripRecord) {
         container.mainContext.delete(trip)
         try? container.mainContext.save()
@@ -157,11 +157,11 @@ class TripRepository {
 
 class EnergySnapshotRepository {
     private let container: ModelContainer
-    
+
     init(container: ModelContainer = AppModelContainer.shared) {
         self.container = container
     }
-    
+
     @MainActor func fetchRecent(_ count: Int = 20) -> [EnergySnapshot] {
         let descriptor = FetchDescriptor<EnergySnapshot>(
             predicate: nil,
@@ -169,7 +169,7 @@ class EnergySnapshotRepository {
         )
         return (try? container.mainContext.fetch(descriptor)) ?? []
     }
-    
+
     @MainActor func add(_ snapshot: EnergySnapshot) {
         container.mainContext.insert(snapshot)
         try? container.mainContext.save()
@@ -178,16 +178,16 @@ class EnergySnapshotRepository {
 
 class MaintenancePhotoRepository {
     private let container: ModelContainer
-    
+
     init(container: ModelContainer = AppModelContainer.shared) {
         self.container = container
     }
-    
+
     @MainActor func fetchAll() -> [MaintenancePhoto] {
         let descriptor = FetchDescriptor<MaintenancePhoto>(sortBy: [SortDescriptor(\.capturedAt, order: .reverse)])
         return (try? container.mainContext.fetch(descriptor)) ?? []
     }
-    
+
     @MainActor func add(_ photo: MaintenancePhoto) {
         container.mainContext.insert(photo)
         try? container.mainContext.save()
@@ -196,11 +196,11 @@ class MaintenancePhotoRepository {
 
 class SettingsRepository {
     private let container: ModelContainer
-    
+
     init(container: ModelContainer = AppModelContainer.shared) {
         self.container = container
     }
-    
+
     @MainActor func fetchOrCreate() -> UserSettings {
         if let settings = (try? container.mainContext.fetch(FetchDescriptor<UserSettings>()))?.first {
             return settings
@@ -210,7 +210,7 @@ class SettingsRepository {
         try? container.mainContext.save()
         return newSettings
     }
-    
+
     @MainActor func update(_ settings: UserSettings) {
         try? container.mainContext.save()
     }

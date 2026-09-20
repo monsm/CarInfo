@@ -13,17 +13,17 @@ import Foundation
 @MainActor
 struct SiriCarController {
     static let shared = SiriCarController()
-    
+
     // 执行语音指令
     func handleIntent(_ intent: INIntent) async -> INInteraction? {
         let store = AppStore.shared
         guard store.isLoggedIn, !store.carId.isEmpty else {
             return nil
         }
-        
+
         let api = APIClient.shared
         let pin = store.readPin() ?? ""
-        
+
         switch intent {
         case let lock as CarLockIntent:
             await executeLock(pin: pin, carId: store.carId, locked: lock.locked == true)
@@ -36,7 +36,7 @@ struct SiriCarController {
         }
         return nil
     }
-    
+
     private func executeLock(pin: String, carId: String, locked: Bool) async {
         let store = AppStore.shared
         let api = APIClient.shared
@@ -51,7 +51,7 @@ struct SiriCarController {
             store.addCommandHistory(cmd: cmd, name: name, success: false, duration: Date().timeIntervalSince(start))
         }
     }
-    
+
     private func executeAc(pin: String, carId: String, on: Bool) async {
         let store = AppStore.shared
         let api = APIClient.shared
@@ -66,7 +66,7 @@ struct SiriCarController {
             store.addCommandHistory(cmd: cmd, name: name, success: false, duration: Date().timeIntervalSince(start))
         }
     }
-    
+
     private func executeFindCar(pin: String, carId: String) async {
         let store = AppStore.shared
         let api = APIClient.shared
@@ -112,15 +112,20 @@ class CarFindIntent: INIntent {
 
 struct SiriShortcutsCard: View {
     let store = AppStore.shared
-    
+
     var body: some View {
-        CardBox(title: "Siri 快捷指令", side: "语音控制", cornerRadius: Theme.Radius.card) {
+        CardBox(title: "Siri 快捷指令", side: "语音控制", cornerRadius: Kansei.Radius.medium) {
             VStack(spacing: 12) {
-                ShortcutRow(icon: "lock.fill", title: "锁车", subtitle: "语音说「锁车」", usage: store.siriUsageCount["lock_true"] ?? 0)
-                ShortcutRow(icon: "lock.open.fill", title: "解锁", subtitle: "语音说「解锁」", usage: store.siriUsageCount["lock_false"] ?? 0)
-                ShortcutRow(icon: "fan.fill", title: "开空调", subtitle: "语音说「开空调」", usage: store.siriUsageCount["ac_on"] ?? 0)
-                ShortcutRow(icon: "power", title: "关空调", subtitle: "语音说「关空调」", usage: store.siriUsageCount["ac_off"] ?? 0)
-                ShortcutRow(icon: "speaker.wave.2.fill", title: "寻车", subtitle: "语音说「寻车」", usage: store.siriUsageCount["find_car"] ?? 0)
+                ShortcutRow(icon: "lock.fill", title: "锁车", subtitle: "语音说「锁车」", usage:
+ store.siriUsageCount["lock_true"] ?? 0)
+                ShortcutRow(icon: "lock.open.fill", title: "解锁", subtitle: "语音说「解锁」", usage:
+ store.siriUsageCount["lock_false"] ?? 0)
+                ShortcutRow(icon: "fan.fill", title: "开空调", subtitle: "语音说「开空调」", usage:
+ store.siriUsageCount["ac_on"] ?? 0)
+                ShortcutRow(icon: "power", title: "关空调", subtitle: "语音说「关空调」", usage:
+ store.siriUsageCount["ac_off"] ?? 0)
+                ShortcutRow(icon: "speaker.wave.2.fill", title: "寻车", subtitle: "语音说「寻车」", usage:
+ store.siriUsageCount["find_car"] ?? 0)
             }
             .padding(.vertical, 8)
         }
@@ -132,17 +137,17 @@ struct ShortcutRow: View {
     let title: String
     let subtitle: String
     let usage: Int
-    
+
     var body: some View {
         HStack(spacing: 12) {
             Image(safeSymbol: icon, fallback: "car.fill")
                 .font(.title3)
-                .foregroundStyle(Theme.Colors.accent)
+                .foregroundStyle(Kansei.Color.ambient)
                 .frame(width: 36, height: 36)
-                .background(DS.Palette.fillSubtle, in: Circle())
+                .background(Kansei.Color.fillSubtle, in: Circle())
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(Theme.body).foregroundStyle(.primary)
-                Text(subtitle).font(Theme.caption).foregroundStyle(.secondary)
+                Text(title).font(Kansei.Type.body).foregroundStyle(Kansei.Color.primary)
+                Text(subtitle).font(Kansei.Type.caption).foregroundStyle(Kansei.Color.secondary)
             }
             Spacer()
             if usage > 0 {

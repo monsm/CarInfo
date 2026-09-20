@@ -148,7 +148,7 @@ struct HomeView: View {
             .padding(.top, DS.Space.sm)
             .padding(.bottom, DS.Space.huge)
         }
-        .dsCanvas()
+        .background(Kansei.Color.background)
         .scrollBounceBehavior(.basedOnSize)
         .refreshable {
             isRefreshing = true
@@ -219,7 +219,7 @@ struct HomeView: View {
             // 车辆标识
             HStack(spacing: DS.Space.sm) {
                 Circle()
-                    .fill(e.online.cls == "ok" ? DS.Palette.ok : DS.Palette.labelTertiary)
+                    .fill(e.online.cls == "ok" ? Kansei.Color.success : Kansei.Color.tertiary)
                     .frame(width: 7, height: 7)
                 if sel.count > 1 {
                     Picker("选择车辆", selection: Binding(
@@ -233,17 +233,17 @@ struct HomeView: View {
                     .pickerStyle(.menu)
                     .labelsHidden()
                     .font(DS.Typo.subheadline.weight(.semibold))
-                    .tint(DS.Palette.label)
+                    .tint(Kansei.Color.primary)
                 } else {
                     Text(name)
                         .font(DS.Typo.subheadline.weight(.semibold))
-                        .foregroundStyle(DS.Palette.label)
+                        .foregroundStyle(Kansei.Color.primary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: DS.Space.sm)
                 Text(e.updated == "--" ? "暂无上报" : "\(e.updated)")
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(DS.Palette.labelTertiary)
+                    .foregroundStyle(Kansei.Color.tertiary)
                     .lineLimit(1)
             }
 
@@ -257,20 +257,20 @@ struct HomeView: View {
                 HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
                     Text("剩余 \(e.range) km")
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(DS.Palette.labelSecondary)
+                        .foregroundStyle(Kansei.Color.secondary)
                     Spacer(minLength: DS.Space.sm)
                     if e.chargeCls == "ok" || e.chargeCls == "charge" {
                         Text(e.chargeText)
                             .font(DS.Typo.footnote.weight(.medium))
-                            .foregroundStyle(DS.Palette.charge)
+                            .foregroundStyle(Kansei.Color.info)
                     } else if !e.socWarn.isEmpty {
                         Text(e.socPct < 15 ? "电量偏低" : "建议补电")
                             .font(DS.Typo.footnote.weight(.medium))
-                            .foregroundStyle(e.socPct < 15 ? DS.Palette.bad : DS.Palette.warn)
+                            .foregroundStyle(e.socPct < 15 ? Kansei.Color.error : Kansei.Color.warning)
                     } else if let tte = e.timeToEmpty, tte != "--" {
                         Text("可行驶 \(tte)")
                             .font(DS.Typo.footnote)
-                            .foregroundStyle(DS.Palette.labelSecondary)
+                            .foregroundStyle(Kansei.Color.secondary)
                     }
                 }
             }
@@ -294,7 +294,7 @@ struct HomeView: View {
                 }
                 Text("点车门可锁 / 解锁整车 —— 本车型协议未提供单门与后备箱的远程开合指令")
                     .font(DS.Typo.caption)
-                    .foregroundStyle(DS.Palette.labelTertiary)
+                    .foregroundStyle(Kansei.Color.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, DS.Space.md)
             }
@@ -314,8 +314,8 @@ struct HomeView: View {
             Text(carLine?.text ?? "点车门可锁 / 解锁")
                 .font(DS.Typo.footnote)
                 .foregroundStyle(carLine == nil
-                                 ? DS.Palette.labelTertiary
-                                 : DS.Palette.status(carLine?.cls ?? "na"))
+                                 ? Kansei.Color.tertiary
+                                 : Kansei.Color.status(carLine?.cls ?? "na"))
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -485,10 +485,10 @@ struct HomeView: View {
     }
 
     private func heroLightColor(_ e: EnergyModel) -> Color {
-        if e.chargeCls == "ok" || e.chargeCls == "charge" { return DS.Palette.charge }
-        if e.socPct < 15 { return DS.Palette.bad }
-        if e.socPct < 30 { return DS.Palette.warn }
-        return DS.Palette.tint
+        if e.chargeCls == "ok" || e.chargeCls == "charge" { return Kansei.Color.info }
+        if e.socPct < 15 { return Kansei.Color.error }
+        if e.socPct < 30 { return Kansei.Color.warning }
+        return Kansei.Color.ambient
     }
 
     private func lightBarGradient(_ accent: Color) -> LinearGradient {
@@ -696,7 +696,9 @@ struct HomeView: View {
             DSTrendEmpty(
                 icon: "gauge.with.dots.needle.50percent",
                 title: "正在积累胎压趋势",
-                message: "每 \(Int(HistoryStore.tyreInterval / 60)) 分钟记一次（任一胎变化 ≥ \(Int(HistoryStore.tyreJump)) kPa 也会立刻记）。已记录 \(points.count) 个点。"
+                message: "每 \(Int(HistoryStore.tyreInterval / 60)) 分钟记一次"
+                         + "（任一胎变化 ≥ \(Int(HistoryStore.tyreJump)) kPa 也会立刻记）。"
+                         + "已记录 \(points.count) 个点。"
             )
             .padding(.top, DS.Space.sm)
         }
@@ -706,19 +708,19 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(item.label)
                 .font(DS.Typo.caption)
-                .foregroundStyle(DS.Palette.labelSecondary)
+                .foregroundStyle(Kansei.Color.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(item.kpa)
                     .font(DS.Typo.metric(28))
-                    .foregroundStyle(item.cls == "ok" ? DS.Palette.label : DS.Palette.status(item.cls))
+                    .foregroundStyle(item.cls == "ok" ? Kansei.Color.primary : Kansei.Color.status(item.cls))
                     .contentTransition(.numericText())
                 Text("kPa")
                     .font(DS.Typo.caption)
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .foregroundStyle(Kansei.Color.secondary)
             }
             Text("\(item.temp)℃")
                 .font(DS.Typo.dataSmall)
-                .foregroundStyle(DS.Palette.labelSecondary)
+                .foregroundStyle(Kansei.Color.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -757,7 +759,8 @@ struct HomeView: View {
                 DSSeparator()
                 DSRow(icon: "leaf.fill", title: "今日减碳", value: String(format: "%.2f kg", stats.todayCarbonKg))
                 DSSeparator()
-                DSRow(icon: "leaf.arrow.triangle.circlepath", title: "累计减碳", value: String(format: "%.2f kg", stats.totalCarbonKg))
+                DSRow(icon: "leaf.arrow.triangle.circlepath",
+                      title: "累计减碳", value: String(format: "%.2f kg", stats.totalCarbonKg))
             }
         }
     }
@@ -774,7 +777,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
                 Text(loc.addr.isEmpty ? "暂无定位数据" : loc.addr)
                     .font(DS.Typo.headline)
-                    .foregroundStyle(loc.addr.isEmpty ? DS.Palette.labelSecondary : DS.Palette.label)
+                    .foregroundStyle(loc.addr.isEmpty ? Kansei.Color.secondary : Kansei.Color.primary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if showMap {
@@ -801,7 +804,7 @@ struct HomeView: View {
             }
             .padding(DS.Space.cardPadding)
             .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                .fill(DS.Palette.surface))
+                .fill(Kansei.Color.nightSurface))
 
             DSCard {
                 VStack(alignment: .leading, spacing: 0) {
@@ -844,7 +847,7 @@ struct HomeView: View {
         return HStack(spacing: DS.Space.sm) {
             Text("更新于 \(update)")
                 .font(DS.Typo.footnote)
-                .foregroundStyle(DS.Palette.labelTertiary)
+                .foregroundStyle(Kansei.Color.tertiary)
             Spacer(minLength: DS.Space.sm)
             if isRefreshing {
                 ProgressView().controlSize(.small)
@@ -855,7 +858,7 @@ struct HomeView: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .buttonStyle(DSIconButtonStyle(size: 36, tint: DS.Palette.tint))
+                .buttonStyle(DSIconButtonStyle(size: 36, tint: Kansei.Color.ambient))
                 .accessibilityLabel(Text("刷新"))
             }
         }
@@ -909,7 +912,10 @@ struct HomeView: View {
             healthScore: summary.overall.title,
             cabinTemp: comfort.cabinTemp
         )
-        let vc = UIActivityViewController(activityItems: [generateShareableStatus(info: info)], applicationActivities: nil)
+        let vc = UIActivityViewController(
+            activityItems: [generateShareableStatus(info: info)],
+            applicationActivities: nil
+        )
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let root = scene.windows.first?.rootViewController else { return }
         root.present(vc, animated: true)
@@ -1003,44 +1009,70 @@ struct CarStageView: View {
             // 车身剪影
             var silhouette = Path()
             silhouette.move(to: CGPoint(x: 24, y: 150))
-            silhouette.addCurve(to: CGPoint(x: 50, y: 128), control1: CGPoint(x: 24, y: 136), control2: CGPoint(x: 34, y: 131))
-            silhouette.addCurve(to: CGPoint(x: 178, y: 86), control1: CGPoint(x: 76, y: 106), control2: CGPoint(x: 122, y: 90))
-            silhouette.addCurve(to: CGPoint(x: 322, y: 118), control1: CGPoint(x: 238, y: 82), control2: CGPoint(x: 292, y: 96))
-            silhouette.addCurve(to: CGPoint(x: 380, y: 137), control1: CGPoint(x: 350, y: 122), control2: CGPoint(x: 372, y: 128))
-            silhouette.addCurve(to: CGPoint(x: 387, y: 151), control1: CGPoint(x: 385, y: 142), control2: CGPoint(x: 387, y: 146))
+            silhouette.addCurve(to: CGPoint(x: 50, y: 128),
+            silhouette                control1: CGPoint(x: 24, y: 136),
+            silhouette                control2: CGPoint(x: 34, y: 131))
+            silhouette.addCurve(to: CGPoint(x: 178, y: 86),
+            silhouette                control1: CGPoint(x: 76, y: 106),
+            silhouette                control2: CGPoint(x: 122, y: 90))
+            silhouette.addCurve(to: CGPoint(x: 322, y: 118),
+            silhouette                control1: CGPoint(x: 238, y: 82),
+            silhouette                control2: CGPoint(x: 292, y: 96))
+            silhouette.addCurve(to: CGPoint(x: 380, y: 137),
+            silhouette                control1: CGPoint(x: 350, y: 122),
+            silhouette                control2: CGPoint(x: 372, y: 128))
+            silhouette.addCurve(to: CGPoint(x: 387, y: 151),
+            silhouette                control1: CGPoint(x: 385, y: 142),
+            silhouette                control2: CGPoint(x: 387, y: 146))
             silhouette.addLine(to: CGPoint(x: 387, y: 156))
-            silhouette.addCurve(to: CGPoint(x: 376, y: 164), control1: CGPoint(x: 387, y: 161), control2: CGPoint(x: 383, y: 164))
+            silhouette.addCurve(to: CGPoint(x: 376, y: 164),
+            silhouette                control1: CGPoint(x: 387, y: 161),
+            silhouette                control2: CGPoint(x: 383, y: 164))
             silhouette.addLine(to: CGPoint(x: 36, y: 164))
-            silhouette.addCurve(to: CGPoint(x: 24, y: 156), control1: CGPoint(x: 28, y: 164), control2: CGPoint(x: 24, y: 161))
+            silhouette.addCurve(to: CGPoint(x: 24, y: 156),
+            silhouette                control1: CGPoint(x: 28, y: 164),
+            silhouette                control2: CGPoint(x: 24, y: 161))
             silhouette.closeSubpath()
             ctx.fill(xf(silhouette), with: .color(body))
 
             // 车顶轮廓光
             var roof = Path()
             roof.move(to: CGPoint(x: 52, y: 142))
-            roof.addCurve(to: CGPoint(x: 178, y: 92), control1: CGPoint(x: 78, y: 112), control2: CGPoint(x: 124, y: 96))
-            roof.addCurve(to: CGPoint(x: 320, y: 122), control1: CGPoint(x: 234, y: 88), control2: CGPoint(x: 288, y: 100))
+            roof.addCurve(to: CGPoint(x: 178, y: 92),
+            roof                control1: CGPoint(x: 78, y: 112),
+            roof                control2: CGPoint(x: 124, y: 96))
+            roof.addCurve(to: CGPoint(x: 320, y: 122),
+            roof                control1: CGPoint(x: 234, y: 88),
+            roof                control2: CGPoint(x: 288, y: 100))
             ctx.stroke(xf(roof), with: .color(Color.white.opacity(0.55)),
                        style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
 
             // 腰线
             var waist = Path()
             waist.move(to: CGPoint(x: 30, y: 132))
-            waist.addCurve(to: CGPoint(x: 384, y: 140), control1: CGPoint(x: 120, y: 124), control2: CGPoint(x: 300, y: 124))
+            waist.addCurve(to: CGPoint(x: 384, y: 140),
+            waist                control1: CGPoint(x: 120, y: 124),
+            waist                control2: CGPoint(x: 300, y: 124))
             ctx.stroke(xf(waist), with: .color(Color.white.opacity(0.20)), style: StrokeStyle(lineWidth: 1.4))
 
             // 车窗 + 一道斜反光
             var window = Path()
             window.move(to: CGPoint(x: 112, y: 140))
-            window.addCurve(to: CGPoint(x: 214, y: 100), control1: CGPoint(x: 136, y: 116), control2: CGPoint(x: 168, y: 104))
-            window.addCurve(to: CGPoint(x: 302, y: 120), control1: CGPoint(x: 252, y: 97), control2: CGPoint(x: 280, y: 104))
+            window.addCurve(to: CGPoint(x: 214, y: 100),
+            window                control1: CGPoint(x: 136, y: 116),
+            window                control2: CGPoint(x: 168, y: 104))
+            window.addCurve(to: CGPoint(x: 302, y: 120),
+            window                control1: CGPoint(x: 252, y: 97),
+            window                control2: CGPoint(x: 280, y: 104))
             window.addLine(to: CGPoint(x: 286, y: 140))
             window.closeSubpath()
             ctx.fill(xf(window), with: .color(Color(white: 0.02)))
 
             var glass = Path()
             glass.move(to: CGPoint(x: 126, y: 136))
-            glass.addCurve(to: CGPoint(x: 214, y: 103), control1: CGPoint(x: 148, y: 114), control2: CGPoint(x: 178, y: 106))
+            glass.addCurve(to: CGPoint(x: 214, y: 103),
+            glass                control1: CGPoint(x: 148, y: 114),
+            glass                control2: CGPoint(x: 178, y: 106))
             glass.addLine(to: CGPoint(x: 200, y: 133))
             glass.closeSubpath()
             ctx.fill(xf(glass), with: .color(Color.white.opacity(0.16)))
@@ -1100,13 +1132,16 @@ struct CarStageView: View {
                 var lid = Path()
                 lid.move(to: CGPoint(x: 96, y: 148))
                 lid.addLine(to: CGPoint(x: 58, y: 116))
-                ctx.stroke(xf(lid), with: .color(tc.opacity(0.85)), style: StrokeStyle(lineWidth: 2.4, lineCap: .round))
+                ctx.stroke(xf(lid), with: .color(tc.opacity(0.85)), style: StrokeStyle(lineWidth: 2.4, lineCap:
+ .round))
             }
 
             // 前灯（冷白）
             var head = Path()
             head.move(to: CGPoint(x: 370, y: 128))
-            head.addCurve(to: CGPoint(x: 387, y: 142), control1: CGPoint(x: 378, y: 131), control2: CGPoint(x: 384, y: 136))
+            head.addCurve(to: CGPoint(x: 387, y: 142),
+            head                control1: CGPoint(x: 378, y: 131),
+            head                control2: CGPoint(x: 384, y: 136))
             ctx.drawLayer { layer in
                 layer.addFilter(.blur(radius: 8))
                 layer.opacity = 0.55
@@ -1152,8 +1187,8 @@ struct CarStageView: View {
 
     private func lockColor(_ cls: String) -> Color {
         switch cls {
-        case "ok":  return DS.Palette.ok
-        case "bad": return DS.Palette.warn
+        case "ok":  return Kansei.Color.success
+        case "bad": return Kansei.Color.warning
         default:    return Color.white.opacity(0.16)
         }
     }
@@ -1271,14 +1306,14 @@ struct LocationMapViewPlaceholder: View {
 
     var body: some View {
         ZStack {
-            DS.Palette.surfaceSunken
+            Kansei.Color.glassLight
             VStack(spacing: DS.Space.sm) {
                 Image(systemName: "map")
                     .font(.system(size: 26, weight: .light))
-                    .foregroundStyle(DS.Palette.labelTertiary)
+                    .foregroundStyle(Kansei.Color.tertiary)
                 Text(addr.isEmpty ? "暂无定位" : addr)
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .foregroundStyle(Kansei.Color.secondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .padding(.horizontal, DS.Space.lg)

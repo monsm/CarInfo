@@ -23,7 +23,7 @@ struct CarKeeperWatchApp: App {
 
 struct WatchRoute: View {
     @State private var selectedTab: Int = 0
-    
+
     var body: some View {
         TabView(selection: $selectedTab) {
             WatchStatusView()
@@ -32,14 +32,14 @@ struct WatchRoute: View {
                     Text("车况")
                 }
                 .tag(0)
-            
+
             WatchControlView()
                 .tabItem {
                     Image(systemName: "dot.radiowaves.left.and.right")
                     Text("控制")
                 }
                 .tag(1)
-            
+
             WatchProfileView()
                 .tabItem {
                     Image(systemName: "person.fill")
@@ -60,7 +60,7 @@ struct WatchStatusView: View {
     @State private var locked: Bool = true
     @State private var charging: Bool = false
     @State private var mileage: Int = 0
-    
+
     var body: some View {
         VStack(spacing: 16) {
             // SOC 大圆环
@@ -84,7 +84,7 @@ struct WatchStatusView: View {
                 }
             }
             .frame(width: 100, height: 100)
-            
+
             // 状态信息
             VStack(spacing: 12) {
                 WatchStatusRow(icon: "gauge", value: "\(range) km", label: "续航")
@@ -94,9 +94,9 @@ struct WatchStatusView: View {
                     WatchStatusRow(icon: "bolt.fill", value: "充电中", label: "", tint: .green)
                 }
             }
-            
+
             Spacer()
-            
+
             // 里程统计
             HStack(spacing: 20) {
                 VStack {
@@ -116,7 +116,7 @@ struct WatchStatusView: View {
         .onAppear { loadFromAppGroup() }
         .refreshable { await reload() }
     }
-    
+
     private func loadFromAppGroup() {
         let defaults = UserDefaults(suiteName: "group.com.you.CarKeeper") ?? UserDefaults.standard
         soc = defaults.integer(forKey: "watch_soc")
@@ -126,7 +126,7 @@ struct WatchStatusView: View {
         charging = defaults.bool(forKey: "watch_charging")
         mileage = defaults.integer(forKey: "watch_mileage")
     }
-    
+
     private func reload() async {
         try? await Task.sleep(nanoseconds: 1_000_000_000)
         loadFromAppGroup()
@@ -139,7 +139,7 @@ struct WatchStatusRow: View {
     let label: String
     // 用 var 而非 let：带默认值的 let 不会进入 memberwise init，调用处的 tint: 会报“extra argument”
     var tint: Color? = nil
-    
+
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
@@ -161,11 +161,11 @@ struct WatchControlView: View {
     @State private var acOn: Bool = false
     @State private var temperature: Int = 22
     @State private var isBusy = false
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Text("远程控制").font(.headline).padding(.top)
-            
+
             // 空调控制
             VStack(spacing: 16) {
                 HStack {
@@ -180,7 +180,7 @@ struct WatchControlView: View {
                         .font(.title).frame(width: 40, height: 40)
                         .background(.ultraThinMaterial, in: Circle())
                 }
-                
+
                 Button(action: toggleAC) {
                     HStack {
                         Image(systemName: acOn ? "fan.fill" : "power")
@@ -194,7 +194,7 @@ struct WatchControlView: View {
                 }
                 .disabled(isBusy)
             }
-            
+
             // 快捷控制
             Grid(horizontalSpacing: 16, verticalSpacing: 16) {
                 GridRow {
@@ -207,11 +207,11 @@ struct WatchControlView: View {
                 }
             }
             .padding(.horizontal)
-            
+
             Spacer()
         }
     }
-    
+
     private func toggleAC() {
         isBusy = true
         acOn.toggle()
@@ -219,12 +219,12 @@ struct WatchControlView: View {
             isBusy = false
         }
     }
-    
+
     private func lockCar() { sendCommand("CentralLock", name: "锁车") }
     private func unlockCar() { sendCommand("CentralUnlock", name: "解锁") }
     private func findCar() { sendCommand("HornLight", name: "寻车") }
     private func flashLights() { sendCommand("FlashLights", name: "闪灯") }
-    
+
     private func sendCommand(_ cmd: String, name: String) {
         isBusy = true
         // 实际通过 WatchConnectivity 发送到 iPhone
@@ -239,7 +239,7 @@ struct WatchControlButton: View {
     let label: String
     let action: () -> Void
     let disabled: Bool
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 6) {

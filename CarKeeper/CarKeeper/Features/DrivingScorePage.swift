@@ -8,7 +8,7 @@ import Charts
 struct DrivingScorePage: View {
     private let store = AppStore.shared
     @State private var showingDetails = false
-    
+
     // 驾驶评分计算
     var overallScore: Int {
         guard !store.tripHistory.isEmpty else { return 0 }
@@ -16,11 +16,11 @@ struct DrivingScorePage: View {
         let avg = Double(scores.reduce(0, +)) / Double(scores.count)
         return Int(avg)
     }
-    
+
     var smoothDrivingScore: Int {
         min(100, max(0, 100 - Int(0 * 5)))
     }
-    
+
     var safeSpeedScore: Int {
         guard let best = store.tripHistory.max(by: { avgSpeed($0) < avgSpeed($1) }) else { return 80 }
         return min(100, max(0, Int(100 - avgSpeed(best) * 0.5)))
@@ -32,16 +32,16 @@ struct DrivingScorePage: View {
         let hours = end.timeIntervalSince(trip.startTime) / 3600
         return hours > 0 ? trip.distanceKm / hours : 0
     }
-    
+
     var efficiencyScore: Int {
         guard let eff = store.tripHistory.last?.avgEfficiency else { return 70 }
         return min(100, max(0, Int(120 - eff)))
     }
-    
+
     var comfortScore: Int {
         min(100, max(0, 100 - Int(0 * 3)))
     }
-    
+
     // 总分颜色
     var scoreColor: Color {
         switch overallScore {
@@ -51,7 +51,7 @@ struct DrivingScorePage: View {
         default: return .red
         }
     }
-    
+
     var scoreGrade: String {
         switch overallScore {
         case 90...: return "S"
@@ -61,7 +61,7 @@ struct DrivingScorePage: View {
         default: return "D"
         }
     }
-    
+
     var improvementTips: [String] {
         var tips: [String] = []
         if smoothDrivingScore < 70 { tips.append("减少急加速次数") }
@@ -71,34 +71,34 @@ struct DrivingScorePage: View {
         if tips.isEmpty { tips.append("驾驶表现优秀，继续保持！") }
         return tips
     }
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // 总评分
                 scoreHero
-                
+
                 // 雷达图
                 radarChart
-                
+
                 // 分项得分
                 splitScores
-                
+
                 // 改进建议
                 improvementCard
-                
+
                 // 历史趋势
                 scoreTrend
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.vertical, Theme.Spacing.md)
+            .padding(.horizontal, Kansei.Spacing.lg)
+            .padding(.vertical, Kansei.Spacing.md)
         }
-        .pageBackground()
+        .background(Kansei.Color.background)
         .navigationTitle("驾驶评分")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityLabel(Text("驾驶评分详情"))
     }
-    
+
     // MARK: - 评分英雄卡
     private var scoreHero: some View {
         VStack(spacing: 16) {
@@ -109,20 +109,20 @@ struct DrivingScorePage: View {
                 Circle()
                     .stroke(scoreColor, lineWidth: 3)
                     .frame(width: 140, height: 140)
-                
+
                 VStack {
                     Text("\(overallScore)")
                         .font(.system(size: 48, weight: .bold))
                         .foregroundStyle(scoreColor)
                     Text("分")
-                        .font(Theme.caption)
-                        .foregroundStyle(.secondary)
+                        .font(Kansei.Type.caption)
+                        .foregroundStyle(Kansei.Color.secondary)
                     Text("等级 \(scoreGrade)")
-                        .font(Theme.subheadline)
+                        .font(Kansei.Type.subheadline)
                         .foregroundStyle(scoreColor)
                 }
             }
-            
+
             // 总览文字
             HStack {
                 Label("驾龄", systemImage: "calendar")
@@ -132,13 +132,13 @@ struct DrivingScorePage: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .glassCard(corner: Theme.Radius.hero)
+        .glassCard(corner: Kansei.Radius.large)
     }
-    
+
     // MARK: - 雷达图
     private var radarChart: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("驾驶能力雷达").font(Theme.font(.subheadline as Font).bold())
+            Text("驾驶能力雷达").font(Kansei.Type.subheadline.weight(.bold))
             Chart {
                 RadarSlice(value: smoothDrivingScore, label: "平稳", color: .green)
                 RadarSlice(value: safeSpeedScore, label: "守规", color: .blue)
@@ -146,10 +146,10 @@ struct DrivingScorePage: View {
                 RadarSlice(value: comfortScore, label: "舒适", color: .orange)
             }
             .frame(height: 200)
-            .glassCard(corner: Theme.Radius.medium)
+            .glassCard(corner: Kansei.Radius.medium)
         }
     }
-    
+
     // MARK: - 分项得分
     private var splitScores: some View {
         VStack(spacing: 10) {
@@ -160,7 +160,7 @@ struct DrivingScorePage: View {
         }
         .glassCard(corner: Theme.Radius.medium)
     }
-    
+
     private func scoreRow(icon: String, label: String, value: Int, color: Color) -> some View {
         HStack {
             HStack(spacing: 8) {
@@ -183,14 +183,14 @@ struct DrivingScorePage: View {
             }
             .frame(height: 6)
             .frame(maxWidth: 100)
-            
+
             Text("\(value)")
-                .font(Theme.font(.subheadline as Font).bold())
+                .font(Kansei.Type.subheadline.weight(.bold))
                 .foregroundStyle(color)
                 .frame(width: 30)
         }
     }
-    
+
     // MARK: - 改进建议
     private var improvementCard: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -200,12 +200,12 @@ struct DrivingScorePage: View {
                     .foregroundStyle(.yellow)
                 Text("改进建议").font(Theme.font(.subheadline as Font).bold())
             }
-            
+
             ForEach(improvementTips, id: \.self) { tip in
                 HStack {
                     Image(systemName: "chevron.right.circle.fill")
                         .font(.caption2)
-                        .foregroundStyle(Theme.Colors.accent)
+                        .foregroundStyle(Kansei.Color.ambient)
                     Text(tip)
                         .font(.caption)
                         .foregroundStyle(.primary)
@@ -216,7 +216,7 @@ struct DrivingScorePage: View {
         .glassCard(corner: Theme.Radius.medium)
         .background(Color.yellow.opacity(0.05))
     }
-    
+
     // MARK: - 历史趋势
     private var scoreTrend: some View {
         let trips = Array(store.tripHistory.suffix(7))
@@ -247,24 +247,24 @@ struct DrivingScorePage: View {
                 }
             }
             .frame(height: 120)
-            .glassCard(corner: Theme.Radius.medium)
+            .glassCard(corner: Kansei.Radius.medium)
         }
     }
-    
+
     // MARK: - 辅助方法
     private func calculateTripScore(_ trip: AppStore.TripRecord) -> Int {
         var score = 70 // 基础分
-        
+
         // 能耗评分
         if let eff = trip.avgEfficiency {
             if eff < 12 { score += 20 }
             else if eff < 15 { score += 10 }
             else if eff > 20 { score -= 15 }
         }
-        
+
         // 平稳度
         score += min(10, max(-10, Int((100 - trip.distanceKm) / 5)))
-        
+
         return max(0, min(100, score))
     }
 }
@@ -274,7 +274,7 @@ struct RadarSlice: ChartContent {
     let value: Int
     let label: String
     let color: Color
-    
+
     var body: some ChartContent {
         LineMark(
             x: .value("维度", label),

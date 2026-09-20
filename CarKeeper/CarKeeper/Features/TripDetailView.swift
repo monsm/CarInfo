@@ -29,57 +29,57 @@ struct TripDetailView: View {
     @State private var mapCenter = CLLocationCoordinate2D(latitude: 39.9, longitude: 107.0)
     @State private var span = MKCoordinateSpan(latitudeDelta: 2, longitudeDelta: 2)
     @State private var showMap = false
-    
+
     private let distanceFormatter: LengthFormatter = {
         let f = LengthFormatter()
         f.unitStyle = .short
         f.numberFormatter.minimumFractionDigits = 1
         return f
     }()
-    
+
     private let speedFormatter: NumberFormatter = {
         let f = NumberFormatter()
         f.numberStyle = .decimal
         f.maximumFractionDigits = 0
         return f
     }()
-    
+
     var avgSpeed: Double {
         let hours = max((trip.endTime ?? Date()).timeIntervalSince(trip.startTime) / 3600, 0.1)
         return trip.distanceKm / hours
     }
-    
+
     var efficiencyText: String {
         if let eff = trip.avgEfficiency {
             return String(format: "%.1f kWh/100km", eff)
         }
         return "—"
     }
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 // 概览卡片
                 overviewCard
-                
+
                 // 地图
                 if trip.startLocation != nil || trip.endLocation != nil {
                     mapCard
                 }
-                
+
                 // 能耗详情
                 energyCard
-                
+
                 // 驾驶行为
                 drivingCard
-                
+
                 // 时间线
                 timelineCard
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.vertical, Theme.Spacing.md)
+            .padding(.horizontal, Kansei.Spacing.lg)
+            .padding(.vertical, Kansei.Spacing.md)
         }
-        .pageBackground()
+        .background(Kansei.Color.background)
         .navigationTitle("行程详情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -92,14 +92,14 @@ struct TripDetailView: View {
         .accessibilityLabel(Text("行程详情"))
         .accessibilityHint(Text("查看行程距离、能耗和驾驶评分"))
     }
-    
+
     // MARK: - 概览
     private var overviewCard: some View {
         VStack(spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(trip.startTime, style: .date)
-                        .font(Theme.caption)
+                        .font(Kansei.Type.caption)
                         .foregroundStyle(.secondary)
                     Text(trip.startTime, style: .time)
                         .font(Theme.subheadline)
@@ -107,17 +107,18 @@ struct TripDetailView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text(DurationFormatter.string(from: max((trip.endTime ?? Date()).timeIntervalSince(trip.startTime), 1)))
-                        .font(Theme.caption)
+                    Text(DurationFormatter.string(from: max((trip.endTime ?? Date().
+timeIntervalSince(trip.startTime), 1)))
+                        .font(Kansei.Type.caption)
                         .foregroundStyle(.secondary)
                     Text(trip.startTime, style: .date)
-                        .font(Theme.caption)
+                        .font(Kansei.Type.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            
+
             Divider().opacity(0.3)
-            
+
             HStack(spacing: 20) {
                 statItem(icon: "figure.walk", value: String(format: "%.1f", trip.distanceKm), unit: "km", label: "里程")
                 statItem(icon: "bolt.fill", value: "\(trip.socChange)%", unit: "", label: "SOC变化")
@@ -125,21 +126,21 @@ struct TripDetailView: View {
             }
         }
         .padding()
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Kansei.Radius.medium)
     }
-    
+
     private func statItem(icon: String, value: String, unit: String, label: String) -> some View {
         VStack(spacing: 4) {
             HStack(spacing: 4) {
                 Image(safeSymbol: icon, fallback: "gauge")
                     .font(.caption)
-                    .foregroundStyle(Theme.Colors.accent)
+                    .foregroundStyle(Kansei.Color.ambient)
                 Text(value)
                     .font(Theme.heroNum)
                     .foregroundStyle(.primary)
                 if !unit.isEmpty {
                     Text(unit)
-                        .font(Theme.caption)
+                        .font(Kansei.Type.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -148,28 +149,28 @@ struct TripDetailView: View {
                 .foregroundStyle(.tertiary)
         }
     }
-    
+
     // MARK: - 地图
     private var mapCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "map.fill")
                     .font(.caption)
-                    .foregroundStyle(Theme.Colors.accent)
+                    .foregroundStyle(Kansei.Color.ambient)
                 Text("行驶路线")
                     .font(Theme.font(.subheadline as Font).bold())
                 Spacer()
                 Button(action: { showMap.toggle() }) {
                     Text(showMap ? "收起" : "展开")
                         .font(.caption)
-                        .foregroundStyle(Theme.Colors.accent)
+                        .foregroundStyle(Kansei.Color.ambient)
                 }
             }
-            
+
             if showMap, let start = trip.startLocation, let end = trip.endLocation {
                 MapView(coordinate: mapCenter, span: span, points: [start.coordinate, end.coordinate])
                     .frame(height: 200)
-                    .cornerRadius(Theme.Radius.small)
+                    .cornerRadius(Kansei.Radius.small)
             } else {
                 VStack(spacing: 8) {
                     Image(systemName: "map.fill")
@@ -180,9 +181,9 @@ struct TripDetailView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .frame(height: 120)
-                .glassCard(corner: Theme.Radius.small)
+                .glassCard(corner: Kansei.Radius.small)
             }
-            
+
             // 起点/终点信息
             HStack {
                 if let loc = trip.startLocation {
@@ -195,14 +196,13 @@ struct TripDetailView: View {
             }
         }
         .padding()
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Kansei.Radius.medium)
     }
-    
+
     private func locationChip(icon: String, text: String, coord: CLLocation) -> some View {
         HStack(spacing: 6) {
             Image(safeSymbol: icon, fallback: "gauge")
-                .font(.caption)
-                .foregroundStyle(Theme.Colors.accent)
+                .font(.caption)                    .foregroundStyle(Kansei.Color.ambient)
             VStack(alignment: .leading) {
                 Text(text).font(.caption2).foregroundStyle(.secondary)
                 Text(String(format: "%.4f, %.4f", coord.coordinate.latitude, coord.coordinate.longitude))
@@ -215,7 +215,7 @@ struct TripDetailView: View {
         .background(Color.primary.opacity(0.05))
         .cornerRadius(8)
     }
-    
+
     // MARK: - 能耗详情
     private var energyCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -227,7 +227,7 @@ struct TripDetailView: View {
                     .font(Theme.font(.subheadline as Font).bold())
                 Spacer()
             }
-            
+
             VStack(spacing: 8) {
                 energyRow(label: "起始电量", value: "\(trip.startSoc)%", color: .green)
                 energyRow(label: "结束电量", value: "\(trip.endSoc)%", color: .orange)
@@ -237,9 +237,9 @@ struct TripDetailView: View {
             }
         }
         .padding()
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Kansei.Radius.medium)
     }
-    
+
     private func energyRow(label: String, value: String, color: Color) -> some View {
         HStack {
             Text(label).font(.caption).foregroundStyle(.secondary)
@@ -247,7 +247,7 @@ struct TripDetailView: View {
             Text(value).font(Theme.subheadline).foregroundStyle(color)
         }
     }
-    
+
     // MARK: - 驾驶行为
     private var drivingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -263,7 +263,7 @@ struct TripDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            
+
             // 驾驶评分条
             VStack(spacing: 8) {
                 HStack {
@@ -272,14 +272,14 @@ struct TripDetailView: View {
                     Text("良好").font(.caption).foregroundStyle(.green)
                 }
                 ProgressBar(value: 0.8, color: .green)
-                
+
                 HStack {
                     Text("急加速/刹车").font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Text("偶尔").font(.caption).foregroundStyle(.orange)
                 }
                 ProgressBar(value: 0.6, color: .orange)
-                
+
                 HStack {
                     Text("超速次数").font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -290,9 +290,9 @@ struct TripDetailView: View {
             .padding(.horizontal, 4)
         }
         .padding()
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Kansei.Radius.medium)
     }
-    
+
     // MARK: - 时间线
     private var timelineCard: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -304,24 +304,32 @@ struct TripDetailView: View {
                     .font(Theme.font(.subheadline as Font).bold())
                 Spacer()
             }
-            
+
             VStack(spacing: 0) {
                 timelineItem(icon: "play.fill", text: "行程开始", time: trip.startTime, color: .green)
-                timelineItem(icon: "location.fill", text: "途经点（GPS记录中）", time: trip.startTime.addingTimeInterval((trip.endTime ?? Date()).timeIntervalSince(trip.startTime) / 3600 * 3600 / 2), color: .blue)
+                timelineItem(
+                    icon: "location.fill",
+                    text: "途经点（GPS记录中）",
+                    time: trip.startTime.addingTimeInterval(
+                        (trip.endTime ?? Date()).timeIntervalSince(trip.startTime)
+                        / 3600 * 3600 / 2
+                    ),
+                    color: .blue
+                )
                 timelineItem(icon: "flag.fill", text: "行程结束", time: trip.endTime ?? Date(), color: .orange)
             }
-            .glassCard(corner: Theme.Radius.small)
+            .glassCard(corner: Kansei.Radius.small)
         }
         .padding()
     }
-    
+
     private func timelineItem(icon: String, text: String, time: Date, color: Color) -> some View {
         HStack(spacing: 12) {
             Circle()
                 .fill(color.opacity(0.2))
                 .frame(width: 32, height: 32)
                 .overlay(Image(safeSymbol: icon, fallback: "location.fill").font(.caption).foregroundStyle(color))
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(text).font(.caption).foregroundStyle(.primary)
                 Text(time, style: .time).font(.caption2).foregroundStyle(.secondary)
@@ -331,7 +339,7 @@ struct TripDetailView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
     }
-    
+
     // MARK: - 分享
     private func shareTrip() {
         let text = """
@@ -430,7 +438,7 @@ struct MapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = UIColor(Theme.Colors.accent)
+                renderer.strokeColor = UIColor(Kansei.Color.ambient)
                 renderer.lineWidth = 3
                 renderer.lineDashPattern = [6, 4]
                 return renderer
@@ -444,7 +452,7 @@ struct MapView: UIViewRepresentable {
 struct ProgressBar: View {
     let value: Double
     let color: Color
-    
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {

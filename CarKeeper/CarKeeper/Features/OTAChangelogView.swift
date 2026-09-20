@@ -6,14 +6,14 @@ import SwiftUI
 
 struct OTAChangelogView: View {
     @State private var versionLogs: [VersionLog] = []
-    
+
     struct VersionLog: Identifiable, Codable {
         var id = UUID()
         let version: String
         let date: Date
         let changes: [String]
     }
-    
+
     var body: some View {
         List(versionLogs) { log in
             VStack(alignment: .leading, spacing: 8) {
@@ -30,7 +30,7 @@ struct OTAChangelogView: View {
                         // 原来是一个 6pt 纯色圆点（只靠颜色当项目符号），改成真正的图标
                         Image(safeSymbol: "checkmark.circle.fill", fallback: "checkmark")
                             .font(.system(size: 12))
-                            .foregroundStyle(Theme.Colors.accent)
+                            .foregroundStyle(Kansei.Color.ambient)
                         Text(change)
                             .font(.caption)
                             .foregroundStyle(.primary)
@@ -43,7 +43,7 @@ struct OTAChangelogView: View {
         .navigationTitle("更新日志")
         .onAppear { loadVersionLogs() }
     }
-    
+
     private func loadVersionLogs() {
         // 从 UserDefaults 加载历史记录
         guard let data = UserDefaults.standard.data(forKey: "carkeeper_version_logs"),
@@ -64,7 +64,7 @@ struct OTAChangelogView: View {
         }
         versionLogs = logs
     }
-    
+
     /// 保存新版本日志
     static func saveVersionLog(_ log: VersionLog) {
         var logs = UserDefaults.standard.object(forKey: "carkeeper_version_logs") as? [VersionLog] ?? []

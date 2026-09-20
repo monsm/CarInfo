@@ -1,0 +1,934 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CarKeeper · 舞台（Stage）v3</title>
+<style>
+/* ==========================================================================
+   Stage v3 —— 不是「卡片式车 App」，是一台被陈列的车。
+   结构：① 整屏舞台（车就是界面） ② 浮在上面的液态玻璃层
+   色彩：只有一支电光蓝作强调，其余全由黑白与光解决。金色全部废弃。
+   运动：① 车身轮廓光扫过一次（车在向你报到）② 数值/环绘制 ③ 能量流
+   ========================================================================== */
+
+:root{
+  /* 夜：舞台（默认） */
+  --stage:radial-gradient(118% 78% at 50% -6%, #1A1D22 0%, #0B0C0F 48%, #000 100%);
+  --stage-floor:radial-gradient(70% 40% at 50% 62%, rgba(255,255,255,.055), rgba(255,255,255,0) 70%);
+  --text:#F6F7F8;
+  --t2:rgba(246,247,248,.62);
+  --t3:rgba(246,247,248,.40);
+  --t4:rgba(246,247,248,.26);
+  --hair:rgba(255,255,255,.10);
+  --hair2:rgba(255,255,255,.055);
+
+  /* 液态玻璃 */
+  --g-fill:linear-gradient(180deg, rgba(255,255,255,.115), rgba(255,255,255,.045) 42%, rgba(255,255,255,.03));
+  --g-blur:blur(28px) saturate(1.7);
+  --g-edge:inset 0 1px 0 rgba(255,255,255,.42), inset 0 -1px 0 rgba(255,255,255,.11),
+           inset 1px 0 0 rgba(255,255,255,.15), inset -1px 0 0 rgba(255,255,255,.07);
+  --g-drop:0 26px 60px -22px rgba(0,0,0,.82), 0 6px 18px -8px rgba(0,0,0,.5);
+  --g-rim:rgba(255,255,255,.55);
+
+  --accent:#4C8DFF;          /* 唯一的强调色：电光蓝 */
+  --accent-soft:rgba(76,141,255,.16);
+  --ok:#3ED07E;
+  --warn:#F2A83B;
+  --bad:#FF5E57;
+}
+[data-mode="day"]{
+  --stage:radial-gradient(118% 78% at 50% -6%, #FFFFFF 0%, #EEEFF1 46%, #D9DBDF 100%);
+  --stage-floor:radial-gradient(70% 40% at 50% 62%, rgba(0,0,0,.055), rgba(0,0,0,0) 70%);
+  --text:#0D0E10;
+  --t2:rgba(13,14,16,.62);
+  --t3:rgba(13,14,16,.42);
+  --t4:rgba(13,14,16,.26);
+  --hair:rgba(13,14,16,.12);
+  --hair2:rgba(13,14,16,.06);
+  --g-fill:linear-gradient(180deg, rgba(255,255,255,.86), rgba(255,255,255,.62) 46%, rgba(255,255,255,.55));
+  --g-blur:blur(26px) saturate(1.5);
+  --g-edge:inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(255,255,255,.55),
+           inset 1px 0 0 rgba(255,255,255,.70), inset -1px 0 0 rgba(255,255,255,.40);
+  --g-drop:0 26px 56px -24px rgba(18,20,24,.34), 0 6px 16px -8px rgba(18,20,24,.18);
+  --g-rim:rgba(255,255,255,.98);
+  --accent:#1B63E8;
+  --accent-soft:rgba(27,99,232,.12);
+  --ok:#12885A;
+  --warn:#B8730C;
+  --bad:#C42B22;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#0A0B0D;
+  font-family:-apple-system,"SF Pro Display","SF Pro Text","PingFang SC",system-ui,sans-serif;
+  color:var(--text);-webkit-font-smoothing:antialiased;
+}
+[data-mode="day"] body{background:#E6E7E9}
+
+/* ---------- 页头 ---------- */
+.wrap{max-width:1500px;margin:0 auto;padding:44px 36px 110px}
+.head{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;padding-bottom:26px;border-bottom:1px solid rgba(255,255,255,.10)}
+[data-mode="day"] .head{border-color:rgba(0,0,0,.12)}
+.head h1{margin:0;font-size:19px;font-weight:600;letter-spacing:.2px;color:#F2F3F5}
+[data-mode="day"] .head h1{color:#0D0E10}
+.head .sub{margin-top:8px;font-size:12px;letter-spacing:.4px;color:rgba(255,255,255,.40);line-height:1.7}
+[data-mode="day"] .head .sub{color:rgba(0,0,0,.44)}
+.spacer{flex:1}
+.seg{display:inline-flex;gap:4px;padding:4px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09)}
+[data-mode="day"] .seg{background:rgba(0,0,0,.05);border-color:rgba(0,0,0,.07)}
+.seg button{appearance:none;border:0;background:transparent;font:inherit;font-size:13px;font-weight:600;letter-spacing:.2px;
+  color:rgba(255,255,255,.55);padding:8px 18px;border-radius:10px;cursor:pointer;transition:.22s}
+[data-mode="day"] .seg button{color:rgba(0,0,0,.5)}
+.seg button[aria-pressed="true"]{background:rgba(255,255,255,.13);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
+[data-mode="day"] .seg button[aria-pressed="true"]{background:#fff;color:#0D0E10;box-shadow:0 2px 8px rgba(0,0,0,.12),inset 0 1px 0 #fff}
+
+/* ---------- 图例 ---------- */
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:30px 0 44px}
+.legend .box{border-radius:20px;padding:20px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(20px)}
+[data-mode="day"] .legend .box{background:rgba(255,255,255,.7);border-color:rgba(0,0,0,.07)}
+.legend h3{margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:rgba(255,255,255,.38)}
+[data-mode="day"] .legend h3{color:rgba(0,0,0,.40)}
+.legend p{margin:0;font-size:12.5px;line-height:1.9;color:rgba(255,255,255,.52)}
+[data-mode="day"] .legend p{color:rgba(0,0,0,.55)}
+.legend p b{color:rgba(255,255,255,.86);font-weight:600}
+[data-mode="day"] .legend p b{color:#0D0E10}
+.dots{display:flex;gap:10px;flex-wrap:wrap}
+.dots i{width:44px;height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.12)}
+
+/* ---------- 手机 ---------- */
+.rail{display:flex;gap:40px;flex-wrap:wrap}
+.slot .cap{margin:0 0 14px 4px;font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:rgba(255,255,255,.36)}
+[data-mode="day"] .slot .cap{color:rgba(0,0,0,.38)}
+.slot .note{margin:12px 4px 0;font-size:11.5px;line-height:1.65;color:rgba(255,255,255,.34);max-width:392px}
+[data-mode="day"] .slot .note{color:rgba(0,0,0,.38)}
+
+.phone{position:relative;width:398px;height:858px;border-radius:58px;padding:10px;
+  background:linear-gradient(158deg,#4A4F57,#121417 62%);box-shadow:0 3px 8px rgba(0,0,0,.5),0 30px 70px -18px rgba(0,0,0,.72)}
+[data-mode="day"] .phone{background:linear-gradient(158deg,#C9CCD2,#8E939B 62%);box-shadow:0 3px 8px rgba(0,0,0,.16),0 30px 70px -20px rgba(0,0,0,.28)}
+.phone::after{content:"";position:absolute;inset:0;border-radius:58px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),inset 0 1px 1px rgba(255,255,255,.24);pointer-events:none}
+
+.screen{position:relative;width:100%;height:100%;border-radius:48px;overflow:hidden;background:var(--stage);color:var(--text)}
+.screen .floor{position:absolute;inset:0;background:var(--stage-floor);pointer-events:none}
+.island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:104px;height:29px;border-radius:15px;background:#000;z-index:30}
+[data-mode="day"] .island{background:#0A0B0C}
+
+/* 状态栏 & 玻璃条 */
+.status{position:absolute;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+  padding:16px 26px 0;font-size:13.5px;font-weight:600;letter-spacing:.2px;color:var(--text)}
+.status .ri{display:flex;align-items:center;gap:6px;opacity:.9}
+
+/* ---------- 液态玻璃 ---------- */
+.glass{
+  position:relative;background:var(--g-fill);backdrop-filter:var(--g-blur);-webkit-backdrop-filter:var(--g-blur);
+  box-shadow:var(--g-drop),var(--g-edge);
+}
+/* 边缘厚玻璃折射：只在边框区域生效的一层，边框内才有的亮度提升 */
+.glass::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  backdrop-filter:blur(9px) brightness(1.07);-webkit-backdrop-filter:blur(9px) brightness(1.07);
+  padding:9px;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;
+}
+/* 镜面高光弧（静态，模拟固定的光源方向：左上） */
+.glass::before{
+  content:"";position:absolute;top:0;left:16%;right:52%;height:1.3px;border-radius:2px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(255,255,255,0),var(--g-rim),rgba(255,255,255,0));opacity:.9;
+}
+
+/* ---------- 舞台 ---------- */
+.stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-top:26px}
+.stage svg{width:132%;margin-left:-16%}
+
+.hud{position:absolute;z-index:20;display:flex;align-items:center;gap:10px}
+.hud.top{top:58px;left:24px;right:24px}
+.hud .name{font-size:11.5px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:var(--t2)}
+.hud .live{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--ok);letter-spacing:.4px}
+.hud .live i{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor}
+
+/* 顶部玻璃胶囊 */
+.pill{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:17px;font-size:12.5px;font-weight:600;cursor:pointer;
+  color:var(--text);transition:transform .18s cubic-bezier(.22,.8,.28,1)}
+.pill:active{transform:scale(.97)}
+.pill .g{color:var(--t3)}
+
+/* ---------- 底部玻璃台 ---------- */
+.shelf{position:absolute;left:16px;right:16px;bottom:104px;z-index:22;border-radius:34px;padding:22px 24px 20px;overflow:hidden}
+.shelf .lead{display:flex;align-items:center;gap:10px}
+.lbl{font-size:10.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3)}
+.shelf .val{font-size:13px;font-weight:600;letter-spacing:.2px}
+.readout{display:flex;align-items:flex-end;gap:16px;margin-top:12px}
+.hero{font-size:112px;font-weight:200;letter-spacing:-5px;line-height:.86;font-variant-numeric:tabular-nums}
+.hero .u{font-size:26px;font-weight:300;letter-spacing:-.5px;color:var(--t2);margin-left:4px}
+.hero2{font-size:30px;font-weight:300;letter-spacing:-1.2px;font-variant-numeric:tabular-nums;line-height:1}
+.hero2 .u{font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--t3);margin-left:6px}
+.shelf .hair{height:1px;background:var(--hair);margin:20px 0 4px}
+.kv{display:flex;gap:14px;padding-top:13px}
+.kv>div{flex:1;min-width:0}
+.kv .k{font-size:10px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--t3);white-space:nowrap}
+.kv .v{margin-top:6px;font-size:15px;font-weight:600;letter-spacing:-.2px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.kv .v.hot{color:var(--accent)}
+.kv .v.ok{color:var(--ok)}
+.kv .v.warn{color:var(--warn)}
+
+/* ---------- 玻璃 Tab 条 ---------- */
+.dock{position:absolute;left:16px;right:16px;bottom:18px;z-index:24;height:70px;border-radius:28px;display:flex;align-items:center;padding:0 8px}
+.dock .item{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  height:56px;border-radius:20px;color:var(--t3);cursor:pointer;transition:color .24s}
+.dock .item span{font-size:9.5px;font-weight:650;letter-spacing:.3px}
+.dock .item.on{color:var(--text)}
+.dock .item.on svg{filter:drop-shadow(0 0 8px rgba(76,141,255,.5))}
+.dock .item.on::before{content:"";position:absolute;inset:2px 6px;border-radius:18px;background:var(--accent-soft);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.20),0 4px 14px -6px rgba(76,141,255,.55);animation:pop .34s cubic-bezier(.22,.8,.28,1)}
+@keyframes pop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
+.dock .item svg{position:relative;z-index:1}
+.dock .item span{position:relative;z-index:1}
+.dock .dot{position:absolute;top:9px;right:calc(50% - 18px);width:7px;height:7px;border-radius:50%;background:var(--warn);box-shadow:0 0 10px rgba(242,168,59,.8)}
+
+.gi{width:23px;height:23px;flex:none;stroke:currentColor;fill:none;stroke-width:1.55;stroke-linecap:round;stroke-linejoin:round}
+
+/* 能量流 / 图表 */
+.flowline{stroke-dasharray:10 12;animation:flow 1.5s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-44}}
+.beacon{animation:beacon 2.6s ease-out infinite}
+@keyframes beacon{0%{r:5;opacity:.55}70%{r:13;opacity:0}100%{r:13;opacity:0}}
+.sweep{stroke-dasharray:1200;stroke-dashoffset:1200;animation:sweep 1.35s cubic-bezier(.4,0,.2,1) .35s forwards}
+@keyframes sweep{to{stroke-dashoffset:0}}
+
+.door{cursor:pointer}
+.door:hover .dglow{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- ================= 图标（统一 23pt 光学尺寸 · 1.55 描边） ================= -->
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-car" viewBox="0 0 24 24"><path d="M3.6 13.4l1.7-4.3A2.6 2.6 0 017.7 7.4h8.6a2.6 2.6 0 012.4 1.7l1.7 4.3"/><path d="M3.6 13.4h16.8v3.9a1.4 1.4 0 01-1.4 1.4h-.9v1a1.2 1.2 0 01-2.4 0v-1H8.3v1a1.2 1.2 0 01-2.4 0v-1h-.9a1.4 1.4 0 01-1.4-1.4v-3.9z"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 8.6h16M4 15.4h16"/><circle cx="9.4" cy="8.6" r="2.3" fill="var(--stage)"/><circle cx="14.6" cy="15.4" r="2.3" fill="var(--stage)"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.4 3l-7 10h4.4l-1 8 7.2-10.4h-4.4L13.4 3z"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><path d="M4.2 17.6l4.6-5.4 3.4 3.1 7.4-8.5"/><circle cx="4.2" cy="17.6" r="1.5" fill="var(--stage)"/><circle cx="19.6" cy="6.8" r="1.5" fill="var(--stage)"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.3"/><path d="M5.4 20c1.3-3.6 3.8-5.4 6.6-5.4s5.3 1.8 6.6 5.4"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.2" y="10.6" width="13.6" height="9.2" rx="3"/><path d="M8.5 10.6V8.3a3.5 3.5 0 017 0v2.3"/></symbol>
+  <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="5.2" y="10.6" width="13.6" height="9.2" rx="3"/><path d="M8.5 10.6V8.3a3.5 3.5 0 016.4-2"/></symbol>
+  <symbol id="i-snow" viewBox="0 0 24 24"><path d="M12 3.6v16.8M4.8 7.9l14.4 8.2M19.2 7.9L4.8 16.1"/></symbol>
+  <symbol id="i-fan" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M12 10c-.4-2.6.6-5.4 3-5.4 1.9 0 2.6 2.6 0 4.2M14 12c2.6-.4 5.4.6 5.4 3 0 1.9-2.6 2.6-4.2 0M12 14c.4 2.6-.6 5.4-3 5.4-1.9 0-2.6-2.6 0-4.2M10 12c-2.6.4-5.4-.6-5.4-3 0-1.9 2.6-2.6 4.2 0"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.3"/><path d="M12 3.6v1.8M12 18.6v1.8M3.6 12h1.8M18.6 12h1.8M6.2 6.2l1.3 1.3M16.5 16.5l1.3 1.3M17.8 6.2l-1.3 1.3M7.5 16.5l-1.3 1.3"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="12" r="3.3"/><path d="M11.3 12H20M17.2 12v3M14.4 12v2.3"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.9"/><path d="M12 5.8l1 2.1 2.3-.7 1.4 1.8-1.5 1.8 1.5 1.8-1.4 1.8-2.3-.7-1 2.1h-2.4l-1-2.1-2.3.7-1.4-1.8L6.4 11 4.9 9.2l1.4-1.8 2.3.7 1-2.1H12z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.6l6.4 2.4v5.3c0 3.9-2.7 6.9-6.4 8.8-3.7-1.9-6.4-4.9-6.4-8.8V6l6.4-2.4z"/><path d="M9.4 12l1.9 2 3.3-3.6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.7V12l3 1.8"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="5.9"/><path d="M15.5 15.5L20 20"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.7 16.4V11a5.3 5.3 0 0110.6 0v5.4"/><path d="M5.2 16.4h13.6M10.2 19.3a2.2 2.2 0 003.6 0"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15.4V4.3M12 4.3L8.7 7.6M12 4.3l3.3 3.3"/><path d="M8.5 11.4H6.7A1.6 1.6 0 005.1 13v5.3a1.6 1.6 0 001.6 1.6h10.6a1.6 1.6 0 001.6-1.6V13a1.6 1.6 0 00-1.6-1.6h-1.8"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9.2 3.8v4.1M14.8 3.8v4.1"/><path d="M6.8 7.9h10.4v2.3a5.2 5.2 0 01-10.4 0V7.9z"/><path d="M12 15.4v4.4"/></symbol>
+  <symbol id="i-door" viewBox="0 0 24 24"><rect x="6.2" y="4" width="11.6" height="16" rx="2.4"/><path d="M13.6 11.4v1.6"/></symbol>
+  <symbol id="i-window" viewBox="0 0 24 24"><rect x="4.2" y="6.2" width="15.6" height="11.6" rx="2.4"/><path d="M4.2 12h15.6"/></symbol>
+  <symbol id="i-mark" viewBox="0 0 24 24"><path d="M3.4 13.6l1.8-4.4A2.7 2.7 0 017.9 7.5h8.2a2.7 2.7 0 012.6 1.7l1.9 4.4"/><path d="M3.4 13.6h17.2v3.6a1.5 1.5 0 01-1.5 1.5H4.9a1.5 1.5 0 01-1.5-1.5v-3.6z"/></symbol>
+</svg>
+
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>Stage v3 · 车就是界面</h1>
+      <div class="sub">整屏舞台 + 液态玻璃层 · 唯一强调色 电光蓝 #4C8DFF · 金色全部废弃 · 数字 112pt 超细字重</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg">
+      <button id="m-night" aria-pressed="true">夜间</button>
+      <button id="m-day" aria-pressed="false">日间</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="box">
+      <h3>结构上到底改了什么</h3>
+      <p>上一版是<b>卡片拼贴</b>：一辆被装进卡片里的车 + 六块并列的信息，所以它像仪表盘点亮了所有仪表。<br>
+         这一版是<b>陈列</b>：车占满整屏、超出屏幕边缘（132% 画幅），像一张被裁切的产品照；所有数据退到一块<b>液态玻璃台</b>上。<br>
+         每屏<b>只有一个主角</b>：车况＝车，车控＝车，充电＝能量。</p>
+    </div>
+    <div class="box">
+      <h3>液态玻璃不是一块半透明矩形</h3>
+      <p>四层叠加才算真玻璃：<b>①</b> 本体磨砂（28px 模糊 + 1.7 饱和）；<b>②</b> <b>只在边框区域生效</b>的一层模糊提亮（厚玻璃棱边的折射）；<b>③</b> 单向内高光（上方 42% 白，下方 11%），光永远来自左上方；<b>④</b> 一段静态镜面高光弧。<br>
+         少了第②层，玻璃就只是毛玻璃——这是 iOS 13 和液态玻璃的分水岭。</p>
+    </div>
+    <div class="box">
+      <h3>色彩只留一支</h3>
+      <div class="dots" style="margin-top:14px">
+        <i style="background:#4C8DFF"></i><i style="background:#3ED07E"></i><i style="background:#F2A83B"></i><i style="background:#FF5E57"></i>
+      </div>
+      <p style="margin-top:14px">电光蓝只出现在<b>活着的状态</b>：充电中、当前 Tab、实时功耗。绿/橙/红只做语义，绝不装饰。<br>
+         金色全部删掉——暖金色是"奢侈品目录"的语言，不是 Apple 的语言；黑白 + 一支冷色的对比度才是。</p>
+    </div>
+    <div class="box">
+      <h3>运动的全部内容</h3>
+      <p><b>①</b> 车身轮廓光从车头扫到车尾，一次（车在向你报到）。<br><b>②</b> 数字与环绘制到目标值。<br><b>③</b> 充电时能量沿电缆流动。<br>
+         没有第四种。整个界面里唯一"常驻"的运动是充电进度在走——因为它本来就在走。</p>
+    </div>
+  </div>
+
+  <div class="rail">
+
+  <!-- ==================== 01 舞台 · 车况 ==================== -->
+  <div class="slot">
+    <p class="cap">01 · 车况 — 一整台车，一屏</p>
+    <div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="floor"></div>
+      <div class="status"><span>9:41</span><div class="ri"><span>▮▮▮</span><span>ᯤ</span><span>100%</span></div></div>
+
+      <!-- 地面光池：用径向渐变而非形状，所以它没有边界——只有衰减 -->
+      <div style="position:absolute;left:0;right:0;top:180px;bottom:0;z-index:5;pointer-events:none;
+           background:radial-gradient(62% 21% at 50% 34%, rgba(255,255,255,.085), rgba(255,255,255,.028) 52%, rgba(255,255,255,0) 100%),
+                      radial-gradient(46% 12% at 50% 36%, rgba(76,141,255,.075), rgba(76,141,255,0) 100%);"></div>
+      <div class="stage" style="align-items:flex-start;padding-top:296px">
+        <svg viewBox="0 0 900 340" aria-label="车辆">
+          <defs>
+            <linearGradient id="body" x1="0" y1="0" x2="0.2" y2="1">
+              <stop offset="0%" stop-color="#24282E"/>
+              <stop offset="38%" stop-color="#121519"/>
+              <stop offset="100%" stop-color="#05060799"/>
+            </linearGradient>
+            <linearGradient id="roofrim" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="rgba(255,255,255,0)"/>
+              <stop offset="22%" stop-color="rgba(255,255,255,.72)"/>
+              <stop offset="58%" stop-color="rgba(255,255,255,.95)"/>
+              <stop offset="100%" stop-color="rgba(255,255,255,.10)"/>
+            </linearGradient>
+            <linearGradient id="siderim" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="rgba(255,255,255,.04)"/>
+              <stop offset="30%" stop-color="rgba(255,255,255,.30)"/>
+              <stop offset="72%" stop-color="rgba(255,255,255,.62)"/>
+              <stop offset="100%" stop-color="rgba(255,255,255,.18)"/>
+            </linearGradient>
+            <linearGradient id="glassref" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="rgba(255,255,255,.28)"/>
+              <stop offset="42%" stop-color="rgba(255,255,255,.04)"/>
+              <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+            </linearGradient>
+            <linearGradient id="tail" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFFFFF"/><stop offset="34%" stop-color="#FF6A5A"/><stop offset="100%" stop-color="#C0271C"/>
+            </linearGradient>
+            <!-- 顶光必须是径向的：线性渐变填在椭圆里，椭圆自己的轮廓就会变成硬边 -->
+            <radialGradient id="keylight" cx="50%" cy="42%" r="50%">
+              <stop offset="0%" stop-color="rgba(255,255,255,.15)"/>
+              <stop offset="58%" stop-color="rgba(255,255,255,.045)"/>
+              <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+            </radialGradient>
+            <filter id="bloom"><feGaussianBlur stdDeviation="7"/></filter>
+            <filter id="soft3"><feGaussianBlur stdDeviation="42"/></filter>
+            <filter id="bloom2"><feGaussianBlur stdDeviation="3"/></filter>
+            <filter id="soft"><feGaussianBlur stdDeviation="12"/></filter>
+            <mask id="refl"><rect x="0" y="292" width="900" height="48" fill="url(#reflgrad)"/></mask>
+            <linearGradient id="reflgrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(255,255,255,.5)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+            </linearGradient>
+          </defs>
+
+          <!-- 顶光 -->
+          <ellipse cx="450" cy="40" rx="380" ry="150" fill="url(#keylight)"/>
+
+          <!-- 车下投影（压在轮胎落地点上） -->
+          <ellipse cx="212" cy="291" rx="118" ry="9" fill="#000" opacity=".85" filter="url(#soft)"/>
+          <ellipse cx="654" cy="291" rx="118" ry="9" fill="#000" opacity=".85" filter="url(#soft)"/>
+
+          <g id="car">
+            <!-- 下装（腰线以下） -->
+            <path d="M44,196 C44,181 56,173 80,170 C210,161 420,160 600,165 C700,168 780,176 812,188 C838,197 850,204 850,213 C850,224 838,231 822,231 L70,231 C50,231 44,222 44,211 Z" fill="url(#body)"/>
+            <!-- 座舱 -->
+            <path d="M262,170 C296,126 340,105 404,100 C476,95 552,104 596,122 C626,133 640,149 646,169 L262,170 Z" fill="url(#body)"/>
+            <!-- 车窗（几乎全黑，只留一道斜反光） -->
+            <path d="M286,166 C314,128 352,112 404,109 C446,107 484,111 516,121 L492,166 Z" fill="#050607"/>
+            <path d="M540,126 C574,136 602,150 624,166 L556,166 Z" fill="#050607"/>
+            <path d="M300,160 C324,130 356,117 398,115 L382,158 Z" fill="url(#glassref)"/>
+            <!-- B 柱 -->
+            <path d="M524,120 L506,168" stroke="#0B0C0E" stroke-width="9"/>
+            <!-- 车门缝 + 把手 -->
+            <path d="M470,172 L462,228" stroke="rgba(255,255,255,.09)" stroke-width="1.2"/>
+            <path d="M496,186 h30" stroke="rgba(255,255,255,.22)" stroke-width="3" stroke-linecap="round"/>
+            <!-- 座舱轮廓光（扫过的那道） -->
+            <path id="sweep1" class="sweep" d="M262,170 C296,126 340,105 404,100 C476,95 552,104 596,122 C626,133 640,149 646,169"
+                  stroke="url(#roofrim)" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+            <!-- 腰线轮廓光 -->
+            <path d="M82,171 C210,162 420,161 600,166 C700,169 780,177 812,189" stroke="url(#siderim)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+            <!-- 面板上的一道柔光（漆面张力） -->
+            <path d="M150,178 C300,172 470,172 660,180" stroke="rgba(255,255,255,.10)" stroke-width="16" fill="none" stroke-linecap="round" filter="url(#bloom2)"/>
+            <!-- 尾灯（贯穿式，带光晕） -->
+            <path d="M46,192 C52,190 58,190 64,192" stroke="url(#tail)" stroke-width="5" fill="none" stroke-linecap="round"/>
+            <path d="M46,192 C52,190 58,190 64,192" stroke="#FF5544" stroke-width="12" fill="none" stroke-linecap="round" filter="url(#bloom)" opacity=".8"/>
+            <!-- 前灯 -->
+            <path d="M812,190 C824,193 834,197 840,202" stroke="rgba(255,250,235,.95)" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <path d="M812,190 C824,193 834,197 840,202" stroke="rgba(255,250,235,.55)" stroke-width="12" fill="none" stroke-linecap="round" filter="url(#bloom)" opacity=".7"/>
+            <!-- 轮arch + 轮 -->
+            <path d="M150,231 A62,62 0 0,1 274,231 Z" fill="#040507"/>
+            <path d="M592,231 A62,62 0 0,1 716,231 Z" fill="#040507"/>
+            <!-- 後輪 -->
+            <g>
+              <circle cx="212" cy="231" r="58" fill="#0B0D10"/>
+              <circle cx="212" cy="231" r="58" fill="none" stroke="rgba(255,255,255,.20)" stroke-width="1.6"/>
+              <path d="M158,190 A62,62 0 0,1 266,190" stroke="rgba(255,255,255,.42)" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+              <circle cx="212" cy="231" r="39" fill="#070809" stroke="rgba(255,255,255,.16)" stroke-width="1.2"/>
+              <path d="M177,204 A34,34 0 0,1 247,204" stroke="rgba(255,255,255,.50)" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+              <circle cx="212" cy="231" r="15" fill="none" stroke="rgba(255,255,255,.26)" stroke-width="1.6"/>
+              <circle cx="212" cy="231" r="5" fill="rgba(255,255,255,.30)"/>
+            </g>
+            <!-- 前輪 -->
+            <g>
+              <circle cx="654" cy="231" r="58" fill="#0B0D10"/>
+              <circle cx="654" cy="231" r="58" fill="none" stroke="rgba(255,255,255,.20)" stroke-width="1.6"/>
+              <path d="M600,190 A62,62 0 0,1 708,190" stroke="rgba(255,255,255,.42)" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+              <circle cx="654" cy="231" r="39" fill="#070809" stroke="rgba(255,255,255,.16)" stroke-width="1.2"/>
+              <path d="M619,204 A34,34 0 0,1 689,204" stroke="rgba(255,255,255,.50)" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+              <circle cx="654" cy="231" r="15" fill="none" stroke="rgba(255,255,255,.26)" stroke-width="1.6"/>
+              <circle cx="654" cy="231" r="5" fill="rgba(255,255,255,.30)"/>
+            </g>
+          </g>
+
+          <!-- 地面上的倒影（遮罩渐隐，不是一团亮带） -->
+          <g mask="url(#refl)" opacity=".30" filter="url(#bloom2)">
+            <g transform="translate(0,528) scale(1,-1)">
+              <path d="M44,196 C44,181 56,173 80,170 C210,161 420,160 600,165 C700,168 780,176 812,188 C838,197 850,204 850,213 C850,224 838,231 822,231 L70,231 C50,231 44,222 44,211 Z" fill="#3A4048"/>
+              <path d="M262,170 C296,126 340,105 404,100 C476,95 552,104 596,122 C626,133 640,149 646,169 Z" fill="#2C323A"/>
+              <circle cx="212" cy="231" r="58" fill="#2A2F36"/>
+              <circle cx="654" cy="231" r="58" fill="#2A2F36"/>
+            </g>
+          </g>
+        </svg>
+      </div>
+
+      <div class="hud top">
+        <div>
+          <div class="name">京A·88888</div>
+          <div class="live" style="margin-top:7px"><i></i>在线 · 2 分钟前上报</div>
+        </div>
+        <div class="spacer"></div>
+        <div class="pill glass" id="lockPill">
+          <svg class="gi g" style="width:17px;height:17px"><use href="#i-lock"/></svg>
+          <span id="lockTxt">已锁车</span>
+        </div>
+      </div>
+
+      <div class="shelf glass">
+        <div class="lead">
+          <span class="lbl">剩余电量</span>
+          <span class="spacer"></span>
+          <span class="val" style="color:var(--accent)">充电中 · 6.8 kW</span>
+        </div>
+        <div class="readout">
+          <div class="hero"><span data-count="78">0</span><span class="u">%</span></div>
+          <div style="margin-bottom:14px">
+            <div class="hero2"><span data-count="420">0</span><span class="u">km 续航</span></div>
+          </div>
+        </div>
+        <div class="hair"></div>
+        <div class="kv">
+          <div><div class="k">电压 / 电流</div><div class="v">356V · 12A</div></div>
+          <div><div class="k">电池温度</div><div class="v">32℃</div></div>
+          <div><div class="k">电池健康</div><div class="v ok">98%</div></div>
+        </div>
+      </div>
+
+      <div class="dock glass">
+        <div class="item on" data-tab="0"><svg class="gi"><use href="#i-car"/></svg><span>车况</span></div>
+        <div class="item" data-tab="1"><svg class="gi"><use href="#i-sliders"/></svg><span>车控</span></div>
+        <div class="item" data-tab="2"><svg class="gi"><use href="#i-bolt"/></svg><span>充电</span></div>
+        <div class="item" data-tab="3"><svg class="gi"><use href="#i-route"/></svg><span>行程</span></div>
+        <div class="item" data-tab="4"><svg class="gi"><use href="#i-person"/></svg><span>我的</span><i class="dot"></i></div>
+      </div>
+    </div></div>
+    <p class="note">车宽 132% 画幅，左右各裁掉一部分——这是"产品照"的构图，也是让车有体量的唯一办法。</p>
+  </div>
+
+  <!-- ==================== 02 车控 · 俯视 ==================== -->
+  <div class="slot">
+    <p class="cap">02 · 车控 — 车本身就是按钮</p>
+    <div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="floor"></div>
+      <div class="status"><span>9:41</span><div class="ri"><span>▮▮▮</span><span>ᯤ</span><span>100%</span></div></div>
+
+      <div class="hud top">
+        <div>
+          <div class="name">车控</div>
+          <div class="live" style="margin-top:7px;color:var(--t3)"><span id="ctrState">四门已锁 · 后备箱未关</span></div>
+        </div>
+        <div class="spacer"></div>
+        <div class="pill glass" id="allLock">
+          <svg class="gi g" style="width:17px;height:17px"><use href="#i-lock"/></svg>
+          <span>全部锁定</span>
+        </div>
+      </div>
+
+      <div class="stage" style="align-items:flex-start;padding-top:118px">
+        <svg viewBox="0 0 460 640" style="width:82%;margin:0">
+          <defs>
+            <linearGradient id="shell" x1="0.1" y1="0" x2="0.9" y2="1">
+              <stop offset="0%" stop-color="#2E343B"/>
+              <stop offset="34%" stop-color="#191D21"/>
+              <stop offset="100%" stop-color="#07080A"/>
+            </linearGradient>
+            <linearGradient id="shellrim" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="rgba(255,255,255,.60)"/>
+              <stop offset="46%" stop-color="rgba(255,255,255,.10)"/>
+              <stop offset="100%" stop-color="rgba(255,255,255,.26)"/>
+            </linearGradient>
+            <linearGradient id="lightbar" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="rgba(255,255,255,.05)"/>
+              <stop offset="50%" stop-color="#FFFFFF"/>
+              <stop offset="100%" stop-color="rgba(255,255,255,.05)"/>
+            </linearGradient>
+          </defs>
+
+          <ellipse cx="230" cy="470" rx="176" ry="120" fill="#000" opacity=".55" filter="url(#soft)"/>
+
+          <!-- 四轮（只露外侧一角） -->
+          <g fill="#060708" stroke="rgba(255,255,255,.10)" stroke-width="1.2">
+            <rect x="52" y="140" width="26" height="56" rx="11" transform="rotate(-3 65 168)"/>
+            <rect x="382" y="140" width="26" height="56" rx="11" transform="rotate(3 395 168)"/>
+            <rect x="52" y="380" width="26" height="56" rx="11" transform="rotate(3 65 408)"/>
+            <rect x="382" y="380" width="26" height="56" rx="11" transform="rotate(-3 395 408)"/>
+          </g>
+
+          <!-- 车身 -->
+          <path d="M230 40 C300 40 356 52 380 76 C396 92 400 116 400 148 L400 388 C400 420 396 444 380 460 C356 484 300 496 230 496 C160 496 104 484 80 460 C64 444 60 420 60 388 L60 148 C60 116 64 92 80 76 C104 52 160 40 230 40 Z" fill="url(#shell)"/>
+          <path d="M230 40 C300 40 356 52 380 76 C396 92 400 116 400 148 L400 388 C400 420 396 444 380 460 C356 484 300 496 230 496 C160 496 104 484 80 460 C64 444 60 420 60 388 L60 148 C60 116 64 92 80 76 C104 52 160 40 230 40 Z" fill="none" stroke="url(#shellrim)" stroke-width="1.4"/>
+
+          <!-- 后视镜 -->
+          <path d="M64 128 l-20 11 4 17 18-6 z" fill="#171B1F" stroke="rgba(255,255,255,.20)" stroke-width="1.1"/>
+          <path d="M396 128 l20 11-4 17-18-6 z" fill="#171B1F" stroke="rgba(255,255,255,.20)" stroke-width="1.1"/>
+
+          <!-- 前风挡 / 天窗 / 后风挡 -->
+          <path d="M112 92 C140 72 180 64 230 64 C280 64 320 72 348 92 L360 122 L100 122 Z" fill="#050607" stroke="rgba(255,255,255,.16)" stroke-width="1.1"/>
+          <rect x="126" y="140" width="208" height="118" rx="26" fill="#050607" stroke="rgba(255,255,255,.15)" stroke-width="1.1"/>
+          <path d="M132 148 h196" stroke="rgba(255,255,255,.08)" stroke-width="1.2"/>
+          <path d="M100 396 L112 452 C140 472 180 480 230 480 C280 480 320 472 348 452 L360 396 Z" fill="#050607" opacity=".92" stroke="rgba(255,255,255,.13)" stroke-width="1.1"/>
+
+          <!-- 车头贯穿灯 -->
+          <path d="M132 46 h76" stroke="rgba(255,250,235,.85)" stroke-width="3.4" stroke-linecap="round"/>
+          <path d="M252 46 h76" stroke="rgba(255,250,235,.85)" stroke-width="3.4" stroke-linecap="round"/>
+          <path d="M132 46 h196" stroke="rgba(255,250,235,.22)" stroke-width="14" stroke-linecap="round" filter="url(#bloom)" opacity=".8"/>
+
+          <!-- 四个可点的门 -->
+          <g class="door" data-door="0">
+            <rect x="60" y="146" width="10" height="72" rx="5" fill="#07080A" stroke="rgba(255,255,255,.18)" stroke-width="1"/>
+            <rect class="dglow" x="60" y="146" width="10" height="72" rx="5" fill="none" stroke="var(--doorc,#3ED07E)" stroke-width="2.4" opacity=".9" style="transition:opacity .2s"/>
+            <rect x="60" y="146" width="10" height="72" rx="5" fill="none" stroke="var(--doorc,#3ED07E)" stroke-width="10" opacity=".22" filter="url(#bloom)"/>
+          </g>
+          <g class="door" data-door="1">
+            <rect x="390" y="146" width="10" height="72" rx="5" fill="#07080A" stroke="rgba(255,255,255,.18)" stroke-width="1"/>
+            <rect class="dglow" x="390" y="146" width="10" height="72" rx="5" fill="none" stroke="var(--doorc,#3ED07E)" stroke-width="2.4" opacity=".9" style="transition:opacity .2s"/>
+            <rect x="390" y="146" width="10" height="72" rx="5" fill="none" stroke="var(--doorc,#3ED07E)" stroke-width="10" opacity=".22" filter="url(#bloom)"/>
+          </g>
+          <g class="door" data-door="2">
+            <rect x="60" y="300" width="10" height="72" rx="5" fill="#07080A" stroke="rgba(255,255,255,.18)" stroke-width="1"/>
+            <rect class="dglow" x="60" y="300" width="10" height="72" rx="5" fill="none" stroke="var(--doorc,#3ED07E)" stroke-width="2.4" opacity=".9" style="transition:opacity .2s"/>
+            <rect x="60" y="300" width="10" height="72" rx="5" fill="none" stroke="var(--doorc,#3ED07E)" stroke-width="10" opacity=".22" filter="url(#bloom)"/>
+          </g>
+          <g class="door" data-door="3">
+            <rect x="390" y="300" width="10" height="72" rx="5" fill="#07080A" stroke="rgba(255,255,255,.18)" stroke-width="1"/>
+            <rect class="dglow" x="390" y="300" width="10" height="72" rx="5" fill="none" stroke="var(--doorc,#3ED07E)" stroke-width="2.4" opacity=".9" style="transition:opacity .2s"/>
+            <rect x="390" y="300" width="10" height="72" rx="5" fill="none" stroke="var(--doorc,#3ED07E)" stroke-width="10" opacity=".22" filter="url(#bloom)"/>
+          </g>
+
+          <!-- 后备箱（未关：琥珀告警） -->
+          <g class="door" id="trunk">
+            <circle cx="230" cy="496" r="34" fill="rgba(242,168,59,.20)" filter="url(#bloom)"/>
+            <path d="M188 496 h84" stroke="#F2A83B" stroke-width="3" stroke-linecap="round"/>
+            <path d="M188 496 h84" stroke="rgba(242,168,59,.4)" stroke-width="14" stroke-linecap="round" filter="url(#bloom)"/>
+          </g>
+        </svg>
+      </div>
+
+      <div class="shelf glass" style="padding:18px 20px">
+        <div class="lead">
+          <span class="lbl">场景</span>
+          <span class="spacer"></span>
+          <span class="val" style="color:var(--t3)">点按车门可开合</span>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:14px">
+          <div class="pill glass" style="flex:1;height:62px;border-radius:22px;justify-content:flex-start;gap:12px;padding:0 18px">
+            <svg class="gi" style="color:var(--accent)"><use href="#i-fan"/></svg>
+            <div><div style="font-size:14px;font-weight:600">极速降温</div><div style="font-size:11px;color:var(--t3);margin-top:3px">16℃ · 5 分钟</div></div>
+          </div>
+          <div class="pill glass" style="flex:1;height:62px;border-radius:22px;justify-content:flex-start;gap:12px;padding:0 18px">
+            <svg class="gi" style="color:var(--t3)"><use href="#i-sun"/></svg>
+            <div><div style="font-size:14px;font-weight:600">一键除霜</div><div style="font-size:11px;color:var(--t3);margin-top:3px">风挡 + 后视镜</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dock glass">
+        <div class="item" data-tab="0"><svg class="gi"><use href="#i-car"/></svg><span>车况</span></div>
+        <div class="item on" data-tab="1"><svg class="gi"><use href="#i-sliders"/></svg><span>车控</span></div>
+        <div class="item" data-tab="2"><svg class="gi"><use href="#i-bolt"/></svg><span>充电</span></div>
+        <div class="item" data-tab="3"><svg class="gi"><use href="#i-route"/></svg><span>行程</span></div>
+        <div class="item" data-tab="4"><svg class="gi"><use href="#i-person"/></svg><span>我的</span><i class="dot"></i></div>
+      </div>
+    </div></div>
+    <p class="note">门是可点的：点一下开合，车上的光色与上方状态文字同步变化——车本身就是控件。</p>
+  </div>
+
+  <!-- ==================== 03 充电 · 能量流 ==================== -->
+  <div class="slot">
+    <p class="cap">03 · 充电 — 能量是可看见的</p>
+    <div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="floor"></div>
+      <div class="status"><span>9:41</span><div class="ri"><span>▮▮▮</span><span>ᯤ</span><span>100%</span></div></div>
+
+      <div class="hud top">
+        <div>
+          <div class="name">充电</div>
+          <div class="live" style="margin-top:7px"><i></i>正在充电 · 6.8 kW</div>
+        </div>
+        <div class="spacer"></div>
+        <div class="pill glass"><span>22:41 充满</span></div>
+      </div>
+
+      <!-- 能量流：桩 → 车 -->
+      <div style="position:absolute;left:0;right:0;top:198px;bottom:300px;z-index:10">
+        <svg viewBox="0 0 400 420" style="width:100%;height:100%">
+          <defs>
+            <linearGradient id="stream" x1="0" y1="1" x2="0.3" y2="0">
+              <stop offset="0%" stop-color="rgba(76,141,255,.15)"/>
+              <stop offset="55%" stop-color="#8FB6FF"/>
+              <stop offset="100%" stop-color="rgba(76,141,255,.15)"/>
+            </linearGradient>
+            <radialGradient id="portglow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="rgba(76,141,255,.55)"/><stop offset="100%" stop-color="rgba(76,141,255,0)"/>
+            </radialGradient>
+          </defs>
+          <!-- 充电桩底座 -->
+          <rect x="150" y="330" width="100" height="62" rx="22" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="1.6"/>
+          <path d="M200 344 l-11 18h9l-3 18 14-21h-9l4-15z" fill="var(--accent)"/>
+          <path d="M200 344 l-11 18h9l-3 18 14-21h-9l4-15z" fill="var(--accent)" filter="url(#bloom)" opacity=".7"/>
+          <!-- 能量流 -->
+          <path d="M200 330 C200 268 214 232 244 196 C268 167 292 136 300 104 C304 88 304 76 302 64"
+                stroke="rgba(255,255,255,.10)" stroke-width="13" fill="none" stroke-linecap="round"/>
+          <path class="flowline" d="M200 330 C200 268 214 232 244 196 C268 167 292 136 300 104 C304 88 304 76 302 64"
+                stroke="url(#stream)" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+          <!-- 车端接口 -->
+          <circle cx="302" cy="60" r="26" fill="url(#portglow)"/>
+          <circle class="beacon" cx="302" cy="60" r="5" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+          <circle cx="302" cy="60" r="5.4" fill="none" stroke="var(--accent)" stroke-width="2.4"/>
+        </svg>
+      </div>
+
+      <div class="shelf glass" style="bottom:104px">
+        <div class="lead">
+          <span class="lbl">电量</span>
+          <span class="spacer"></span>
+          <span class="val">目标 90%</span>
+        </div>
+        <div class="readout">
+          <div class="hero"><span data-count="78">0</span><span class="u">%</span></div>
+          <div style="margin-bottom:14px">
+            <div class="hero2"><span data-count="68" data-div="10">0</span><span class="u">kW 功率</span></div>
+          </div>
+        </div>
+        <div class="hair"></div>
+        <svg viewBox="0 0 320 56" style="width:100%;display:block;margin-top:12px">
+          <defs>
+            <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(76,141,255,.34)"/><stop offset="100%" stop-color="rgba(76,141,255,0)"/>
+            </linearGradient>
+          </defs>
+          <path d="M0 46 L29 42 L58 44 L87 34 L116 36 L145 26 L174 28 L203 20 L232 22 L261 12 L290 14 L320 16 L320 56 L0 56 Z" fill="url(#area)"/>
+          <path id="curve" class="sweep" d="M0 46 L29 42 L58 44 L87 34 L116 36 L145 26 L174 28 L203 20 L232 22 L261 12 L290 14 L320 16"
+                fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="261" cy="12" r="10" fill="rgba(76,141,255,.20)"/>
+          <circle cx="261" cy="12" r="4" fill="var(--accent)" stroke="var(--stage)" stroke-width="2"/>
+        </svg>
+        <div class="kv" style="padding-top:14px">
+          <div><div class="k">本月充电</div><div class="v">184 kWh</div></div>
+          <div><div class="k">本月电费</div><div class="v">¥121</div></div>
+          <div><div class="k">对比燃油省</div><div class="v hot">¥806</div></div>
+        </div>
+      </div>
+
+      <div class="dock glass">
+        <div class="item" data-tab="0"><svg class="gi"><use href="#i-car"/></svg><span>车况</span></div>
+        <div class="item" data-tab="1"><svg class="gi"><use href="#i-sliders"/></svg><span>车控</span></div>
+        <div class="item on" data-tab="2"><svg class="gi"><use href="#i-bolt"/></svg><span>充电</span></div>
+        <div class="item" data-tab="3"><svg class="gi"><use href="#i-route"/></svg><span>行程</span></div>
+        <div class="item" data-tab="4"><svg class="gi"><use href="#i-person"/></svg><span>我的</span><i class="dot"></i></div>
+      </div>
+    </div></div>
+    <p class="note">能量沿着一条真实的路径从桩流进车；充电结束这条线就消失——它不是一个装饰动画。</p>
+  </div>
+
+  <!-- ==================== 04 我的 ==================== -->
+  <div class="slot">
+    <p class="cap">04 · 我的</p>
+    <div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="floor"></div>
+      <div class="status"><span>9:41</span><div class="ri"><span>▮▮▮</span><span>ᯤ</span><span>100%</span></div></div>
+
+      <div class="hud top">
+        <div class="name">我的</div>
+        <div class="spacer"></div>
+        <div class="pill glass"><svg class="gi g" style="width:17px;height:17px"><use href="#i-bell"/></svg><span style="color:var(--warn)">3</span></div>
+      </div>
+
+      <!-- 头像作为舞台上的"物件"，而不是卡片里的头像 -->
+      <div class="stage" style="padding-top:60px;align-items:flex-start">
+        <svg viewBox="0 0 400 300" style="width:64%;margin:0">
+          <defs>
+            <linearGradient id="seal" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#2B3138"/><stop offset="100%" stop-color="#0A0C0E"/>
+            </linearGradient>
+            <linearGradient id="sealrim" x1="0" y1="0" x2="0.6" y2="1">
+              <stop offset="0%" stop-color="rgba(255,255,255,.70)"/><stop offset="55%" stop-color="rgba(255,255,255,.08)"/><stop offset="100%" stop-color="rgba(255,255,255,.30)"/>
+            </linearGradient>
+          </defs>
+          <ellipse cx="200" cy="252" rx="120" ry="20" fill="#000" opacity=".7" filter="url(#soft)"/>
+          <rect x="86" y="60" width="228" height="228" rx="72" fill="url(#seal)"/>
+          <rect x="86" y="60" width="228" height="228" rx="72" fill="none" stroke="url(#sealrim)" stroke-width="1.6"/>
+          <path d="M86 152 h228" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+          <path d="M200 88 v228" stroke="rgba(255,255,255,.06)" stroke-width="1"/>
+          <text x="200" y="228" text-anchor="middle" fill="rgba(255,255,255,.92)"
+                style="font-size:64px;font-weight:200;letter-spacing:2px;font-family:-apple-system,'PingFang SC'">陈</text>
+          <rect x="106" y="80" width="60" height="2" rx="1" fill="rgba(255,255,255,.55)"/>
+        </svg>
+      </div>
+
+      <div class="hud" style="top:340px;left:0;right:0;justify-content:center;flex-direction:column;gap:8px">
+        <div style="font-size:22px;font-weight:600;letter-spacing:.2px">陈先生</div>
+        <div style="font-size:12.5px;letter-spacing:.4px;color:var(--t3)">138****8888 · 已实名认证 · 会员至 2027-03</div>
+      </div>
+
+      <div class="shelf glass" style="bottom:104px;padding:16px 20px 12px">
+        <div class="kv" style="padding-top:2px">
+          <div><div class="k">绑定车辆</div><div class="v">1 辆</div></div>
+          <div><div class="k">数字钥匙</div><div class="v">2 把</div></div>
+          <div><div class="k">本月里程</div><div class="v">1,284 km</div></div>
+        </div>
+        <div class="hair" style="margin:16px 0 2px"></div>
+        <div class="pill" style="height:52px;justify-content:flex-start;gap:12px;padding:0 4px">
+          <svg class="gi" style="color:var(--t2)"><use href="#i-key"/></svg><span style="font-size:14.5px">钥匙共享</span>
+          <span class="spacer"></span><span style="font-size:13px;color:var(--t3)">2 把 ›</span>
+        </div>
+        <div class="hair"></div>
+        <div class="pill" style="height:52px;justify-content:flex-start;gap:12px;padding:0 4px">
+          <svg class="gi" style="color:var(--t2)"><use href="#i-gear"/></svg><span style="font-size:14.5px">保养与保险</span>
+          <span class="spacer"></span><span style="font-size:13px;color:var(--ok)">正常 ›</span>
+        </div>
+        <div class="hair"></div>
+        <div class="pill" style="height:52px;justify-content:flex-start;gap:12px;padding:0 4px">
+          <svg class="gi" style="color:var(--t2)"><use href="#i-shield"/></svg><span style="font-size:14.5px">安全与隐私</span>
+          <span class="spacer"></span><span style="font-size:13px;color:var(--t3)">›</span>
+        </div>
+      </div>
+
+      <div class="dock glass">
+        <div class="item" data-tab="0"><svg class="gi"><use href="#i-car"/></svg><span>车况</span></div>
+        <div class="item" data-tab="1"><svg class="gi"><use href="#i-sliders"/></svg><span>车控</span></div>
+        <div class="item" data-tab="2"><svg class="gi"><use href="#i-bolt"/></svg><span>充电</span></div>
+        <div class="item" data-tab="3"><svg class="gi"><use href="#i-route"/></svg><span>行程</span></div>
+        <div class="item on" data-tab="4"><svg class="gi"><use href="#i-person"/></svg><span>我的</span></div>
+      </div>
+    </div></div>
+    <p class="note">"我的"没有头像照片，只有一枚刻印——没有素材也能做到不廉价。</p>
+  </div>
+
+  <!-- ==================== 05 锁屏 + 小组件 ==================== -->
+  <div class="slot">
+    <p class="cap">05 · 锁屏实时活动 + 桌面小组件</p>
+    <div class="phone"><div class="screen" style="background:radial-gradient(120% 70% at 60% -10%, #23262C 0%, #0C0E11 52%, #000 100%)">
+      <div class="island"></div>
+      <div style="position:absolute;left:0;right:0;top:96px;padding:0 30px;z-index:10">
+        <div style="font-size:13px;font-weight:600;letter-spacing:.5px;color:rgba(255,255,255,.5)">9 月 20 日 星期六</div>
+        <div style="font-size:84px;font-weight:200;letter-spacing:-4px;margin-top:2px;color:#fff;font-variant-numeric:tabular-nums">9:41</div>
+
+        <div class="glass" style="margin-top:28px;border-radius:30px;padding:20px 22px">
+          <div style="display:flex;align-items:center;gap:11px">
+            <svg class="gi" style="width:19px;height:19px;color:var(--accent)"><use href="#i-bolt"/></svg>
+            <span style="font-size:14px;font-weight:600;color:#fff">正在充电 · 78%</span>
+            <span class="spacer"></span>
+            <span style="font-size:12.5px;font-weight:600;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums">22:41 充满</span>
+          </div>
+          <div style="margin-top:15px;height:6px;border-radius:3px;background:rgba(255,255,255,.13);overflow:hidden">
+            <div style="height:100%;width:78%;border-radius:3px;background:linear-gradient(90deg,#2A5FD0,#8FB6FF)"></div>
+          </div>
+          <div style="display:flex;margin-top:12px;font-size:11.5px;color:rgba(255,255,255,.45)">
+            <span>6.8 kW</span><span class="spacer"></span><span>420 km 续航</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:16px;margin-top:24px">
+          <div class="glass" style="flex:1;border-radius:28px;padding:16px">
+            <div class="lbl" style="color:rgba(255,255,255,.45)">电量</div>
+            <svg viewBox="0 0 120 120" style="width:100%;margin-top:8px">
+              <circle cx="60" cy="60" r="44" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="10"/>
+              <circle cx="60" cy="60" r="44" fill="none" stroke="#8FB6FF" stroke-width="10" stroke-linecap="round"
+                      stroke-dasharray="276.5" stroke-dashoffset="60.8" transform="rotate(-90 60 60)"/>
+              <text x="60" y="70" text-anchor="middle" fill="#fff"
+                    style="font-size:30px;font-weight:250;font-variant-numeric:tabular-nums;letter-spacing:-1px">78%</text>
+            </svg>
+            <div style="text-align:center;font-size:11.5px;color:rgba(255,255,255,.45);margin-top:2px">420 km</div>
+          </div>
+          <div class="glass" style="flex:1;border-radius:28px;padding:16px">
+            <div class="lbl" style="color:rgba(255,255,255,.45)">车辆</div>
+            <svg viewBox="0 0 260 130" style="width:100%;margin-top:14px">
+              <path d="M28,96 C28,80 40,73 62,70 C92,50 132,42 176,44 C230,46 250,62 258,84" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="2.4" stroke-linecap="round"/>
+              <path d="M28,96 C28,104 34,108 46,108 L214,108 C228,108 236,104 236,96" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="2.4" stroke-linecap="round"/>
+              <circle cx="76" cy="108" r="13" fill="#0A0B0D" stroke="rgba(255,255,255,.4)" stroke-width="2"/>
+              <circle cx="186" cy="108" r="13" fill="#0A0B0D" stroke="rgba(255,255,255,.4)" stroke-width="2"/>
+              <path d="M30 74 h14" stroke="rgba(255,255,255,.8)" stroke-width="4" stroke-linecap="round"/>
+            </svg>
+            <div style="text-align:center;font-size:11.5px;color:rgba(255,255,255,.45);margin-top:8px">已锁车 · 门窗已关</div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <p class="note">锁屏的玻璃用的是同一套四层材质——所以实时活动和小组件看起来和 App 内是同一个产品。</p>
+  </div>
+
+  <!-- ==================== 06 登录 ==================== -->
+  <div class="slot">
+    <p class="cap">06 · 登录</p>
+    <div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="floor"></div>
+      <div class="status"><span>9:41</span><div class="ri"><span>▮▮▮</span><span>ᯤ</span><span>100%</span></div></div>
+
+      <!-- 品牌：把车头灯的光当作标志 -->
+      <div style="position:absolute;left:0;right:0;top:112px;z-index:10;text-align:center">
+        <svg viewBox="0 0 400 120" style="width:56%;margin:0 auto;display:block">
+          <defs>
+            <linearGradient id="brand" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="rgba(255,255,255,.6)"/><stop offset="50%" stop-color="#FFFFFF"/><stop offset="100%" stop-color="rgba(255,255,255,.6)"/>
+            </linearGradient>
+          </defs>
+          <path d="M20 66 C110 44 200 36 300 40" stroke="url(#brand)" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M60 78 C150 62 220 58 300 62" stroke="rgba(255,255,255,.20)" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+          <path d="M300 40 C340 44 372 54 386 66" stroke="#8FB6FF" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+          <path d="M300 40 C340 44 372 54 386 66" stroke="#4C8DFF" stroke-width="12" fill="none" stroke-linecap="round" filter="url(#bloom)" opacity=".55"/>
+        </svg>
+        <div style="font-size:38px;font-weight:200;letter-spacing:-.6px;margin-top:26px">长安车管家</div>
+        <div style="font-size:10px;font-weight:600;letter-spacing:4.4px;color:var(--t4);margin-top:12px">CHANGAN CONNECT</div>
+      </div>
+
+      <div class="shelf glass" style="bottom:104px;padding:10px 20px">
+        <div class="pill" style="height:60px;justify-content:flex-start;gap:12px;padding:0 4px">
+          <svg class="gi" style="color:var(--t3)"><use href="#i-person"/></svg><span style="font-size:15px;color:var(--t3)">手机号</span>
+        </div>
+        <div class="hair"></div>
+        <div class="pill" style="height:60px;justify-content:flex-start;gap:12px;padding:0 4px">
+          <svg class="gi" style="color:var(--t3)"><use href="#i-window"/></svg><span style="font-size:15px;color:var(--t3)">图形验证码</span>
+          <span class="spacer"></span>
+          <span style="font-size:14px;font-weight:700;letter-spacing:3px;color:var(--text);background:var(--accent-soft);padding:6px 12px;border-radius:10px">8F3K</span>
+        </div>
+        <div class="hair"></div>
+        <div class="pill" style="height:60px;justify-content:flex-start;gap:12px;padding:0 4px">
+          <svg class="gi" style="color:var(--t3)"><use href="#i-bell"/></svg><span style="font-size:15px;color:var(--t3)">短信验证码</span>
+          <span class="spacer"></span>
+          <span style="font-size:12.5px;font-weight:650;color:var(--accent);background:var(--accent-soft);padding:8px 14px;border-radius:15px">获取验证码</span>
+        </div>
+        <div style="height:58px;border-radius:24px;margin-top:16px;display:grid;place-items:center;color:#fff;font-size:16.5px;font-weight:650;letter-spacing:.6px;
+             background:linear-gradient(180deg,#5A96FF,#2F6FE0);box-shadow:inset 0 1px 0 rgba(255,255,255,.42),0 16px 34px -14px rgba(76,141,255,.7)">登录</div>
+        <div class="pill" style="height:54px;justify-content:center;margin-top:10px"><span style="font-size:15px">使用 Face ID 登录</span></div>
+      </div>
+      <div class="dock" style="height:auto;background:transparent;box-shadow:none;backdrop-filter:none;justify-content:center">
+        <div style="width:136px;height:5px;border-radius:3px;background:var(--text);opacity:.25"></div>
+      </div>
+    </div></div>
+    <p class="note">登录页不画车，只用车头灯那道光的走向当标志——克制是唯一能显贵的东西。</p>
+  </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  var root = document.documentElement;
+
+  /* ---------- 日夜切换 ---------- */
+  var n = document.getElementById('m-night'), d = document.getElementById('m-day');
+  function setMode(m){
+    if(m === 'day'){ root.setAttribute('data-mode','day'); d.setAttribute('aria-pressed','true'); n.setAttribute('aria-pressed','false'); }
+    else { root.removeAttribute('data-mode'); n.setAttribute('aria-pressed','true'); d.setAttribute('aria-pressed','false'); }
+  }
+  n.addEventListener('click', function(){ setMode('night'); });
+  d.addEventListener('click', function(){ setMode('day'); });
+
+  /* ---------- 数值滚动（缓出，等宽） ---------- */
+  function count(){
+    document.querySelectorAll('[data-count]').forEach(function(el){
+      var target = parseFloat(el.getAttribute('data-count'));
+      var div = parseFloat(el.getAttribute('data-div') || '1');
+      var start = performance.now(), dur = 1200;
+      function step(now){
+        var t = Math.min(1,(now-start)/dur), e = 1-Math.pow(1-t,3), v = target/div*e;
+        el.textContent = div > 1 ? v.toFixed(1) : Math.round(v);
+        if(t < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  }
+  count();
+
+  /* ---------- Tab 条 ---------- */
+  document.querySelectorAll('.dock').forEach(function(dock){
+    dock.querySelectorAll('.item').forEach(function(it){
+      it.addEventListener('click', function(){
+        dock.querySelectorAll('.item').forEach(function(x){ x.classList.remove('on'); });
+        it.classList.add('on');
+      });
+    });
+  });
+
+  /* ---------- 锁车 / 解锁 ---------- */
+  var lockPill = document.getElementById('lockPill');
+  if(lockPill){
+    var locked = true, txt = document.getElementById('lockTxt'), ico = lockPill.querySelector('use');
+    lockPill.addEventListener('click', function(){
+      locked = !locked;
+      txt.textContent = locked ? '已锁车' : '已解锁';
+      ico.setAttribute('href', locked ? '#i-lock' : '#i-unlock');
+    });
+  }
+
+  /* ---------- 车门：点按开合（车就是控件） ---------- */
+  var doors = Array.prototype.slice.call(document.querySelectorAll('.door[data-door]'));
+  var names = ['左前门','右前门','左后门','右后门'];
+  var open = [false,false,false,false];
+  var trunkOpen = true;
+  var ctr = document.getElementById('ctrState');
+
+  function paint(){
+    doors.forEach(function(g, i){
+      var c = open[i] ? '#F2A83B' : '#3ED07E';
+      g.querySelectorAll('[stroke]').forEach(function(el){
+        if(el.getAttribute('stroke') && el.getAttribute('stroke').indexOf('var(--doorc') === 0){ el.style.setProperty('--doorc', c); }
+      });
+      g.querySelectorAll('rect[stroke^="var(--doorc"]').forEach(function(el){ el.style.setProperty('--doorc', c); });
+      g.style.setProperty('--doorc', c);
+    });
+    var openList = [];
+    open.forEach(function(v,i){ if(v) openList.push(names[i]); });
+    var msg = openList.length ? openList.join('、') + ' 未关' : '四门已锁';
+    msg += trunkOpen ? ' · 后备箱未关' : ' · 后备箱已关';
+    if(ctr) ctr.textContent = msg;
+  }
+  doors.forEach(function(g, i){
+    g.addEventListener('click', function(){ open[i] = !open[i]; paint(); });
+  });
+  var trunk = document.getElementById('trunk');
+  if(trunk) trunk.addEventListener('click', function(){ trunkOpen = !trunkOpen; paint(); });
+
+  var allLock = document.getElementById('allLock');
+  if(allLock) allLock.addEventListener('click', function(){
+    var anyOpen = open.some(Boolean);
+    open = anyOpen ? [false,false,false,false] : [true,true,true,true];
+    paint();
+  });
+
+  paint();
+})();
+</script>
+</body>
+</html>

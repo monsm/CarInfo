@@ -8,7 +8,7 @@ struct GlobalSearchHUD: View {
     @Binding var isPresented: Bool
     @State private var searchText = ""
     @State private var searchResults: [SearchResult] = []
-    
+
     struct SearchResult: Identifiable {
         let id = UUID()
         let title: String
@@ -16,26 +16,26 @@ struct GlobalSearchHUD: View {
         let icon: String
         let action: () -> Void
     }
-    
+
     var body: some View {
         ZStack {
             // 背景遮罩
             Color.black.opacity(0.5)
                 .ignoresSafeArea()
                 .onTapGesture { isPresented = false }
-            
+
             VStack(spacing: 0) {
                 // 搜索框
                 HStack(spacing: 12) {
                     Image(systemName: "magnifyingglass")
                         .font(.title3)
                         .foregroundStyle(.secondary)
-                    
+
                     TextField("搜索车况、设置...", text: $searchText)
                         .font(.title3)
                         .textFieldStyle(.plain)
                         .foregroundColor(.primary)
-                    
+
                     if !searchText.isEmpty {
                         Button {
                             searchText = ""
@@ -48,7 +48,7 @@ struct GlobalSearchHUD: View {
                 .padding()
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                 .padding(.horizontal)
-                
+
                 // 搜索结果
                 ScrollView {
                     VStack(spacing: 8) {
@@ -61,7 +61,7 @@ struct GlobalSearchHUD: View {
                     }
                     .padding()
                 }
-                
+
                 Spacer()
             }
             .padding(.top, 16)
@@ -73,10 +73,10 @@ struct GlobalSearchHUD: View {
             searchResults = []
         }
     }
-    
+
     private func performSearch(_ text: String) -> [SearchResult] {
         guard !text.isEmpty else { return [] }
-        
+
         let allItems: [SearchResult] = [
             SearchResult(
                 title: "车辆状态",
@@ -115,7 +115,7 @@ struct GlobalSearchHUD: View {
                 action: {}
             )
         ]
-        
+
         return allItems.filter { item in
             item.title.localizedCaseInsensitiveContains(text) ||
             item.subtitle.localizedCaseInsensitiveContains(text)
@@ -126,15 +126,15 @@ struct GlobalSearchHUD: View {
 struct SearchResultRow: View {
     let result: GlobalSearchHUD.SearchResult
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(safeSymbol: result.icon, fallback: "magnifyingglass")
                     .font(.title2)
-                    .foregroundStyle(Theme.Colors.accent)
+                    .foregroundStyle(Kansei.Color.ambient)
                     .frame(width: 36)
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(result.title)
                         .font(.headline)
@@ -142,9 +142,9 @@ struct SearchResultRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(.tertiary)

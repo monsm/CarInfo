@@ -12,7 +12,7 @@ enum DTCSeverity: String, CaseIterable, Identifiable {
     case warning = "warning"         // 橙色 - 尽快检查
     case info = "info"               // 蓝色 - 提示信息
     case resolved = "resolved"       // 绿色 - 已解决
-    
+
     var id: String { rawValue }
     var color: Color {
         switch self {
@@ -44,13 +44,13 @@ struct DTCSeverityBadge: View {
     let severity: DTCSeverity
     let code: String
     let description: String
-    
+
     var body: some View {
-        HStack(spacing: Theme.Spacing.sm) {
+        HStack(spacing: Kansei.Spacing.sm) {
             Image(safeSymbol: severity.icon, fallback: "exclamationmark.triangle.fill")
                 .foregroundColor(severity.color)
                 .font(.title3)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(code)
@@ -80,7 +80,7 @@ enum DriveMode: String, CaseIterable {
     case comfort = "COMFORT"
     case sport = "SPORT"
     case snow = "SNOW"
-    
+
     var icon: String {
         switch self {
         case .eco: return "leaf.fill"
@@ -103,9 +103,9 @@ struct DriveModeDisplay: View {
     let currentMode: DriveMode
     let availableModes: [DriveMode]
     let onModeChange: (DriveMode) -> Void
-    
+
     var body: some View {
-        HStack(spacing: Theme.Spacing.md) {
+        HStack(spacing: Kansei.Spacing.md) {
             ForEach(availableModes, id: \.self) { mode in
                 Button {
                     onModeChange(mode)
@@ -119,9 +119,9 @@ struct DriveModeDisplay: View {
                     .frame(width: 56, height: 56)
                     .background(mode == currentMode ? mode.color : Color.clear)
                     .foregroundColor(mode == currentMode ? .white : mode.color)
-                    .cornerRadius(Theme.Radius.medium)
+                    .cornerRadius(Kansei.Radius.medium)
                     .overlay(
-                        RoundedRectangle(cornerRadius: Theme.Radius.medium)
+                        RoundedRectangle(cornerRadius: Kansei.Radius.medium)
                             .stroke(mode == currentMode ? mode.color : Color.clear, lineWidth: 2)
                     )
                 }
@@ -135,7 +135,7 @@ struct DriveModeDisplay: View {
 // MARK: - E8 车辆2D状态俯视图
 struct Vehicle2DStatusView: View {
     let control: [String: Any]?
-    
+
     // ⚠️ 字段名与取值语义必须对齐官方报文（对照小程序 utils/vm.js 的 bodyDetailModel / bodyStatus）：
     // 门 / 后备箱 / 前舱盖 / 天窗 / 车窗开度 / 灯光：0 = 关闭或已锁，非 0 = 开启或未锁。
     // 之前这里读的是 doorLocked / trunkOpen / hoodOpen / windowFrontLeft …… 这些键在长安接口里
@@ -177,7 +177,7 @@ struct Vehicle2DStatusView: View {
     private var isHazardOn: Bool {
         flag(["LeftTurnSignal", "TurnLndicatorLeft"]) && flag(["RightTurnSignal", "TurnLndicatorRight"])
     }
-    
+
     var body: some View {
         ZStack {
             // 车身轮廓
@@ -185,7 +185,7 @@ struct Vehicle2DStatusView: View {
                 .fill(Color.secondary.opacity(0.1))
                 .frame(width: 120, height: 200)
                 .cornerRadius(20)
-            
+
             // 车顶
             Rectangle()
                 .fill(Color.secondary.opacity(0.15))
@@ -201,7 +201,7 @@ struct Vehicle2DStatusView: View {
                     .offset(y: -30)
                     .accessibilityLabel(Text("天窗已打开"))
             }
-            
+
             // 车门状态指示
             // 左前门
             if isWindowFrontLeftOpen {
@@ -251,7 +251,7 @@ struct Vehicle2DStatusView: View {
                     .frame(width: 8, height: 35)
                     .offset(x: 54, y: 30)
             }
-            
+
             // 车灯状态（原来是无含义的纯色圆点，现在用灯光 / 危险警示图标）
             if isHeadlightOn {
                 Image(safeSymbol: "lightbulb.fill", fallback: "lightbulb")
@@ -273,13 +273,13 @@ struct Vehicle2DStatusView: View {
                     .foregroundStyle(.orange)
                     .offset(x: 35, y: -85)
             }
-            
+
             // 锁止状态中心图标
             Image(safeSymbol: isDoorLocked ? "lock.fill" : "lock.open.fill", fallback: "lock.fill")
                 .font(.title2)
                 .foregroundColor(isDoorLocked ? .green : .orange)
                 .offset(y: 50)
-            
+
             // 后备箱指示（原来是 🔓 emoji，改成真正的图标）
             if isTrunkOpen {
                 Image(safeSymbol: "archivebox.fill", fallback: "shippingbox.fill")

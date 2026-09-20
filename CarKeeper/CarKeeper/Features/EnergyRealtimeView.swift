@@ -11,7 +11,7 @@ import Charts
 // MARK: - E1 实时能耗率
 struct RealtimeEnergyDisplay: View {
     let store: AppStore
-    
+
     var currentEnergyRate: Double {
         let history = store.energyHistory
         guard history.count >= 2 else { return 0 }
@@ -26,7 +26,7 @@ struct RealtimeEnergyDisplay: View {
         let energyUsed = abs(socDiff) / 100.0 * 15.0
         return energyUsed / timeDiff // kWh/h
     }
-    
+
     var body: some View {
         HStack {
             VStack(alignment: .leading) {
@@ -74,13 +74,13 @@ struct SOHDashboard: View {
         default: return .red
         }
     }
-    
+
     var body: some View {
-        VStack(spacing: Theme.Spacing.sm) {
+        VStack(spacing: Kansei.Spacing.sm) {
             Text("电池健康度 SOH")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            
+
             ZStack {
                 Circle()
                     .stroke(Color.secondary.opacity(0.15), lineWidth: 12)
@@ -89,7 +89,7 @@ struct SOHDashboard: View {
                     .foregroundStyle(sohColor)
                     .rotationEffect(.degrees(270))
                     .animation(.spring(response: 0.6, dampingFraction: 0.7), value: soh)
-                
+
                 VStack {
                     Text(String(format: "%.0f%%", soh))
                         .font(.system(size: 28, weight: .bold, design: .rounded))
@@ -100,7 +100,7 @@ struct SOHDashboard: View {
                 }
             }
             .frame(width: 100, height: 100)
-            
+
             HStack {
                 Text("最大续航: \(currentMaxRange) km")
                     .font(.caption)
@@ -119,7 +119,7 @@ struct SOHDashboard: View {
 // MARK: - E3 胎压趋势折线图
 struct TirePressureTrendChart: View {
     let pressures: [TirePressureRecord]
-    
+
     var body: some View {
         if pressures.count < 2 {
             Text("暂无胎压历史数据")
@@ -136,7 +136,7 @@ struct TirePressureTrendChart: View {
                     )
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
                     .foregroundStyle(.blue)
-                    
+
                     PointMark(
                         x: .value("时间", pressures[i].time),
                         y: .value("压力 bar", pressures[i].pressure)
@@ -144,7 +144,7 @@ struct TirePressureTrendChart: View {
                     .foregroundStyle(.blue)
                     .symbolSize(20)
                 }
-                
+
                 // 正常范围带
                 RuleMark(y: .value("下限", 2.5))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
@@ -172,15 +172,16 @@ struct TirePressureRecord: Identifiable {
 struct EnergyGaugeView: View {
     let rate: Double // kWh/100km
     let color: Color
-    
+
     var body: some View {
         ZStack {
             // 背景弧
             RadiusArc(startAngle: .degrees(-225), endAngle: .degrees(45), color: .secondary.opacity(0.2), lineWidth: 12)
             // 进度弧
-            RadiusArc(startAngle: .degrees(-225), endAngle: .degrees(45 + (rate / 40.0) * 270), color: color, lineWidth: 12)
+            RadiusArc(startAngle: .degrees(-225), endAngle: .degrees(45 + (rate / 40.0) * 270), color: colorl
+ineWidth: 12)
                 .animation(.easeOut(duration: 0.5), value: rate)
-            
+
             VStack {
                 Text("\(String(format: "%.1f", rate))")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
@@ -198,7 +199,7 @@ struct RadiusArc: View {
     let endAngle: Angle
     let color: Color
     let lineWidth: CGFloat
-    
+
     var body: some View {
         Circle()
             .trim(from: 0, to: 1)
@@ -213,13 +214,14 @@ struct RadiusArc: View {
                     let start = point(onCircle: center, radius: radius, angle: startAngle)
                     let end = point(onCircle: center, radius: radius, angle: endAngle)
                     path.move(to: start)
-                    path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle, clockwise: false)
+                    path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAnglec
+lockwise: false)
                 }
                 .fill(color)
             )
             .frame(width: 100, height: 100)
     }
-    
+
     private func point(onCircle center: CGPoint, radius: CGFloat, angle: Angle) -> CGPoint {
         let radians = angle.radians
         return CGPoint(x: center.x + radius * cos(radians), y: center.y + radius * sin(radians))

@@ -16,20 +16,20 @@ struct TemporaryKey: Identifiable, Codable {
     let maxUses: Int
     var usedCount: Int
     var isActive: Bool
-    
+
     var remainingUses: Int { max(0, maxUses - usedCount) }
     var isExpired: Bool { Date() > expiresAt }
 }
 
 class TempKeyManager: ObservableObject {
     static let shared = TempKeyManager()
-    
+
     @Published var keys: [TemporaryKey] = []
-    
+
     private init() {
         loadKeys()
     }
-    
+
     /// 生成临时钥匙
     func createKey(recipient: String, days: Int = 7, maxUses: Int = 10) -> TemporaryKey {
         let code = String(format: "%06d", Int.random(in: 100000...999999))
@@ -47,7 +47,7 @@ class TempKeyManager: ObservableObject {
         saveKeys()
         return key
     }
-    
+
     /// 使用钥匙（减少剩余次数）
     func useKey(_ id: UUID) {
         if let idx = keys.firstIndex(where: { $0.id == id }) {
@@ -60,13 +60,13 @@ class TempKeyManager: ObservableObject {
             saveKeys()
         }
     }
-    
+
     /// 撤销钥匙
     func revokeKey(_ id: UUID) {
         keys.removeAll { $0.id == id }
         saveKeys()
     }
-    
+
     /// 退出登录时清空（内存 + 磁盘）：临时钥匙是跟账号绑定的数据
     func resetAll() {
         keys = []
@@ -78,7 +78,7 @@ class TempKeyManager: ObservableObject {
             UserDefaults.standard.set(data, forKey: "carkeeper_temp_keys")
         }
     }
-    
+
     private func loadKeys() {
         guard let data = UserDefaults.standard.data(forKey: "carkeeper_temp_keys"),
               let decoded = try? JSONDecoder().decode([TemporaryKey].self, from: data) else { return }
@@ -99,25 +99,25 @@ struct FamilyMember: Identifiable, Codable {
 
 class FamilyManager: ObservableObject {
     static let shared = FamilyManager()
-    
+
     @Published var members: [FamilyMember] = []
     @Published var ownerName: String = "我"
-    
+
     private init() {
         loadMembers()
     }
-    
+
     func addMember(name: String, phone: String, roles: [String] = ["驾驶员"]) {
         let member = FamilyMember(name: name, phone: phone, avatar: String(name.first ?? "M"), roles: roles)
         members.append(member)
         saveMembers()
     }
-    
+
     func removeMember(_ id: UUID) {
         members.removeAll { $0.id == id }
         saveMembers()
     }
-    
+
     func shareCar(_ carId: String, with member: FamilyMember) {
         var m = member
         if !m.sharedCars.contains(carId) {
@@ -128,7 +128,7 @@ class FamilyManager: ObservableObject {
             saveMembers()
         }
     }
-    
+
     /// 退出登录时清空（内存 + 磁盘）：家庭成员列表是跟账号绑定的数据
     func resetAll() {
         members = []
@@ -141,7 +141,7 @@ class FamilyManager: ObservableObject {
             UserDefaults.standard.set(data, forKey: "carkeeper_family_members")
         }
     }
-    
+
     private func loadMembers() {
         guard let data = UserDefaults.standard.data(forKey: "carkeeper_family_members"),
               let decoded = try? JSONDecoder().decode([FamilyMember].self, from: data) else { return }
@@ -153,7 +153,7 @@ class FamilyManager: ObservableObject {
 struct TempKeyCard: View {
     let key: TemporaryKey
     let onUse: () -> Void
-    
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -170,14 +170,14 @@ struct TempKeyCard: View {
                 }
             }
             Spacer()
-            
+
             if key.isActive && !key.isExpired && key.remainingUses > 0 {
                 Button(action: onUse) {
                     Text("使用")
                         .font(.caption.weight(.semibold))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Theme.Colors.accent)
+                        .background(Kansei.Color.ambient)
                         .foregroundColor(.white)
                         .cornerRadius(8)
                 }
@@ -198,10 +198,10 @@ struct FamilyMemberRow: View {
     var body: some View {
         HStack {
             Circle()
-                .fill(Theme.Colors.accent.opacity(0.2))
+                .fill(Kansei.Color.ambient.opacity(0.2))
                 .frame(width: 40, height: 40)
-                .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(Theme.Colors.accent))
-            
+                .overlay(Text(member.avatar).font(.title3).fontWeight(.bold)                .foregroundColor(Kansei.Color.ambient))
+
             VStack(alignment: .leading) {
                 Text(member.name)
                     .font(.subheadline).fontWeight(.semibold)
@@ -223,7 +223,7 @@ struct TempKeyListView: View {
     @State private var recipientName = ""
     @State private var days = 7
     @State private var maxUses = 10
-    
+
     var body: some View {
         List {
             Section("当前有效钥匙") {
@@ -238,7 +238,7 @@ struct TempKeyListView: View {
                     }
                 }
             }
-            
+
             Section("创建新钥匙") {
                 VStack(spacing: 12) {
                     TextField(" recipient 姓名", text: $recipientName)
@@ -273,7 +273,7 @@ struct FamilyManagementView: View {
     @State private var showAdd = false
     @State private var newName = ""
     @State private var newPhone = ""
-    
+
     var body: some View {
         List {
             Section("家庭成员") {
@@ -285,7 +285,7 @@ struct FamilyManagementView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            
+
             Section("添加成员") {
                 VStack(spacing: 12) {
                     TextField("姓名", text: $newName)

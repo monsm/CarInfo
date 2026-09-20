@@ -12,9 +12,9 @@ class ShakeDetector: ObservableObject {
     private var isEnabled: Bool {
         UserDefaults.standard.bool(forKey: "carkeeper_shake_to_lock")
     }
-    
+
     private init() {}
-    
+
     func startMonitoring() {
         guard motionManager.isAccelerometerAvailable, isEnabled else { return }
         motionManager.accelerometerUpdateInterval = 0.1
@@ -28,11 +28,11 @@ class ShakeDetector: ObservableObject {
             }
         }
     }
-    
+
     func stopMonitoring() {
         motionManager.stopAccelerometerUpdates()
     }
-    
+
     var onShake: ((CMAcceleration) -> Void)?
 }
 
@@ -44,7 +44,7 @@ struct SOCDetailSheet: View {
     let timeToEmpty: Int?
     let charging: Bool
     @Environment(\.dismiss) var dismiss
-    
+
     var body: some View {
         NavigationStack {
             List {
@@ -81,9 +81,9 @@ struct CarSwitchGesture: ViewModifier {
     @Binding var selectedCarIndex: Int
     let carCount: Int
     let onSwitch: (Int) -> Void
-    
+
     @State private var dragOffset: CGFloat = 0
-    
+
     func body(content: Content) -> some View {
         content
             .gesture(

@@ -258,7 +258,7 @@ struct DSCanvas<Content: View>: View {
 
     var body: some View {
         ZStack {
-            DS.Palette.canvas.ignoresSafeArea()
+            Kansei.Color.background.ignoresSafeArea()
             content()
         }
     }
@@ -295,29 +295,12 @@ struct DSCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(DS.Palette.surface)
+                    .fill(Kansei.Color.nightSurface)
             }
     }
 }
 
 /// 可点击卡片
-struct DSTappableCard<Content: View>: View {
-    var action: () -> Void
-    var content: () -> Content
-
-    init(action: @escaping () -> Void, @ViewBuilder content: @escaping () -> Content) {
-        self.action = action
-        self.content = content
-    }
-
-    var body: some View {
-        Button(action: action) {
-            DSCard(content: content)
-        }
-        .buttonStyle(DSCardButtonStyle())
-    }
-}
-
 struct DSCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -335,7 +318,7 @@ struct DSDivider: View {
     var inset: CGFloat = 0
     var body: some View {
         Rectangle()
-            .fill(DS.Palette.hairline)
+            .fill(Kansei.Color.glassBorder)
             .frame(height: DS.Hair.line)
             .padding(.leading, inset)
     }
@@ -372,14 +355,14 @@ struct DSGroup<Content: View>: View {
             VStack(spacing: 0) { content() }
                 .background {
                     RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                        .fill(DS.Palette.surface)
+                        .fill(Kansei.Color.nightSurface)
                 }
                 // 裁剪掉圆角：行的按压底色是矩形，不裁会在分组四角露出方角
                 .clipShape(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous))
             if let footer {
                 Text(footer)
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .foregroundStyle(Kansei.Color.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6)
             }
@@ -417,12 +400,12 @@ struct DSKeyValueRow: View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Space.md) {
             Text(key)
                 .font(DS.Typo.subheadline)
-                .foregroundStyle(DS.Palette.label)
+                .foregroundStyle(Kansei.Color.primary)
                 .lineLimit(2)
             Spacer(minLength: DS.Space.sm)
             Text(value)
                 .font(mono ? DS.Typo.dataSmall : DS.Typo.subheadline)
-                .foregroundStyle(valueCls == "na" ? DS.Palette.labelSecondary : DS.Palette.status(valueCls))
+                .foregroundStyle(valueCls == "na" ? Kansei.Color.secondary : Kansei.Color.status(valueCls))
                 .multilineTextAlignment(.trailing)
                 .layoutPriority(1)
         }
@@ -446,18 +429,18 @@ struct DSSectionHeader: View {
             Text(title.uppercased())
                 .font(DS.Typo.footnote)
                 .tracking(0.2)
-                .foregroundStyle(DS.Palette.labelSecondary)
+                .foregroundStyle(Kansei.Color.secondary)
             Spacer(minLength: DS.Space.sm)
             if let trailing {
                 if let action {
                     Button(trailing, action: action)
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(DS.Palette.tint)
+                        .foregroundStyle(Kansei.Color.ambient)
                         .buttonStyle(.plain)
                 } else {
                     Text(trailing)
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(DS.Palette.labelTertiary)
+                        .foregroundStyle(Kansei.Color.tertiary)
                 }
             }
         }
@@ -471,7 +454,7 @@ struct DSBigNumber: View {
     var unit: String? = nil
     var caption: String? = nil
     var size: CGFloat = 96
-    var tint: Color = DS.Palette.label
+    var tint: Color = Kansei.Color.primary
     var alignment: HorizontalAlignment = .leading
 
     var body: some View {
@@ -487,13 +470,13 @@ struct DSBigNumber: View {
                 if let unit {
                     Text(unit)
                         .font(DS.Typo.metric(size * 0.30))
-                        .foregroundStyle(DS.Palette.labelSecondary)
+                        .foregroundStyle(Kansei.Color.secondary)
                 }
             }
             if let caption {
                 Text(caption)
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .foregroundStyle(Kansei.Color.secondary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -506,7 +489,7 @@ struct DSMetric: View {
     var unit: String? = nil
     var caption: String? = nil
     var size: CGFloat = 72
-    var tint: Color = DS.Palette.label
+    var tint: Color = Kansei.Color.primary
     var alignment: HorizontalAlignment = .leading
 
     var body: some View {
@@ -582,7 +565,7 @@ struct DSStatStrip: View {
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
                 if idx > 0 {
                     Rectangle()
-                        .fill(DS.Palette.hairline)
+                        .fill(Kansei.Color.glassBorder)
                         .frame(width: DS.Hair.line)
                         .frame(maxHeight: .infinity)
                 }
@@ -596,10 +579,10 @@ struct DSStatStrip: View {
                             .lineLimit(1)
                     }
                     .font(DS.Typo.caption)
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .foregroundStyle(Kansei.Color.secondary)
                     Text(item.value)
                         .font(DS.Typo.data)
-                        .foregroundStyle(item.cls == "na" ? DS.Palette.label : DS.Palette.status(item.cls))
+                        .foregroundStyle(item.cls == "na" ? Kansei.Color.primary : Kansei.Color.status(item.cls))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
@@ -619,7 +602,7 @@ struct DSChip: View {
     var cls: String = "na"
     var icon: String? = nil
 
-    private var color: Color { DS.Palette.status(cls) }
+    private var color: Color { Kansei.Color.status(cls) }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -634,7 +617,7 @@ struct DSChip: View {
             }
             Text(text)
                 .font(DS.Typo.footnote)
-                .foregroundStyle(cls == "na" ? DS.Palette.labelSecondary : color)
+                .foregroundStyle(cls == "na" ? Kansei.Color.secondary : color)
                 .lineLimit(1)
         }
         .accessibilityElement(children: .combine)
@@ -653,16 +636,16 @@ struct DSStatRow: View {
             if let icon {
                 Image(safeSymbol: icon, fallback: "circle")
                     .font(.system(size: DS.Size.iconSm))
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .foregroundStyle(Kansei.Color.secondary)
                     .frame(width: 20)
             }
             Text(label)
                 .font(DS.Typo.body)
-                .foregroundStyle(DS.Palette.label)
+                .foregroundStyle(Kansei.Color.primary)
             Spacer(minLength: DS.Space.md)
             Text(value)
                 .font(DS.Typo.data)
-                .foregroundStyle(valueCls == "na" ? DS.Palette.labelSecondary : DS.Palette.status(valueCls))
+                .foregroundStyle(valueCls == "na" ? Kansei.Color.secondary : Kansei.Color.status(valueCls))
                 .multilineTextAlignment(.trailing)
         }
         .frame(minHeight: DS.Space.row)
@@ -683,14 +666,14 @@ struct DSStatTile: View {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
                     .font(DS.Typo.metric(28))
-                    .foregroundStyle(cls == "na" ? DS.Palette.label : DS.Palette.status(cls))
+                    .foregroundStyle(cls == "na" ? Kansei.Color.primary : Kansei.Color.status(cls))
                     .contentTransition(.numericText())
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 if let unit {
                     Text(unit)
                         .font(DS.Typo.caption)
-                        .foregroundStyle(DS.Palette.labelSecondary)
+                        .foregroundStyle(Kansei.Color.secondary)
                 }
             }
             HStack(spacing: 4) {
@@ -702,7 +685,7 @@ struct DSStatTile: View {
                     .lineLimit(1)
             }
             .font(DS.Typo.caption)
-            .foregroundStyle(DS.Palette.labelSecondary)
+            .foregroundStyle(Kansei.Color.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -734,17 +717,17 @@ struct DSRow: View {
             if let icon {
                 Image(safeSymbol: icon, fallback: "circle")
                     .font(.system(size: DS.Size.icon))
-                    .foregroundStyle(DS.Palette.tint)
+                    .foregroundStyle(Kansei.Color.ambient)
                     .frame(width: DS.Size.iconColumn, alignment: .center)
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(DS.Typo.body)
-                    .foregroundStyle(DS.Palette.label)
+                    .foregroundStyle(Kansei.Color.primary)
                 if let subtitle {
                     Text(subtitle)
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(DS.Palette.labelSecondary)
+                        .foregroundStyle(Kansei.Color.secondary)
                         .lineLimit(2)
                 }
             }
@@ -752,13 +735,13 @@ struct DSRow: View {
             if let value {
                 Text(value)
                     .font(DS.Typo.data)
-                    .foregroundStyle(valueCls == "na" ? DS.Palette.labelSecondary : DS.Palette.status(valueCls))
+                    .foregroundStyle(valueCls == "na" ? Kansei.Color.secondary : Kansei.Color.status(valueCls))
                     .multilineTextAlignment(.trailing)
             }
             if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(DS.Palette.labelTertiary)
+                    .foregroundStyle(Kansei.Color.tertiary)
             }
         }
         .frame(minHeight: DS.Space.row)
@@ -770,7 +753,7 @@ struct DSRow: View {
 struct DSRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(configuration.isPressed ? DS.Palette.fillSubtle : Color.clear)
+            .background(configuration.isPressed ? Kansei.Color.fillSubtle : Color.clear)
             .animation(DS.Motion.press, value: configuration.isPressed)
     }
 }
@@ -787,7 +770,7 @@ struct DSTile: View {
     var action: () -> Void
 
     private var accent: Color {
-        isActive ? DS.Palette.status(cls) : DS.Palette.label
+        isActive ? Kansei.Color.status(cls) : Kansei.Color.primary
     }
 
     var body: some View {
@@ -810,7 +793,7 @@ struct DSTile: View {
                 if let subtitle {
                     Text(subtitle)
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(DS.Palette.labelSecondary)
+                        .foregroundStyle(Kansei.Color.secondary)
                         .lineLimit(1)
                 }
             }
@@ -819,7 +802,7 @@ struct DSTile: View {
             .frame(minHeight: 84, alignment: .topLeading)
             .background {
                 RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                    .fill(DS.Palette.surface)
+                    .fill(Kansei.Color.nightSurface)
             }
         }
         .buttonStyle(DSCardButtonStyle())
@@ -830,7 +813,7 @@ struct DSTile: View {
 
 /// 主操作按钮（一屏最多一个）：实心胶囊
 struct DSPrimaryButtonStyle: ButtonStyle {
-    var tint: Color = DS.Palette.tint
+    var tint: Color = Kansei.Color.ambient
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -850,10 +833,10 @@ struct DSSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(DS.Typo.headline)
-            .foregroundStyle(DS.Palette.label)
+            .foregroundStyle(Kansei.Color.primary)
             .frame(maxWidth: .infinity)
             .frame(height: DS.Size.button)
-            .background(Capsule().fill(DS.Palette.fill))
+            .background(Capsule().fill(Kansei.Color.glassLight))
             .opacity(configuration.isPressed ? 0.65 : 1)
             .animation(DS.Motion.press, value: configuration.isPressed)
     }
@@ -862,14 +845,14 @@ struct DSSecondaryButtonStyle: ButtonStyle {
 /// 图标按钮（导航栏、行尾）
 struct DSIconButtonStyle: ButtonStyle {
     var size: CGFloat = DS.Size.tap
-    var tint: Color = DS.Palette.label
+    var tint: Color = Kansei.Color.primary
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: DS.Size.iconLg))
             .foregroundStyle(tint)
             .frame(width: size, height: size)
-            .background(Circle().fill(configuration.isPressed ? DS.Palette.fill : Color.clear))
+            .background(Circle().fill(configuration.isPressed ? Kansei.Color.glassLight : Color.clear))
             .contentShape(Circle())
             .animation(DS.Motion.press, value: configuration.isPressed)
     }
@@ -889,13 +872,13 @@ struct DSSegmented<T: Hashable>: View {
                 } label: {
                     Text(option.title)
                         .font(DS.Typo.subheadline.weight(selected ? .semibold : .regular))
-                        .foregroundStyle(DS.Palette.label)
+                        .foregroundStyle(Kansei.Color.primary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 32)
                         .background {
                             if selected {
                                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                    .fill(DS.Palette.surface)
+                                    .fill(Kansei.Color.nightSurface)
                                     .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
                             }
                         }
@@ -905,106 +888,12 @@ struct DSSegmented<T: Hashable>: View {
             }
         }
         .padding(2)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(DS.Palette.surfaceSunken))
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Kansei.Color.glassLight))
     }
 }
 
 /// 环形仪表：单色细环 + 轨道（保留给确实需要"环"的少数页面）
-struct DSGauge: View {
-    var progress: Double
-    var lineWidth: CGFloat = 10
-    var tint: Color = DS.Palette.tint
-    var value: String? = nil
-    var unit: String? = nil
-    var caption: String? = nil
-    var size: CGFloat = 180
-    var gradient: LinearGradient? = nil
-    var onHero: Bool = false
-
-    private var trackColor: Color { onHero ? DS.Palette.onHeroLine : DS.Palette.track }
-    private var valueColor: Color { onHero ? DS.Palette.onHero : DS.Palette.label }
-    private var captionColor: Color { onHero ? DS.Palette.onHeroSecondary : DS.Palette.labelSecondary }
-
-    var body: some View {
-        ZStack {
-            Circle().stroke(trackColor, style: StrokeStyle(lineWidth: lineWidth))
-            Circle()
-                .trim(from: 0, to: max(0.001, min(1, progress)))
-                .stroke(gradient.map { AnyShapeStyle($0) } ?? AnyShapeStyle(tint),
-                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .animation(DS.Motion.value, value: progress)
-            VStack(spacing: 2) {
-                if let value {
-                    HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text(value)
-                            .font(DS.Typo.display(size * 0.30))
-                            .tracking(-size * 0.01)
-                            .foregroundStyle(valueColor)
-                            .contentTransition(.numericText())
-                        if let unit {
-                            Text(unit)
-                                .font(DS.Typo.metric(size * 0.14))
-                                .foregroundStyle(captionColor)
-                        }
-                    }
-                }
-                if let caption {
-                    Text(caption)
-                        .font(DS.Typo.caption)
-                        .foregroundStyle(captionColor)
-                }
-            }
-        }
-        .frame(width: size, height: size)
-        .accessibilityElement(children: .combine)
-    }
-}
-
 /// 迷你趋势曲线（Canvas 手绘）
-struct DSSparkline: View {
-    var values: [Double]
-    var tint: Color = DS.Palette.tint
-    var height: CGFloat = 56
-    var showsFill: Bool = true
-
-    var body: some View {
-        GeometryReader { geo in
-            let pts = points(in: geo.size)
-            ZStack {
-                if showsFill, pts.count > 1 {
-                    Path { p in
-                        p.move(to: CGPoint(x: pts[0].x, y: geo.size.height))
-                        pts.forEach { p.addLine(to: $0) }
-                        p.addLine(to: CGPoint(x: pts[pts.count - 1].x, y: geo.size.height))
-                        p.closeSubpath()
-                    }
-                    .fill(tint.opacity(0.14))
-                }
-                Path { p in
-                    guard pts.count > 1 else { return }
-                    p.move(to: pts[0])
-                    pts.dropFirst().forEach { p.addLine(to: $0) }
-                }
-                .stroke(tint, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-            }
-        }
-        .frame(height: height)
-        .accessibilityHidden(true)
-    }
-
-    private func points(in size: CGSize) -> [CGPoint] {
-        guard values.count > 1, let mn = values.min(), let mx = values.max() else { return [] }
-        let span = max(0.0001, mx - mn)
-        let stepX = size.width / CGFloat(values.count - 1)
-        return values.enumerated().map { idx, v in
-            let ratio = (v - mn) / span
-            let y = size.height - CGFloat(ratio) * (size.height - 4) - 2
-            return CGPoint(x: CGFloat(idx) * stepX, y: y)
-        }
-    }
-}
-
 /// 信息条（离线、失败、提示）：安静的提示，不用彩色块
 struct DSNotice: View {
     enum Kind { case info, warning, error, success
@@ -1034,23 +923,23 @@ struct DSNotice: View {
         HStack(spacing: DS.Space.sm) {
             Image(safeSymbol: kind.icon, fallback: "info.circle.fill")
                 .font(.system(size: 15))
-                .foregroundStyle(DS.Palette.status(kind.cls))
+                .foregroundStyle(Kansei.Color.status(kind.cls))
             Text(text)
                 .font(DS.Typo.footnote)
-                .foregroundStyle(DS.Palette.label)
+                .foregroundStyle(Kansei.Color.primary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: DS.Space.sm)
             if let action {
                 Button(action.title, action: action.run)
                     .font(DS.Typo.footnote.weight(.semibold))
-                    .foregroundStyle(DS.Palette.tint)
+                    .foregroundStyle(Kansei.Color.ambient)
                     .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, DS.Space.md)
         .padding(.vertical, DS.Space.sm)
         .background(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-            .fill(DS.Palette.surface))
+            .fill(Kansei.Color.nightSurface))
         .accessibilityElement(children: .combine)
     }
 }
@@ -1068,15 +957,15 @@ struct DSPlaceholder: View {
         VStack(spacing: DS.Space.md) {
             Image(safeSymbol: icon, fallback: "questionmark.circle")
                 .font(.system(size: 40, weight: .light))
-                .foregroundStyle(cls == "na" ? DS.Palette.labelTertiary : DS.Palette.status(cls))
+                .foregroundStyle(cls == "na" ? Kansei.Color.tertiary : Kansei.Color.status(cls))
             Text(title)
                 .font(DS.Typo.headline)
-                .foregroundStyle(DS.Palette.label)
+                .foregroundStyle(Kansei.Color.primary)
                 .multilineTextAlignment(.center)
             if let message {
                 Text(message)
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .foregroundStyle(Kansei.Color.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1099,7 +988,7 @@ struct DSSkeleton: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-            .fill(DS.Palette.fillSubtle)
+            .fill(Kansei.Color.fillSubtle)
             .frame(width: width, height: height)
             .accessibilityHidden(true)
     }
@@ -1110,120 +999,4 @@ struct DSSkeleton: View {
 // =============================================================================
 
 /// 顶部导航栏容器（浮在内容之上 → 玻璃合法）
-struct DSNavBar<Trailing: View>: View {
-    var title: String
-    var subtitle: String? = nil
-    var showsBack: Bool = false
-    var onBack: (() -> Void)? = nil
-    @ViewBuilder var trailing: () -> Trailing
-
-    var body: some View {
-        HStack(spacing: DS.Space.sm) {
-            if showsBack, let onBack {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                }
-                .buttonStyle(DSIconButtonStyle(size: 44, tint: DS.Palette.tint))
-                .accessibilityLabel(Text("返回"))
-            }
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(DS.Typo.title3)
-                    .foregroundStyle(DS.Palette.label)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(DS.Typo.caption)
-                        .foregroundStyle(DS.Palette.labelSecondary)
-                }
-            }
-            Spacer(minLength: DS.Space.sm)
-            trailing()
-        }
-        .padding(.horizontal, DS.Space.page)
-        .padding(.vertical, DS.Space.sm)
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .bottom) { DSDivider() }
-    }
-}
-
-extension DSNavBar where Trailing == EmptyView {
-    init(title: String, subtitle: String? = nil, showsBack: Bool = false, onBack: (() -> Void)? = nil) {
-        self.init(title: title, subtitle: subtitle, showsBack: showsBack, onBack: onBack) { EmptyView() }
-    }
-}
-
 /// 底部悬浮操作条（浮在内容之上 → 玻璃合法）
-struct DSBottomBar<Content: View>: View {
-    var content: () -> Content
-
-    init(@ViewBuilder content: @escaping () -> Content) {
-        self.content = content
-    }
-
-    var body: some View {
-        content()
-            .padding(.horizontal, DS.Space.md)
-            .padding(.vertical, DS.Space.sm)
-            .background(.ultraThinMaterial)
-            .overlay(alignment: .top) { DSDivider() }
-    }
-}
-
-// =============================================================================
-// MARK: - 便捷修饰符
-// =============================================================================
-
-extension View {
-    /// 分组表面外观
-    func dsSurface(padding: CGFloat = DS.Space.cardPadding,
-                   radius: CGFloat = DS.Radius.card,
-                   glass: Bool = false) -> some View {
-        modifier(DSSurfaceModifier(padding: padding, radius: radius, glass: glass))
-    }
-
-    /// 页面根部：单一画布底色 + 统一 20pt 页面左右边距
-    func dsCanvas() -> some View {
-        dsPageMargins()
-            .background(DS.Palette.canvas.ignoresSafeArea())
-    }
-
-    /// 给页面根部的滚动容器统一左右安全边距
-    func dsPageMargins() -> some View {
-        contentMargins(.horizontal, DS.Space.page, for: .scrollContent)
-    }
-
-    /// 组内行的内边距
-    func dsRowInsets() -> some View {
-        padding(.horizontal, DS.Space.md).padding(.vertical, DS.Space.xxs)
-    }
-}
-
-struct DSSurfaceModifier: ViewModifier {
-    var padding: CGFloat
-    var radius: CGFloat
-    var glass: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .padding(padding)
-            .background {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(glass ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(DS.Palette.surface))
-            }
-    }
-}
-
-// =============================================================================
-// MARK: - 触觉反馈（只保留两种）
-// =============================================================================
-enum DSHaptic {
-    static func tap() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    }
-    static func result(_ success: Bool) {
-        UINotificationFeedbackGenerator().notificationOccurred(success ? .success : .error)
-    }
-    static func select() {
-        UISelectionFeedbackGenerator().selectionChanged()
-    }
-}

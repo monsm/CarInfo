@@ -9,20 +9,20 @@ import CoreLocation
 // MARK: - E39 地理围栏通知
 class GeofenceNotificationManager: ObservableObject {
     static let shared = GeofenceNotificationManager()
-    
+
     @Published var enabledLocations: [String: (lat: Double, lng: Double, name: String)] = [:]
-    
+
     func scheduleGeofenceNotification(for name: String, lat: Double, lng: Double, radius: Double = 150) {
         let center = CLLocationCoordinate2D(latitude: lat, longitude: lng)
         let region = CLCircularRegion(center: center, radius: radius, identifier: name)
         region.notifyOnEntry = true
         region.notifyOnExit = true
-        
+
         let content = UNMutableNotificationContent()
         content.title = "位置提醒"
         content.body = "您已\(region.notifyOnEntry ? "进入" : "离开") \(name)"
         content.sound = .default
-        
+
         let request = UNNotificationRequest(identifier: "geofence_\(name)", content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }
@@ -31,17 +31,19 @@ class GeofenceNotificationManager: ObservableObject {
 // MARK: - E40 充电前N分钟提醒
 class PreChargeReminder: ObservableObject {
     static let shared = PreChargeReminder()
-    
+
     func scheduleReminder(minutesBefore: Int, chargeCompleteTime: Date) {
         let triggerTime = chargeCompleteTime.addingTimeInterval(-Double(minutesBefore * 60))
-        
+
         let content = UNMutableNotificationContent()
         content.title = "充电提醒"
         content.body = "将在\(minutesBefore)分钟后充满，请准备离店"
         content.sound = .default
-        
-        let trigger = UNCalendarNotificationTrigger(dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: triggerTime), repeats: false)
-        let request = UNNotificationRequest(identifier: "charge_reminder_\(UUID().uuidString)", content: content, trigger: trigger)
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: Calendar.current.dateComponents([.year.
+month, .day, .hour, .minute], from: triggerTime), repeats: false)
+        let request = UNNotificationRequest(identifier: "charge_reminder_\(UUID().uuidString)"c
+ontent: content, trigger: trigger)
         UNUserNotificationCenter.current().add(request)
     }
 }
@@ -49,9 +51,9 @@ class PreChargeReminder: ObservableObject {
 // MARK: - E41 恶劣天气预警
 class WeatherAlertManager: ObservableObject {
     static let shared = WeatherAlertManager()
-    
+
     @Published var activeAlerts: [WeatherAlert] = []
-    
+
     func checkWeatherAlert() {
         // 简化实现：实际应调用天气API
         let alert = WeatherAlert(
@@ -86,7 +88,7 @@ enum WeatherAlertType {
 struct LowBatteryRoutePlan: View {
     let currentSOC: Int
     let nearbyStations: [ChargingStation]
-    
+
     var body: some View {
         if nearbyStations.isEmpty {
             Text("附近暂无充电站")
@@ -109,7 +111,7 @@ struct LowBatteryRoutePlan: View {
                         .font(.caption)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Theme.Colors.accent)
+                        .background(Kansei.Color.ambient)
                         .foregroundColor(.white)
                         .cornerRadius(8)
                 }
@@ -128,19 +130,19 @@ struct ChargingStation: Identifiable {
 // MARK: - E43 定时提醒
 class ScheduledReminderManager: ObservableObject {
     static let shared = ScheduledReminderManager()
-    
+
     func scheduleDailyReport(hour: Int, minute: Int) {
         var components = DateComponents()
         components.hour = hour
         components.minute = minute
-        
+
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
-        
+
         let content = UNMutableNotificationContent()
         content.title = "每日车况简报"
         content.body = "您的车辆状态良好，SOC: 75%"
         content.sound = .default
-        
+
         let request = UNNotificationRequest(identifier: "daily_report", content: content, trigger: trigger)
         UNUserNotificationCenter.current().add(request)
     }
@@ -149,7 +151,7 @@ class ScheduledReminderManager: ObservableObject {
 // MARK: - E44 通知分组
 class NotificationGroupManager: ObservableObject {
     static let shared = NotificationGroupManager()
-    
+
     func setupNotificationCategories() {
         let chargeCategory = UNNotificationCategory(
             identifier: "carkeeper_charge",
@@ -159,7 +161,7 @@ class NotificationGroupManager: ObservableObject {
             intentIdentifiers: [],
             options: [.customDismissAction]
         )
-        
+
         UNUserNotificationCenter.current().setNotificationCategories([chargeCategory])
     }
 }

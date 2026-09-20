@@ -513,7 +513,7 @@ enum VM {
             UserDefaults.standard.set(miles, forKey: AppStore.lastServiceMileageKey)
             serviceReminder = "\(interval) km 后保养"
         }
-        
+
         return VehicleSummary(
             name: vname,
             plate: vplate.isEmpty ? "未上牌" : vplate,

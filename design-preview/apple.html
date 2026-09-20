@@ -1,0 +1,904 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CarKeeper v4 · iOS 原生语言</title>
+<style>
+/* ==========================================================================
+   v4 —— 按 Apple 的做法重来
+   ① 不用卡片：内容直接落在画布上，用「发丝分隔线」组织（iOS 的 separator 真值）
+   ② 排版就是设计：用 iOS 真实的字号阶梯，不是自造的中庸字号
+   ③ 只用系统色：label / secondaryLabel / tertiaryLabel 三档不透明度 + 系统蓝绿橙红
+   ④ 一个核心机制：车灯就是电量表 —— 没有仪表盘
+   ⑤ 玻璃只出现在「浮在内容之上的那一层」（iOS 26 悬浮 Tab 栏），别处一律不用
+   ========================================================================== */
+
+:root{
+  /* iOS 系统色 · 暗色 */
+  --bg:#000;
+  --bg2:#1C1C1E;
+  --bg3:#2C2C2E;
+  --label:rgba(255,255,255,1);
+  --label2:rgba(255,255,255,.60);
+  --label3:rgba(255,255,255,.30);
+  --label4:rgba(255,255,255,.18);
+  --sep:rgba(84,84,88,.65);          /* iOS 暗色分隔线真值 */
+  --sep-opaque:#38383A;
+  --blue:#0A84FF;
+  --green:#30D158;
+  --orange:#FF9F0A;
+  --red:#FF453A;
+  --glass:rgba(30,30,32,.72);
+  --fill:rgba(120,120,128,.24);
+  --fill2:rgba(120,120,128,.16);
+}
+[data-mode="light"]{
+  --bg:#F2F2F7;
+  --bg2:#FFFFFF;
+  --bg3:#E5E5EA;
+  --label:rgba(0,0,0,1);
+  --label2:rgba(60,60,67,.60);
+  --label3:rgba(60,60,67,.30);
+  --label4:rgba(60,60,67,.18);
+  --sep:rgba(60,60,67,.29);          /* iOS 亮色分隔线真值 */
+  --sep-opaque:#C6C6C8;
+  --blue:#007AFF;
+  --green:#34C759;
+  --orange:#FF9500;
+  --red:#FF3B30;
+  --glass:rgba(249,249,249,.78);
+  --fill:rgba(120,120,128,.20);
+  --fill2:rgba(120,120,128,.12);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:#111;font-family:-apple-system,"SF Pro Display","SF Pro Text","PingFang SC",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;color:#fff}
+[data-mode="light"] body{background:#D9D9DE}
+
+.wrap{max-width:1560px;margin:0 auto;padding:40px 34px 100px}
+.head{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;padding-bottom:24px;border-bottom:1px solid rgba(255,255,255,.12)}
+.head h1{margin:0;font-size:19px;font-weight:600;letter-spacing:.1px}
+.head .sub{margin-top:8px;font-size:12.5px;line-height:1.7;color:rgba(255,255,255,.45)}
+[data-mode="light"] .head h1{color:#111}
+[data-mode="light"] .head .sub{color:rgba(0,0,0,.5)}
+[data-mode="light"] .head{border-color:rgba(0,0,0,.12)}
+.spacer{flex:1}
+.seg{display:inline-flex;gap:4px;padding:4px;border-radius:12px;background:rgba(255,255,255,.09)}
+[data-mode="light"] .seg{background:rgba(0,0,0,.07)}
+.seg button{appearance:none;border:0;background:transparent;font:inherit;font-size:13px;font-weight:600;color:rgba(255,255,255,.55);
+  padding:8px 18px;border-radius:9px;cursor:pointer;transition:.2s}
+[data-mode="light"] .seg button{color:rgba(0,0,0,.5)}
+.seg button[aria-pressed="true"]{background:rgba(255,255,255,.16);color:#fff}
+[data-mode="light"] .seg button[aria-pressed="true"]{background:#fff;color:#000}
+
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin:28px 0 44px}
+.legend .box{border-radius:16px;padding:18px;background:rgba(255,255,255,.055)}
+[data-mode="light"] .legend .box{background:rgba(255,255,255,.75)}
+.legend h3{margin:0 0 12px;font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:rgba(255,255,255,.4)}
+[data-mode="light"] .legend h3{color:rgba(0,0,0,.42)}
+.legend p{margin:0;font-size:12.5px;line-height:1.95;color:rgba(255,255,255,.55)}
+[data-mode="light"] .legend p{color:rgba(0,0,0,.55)}
+.legend p b{color:#fff;font-weight:600}
+[data-mode="light"] .legend p b{color:#000}
+.legend .sw{display:flex;gap:9px;margin-top:12px;flex-wrap:wrap}
+.legend .sw i{width:46px;height:30px;border-radius:8px;display:block;border:1px solid rgba(255,255,255,.14)}
+
+.rail{display:flex;gap:36px;flex-wrap:wrap}
+.cap{margin:0 0 12px 3px;font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.4)}
+[data-mode="light"] .cap{color:rgba(0,0,0,.42)}
+.note{margin:12px 3px 0;font-size:12px;line-height:1.6;color:rgba(255,255,255,.38);max-width:393px}
+[data-mode="light"] .note{color:rgba(0,0,0,.42)}
+
+/* ---------- 设备 ---------- */
+.phone{position:relative;width:413px;height:872px;border-radius:60px;padding:10px;
+  background:linear-gradient(160deg,#4A4A4E,#151517 60%);box-shadow:0 30px 70px -20px rgba(0,0,0,.75)}
+[data-mode="light"] .phone{background:linear-gradient(160deg,#CFCFD4,#8E8E93 60%);box-shadow:0 30px 70px -24px rgba(0,0,0,.3)}
+.phone::after{content:"";position:absolute;inset:0;border-radius:60px;pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),inset 0 1px 1px rgba(255,255,255,.26)}
+.screen{position:relative;width:393px;height:852px;border-radius:50px;overflow:hidden;background:var(--bg);color:var(--label)}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:112px;height:33px;border-radius:18px;background:#000;z-index:60}
+
+/* iOS 状态栏：按真实点距 */
+.statusbar{position:absolute;top:0;left:0;right:0;height:54px;z-index:55;display:flex;align-items:center;justify-content:space-between;
+  padding:16px 30px 0;font-size:15px;font-weight:600;letter-spacing:.2px;color:var(--label)}
+.statusbar .ri{display:flex;align-items:center;gap:5px}
+
+/* iOS 大标题 */
+.h1{font-size:34px;font-weight:700;letter-spacing:.37px;line-height:41px;margin:0}
+.h2{font-size:22px;font-weight:600;letter-spacing:-.26px;line-height:28px;margin:0}
+.body{font-size:17px;font-weight:400;letter-spacing:-.41px;line-height:22px}
+.sub{font-size:15px;font-weight:400;letter-spacing:-.24px;line-height:20px}
+.foot{font-size:13px;font-weight:400;letter-spacing:-.08px;line-height:18px}
+.cap1{font-size:12px;font-weight:400;line-height:16px}
+.cap2{font-size:11px;font-weight:400;letter-spacing:.07px;line-height:13px}
+.sec{font-size:13px;font-weight:400;letter-spacing:-.08px;text-transform:uppercase;color:var(--label2)}
+.semib{font-weight:600}
+.c2{color:var(--label2)}
+.c3{color:var(--label3)}
+
+/* 分隔线：iOS 是「内缩」的，不是通栏 */
+.hr{height:1px;background:var(--sep);flex:none}
+.hr-in{margin-left:16px}
+.hr-inset{margin-left:20px}
+
+.row{display:flex;align-items:center;gap:13px;min-height:44px;padding:0 20px}
+.row .t{font-size:17px;letter-spacing:-.41px}
+.row .v{margin-left:auto;font-size:17px;letter-spacing:-.41px;color:var(--label2)}
+.row .v.chev{color:var(--label3);font-size:15px}
+.row .ic{width:29px;display:grid;place-items:center;flex:none}
+
+/* 当前屏 */
+.page{position:absolute;inset:0;display:flex;flex-direction:column}
+.scroll{flex:1;overflow:hidden;padding-top:54px}
+.pad{padding:0 20px}
+
+/* 玻璃：只用于「浮在内容之上」的那一层（iOS 26 悬浮 Tab 栏） */
+.tabbar{position:absolute;left:14px;right:14px;bottom:20px;z-index:50;height:58px;border-radius:29px;display:flex;align-items:center;
+  background:var(--glass);backdrop-filter:blur(34px) saturate(180%);-webkit-backdrop-filter:blur(34px) saturate(180%);
+  box-shadow:0 8px 34px -10px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 .5px rgba(255,255,255,.10)}
+[data-mode="light"] .tabbar{box-shadow:0 10px 30px -12px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.9),inset 0 0 0 .5px rgba(0,0,0,.05)}
+.tabbar .tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--label3);cursor:pointer;transition:color .2s}
+.tabbar .tb.on{color:var(--blue)}
+.tabbar .tb span{font-size:10px;font-weight:500;letter-spacing:.1px}
+.homebar{position:absolute;left:50%;transform:translateX(-50%);bottom:8px;width:140px;height:5px;border-radius:3px;background:var(--label);opacity:.28;z-index:55}
+
+.gi{width:26px;height:26px;flex:none;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+/* 大数字：SF Pro Display 超细 —— Apple 的仪器感全靠字重差 */
+.num{font-weight:100;letter-spacing:-6px;font-variant-numeric:tabular-nums;line-height:.84}
+.num .u{font-weight:300;letter-spacing:-1px;color:var(--label2)}
+
+/* 光条 = 电量表 */
+.lightbarC{position:relative;height:6px;border-radius:3px;background:var(--label4);overflow:hidden}
+.lightbarC .fill{position:absolute;inset:0 auto 0 0;border-radius:3px;background:linear-gradient(90deg,#FFFFFF,#9CC6FF 60%,var(--blue))}
+.lightbarC .glow{position:absolute;inset:-9px auto -9px 0;filter:blur(13px);border-radius:8px;background:linear-gradient(90deg,rgba(255,255,255,.5),rgba(10,132,255,.75))}
+
+/* 图表 */
+.chart .grid{stroke:var(--sep);stroke-width:1}
+.chart .line{fill:none;stroke:var(--blue);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.chart .area{fill:url(#areaFill)}
+.bars{display:flex;align-items:flex-end;gap:10px;height:132px}
+.bars .b{flex:1;border-radius:6px;background:var(--label4);position:relative;overflow:hidden}
+.bars .b.on{background:var(--blue)}
+.bars .b .in{position:absolute;left:0;right:0;bottom:0;border-radius:6px}
+
+.sweep{stroke-dasharray:1400;stroke-dashoffset:1400;animation:draw 1.5s cubic-bezier(.32,.8,.28,1) .3s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.beacon{animation:beacon 2.6s ease-out infinite}
+@keyframes beacon{0%{r:6;opacity:.5}70%{r:15;opacity:0}100%{r:15;opacity:0}}
+.flow{stroke-dasharray:9 12;animation:flow 1.4s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-42}}
+.door{cursor:pointer}
+</style>
+</head>
+<body>
+
+<!-- 图标：统一 26pt、1.5 描边（iOS Tab 栏尺寸） -->
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-car" viewBox="0 0 24 24"><path d="M4.2 13.6l1.6-4.1a2.6 2.6 0 012.4-1.6h7.6a2.6 2.6 0 012.4 1.6l1.6 4.1"/><path d="M4.2 13.6h15.6v3.5a1.5 1.5 0 01-1.5 1.5h-.8v1a1.2 1.2 0 01-2.4 0v-1H8.9v1a1.2 1.2 0 01-2.4 0v-1h-.8a1.5 1.5 0 01-1.5-1.5v-3.5z"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 8.8h16M4 15.2h16"/><circle cx="9.6" cy="8.8" r="2.2" fill="var(--bg)"/><circle cx="14.4" cy="15.2" r="2.2" fill="var(--bg)"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.6 3l-7 10h4.3l-1 8 7.1-10.4h-4.3L13.6 3z"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><path d="M4.4 17.4l4.4-5.2 3.3 3 7.1-8.2"/><circle cx="4.4" cy="17.4" r="1.4" fill="var(--bg)"/><circle cx="19.2" cy="7" r="1.4" fill="var(--bg)"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.2"/><path d="M5.6 20c1.2-3.5 3.7-5.2 6.4-5.2s5.2 1.7 6.4 5.2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.4" y="10.8" width="13.2" height="8.8" rx="2.8"/><path d="M8.6 10.8V8.4a3.4 3.4 0 016.8 0v2.4"/></symbol>
+  <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="5.4" y="10.8" width="13.2" height="8.8" rx="2.8"/><path d="M8.6 10.8V8.4a3.4 3.4 0 016.2-2"/></symbol>
+  <symbol id="i-fan" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.9"/><path d="M12 10.1c-.4-2.5.6-5.1 2.9-5.1 1.8 0 2.5 2.5 0 4M13.9 12c2.5-.4 5.1.6 5.1 2.9 0 1.8-2.5 2.5-4 0M12 13.9c.4 2.5-.6 5.1-2.9 5.1-1.8 0-2.5-2.5 0-4M10.1 12c-2.5.4-5.1-.6-5.1-2.9 0-1.8 2.5-2.5 4 0"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.6v1.7M12 18.7v1.7M3.6 12h1.7M18.7 12h1.7M6.3 6.3l1.2 1.2M16.5 16.5l1.2 1.2M17.7 6.3l-1.2 1.2M7.5 16.5l-1.2 1.2"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.8 16.2V11a5.2 5.2 0 0110.4 0v5.2"/><path d="M5.4 16.2h13.2M10.3 19a2.2 2.2 0 003.4 0"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.8V12l2.9 1.7"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.8"/><path d="M12 5.9l1 2 2.2-.7 1.3 1.7-1.4 1.8 1.4 1.8-1.3 1.7-2.2-.7-1 2h-2.4l-1-2-2.2.7-1.3-1.7L6.5 10.7 5.1 8.9l1.3-1.7 2.2.7 1-2H12z"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8.2" cy="12" r="3.2"/><path d="M11.4 12H20M17.2 12v2.9M14.5 12v2.2"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.7l6.3 2.3v5.2c0 3.8-2.6 6.8-6.3 8.6-3.7-1.8-6.3-4.8-6.3-8.6V6l6.3-2.3z"/><path d="M9.5 12l1.9 1.9 3.2-3.5"/></symbol>
+  <symbol id="i-window" viewBox="0 0 24 24"><rect x="4.4" y="6.4" width="15.2" height="11.2" rx="2.2"/><path d="M4.4 12h15.2"/></symbol>
+  <symbol id="i-trunk" viewBox="0 0 24 24"><rect x="4.4" y="7.4" width="15.2" height="9.2" rx="2.2"/><path d="M9.4 7.4V5.8h5.2v1.6"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9.4 4v3.9M14.6 4v3.9"/><path d="M7 7.9h10v2.2a5 5 0 01-10 0V7.9z"/><path d="M12 15.1v4.3"/></symbol>
+  <symbol id="i-chevr" viewBox="0 0 24 24"><path d="M9.4 6.4l5.6 5.6-5.6 5.6"/></symbol>
+</svg>
+
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>v4 · 按 Apple 的做法重来</h1>
+      <div class="sub">无卡片 · iOS 真实字号阶梯 · iOS 系统色与分隔线真值 · 车灯即电量表 · 玻璃只用于浮层</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg">
+      <button id="m-dark" aria-pressed="true">暗色</button>
+      <button id="m-light" aria-pressed="false">亮色</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="box">
+      <h3>为什么上一版不像 Apple</h3>
+      <p><b>玻璃盒子太多</b>：上一版一块屏上有玻璃台、玻璃胶囊、玻璃输入框、玻璃 Tab 条——<b>四五次材质切换等于没有材质</b>。Apple 一块屏最多一次。<br>
+        <b>图标太花</b>：带底色的图标砖、状态胶囊、彩色圆点，全是"信息密度装饰"。Apple 用<b>排版</b>分层，不用容器分层。<br>
+        <b>节奏平均</b>：每一块高度差不多、间距差不多，于是看起来像模板。<br>
+        <b>没有核心机制</b>：好看的点很多，但没有一个是"只有这个 App 有"的。</p>
+    </div>
+    <div class="box">
+      <h3>这一版的核心机制：车灯就是电量表</h3>
+      <p>不再有仪表盘、不再有续航环。车尾那道贯穿光带<b>本身就是电量条</b>——亮的部分就是 78%，暗的部分就是还没充的 22%。<br>
+        下面的白色光条是同一件事在平面上的直读版本，两者永远同步。<br>
+        于是这一屏只剩<b>一个数字、一道光、一条分隔线</b>——这才是能让人记住的东西。</p>
+    </div>
+    <div class="box">
+      <h3>用的是 iOS 的真值，不是我调的手感</h3>
+      <p>大标题 <b>34/700 字距 .37</b>；正文 <b>17/400 字距 −.41</b>；脚注 <b>13</b>；说明 <b>12</b>；<b>11</b>。<br>
+        分隔线暗色 <b>rgba(84,84,88,.65)</b>、亮色 <b>rgba(60,60,67,.29)</b>，且<b>内缩 20pt 不通栏</b>。<br>
+        文字只有三档：label / 60% / 30%。行高 44pt，图标 26pt，Tab 栏 58pt。<br>
+        系统色：蓝 <b>#0A84FF</b> / 绿 <b>#30D158</b> / 橙 <b>#FF9F0A</b> / 红 <b>#FF453A</b>。</p>
+    </div>
+    <div class="box">
+      <h3>运动与克制</h3>
+      <p>只有一个常驻运动：充电时能量沿电缆流动（它本来就在流）。<br>
+        一次性运动两个：图表线条绘制、光条从 0 长到 78%。<br>
+        <b>没有涟漪、没有光晕、没有扫光、没有呼吸、没有粒子。</b>界面里所有会发光的东西都对应一个真实状态。</p>
+    </div>
+  </div>
+
+  <div class="rail">
+
+  <!-- ==================== 01 车况（核心机制） ==================== -->
+  <div class="slot">
+    <p class="cap">01 · 车况 — 车灯就是电量表</p>
+    <div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="statusbar"><span>9:41</span><div class="ri"><span>▮▮▮</span><span>ᯤ</span><span>100%</span></div></div>
+
+      <div class="page">
+        <div class="scroll">
+
+          <!-- 车：只用车灯与轮廓光成像（不给车身填色） -->
+          <div style="position:relative;margin-top:6px">
+            <svg viewBox="0 0 470 250" style="width:100%;display:block">
+              <defs>
+                <linearGradient id="rim" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="rgba(255,255,255,.05)"/>
+                  <stop offset="30%" stop-color="rgba(255,255,255,.55)"/>
+                  <stop offset="72%" stop-color="rgba(255,255,255,.85)"/>
+                  <stop offset="100%" stop-color="rgba(255,255,255,.10)"/>
+                </linearGradient>
+                <linearGradient id="taill" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="rgba(255,255,255,0)"/>
+                  <stop offset="18%" stop-color="#FFFFFF"/>
+                  <stop offset="100%" stop-color="#FF6B5B"/>
+                </linearGradient>
+                <radialGradient id="keylight" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="rgba(255,255,255,.10)"/>
+                  <stop offset="55%" stop-color="rgba(255,255,255,.03)"/>
+                  <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+                </radialGradient>
+                <filter id="bl"><feGaussianBlur stdDeviation="9"/></filter>
+                <filter id="bl2"><feGaussianBlur stdDeviation="3.4"/></filter>
+              </defs>
+
+              <!-- 地面反光（径向、无边界） -->
+              <ellipse cx="235" cy="212" rx="300" ry="70" fill="url(#keylight)" opacity=".9"/>
+
+              <!-- 车身：几乎不填色，只留剪影 -->
+              <path d="M24,150 C24,136 34,131 50,128 C76,106 122,90 178,86 C238,82 292,96 322,118 C350,122 372,128 380,137 C385,142 387,146 387,151 L387,156 C387,161 383,164 376,164 L36,164 C28,164 24,161 24,156 Z" fill="var(--silhouette,#0B0B0C)"/>
+
+              <!-- 车顶轮廓光 -->
+              <path d="M52,142 C78,112 124,96 178,92 C234,88 288,100 320,122" stroke="url(#rim)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+              <!-- 腰线轮廓光 -->
+              <path d="M30,132 C120,124 300,124 384,140" stroke="rgba(255,255,255,.22)" stroke-width="1.4" fill="none"/>
+              <!-- 车窗：一道斜反光 -->
+              <path d="M112,140 C136,116 168,104 214,100 C252,97 280,104 302,120 L286,140 Z" fill="#050505"/>
+              <path d="M126,136 C148,114 178,106 214,103 L200,133 Z" fill="rgba(255,255,255,.16)"/>
+              <!-- 前灯（冷白） -->
+              <path d="M370,128 C378,131 384,136 387,142" stroke="rgba(255,252,240,.95)" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+              <path d="M370,128 C378,131 384,136 387,142" stroke="rgba(255,252,240,.5)" stroke-width="11" fill="none" stroke-linecap="round" filter="url(#bl)"/>
+              <!-- 车尾贯穿灯 = 电量表（78% 亮 / 22% 暗） -->
+              <path d="M24,142 h64" stroke="var(--label4)" stroke-width="4" stroke-linecap="round"/>
+              <path d="M24,142 h50" stroke="url(#taill)" stroke-width="4" stroke-linecap="round"/>
+              <path d="M24,142 h50" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" filter="url(#bl)" opacity=".55"/>
+              <!-- 轮 -->
+              <g>
+                <circle cx="110" cy="164" r="30" fill="#050505" stroke="rgba(255,255,255,.16)" stroke-width="1.4"/>
+                <circle cx="110" cy="164" r="17" fill="none" stroke="rgba(255,255,255,.26)" stroke-width="1.6"/>
+                <path d="M93,152 A24,24 0 0,1 127,152" stroke="rgba(255,255,255,.42)" stroke-width="2" fill="none" stroke-linecap="round"/>
+              </g>
+              <g>
+                <circle cx="316" cy="164" r="30" fill="#050505" stroke="rgba(255,255,255,.16)" stroke-width="1.4"/>
+                <circle cx="316" cy="164" r="17" fill="none" stroke="rgba(255,255,255,.26)" stroke-width="1.6"/>
+                <path d="M299,152 A24,24 0 0,1 333,152" stroke="rgba(255,255,255,.42)" stroke-width="2" fill="none" stroke-linecap="round"/>
+              </g>
+            </svg>
+          </div>
+
+          <!-- 车名 -->
+          <div class="pad" style="display:flex;align-items:center;gap:8px;margin-top:-10px">
+            <div style="width:6px;height:6px;border-radius:3px;background:var(--green)"></div>
+            <span class="sub semib">京A·88888</span>
+            <span class="spacer"></span>
+            <span class="foot c3">2 分钟前</span>
+          </div>
+
+          <!-- 唯一的大数字 -->
+          <div class="pad" style="margin-top:26px">
+            <div class="num" style="font-size:150px"><span data-count="78">0</span><span class="u" style="font-size:44px">%</span></div>
+          </div>
+
+          <!-- 光条 = 同一个数字的另一种写法 -->
+          <div class="pad" style="margin-top:26px">
+            <div class="lightbarC">
+              <div class="glow" style="width:78%"></div>
+              <div class="fill" style="width:78%"></div>
+            </div>
+            <div style="display:flex;margin-top:11px">
+              <span class="foot c2">剩余 420 km</span>
+              <span class="spacer"></span>
+              <span class="foot" style="color:var(--blue)">充电中 · 6.8 kW</span>
+            </div>
+          </div>
+
+          <!-- 三条事实：只有分隔线，没有容器 -->
+          <div style="margin-top:28px">
+            <div class="hr"></div>
+            <div style="display:flex">
+              <div style="flex:1;padding:16px 20px 18px">
+                <div class="cap1 c2">电池温度</div>
+                <div class="body semib" style="margin-top:5px">32℃</div>
+              </div>
+              <div style="width:1px;background:var(--sep)"></div>
+              <div style="flex:1;padding:16px 20px 18px">
+                <div class="cap1 c2">电压 / 电流</div>
+                <div class="body semib" style="margin-top:5px;font-variant-numeric:tabular-nums">356V</div>
+              </div>
+              <div style="width:1px;background:var(--sep)"></div>
+              <div style="flex:1;padding:16px 20px 18px">
+                <div class="cap1 c2">电池健康</div>
+                <div class="body semib" style="margin-top:5px;color:var(--green)">98%</div>
+              </div>
+            </div>
+            <div class="hr"></div>
+            <div class="row" style="min-height:52px"><span class="t">胎压</span><span class="v" style="color:var(--label)">2.4 bar</span></div>
+            <div class="hr"></div>
+            <div class="row" style="min-height:52px"><span class="t">后备箱</span><span class="v" style="color:var(--orange)">未关闭</span></div>
+            <div class="hr"></div>
+          </div>
+          <div style="height:110px"></div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tb on"><svg class="gi"><use href="#i-car"/></svg><span>车况</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-sliders"/></svg><span>车控</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-bolt"/></svg><span>充电</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-route"/></svg><span>行程</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-person"/></svg><span>我的</span></div>
+        </div>
+        <div class="homebar"></div>
+      </div>
+    </div></div>
+    <p class="note">整车只用车顶轮廓光、车灯和剪影成像——车身不填色。左侧那道贯穿灯亮的长度就是 78%，和下面这条白光是同一个数据。</p>
+  </div>
+
+  <!-- ==================== 02 车控 ==================== -->
+  <div class="slot">
+    <p class="cap">02 · 车控 — 线描示意，不着色</p>
+    <div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="statusbar"><span>9:41</span><div class="ri"><span>▮▮▮</span><span>ᯤ</span><span>100%</span></div></div>
+
+      <div class="page">
+        <div class="scroll">
+          <div class="pad" style="padding-top:14px"><h1 class="h1">车控</h1></div>
+
+          <div style="position:relative;margin-top:14px">
+            <svg viewBox="0 0 320 470" style="width:100%;display:block">
+              <defs>
+                <radialGradient id="floor2" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="rgba(255,255,255,.10)"/><stop offset="55%" stop-color="rgba(255,255,255,.025)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+                </radialGradient>
+              </defs>
+              <!-- 地面反光 -->
+              <ellipse cx="160" cy="250" rx="190" ry="165" fill="url(#floor2)"/>
+
+              <!-- 线描车身（薄线，不着色 —— Apple 的产品示意就是线描） -->
+              <g fill="none" stroke="var(--label)" stroke-width="1.5" stroke-linejoin="round" opacity=".85">
+                <path d="M160 26 C206 26 240 34 254 50 C264 61 267 76 267 96 L267 250 C267 282 264 300 254 312 C240 328 206 336 160 336 C114 336 80 328 66 312 C56 300 53 282 53 250 L53 96 C53 76 56 61 66 50 C80 34 114 26 160 26 Z"/>
+              </g>
+              <!-- 风挡 / 天窗 / 后风挡 -->
+              <g fill="none" stroke="var(--label2)" stroke-width="1.3">
+                <path d="M84 62 C100 48 128 42 160 42 C192 42 220 48 236 62 L245 84 L75 84 Z"/>
+                <rect x="92" y="98" width="136" height="76" rx="16"/>
+                <path d="M75 278 L84 316 C100 328 128 334 160 334 C192 334 220 328 236 316 L245 278 Z"/>
+              </g>
+              <!-- 后视镜 -->
+              <g fill="none" stroke="var(--label2)" stroke-width="1.3">
+                <path d="M56 88 l-16 9 3 13 14-5 z"/><path d="M264 88 l16 9-3 13-14-5 z"/>
+              </g>
+
+              <!-- 四门：可点，绿=已关 橙=未关 -->
+              <g class="door" data-door="0">
+                <path d="M53 96 v48" stroke="var(--doorc,#30D158)" stroke-width="3" stroke-linecap="round" opacity=".95"/>
+                <path d="M53 96 v48" stroke="var(--doorc,#30D158)" stroke-width="12" stroke-linecap="round" filter="url(#bl2)" opacity=".35"/>
+              </g>
+              <g class="door" data-door="1">
+                <path d="M267 96 v48" stroke="var(--doorc,#30D158)" stroke-width="3" stroke-linecap="round" opacity=".95"/>
+                <path d="M267 96 v48" stroke="var(--doorc,#30D158)" stroke-width="12" stroke-linecap="round" filter="url(#bl2)" opacity=".35"/>
+              </g>
+              <g class="door" data-door="2">
+                <path d="M53 204 v48" stroke="var(--doorc,#30D158)" stroke-width="3" stroke-linecap="round" opacity=".95"/>
+                <path d="M53 204 v48" stroke="var(--doorc,#30D158)" stroke-width="12" stroke-linecap="round" filter="url(#bl2)" opacity=".35"/>
+              </g>
+              <g class="door" data-door="3">
+                <path d="M267 204 v48" stroke="var(--doorc,#30D158)" stroke-width="3" stroke-linecap="round" opacity=".95"/>
+                <path d="M267 204 v48" stroke="var(--doorc,#30D158)" stroke-width="12" stroke-linecap="round" filter="url(#bl2)" opacity=".35"/>
+              </g>
+
+              <!-- 后备箱未关 -->
+              <g class="door" id="trunk">
+                <path d="M112 336 h96" stroke="var(--orange)" stroke-width="3" stroke-linecap="round"/>
+                <path d="M112 336 h96" stroke="var(--orange)" stroke-width="14" stroke-linecap="round" filter="url(#bl2)" opacity=".28"/>
+              </g>
+            </svg>
+          </div>
+
+          <div class="pad" style="text-align:center;margin-top:-14px">
+            <div class="foot c2" id="ctrState">四门已锁 · 后备箱未关</div>
+          </div>
+
+          <!-- 场景：只有一个实心胶囊（Apple 的做法：一屏最多一个主按钮） -->
+          <div class="pad" style="margin-top:30px">
+            <div style="height:50px;border-radius:25px;display:grid;place-items:center;background:var(--blue);color:#fff"
+                 class="body semib">极速降温 · 16℃ 5 分钟</div>
+          </div>
+
+          <div style="margin-top:26px">
+            <div class="hr"></div>
+            <div class="row" style="min-height:52px"><span class="t">车窗</span><span class="v">全部关闭</span></div>
+            <div class="hr"></div>
+            <div class="row" style="min-height:52px"><span class="t">空调</span><span class="v">已关闭</span></div>
+            <div class="hr"></div>
+            <div class="row" style="min-height:52px"><span class="t">儿童锁</span><span class="v" style="color:var(--green)">已开启</span></div>
+            <div class="hr"></div>
+          </div>
+          <div style="height:110px"></div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tb"><svg class="gi"><use href="#i-car"/></svg><span>车况</span></div>
+          <div class="tb on"><svg class="gi"><use href="#i-sliders"/></svg><span>车控</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-bolt"/></svg><span>充电</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-route"/></svg><span>行程</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-person"/></svg><span>我的</span></div>
+        </div>
+        <div class="homebar"></div>
+      </div>
+    </div></div>
+    <p class="note">点车门可开合，线色与下方状态行同步。车身是薄线描、不着色——一填色就变成"插画"，一着色就变成"儿童 App"。</p>
+  </div>
+
+  <!-- ==================== 03 充电 ==================== -->
+  <div class="slot">
+    <p class="cap">03 · 充电</p>
+    <div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="statusbar"><span>9:41</span><div class="ri"><span>▮▮▮</span><span>ᯤ</span><span>100%</span></div></div>
+
+      <div class="page">
+        <div class="scroll">
+          <div class="pad" style="padding-top:14px"><h1 class="h1">充电</h1></div>
+
+          <div class="pad" style="margin-top:22px">
+            <div class="foot c2">预计 22:41 充满</div>
+            <div class="num" style="font-size:118px;margin-top:8px"><span data-count="78">0</span><span class="u" style="font-size:36px">%</span></div>
+          </div>
+
+          <!-- 能量：从桩流向车（唯一常驻运动） -->
+          <div class="pad" style="margin-top:22px">
+            <svg viewBox="0 0 320 96" style="width:100%;display:block">
+              <defs>
+                <linearGradient id="stream" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="rgba(10,132,255,.15)"/>
+                  <stop offset="55%" stop-color="#9CC6FF"/>
+                  <stop offset="100%" stop-color="rgba(10,132,255,.15)"/>
+                </linearGradient>
+                <radialGradient id="portg" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="rgba(10,132,255,.5)"/><stop offset="100%" stop-color="rgba(10,132,255,0)"/>
+                </radialGradient>
+              </defs>
+              <!-- 桩 -->
+              <rect x="8" y="30" width="34" height="46" rx="12" fill="none" stroke="var(--label2)" stroke-width="1.5"/>
+              <rect x="19" y="20" width="12" height="10" rx="3" fill="none" stroke="var(--label2)" stroke-width="1.5"/>
+              <path d="M25 42 l-7 11h6l-2 11 8-13h-6l2-9z" fill="var(--blue)"/>
+              <!-- 能量流 -->
+              <path d="M42 76 C110 76 150 60 200 40 C240 24 268 18 288 18" fill="none" stroke="var(--label4)" stroke-width="7" stroke-linecap="round"/>
+              <path class="flow" d="M42 76 C110 76 150 60 200 40 C240 24 268 18 288 18" fill="none" stroke="url(#stream)" stroke-width="2.6" stroke-linecap="round"/>
+              <!-- 车端接口 -->
+              <circle cx="290" cy="18" r="18" fill="url(#portg)"/>
+              <circle class="beacon" cx="290" cy="18" r="6" fill="none" stroke="var(--blue)" stroke-width="1.5"/>
+              <circle cx="290" cy="18" r="5" fill="none" stroke="var(--blue)" stroke-width="2.4"/>
+            </svg>
+            <div style="display:flex;margin-top:2px">
+              <span class="foot c2">6.8 kW</span><span class="spacer"></span><span class="foot c2">目标 90%</span>
+            </div>
+          </div>
+
+          <!-- 充电曲线：通栏、无框（图表就是内容，不该被装进卡片） -->
+          <div style="margin-top:26px">
+            <div class="pad"><div class="foot c2">本次充电功率</div></div>
+            <svg viewBox="0 0 393 130" style="width:100%;display:block;margin-top:12px">
+              <defs>
+                <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="rgba(10,132,255,.30)"/><stop offset="100%" stop-color="rgba(10,132,255,0)"/>
+                </linearGradient>
+              </defs>
+              <line class="grid" x1="20" y1="106" x2="393" y2="106"/>
+              <path class="area" d="M20 96 L60 88 L100 90 L140 72 L180 74 L220 54 L260 58 L300 30 L340 34 L393 40 L393 106 L20 106 Z"/>
+              <path class="line sweep" d="M20 96 L60 88 L100 90 L140 72 L180 74 L220 54 L260 58 L300 30 L340 34 L393 40"/>
+              <circle cx="300" cy="30" r="11" fill="rgba(10,132,255,.18)"/>
+              <circle cx="300" cy="30" r="4.5" fill="var(--blue)" stroke="var(--bg)" stroke-width="2.5"/>
+              <text x="20" y="124" fill="var(--label3)" style="font-size:11px;font-family:-apple-system,'PingFang SC'">22:00</text>
+              <text x="300" y="124" fill="var(--label3)" style="font-size:11px;font-family:-apple-system,'PingFang SC'">现在</text>
+            </svg>
+          </div>
+
+          <div style="margin-top:18px">
+            <div class="hr"></div>
+            <div class="row" style="min-height:52px"><span class="t">本月充电</span><span class="v">184 kWh</span></div>
+            <div class="hr"></div>
+            <div class="row" style="min-height:52px"><span class="t">本月电费</span><span class="v">¥121</span></div>
+            <div class="hr"></div>
+            <div class="row" style="min-height:52px"><span class="t">相比燃油节省</span><span class="v" style="color:var(--green)">¥806</span></div>
+            <div class="hr"></div>
+          </div>
+          <div style="height:110px"></div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tb"><svg class="gi"><use href="#i-car"/></svg><span>车况</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-sliders"/></svg><span>车控</span></div>
+          <div class="tb on"><svg class="gi"><use href="#i-bolt"/></svg><span>充电</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-route"/></svg><span>行程</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-person"/></svg><span>我的</span></div>
+        </div>
+        <div class="homebar"></div>
+      </div>
+    </div></div>
+    <p class="note">图表通栏、不装进卡片——它是内容本身。这也是 Health / 股市的做法：让图表占满宽度，只留一条基线与两个时间。</p>
+  </div>
+
+  <!-- ==================== 04 行程 ==================== -->
+  <div class="slot">
+    <p class="cap">04 · 行程</p>
+    <div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="statusbar"><span>9:41</span><div class="ri"><span>▮▮▮</span><span>ᯤ</span><span>100%</span></div></div>
+
+      <div class="page">
+        <div class="scroll">
+          <div class="pad" style="padding-top:14px"><h1 class="h1">行程</h1></div>
+
+          <div class="pad" style="margin-top:24px">
+            <div class="foot c2">九月合计</div>
+            <div class="num" style="font-size:112px;margin-top:8px"><span data-count="1284">0</span><span class="u" style="font-size:34px">km</span></div>
+          </div>
+
+          <!-- 近七日：Apple 健身式的圆角柱，通栏、无框 -->
+          <div style="margin-top:30px">
+            <div class="pad" style="display:flex;align-items:baseline">
+              <span class="foot c2">近 7 日里程</span>
+              <span class="spacer"></span>
+              <span class="cap1 c3">平均 42 km</span>
+            </div>
+            <div class="pad" style="margin-top:16px">
+              <div class="bars">
+                <div class="b" style="height:46%"></div>
+                <div class="b" style="height:64%"></div>
+                <div class="b" style="height:38%"></div>
+                <div class="b" style="height:82%"></div>
+                <div class="b" style="height:56%"></div>
+                <div class="b" style="height:100%"></div>
+                <div class="b on" style="height:70%"></div>
+              </div>
+              <div style="display:flex;margin-top:9px">
+                <span class="cap2 c3" style="flex:1;text-align:center">一</span>
+                <span class="cap2 c3" style="flex:1;text-align:center">二</span>
+                <span class="cap2 c3" style="flex:1;text-align:center">三</span>
+                <span class="cap2 c3" style="flex:1;text-align:center">四</span>
+                <span class="cap2 c3" style="flex:1;text-align:center">五</span>
+                <span class="cap2 c3" style="flex:1;text-align:center">六</span>
+                <span class="cap2" style="flex:1;text-align:center;color:var(--blue)">今天</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:34px">
+            <div class="hr"></div>
+            <div class="row" style="min-height:60px">
+              <span class="t">平均电耗</span><span class="v">14.2 kWh/100km</span>
+            </div>
+            <div class="hr"></div>
+            <div class="row" style="min-height:60px">
+              <span class="t">驾驶评分</span><span class="v" style="color:var(--blue)">92</span>
+            </div>
+            <div class="hr"></div>
+            <div class="row" style="min-height:60px">
+              <span class="t">急加速 / 急刹</span><span class="v">2 / 1</span>
+            </div>
+            <div class="hr"></div>
+          </div>
+
+          <!-- 最近行程：iOS 列表，无卡片 -->
+          <div style="margin-top:26px">
+            <div class="pad" style="margin-bottom:8px"><div class="sec">最近行程</div></div>
+            <div class="hr"></div>
+            <div class="row" style="min-height:62px">
+              <span class="t">公司 → 家</span>
+              <span class="v" style="color:var(--label)"><span class="foot c2" style="margin-right:8px">今天 19:20</span>24.6 km</span>
+            </div>
+            <div class="hr hr-in"></div>
+            <div class="row" style="min-height:62px">
+              <span class="t">家 → 机场 T3</span>
+              <span class="v" style="color:var(--label)"><span class="foot c2" style="margin-right:8px">昨天 07:05</span>48.2 km</span>
+            </div>
+            <div class="hr hr-in"></div>
+            <div class="hr"></div>
+          </div>
+          <div style="height:110px"></div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tb"><svg class="gi"><use href="#i-car"/></svg><span>车况</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-sliders"/></svg><span>车控</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-bolt"/></svg><span>充电</span></div>
+          <div class="tb on"><svg class="gi"><use href="#i-route"/></svg><span>行程</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-person"/></svg><span>我的</span></div>
+        </div>
+        <div class="homebar"></div>
+      </div>
+    </div></div>
+    <p class="note">柱状图不用容器包起来，分隔线不通栏（内缩 20pt）——这两条是 iOS 列表最容易辨认的指纹。</p>
+  </div>
+
+  <!-- ==================== 05 我的 ==================== -->
+  <div class="slot">
+    <p class="cap">05 · 我的 — iOS 设置式分组列表</p>
+    <div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="statusbar"><span>9:41</span><div class="ri"><span>▮▮▮</span><span>ᯤ</span><span>100%</span></div></div>
+
+      <div class="page">
+        <div class="scroll">
+          <div class="pad" style="padding-top:14px"><h1 class="h1">我的</h1></div>
+
+          <!-- 账户头：iOS 设置顶部那种极简身份区 -->
+          <div class="pad" style="margin-top:26px;display:flex;align-items:center;gap:16px">
+            <div style="width:64px;height:64px;border-radius:32px;background:var(--fill);display:grid;place-items:center;color:var(--label2)">
+              <svg class="gi" style="width:30px;height:30px"><use href="#i-person"/></svg>
+            </div>
+            <div>
+              <div class="h2">陈先生</div>
+              <div class="foot c2" style="margin-top:4px">138****8888 · 已实名认证</div>
+            </div>
+            <span class="spacer"></span>
+            <svg style="width:20px;height:20px;color:var(--label3)"><use href="#i-chevr"/></svg>
+          </div>
+
+          <div style="margin-top:30px">
+            <div class="pad" style="margin-bottom:8px"><div class="sec">车辆与钥匙</div></div>
+            <div class="hr"></div>
+            <div class="row">
+              <span class="ic" style="color:var(--blue)"><svg class="gi" style="width:22px;height:22px"><use href="#i-car"/></svg></span>
+              <span class="t">京A·88888</span><span class="v chev">›</span>
+            </div>
+            <div class="hr hr-inset"></div>
+            <div class="row">
+              <span class="ic" style="color:var(--blue)"><svg class="gi" style="width:22px;height:22px"><use href="#i-key"/></svg></span>
+              <span class="t">钥匙共享</span><span class="v">2 把</span>
+            </div>
+            <div class="hr hr-inset"></div>
+            <div class="row">
+              <span class="ic" style="color:var(--orange)"><svg class="gi" style="width:22px;height:22px"><use href="#i-gear"/></svg></span>
+              <span class="t">保养与保险</span><span class="v">正常</span>
+            </div>
+            <div class="hr"></div>
+          </div>
+
+          <div style="margin-top:32px">
+            <div class="pad" style="margin-bottom:8px"><div class="sec">安全</div></div>
+            <div class="hr"></div>
+            <div class="row">
+              <span class="ic" style="color:var(--green)"><svg class="gi" style="width:22px;height:22px"><use href="#i-shield"/></svg></span>
+              <span class="t">Face ID 解锁</span>
+              <span class="v"><span style="display:inline-block;width:51px;height:31px;border-radius:16px;background:var(--green);position:relative;vertical-align:middle">
+                <span style="position:absolute;top:2px;right:2px;width:27px;height:27px;border-radius:14px;background:#fff"></span></span></span>
+            </div>
+            <div class="hr hr-inset"></div>
+            <div class="row">
+              <span class="ic" style="color:var(--label2)"><svg class="gi" style="width:22px;height:22px"><use href="#i-lock"/></svg></span>
+              <span class="t">数据与隐私</span><span class="v chev">›</span>
+            </div>
+            <div class="hr"></div>
+          </div>
+
+          <div style="margin-top:32px">
+            <div class="pad" style="margin-bottom:8px"><div class="sec">消息</div></div>
+            <div class="hr"></div>
+            <div class="row">
+              <span class="ic" style="color:var(--blue)"><svg class="gi" style="width:22px;height:22px"><use href="#i-bell"/></svg></span>
+              <span class="t">车辆提醒</span><span class="v"><span style="background:var(--red);color:#fff;font-size:13px;font-weight:600;padding:2px 8px;border-radius:11px">3</span></span>
+            </div>
+            <div class="hr hr-inset"></div>
+            <div class="row">
+              <span class="ic" style="color:var(--label2)"><svg class="gi" style="width:22px;height:22px"><use href="#i-bell"/></svg></span>
+              <span class="t">服务通知</span><span class="v chev">›</span>
+            </div>
+            <div class="hr"></div>
+          </div>
+          <div style="height:110px"></div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tb"><svg class="gi"><use href="#i-car"/></svg><span>车况</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-sliders"/></svg><span>车控</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-bolt"/></svg><span>充电</span></div>
+          <div class="tb"><svg class="gi"><use href="#i-route"/></svg><span>行程</span></div>
+          <div class="tb on"><svg class="gi"><use href="#i-person"/></svg><span>我的</span></div>
+        </div>
+        <div class="homebar"></div>
+      </div>
+    </div></div>
+    <p class="note">这就是 iOS 设置：分组标题小写灰字、分隔线内缩、开关是原生比例（51×31）。没有一个卡片。</p>
+  </div>
+
+  <!-- ==================== 06 锁屏 + 小组件 ==================== -->
+  <div class="slot">
+    <p class="cap">06 · 锁屏实时活动 + 小组件</p>
+    <div class="phone"><div class="screen" style="background:#000">
+      <div class="island"></div>
+      <div style="position:absolute;left:0;right:0;top:92px;padding:0 26px;z-index:10">
+        <div class="foot c2">9 月 20 日 星期六</div>
+        <div style="font-size:88px;font-weight:200;letter-spacing:-4.4px;line-height:.95;margin-top:4px;font-variant-numeric:tabular-nums">9:41</div>
+
+        <!-- 实时活动 -->
+        <div style="margin-top:30px;border-radius:26px;padding:18px 20px;background:rgba(30,30,32,.8);
+             backdrop-filter:blur(30px) saturate(180%);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 14px 40px -16px rgba(0,0,0,.9)">
+          <div style="display:flex;align-items:center;gap:10px">
+            <svg class="gi" style="width:20px;height:20px;color:var(--blue)"><use href="#i-bolt"/></svg>
+            <span class="sub semib">正在充电 · 78%</span>
+            <span class="spacer"></span>
+            <span class="foot c2">22:41 充满</span>
+          </div>
+          <div style="margin-top:15px" class="lightbarC">
+            <div class="glow" style="width:78%"></div>
+            <div class="fill" style="width:78%"></div>
+          </div>
+          <div style="display:flex;margin-top:11px">
+            <span class="cap1 c2">6.8 kW</span><span class="spacer"></span><span class="cap1 c2">420 km 续航</span>
+          </div>
+        </div>
+
+        <!-- 小组件 -->
+        <div style="display:flex;gap:16px;margin-top:22px">
+          <div style="flex:1;border-radius:26px;padding:16px;background:rgba(30,30,32,.8);backdrop-filter:blur(30px) saturate(180%);
+               box-shadow:inset 0 1px 0 rgba(255,255,255,.14)">
+            <div class="lbl cap1 c2" style="font-size:12px">电量</div>
+            <div class="num" style="font-size:44px;letter-spacing:-2px;margin-top:12px">78<span class="u" style="font-size:20px">%</span></div>
+            <div class="lightbarC" style="margin-top:12px"><div class="fill" style="width:78%"></div></div>
+            <div class="cap1 c2" style="margin-top:10px">420 km</div>
+          </div>
+          <div style="flex:1;border-radius:26px;padding:16px;background:rgba(30,30,32,.8);backdrop-filter:blur(30px) saturate(180%);
+               box-shadow:inset 0 1px 0 rgba(255,255,255,.14)">
+            <div class="cap1 c2" style="font-size:12px">车辆</div>
+            <svg viewBox="0 0 200 90" style="width:100%;margin-top:20px">
+              <path d="M14 62 C14 50 22 45 40 43 C64 28 96 22 130 24 C166 26 184 40 188 56" fill="none" stroke="var(--label2)" stroke-width="2" stroke-linecap="round"/>
+              <path d="M14 62 C14 72 20 76 32 76 L168 76 C182 76 188 72 188 62" fill="none" stroke="var(--label4)" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="54" cy="76" r="10" fill="#000" stroke="var(--label2)" stroke-width="2"/>
+              <circle cx="148" cy="76" r="10" fill="#000" stroke="var(--label2)" stroke-width="2"/>
+              <path d="M16 46 h10" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/>
+            </svg>
+            <div class="cap1 c2" style="margin-top:14px">已锁车</div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <p class="note">锁屏用同一套系统蓝与同一条光条——所以它在锁屏上和在 App 内是同一个产品，而不是两张图。</p>
+  </div>
+
+  <!-- ==================== 07 登录 ==================== -->
+  <div class="slot">
+    <p class="cap">07 · 登录</p>
+    <div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="page">
+        <div class="scroll" style="padding-top:120px">
+          <div style="text-align:center">
+            <svg viewBox="0 0 200 54" style="width:150px;display:block;margin:0 auto">
+              <path d="M6 34 C46 20 92 14 150 16" fill="none" stroke="var(--label)" stroke-width="1.6" stroke-linecap="round" opacity=".85"/>
+              <path d="M34 42 C74 32 110 30 150 32" fill="none" stroke="var(--label3)" stroke-width="1.2" stroke-linecap="round"/>
+              <path d="M150 16 C176 18 190 24 196 32" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"/>
+              <path d="M150 16 C176 18 190 24 196 32" fill="none" stroke="var(--blue)" stroke-width="9" stroke-linecap="round" opacity=".28" filter="url(#bl)"/>
+            </svg>
+            <div class="h1" style="margin-top:22px;font-weight:600">长安车管家</div>
+            <div class="foot c3" style="margin-top:8px;letter-spacing:2.6px">CHANGAN CONNECT</div>
+          </div>
+
+          <div style="margin-top:52px">
+            <div class="hr"></div>
+            <div class="row" style="min-height:56px"><span class="t c3">手机号</span></div>
+            <div class="hr hr-inset"></div>
+            <div class="row" style="min-height:56px"><span class="t c3">图形验证码</span>
+              <span class="v" style="color:var(--label);font-weight:600;letter-spacing:3px">8F3K</span></div>
+            <div class="hr hr-inset"></div>
+            <div class="row" style="min-height:56px"><span class="t c3">短信验证码</span>
+              <span class="v" style="color:var(--blue)">获取验证码</span></div>
+            <div class="hr"></div>
+          </div>
+
+          <div class="pad" style="margin-top:30px">
+            <div style="height:50px;border-radius:25px;display:grid;place-items:center;background:var(--blue);color:#fff" class="body semib">登录</div>
+            <div class="foot c2" style="text-align:center;margin-top:22px">使用 Face ID 登录</div>
+          </div>
+        </div>
+        <div class="homebar"></div>
+      </div>
+    </div></div>
+    <p class="note">Apple 的登录页：一个实心胶囊是唯一的按钮，其余全是文字与分隔线。输入框也没有边框盒子。</p>
+  </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  var root = document.documentElement;
+
+  /* 日夜 */
+  var dk = document.getElementById('m-dark'), lt = document.getElementById('m-light');
+  function mode(m){
+    if(m === 'light'){ root.setAttribute('data-mode','light'); lt.setAttribute('aria-pressed','true'); dk.setAttribute('aria-pressed','false'); }
+    else { root.removeAttribute('data-mode'); dk.setAttribute('aria-pressed','true'); lt.setAttribute('aria-pressed','false'); }
+  }
+  dk.addEventListener('click', function(){ mode('dark'); });
+  lt.addEventListener('click', function(){ mode('light'); });
+
+  /* 数字滚动：缓出到目标值 */
+  document.querySelectorAll('[data-count]').forEach(function(el){
+    var target = parseFloat(el.getAttribute('data-count'));
+    var t0 = performance.now(), dur = 1250;
+    (function step(now){
+      var t = Math.min(1,(now-t0)/dur), e = 1-Math.pow(1-t,3);
+      el.textContent = Math.round(target*e).toLocaleString('en-US');
+      if(t < 1) requestAnimationFrame(step);
+    })(t0);
+  });
+
+  /* Tab */
+  document.querySelectorAll('.tabbar').forEach(function(bar){
+    bar.querySelectorAll('.tb').forEach(function(tb){
+      tb.addEventListener('click', function(){
+        bar.querySelectorAll('.tb').forEach(function(x){ x.classList.remove('on'); });
+        tb.classList.add('on');
+      });
+    });
+  });
+
+  /* 车门：车就是控件 */
+  var doors = Array.prototype.slice.call(document.querySelectorAll('.door[data-door]'));
+  var names = ['左前门','右前门','左后门','右后门'];
+  var open = [false,false,false,false];
+  var trunkOpen = true;
+  var state = document.getElementById('ctrState');
+  function paint(){
+    doors.forEach(function(g, i){ g.style.setProperty('--doorc', open[i] ? '#FF9F0A' : '#30D158'); });
+    var list = [];
+    open.forEach(function(v,i){ if(v) list.push(names[i]); });
+    var msg = list.length ? list.join('、') + ' 未关' : '四门已锁';
+    msg += trunkOpen ? ' · 后备箱未关' : ' · 后备箱已关';
+    if(state) state.textContent = msg;
+  }
+  doors.forEach(function(g,i){ g.addEventListener('click', function(){ open[i] = !open[i]; paint(); }); });
+  var trunk = document.getElementById('trunk');
+  if(trunk) trunk.addEventListener('click', function(){ trunkOpen = !trunkOpen; paint(); });
+  paint();
+})();
+</script>
+</body>
+</html>

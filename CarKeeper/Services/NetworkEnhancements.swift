@@ -48,15 +48,15 @@ extension URLSession {
 // MARK: - N37 网络质量实时监控
 class NetworkQualityMonitor: ObservableObject {
     static let shared = NetworkQualityMonitor()
-    
+
     @Published var latency: Double = 0          // ms
     @Published var isReachable: Bool = false
     @Published var connectionType: String = "unknown"
-    
+
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "network.quality.monitor")
     private var lastCheck: Date?
-    
+
     private init() {
         monitor.pathUpdateHandler = { [weak self] path in
             guard let self = self else { return }
@@ -72,13 +72,13 @@ class NetworkQualityMonitor: ObservableObject {
             }
         }
         monitor.start(queue: queue)
-        
+
         // 每 30s 测一次延迟
         Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             self?.measureLatency()
         }
     }
-    
+
     private func measureLatency() {
         guard let url = URL(string: "https://m.iov.changan.com.cn") else { return }
         let start = CFAbsoluteTimeGetCurrent()
@@ -92,12 +92,12 @@ class NetworkQualityMonitor: ObservableObject {
 // MARK: - N41 离线模式
 class OfflineModeManager: ObservableObject {
     static let shared = OfflineModeManager()
-    
+
     @Published var isOffline: Bool = false
     @Published var offlineMessage: String = ""
-    
+
     private let monitor = NetworkQualityMonitor.shared
-    
+
     private init() {
         monitor.$isReachable
             .sink { [weak self] reachable in
@@ -113,6 +113,6 @@ class OfflineModeManager: ObservableObject {
             }
             .store(in: &cancellables)
     }
-    
+
     private var cancellables = Set<AnyCancellable>()
 }

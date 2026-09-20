@@ -8,9 +8,9 @@ struct CommandHistoryView: View {
     private let store = AppStore.shared
     @State private var filter: String = "all"
     @State private var expandedCmds: Set<UUID> = []
-    
+
     private let filters = ["全部", "成功", "失败", "进行中"]
-    
+
     var filteredCommands: [AppStore.HistoryEntry] {
         store.commandHistory
             .filter { entry in
@@ -22,48 +22,49 @@ struct CommandHistoryView: View {
                 }
             }
     }
-    
+
     var successRate: Double {
         guard !store.commandHistory.isEmpty else { return 0 }
         let succeeded = store.commandHistory.filter { $0.success }.count
         return Double(succeeded) / Double(store.commandHistory.count)
     }
-    
+
     var inProgressCount: Int {
         store.commandHistory.filter { $0.finishedAt == nil }.count
     }
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 // 统计卡片
                 statsCard
-                
+
                 // 筛选
                 filterBar
-                
+
                 // 列表
                 commandList
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.vertical, Theme.Spacing.md)
+            .padding(.horizontal, Kansei.Spacing.lg)
+            .padding(.vertical, Kansei.Spacing.md)
         }
-        .pageBackground()
+        .background(Kansei.Color.background)
         .navigationTitle("指令历史")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityLabel(Text("指令历史"))
     }
-    
+
     // MARK: - 统计卡片
     private var statsCard: some View {
         HStack(spacing: 0) {
             statBubble(label: "总指令", value: "\(store.commandHistory.count)", tint: .blue)
-            statBubble(label: "成功率", value: successRate > 0 ? String(format: "%.0f%%", successRate * 100) : "—", tint: .green)
+            statBubble(label: "成功率", value: successRate > 0 ? String(format: "%.0f%%", successRate * 100:
+ "—", tint: .green)
             statBubble(label: "进行中", value: "\(inProgressCount)", tint: .orange)
         }
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Kansei.Radius.medium)
     }
-    
+
     private func statBubble(label: String, value: String, tint: Color) -> some View {
         VStack(spacing: 4) {
             Text(value)
@@ -75,7 +76,7 @@ struct CommandHistoryView: View {
         }
         .frame(maxWidth: .infinity)
     }
-    
+
     // MARK: - 筛选
     private var filterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -86,15 +87,15 @@ struct CommandHistoryView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(filter == f ? Theme.Colors.accent.opacity(0.2) : Color.clear)
-                            .foregroundStyle(filter == f ? Theme.Colors.accent : .secondary)
+                            .background(filter == f ? Kansei.Color.ambient.opacity(0.2) : Color.clear)
+                            .foregroundStyle(filter == f ? Kansei.Color.ambient : Kansei.Color.secondary)
                             .cornerRadius(20)
                     }
                 }
             }
         }
     }
-    
+
     // MARK: - 列表
     @ViewBuilder
     private var commandList: some View {
@@ -115,10 +116,10 @@ struct CommandHistoryView: View {
             }
         }
     }
-    
+
     private func commandRow(_ cmd: AppStore.HistoryEntry, idx: Int) -> some View {
         let isExpanded = expandedCmds.contains(cmd.id)
-        
+
         return Button(role: nil, action: {
             withAnimation(.spring(response: 0.35)) {
                 if isExpanded { expandedCmds.remove(cmd.id) }
@@ -134,7 +135,7 @@ struct CommandHistoryView: View {
                         .foregroundStyle(cmd.statusColor)
                         .frame(width: 14)
                         .accessibilityLabel(Text(cmd.success ? "执行成功" : "执行失败"))
-                    
+
                     // 图标
                     Image(safeSymbol: cmd.iconName, fallback: "checkmark.circle.fill")
                         .font(.caption)
@@ -142,19 +143,19 @@ struct CommandHistoryView: View {
                         .frame(width: 28, height: 28)
                         .background(cmd.statusColor.opacity(0.1))
                         .cornerRadius(6)
-                    
+
                     // 名称
                     Text(cmd.name)
                         .font(Theme.subheadline)
                         .foregroundStyle(.primary)
-                    
+
                     Spacer()
-                    
+
                     // 时间
                     Text(cmd.startedAt, style: .time)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                    
+
                     // 状态图标
                     if cmd.finishedAt != nil {
                         Image(systemName: cmd.success ? "checkmark.circle.fill" : "xmark.circle.fill")
@@ -168,7 +169,7 @@ struct CommandHistoryView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                
+
                 // 展开详情
                 if isExpanded, let finishedAt = cmd.finishedAt {
                     VStack(alignment: .leading, spacing: 6) {
@@ -186,7 +187,7 @@ struct CommandHistoryView: View {
                     .font(.caption)
                 }
             }
-            .glassCard(corner: Theme.Radius.small)
+            .glassCard(corner: Kansei.Radius.small)
             .onTapGesture {
                 withAnimation(.spring(response: 0.35)) {
                     if isExpanded { expandedCmds.remove(cmd.id) }

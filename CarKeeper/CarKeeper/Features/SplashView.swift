@@ -1,80 +1,93 @@
 // =============================================================================
-// #NEW-112 启动画面 Splash
-// 设计：Tesla 式 —— 纯色画布 + 扁平品牌标 + 细进度线。
-// 品牌的第一秒应该安静、干净、可信。
+// SplashView.swift — 电影感启动
+// Tesla 式极简 + 时间感知品牌光 + 呼吸动画
 // =============================================================================
-
 import SwiftUI
-import UIKit
 
 struct SplashView: View {
     @State private var progress: CGFloat = 0
     @State private var showMain = false
     @State private var dissolved = false
+    @State private var brandGlow: CGFloat = 0
 
     let duration: TimeInterval = 2.0
 
     var body: some View {
         ZStack {
-            DS.Palette.canvasGradient.ignoresSafeArea()
+            // 全屏背景
+            Kansei.Color.background.ignoresSafeArea()
 
-            VStack(spacing: DS.Space.xxl) {
-                // 品牌标：与登录页同一套视觉（主色方标 + 顶部高光 + 柔印）
-                Image(systemName: "car.side.fill")
-                    .font(.system(size: 34, weight: .medium))
-                    .foregroundStyle(DS.Palette.labelOnTint)
-                    .frame(width: 72, height: 72)
-                    .background(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .fill(DS.Palette.tint)
-                    )
-                    // v4：与登录页同一块的平坦主色方标（无梯度描边、无柔印）
+            // 品牌光晕
+            Circle()
+                .fill(Kansei.Color.ambient.opacity(0.3))
+                .frame(width: 300, height: 300)
+                .blur(radius: 60)
+                .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height / 2 - 40)
+                .opacity(brandGlow)
 
-                VStack(spacing: DS.Space.sm) {
+            VStack(spacing: Kansei.Spacing.xxl) {
+                // 品牌标：呼吸光效
+                ZStack {
+                    Circle()
+                        .fill(Kansei.Color.ambient)
+                        .frame(width: 80, height: 80)
+                        .blur(radius: 20)
+                        .opacity(brandGlow * 0.5)
+
+                    Image(systemName: "car.side.fill")
+                        .font(.system(size: 36, weight: .medium))
+                        .foregroundColor(Kansei.Color.primary)
+                        .frame(width: 80, height: 80)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(Kansei.Color.ambient)
+                        )
+                }
+                .kanseiBreathe(opacity: 0.4, scale: 1.05)
+
+                VStack(spacing: Kansei.Spacing.sm) {
                     Text("长安车管家")
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(DS.Palette.label)
-                        .tracking(1.2)
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(Kansei.Color.primary)
+                        .tracking(2)
+
                     Text("CHANGAN CONNECT")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(DS.Palette.labelTertiary)
-                        .tracking(3)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Kansei.Color.tertiary)
+                        .tracking(4)
                 }
 
-                // 进度线：2pt，单一主色，宽度与内容区对齐
+                // 进度条
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(DS.Palette.surfaceSunken)
-                        Capsule()
-                            .fill(DS.Palette.tint)
-                            .frame(width: max(2, geo.size.width * progress))
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Kansei.Color.glassBorder)
+                            .frame(height: 3)
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Kansei.Color.ambient)
+                            .frame(width: geo.size.width * progress, height: 3)
                     }
                 }
-                .frame(width: 180, height: 3)
-                .clipShape(Capsule())
-                .padding(.top, DS.Space.md)
-                .accessibilityHidden(true)
+                .frame(width: 160, height: 3)
+                .padding(.top, Kansei.Spacing.md)
             }
-            .opacity(dissolved ? 0 : 1)
-            .scaleEffect(dissolved ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.35), value: dissolved)
         }
         .onAppear {
             withAnimation(.linear(duration: duration)) {
                 progress = 1.0
             }
+            brandGlow = 1.0
+
             DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-                dissolved = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                withAnimation(.easeOut(duration: 0.4)) {
+                    dissolved = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                     showMain = true
                 }
             }
         }
-    }
-}
-
-struct SplashView_Previews: PreviewProvider {
-    static var previews: some View {
-        SplashView()
+        .scaleEffect(dissolved ? 0.95 : 1)
+        .opacity(dissolved ? 0 : 1)
     }
 }

@@ -57,10 +57,10 @@ extension Color {
 enum Theme {
     // MARK: - 颜色别名（兼容旧代码 Theme.Colors.*）
     enum Colors {
-        static var accent: Color { DS.Palette.tint }
-        static var brand: Color { DS.Palette.tint }
-        static var brandLight: Color { DS.Palette.tint }
-        static var brandDark: Color { DS.Palette.tint }
+        static var accent: Color { Kansei.Color.ambient }
+        static var brand: Color { Kansei.Color.ambient }
+        static var brandLight: Color { Kansei.Color.ambient }
+        static var brandDark: Color { Kansei.Color.ambient }
         static var background: Color { ColorSystem.background }
         static var cardBg: Color { ColorSystem.cardBg }
         static var primary: Color { ColorSystem.primary }
@@ -68,32 +68,32 @@ enum Theme {
         static var tertiary: Color { ColorSystem.tertiary }
         static var border: Color { ColorSystem.border }
         static var fill: Color { ColorSystem.fill }
-        static var ok: Color { DS.Palette.ok }
-        static var warn: Color { DS.Palette.warn }
-        static var bad: Color { DS.Palette.bad }
-        static var tint: Color { DS.Palette.tint }
-        static var charge: Color { DS.Palette.charge }
+        static var ok: Color { Kansei.Color.success }
+        static var warn: Color { Kansei.Color.warning }
+        static var bad: Color { Kansei.Color.error }
+        static var tint: Color { Kansei.Color.ambient }
+        static var charge: Color { Kansei.Color.info }
     }
 
     // MARK: - 品牌色（自适应浅色/深色模式）
 
-    /// 主色调：全 App 只有一个强调色（DS.Palette.tint）。
+    /// 主色调：全 App 只有一个强调色（Kansei.Color.ambient）。
     /// 各页面不设自己的色相，页面之间的差异由排版与内容表达。
-    static var brand: Color { DS.Palette.tint }
-    static var brandLight: Color { DS.Palette.tint }
-    static var brandDark: Color { DS.Palette.tint }
+    static var brand: Color { Kansei.Color.ambient }
+    static var brandLight: Color { Kansei.Color.ambient }
+    static var brandDark: Color { Kansei.Color.ambient }
 
     // MARK: - 语义色（全局唯一来源：DS.Palette）
-    static var ok: Color { DS.Palette.ok }
-    static var warn: Color { DS.Palette.warn }
-    static var bad: Color { DS.Palette.bad }
-    static var charge: Color { DS.Palette.charge }
-    static var acc: Color { DS.Palette.tint }
-    static var na: Color { DS.Palette.labelTertiary }
+    static var ok: Color { Kansei.Color.success }
+    static var warn: Color { Kansei.Color.warning }
+    static var bad: Color { Kansei.Color.error }
+    static var charge: Color { Kansei.Color.info }
+    static var acc: Color { Kansei.Color.ambient }
+    static var na: Color { Kansei.Color.tertiary }
 
     // MARK: - 状态 → 语义色
     static func statusColor(_ cls: String) -> Color {
-        DS.Palette.status(cls)
+        Kansei.Color.status(cls)
     }
 
     // =============================================================================
@@ -158,7 +158,6 @@ enum Theme {
         static var footnote: Font { .footnote }
     }
 
-
     // =============================================================================
     // 二、间距体系（Spacing Scale）
     // =============================================================================
@@ -202,26 +201,26 @@ enum Theme {
     // =============================================================================
     enum ColorSystem {
         // ---- 表面色（Surface）：来源统一为 DS.Palette，保证与 DS 组件同色 ----
-        static let background: Color = DS.Palette.canvas
-        static let cardBg: Color = DS.Palette.surface
-        static let surfaceRaised: Color = DS.Palette.surfaceRaised
-        static let overlay: Color = DS.Palette.surface
-        static let glass: Color = DS.Palette.surface   // 旧版的半透明页面底已取消，避免“满屏玻璃”
+        static let background: Color = Kansei.Color.background
+        static let cardBg: Color = Kansei.Color.nightSurface
+        static let surfaceRaised: Color = Kansei.Color.nightSurface
+        static let overlay: Color = Kansei.Color.nightSurface
+        static let glass: Color = Kansei.Color.nightSurface   // 旧版的半透明页面底已取消，避免“满屏玻璃”
 
         // ---- 文字色（Text）----
-        static let primary: Color = DS.Palette.label
-        static let secondary: Color = DS.Palette.labelSecondary
-        static let tertiary: Color = DS.Palette.labelTertiary
-        static let quaternary: Color = DS.Palette.labelTertiary.opacity(0.6)
+        static let primary: Color = Kansei.Color.primary
+        static let secondary: Color = Kansei.Color.secondary
+        static let tertiary: Color = Kansei.Color.tertiary
+        static let quaternary: Color = Kansei.Color.tertiary.opacity(0.6)
 
         // ---- 边框色（Border）：发丝线 ----
-        static let border: Color = DS.Palette.hairline
-        static let borderSubtle: Color = DS.Palette.hairline.opacity(0.6)
+        static let border: Color = Kansei.Color.glassBorder
+        static let borderSubtle: Color = Kansei.Color.glassBorder.opacity(0.6)
 
         // ---- 填充色（Fill）----
-        static let fill: Color = DS.Palette.surfaceRaised
-        static let fillSubtle: Color = DS.Palette.surfaceSunken
-        static let fillHighlighted: Color = DS.Palette.surfaceRaised
+        static let fill: Color = Kansei.Color.nightSurface
+        static let fillSubtle: Color = Kansei.Color.glassLight
+        static let fillHighlighted: Color = Kansei.Color.nightSurface
 
         // ---- 阴影色（Tesla 式：极弱，只用于“浮层”）----
         static let shadowLight: Color = Color.black.opacity(0.05)
@@ -244,7 +243,8 @@ enum Theme {
         static let responseBase: Double = 0.45
         static let dampingFraction: Double = 0.8
         static let duration: Double = 0.5
-        static var standard: Animation { Animation.spring(response: responseBase, dampingFraction: dampingFraction, blendDuration: duration) }
+        static var standard: Animation { Animation.spring(response: responseBase, dampingFraction: dampingFraction,
+ blendDuration: duration) }
         static var quick: Animation { Animation.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.25) }
         static var slow: Animation { Animation.spring(response: 0.6, dampingFraction: 0.9, blendDuration: 0.5) }
         static var smooth: Animation { Animation.easeInOut(duration: 0.35) }
@@ -298,7 +298,7 @@ struct ShadowStyle {
 // MARK: - View Extensions：Apple Premium 组件
 extension View {
     // 页面底色 + 统一页面边距
-    // 刻意不接受任何颜色参数：页面底色只能是 DS.Palette.canvas 这一层。
+    // 刻意不接受任何颜色参数：页面底色只能是 Kansei.Color.background 这一层。
     func pageBackground() -> some View {
         contentMargins(.horizontal, DS.Space.page, for: .scrollContent)
             .background(DS.Palette.canvasGradient.ignoresSafeArea())
@@ -335,7 +335,7 @@ struct GlassCardModifier: ViewModifier {
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     // 内容一律不透明（hero 也一样）：玻璃只允许出现在浮层。
-                    .fill(DS.Palette.surface)
+                    .fill(Kansei.Color.nightSurface)
             }
             // v4：内容层没有描边、没有阴影 —— 深度只由系统表面色表达。
             // （它们曾经是“卡片感”的来源，也是界面显廉价的主因。）
@@ -404,7 +404,7 @@ struct CardBox<Content: View>: View {
                 Text(title.uppercased())
                     .font(DS.Typo.sectionLabel)
                     .tracking(0.6)
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .foregroundStyle(Kansei.Color.secondary)
                 Spacer(minLength: DS.Space.sm)
                 if let side, !side.isEmpty {
                     DSChip(text: side, cls: sideCls.isEmpty ? "na" : sideCls)
@@ -468,14 +468,14 @@ struct ExpandingCardBox<Content: View>: View {
                     Text(title.uppercased())
                         .font(DS.Typo.sectionLabel)
                         .tracking(0.6)
-                        .foregroundStyle(DS.Palette.labelSecondary)
+                        .foregroundStyle(Kansei.Color.secondary)
                     Spacer(minLength: DS.Space.sm)
                     if let side, !side.isEmpty {
                         DSChip(text: side, cls: sideCls.isEmpty ? "na" : sideCls)
                     }
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(DS.Palette.labelTertiary)
+                        .foregroundStyle(Kansei.Color.tertiary)
                         .rotationEffect(isExpanded ? .degrees(180) : .degrees(0))
                         .animation(DS.Motion.press, value: isExpanded)
                 }
@@ -806,7 +806,6 @@ extension DynamicTypeSize {
 }
 #endif
 
-
 // =============================================================================
 // Page State Views —— 统一的加载 / 错误 / 空状态展示组件
 // 所有 Feature 页面统一使用，确保深浅双模式下视觉一致
@@ -828,7 +827,7 @@ struct PageLoadingView: View {
                 ProgressView().controlSize(.small)
                 Text(message)
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .foregroundStyle(Kansei.Color.secondary)
             }
             DSSkeleton(height: 88, width: nil)
             DSSkeleton(height: 142, width: nil)
@@ -856,10 +855,10 @@ struct PageErrorView: View {
         VStack(spacing: DS.Space.md) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 30, weight: .light))
-                .foregroundStyle(DS.Palette.warn)
+                .foregroundStyle(Kansei.Color.warning)
             Text(message)
                 .font(DS.Typo.subheadline)
-                .foregroundStyle(DS.Palette.labelSecondary)
+                .foregroundStyle(Kansei.Color.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Button("重新加载") { retryAction() }
@@ -873,201 +872,10 @@ struct PageErrorView: View {
 }
 
 /// 页面空状态（无数据但无错误）— #25 带液态玻璃插画风格
-struct PageEmptyView: View {
-    let title: String
-    let subtitle: String
-    let icon: String
-
-    init(_ title: String, subtitle: String = "", icon: String = "doc.text") {
-        self.title = title
-        self.subtitle = subtitle
-        self.icon = icon
-    }
-
-    var body: some View {
-        VStack(spacing: DS.Space.md) {
-            Image(safeSymbol: icon, fallback: "car.fill")
-                .font(.system(size: 34, weight: .light))
-                .foregroundStyle(DS.Palette.labelTertiary)
-            Text(title)
-                .font(DS.Typo.headline)
-                .foregroundStyle(DS.Palette.label)
-                .multilineTextAlignment(.center)
-            if !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(DS.Typo.footnote)
-                    .foregroundStyle(DS.Palette.labelSecondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, DS.Space.xxxl)
-        .padding(.horizontal, DS.Space.xl)
-    }
-}
-
-
-// =============================================================================
-// DataFreshnessBadge —— #3 数据新鲜度徽章
-// 根据时间差显示不同图标 + 颜色（原来是纯色小圆点，只靠颜色区分）
-// =============================================================================
-struct DataFreshnessBadge: View {
-    let timestamp: Date?
-    let fontSize: CGFloat = 10
-
-    var body: some View {
-        if let ts = timestamp, Date().timeIntervalSince(ts) < 300 {
-            let age = Int(Date().timeIntervalSince(ts) / 60)
-            let cls: String = age < 3 ? "ok" : (age < 15 ? "warn" : "bad")
-            let color = DS.Palette.status(cls)
-            let label: String = age < 1 ? "刚刚更新" : "\(age) 分钟前"
-            let symbol = age < 3 ? "checkmark.circle.fill"
-                        : (age < 15 ? "clock.fill" : "exclamationmark.triangle.fill")
-            HStack(spacing: 4) {
-                Image(safeSymbol: symbol, fallback: "clock.fill")
-                    .font(.system(size: fontSize, weight: .semibold))
-                Text(label)
-                    .font(.system(size: fontSize, weight: .medium))
-            }
-            .foregroundStyle(color)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(Capsule().fill(color.opacity(0.12)))
-            .accessibilityLabel(Text(label))
-        }
-    }
-}
-
-// =============================================================================
-// NetworkStatusIndicator —— #4 网络状态顶部微条
 // =============================================================================
 /// 网络状态条：一整行、发丝线分隔、左对齐 —— 像车内状态灯，而不是飘在顶部的彩色胶囊。
-struct NetworkStatusIndicator: View {
-    let status: AppStore.NetworkStatus
-    var body: some View {
-        switch status {
-        case .online:
-            EmptyView()
-        case .weak:
-            DSNotice(kind: .warning, text: "网络较弱，数据可能不是最新")
-                .padding(.horizontal, DS.Space.page)
-                .padding(.top, DS.Space.sm)
-        case .offline:
-            DSNotice(kind: .error, text: "当前离线，显示的是最近一次同步的数据")
-                .padding(.horizontal, DS.Space.page)
-                .padding(.top, DS.Space.sm)
-        }
-    }
-}
-
-// =============================================================================
-// ReduceMotionAware —— #6 降低动态效果检测
-// =============================================================================
-extension View {
-    @ViewBuilder
-    func reduceMotionIfRequired<V: View>(_ content: () -> V) -> some View {
-        if UIAccessibility.isReduceTransparencyEnabled || UIAccessibility.isReduceMotionEnabled {
-            content()
-                .animation(nil, value: 0)
-        } else {
-            self
-        }
-    }
-}
-
-// =============================================================================
-// ToastView —— iOS 27 Liquid Glass 全局 Toast 提示
-// 底部胶囊形磨砂玻璃卡片；出现用弹簧、消失用 easeOut 淡出（状态变化，非装饰）
-// =============================================================================
-
 /// 全局 Toast 提示（由 NavState.currentItem 驱动，挂载在根视图上）
-struct ToastView: View {
-    let text: String
-    let icon: String
-
-    var body: some View {
-        HStack(spacing: DS.Space.sm) {
-            Image(safeSymbol: icon, fallback: "info.circle.fill")
-                .font(.system(size: DS.Size.iconSm, weight: .semibold))
-                .foregroundStyle(DS.Palette.tint)
-            Text(text)
-                .font(DS.Typo.subheadline.weight(.semibold))
-                .foregroundStyle(DS.Palette.label)
-        }
-        .padding(.horizontal, DS.Space.lg)
-        .padding(.vertical, DS.Space.md)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(DS.Palette.hairlineStrong, lineWidth: DS.Hair.line))
-        .shadow(color: .black.opacity(0.18), radius: 16, y: 6)
-        .padding(.bottom, DS.Space.md)
-        .padding(.horizontal, DS.Space.xxl)
-        .transition(
-            .asymmetric(
-                insertion: .move(edge: .bottom)
-                    .combined(with: .opacity)
-                    .animation(.spring(response: 0.45, dampingFraction: 0.6, blendDuration: 0.25)),
-                removal: .opacity.animation(.easeOut(duration: 0.2))
-            )
-        )
-    }
-}
-
 // =============================================================================
-// ScrollBounceBehavior —— #12 自定义下拉刷新环形进度条
-// 在每个 ScrollView 顶部注入一个 Liquid Glass 风格的环形进度指示器
-// =============================================================================
-struct RefreshProgressRing: View {
-    let progress: Double
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(Theme.Colors.accent.opacity(0.15), lineWidth: 2)
-                .frame(width: 16, height: 16)
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(Theme.Colors.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                .frame(width: 16, height: 16)
-                .rotationEffect(.degrees(-90))
-        }
-    }
-}
-
-extension View {
-    /// #12 下拉刷新环形进度条
-    func refreshProgressRing(progress: Binding<CGFloat>) -> some View {
-        self.overlay(alignment: .top) {
-            if progress.wrappedValue > 0 {
-                RefreshProgressRing(progress: Double(progress.wrappedValue))
-                    .frame(width: 20, height: 20)
-            }
-        }
-    }
-}
-
-// =============================================================================
-// PowerSavingCheck —— #31 省电模式检测
-// 当省电模式开启时，禁用所有动画和背景任务
-// =============================================================================
-enum PowerSavingMode {
-    static var isEnabled: Bool { UserDefaults.standard.bool(forKey: "carkeeper_power_saving") }
-
-    static func animation(_ anim: Animation?) -> Animation? {
-        isEnabled ? nil : anim
-    }
-
-    static func shouldAnimate(_ condition: Bool) -> Bool {
-        isEnabled ? false : condition
-    }
-
-    static func task(_ body: @escaping () async -> Void) -> Task<Void, Never>? {
-        isEnabled ? nil : Task { await body() }
-    }
-}
-
-// =============================================================================
-// ShareableStatusCard —— #19 车况快照分享图（轻量版）
-// 生成当前车况的简要描述文本用于分享
 // =============================================================================
 struct ShareableStatusInfo: Identifiable {
     let id = UUID()
@@ -1099,7 +907,7 @@ struct ChargingStationFinder: View {
     @State private var showMap = false
     @State private var stations: [ChargingStation] = []
     @State private var isLoading = false
-    
+
     struct ChargingStation: Identifiable {
         let id = UUID()
         let name: String
@@ -1107,7 +915,7 @@ struct ChargingStationFinder: View {
         let address: String
         let type: String  // 快充/慢充
     }
-    
+
     var body: some View {
         Button {
             searchStations()
@@ -1134,7 +942,7 @@ struct ChargingStationFinder: View {
             ChargingStationMapView(stations: stations)
         }
     }
-    
+
     private func searchStations() {
         isLoading = true
         // 使用 MapKit 搜索附近充电站
@@ -1145,7 +953,7 @@ struct ChargingStationFinder: View {
             latitudinalMeters: 5000,
             longitudinalMeters: 5000
         )
-        
+
         let search = MKLocalSearch(request: request)
         search.start { response, error in
             isLoading = false
@@ -1166,370 +974,10 @@ struct ChargingStationFinder: View {
     }
 }
 
-struct ChargingStationMapView: View {
-    let stations: [ChargingStationFinder.ChargingStation]
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        VStack {
-            Text("附近充电站 (\(stations.count) 个)")
-                .font(Theme.h3)
-                .padding()
-            List(stations) { station in
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text(station.name).font(Theme.body)
-                        Text(station.address).font(Theme.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing) {
-                        Text(station.distance).font(Theme.caption.weight(.semibold)).foregroundStyle(Theme.Colors.accent)
-                        Text(station.type).font(Theme.micro).foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.vertical, 8)
-            }
-            Button("关闭") { dismiss() }
-                .padding()
-        }
-        .presentationDetents([.medium, .large])
-    }
-}
+
 
 // =============================================================================
-// MonthlyReportGenerator — #39 驾驶报告月报（PDFKit）
-// 生成本月驾驶报告 PDF
 // =============================================================================
-struct MonthlyReportGenerator: View {
-    @State private var showReport = false
-    @State private var reportData: ReportData?
-    
-    struct ReportData {
-        let totalMileage: Int
-        let avgConsumption: Double
-        let chargeSessions: Int
-        let avgSoc: Int
-        let driveScore: Int
-    }
-    
-    var body: some View {
-        Button {
-            generateReport()
-        } label: {
-            HStack {
-                Image(systemName: "doc.text.fill")
-                    .font(Theme.bodyMd)
-                Text("本月驾驶报告")
-                    .font(Theme.body)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(Theme.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.vertical, DS.Space.md)
-            .glassCard()
-        }
-        .buttonStyle(.plain)
-        .sheet(isPresented: $showReport) {
-            if let data = reportData {
-                MonthlyReportView(data: data)
-            }
-        }
-    }
-    
-    private func generateReport() {
-        // 模拟生成报告数据
-        let data = ReportData(
-            totalMileage: 1250,
-            avgConsumption: 14.5,
-            chargeSessions: 8,
-            avgSoc: 65,
-            driveScore: 85
-        )
-        reportData = data
-        showReport = true
-    }
-}
-
-struct MonthlyReportView: View {
-    let data: MonthlyReportGenerator.ReportData
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                Text("月度驾驶报告")
-                    .font(Theme.h2)
-                Divider()
-                
-                ReportSection(title: "行驶统计") {
-                    ReportRow(label: "总里程", value: "\(data.totalMileage) km")
-                    ReportRow(label: "平均能耗", value: "\(data.avgConsumption) kWh/100km")
-                    ReportRow(label: "充电次数", value: "\(data.chargeSessions) 次")
-                    ReportRow(label: "平均电量", value: "\(data.avgSoc)%")
-                }
-                
-                ReportSection(title: "驾驶评分") {
-                    ReportRow(label: "综合评分", value: "\(data.driveScore) 分")
-                    ReportRow(label: "评价", value: data.driveScore >= 80 ? "优秀" : "良好")
-                }
-                
-                Button("分享报告") {
-                    shareReport()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.Colors.accent)
-                
-                Button("关闭") { dismiss() }
-                    .font(Theme.body)
-                    .foregroundStyle(.secondary)
-            }
-            .padding()
-        }
-        .presentationDetents([.large])
-    }
-    
-    private func shareReport() {
-        // 生成 PDF 并分享
-        let html = generateHTMLReport()
-        let url = saveHTMLToTemp(html: html)
-        let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-            vc.popoverPresentationController?.sourceView = scene.windows.first
-            scene.windows.first?.rootViewController?.present(vc, animated: true)
-        }
-    }
-    
-    private func generateHTMLReport() -> String {
-        return """
-        <html><body style="font-family:system-ui;padding:20px;">
-        <h1>月度驾驶报告</h1>
-        <h2>行驶统计</h2>
-        <ul>
-        <li>总里程: \(data.totalMileage) km</li>
-        <li>平均能耗: \(data.avgConsumption) kWh/100km</li>
-        <li>充电次数: \(data.chargeSessions) 次</li>
-        <li>平均电量: \(data.avgSoc)%</li>
-        </ul>
-        <h2>驾驶评分</h2>
-        <p>综合评分: \(data.driveScore) 分 - \(data.driveScore >= 80 ? "优秀" : "良好")</p>
-        </body></html>
-        """
-    }
-    
-    private func saveHTMLToTemp(html: String) -> URL {
-        let filename = "monthly_report_\(Date().timeIntervalSince1970).html"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-        try? html.write(to: url, atomically: true, encoding: .utf8)
-        return url
-    }
-}
-
-struct ReportSection<Content: View>: View {
-    let title: String
-    let content: Content
-
-    init(title: String, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(Theme.h4).foregroundStyle(.secondary)
-            content
-        }
-        .padding()
-        .glassCard()
-    }
-}
-
-struct ReportRow: View {
-    let label: String
-    let value: String
-    
-    var body: some View {
-        HStack {
-            Text(label).font(Theme.body).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).font(Theme.body.weight(.semibold))
-        }
-    }
-}
-
-// =============================================================================
-// PowerSavingToggle —— #31 省电模式开关
-// 在设置页面或首页添加开关，关闭动画和后台刷新
-// =============================================================================
-struct PowerSavingToggle: View {
-    @AppStorage("carkeeper_power_saving") private var enabled = false
-
-    var body: some View {
-        Toggle(isOn: $enabled) {
-            HStack {
-                Image(systemName: enabled ? "battery.100" : "battery.25")
-                    .foregroundStyle(enabled ? .green : .orange)
-                Text(enabled ? "省电模式已开启" : "省电模式")
-                    .font(Theme.body)
-            }
-        }
-        .toggleStyle(SwitchToggleStyle(tint: enabled ? .green : .orange))
-        .onChange(of: enabled) { newValue in
-            if newValue {
-                ToastManager.shared.show("省电模式已开启，动画和后台刷新已关闭", icon: "battery.25")
-            } else {
-                ToastManager.shared.show("省电模式已关闭", icon: "battery.100")
-            }
-        }
-    }
-}
-
-// =============================================================================
-// DriveBehaviorScore —— #45 驾驶行为评分
-// 根据急加速/急刹车频率给出评分
-// =============================================================================
-struct DriveBehaviorScore {
-    let aggressiveAccel: Int    // 急加速次数
-    let harshBrake: Int         // 急刹车次数
-    let totalTrips: Int         // 总行程数
-    let score: Int              // 综合评分 0-100
-
-    var label: String {
-        switch score {
-        case 80...100: return "优秀"
-        case 60...79: return "良好"
-        case 40...59: return "一般"
-        default: return "需改进"
-        }
-    }
-
-    var color: Color {
-        switch score {
-        case 80...100: return .green
-        case 60...79: return .blue
-        case 40...59: return .orange
-        default: return .red
-        }
-    }
-}
-
-func calculateDriveBehaviorScore(_ cache: [String: Any?]) -> DriveBehaviorScore? {
-    // 简化版：基于控制数据中的加速度相关指标
-    guard let control = cache["control"] as? [String: Any] else { return nil }
-    // 实际项目中需要从传感器数据计算，这里返回默认值
-    let aggressiveAccel = Int(control["AggressiveAccel"] as? Int ?? 0)
-    let harshBrake = Int(control["HarshBrake"] as? Int ?? 0)
-    let totalTrips = max(1, aggressiveAccel + harshBrake + 1)
-    let score = max(0, min(100, 100 - aggressiveAccel * 5 - harshBrake * 3))
-    return DriveBehaviorScore(aggressiveAccel: aggressiveAccel, harshBrake: harshBrake, totalTrips: totalTrips, score: score)
-}
-
-// =============================================================================
-// #NEW-103 CoreHaptics 精密触觉反馈
-// =============================================================================
-enum HapticFeedback {
-    /// 轻触反馈（用于按钮点击）
-    static func lightTap() {
-        guard let engine = try? CHHapticEngine() else { return }
-        do {
-            let pattern = CHHapticEvent(eventType: .hapticContinuous, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3)], relativeTime: 0, duration: 0.05)
-            let event = try CHHapticPattern(events: [pattern], parameters: [])
-            try engine.start()
-            let player = try engine.makePlayer(with: event)
-            try player.start(atTime: 0)
-        } catch {
-            // 忽略错误，设备不支持时降级
-        }
-    }
-
-    /// 成功反馈（用于操作成功）
-    static func success() {
-        guard let engine = try? CHHapticEngine() else { return }
-        do {
-            let event1 = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5)], relativeTime: 0, duration: 0.1)
-            let event2 = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3)], relativeTime: 0.1, duration: 0.15)
-            let pattern = try CHHapticPattern(events: [event1, event2], parameters: [])
-            try engine.start()
-            let player = try engine.makePlayer(with: pattern)
-            try player.start(atTime: 0)
-        } catch {
-            // 降级处理
-        }
-    }
-
-    /// 警告反馈（用于告警）
-    static func warning() {
-        guard let engine = try? CHHapticEngine() else { return }
-        do {
-            let event1 = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8)], relativeTime: 0, duration: 0.15)
-            let event2 = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6)], relativeTime: 0.12, duration: 0.15)
-            let event3 = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8)], relativeTime: 0.24, duration: 0.15)
-            let pattern = try CHHapticPattern(events: [event1, event2, event3], parameters: [])
-            try engine.start()
-            let player = try engine.makePlayer(with: pattern)
-            try player.start(atTime: 0)
-        } catch {
-            // 降级处理
-        }
-    }
-
-    /// 解锁反馈
-    static func unlock() {
-        guard let engine = try? CHHapticEngine() else { return }
-        do {
-            let event = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.4)], relativeTime: 0, duration: 0.2)
-            let pattern = try CHHapticPattern(events: [event], parameters: [])
-            try engine.start()
-            let player = try engine.makePlayer(with: pattern)
-            try player.start(atTime: 0)
-        } catch {}
-    }
-
-    /// 锁车反馈
-    static func lock() {
-        guard let engine = try? CHHapticEngine() else { return }
-        do {
-            let event = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6)], relativeTime: 0, duration: 0.15)
-            let pattern = try CHHapticPattern(events: [event], parameters: [])
-            try engine.start()
-            let player = try engine.makePlayer(with: pattern)
-            try player.start(atTime: 0)
-        } catch {}
-    }
-
-    /// 系统级轻触（兼容所有设备）
-    static func systemTap() {
-        AudioServicesPlaySystemSound(1104) // UIImpactFeedbackScheduler
-    }
-}
-
-// =============================================================================
-// #NEW-104 AudioToolbox 操作音效
-// =============================================================================
-enum SoundFeedback {
-    /// 成功音效
-    static func playSuccess() {
-        AudioServicesPlaySystemSound(1000) // 系统成功音
-    }
-
-    /// 错误音效
-    static func playError() {
-        AudioServicesPlaySystemSound(1001) // 系统错误音
-    }
-
-    /// 通知音效
-    static func playNotification() {
-        AudioServicesPlaySystemSound(1005) // 系统通知音
-    }
-
-    /// 点击音效
-    static func playClick() {
-        AudioServicesPlaySystemSound(1100) // UIButtonClick
-    }
-}
-
-// =============================================================================
-// #NEW-105 Photo Picker 图片选择器辅助
 // =============================================================================
 struct ImagePicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?
@@ -1551,7 +999,8 @@ struct ImagePicker: UIViewControllerRepresentable {
     class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let parent: ImagePicker
         init(_ parent: ImagePicker) { self.parent = parent }
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info:
+ [UIImagePickerController.InfoKey : Any]) {
             if let image = info[.originalImage] as? UIImage {
                 parent.image = image
             }
@@ -1606,7 +1055,8 @@ private enum ImagePickerDelegateStore {
 private class ImagePickerCoordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     let completion: (UIImage?) -> Void
     init(completion: @escaping (UIImage?) -> Void) { self.completion = completion }
-    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info:
+ [UIImagePickerController.InfoKey : Any]) {
         if let image = info[.originalImage] as? UIImage {
             completion(image)
         }
@@ -1617,8 +1067,6 @@ private class ImagePickerCoordinator: NSObject, UIImagePickerControllerDelegate,
         picker.dismiss(animated: true)
     }
 }
-
-
 
 // MARK: - View extensions
 extension View {

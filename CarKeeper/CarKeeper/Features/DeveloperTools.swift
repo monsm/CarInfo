@@ -8,7 +8,7 @@ import UniformTypeIdentifiers
 // MARK: - E63 崩溃日志在线查看
 struct CrashLogViewer: View {
     @StateObject private var reporter = CrashReporter.shared
-    
+
     var body: some View {
         List(reporter.readCrashHistory(), id: \.self) { log in
             ScrollView {
@@ -18,7 +18,7 @@ struct CrashLogViewer: View {
             }
         }
         .listStyle(.plain)
-        .dsCanvas()
+        .background(Kansei.Color.background)
         .navigationTitle("崩溃日志")
         .toolbar {
             Button("清除日志") { reporter.clearCrashHistory() }
@@ -30,9 +30,9 @@ struct CrashLogViewer: View {
 // MARK: - E64 性能瓶颈报告
 struct PerformanceReport: View {
     @StateObject private var tracker = PerformanceTracker.shared
-    
+
     var body: some View {
-        VStack(spacing: Theme.Spacing.md) {
+        VStack(spacing: Kansei.Spacing.md) {
             HStack {
                 Text("页面加载时间")
                 Spacer()
@@ -61,7 +61,7 @@ struct PerformanceReport: View {
 class MockAPIClient {
     static let shared = MockAPIClient()
     @Published var mockMode = false
-    
+
     func getMockCarData() -> [String: Any] {
         return [
             // 用真实报文的键名，避免模拟数据与线上解析逻辑“互相印证”出错误结论
@@ -76,7 +76,7 @@ class MockAPIClient {
 struct DataImportView: View {
     private let store = AppStore.shared
     @State private var showPicker = false
-    
+
     var body: some View {
         List {
             Section("导入数据") {
@@ -96,17 +96,17 @@ struct DataImportView: View {
 
 struct FilePicker: UIViewControllerRepresentable {
     let allowedContentTypes: [UTType]
-    
+
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: allowedContentTypes)
         picker.delegate = context.coordinator
         return picker
     }
-    
+
     func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
-    
+
     func makeCoordinator() -> Coordinator { Coordinator() }
-    
+
     class Coordinator: NSObject, UIDocumentPickerDelegate {
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             // 处理文件选择
@@ -118,7 +118,7 @@ struct FilePicker: UIViewControllerRepresentable {
 class FeatureFlags : ObservableObject {
     static let shared = FeatureFlags()
     @Published var flags: [String: Bool] = [:]
-    
+
     func enable(_ flag: String) { flags[flag] = true }
     func disable(_ flag: String) { flags[flag] = false }
     func isAvailable(_ flag: String) -> Bool { flags[flag] ?? false }
@@ -128,7 +128,7 @@ struct FeatureFlagToggle: View {
     let flag: String
     let title: String
     @StateObject private var flags = FeatureFlags.shared
-    
+
     var body: some View {
         HStack {
             Text(title)

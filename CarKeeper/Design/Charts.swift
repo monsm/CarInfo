@@ -76,12 +76,12 @@ struct DSTrendChart: View {
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                    .foregroundStyle(DS.Palette.hairline)
+                    .foregroundStyle(Kansei.Color.glassBorder)
                 AxisValueLabel {
                     if let v = value.as(Double.self) {
                         Text(valueText(v))
                             .font(DS.Typo.caption2)
-                            .foregroundStyle(DS.Palette.labelTertiary)
+                            .foregroundStyle(Kansei.Color.tertiary)
                     }
                 }
             }
@@ -89,12 +89,12 @@ struct DSTrendChart: View {
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { value in
                 AxisGridLine()
-                    .foregroundStyle(DS.Palette.hairline.opacity(0.6))
+                    .foregroundStyle(Kansei.Color.glassBorder.opacity(0.6))
                 AxisValueLabel {
                     if let d = value.as(Date.self) {
                         Text(Self.axisTime(d))
                             .font(DS.Typo.caption2)
-                            .foregroundStyle(DS.Palette.labelTertiary)
+                            .foregroundStyle(Kansei.Color.tertiary)
                     }
                 }
             }
@@ -117,7 +117,7 @@ struct DSTrendChart: View {
 
 struct DSTyreTrendChart: View {
     var points: [HistoryStore.TyrePoint]
-    var tint: Color = DS.Palette.tint
+    var tint: Color = Kansei.Color.ambient
     var height: CGFloat = 156
 
     /// 四条线只用一支强调色的四个明度档 + 不同虚实，不引入第二支彩色
@@ -215,12 +215,12 @@ struct DSTyreTrendChart: View {
             .chartYAxis {
                 AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                        .foregroundStyle(DS.Palette.hairline)
+                        .foregroundStyle(Kansei.Color.glassBorder)
                     AxisValueLabel {
                         if let v = value.as(Double.self) {
                             Text(String(format: "%.0f", v))
                                 .font(DS.Typo.caption2)
-                                .foregroundStyle(DS.Palette.labelTertiary)
+                                .foregroundStyle(Kansei.Color.tertiary)
                         }
                     }
                 }
@@ -228,12 +228,12 @@ struct DSTyreTrendChart: View {
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 4)) { value in
                     AxisGridLine()
-                        .foregroundStyle(DS.Palette.hairline.opacity(0.6))
+                        .foregroundStyle(Kansei.Color.glassBorder.opacity(0.6))
                     AxisValueLabel {
                         if let d = value.as(Date.self) {
                             Text(d.formatted(.dateTime.month().day().hour()))
                                 .font(DS.Typo.caption2)
-                                .foregroundStyle(DS.Palette.labelTertiary)
+                                .foregroundStyle(Kansei.Color.tertiary)
                         }
                     }
                 }
@@ -250,10 +250,10 @@ struct DSTyreTrendChart: View {
                             .frame(width: 12, height: 2.5)
                         Text(wheel.rawValue)
                             .font(DS.Typo.caption2)
-                            .foregroundStyle(DS.Palette.labelSecondary)
+                            .foregroundStyle(Kansei.Color.secondary)
                         Text(last.map { String(format: "%.0f", $0) } ?? "--")
                             .font(DS.Typo.digits(11))
-                            .foregroundStyle(DS.Palette.label)
+                            .foregroundStyle(Kansei.Color.primary)
                     }
                 }
                 Spacer(minLength: 0)
@@ -274,15 +274,15 @@ struct DSTrendEmpty: View {
         HStack(alignment: .top, spacing: DS.Space.md) {
             Image(safeSymbol: icon, fallback: "chart.xyaxis.line")
                 .font(.system(size: 20, weight: .light))
-                .foregroundStyle(DS.Palette.labelTertiary)
+                .foregroundStyle(Kansei.Color.tertiary)
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: DS.Space.xxs) {
                 Text(title)
                     .font(DS.Typo.subheadline.weight(.semibold))
-                    .foregroundStyle(DS.Palette.label)
+                    .foregroundStyle(Kansei.Color.primary)
                 Text(message)
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .foregroundStyle(Kansei.Color.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)

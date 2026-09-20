@@ -8,7 +8,7 @@ enum OnboardingPage: String, CaseIterable, Identifiable {
     case connect = "connect"
     case location = "location"
     case pin = "pin"
-    
+
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -37,7 +37,7 @@ struct OnboardingView: View {
     @State private var currentPage = 0
     @State private var isLastPage = false
     @AppStorage("carkeeper_onboarding_seen") private var onboardingSeen = false
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // 页面内容
@@ -49,13 +49,13 @@ struct OnboardingView: View {
             }
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
             .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
-            
+
             // 底部操作区
             VStack(spacing: 20) {
                 Text(isLastPage ? "准备好了吗？" : "")
                     .font(Theme.h3)
                     .foregroundStyle(.primary)
-                
+
                 if isLastPage {
                     Button("开始使用") {
                         onboardingSeen = true
@@ -64,9 +64,9 @@ struct OnboardingView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Theme.Colors.accent, in: RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: Theme.Colors.accent.opacity(0.3), radius: 8, y: 4)
-                    
+                    .background(Kansei.Color.ambient, in: RoundedRectangle(cornerRadius: Kansei.Radius.medium))
+                    .shadow(color: Kansei.Color.ambient.opacity(0.3), radius: 8, y: 4)
+
                     Button("跳过引导") {
                         onboardingSeen = true
                     }
@@ -79,9 +79,9 @@ struct OnboardingView: View {
                         }
                         .font(Theme.caption)
                         .foregroundStyle(.secondary)
-                        
+
                         Spacer()
-                        
+
                         Button(currentPage < OnboardingPage.allCases.count - 1 ? "下一步" : "完成") {
                             withAnimation(.spring(response: 0.3)) {
                                 if currentPage < OnboardingPage.allCases.count - 1 {
@@ -95,48 +95,48 @@ struct OnboardingView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
-                        .background(Theme.Colors.accent, in: RoundedRectangle(cornerRadius: 12))
+                        .background(Kansei.Color.ambient, in: RoundedRectangle(cornerRadius: Kansei.Radius.medium))
                     }
                 }
             }
             .padding(.horizontal, DS.Space.xxxl)
             .padding(.vertical, DS.Space.xxl)
             .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                .fill(DS.Palette.surface))
+                .fill(Kansei.Color.nightSurface))
             .overlay(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                .strokeBorder(DS.Palette.hairline, lineWidth: DS.Hair.line))
+                .strokeBorder(Kansei.Color.glassBorder, lineWidth: DS.Hair.line))
             .padding(.top, DS.Space.xl)
         }
         // 旧版：整屏三色渐变（主色 + 紫 + 蓝）。新版：单一画布色。
-        .dsCanvas()
+        .background(Kansei.Color.background)
     }
-    
+
     private func onboardingPage(_ page: OnboardingPage) -> some View {
         VStack(spacing: 24) {
             // 图标
             ZStack {
                 // 旧版：渐变色圆 + 超大图标。新版：扁平色块（与登录页品牌标同一套语言）。
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(DS.Palette.tintSoft)
+                    .fill(Kansei.Color.ambient)
                     .frame(width: 96, height: 96)
                 Image(safeSymbol: page.icon, fallback: "car.fill")
                     .font(.system(size: 40, weight: .regular))
-                    .foregroundStyle(DS.Palette.tint)
+                    .foregroundStyle(Kansei.Color.ambient)
             }
-            
+
             // 标题和描述
             VStack(spacing: 12) {
                 Text(page.title)
                     .font(Theme.h2)
                     .foregroundStyle(.primary)
-                
+
                 Text(page.description)
-                    .font(Theme.body)
+                    .font(Kansei.Type.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
-            
+
             // 示例内容
             if page == .connect {
                 ExampleCard(title: "示例车牌", value: "京A·12345")
@@ -153,7 +153,7 @@ struct OnboardingView: View {
 struct ExampleCard: View {
     let title: String
     let value: String
-    
+
     var body: some View {
         HStack {
             Text(title)
@@ -161,11 +161,11 @@ struct ExampleCard: View {
                 .foregroundStyle(.secondary)
             Spacer()
             Text(value)
-                .font(Theme.body.monospaced())
-                .foregroundStyle(Theme.Colors.accent)
+                .font(Kansei.Type.body.monospaced())
+                .foregroundStyle(Kansei.Color.ambient)
         }
         .padding()
-        .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 12))
+        .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 40)
     }
 }

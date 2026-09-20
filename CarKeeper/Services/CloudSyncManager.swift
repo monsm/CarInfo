@@ -7,7 +7,7 @@ import CloudKit
 
 class CloudSyncManager: ObservableObject {
     static let shared = CloudSyncManager()
-    
+
     /// iCloud 容器标识符（必须与签名时使用的 iCloud 容器完全一致）。
     static let containerIdentifier = "iCloud.com.you.CarKeeper"
 
@@ -35,25 +35,25 @@ class CloudSyncManager: ObservableObject {
         return CKContainer(identifier: Self.containerIdentifier)
     }()
     private lazy var publicDB: CKDatabase? = container?.publicCloudDatabase
-    
+
     // 同步的记录类型
     enum RecordType: String {
         case settings = "CarSettings"
         case tripHistory = "TripHistory"
         case energyHistory = "EnergyHistory"
     }
-    
+
     private init() {}
-    
+
     /// 检查 CloudKit 是否可用（自带 entitlement 探测，无 iCloud 能力时恒为 false）
     var isCloudAvailable: Bool {
         return publicDB != nil
     }
-    
+
     /// 同步设置到云端
     func syncSettings(_ settings: [String: Any]) async -> Bool {
         guard let db = publicDB else { return false }
-        
+
         do {
             let record = CKRecord(recordType: RecordType.settings.rawValue, recordID: CKRecord.ID(recordName: "user_settings"))
             record["preferences"] = try JSONSerialization.data(withJSONObject: settings)
@@ -64,11 +64,11 @@ class CloudSyncManager: ObservableObject {
             return false
         }
     }
-    
+
     /// 从云端拉取设置
     func fetchSettings() async -> [String: Any]? {
         guard let db = publicDB else { return nil }
-        
+
         do {
             let record = try await db.record(for: CKRecord.ID(recordName: "user_settings"))
             if let data = record["preferences"] as? Data,
@@ -80,11 +80,11 @@ class CloudSyncManager: ObservableObject {
         }
         return nil
     }
-    
+
     /// 同步行程记录
     func syncTrips(_ trips: [TripRecord]) async -> Bool {
         guard let db = publicDB else { return false }
-        
+
         do {
             for trip in trips {
                 let record = CKRecord(recordType: RecordType.tripHistory.rawValue, recordID: CKRecord.ID(recordName: trip.id.uuidString))
@@ -101,14 +101,14 @@ class CloudSyncManager: ObservableObject {
             return false
         }
     }
-    
+
     /// 获取云端行程记录
     func fetchTrips() async -> [TripRecord] {
         guard let db = publicDB else { return [] }
-        
+
         var trips: [TripRecord] = []
         let query = CKQuery(recordType: RecordType.tripHistory.rawValue, predicate: NSPredicate(value: true))
-        
+
         do {
             let results = try await db.records(matching: query)
             for (_, result) in results.matchResults {
@@ -126,7 +126,7 @@ class CloudSyncManager: ObservableObject {
         } catch {
             print("Cloud fetch trips failed: \(error)")
         }
-        
+
         return trips.sorted { $0.startTime > $1.startTime }
     }
 

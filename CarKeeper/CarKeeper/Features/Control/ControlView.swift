@@ -8,7 +8,6 @@ import AVFoundation
 struct ControlView: View {
     private let store = AppStore.shared
 
-    /// 协议里被允许作为快控入口的指令（与 mainCommands / moreCommands / hero 完全一致）
     static let quickAllowlist: Set<String> = [
         "LockDoor", "UnLockDoor", "OpenAir", "CloseAir",
         "FlashLight", "Whistle", "RemoteSearchCar"
@@ -84,18 +83,24 @@ struct ControlView: View {
         return { lock.lock(); n += 1; lock.unlock(); return n }
     }()
 
-    private var bodyDetail: (summary: String, cls: String, doorRows: [(String, String, String)], windowRows: [(String, String, String)], extraRows: [(String, String, String)], lampRows: [(String, String)])? {
+    private var bodyDetail: (
+        summary: String, cls: String,
+        doorRows: [(String, String, String)],
+        windowRows: [(String, String, String)],
+        extraRows: [(String, String, String)],
+        lampRows: [(String, String)]
+    )? {
         guard let ctrl = ciVal(store.caches, "control") else { return nil }
         let hasCtrl = ctrl.count > 0
         guard hasCtrl else { return nil }
-        
+
         func num(_ k: String) -> Int? {
             ciNumberInt(ctrl, [k])
         }
         func s(_ k: String) -> String? {
             ciString(ctrl, [k])
         }
-        
+
         var doorRows: [(String, String, String)] = []
         let doorDefs: [(String, String, String)] = [
             ("左前门", "LeftFrontDoor", "LeftFrontDoorLock"),
@@ -111,10 +116,11 @@ struct ControlView: View {
                 lk.map { $0 == 0 ? "已锁" : "未锁" }
             ].compactMap { $0 }
             if !parts.isEmpty {
-                doorRows.append((label, parts.joined(separator: " · "), d != nil && d! != 0 || lk != nil && lk! != 0 ? "bad" : "ok"))
+                let isBad = d != nil && d! != 0 || lk != nil && lk! != 0
+                doorRows.append((label, parts.joined(separator: " · "), isBad ? "bad" : "ok"))
             }
         }
-        
+
         var windowRows: [(String, String, String)] = []
         let winDefs: [(String, String, String)] = [
             ("左前窗", "LeftAnteriorWindowDegree", ""),
@@ -128,7 +134,7 @@ struct ControlView: View {
             let v = deg == 0 ? "关闭" : "开启 \(deg!)°"
             windowRows.append((label, v, deg != 0 ? "bad" : "ok"))
         }
-        
+
         var lampRows: [(String, String)] = []
         let lampDefs: [(String, String, String?)] = [
             ("近光灯", "LowBeam", nil),
@@ -145,7 +151,7 @@ struct ControlView: View {
             let isOn = (x1 != nil && x1! != 0) || (x2 != nil && x2! != 0)
             lampRows.append((label, isOn ? "亮" : "灭"))
         }
-        
+
         // 舱盖/天窗（引擎盖/天窗）
         var extraRows: [(String, String, String)] = []
         if let hood = ciNumber(ctrl, ["Hood", "hood"]) {
@@ -156,16 +162,26 @@ struct ControlView: View {
             let v = sunroof == 0 ? "关闭" : "开启"
             extraRows.append(("天窗", v, sunroof != 0 ? "bad" : "ok"))
         }
-        let badCount = doorRows.filter { $0.2 == "bad" }.count + windowRows.filter { $0.2 == "bad" }.count + extraRows.filter { $0.2 == "bad" }.count
+        let badDoors = doorRows.filter { $0.2 == "bad" }.count
+        let badWindows = windowRows.filter { $0.2 == "bad" }.count
+        let badExtra = extraRows.filter { $0.2 == "bad" }.count
+        let badCount = badDoors + badWindows + badExtra
         let summary = doorRows.isEmpty && windowRows.isEmpty && lampRows.isEmpty
             ? "--"
             : (badCount > 0 ? "\(badCount) 项异常" : "全部正常")
         let cls = badCount > 0 ? "bad" : "ok"
-        
-        return (summary: summary, cls: cls, doorRows: doorRows, windowRows: windowRows, extraRows: extraRows, lampRows: lampRows)
+
+        return (summary: summary, cls: cls,
+                doorRows: doorRows, windowRows: windowRows,
+                extraRows: extraRows, lampRows: lampRows)
     }
-    private func bodyDetailCard(_ bd: (summary: String, cls: String, doorRows: [(String, String, String)], windowRows: [(String, String, String)], extraRows: [(String, String, String)], lampRows: [(String, String)])) -> some View {
-        ExpandingCardBox(title: "车身状态", side: bd.summary, sideCls: bd.cls, cornerRadius: Theme.Radius.card) {
+    private func bodyDetailCard(
+        _ bd: (summary: String, cls: String,
+               doorRows: [(String, String, String)],
+               windowRows: [(String, String, String)],
+               extraRows: [(String, String, String)],
+               lampRows: [(String, String)])) -> some View {
+        ExpandingCardBox(title: "车身状态", side: bd.summary, sideCls: bd.cls, cornerRadius: Kansei.Radius.medium) {
             VStack(spacing: 8) {
                 if !bd.doorRows.isEmpty {
                     sectionLabel("车门")
@@ -205,9 +221,9 @@ struct ControlView: View {
                     let lit = bd.lampRows.filter { $0.1 == "亮" }
                     if !lit.isEmpty {
                         Text(lit.map { $0.0 }.joined(separator: " · "))
-                            .font(Theme.caption).foregroundStyle(Theme.warn)
+                            .font(Kansei.Type.caption).foregroundStyle(Kansei.Color.warning)
                     } else {
-                        Text("全部关闭").font(Theme.caption).foregroundStyle(.secondary)
+                        Text("全部关闭").font(Kansei.Type.caption).foregroundStyle(Kansei.Color.secondary)
                     }
                 }
             }
@@ -234,13 +250,14 @@ struct ControlView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .refreshable {
-            tempDisplayCount = 0            // 数字归零
+            tempDisplayCount = 0
+            // 数字归零
             Task {
                 await refreshControlCache()
             }
             // 数据回来后自动重播计数动画（pendingTemp 不变，onChange 会触发）
         }
-        .dsCanvas()
+        .background(Kansei.Color.background)
         .navigationTitle("车控")
             .accessibilityLabel(Text("车控"))
             .accessibilityHint(Text("远程控制车辆：锁车、解锁、空调、座椅加热"))
@@ -283,8 +300,6 @@ struct ControlView: View {
                 }
         }
         // MARK: 车身明细（车门/窗/灯状态）
-    
-    
 
         .onAppear {
             if running != nil && pollTask == nil {
@@ -331,7 +346,8 @@ struct ControlView: View {
     // MARK: 头部（v4：读数就在车上 —— 一屏不堆卡片）
     private var controlHeader: some View {
         let carSel = VM.carSel(store.cars, store.carId)
-        let name = carSel.options.indices.contains(carSel.index) ? carSel.options[carSel.index].name : "未绑定车辆"
+        let name = carSel.options.indices.contains(carSel.index)
+            ? carSel.options[carSel.index].name : "未绑定车辆"
 
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: DS.Space.sm) {
@@ -347,11 +363,11 @@ struct ControlView: View {
                     .pickerStyle(.menu)
                     .labelsHidden()
                     .font(DS.Typo.subheadline.weight(.semibold))
-                    .tint(DS.Palette.label)
+                    .tint(Kansei.Color.primary)
                 } else {
                     Text(name)
                         .font(DS.Typo.subheadline.weight(.semibold))
-                        .foregroundStyle(DS.Palette.label)
+                        .foregroundStyle(Kansei.Color.primary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: DS.Space.sm)
@@ -370,7 +386,7 @@ struct ControlView: View {
 
             Text(statusLineText())
                 .font(DS.Typo.footnote)
-                .foregroundStyle(DS.Palette.labelSecondary)
+                .foregroundStyle(Kansei.Color.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
         }
     }
@@ -419,7 +435,7 @@ struct ControlView: View {
 
     // MARK: 快捷预设场景 (#18)
     private var presetScenesCard: some View {
-        CardBox(title: "快捷场景", cornerRadius: Theme.Radius.card) {
+        CardBox(title: "快捷场景", cornerRadius: Kansei.Radius.medium) {
             VStack(spacing: 10) {
                 ForEach(Array(presetScenes.enumerated()), id: \.element.key) { idx, scene in
                     Button {
@@ -428,9 +444,12 @@ struct ControlView: View {
                         HStack(spacing: 12) {
                             Image(safeSymbol: scene.symbol, fallback: "car.fill")
                                 .font(Theme.bodyMd)
-                                .foregroundStyle(Theme.Colors.accent)
+                                .foregroundStyle(Kansei.Color.ambient)
                                 .frame(width: 32, height: 32)
-                                .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .background(
+                                    Kansei.Color.fillSubtle,
+                                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                )
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(scene.name).font(Theme.body)
                                 if let note = scene.note {
@@ -460,7 +479,9 @@ struct ControlView: View {
         }
     }
 
-    private func onPresetScene(_ scene: (key: String, name: String, symbol: String, commands: [String], note: String?)) {
+    private func onPresetScene(
+        _ scene: (key: String, name: String, symbol: String,
+                  commands: [String], note: String?)
         // 执行场景内的所有指令（按顺序）
         for _ in scene.commands {
             if !busy && running == nil {
@@ -519,7 +540,7 @@ struct ControlView: View {
                             .foregroundStyle(.tertiary)
                         Text(showMoreCommands ? "收起" : "更多指令")
                             .font(Theme.caption)
-                            .foregroundStyle(Theme.Colors.accent)
+                            .foregroundStyle(Kansei.Color.ambient)
                         Spacer()
                     }
                     .padding(.vertical, 10)
@@ -539,7 +560,7 @@ struct ControlView: View {
                     .font(Theme.bodyMd)
                     .foregroundStyle(Theme.brand)
                     .frame(width: 30, height: 30)
-                    .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name).font(Theme.body)
                     if let note = item.note {
@@ -561,7 +582,8 @@ struct ControlView: View {
 
     // MARK: 记录
     private var historyCard: some View {
-        ExpandingCardBox(title: "执行记录", side: "\(history.count) 条", sideCls: "na", cornerRadius: Theme.Radius.card) {
+        ExpandingCardBox(title: "执行记录", side: "\(history.count) 条", sideCls: "na", cornerRadius:
+ Kansei.Radius.medium) {
             VStack(spacing: 0) {
                 ForEach(Array(history.enumerated()), id: \.element.id) { idx, item in
                     HStack(spacing: 12) {
@@ -613,7 +635,9 @@ struct ControlView: View {
 
         Task { @MainActor in
             do {
-                let data = try await APIClient.shared.sendControlCommand(cmd: cmd, carId: store.carId, pin: pin, temperature: temperature)
+                let data = try await APIClient.shared.sendControlCommand(
+                    cmd: cmd, carId: store.carId,
+                    pin: pin, temperature: temperature)
                 let taskId = data.flatMap { ciString($0, ["TaskId", "taskId"]) } ?? ""
                 if !taskId.isEmpty {
                     running?.taskId = taskId
@@ -664,7 +688,11 @@ struct ControlView: View {
         }
     }
 
-    private func finish(_ run: RunState, ok: Bool, text: String, desc: String, handleCode: String = "", finishTime: String = "") {
+    private func finish(
+        _ run: RunState, ok: Bool, text: String,
+        desc: String, handleCode: String = "",
+        finishTime: String = ""
+    ) {
         pollTask?.cancel()
         let cls = ok ? "ok" : "bad"
         var newRun = run
@@ -714,7 +742,7 @@ struct ControlView: View {
                 KVRow(k: "任务 ID", v: r.taskId.isEmpty ? "--" : r.taskId)
                 Spacer()
             }
-            .padding(Theme.Spacing.xl)
+            .padding(Kansei.Spacing.xl)
         }
     }
 
@@ -743,11 +771,11 @@ struct CarTopView: View {
     var windowsOpen: Bool
 
     private func color(_ cls: String) -> Color {
-        cls == "bad" ? DS.Palette.warn : DS.Palette.ok
+        cls == "bad" ? Kansei.Color.warning : Kansei.Color.success
     }
 
     private func doorColor(_ idx: Int) -> Color {
-        guard doorCls.indices.contains(idx) else { return DS.Palette.ok }
+        guard doorCls.indices.contains(idx) else { return Kansei.Color.success }
         return color(doorCls[idx])
     }
 
@@ -764,9 +792,9 @@ struct CarTopView: View {
                 Path(CGRect(origin: .zero, size: size)),
                 with: .radialGradient(
                     Gradient(colors: [
-                        DS.Palette.label.opacity(0.06),
-                        DS.Palette.label.opacity(0.015),
-                        DS.Palette.label.opacity(0.0)
+                        Kansei.Color.primary.opacity(0.06),
+                        Kansei.Color.primary.opacity(0.015),
+                        Kansei.Color.primary.opacity(0.0)
                     ]),
                     center: CGPoint(x: size.width / 2, y: size.height * 0.52),
                     startRadius: 0,
@@ -777,42 +805,66 @@ struct CarTopView: View {
             // 车身轮廓（薄线）
             var outline = Path()
             outline.move(to: CGPoint(x: 160, y: 26))
-            outline.addCurve(to: CGPoint(x: 254, y: 50), control1: CGPoint(x: 206, y: 26), control2: CGPoint(x: 240, y: 34))
-            outline.addCurve(to: CGPoint(x: 267, y: 96), control1: CGPoint(x: 264, y: 61), control2: CGPoint(x: 267, y: 76))
+            outline.addCurve(to: CGPoint(x: 254, y: 50),
+            outline            control1: CGPoint(x: 206, y: 26),
+            outline            control2: CGPoint(x: 240, y: 34))
+            outline.addCurve(to: CGPoint(x: 267, y: 96),
+            outline            control1: CGPoint(x: 264, y: 61),
+            outline            control2: CGPoint(x: 267, y: 76))
             outline.addLine(to: CGPoint(x: 267, y: 250))
-            outline.addCurve(to: CGPoint(x: 254, y: 312), control1: CGPoint(x: 267, y: 282), control2: CGPoint(x: 264, y: 300))
-            outline.addCurve(to: CGPoint(x: 160, y: 336), control1: CGPoint(x: 240, y: 328), control2: CGPoint(x: 206, y: 336))
-            outline.addCurve(to: CGPoint(x: 66, y: 312), control1: CGPoint(x: 114, y: 336), control2: CGPoint(x: 80, y: 328))
-            outline.addCurve(to: CGPoint(x: 53, y: 250), control1: CGPoint(x: 56, y: 300), control2: CGPoint(x: 53, y: 282))
+            outline.addCurve(to: CGPoint(x: 254, y: 312),
+            outline            control1: CGPoint(x: 267, y: 282),
+            outline            control2: CGPoint(x: 264, y: 300))
+            outline.addCurve(to: CGPoint(x: 160, y: 336),
+            outline            control1: CGPoint(x: 240, y: 328),
+            outline            control2: CGPoint(x: 206, y: 336))
+            outline.addCurve(to: CGPoint(x: 66, y: 312),
+            outline            control1: CGPoint(x: 114, y: 336),
+            outline            control2: CGPoint(x: 80, y: 328))
+            outline.addCurve(to: CGPoint(x: 53, y: 250),
+            outline            control1: CGPoint(x: 56, y: 300),
+            outline            control2: CGPoint(x: 53, y: 282))
             outline.addLine(to: CGPoint(x: 53, y: 96))
-            outline.addCurve(to: CGPoint(x: 66, y: 50), control1: CGPoint(x: 53, y: 76), control2: CGPoint(x: 56, y: 61))
-            outline.addCurve(to: CGPoint(x: 160, y: 26), control1: CGPoint(x: 80, y: 34), control2: CGPoint(x: 114, y: 26))
+            outline.addCurve(to: CGPoint(x: 66, y: 50),
+            outline            control1: CGPoint(x: 53, y: 76),
+            outline            control2: CGPoint(x: 56, y: 61))
+            outline.addCurve(to: CGPoint(x: 160, y: 26),
+            outline            control1: CGPoint(x: 80, y: 34),
+            outline            control2: CGPoint(x: 114, y: 26))
             outline.closeSubpath()
-            ctx.stroke(xf(outline), with: .color(DS.Palette.label.opacity(0.85)),
+            ctx.stroke(xf(outline), with: .color(Kansei.Color.primary.opacity(0.85)),
                        style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
 
             // 风挡 / 天窗 / 后风挡
             var windshield = Path()
             windshield.move(to: CGPoint(x: 84, y: 62))
-            windshield.addCurve(to: CGPoint(x: 160, y: 42), control1: CGPoint(x: 100, y: 48), control2: CGPoint(x: 128, y: 42))
-            windshield.addCurve(to: CGPoint(x: 236, y: 62), control1: CGPoint(x: 192, y: 42), control2: CGPoint(x: 220, y: 48))
+            windshield.addCurve(to: CGPoint(x: 160, y: 42),
+            windshield            control1: CGPoint(x: 100, y: 48),
+            windshield            control2: CGPoint(x: 128, y: 42))
+            windshield.addCurve(to: CGPoint(x: 236, y: 62),
+            windshield            control1: CGPoint(x: 192, y: 42),
+            windshield            control2: CGPoint(x: 220, y: 48))
             windshield.addLine(to: CGPoint(x: 245, y: 84))
             windshield.addLine(to: CGPoint(x: 75, y: 84))
             windshield.closeSubpath()
-            ctx.stroke(xf(windshield), with: .color(DS.Palette.labelSecondary),
+            ctx.stroke(xf(windshield), with: .color(Kansei.Color.secondary),
                        style: StrokeStyle(lineWidth: 1.3, lineJoin: .round))
 
             let roof = Path(roundedRect: CGRect(x: 92, y: 98, width: 136, height: 76), cornerRadius: 16)
-            ctx.stroke(xf(roof), with: .color(DS.Palette.labelSecondary), style: StrokeStyle(lineWidth: 1.3))
+            ctx.stroke(xf(roof), with: .color(Kansei.Color.secondary), style: StrokeStyle(lineWidth: 1.3))
 
             var rear = Path()
             rear.move(to: CGPoint(x: 75, y: 278))
             rear.addLine(to: CGPoint(x: 84, y: 316))
-            rear.addCurve(to: CGPoint(x: 160, y: 334), control1: CGPoint(x: 100, y: 328), control2: CGPoint(x: 128, y: 334))
-            rear.addCurve(to: CGPoint(x: 236, y: 316), control1: CGPoint(x: 192, y: 334), control2: CGPoint(x: 220, y: 328))
+            rear.addCurve(to: CGPoint(x: 160, y: 334),
+            rear            control1: CGPoint(x: 100, y: 328),
+            rear            control2: CGPoint(x: 128, y: 334))
+            rear.addCurve(to: CGPoint(x: 236, y: 316),
+            rear            control1: CGPoint(x: 192, y: 334),
+            rear            control2: CGPoint(x: 220, y: 328))
             rear.addLine(to: CGPoint(x: 245, y: 278))
             rear.closeSubpath()
-            ctx.stroke(xf(rear), with: .color(DS.Palette.labelSecondary), style: StrokeStyle(lineWidth: 1.3))
+            ctx.stroke(xf(rear), with: .color(Kansei.Color.secondary), style: StrokeStyle(lineWidth: 1.3))
 
             // 后视镜
             var mirrorL = Path()
@@ -827,8 +879,8 @@ struct CarTopView: View {
             mirrorR.addLine(to: CGPoint(x: 277, y: 110))
             mirrorR.addLine(to: CGPoint(x: 263, y: 105))
             mirrorR.closeSubpath()
-            ctx.stroke(xf(mirrorL), with: .color(DS.Palette.labelSecondary), style: StrokeStyle(lineWidth: 1.3))
-            ctx.stroke(xf(mirrorR), with: .color(DS.Palette.labelSecondary), style: StrokeStyle(lineWidth: 1.3))
+            ctx.stroke(xf(mirrorL), with: .color(Kansei.Color.secondary), style: StrokeStyle(lineWidth: 1.3))
+            ctx.stroke(xf(mirrorR), with: .color(Kansei.Color.secondary), style: StrokeStyle(lineWidth: 1.3))
 
             // 四门状态线：绿 = 已关，橙 = 未关
             let doorSpans: [(CGFloat, CGFloat, CGFloat)] = [
@@ -851,12 +903,13 @@ struct CarTopView: View {
             var trunk = Path()
             trunk.move(to: CGPoint(x: 112, y: 336))
             trunk.addLine(to: CGPoint(x: 208, y: 336))
-            let trunkColor = trunkOpen ? DS.Palette.warn : DS.Palette.ok
+            let trunkColor = trunkOpen ? Kansei.Color.warning : Kansei.Color.success
             if trunkOpen {
                 ctx.drawLayer { layer in
                     layer.addFilter(.blur(radius: 5))
                     layer.opacity = 0.3
-                    layer.stroke(xf(trunk), with: .color(trunkColor), style: StrokeStyle(lineWidth: 14, lineCap: .round))
+                    layer.stroke(xf(trunk), with: .color(trunkColor),
+                               style: StrokeStyle(lineWidth: 14, lineCap: .round))
                 }
             }
             ctx.stroke(xf(trunk), with: .color(trunkColor), style: StrokeStyle(lineWidth: 3, lineCap: .round))
@@ -869,9 +922,9 @@ struct CarTopView: View {
                 var wr = Path()
                 wr.move(to: CGPoint(x: 267, y: 96))
                 wr.addLine(to: CGPoint(x: 267, y: 250))
-                ctx.stroke(xf(wl), with: .color(DS.Palette.warn.opacity(0.45)),
+                ctx.stroke(xf(wl), with: .color(Kansei.Color.warning.opacity(0.45)),
                            style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                ctx.stroke(xf(wr), with: .color(DS.Palette.warn.opacity(0.45)),
+                ctx.stroke(xf(wr), with: .color(Kansei.Color.warning.opacity(0.45)),
                            style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
             }
         }
@@ -899,7 +952,8 @@ struct PINKeypadView: View {
                     Text(i < pin.count ? String(pin[pin.index(pin.startIndex, offsetBy: i)]) : "")
                         .font(Theme.d4)
                         .frame(width: 42, height: 54)
-                        .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 12, style:
+ .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(i == pin.count ? Theme.brand : Color(.systemGray4),
                                           lineWidth: i == pin.count ? 2 : 1))
@@ -917,7 +971,8 @@ struct PINKeypadView: View {
                         }
                         .font(Theme.d4)
                         .frame(maxWidth: .infinity, minHeight: 56)
-                        .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 14, style:
+ .continuous))
                         .foregroundStyle(.primary)
                     }
                     .buttonStyle(.plain)

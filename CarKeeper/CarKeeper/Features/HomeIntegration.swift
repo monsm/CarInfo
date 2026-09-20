@@ -9,13 +9,13 @@ import HomeKit
 struct GarageDoorStatus: View {
     @State private var garageOpen = false
     @State private var isConnected = false
-    
+
     var body: some View {
         HStack {
             Image(safeSymbol: garageOpen ? "door.garage.open" : "door.garage.closed", fallback: "house.fill")
                 .font(.title2)
                 .foregroundColor(garageOpen ? .orange : .green)
-            
+
             VStack(alignment: .leading) {
                 Text("车库门")
                     .font(.subheadline)
@@ -23,16 +23,16 @@ struct GarageDoorStatus: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             Button {
                 // 切换车库门状态
                 garageOpen.toggle()
             } label: {
                 Image(systemName: garageOpen ? "lock.fill" : "lock.open.fill")
                     .font(.title3)
-                    .foregroundColor(Theme.Colors.accent)
+                    .foregroundColor(Kansei.Color.ambient)
             }
         }
         .padding()
@@ -45,13 +45,13 @@ struct HomeAirConditionerControl: View {
     @State private var homeTemp: Double = 24.0
     @State private var targetTemp: Double = 22.0
     @State private var isOn = false
-    
+
     var body: some View {
         HStack {
             Image(systemName: "fan.fill")
                 .font(.title2)
                 .foregroundColor(isOn ? .blue : .secondary)
-            
+
             VStack(alignment: .leading) {
                 Text("家中空调")
                     .font(.subheadline)
@@ -59,9 +59,9 @@ struct HomeAirConditionerControl: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             Toggle("", isOn: $isOn)
                 .labelsHidden()
         }
@@ -73,19 +73,19 @@ struct HomeAirConditionerControl: View {
 // MARK: - E36 场景联动
 struct HomeSceneControl: View {
     let scenes = ["离家模式", "回家模式", "睡眠模式", "观影模式"]
-    
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Theme.Spacing.sm) {
+            HStack(spacing: Kansei.Spacing.sm) {
                 ForEach(scenes, id: \.self) { scene in
                     Button(scene) {
                         // 触发HomeKit场景
                     }
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .padding(.vertical, Theme.Spacing.sm)
-                    .background(Theme.Colors.accent.opacity(0.2))
-                    .foregroundColor(Theme.Colors.accent)
-                    .cornerRadius(Theme.Radius.medium)
+                    .padding(.horizontal, Kansei.Spacing.md)
+                    .padding(.vertical, Kansei.Spacing.sm)
+                    .background(Kansei.Color.ambient.opacity(0.2))
+                    .foregroundColor(Kansei.Color.ambient)
+                    .cornerRadius(Kansei.Radius.medium)
                 }
             }
         }
@@ -96,9 +96,9 @@ struct HomeSceneControl: View {
 // MARK: - E37 车辆状态同步HomeKit
 class HomeKitSyncManager: ObservableObject {
     static let shared = HomeKitSyncManager()
-    
+
     @Published var carAtHome: Bool = false
-    
+
     func updateCarLocation(_ atHome: Bool) {
         carAtHome = atHome
         // 同步到HomeKit
@@ -109,19 +109,19 @@ class HomeKitSyncManager: ObservableObject {
 struct ReverseLinkageControl: View {
     @State private var autoUnlockOnArrival = false
     @State private var autoACOnArrival = false
-    
+
     var body: some View {
-        VStack(spacing: Theme.Spacing.sm) {
+        VStack(spacing: Kansei.Spacing.sm) {
             HStack {
                 Image(systemName: "car.fill")
-                    .foregroundColor(Theme.Colors.accent)
+                    .foregroundColor(Kansei.Color.ambient)
                 Text("到家自动解锁")
                     .font(.subheadline)
                 Spacer()
                 Toggle("", isOn: $autoUnlockOnArrival)
                     .labelsHidden()
             }
-            
+
             HStack {
                 Image(systemName: "fan.fill")
                     .foregroundColor(.blue)
@@ -140,10 +140,10 @@ struct ReverseLinkageControl: View {
 // MARK: - HomeKit集成服务
 class GKHomeManager: ObservableObject {
     static let shared = GKHomeManager()
-    
+
     @Published var homes: [HMHome] = []
     @Published var accessories: [HMAccessory] = []
-    
+
     func requestHomeAccess() {
         // HomeKit访问请求
     }

@@ -13,7 +13,7 @@ enum TripCostType: String, CaseIterable, Identifiable, Codable {
     case toll = "toll"
     case wash = "carwash"
     case insurance = "insurance"
-    
+
     var id: String { rawValue }
     var displayName: String {
         switch self {
@@ -50,7 +50,7 @@ struct CostEntry: Identifiable, Codable {
 
 class MileageTracker : ObservableObject {
     static let shared = MileageTracker()
-    
+
     var entries: [CostEntry] {
         if let data = UserDefaults.standard.data(forKey: "carkeeper_mileage_entries"),
            let decoded = try? JSONDecoder().decode([CostEntry].self, from: data) {
@@ -58,7 +58,7 @@ class MileageTracker : ObservableObject {
         }
         return []
     }
-    
+
     func addEntry(_ entry: CostEntry) {
         var list = entries
         list.insert(entry, at: 0)
@@ -66,21 +66,21 @@ class MileageTracker : ObservableObject {
             UserDefaults.standard.set(data, forKey: "carkeeper_mileage_entries")
         }
     }
-    
+
     func deleteEntry(_ id: UUID) {
         let list = entries.filter { $0.id != id }
         if let data = try? JSONEncoder().encode(list) {
             UserDefaults.standard.set(data, forKey: "carkeeper_mileage_entries")
         }
     }
-    
+
     func totalThisMonth() -> Double {
         let now = Date()
         let cal = Calendar.current
         let startOfMonth = cal.date(from: cal.dateComponents([.year, .month], from: now))!
         return entries.filter { $0.date >= startOfMonth }.map { $0.amount }.reduce(0, +)
     }
-    
+
     func totalByType(_ type: TripCostType) -> Double {
         entries.filter { $0.type == type }.map { $0.amount }.reduce(0, +)
     }
@@ -92,38 +92,38 @@ struct MileageJournalView: View {
     @State private var selectedType: TripCostType = .charge
     @State private var amountText: String = ""
     @State private var noteText: String = ""
-    
+
     private let months = ["本月", "上月", "全部"]
     @State private var currentPeriod = 0
-    
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: Theme.Spacing.md) {
+            VStack(spacing: Kansei.Spacing.md) {
                 // 周期选择
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Theme.Spacing.sm) {
+                    HStack(spacing: Kansei.Spacing.sm) {
                         ForEach(months.indices, id: \.self) { i in
                             Text(months[i])
                                 .font(.subheadline)
                                 .foregroundColor(currentPeriod == i ? .white : .secondary)
-                                .padding(.horizontal, Theme.Spacing.md)
-                                .padding(.vertical, Theme.Spacing.xs)
-                                .background(currentPeriod == i ? Theme.Colors.accent : Color.clear)
-                                .cornerRadius(Theme.Radius.sm)
+                                .padding(.horizontal, Kansei.Spacing.md)
+                                .padding(.vertical, Kansei.Spacing.xs)
+                                .background(currentPeriod == i ? Kansei.Color.ambient : Color.clear)
+                                .cornerRadius(Kansei.Radius.small)
                                 .onTapGesture { currentPeriod = i }
                         }
                     }
                 }
-                
+
                 // 统计卡片
-                HStack(spacing: Theme.Spacing.sm) {
+                HStack(spacing: Kansei.Spacing.sm) {
                     ForEach(Array(TripCostType.allCases.prefix(4)), id: \.self) { type in
                         CostSummaryTile(type: type, total: tracker.totalByType(type))
                     }
                 }
-                
+
                 Divider().opacity(0.3)
-                
+
                 // 明细列表
                 VStack(spacing: 0) {
                     ForEach(tracker.entries) { entry in
@@ -136,20 +136,20 @@ struct MileageJournalView: View {
                     }
                 }
                 .listStyle(.plain)
-                
+
                 Spacer()
-                
+
                 // 添加按钮
                 Button { showAddSheet = true } label: {
                     Label("添加记录", systemImage: "plus.circle.fill")
                         .font(.body)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Theme.Colors.accent)
+                        .background(Kansei.Color.ambient)
                         .foregroundColor(.white)
-                        .cornerRadius(Theme.Radius.medium)
+                        .cornerRadius(Kansei.Radius.medium)
                 }
-                .padding(.top, Theme.Spacing.sm)
+                .padding(.top, Kansei.Spacing.sm)
             }
             .sheet(isPresented: $showAddSheet) {
                 AddCostEntrySheet(selectedType: $selectedType, amountText: $amountText, noteText: $noteText)
@@ -175,7 +175,7 @@ struct CostSummaryTile: View {
         VStack(spacing: Theme.Spacing.xs) {
             Image(safeSymbol: type.icon, fallback: "doc.text.fill")
                 .font(.title2)
-                .foregroundColor(Theme.Colors.accent)
+                .foregroundColor(Kansei.Color.ambient)
             Text("\(total, specifier: "%.1f")")
                 .font(.callout)
                 .fontWeight(.semibold)
@@ -184,7 +184,7 @@ struct CostSummaryTile: View {
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.Spacing.sm)
+        .padding(.vertical, Kansei.Spacing.sm)
         .glassCard()
     }
 }
@@ -197,7 +197,7 @@ struct AddCostEntrySheet: View {
     @State private var showTypePicker = false
     @State private var selectedDate = Date()
     @State private var odometerText: String = ""
-    
+
     var body: some View {
         NavigationStack {
             Form {
@@ -258,13 +258,13 @@ struct AddCostEntrySheet: View {
 struct CostEntryRow: View {
     let entry: CostEntry
     var body: some View {
-        HStack(spacing: Theme.Spacing.sm) {
+        HStack(spacing: Kansei.Spacing.sm) {
             Image(safeSymbol: entry.type.icon, fallback: "doc.text.fill")
                 .font(.headline)
                 .frame(width: 36, height: 36)
-                .background(Theme.Colors.accent.opacity(0.15))
+                .background(Kansei.Color.ambient.opacity(0.15))
                 .clipShape(Circle())
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.type.displayName)
                     .font(.subheadline)
@@ -273,9 +273,9 @@ struct CostEntryRow: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             VStack(alignment: .trailing, spacing: 2) {
                 Text("-¥\(entry.amount, specifier: "%.2f")")
                     .font(.subheadline)

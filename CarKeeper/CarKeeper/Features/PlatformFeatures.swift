@@ -9,7 +9,7 @@ import AppIntents
 // MARK: - E73 Lock Screen Widget（Active State）
 struct LockScreenWidget: View {
     let car: [String: Any]?
-    
+
     var body: some View {
         VStack(spacing: 8) {
             HStack {
@@ -24,7 +24,7 @@ struct LockScreenWidget: View {
                         .foregroundColor(.green)
                 }
             }
-            
+
             // 快捷操作按钮
             HStack(spacing: 20) {
                 Button {
@@ -33,7 +33,7 @@ struct LockScreenWidget: View {
                     Image(systemName: "lock.fill")
                         .font(.title2)
                         .frame(width: 44, height: 44)
-                        .background(Theme.Colors.accent.opacity(0.2))
+                        .background(Kansei.Color.ambient.opacity(0.2))
                         .clipShape(Circle())
                 }
                 Button {
@@ -63,7 +63,7 @@ struct LockScreenWidget: View {
 // MARK: - E74 Spotlight搜索集成
 struct SpotlightSearchable: ViewModifier {
     @State private var searchQuery = ""
-    
+
     func body(content: Content) -> some View {
         content
             .searchable(text: $searchQuery, prompt: "搜索车辆状态...")
@@ -83,10 +83,10 @@ extension View {
 struct SiriSuggestionProvider: AppIntent {
     static let title: LocalizedStringResource = "快速查看车况"
     static let description = IntentDescription("通过Siri快速获取车辆状态")
-    
+
     @Parameter(title: "车辆ID", default: "")
     var carId: String
-    
+
     func perform() async throws -> some IntentResult & ProvidesDialog {
         return .result(dialog: "正在查看车辆状态...")
     }
@@ -128,12 +128,12 @@ struct iPadSplitView: View {
 struct SplitView<Sidebar: View, Detail: View>: View {
     let sidebar: Sidebar
     let detail: Detail
-    
+
     init(@ViewBuilder sidebar: () -> Sidebar, @ViewBuilder detail: () -> Detail) {
         self.sidebar = sidebar()
         self.detail = detail()
     }
-    
+
     var body: some View {
         #if os(iOS)
         GeometryReader { geometry in

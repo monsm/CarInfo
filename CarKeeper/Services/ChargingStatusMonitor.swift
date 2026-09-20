@@ -5,7 +5,7 @@ import SwiftUI
 class ChargingStatusMonitor: ObservableObject {
     static let shared = ChargingStatusMonitor()
     private init() {}
-    
+
     func startMonitoring() {
         // Monitor charging status
     }

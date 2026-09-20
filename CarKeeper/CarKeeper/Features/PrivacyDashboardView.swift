@@ -7,7 +7,7 @@ import SwiftUI
 struct PrivacyDashboardView: View {
     private let store = AppStore.shared
     @State private var showClearConfirm = false
-    
+
     private var dataCategories: [(title: String, items: [(name: String, size: String, type: String)])] {
         [
         (
@@ -38,7 +38,8 @@ struct PrivacyDashboardView: View {
         (
             title: "设置偏好",
             items: [
-                ("夜间模式", UserDefaults.standard.object(forKey: "carkeeper_force_dark_mode") != nil ? "自定义" : "跟随系统", "UserDefaults"),
+                ("夜间模式", UserDefaults.standard.object(forKey: "carkeeper_force_dark_mode"!
+= nil ? "自定义" : "跟随系统", "UserDefaults"),
                 ("卡片排序", "\(store.cardOrder.count) 个自定义", "UserDefaults"),
                 ("语言", Locale.current.language.languageCode?.identifier ?? "zh", "UserDefaults")
             ]
@@ -49,16 +50,16 @@ struct PrivacyDashboardView: View {
     private var totalRecords: Int {
         store.energyHistory.count + store.tripHistory.count + store.commandHistory.count
     }
-    
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: Theme.Spacing.lg) {
+                VStack(spacing: Kansei.Spacing.lg) {
                     // 汇总卡片
                     VStack(spacing: Theme.Spacing.sm) {
                         Image(safeSymbol: "checkerboard.shield", fallback: "shield.fill")
                             .font(.system(size: 48))
-                            .foregroundColor(Theme.Colors.accent)
+                            .foregroundColor(Kansei.Color.ambient)
                         Text("数据透明度")
                             .font(.title2)
                             .fontWeight(.bold)
@@ -67,14 +68,14 @@ struct PrivacyDashboardView: View {
                             .foregroundColor(.secondary)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, Theme.Spacing.md)
+                    .padding(.vertical, Kansei.Spacing.md)
                     .glassCard()
-                    
+
                     // 分类详情
                     ForEach(dataCategories, id: \.title) { category in
                         PrivacyCategorySection(category: category)
                     }
-                    
+
                     // 一键清除按钮
                     VStack(spacing: Theme.Spacing.sm) {
                         Button(role: .destructive) {
@@ -88,7 +89,7 @@ struct PrivacyDashboardView: View {
                                 .foregroundColor(.red)
                                 .cornerRadius(Theme.Radius.medium)
                         }
-                        
+
                         Button {
                             // 仅清除行程和能耗数据
                             store.tripHistory = []
@@ -104,11 +105,11 @@ struct PrivacyDashboardView: View {
                                 .cornerRadius(Theme.Radius.medium)
                         }
                     }
-                    .padding(.top, Theme.Spacing.sm)
+                    .padding(.top, Kansei.Spacing.sm)
                 }
                 .padding()
             }
-            .dsCanvas()
+            .background(Kansei.Color.background)
             .navigationTitle("隐私与数据")
             .navigationBarTitleDisplayMode(.inline)
             .alert("确认清除", isPresented: $showClearConfirm) {
@@ -125,14 +126,14 @@ struct PrivacyDashboardView: View {
 
 struct PrivacyCategorySection: View {
     let category: (title: String, items: [(name: String, size: String, type: String)])
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+        VStack(alignment: .leading, spacing: Kansei.Spacing.xs) {
             Text(category.title)
                 .font(.headline)
                 .padding(.horizontal)
-                .padding(.top, Theme.Spacing.sm)
-            
+                .padding(.top, Kansei.Spacing.sm)
+
             ForEach(Array(category.items.enumerated()), id: \.offset) { idx, item in
                 HStack {
                     Text(item.name)
@@ -169,14 +170,14 @@ extension AppStore {
                 UserDefaults.standard.removeObject(forKey: key)
             }
         }
-        
+
         // 清除 Keychain
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Bundle.main.bundleIdentifier ?? "com.you.CarKeeper"
         ]
         SecItemDelete(query as CFDictionary)
-        
+
         // 重置状态
         isLoggedIn = false
         phone = ""
@@ -187,7 +188,7 @@ extension AppStore {
         energyHistory = []
         tripHistory = []
         commandHistory = []
-        
+
         NotificationCenter.default.post(name: .didLogout, object: nil)
     }
 }

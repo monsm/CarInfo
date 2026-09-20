@@ -11,14 +11,14 @@ struct ExportDataView: View {
     @State private var isExporting = false
     @State private var exportURL: URL?
     @State private var showSuccess = false
-    
+
     enum ExportType: String, CaseIterable {
         case trips = "行程记录"
         case charging = "充电记录"
         case commands = "指令历史"
         case diagnostics = "诊断报告"
     }
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -32,10 +32,10 @@ struct ExportDataView: View {
                     }
                     .pickerStyle(SegmentedPickerStyle())
                 }
-                
+
                 // 导出内容预览
                 previewCard
-                
+
                 // 操作按钮
                 VStack(spacing: 12) {
                     Button(action: exportAsCSV) {
@@ -46,11 +46,11 @@ struct ExportDataView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Theme.Colors.accent)
+                        .background(Kansei.Color.ambient)
                         .foregroundStyle(.white)
                         .cornerRadius(12)
                     }
-                    
+
                     Button(action: exportAsPDF) {
                         HStack {
                             Image(systemName: "doc.richtext")
@@ -67,7 +67,7 @@ struct ExportDataView: View {
             }
             .padding()
         }
-        .pageBackground()
+        .background(Kansei.Color.background)
         .navigationTitle("导出数据")
         .navigationBarTitleDisplayMode(.inline)
         .alert("导出成功", isPresented: $showSuccess) {
@@ -80,11 +80,11 @@ struct ExportDataView: View {
         }
         .accessibilityLabel(Text("数据导出工具"))
     }
-    
+
     private var previewCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("导出预览").font(.caption).foregroundStyle(.secondary)
-            
+
             let lines = previewLines
             ScrollView {
                 Text(lines.joined(separator: "\n"))
@@ -98,16 +98,17 @@ struct ExportDataView: View {
             .cornerRadius(8)
         }
         .padding()
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Kansei.Radius.medium)
     }
-    
+
     private var previewLines: [String] {
         switch exportType {
         case .trips:
             let first = store.tripHistory.first
             return [
                 "时间,里程(km),能耗(kWh/100km),开始SOC,结束SOC",
-                first.map { "\($0.startTime),\($0.distanceKm),\($0.avgEfficiency ?? 0),\($0.startSoc),\($0.endSoc)" } ?? "暂无数据"
+                first.map { "\($0.startTime),\($0.distanceKm),\($0.avgEfficiency ?? 0),\($0.startSoc)\
+($0.endSoc)" } ?? "暂无数据"
             ]
         case .charging:
             return [
@@ -124,7 +125,7 @@ struct ExportDataView: View {
             return ["诊断报告导出功能开发中..."]
         }
     }
-    
+
     private func exportAsCSV() {
         isExporting = true
         Task {
@@ -137,7 +138,7 @@ struct ExportDataView: View {
             }
         }
     }
-    
+
     private func exportAsPDF() {
         isExporting = true
         Task {
@@ -150,7 +151,7 @@ struct ExportDataView: View {
             }
         }
     }
-    
+
     private var csvContent: String {
         var lines: [String] = []
         switch exportType {
@@ -177,7 +178,7 @@ struct ExportDataView: View {
         }
         return lines.joined(separator: "\n")
     }
-    
+
     private var pdfHTMLContent: String {
         """
         <html><head><style>
@@ -196,7 +197,7 @@ struct ExportDataView: View {
         </body></html>
         """
     }
-    
+
     private var pdfTableRows: String {
         switch exportType {
         case .trips:
@@ -207,25 +208,25 @@ struct ExportDataView: View {
             return "<tr><td colspan='2'>暂无数据</td></tr>"
         }
     }
-    
+
     private func saveToFile(_ content: String, filename: String) -> URL? {
         let tempDir = FileManager.default.temporaryDirectory
         let fileURL = tempDir.appendingPathComponent(filename)
         try? content.write(to: fileURL, atomically: true, encoding: .utf8)
         return fileURL
     }
-    
+
     private func saveHTMLAsPDF(_ html: String, filename: String) -> URL? {
         let tempDir = FileManager.default.temporaryDirectory
         let htmlURL = tempDir.appendingPathComponent("export.html")
         let pdfURL = tempDir.appendingPathComponent(filename)
         try? html.write(to: htmlURL, atomically: true, encoding: .utf8)
-        
+
         let htmlData = html.data(using: .utf8) ?? Data()
         // Simple approach: return the HTML file as-is for sharing
         return htmlURL
     }
-    
+
     private func shareExportedFile() {
         guard let url = exportURL else { return }
         let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
@@ -234,7 +235,6 @@ struct ExportDataView: View {
         }
     }
 }
-
 
 struct ExportDataView_Previews: PreviewProvider {
     static var previews: some View {

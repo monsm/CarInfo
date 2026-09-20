@@ -36,12 +36,12 @@ struct BatteryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.Spacing.cardSpacing) {
+            VStack(spacing: Kansei.Spacing.lg) {
                 sections
             }
         }
         .scrollBounceBehavior(.basedOnSize)
-        .dsCanvas()
+        .background(Kansei.Color.background)
         .navigationTitle("充电")
         .navigationBarTitleDisplayMode(.large)
             .accessibilityLabel(Text("充电"))
@@ -107,12 +107,12 @@ struct BatteryView: View {
                 Text(e.chargeText)
                     .font(DS.Typo.footnote)
                     .foregroundStyle(e.chargeCls == "ok" || e.chargeCls == "charge"
-                                     ? DS.Palette.charge : DS.Palette.labelSecondary)
+                                     ? Kansei.Color.info : Kansei.Color.secondary)
                 Spacer(minLength: DS.Space.sm)
                 if !e.socWarn.isEmpty {
                     Text(e.socWarn)
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(DS.Palette.status(e.socCls))
+                        .foregroundStyle(Kansei.Color.status(e.socCls))
                 }
             }
 
@@ -129,16 +129,16 @@ struct BatteryView: View {
             HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
                 Text("续航 \(rangeText) km")
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .foregroundStyle(Kansei.Color.secondary)
                 Spacer(minLength: DS.Space.sm)
                 if let ttf = e.timeToFull, ttf != "--" {
                     Text("预计充满 \(ttf)")
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(DS.Palette.labelSecondary)
+                        .foregroundStyle(Kansei.Color.secondary)
                 } else if let tte = e.timeToEmpty, tte != "--" {
                     Text("可行驶 \(tte)")
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(DS.Palette.labelSecondary)
+                        .foregroundStyle(Kansei.Color.secondary)
                 }
             }
             .padding(.top, DS.Space.md)
@@ -158,9 +158,9 @@ struct BatteryView: View {
     // MARK: SOC 语义色（不用渐变，颜色只表达健康度）
     private func socTint(_ pct: Int) -> Color {
         switch pct {
-        case ..<20: return DS.Palette.bad
-        case ..<40: return DS.Palette.warn
-        default: return DS.Palette.ok
+        case ..<20: return Kansei.Color.error
+        case ..<40: return Kansei.Color.warning
+        default: return Kansei.Color.success
         }
     }
 
@@ -168,12 +168,13 @@ struct BatteryView: View {
     private func verdictCard(_ cache: [String: Any?], _ b: BatteryModel) -> some View {
         Group {
             if let batt = AN.summarize(cache, store.car).domains.first(where: { $0.key == "battery" }) {
-                ExpandingCardBox(title: "分析结论", side: batt.title, sideCls: batt.cls, cornerRadius: Theme.Radius.card) {
+                ExpandingCardBox(title: "分析结论", side: batt.title,
+                                 sideCls: batt.cls, cornerRadius: Kansei.Radius.medium) {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(batt.reasons) { r in
                             HStack(alignment: .top, spacing: 8) {
                                 StatusDot(cls: r.cls)
-                                Text(r.t).font(Theme.caption).foregroundStyle(.secondary)
+                                Text(r.t).font(Kansei.Type.caption).foregroundStyle(Kansei.Color.secondary)
                             }
                         }
                     }
@@ -184,14 +185,16 @@ struct BatteryView: View {
 
     // MARK: 一致性
     private func consistencyCard(_ b: BatteryModel) -> some View {
-        ExpandingCardBox(title: "一致性", side: b.cellStats.map { "\($0.count) 节采样" } ?? "接口未上报", sideCls: "ok", cornerRadius: Theme.Radius.card) {
+        let cellLabel = b.cellStats.map { "\(b.cellStats?.count ?? 0) 节采样" } ?? "接口未上报"
+        ExpandingCardBox(title: "一致性", side: cellLabel, sideCls: "ok",
+                         cornerRadius: Kansei.Radius.medium) {
             VStack(spacing: 12) {
                 if let cell = b.cellStats {
                     VStack(spacing: 6) {
                         sectionLabel("单体电压 (V)")
                         Chart(Array(cell.bars.enumerated()), id: \.offset) { (_ idx, v) in
                             BarMark(x: .value("序号", idx), y: .value("V", v))
-                                .foregroundStyle(Theme.ok.opacity(0.7))
+                                .foregroundStyle(Kansei.Color.success.opacity(0.7))
                                 .cornerRadius(1.5)
                         }
                         .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
@@ -211,7 +214,7 @@ struct BatteryView: View {
                         sectionLabel("温度探针 (℃)")
                         Chart(Array(probe.bars.enumerated()), id: \.offset) { (_ idx, v) in
                             BarMark(x: .value("序号", idx), y: .value("℃", v))
-                                .foregroundStyle(Theme.brand.opacity(0.55))
+                                .foregroundStyle(Kansei.Color.ambient.opacity(0.55))
                                 .cornerRadius(1.5)
                         }
                         .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
@@ -231,7 +234,9 @@ struct BatteryView: View {
 
     // MARK: 能耗历史折线图 (#13)
     private func chargeCard(_ b: BatteryModel) -> some View {
-        ExpandingCardBox(title: "充电", side: b.charging.text, sideCls: b.charging.cls.isEmpty ? "na" : b.charging.cls, cornerRadius: Theme.Radius.card) {
+        let chargeSide = b.charging.cls.isEmpty ? "na" : b.charging.cls
+        ExpandingCardBox(title: "充电", side: b.charging.text, sideCls: chargeSide,
+                         cornerRadius: Kansei.Radius.medium) {
             VStack(spacing: 0) {
                 let rows = chargeRows(b)
                 ForEach(Array(rows.enumerated()), id: \.offset) { (_ idx, r) in
@@ -279,12 +284,12 @@ struct BatteryView: View {
     private func motorCard(_ b: BatteryModel) -> some View {
         Group {
             if !b.motors.isEmpty {
-                ExpandingCardBox(title: "动力系统", side: "\(b.motors.count) 台电机", cornerRadius: Theme.Radius.card) {
+                ExpandingCardBox(title: "动力系统", side: "\(b.motors.count) 台电机", cornerRadius: Kansei.Radius.medium) {
                     VStack(spacing: 12) {
                         ForEach(Array(b.motors.enumerated()), id: \.offset) { (_ idx, m) in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(m.num == "--" ? "驱动电机" : "驱动电机 #\(m.num)")
-                                    .font(Theme.font(.caption as Font).bold()).foregroundStyle(.secondary)
+                                    .font(Kansei.Type.caption.weight(.bold)).foregroundStyle(Kansei.Color.secondary)
                                 let rows = motorRows(m)
                                 ForEach(Array(rows.enumerated()), id: \.offset) { (_ idx, r) in
                                     KVRow(k: r.k, v: r.v)
@@ -319,11 +324,12 @@ struct BatteryView: View {
                             if !f.codes.isEmpty {
                                 Text(f.codes)
                                     .font(Theme.mono)
-                                    .foregroundStyle(.secondary).lineLimit(3)
+                                    .foregroundStyle(Kansei.Color.secondary).lineLimit(3)
                             }
                         }
                         .padding(10)
-                        .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 12, style:
+ .continuous))
                     }
                 }
             }
@@ -339,7 +345,7 @@ struct BatteryView: View {
                         ForEach(Array(b.alarms.enumerated()), id: \.offset) { (_ idx, a) in
                             HStack {
                                 StatusDot(cls: "bad")
-                                Text(a).font(Theme.caption)
+                                Text(a).font(Kansei.Type.caption)
                                 Spacer()
                                 Text("触发").font(Theme.font(.footnote as Font).bold())
                                     .foregroundStyle(Theme.bad)
@@ -368,7 +374,7 @@ struct BatteryView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private struct R { let k: String; let v: String; var cls: String = "" }
@@ -435,11 +441,11 @@ struct BatteryView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text("SOC 历史")
                         .font(DS.Typo.subheadline.weight(.semibold))
-                        .foregroundStyle(DS.Palette.label)
+                        .foregroundStyle(Kansei.Color.primary)
                     Spacer(minLength: DS.Space.sm)
                     Text("当前 \(e.socPct)%")
                         .font(DS.Typo.digits(13))
-                        .foregroundStyle(DS.Palette.labelSecondary)
+                        .foregroundStyle(Kansei.Color.secondary)
                 }
                 if socPoints.count >= 2 {
                     DSTrendChart(points: socPoints,
@@ -451,7 +457,9 @@ struct BatteryView: View {
                     DSTrendEmpty(
                         icon: "chart.xyaxis.line",
                         title: "正在积累 SOC 数据",
-                        message: "服务端没有历史接口，这条曲线由 App 每 \(socMinutes) 分钟采一次（电量变化 ≥ \(Int(HistoryStore.socJump))% 也会立刻留一个点）。已记录 \(socPoints.count) 个点。"
+                        message: "服务端没有历史接口，这条曲线由 App 每 \(socMinutes) " +
+                                 "分钟采一次（电量变化 ≥ \(Int(HistoryStore.socJump))% 也会立刻留一个点）。"
+                                 + "已记录 \(socPoints.count) 个点。"
                     )
                 }
             }
@@ -461,18 +469,18 @@ struct BatteryView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text("充电功率")
                         .font(DS.Typo.subheadline.weight(.semibold))
-                        .foregroundStyle(DS.Palette.label)
+                        .foregroundStyle(Kansei.Color.primary)
                     Spacer(minLength: DS.Space.sm)
                     if let c = e.charging {
                         Text(c.power)
                             .font(DS.Typo.digits(13))
-                            .foregroundStyle(DS.Palette.charge)
+                            .foregroundStyle(Kansei.Color.info)
                     }
                 }
                 if powerPoints.count >= 2 {
                     DSTrendChart(points: powerPoints,
                                  unit: "kW",
-                                 tint: DS.Palette.charge,
+                                 tint: Kansei.Color.info,
                                  height: 132,
                                  valueText: { String(format: "%.0f", $0) })
                 } else {
@@ -560,7 +568,7 @@ struct DestinationCalculatorView: View {
                 .keyboardType(.decimalPad)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 12))
+                .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1))
 
             if let reach = canReach {
@@ -599,5 +607,4 @@ struct DestinationCalculatorView: View {
         canReach = effectiveRange >= Int(dist)
     }
 }
-
 

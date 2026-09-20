@@ -92,7 +92,7 @@ struct CarKeeperApp: App {
     @State private var isAppLoading = false
     // #NEW-113 Onboarding 引导状态
     @AppStorage("carkeeper_onboarding_seen") private var onboardingSeen = false
-    
+
     /// 处理 carkeeper:// 深链。
     /// 此前 Info.plist 注册了 scheme，但全项目没有任何 onOpenURL 接收方 —— 扫二维码/点链接豪无反应。
     private func openDeeplink(_ url: URL) {
@@ -262,12 +262,9 @@ final class NavState: ObservableObject, @unchecked Sendable {
 
 struct MainTabView: View {
     @StateObject private var nav = NavState.shared
-    // VoiceOver：记录上次朗读的 Tab，避免重复播报
     @State private var lastAnnouncedTab: Int = 0
     private let store = AppStore.shared
-    // #5 低电量 Tab 角标：SOC < 20% 时显示
     @State private var lowBatteryBadge: Bool = false
-    // #4 网络状态监测定时器（每 30 秒检查一次）
     private let networkMonitorTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     /// 深潜页目标视图（独立函数避免巨型 switch 拖慢类型检查）
@@ -328,10 +325,9 @@ struct MainTabView: View {
             .tabItem {
                 Label("车况", systemImage: "car.fill")
                     .accessibilityLabel(Text("车况"))
-                    .accessibilityHint(Text("车辆状态概览，包含行驶里程、胎压、SOC 电量等关键信息"))
             }
             // 低电量时在 Tab 上给出角标（只有真需要用户注意时才出现）
-            .badge(lowBatteryBadge ? Text("低电量") : nil)
+            .badge(lowBatteryBadge ? "低" : nil)
             .tag(0)
     }
 
@@ -347,7 +343,6 @@ struct MainTabView: View {
             .tabItem {
                 Label("车控", systemImage: "slider.horizontal.3")
                     .accessibilityLabel(Text("车控"))
-                    .accessibilityHint(Text("远程控制车辆，包括锁车、解锁、空调控制等功能"))
             }
             .tag(1)
 
@@ -365,7 +360,6 @@ struct MainTabView: View {
             .tabItem {
                 Label("充电", systemImage: "bolt.fill")
                     .accessibilityLabel(Text("充电"))
-                    .accessibilityHint(Text("充电状态、充电曲线与电费统计"))
             }
             .tag(2)
 
@@ -401,7 +395,6 @@ struct MainTabView: View {
             .tabItem {
                 Label("我的", systemImage: "person.fill")
                     .accessibilityLabel(Text("我的"))
-                    .accessibilityHint(Text("账号设置和个人信息管理"))
             }
             .tag(4)
     }
@@ -414,8 +407,8 @@ struct MainTabView: View {
             tripsTab
             mineTab
         }
-        // 选中色交给 SwiftUI（TabBar 保持系统原生液态玻璃外观）
-        .tint(DS.Palette.tint)
+        // 情感化配色：时间感知主色调
+        .tint(Kansei.Color.ambient)
         // VoiceOver：切换 Tab 时朗读当前页面名称（仅首次切换到新 Tab）
         .onChange(of: nav.selectedTab) { newTab in
             if newTab != lastAnnouncedTab {
@@ -457,7 +450,7 @@ struct MainTabView: View {
 struct DetailSplitView: View {
     @StateObject private var nav = NavState.shared
     private let store = AppStore.shared
-    
+
     var body: some View {
         if store.isLoggedIn {
             MainTabView()

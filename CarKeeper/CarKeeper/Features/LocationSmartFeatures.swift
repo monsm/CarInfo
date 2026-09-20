@@ -6,7 +6,7 @@ import SwiftUI
 class LocationSmartFeatures: ObservableObject {
     static let shared = LocationSmartFeatures()
     private init() {}
-    
+
     func startMonitoring() {
         // Start location-based smart features
     }

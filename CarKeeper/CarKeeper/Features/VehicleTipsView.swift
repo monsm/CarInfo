@@ -7,12 +7,13 @@ import SwiftUI
 struct VehicleTipsView: View {
     private let store = AppStore.shared
     @State private var selectedCategory: TipCategory = .all
-    @State private var dismissedTips: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "dismissed_tips") ?? [])
-    
+    @State private var dismissedTips: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "dismissed_tips")
+ ?? [])
+
     // 智能提示引擎
     var tips: [VehicleTip] {
         var result: [VehicleTip] = []
-        
+
         let cache = store.caches
 
         // 电量
@@ -84,7 +85,7 @@ struct VehicleTipsView: View {
                 ))
             }
         }
-        
+
         // 天气相关
         result.append(VehicleTip(
             category: .weather,
@@ -94,7 +95,7 @@ struct VehicleTipsView: View {
             action: nil,
             severity: .info
         ))
-        
+
         // 节能技巧
         if store.totalMileage > 1000 {
             result.append(VehicleTip(
@@ -106,18 +107,18 @@ struct VehicleTipsView: View {
                 severity: .info
             ))
         }
-        
+
         return result.filter { tip in
             !dismissedTips.contains(tip.id)
         }
     }
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 // 分类筛选
                 categoryPicker
-                
+
                 // 提示列表
                 if tips.isEmpty {
                     emptyState
@@ -129,10 +130,10 @@ struct VehicleTipsView: View {
                     }
                 }
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.vertical, Theme.Spacing.md)
+            .padding(.horizontal, Kansei.Spacing.lg)
+            .padding(.vertical, Kansei.Spacing.md)
         }
-        .pageBackground()
+        .background(Kansei.Color.background)
         .navigationTitle("车辆提示")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -140,13 +141,13 @@ struct VehicleTipsView: View {
                 Button(action: dismissAll) {
                     Text("全部已读")
                         .font(.caption)
-                        .foregroundStyle(Theme.Colors.accent)
+                        .foregroundStyle(Kansei.Color.ambient)
                 }
             }
         }
         .accessibilityLabel(Text("车辆智能提示"))
     }
-    
+
     // MARK: - 分类筛选
     private var categoryPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -157,20 +158,20 @@ struct VehicleTipsView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(selectedCategory == cat ? Theme.Colors.accent.opacity(0.2) : Color.clear)
-                            .foregroundStyle(selectedCategory == cat ? Theme.Colors.accent : .secondary)
+                            .background(selectedCategory == cat ? Kansei.Color.ambient.opacity(0.2) : Color.clear)
+                            .foregroundStyle(selectedCategory == cat ? Kansei.Color.ambient : Kansei.Color.secondary)
                             .cornerRadius(16)
                     }
                 }
             }
         }
     }
-    
+
     private var filteredTips: [VehicleTip] {
         if selectedCategory == .all { return tips }
         return tips.filter { $0.category == selectedCategory }
     }
-    
+
     // MARK: - 提示行
     private func tipRow(_ tip: VehicleTip) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -181,7 +182,7 @@ struct VehicleTipsView: View {
                     .foregroundStyle(tip.severity.color)
                     .frame(width: 14)
                     .accessibilityLabel(Text(tip.severity.label))
-                
+
                 // 图标
                 Image(safeSymbol: tip.icon, fallback: "info.circle.fill")
                     .font(.caption)
@@ -189,21 +190,21 @@ struct VehicleTipsView: View {
                     .frame(width: 28, height: 28)
                     .background(tip.severity.color.opacity(0.1))
                     .cornerRadius(6)
-                
+
                 VStack(alignment: .leading, spacing: 2) {
                     Text(tip.title).font(Theme.subheadline).foregroundStyle(.primary)
                     Text(tip.body).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                
+
                 if let action = tip.action {
                     Button(action: { handleAction(tip) }) {
                         Text(action)
                             .font(.caption)
-                            .foregroundStyle(Theme.Colors.accent)
+                            .foregroundStyle(Kansei.Color.ambient)
                     }
                 }
-                
+
                 Button(action: { dismiss(tip) }) {
                     Image(systemName: "xmark")
                         .font(.caption2)
@@ -212,12 +213,12 @@ struct VehicleTipsView: View {
             }
         }
         .padding()
-        .glassCard(corner: Theme.Radius.small)
+        .glassCard(corner: Kansei.Radius.small)
         .onTapGesture {
             if tip.severity != .info { dismiss(tip) }
         }
     }
-    
+
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.seal.fill")
@@ -233,22 +234,22 @@ struct VehicleTipsView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
     }
-    
+
     // MARK: - 操作
     private func dismiss(_ tip: VehicleTip) {
         dismissedTips.insert(tip.id)
         persistDismissed()
     }
-    
+
     private func dismissAll() {
         for tip in filteredTips { dismissedTips.insert(tip.id) }
         persistDismissed()
     }
-    
+
     private func persistDismissed() {
         UserDefaults.standard.set(Array(dismissedTips), forKey: "dismissed_tips")
     }
-    
+
     private func handleAction(_ tip: VehicleTip) {
         switch tip.title {
         case "电量较低":

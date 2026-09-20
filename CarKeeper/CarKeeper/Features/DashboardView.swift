@@ -13,30 +13,30 @@ struct DashboardView: View {
     // 原来这样读 → 仪表盘的 SOC / 续航 / 温度恒显示 0% / 0km / 22°C。
     private var energyModel: EnergyModel { VM.energy(store.caches, store.car) }
     private var comfortModel: ComfortModel { VM.comfortStatus(store.caches) }
-    
+
     let periods = ["24小时", "7天", "30天"]
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: DS.Space.gap) {
                 // 周期选择
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Theme.Spacing.sm) {
+                    HStack(spacing: Kansei.Spacing.sm) {
                         ForEach(periods, id: \.self) { p in
                             periodChip(text: p, selected: period == p)
                         }
                     }
                 }
-                
+
                 // 核心指标
-                HStack(spacing: Theme.Spacing.sm) {
+                HStack(spacing: Kansei.Spacing.sm) {
                     DashTile(icon: "bolt.fill", label: "SOC",
                              value: energyModel.soc == "--" ? "--" : "\(energyModel.socPct)%", color: .green)
                     DashTile(icon: "gauge", label: "续航",
                              value: energyModel.range == "--" ? "--" : "\(energyModel.range)km", color: .blue)
                     DashTile(icon: "thermometer", label: "温度", value: comfortModel.cabinTemp, color: .orange)
                 }
-                
+
                 // SOC 历史（真实车端采样）
                 // 这里原来是 `store.energyHistory.prefix(7)` 画的"日期"轴曲线 ——
                 // 但 energyHistory 只是 20 条 / 60 秒的实时缓冲，7 个点全在同一分钟内，
@@ -46,20 +46,21 @@ struct DashboardView: View {
                 if socPoints.count >= 2 {
                     DSTrendChart(points: socPoints,
                                  unit: "%",
-                                 tint: DS.Palette.tint,
+                                 tint: Kansei.Color.ambient,
                                  yDomain: 0...100,
                                  valueText: { String(format: "%.0f", $0) })
                 } else {
                     DSTrendEmpty(
                         icon: "chart.xyaxis.line",
                         title: "正在积累 SOC 数据",
-                        message: "服务端没有历史接口，曲线由 App 每 \(Int(HistoryStore.socInterval / 60)) 分钟采样一次。已记录 \(socPoints.count) 个点。"
+                        message: "服务端没有历史接口，曲线由 App 每 \(Int(HistoryStore.socInterval / 60)) 分钟采样一次。已记录
+ \(socPoints.count) 个点。"
                     )
                 }
-                
+
                 // 驾驶评分
                 let score = store.drivingScore
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                VStack(alignment: .leading, spacing: Kansei.Spacing.sm) {
                     Text("驾驶安全评分")
                         .font(.subheadline)
                         .fontWeight(.semibold)
@@ -94,7 +95,7 @@ struct DashboardView: View {
             }
             .padding(.vertical, DS.Space.sm)
         }
-        .dsCanvas()
+        .background(Kansei.Color.background)
         .navigationTitle("仪表盘")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -103,10 +104,10 @@ struct DashboardView: View {
         Text(text)
             .font(.subheadline)
             .foregroundColor(selected ? .white : .secondary)
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.vertical, Theme.Spacing.xs)
-            .background(selected ? Theme.Colors.accent : Color.clear)
-            .cornerRadius(Theme.Radius.sm)
+            .padding(.horizontal, Kansei.Spacing.md)
+            .padding(.vertical, Kansei.Spacing.xs)
+            .background(selected ? Kansei.Color.ambient : Color.clear)
+            .cornerRadius(Kansei.Radius.small)
     }
 }
 
@@ -115,9 +116,9 @@ struct DashTile: View {
     let label: String
     let value: String
     let color: Color
-    
+
     var body: some View {
-        VStack(spacing: Theme.Spacing.xs) {
+        VStack(spacing: Kansei.Spacing.xs) {
             Image(safeSymbol: icon, fallback: "gauge")
                 .font(.title2)
                 .foregroundColor(color)
@@ -129,7 +130,7 @@ struct DashTile: View {
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.Spacing.sm)
+        .padding(.vertical, Kansei.Spacing.sm)
         .glassCard()
     }
 }

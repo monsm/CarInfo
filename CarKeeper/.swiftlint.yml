@@ -1,0 +1,128 @@
+# SwiftLint 配置 — 长安车管家
+# 参考: https://github.com/realm/SwiftLint/blob/master/Documents/rules.md
+
+# 规则配置
+disabled_rules:
+  - todo
+  - line_length  # 禁用行长度限制，允许长注释和文档
+
+opt_in_rules:
+  - array_init
+  - closure_body_length
+  - closure_end_indentation
+  - closure_spacing
+  - collects_testcase
+  - conditional_returns_on_newline
+  - contains_over_filter_is_empty
+  - contains_over_filter_count
+  - contains_over_first_not_nil
+  - contains_over_range_nil_comparison
+  - convenience_type
+  - direct_return
+  - discouraged_object_literal
+  - empty_collection_literal
+  - empty_count
+  - empty_string
+  - enum_case_associated_values_count
+  - fatal_error_message
+  - file_name_no_space
+  - first_where
+  - flatmap_over_map_reduce
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - join_absolute_paths
+  - last_where
+  - legacy_hashing
+  - legacy_random
+  - modifier_order
+  - overridden_super_call
+  - override_in_extension
+  - private_action
+  - private_outlet
+  - prohibited_super_call
+  - reduce_into
+  - redundant_nil_coalescing
+  - sorted_first_last
+  - sorted_imports
+  - toggle_bool
+  - unneeded_parentheses_in_closure_argument
+  - unowned_variable_capture
+  - vertical_parameter_alignment_on_call
+  - yoda_condition
+
+# 警告阈值
+warning_threshold: 100
+
+# 错误阈值
+error_threshold: 50
+
+# 自定义规则
+custom_rules:
+  # 禁止直接使用颜色值，必须使用 Kansei 命名空间
+  kansei_color_usage:
+    name: "Kansei Color Usage"
+    regex: 'Color\(red: [0-9.]+, green: [0-9.]+, blue: [0-9.]+)'
+    message: "请使用 Kansei.Color.* 命名空间代替硬编码颜色值"
+    severity: warning
+  
+  # 禁止直接使用 DS.Palette（应用迁移到新设计系统）
+  old_palette_usage:
+    name: "Old Palette Usage"
+    regex: 'DS\.Palette\.'
+    message: "请使用 Kansei.Color.* 替代 DS.Palette.*"
+    severity: warning
+  
+  # 禁止直接使用 Theme 命名空间（应用迁移到新设计系统）
+  old_theme_usage:
+    name: "Old Theme Usage"
+    regex: '\.background\(Theme\.'
+    message: "请使用 Kansei.Color.* 替代 Theme.*"
+    severity: warning
+  
+  # 禁止使用旧背景修饰符
+  old_background_modifier:
+    name: "Old Background Modifier"
+    regex: '\.(pageBackground|dsCanvas)\(\)'
+    message: "请使用 .background(Kansei.Color.background)"
+    severity: warning
+
+# 排除目录
+excluded:
+  - CarKeeper/CarKeeper/Design/DS.swift
+  - CarKeeper/CarKeeper/Design/Theme.swift
+  - CarKeeper/CarKeeper/Design/Kansei.swift
+  - CarKeeper/CarKeeper/Design/Glass.swift
+  - CarKeeper/CarKeeper/Design/Canvas.swift
+  - CarKeeper/CarKeeper/Design/Instrument.swift
+  - CarKeeper/CarKeeper/Design/Car.swift
+  - CarKeeper/CarKeeper/Design/OrbitNav.swift
+  - CarKeeper/CarKeeper/Design/Charts.swift
+  - CarKeeper/CarKeeper/Services
+  - CarKeeper/WatchApp
+  - CarKeeper/Widgets
+  - CarKeeper/CarPlay
+  - CarKeeper/AppClip
+  - CarKeeper/HealthKit
+
+# 配置文件格式
+file_length:
+  warning: 500
+  error: 1000
+
+type_body_length:
+  warning: 300
+  error: 500
+
+function_body_length:
+  warning: 100
+  error: 200
+
+indentation_size:
+  size: 4
+
+trailing_whitespace:
+  ignores_empty_lines: true
+  ignores_comments: true
+
+vertical_whitespace:
+  max_empty_lines: 2

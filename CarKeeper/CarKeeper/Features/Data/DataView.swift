@@ -68,7 +68,7 @@ struct DataView: View {
                     }
                     Text(footerText)
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(DS.Palette.labelTertiary)
+                        .foregroundStyle(Kansei.Color.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, DS.Hair.inset)
                 }
@@ -78,7 +78,7 @@ struct DataView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground()
+        .background(Kansei.Color.background)
         .navigationTitle("全量数据")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { kindMenu }
@@ -126,7 +126,7 @@ struct DataView: View {
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 10, weight: .semibold))
             }
-            .foregroundStyle(DS.Palette.tint)
+            .foregroundStyle(Kansei.Color.ambient)
         }
         .accessibilityLabel(Text("数据分类：\(kind.title)"))
     }
@@ -139,7 +139,7 @@ struct DataView: View {
                 ProgressView().controlSize(.small)
                 Text("正在整理 \(kind.title)…")
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .foregroundStyle(Kansei.Color.secondary)
             }
             DSSkeleton(height: 44)
             DSSkeleton(height: 132)
@@ -185,12 +185,12 @@ struct DataView: View {
             DSSectionHeader(title: b.h)
             Text(headline.isEmpty ? "—" : headline)
                 .font(DS.Typo.title2)
-                .foregroundStyle(DS.Palette.label)
+                .foregroundStyle(Kansei.Color.primary)
                 .fixedSize(horizontal: false, vertical: true)
             if !detail.isEmpty {
                 Text(detail)
                     .font(DS.Typo.subheadline)
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .foregroundStyle(Kansei.Color.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, DS.Space.xs)
             }
@@ -347,31 +347,45 @@ struct DataView: View {
 
     private func statusBlocks(_ d: [String: Any]) -> [Block] {
         var out: [Block] = []
-        out.append(Block(h: "核心状态", rows: rows(d, ["CarStatus", "Status", "FireStatus", "VehicleSpeed", "TotalOdometer", "ValidGps", "Lat", "Lng", "Alti", "Heading", "SatNum"])))
-        out.append(Block(h: "门窗锁", rows: rows(d, ["Door", "Window", "Hood", "Trunk", "Sunroof", "DriverDoorLock", "LeftFrontDoor", "RightFrontDoor", "LeftRearDoor", "RightRearDoor"])))
-        out.append(Block(h: "灯光", rows: rows(d, ["LowBeam", "HighBeam", "FrontFoglamp", "RearFoglamp", "PositionLamp"])))
-        out.append(Block(h: "电池核心", rows: rows(d, ["Soc", "RemainPower", "RemainedPowerMile", "TotalVoltage", "TotalCurrent", "InsulateResistance", "PowerBatteryStatus"])))
-        out.append(Block(h: "轮胎", rows: rows(d, ["LfTyrePressure", "RfTyrePressure", "LrTyrePressure", "RrTyrePressure", "LeftFrontTireTemperature", "RightFrontTireTemperature"])))
-        out.append(Block(h: "故障码", rows: rows(d, ["EngineFaultCount", "EngineFaultCodes", "DriveMotorFaultCount", "DriveMotorFaultCodes", "RechargeableStorageDevicesFaultCount", "RechargeableStorageDevicesFaultCodes"])))
+        out.append(Block(h: "核心状态", rows: rows(d, ["CarStatus", "Status", "FireStatus", "VehicleSpeed",
+ "TotalOdometer", "ValidGps", "Lat", "Lng", "Alti", "Heading", "SatNum"])))
+        out.append(Block(h: "门窗锁", rows: rows(d, ["Door", "Window", "Hood", "Trunk", "Sunroof", "DriverDoorLock",
+ "LeftFrontDoor", "RightFrontDoor", "LeftRearDoor", "RightRearDoor"])))
+        out.append(Block(h: "灯光", rows: rows(d, ["LowBeam", "HighBeam", "FrontFoglamp", "RearFoglamp",
+ "PositionLamp"])))
+        out.append(Block(h: "电池核心", rows: rows(d, ["Soc", "RemainPower", "RemainedPowerMile", "TotalVoltage",
+ "TotalCurrent", "InsulateResistance", "PowerBatteryStatus"])))
+        out.append(Block(h: "轮胎", rows: rows(d, ["LfTyrePressure", "RfTyrePressure", "LrTyrePressure",
+ "RrTyrePressure", "LeftFrontTireTemperature", "RightFrontTireTemperature"])))
+        out.append(Block(h: "故障码", rows: rows(d, ["EngineFaultCount", "EngineFaultCodes", "DriveMotorFaultCount",
+ "DriveMotorFaultCodes", "RechargeableStorageDevicesFaultCount", "RechargeableStorageDevicesFaultCodes"])))
         out.append(Block(h: "系统标识", rows: rows(d, ["Vin", "CarId", "UserId", "Tuid", "LastUpdatedTime"])))
         return out
     }
 
     private func chargeBlocks(_ d: [String: Any]) -> [Block] {
-        [Block(h: "充电状态", rows: rows(d, ["ChrgStatus", "RemainPower", "RemainedPowerMile", "ChargDeltMins", "ChargeStarttime", "ChargeStoptime", "PowerLineStatus", "BatteryHeatingStatus", "ChargeReservationStatus", "ReservationUseVehicleTime"]))]
+        [Block(h: "充电状态", rows: rows(d, [
+            "ChrgStatus", "RemainPower", "RemainedPowerMile", "ChargDeltMins",
+            "ChargeStarttime", "ChargeStoptime", "PowerLineStatus",
+            "BatteryHeatingStatus", "ChargeReservationStatus",
+            "ReservationUseVehicleTime"
+        ]))]
     }
 
     private func locationBlocks(_ d: [String: Any]) -> [Block] {
-        [Block(h: "定位", rows: rows(d, ["CarId", "Lng", "Lat", "AddrDesc", "GpsTime", "Speed", "Heading", "Status", "ValidGps"]))]
+        [Block(h: "定位", rows: rows(d, ["CarId", "Lng", "Lat", "AddrDesc", "GpsTime", "Speed", "Heading", "Status",
+ "ValidGps"]))]
     }
 
     private func envBlocks(_ d: [String: Any]) -> [Block] {
-        [Block(h: "环境与定位", rows: rows(d, ["Pm25InnnerCarValue", "Pm25OuterCarValue", "VehicleTemperature", "EnvironmentalTemperature", "UpdateTime"]))]
+        [Block(h: "环境与定位", rows: rows(d, ["Pm25InnnerCarValue", "Pm25OuterCarValue", "VehicleTemperature",
+ "EnvironmentalTemperature", "UpdateTime"]))]
     }
 
     private func userBlocks(_ d: [String: Any]) -> [Block] {
         [
-            Block(h: "核心账户", rows: rows(d, ["UserId", "UserNickname", "UserFullname", "Mobile", "Gender", "RealnameAuthed"])),
+            Block(h: "核心账户", rows: rows(d, ["UserId", "UserNickname", "UserFullname", "Mobile", "Gender",
+ "RealnameAuthed"])),
             Block(h: "证件联系", rows: rows(d, ["IdcardType", "Idcard", "Birthday", "Email", "Address", "Telephone"])),
             Block(h: "账号状态", rows: rows(d, ["OpenId", "RegisterTime", "LastLoginTime", "Status", "Locked", "Deleted"]))
         ]
@@ -381,12 +395,14 @@ struct DataView: View {
         [
             Block(h: "身份识别", rows: rows(d, ["CarId", "Vin", "CarName", "PlateNumber", "IsNev", "Pin"])),
             Block(h: "基础配置", rows: rows(d, ["ModelCode", "ConfCode", "ConfName", "BrandCode", "SeriesCode", "Color"])),
-            Block(h: "注册与保险", rows: rows(d, ["RegisterTime", "ProductTime", "InsuranceEndDate", "InsuranceCompany", "InsurancePhone"]))
+            Block(h: "注册与保险", rows: rows(d, ["RegisterTime", "ProductTime", "InsuranceEndDate", "InsuranceCompany",
+ "InsurancePhone"]))
         ]
     }
 
     private func checkBlocks(_ d: [String: Any]) -> [Block] {
-        var out: [Block] = [Block(h: "检测概览", rows: rows(d, ["CheckHistoryId", "UserId", "CarId", "CheckTime", "Score", "NormalCount", "RiskCount", "FaultCount"]))]
+        var out: [Block] = [Block(h: "检测概览", rows: rows(d, ["CheckHistoryId", "UserId", "CarId", "CheckTime",
+ "Score", "NormalCount", "RiskCount", "FaultCount"]))]
         if let details = ciArray(d, ["Details"]) {
             for sys in details {
                 let sName = ciString(sys, ["ItemName"]) ?? "系统"

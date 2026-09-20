@@ -18,30 +18,30 @@ struct ChargeRecord: Codable {
 
 class ChargeBillGenerator {
     static let shared = ChargeBillGenerator()
-    
+
     func generatePDF(records: [ChargeRecord], vehiclePlate: String) -> URL? {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy年MM月"
         let monthStr = formatter.string(from: Date())
-        
+
         let pdfRenderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))
         let pdfData = pdfRenderer.pdfData { ctx in
             ctx.beginPage()
-            
+
             // 标题
             let titleAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 24, weight: .bold),
                 .foregroundColor: UIColor.label
             ]
             "充电账单".draw(at: CGPoint(x: 40, y: 60), withAttributes: titleAttrs)
-            
+
             // 月份
             let subAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 14, weight: .regular),
                 .foregroundColor: UIColor.secondaryLabel
             ]
             "\(vehiclePlate) · \(monthStr)".draw(at: CGPoint(x: 40, y: 95), withAttributes: subAttrs)
-            
+
             // 汇总
             let totalKWh = records.map { $0.kWh }.reduce(0, +)
             let totalCost = records.map { $0.cost }.reduce(0, +)
@@ -51,7 +51,7 @@ class ChargeBillGenerator {
                 .foregroundColor: UIColor.systemGreen
             ]
             summary.draw(at: CGPoint(x: 40, y: 130), withAttributes: sumAttrs)
-            
+
             // 表格头
             let headerY: CGFloat = 170
             let colX: [CGFloat] = [40, 180, 280, 380, 480]
@@ -59,12 +59,12 @@ class ChargeBillGenerator {
             headers.enumerated().forEach { i, h in
                 h.draw(at: CGPoint(x: colX[i], y: headerY), withAttributes: subAttrs)
             }
-            
+
             // 分割线
             UIColor.separator.withAlphaComponent(0.3).setStroke()
             let line = UIBezierPath(rect: CGRect(x: 40, y: headerY + 20, width: 515, height: 1))
             line.stroke()
-            
+
             // 记录行
             let rowAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 12),
@@ -80,7 +80,7 @@ class ChargeBillGenerator {
                     text.draw(at: CGPoint(x: colX[i], y: rowY), withAttributes: rowAttrs)
                 }
             }
-            
+
             // 底部说明
             let note = "本账单由 CarKeeper 自动生成，仅供参考。"
             let noteAttrs: [NSAttributedString.Key: Any] = [
@@ -89,7 +89,7 @@ class ChargeBillGenerator {
             ]
             note.draw(at: CGPoint(x: 40, y: 790), withAttributes: noteAttrs)
         }
-        
+
         let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let fileURL = docsDir.appendingPathComponent("charge_bill_\(monthStr).pdf")
         try? pdfData.write(to: fileURL)
@@ -100,7 +100,7 @@ class ChargeBillGenerator {
 // MARK: - N33 车辆估值
 class VehicleValuation {
     static let shared = VehicleValuation()
-    
+
     /// 基于使用年限 + 里程估算残值率
     func estimateValue(initialPrice: Double, years: Int, mileageKm: Double) -> Double {
         // 年折旧：前3年每年15%，之后每年10%
@@ -116,7 +116,7 @@ class VehicleValuation {
         let mileageDep = min(Double(mileageKm / 10000) * 0.02, 0.30)
         return initialPrice * depreciation * (1 - mileageDep)
     }
-    
+
     /// 车辆信息卡片
     func valuationCard(initialPrice: Double, years: Int, mileageKm: Double) -> (currentValue: Double, depreciationRate: Double) {
         let value = estimateValue(initialPrice: initialPrice, years: years, mileageKm: mileageKm)
@@ -136,14 +136,14 @@ struct Inspection: Identifiable, Codable {
 class InspectionCalendar: ObservableObject {
     @Published var inspections: [Inspection] = []
     static let shared = InspectionCalendar()
-    
+
     private init() {
         if let data = UserDefaults.standard.data(forKey: "carkeeper_inspections"),
            let decoded = try? JSONDecoder().decode([Inspection].self, from: data) {
             inspections = decoded
         }
     }
-    
+
     func addInspection(_ inspection: Inspection) {
         var list = inspections
         list.append(inspection)
@@ -151,7 +151,7 @@ class InspectionCalendar: ObservableObject {
             UserDefaults.standard.set(data, forKey: "carkeeper_inspections")
         }
     }
-    
+
     /// 获取即将到期的年检（60天内）
     var upcomingInspections: [Inspection] {
         let now = Date()
@@ -160,17 +160,17 @@ class InspectionCalendar: ObservableObject {
             .filter { $0.date >= now && $0.date <= sixtyDays }
             .sorted { $0.date < $1.date }
     }
-    
+
     /// 已过期
     var expiredInspections: [Inspection] {
         inspections.filter { $0.date < Date() }
     }
-    
+
     /// 距离下次年检天数
     func daysUntilInspection(for inspection: Inspection) -> Int {
         Calendar.current.dateComponents([.day], from: Date(), to: inspection.date).day ?? 0
     }
-    
+
     private func saveInspections(_ list: [Inspection]) {
         if let data = try? JSONEncoder().encode(list) {
             UserDefaults.standard.set(data, forKey: "carkeeper_inspections")
@@ -190,12 +190,12 @@ class InspectionCalendar: ObservableObject {
 struct InspectionRow: View {
     let inspection: Inspection
     let currentMileage: Double
-    
+
     var body: some View {
         let days = InspectionCalendar.shared.daysUntilInspection(for: inspection)
         let isExpired = days < 0
         let isUrgent = days > 0 && days <= 30
-        
+
         HStack {
             Image(systemName: isExpired ? "exclamationmark.triangle.fill" : "calendar.fill")
                 .foregroundColor(isExpired ? .red : isUrgent ? .orange : .blue)
@@ -203,16 +203,16 @@ struct InspectionRow: View {
                 .frame(width: 36, height: 36)
                 .background(isExpired ? Color.red.opacity(0.1) : isUrgent ? Color.orange.opacity(0.1) : Color.blue.opacity(0.1))
                 .clipShape(Circle())
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(inspection.vehicleName)
                     .font(.subheadline).fontWeight(.medium)
                 Text(inspection.date.formatted(date: .numeric, time: .omitted))
                     .font(.caption).foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             VStack(alignment: .trailing) {
                 Text(isExpired ? "已过期" : "\(days)天后到期")
                     .font(.caption).fontWeight(.semibold)
@@ -227,7 +227,7 @@ struct InspectionRow: View {
 struct InspectionCard: View {
     let inspection: Inspection
     @State private var showEdit = false
-    
+
     var body: some View {
         InspectionRow(inspection: inspection, currentMileage: 0)
             .onTapGesture { showEdit = true }
@@ -246,13 +246,13 @@ struct InspectionEditForm: View {
     @State private var name: String
     @State private var date: Date
     @Environment(\.dismiss) private var dismiss
-    
+
     init(inspection: Inspection) {
         self.inspection = inspection
         _name = State(initialValue: inspection.vehicleName)
         _date = State(initialValue: inspection.date)
     }
-    
+
     var body: some View {
         Form {
             Section("车辆信息") {
@@ -281,7 +281,7 @@ struct InspectionCalendarView: View {
     @State private var showAdd = false
     @State private var vehicleName = ""
     @State private var inspectionDate = Date()
-    
+
     var body: some View {
         List {
             Section("即将到期（60天内）") {
@@ -294,7 +294,7 @@ struct InspectionCalendarView: View {
                     }
                 }
             }
-            
+
             Section("历史记录") {
                 ForEach(calendar.inspections.filter { $0.date < Date() }) { inspection in
                     InspectionRow(inspection: inspection, currentMileage: 0)
@@ -305,7 +305,7 @@ struct InspectionCalendarView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            
+
             Section("添加年检") {
                 VStack(spacing: 12) {
                     TextField("车辆名称", text: $vehicleName)
@@ -333,14 +333,14 @@ struct VehicleValuationView: View {
     @State private var initialPrice: String = ""
     @State private var purchaseDate = Date()
     @State private var currentMileage: String = ""
-    
+
     var estimatedValue: Double {
         let price = Double(initialPrice) ?? 200000
         let years = Calendar.current.dateComponents([.year], from: purchaseDate, to: Date()).year ?? 0
         let mileage = Double(currentMileage) ?? 30000
         return VehicleValuation.shared.estimateValue(initialPrice: price, years: max(years, 1), mileageKm: mileage)
     }
-    
+
     var body: some View {
         Form {
             Section("车辆信息") {
@@ -350,7 +350,7 @@ struct VehicleValuationView: View {
                 TextField("当前里程（km）", text: $currentMileage)
                     .keyboardType(.decimalPad)
             }
-            
+
             Section("估值结果") {
                 HStack {
                     VStack(alignment: .leading) {
@@ -376,7 +376,7 @@ struct VehicleValuationView: View {
                 }
                 .padding(.vertical, 8)
             }
-            
+
             Section("折旧说明") {
                 Text("前3年每年折旧15%，之后每年10%。里程折旧每万公里2%，上限30%。")
                     .font(.caption)
@@ -391,15 +391,15 @@ struct VehicleValuationView: View {
 struct ChargeBillSheet: View {
     private let store = AppStore.shared
     @State private var showingPDF = false
-    
+
     var chargeRecords: [ChargeRecord] {
         // 从 energyHistory 估算充电记录（实际应从后端获取）
         return []
     }
-    
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: Theme.Spacing.lg) {
+            VStack(spacing: Kansei.Spacing.lg) {
                 if chargeRecords.isEmpty {
                     EmptyStateView(
                         icon: "bolt.slash",
@@ -421,11 +421,11 @@ struct ChargeBillSheet: View {
                             Spacer()
                             Text("\(record.kWh) kWh")
                                 .font(.subheadline)
-                                .foregroundColor(Theme.Colors.accent)
+                                .foregroundColor(Kansei.Color.ambient)
                         }
                     }
                 }
-                
+
                 Button {
                     // 生成 PDF
                     if let url = ChargeBillGenerator.shared.generatePDF(
@@ -439,12 +439,12 @@ struct ChargeBillSheet: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Theme.Colors.accent)
+                        .background(Kansei.Color.ambient)
                         .foregroundColor(.white)
-                        .cornerRadius(Theme.Radius.medium)
+                        .cornerRadius(Kansei.Radius.medium)
                 }
                 .padding(.horizontal)
-                
+
                 if showingPDF {
                     Text("PDF 已保存到文件 App")
                         .font(.caption)

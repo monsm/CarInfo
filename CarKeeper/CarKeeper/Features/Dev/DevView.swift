@@ -47,7 +47,7 @@ struct DevView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground()
+        .background(Kansei.Color.background)
         .navigationTitle("设计令牌")
         .confirmationDialog("清除全部车端缓存？", isPresented: $showClearConfirm, titleVisibility: .visible) {
             Button("清除缓存", role: .destructive) {
@@ -65,23 +65,24 @@ struct DevView: View {
 
     private var surfaceTokens: [SWatch] {
         [
-            SWatch(name: "canvas", color: DS.Palette.canvas, note: "页面画布 · systemGroupedBackground"),
-            SWatch(name: "surface", color: DS.Palette.surface, note: "分组表面 · secondarySystemGroupedBackground"),
-            SWatch(name: "surfaceRaised", color: DS.Palette.surfaceRaised, note: "内凹表面 · tertiarySystemGroupedBackground"),
-            SWatch(name: "hairline", color: DS.Palette.hairline, note: "发丝分隔线 · UIColor.separator"),
-            SWatch(name: "fill", color: DS.Palette.fill, note: "通用填充 · tertiarySystemFill"),
-            SWatch(name: "tintSoft", color: DS.Palette.tintSoft, note: "强调色淡底（选中胶囊）")
+            SWatch(name: "canvas", color: Kansei.Color.background, note: "页面画布 · systemGroupedBackground"),
+            SWatch(name: "surface", color: Kansei.Color.nightSurface, note: "分组表面 · secondarySystemGroupedBackground"),
+            SWatch(name: "surfaceRaised", color: Kansei.Color.nightSurface, note: "内凹表面 ·
+ tertiarySystemGroupedBackground"),
+            SWatch(name: "hairline", color: Kansei.Color.glassBorder, note: "发丝分隔线 · UIColor.separator"),
+            SWatch(name: "fill", color: Kansei.Color.glassLight, note: "通用填充 · tertiarySystemFill"),
+            SWatch(name: "tintSoft", color: Kansei.Color.ambient, note: "强调色淡底（选中胶囊）")
         ]
     }
 
     private var semanticTokens: [SWatch] {
         [
-            SWatch(name: "tint", color: DS.Palette.tint, note: "唯一强调色 · 系统蓝 #007AFF / #0A84FF"),
-            SWatch(name: "ok", color: DS.Palette.ok, note: "正常 / 已就绪 · systemGreen"),
-            SWatch(name: "warn", color: DS.Palette.warn, note: "预警 / 需关注 · systemOrange"),
-            SWatch(name: "bad", color: DS.Palette.bad, note: "故障 / 异常 · systemRed"),
-            SWatch(name: "charge", color: DS.Palette.charge, note: "充电 / 电驱状态"),
-            SWatch(name: "labelTertiary", color: DS.Palette.labelTertiary, note: "文字第三级 · 30%")
+            SWatch(name: "tint", color: Kansei.Color.ambient, note: "唯一强调色 · 系统蓝 #007AFF / #0A84FF"),
+            SWatch(name: "ok", color: Kansei.Color.success, note: "正常 / 已就绪 · systemGreen"),
+            SWatch(name: "warn", color: Kansei.Color.warning, note: "预警 / 需关注 · systemOrange"),
+            SWatch(name: "bad", color: Kansei.Color.error, note: "故障 / 异常 · systemRed"),
+            SWatch(name: "charge", color: Kansei.Color.info, note: "充电 / 电驱状态"),
+            SWatch(name: "labelTertiary", color: Kansei.Color.tertiary, note: "文字第三级 · 30%")
         ]
     }
 
@@ -94,20 +95,20 @@ struct DevView: View {
                             .fill(item.color)
                             .frame(width: 28, height: 28)
                             .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(DS.Palette.hairline, lineWidth: DS.Hair.line))
+                                .strokeBorder(Kansei.Color.glassBorder, lineWidth: DS.Hair.line))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.name)
                                 .font(DS.Typo.body)
-                                .foregroundStyle(DS.Palette.label)
+                                .foregroundStyle(Kansei.Color.primary)
                             Text(item.note)
                                 .font(DS.Typo.caption)
-                                .foregroundStyle(DS.Palette.labelSecondary)
+                                .foregroundStyle(Kansei.Color.secondary)
                                 .lineLimit(2)
                         }
                         Spacer(minLength: DS.Space.sm)
                         Text(item.color.hexString())
                             .font(.system(size: 13, design: .monospaced))
-                            .foregroundStyle(DS.Palette.labelSecondary)
+                            .foregroundStyle(Kansei.Color.secondary)
                     }
                     .padding(.vertical, 6)
                     .accessibilityElement(children: .combine)
@@ -142,12 +143,12 @@ struct DevView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(token.sample)
                             .font(token.font)
-                            .foregroundStyle(DS.Palette.label)
+                            .foregroundStyle(Kansei.Color.primary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
                         Text("\(token.name) · \(token.metrics)")
                             .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(DS.Palette.labelSecondary)
+                            .foregroundStyle(Kansei.Color.secondary)
                     }
                     .padding(.vertical, 6)
                     .accessibilityElement(children: .combine)

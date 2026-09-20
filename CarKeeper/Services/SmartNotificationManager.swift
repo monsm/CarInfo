@@ -12,35 +12,35 @@ enum NotificationType: String, CaseIterable {
     case serviceDue = "service_due"
     case tripComplete = "trip_complete"
     case dndDriving = "dnd_driving"
-    
+
     var soundName: String { "carkeeper_alert.aiff" }
     var category: String { rawValue }
 }
 
 class SmartNotificationManager: ObservableObject {
     static let shared = SmartNotificationManager()
-    
+
     private let center = UNUserNotificationCenter.current()
-    
+
     // 充电相关
     var chargeLowThreshold: Int = 20
     var chargeFullNotifyEnabled: Bool = true
     var chargeLowNotifyEnabled: Bool = true
-    
+
     // 胎压相关
     var tirePressureAlertEnabled: Bool = true
     var tirePressureLowThreshold: Double = 2.0
     var tirePressureHighThreshold: Double = 3.2
-    
+
     // 保养相关
     var serviceRemindersEnabled: Bool = true
-    
+
     // DND 驾驶模式
     var dndEnabled: Bool = false
     var dndSpeedThreshold: Double = 30.0
-    
+
     private init() {}
-    
+
     func requestAuthorization() async -> Bool {
         do {
             try await center.requestAuthorization(options: [.alert, .sound, .badge])
@@ -49,7 +49,7 @@ class SmartNotificationManager: ObservableObject {
             return false
         }
     }
-    
+
     func registerCategories() {
         let chargeActions = [
             UNNotificationAction(identifier: "ACTION_CHARGE_NOW", title: "立即充电", options: [.foreground]),
@@ -57,7 +57,7 @@ class SmartNotificationManager: ObservableObject {
         ]
         let tireAction = UNNotificationAction(identifier: "ACTION_CHECK_TIRES", title: "查看胎压", options: [.foreground])
         let dndAction = UNNotificationAction(identifier: "ACTION_TOGGLE_DND", title: "关闭勿扰", options: [])
-        
+
         let chargeCategory = UNNotificationCategory(
             identifier: NotificationType.chargeLow.category,
             actions: chargeActions, intentIdentifiers: [],
@@ -73,10 +73,10 @@ class SmartNotificationManager: ObservableObject {
             actions: [dndAction], intentIdentifiers: [],
             options: []
         )
-        
+
         center.setNotificationCategories([chargeCategory, tireCategory, dndCategory])
     }
-    
+
     func sendNotification(
         type: NotificationType,
         title: String,
@@ -91,7 +91,7 @@ class SmartNotificationManager: ObservableObject {
         content.categoryIdentifier = type.category
         content.sound = .default
         content.userInfo = userInfo
-        
+
         let request = UNNotificationRequest(
             identifier: "\(type.rawValue)_\(UUID().uuidString)",
             content: content,
@@ -99,7 +99,7 @@ class SmartNotificationManager: ObservableObject {
         )
         center.add(request)
     }
-    
+
     // N15 智能充电提醒
     func checkChargeNotification(soc: Int?, charging: Bool?, lastCheck: Date?) {
         guard let soc = soc, charging != true else { return }
@@ -116,7 +116,7 @@ class SmartNotificationManager: ObservableObject {
             return
         }
     }
-    
+
     // N19 充电完成通知
     func notifyChargeComplete(soc: Int, range: Int) {
         guard UserDefaults.standard.bool(forKey: "carkeeper_charge_complete_notify") else { return }
@@ -127,7 +127,7 @@ class SmartNotificationManager: ObservableObject {
             userInfo: ["action": "charge_complete"]
         )
     }
-    
+
     // N16 胎压异常推送
     func checkTirePressure(tirePressures: [String: Double]?) {
         guard let pressures = tirePressures, tirePressureAlertEnabled else { return }
@@ -144,7 +144,7 @@ class SmartNotificationManager: ObservableObject {
             userInfo: ["anomalies": anomalies.map { "\($0.name):\($0.pressure)" }]
         )
     }
-    
+
     // N17 保养到期双重提醒
     func checkServiceDue(nextDate: Date?) {
         guard let next = nextDate, serviceRemindersEnabled else { return }
@@ -152,7 +152,7 @@ class SmartNotificationManager: ObservableObject {
         let sevenDays = cal.date(byAdding: .day, value: 7, to: Date())!
         let today = cal.startOfDay(for: Date())
         let nextDay = cal.startOfDay(for: next)
-        
+
         if nextDay >= today && nextDay <= sevenDays {
             let daysLeft = cal.dateComponents([.day], from: Date(), to: next).day ?? 0
             sendNotification(
@@ -170,7 +170,7 @@ class SmartNotificationManager: ObservableObject {
             )
         }
     }
-    
+
     // N18 行程结束摘要
     func notifyTripComplete(distanceKm: Double, energyKWh: Double, durationMin: Double, socStart: Int, socEnd: Int) {
         let savings = energyKWh * 0.6
@@ -184,7 +184,7 @@ class SmartNotificationManager: ObservableObject {
             ]
         )
     }
-    
+
     // N20 DND 驾驶模式
     func enableDDrivingMode() {
         dndEnabled = true
@@ -196,7 +196,7 @@ class SmartNotificationManager: ObservableObject {
             userInfo: ["action": "toggle_dnd"]
         )
     }
-    
+
     func disableDDrivingMode() {
         dndEnabled = false
         UserDefaults.standard.set(false, forKey: "carkeeper_dnd_mode")
@@ -209,7 +209,7 @@ extension AppStore {
         get { UserDefaults.standard.object(forKey: "carkeeper_last_charge_alert") as? Date }
         set { UserDefaults.standard.set(newValue, forKey: "carkeeper_last_charge_alert") }
     }
-    
+
     func checkNotificationsIfNeeded() {
         let notif = SmartNotificationManager.shared
         // ⚠️ 报文里没有 car["energy"] 这种嵌套结构（小程序也是从 charge / control 现算），
@@ -218,9 +218,9 @@ extension AppStore {
 
         let soc = VM.energy(caches, car).socPct
         let charging = isCharging
-        
+
         notif.checkChargeNotification(soc: soc, charging: charging, lastCheck: lastChargeAlertTime)
-        
+
         if let nextDate = UserDefaults.standard.object(forKey: "carkeeper_next_service_date") as? Date {
             notif.checkServiceDue(nextDate: nextDate)
         }

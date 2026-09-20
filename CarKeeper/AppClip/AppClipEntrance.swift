@@ -16,7 +16,7 @@ struct AppClipEntranceView: View {
     @State private var hasError = false
     @State private var showMainApp = false
     @State private var carData: [String: Any]? = nil
-    
+
     var body: some View {
         ZStack {
             // 背景渐变
@@ -26,7 +26,7 @@ struct AppClipEntranceView: View {
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
-            
+
             VStack(spacing: 24) {
                 // Logo
                 ZStack {
@@ -38,11 +38,11 @@ struct AppClipEntranceView: View {
                         .font(.system(size: 36))
                         .foregroundStyle(.white)
                 }
-                
+
                 Text("CarKeeper").font(.system(size: 24, weight: .bold)).foregroundStyle(.white)
                 Text("扫码车牌，快速查看车辆状态").font(.system(size: 14)).foregroundStyle(.white.opacity(0.7))
                     .multilineTextAlignment(.center)
-                
+
                 // 车牌输入框
                 HStack(spacing: 12) {
                     Image(systemName: "creditcard.fill").font(.title3).foregroundStyle(Color.accentColor)
@@ -62,13 +62,13 @@ struct AppClipEntranceView: View {
                 .padding(.vertical, 14)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1))
-                
+
                 // 加载状态
                 if isLoading {
                     ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
                     Text("正在查询车辆信息...").font(.system(size: 13)).foregroundStyle(.white.opacity(0.6))
                 }
-                
+
                 // 错误提示
                 if hasError {
                     Text("未找到该车辆，请检查车牌号或下载完整 App")
@@ -77,7 +77,7 @@ struct AppClipEntranceView: View {
                         .padding(.vertical, 10)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
                 }
-                
+
                 // 主要操作按钮
                 Button {
                     isLoading = true
@@ -99,7 +99,7 @@ struct AppClipEntranceView: View {
                         .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
                         .foregroundStyle(Color.accentColor)
                 }
-                
+
                 // 已有账号？打开完整 App
                 Button {
                     showMainApp = true
@@ -108,9 +108,9 @@ struct AppClipEntranceView: View {
                         .font(.system(size: 15))
                         .foregroundStyle(.white.opacity(0.6))
                 }
-                
+
                 Spacer()
-                
+
                 // 功能说明
                 VStack(spacing: 12) {
                     FeatureItem(icon: "battery.100", label: "实时电量")
@@ -130,7 +130,7 @@ struct AppClipEntranceView: View {
 struct FeatureItem: View {
     let icon: String
     let label: String
-    
+
     var body: some View {
         HStack(spacing: 10) {
             // 注：AppClip target 不包含 Design/Theme.swift，用不了 SafeSymbol 兜底，
@@ -169,7 +169,7 @@ class CarClipAppDelegate: NSObject, UIApplicationDelegate {
         }
         return true
     }
-    
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         return true
     }
