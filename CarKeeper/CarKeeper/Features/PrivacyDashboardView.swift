@@ -38,11 +38,11 @@ struct PrivacyDashboardView: View {
         (
             title: "设置偏好",
             items: [
-                ("夜间模式", UserDefaults.standard.object(forKey: "carkeeper_force_dark_mode" != nil ? "自定义" : "跟随系统",
+                ("夜间模式", UserDefaults.standard.object(forKey: "carkeeper_force_dark_mode") != nil ? "自定义" : "跟随系统",
                  "UserDefaults"),
                 ("卡片排序", "\(store.cardOrder.count) 个自定义", "UserDefaults"),
-                ("语言", Locale.current.language.languageCode?.identifier ?? "zh", "UserDefaults")
-            ]
+                ("语言", Locale.current.language.languageCode?.identifier ?? "zh", "UserDefaults"),
+                ]
         )
     ]
     }
