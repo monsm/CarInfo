@@ -107,8 +107,9 @@ struct ExportDataView: View {
             let first = store.tripHistory.first
             return [
                 "时间,里程(km),能耗(kWh/100km),开始SOC,结束SOC",
-                first.map { "\($0.startTime),\($0.distanceKm),\($0.avgEfficiency ?? 0),\($0.startSoc)\
-($0.endSoc)" } ?? "暂无数据"
+                first.map { row in
+                    "\(row.startTime),\(row.distanceKm),\(row.avgEfficiency ?? 0),\(row.startSoc), \(row.endSoc)"
+                } ?? "暂无数据"
             ]
         case .charging:
             return [

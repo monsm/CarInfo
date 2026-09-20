@@ -806,31 +806,31 @@ struct CarTopView: View {
             var outline = Path()
             outline.move(to: CGPoint(x: 160, y: 26))
             outline.addCurve(to: CGPoint(x: 254, y: 50),
-            outline            control1: CGPoint(x: 206, y: 26),
-            outline            control2: CGPoint(x: 240, y: 34))
+            control1: CGPoint(x: 206, y: 26),
+            control2: CGPoint(x: 240, y: 34))
             outline.addCurve(to: CGPoint(x: 267, y: 96),
-            outline            control1: CGPoint(x: 264, y: 61),
-            outline            control2: CGPoint(x: 267, y: 76))
+            control1: CGPoint(x: 264, y: 61),
+            control2: CGPoint(x: 267, y: 76))
             outline.addLine(to: CGPoint(x: 267, y: 250))
             outline.addCurve(to: CGPoint(x: 254, y: 312),
-            outline            control1: CGPoint(x: 267, y: 282),
-            outline            control2: CGPoint(x: 264, y: 300))
+            control1: CGPoint(x: 267, y: 282),
+            control2: CGPoint(x: 264, y: 300))
             outline.addCurve(to: CGPoint(x: 160, y: 336),
-            outline            control1: CGPoint(x: 240, y: 328),
-            outline            control2: CGPoint(x: 206, y: 336))
+            control1: CGPoint(x: 240, y: 328),
+            control2: CGPoint(x: 206, y: 336))
             outline.addCurve(to: CGPoint(x: 66, y: 312),
-            outline            control1: CGPoint(x: 114, y: 336),
-            outline            control2: CGPoint(x: 80, y: 328))
+            control1: CGPoint(x: 114, y: 336),
+            control2: CGPoint(x: 80, y: 328))
             outline.addCurve(to: CGPoint(x: 53, y: 250),
-            outline            control1: CGPoint(x: 56, y: 300),
-            outline            control2: CGPoint(x: 53, y: 282))
+            control1: CGPoint(x: 56, y: 300),
+            control2: CGPoint(x: 53, y: 282))
             outline.addLine(to: CGPoint(x: 53, y: 96))
             outline.addCurve(to: CGPoint(x: 66, y: 50),
-            outline            control1: CGPoint(x: 53, y: 76),
-            outline            control2: CGPoint(x: 56, y: 61))
+            control1: CGPoint(x: 53, y: 76),
+            control2: CGPoint(x: 56, y: 61))
             outline.addCurve(to: CGPoint(x: 160, y: 26),
-            outline            control1: CGPoint(x: 80, y: 34),
-            outline            control2: CGPoint(x: 114, y: 26))
+            control1: CGPoint(x: 80, y: 34),
+            control2: CGPoint(x: 114, y: 26))
             outline.closeSubpath()
             ctx.stroke(xf(outline), with: .color(Kansei.Color.primary.opacity(0.85)),
                        style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
@@ -839,11 +839,11 @@ struct CarTopView: View {
             var windshield = Path()
             windshield.move(to: CGPoint(x: 84, y: 62))
             windshield.addCurve(to: CGPoint(x: 160, y: 42),
-            windshield            control1: CGPoint(x: 100, y: 48),
-            windshield            control2: CGPoint(x: 128, y: 42))
+            control1: CGPoint(x: 100, y: 48),
+            control2: CGPoint(x: 128, y: 42))
             windshield.addCurve(to: CGPoint(x: 236, y: 62),
-            windshield            control1: CGPoint(x: 192, y: 42),
-            windshield            control2: CGPoint(x: 220, y: 48))
+            control1: CGPoint(x: 192, y: 42),
+            control2: CGPoint(x: 220, y: 48))
             windshield.addLine(to: CGPoint(x: 245, y: 84))
             windshield.addLine(to: CGPoint(x: 75, y: 84))
             windshield.closeSubpath()
@@ -857,11 +857,11 @@ struct CarTopView: View {
             rear.move(to: CGPoint(x: 75, y: 278))
             rear.addLine(to: CGPoint(x: 84, y: 316))
             rear.addCurve(to: CGPoint(x: 160, y: 334),
-            rear            control1: CGPoint(x: 100, y: 328),
-            rear            control2: CGPoint(x: 128, y: 334))
+            control1: CGPoint(x: 100, y: 328),
+            control2: CGPoint(x: 128, y: 334))
             rear.addCurve(to: CGPoint(x: 236, y: 316),
-            rear            control1: CGPoint(x: 192, y: 334),
-            rear            control2: CGPoint(x: 220, y: 328))
+            control1: CGPoint(x: 192, y: 334),
+            control2: CGPoint(x: 220, y: 328))
             rear.addLine(to: CGPoint(x: 245, y: 278))
             rear.closeSubpath()
             ctx.stroke(xf(rear), with: .color(Kansei.Color.secondary), style: StrokeStyle(lineWidth: 1.3))

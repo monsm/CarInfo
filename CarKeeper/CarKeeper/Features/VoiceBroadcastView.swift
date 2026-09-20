@@ -29,8 +29,9 @@ class VoiceBroadcastManager: NSObject, ObservableObject {
     // N44 下车打卡语音播报
     func speakCheckOut(distanceKm: Double, energyKWh: Double, socEnd: Int) {
         guard enabled else { return }
-        let msg = "行程结束，本次行驶\(String(format: "%.1f", distanceKm))公里，耗电\(String(format: "%.1f", energyKWh)千
-瓦时，当前电量\(socEnd) percent"
+        let km = String(format: "%.1f", distanceKm)
+        let kwh = String(format: "%.1f", energyKWh)
+        let msg = "行程结束，本次行驶\(km)公里，耗电\(kwh)千瓦时，当前电量\(socEnd)%"
         speak(msg)
     }
 

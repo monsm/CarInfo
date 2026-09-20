@@ -176,10 +176,19 @@ struct EnergyGaugeView: View {
     var body: some View {
         ZStack {
             // 背景弧
-            RadiusArc(startAngle: .degrees(-225), endAngle: .degrees(45), color: .secondary.opacity(0.2), lineWidth: 12)
+            RadiusArc(
+                startAngle: .degrees(-225),
+                endAngle: .degrees(45),
+                color: .secondary.opacity(0.2),
+                lineWidth: 12
+            )
             // 进度弧
-            RadiusArc(startAngle: .degrees(-225), endAngle: .degrees(45 + (rate / 40.0) * 270), color: colorl
-ineWidth: 12)
+            RadiusArc(
+                startAngle: .degrees(-225),
+                endAngle: .degrees(45 + (rate / 40.0) * 270),
+                color: color,
+                lineWidth: 12
+            )
                 .animation(.easeOut(duration: 0.5), value: rate)
 
             VStack {
@@ -214,7 +223,7 @@ struct RadiusArc: View {
                     let start = point(onCircle: center, radius: radius, angle: startAngle)
                     let end = point(onCircle: center, radius: radius, angle: endAngle)
                     path.move(to: start)
-                    path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAnglec
+                    path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle,
 lockwise: false)
                 }
                 .fill(color)

@@ -365,7 +365,8 @@ struct MineView: View {
                 HStack(spacing: 10) {
                     tile("exclamationmark.octagon.fill", "紧急求助", tint: .red) { nav.pushNavigation(.emergency) }
                     tile("lightbulb.fill", "车辆提示", tint: .yellow) { nav.pushNavigation(.tips) }
-                }                    tile("trophy.fill", "驾驶评分",
+                }
+                    tile("trophy.fill", "驾驶评分",
                           tint: Kansei.Color.ambient) { nav.pushNavigation(.score) }
             }
         }

@@ -1010,28 +1010,28 @@ struct CarStageView: View {
             var silhouette = Path()
             silhouette.move(to: CGPoint(x: 24, y: 150))
             silhouette.addCurve(to: CGPoint(x: 50, y: 128),
-            silhouette                control1: CGPoint(x: 24, y: 136),
-            silhouette                control2: CGPoint(x: 34, y: 131))
+            control1: CGPoint(x: 24, y: 136),
+            control2: CGPoint(x: 34, y: 131))
             silhouette.addCurve(to: CGPoint(x: 178, y: 86),
-            silhouette                control1: CGPoint(x: 76, y: 106),
-            silhouette                control2: CGPoint(x: 122, y: 90))
+            control1: CGPoint(x: 76, y: 106),
+            control2: CGPoint(x: 122, y: 90))
             silhouette.addCurve(to: CGPoint(x: 322, y: 118),
-            silhouette                control1: CGPoint(x: 238, y: 82),
-            silhouette                control2: CGPoint(x: 292, y: 96))
+            control1: CGPoint(x: 238, y: 82),
+            control2: CGPoint(x: 292, y: 96))
             silhouette.addCurve(to: CGPoint(x: 380, y: 137),
-            silhouette                control1: CGPoint(x: 350, y: 122),
-            silhouette                control2: CGPoint(x: 372, y: 128))
+            control1: CGPoint(x: 350, y: 122),
+            control2: CGPoint(x: 372, y: 128))
             silhouette.addCurve(to: CGPoint(x: 387, y: 151),
-            silhouette                control1: CGPoint(x: 385, y: 142),
-            silhouette                control2: CGPoint(x: 387, y: 146))
+            control1: CGPoint(x: 385, y: 142),
+            control2: CGPoint(x: 387, y: 146))
             silhouette.addLine(to: CGPoint(x: 387, y: 156))
             silhouette.addCurve(to: CGPoint(x: 376, y: 164),
-            silhouette                control1: CGPoint(x: 387, y: 161),
-            silhouette                control2: CGPoint(x: 383, y: 164))
+            control1: CGPoint(x: 387, y: 161),
+            control2: CGPoint(x: 383, y: 164))
             silhouette.addLine(to: CGPoint(x: 36, y: 164))
             silhouette.addCurve(to: CGPoint(x: 24, y: 156),
-            silhouette                control1: CGPoint(x: 28, y: 164),
-            silhouette                control2: CGPoint(x: 24, y: 161))
+            control1: CGPoint(x: 28, y: 164),
+            control2: CGPoint(x: 24, y: 161))
             silhouette.closeSubpath()
             ctx.fill(xf(silhouette), with: .color(body))
 
@@ -1039,11 +1039,11 @@ struct CarStageView: View {
             var roof = Path()
             roof.move(to: CGPoint(x: 52, y: 142))
             roof.addCurve(to: CGPoint(x: 178, y: 92),
-            roof                control1: CGPoint(x: 78, y: 112),
-            roof                control2: CGPoint(x: 124, y: 96))
+            control1: CGPoint(x: 78, y: 112),
+            control2: CGPoint(x: 124, y: 96))
             roof.addCurve(to: CGPoint(x: 320, y: 122),
-            roof                control1: CGPoint(x: 234, y: 88),
-            roof                control2: CGPoint(x: 288, y: 100))
+            control1: CGPoint(x: 234, y: 88),
+            control2: CGPoint(x: 288, y: 100))
             ctx.stroke(xf(roof), with: .color(Color.white.opacity(0.55)),
                        style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
 
@@ -1051,19 +1051,19 @@ struct CarStageView: View {
             var waist = Path()
             waist.move(to: CGPoint(x: 30, y: 132))
             waist.addCurve(to: CGPoint(x: 384, y: 140),
-            waist                control1: CGPoint(x: 120, y: 124),
-            waist                control2: CGPoint(x: 300, y: 124))
+            control1: CGPoint(x: 120, y: 124),
+            control2: CGPoint(x: 300, y: 124))
             ctx.stroke(xf(waist), with: .color(Color.white.opacity(0.20)), style: StrokeStyle(lineWidth: 1.4))
 
             // 车窗 + 一道斜反光
             var window = Path()
             window.move(to: CGPoint(x: 112, y: 140))
             window.addCurve(to: CGPoint(x: 214, y: 100),
-            window                control1: CGPoint(x: 136, y: 116),
-            window                control2: CGPoint(x: 168, y: 104))
+            control1: CGPoint(x: 136, y: 116),
+            control2: CGPoint(x: 168, y: 104))
             window.addCurve(to: CGPoint(x: 302, y: 120),
-            window                control1: CGPoint(x: 252, y: 97),
-            window                control2: CGPoint(x: 280, y: 104))
+            control1: CGPoint(x: 252, y: 97),
+            control2: CGPoint(x: 280, y: 104))
             window.addLine(to: CGPoint(x: 286, y: 140))
             window.closeSubpath()
             ctx.fill(xf(window), with: .color(Color(white: 0.02)))
@@ -1071,8 +1071,8 @@ struct CarStageView: View {
             var glass = Path()
             glass.move(to: CGPoint(x: 126, y: 136))
             glass.addCurve(to: CGPoint(x: 214, y: 103),
-            glass                control1: CGPoint(x: 148, y: 114),
-            glass                control2: CGPoint(x: 178, y: 106))
+            control1: CGPoint(x: 148, y: 114),
+            control2: CGPoint(x: 178, y: 106))
             glass.addLine(to: CGPoint(x: 200, y: 133))
             glass.closeSubpath()
             ctx.fill(xf(glass), with: .color(Color.white.opacity(0.16)))
@@ -1140,8 +1140,8 @@ struct CarStageView: View {
             var head = Path()
             head.move(to: CGPoint(x: 370, y: 128))
             head.addCurve(to: CGPoint(x: 387, y: 142),
-            head                control1: CGPoint(x: 378, y: 131),
-            head                control2: CGPoint(x: 384, y: 136))
+            control1: CGPoint(x: 378, y: 131),
+            control2: CGPoint(x: 384, y: 136))
             ctx.drawLayer { layer in
                 layer.addFilter(.blur(radius: 8))
                 layer.opacity = 0.55

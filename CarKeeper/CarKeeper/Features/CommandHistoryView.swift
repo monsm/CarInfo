@@ -58,8 +58,8 @@ struct CommandHistoryView: View {
     private var statsCard: some View {
         HStack(spacing: 0) {
             statBubble(label: "总指令", value: "\(store.commandHistory.count)", tint: .blue)
-            statBubble(label: "成功率", value: successRate > 0 ? String(format: "%.0f%%", successRate * 100:
- "—", tint: .green)
+            let rateStr = successRate > 0 ? String(format: "%.0f%%", successRate * 100) : "—"
+            statBubble(label: "成功率", value: rateStr, tint: .green)
             statBubble(label: "进行中", value: "\(inProgressCount)", tint: .orange)
         }
         .glassCard(corner: Kansei.Radius.medium)

@@ -107,8 +107,8 @@ struct TripDetailView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text(DurationFormatter.string(from: max((trip.endTime ?? Date().
-timeIntervalSince(trip.startTime), 1)))
+                    Text(DurationFormatter.string(
+                        from: max((trip.endTime ?? Date()).timeIntervalSince(trip.startTime), 1)))
                         .font(Kansei.Type.caption)
                         .foregroundStyle(.secondary)
                     Text(trip.startTime, style: .date)
@@ -259,7 +259,14 @@ timeIntervalSince(trip.startTime), 1)))
                 Text("驾驶行为")
                     .font(Theme.font(.subheadline as Font).bold())
                 Spacer()
-                Text(DurationFormatter.string(from: max((trip.endTime ?? Date()).timeIntervalSince(trip.startTime), 1)))
+                Text(
+                    DurationFormatter.string(
+                        from: max(
+                            (trip.endTime ?? Date()).timeIntervalSince(trip.startTime),
+                            1
+                        )
+                    )
+                )
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

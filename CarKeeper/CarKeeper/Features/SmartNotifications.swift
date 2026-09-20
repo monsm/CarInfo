@@ -40,10 +40,11 @@ class PreChargeReminder: ObservableObject {
         content.body = "将在\(minutesBefore)分钟后充满，请准备离店"
         content.sound = .default
 
-        let trigger = UNCalendarNotificationTrigger(dateMatching: Calendar.current.dateComponents([.year.
-month, .day, .hour, .minute], from: triggerTime), repeats: false)
-        let request = UNNotificationRequest(identifier: "charge_reminder_\(UUID().uuidString)"c
-ontent: content, trigger: trigger)
+        let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: triggerTime)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "charge_reminder_\(UUID().uuidString)",
+            content: content, trigger: trigger)
         UNUserNotificationCenter.current().add(request)
     }
 }

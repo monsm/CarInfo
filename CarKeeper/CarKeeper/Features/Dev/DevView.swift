@@ -67,8 +67,8 @@ struct DevView: View {
         [
             SWatch(name: "canvas", color: Kansei.Color.background, note: "页面画布 · systemGroupedBackground"),
             SWatch(name: "surface", color: Kansei.Color.nightSurface, note: "分组表面 · secondarySystemGroupedBackground"),
-            SWatch(name: "surfaceRaised", color: Kansei.Color.nightSurface, note: "内凹表面 ·
- tertiarySystemGroupedBackground"),
+            SWatch(name: "surfaceRaised", color: Kansei.Color.nightSurface,
+                    note: "内凹表面 · tertiarySystemGroupedBackground"),
             SWatch(name: "hairline", color: Kansei.Color.glassBorder, note: "发丝分隔线 · UIColor.separator"),
             SWatch(name: "fill", color: Kansei.Color.glassLight, note: "通用填充 · tertiarySystemFill"),
             SWatch(name: "tintSoft", color: Kansei.Color.ambient, note: "强调色淡底（选中胶囊）")
