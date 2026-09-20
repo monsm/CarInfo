@@ -582,7 +582,10 @@ struct ChargingLockScreenView: View {
 // MARK: - 扩展入口
 // =============================================================================
 
-/// ⚠️ 类名必须与 Widgets/Info.plist 的 NSExtensionPrincipalClass 一致
+/// 扩展入口。WidgetKit 的入口**只由这个 `@main` 决定**，
+/// Info.plist 里**不能**声明 NSExtensionPrincipalClass / NSExtensionMainStoryboard
+/// （声明了安装会被直接拒绝：AppexBundleContainsClassOrStoryboard）。
+/// 所以：改这里的类型名是安全的，不需要同步改任何 plist。
 @main
 struct CarKeeperWidgetBundle: WidgetBundle {
     var body: some Widget {

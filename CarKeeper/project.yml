@@ -100,9 +100,18 @@ targets:
     info:
       path: Widgets/Info.plist
       properties:
+        # ⚠️ WidgetKit 扩展点**只允许** NSExtensionPointIdentifier 这一个键。
+        # 千万不要加 NSExtensionPrincipalClass / NSExtensionMainStoryboard ——
+        # 安装时会直接被拒（这不是警告，是装不上）：
+        #   AppexBundleContainsClassOrStoryboard (… WidgetBundle.appex … defines either
+        #   an NSExtensionMainStoryboard or NSExtensionPrincipalClass key, which is not
+        #   allowed for the extension point com.apple.widgetkit-extension)
+        # 小组件的入口是代码里的 `@main struct CarKeeperWidgetBundle: WidgetBundle`，
+        # 不需要（也不允许）在 plist 里再声明一次。
+        # （CarPlay 那个 target 是另一回事：com.apple.carplay.app-service 确实需要
+        #   PrincipalClass，所以它那里保留。）
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
-          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).CarKeeperWidgetBundle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper.widget
@@ -113,6 +122,9 @@ targets:
         # 扩展要读 App 写在同一 App Group 里的快照，没有这份 entitlements 就只能读到 0
         CODE_SIGN_ENTITLEMENTS: Widgets/Widgets.entitlements
         TARGETED_DEVICE_FAMILY: 1,2
+        # 这个扩展不做任何网络请求（只读 App 写进 App Group 的快照），
+        # 所以不声明 NSAppTransportSecurity —— 少一个键就少一处需要维护的差异。
+        # 若将来小组件要自己联网（例如 AppIntent 里拉车况），在这里补回 ATS 并说明用途。
     # 这里原来写的是「扩展依赖 App」—— 方向反了：
     #   · 扩展无法 import App 模块（东西拿不到），
     #   · 而且 App 现在依赖本目标，两边互指会构成依赖循环。
