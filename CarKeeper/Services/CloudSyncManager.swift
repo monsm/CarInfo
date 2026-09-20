@@ -8,21 +8,31 @@ import CloudKit
 class CloudSyncManager: ObservableObject {
     static let shared = CloudSyncManager()
     
-    /// iCloud 能力探测。
+    /// iCloud 容器标识符（必须与签名时使用的 iCloud 容器完全一致）。
+    static let containerIdentifier = "iCloud.com.you.CarKeeper"
+
+    /// CloudKit 总开关，读取 Info.plist 的 `CKCloudKitEnabled`，默认 **false**。
     ///
     /// ⚠️ `CKContainer(identifier:)` 在 entitlements 里没有该容器标识符时，会抛出一个 Swift
     /// 无法捕获的 ObjC 异常（"The application's entitlements do not include the … container
     /// identifier"），进程当场被杀 —— 表现就是「安装后点图标直接闪退」。
-    /// CI 的未签名构建（CODE_SIGNING_ALLOWED=NO）和用免费证书/侧载工具重签的包都没有 iCloud
-    /// 能力，所以必须先探测、再构造容器。缺少 iCloud 能力或未登录 iCloud 时该探测只返回 nil，
-    /// 不会抛异常。
+    ///
+    /// CI 的未签名构建（CODE_SIGNING_ALLOWED=NO）和用免费证书/侧载工具重签的包都拿不到
+    /// iCloud 能力，所以这里默认关闭，并且只用构建配置来判断：`ubiquityIdentityToken` 在没有
+    /// entitlement 时是否一定返回 nil 并无稳定保证，把它当作唯一依据仍可能再次踩到同一个崩溃。
+    /// 只有用带 iCloud 容器的证书正式签名后，才把 Info.plist 的该键改成 true。
+    static let isCloudKitProvisioned: Bool =
+        (Bundle.main.object(forInfoDictionaryKey: "CKCloudKitEnabled") as? Bool) ?? false
+
+    /// 当前是否真的能用 CloudKit：本包被授权 + 用户已登录 iCloud。
     static var isCloudKitEntitled: Bool {
-        FileManager.default.ubiquityIdentityToken != nil
+        guard isCloudKitProvisioned else { return false }
+        return FileManager.default.ubiquityIdentityToken != nil
     }
 
     private lazy var container: CKContainer? = {
         guard Self.isCloudKitEntitled else { return nil }
-        return CKContainer(identifier: "iCloud.com.you.CarKeeper")
+        return CKContainer(identifier: Self.containerIdentifier)
     }()
     private lazy var publicDB: CKDatabase? = container?.publicCloudDatabase
     

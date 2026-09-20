@@ -31,6 +31,20 @@
     </array>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>用于显示车辆当前位置</string>
+    <key>NSCameraUsageDescription</key>
+    <string>用于拍摄车辆照片</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>用于选择车辆照片</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>用于保存车辆照片到相册</string>
+    <key>NSFaceIDUsageDescription</key>
+    <string>用于验证身份后访问敏感信息</string>
+    <key>NSHealthShareUsageDescription</key>
+    <string>用于读取健康数据换算碳减排</string>
+    <key>NSHealthUpdateUsageDescription</key>
+    <string>用于把碳减排数据写入健康 App</string>
+    <key>CKCloudKitEnabled</key>
+    <false/>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>

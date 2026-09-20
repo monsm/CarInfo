@@ -42,6 +42,17 @@ targets:
           CFBundleURLSchemes:
           - carkeeper
         NSLocationWhenInUseUsageDescription: 用于显示车辆当前位置
+        # 以下是实际调用了对应 API 就必须存在的键，缺失会直接杀进程（不是报错）
+        NSCameraUsageDescription: 用于拍摄车辆照片
+        NSPhotoLibraryUsageDescription: 用于选择车辆照片
+        NSPhotoLibraryAddUsageDescription: 用于保存车辆照片到相册
+        NSFaceIDUsageDescription: 用于验证身份后访问敏感信息
+        NSHealthShareUsageDescription: 用于读取健康数据换算碳减排
+        NSHealthUpdateUsageDescription: 用于把碳减排数据写入健康 App
+        # iCloud/CloudKit 总开关：未签名构建与侧载重签的包都没有 iCloud entitlement，
+        # 构造 CKContainer 会抛出 Swift 无法捕获的 ObjC 异常并直接杀进程（表现为启动闪退）。
+        # 只有用带 iCloud 容器的证书签名时才把它改成 true。
+        CKCloudKitEnabled: false
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
         UISupportedInterfaceOrientations:
@@ -188,8 +199,11 @@ targets:
         NSAppClip:
           NSAppClipRequestEphemeralUserNotification: false
           NSAppClipRequestLocationConfirmation: false
-        CFBundleURLSchemes:
-        - carkeeper-clip
+        # 与主 app 同理：URL scheme 必须挂在 CFBundleURLTypes 下，裸键无效
+        CFBundleURLTypes:
+        - CFBundleURLName: com.you.CarKeeper.clip
+          CFBundleURLSchemes:
+          - carkeeper-clip
         CFBundleShortVersionString: '1.0'
         CFBundleVersion: '1'
     settings:
