@@ -37,22 +37,24 @@ struct DashboardView: View {
                     DashTile(icon: "thermometer", label: "温度", value: comfortModel.cabinTemp, color: .orange)
                 }
                 
-                // 能耗图表
-                let history = store.energyHistory
-                if !history.isEmpty {
-                    let last = Array(history.prefix(7))
-                    Chart {
-                        ForEach(last.indices, id: \.self) { i in
-                            LineMark(
-                                x: .value("日期", last[i].timestamp),
-                                y: .value("SOC", Double(last[i].soc))
-                            )
-                            .lineStyle(StrokeStyle(lineWidth: 2))
-                            .foregroundStyle(Theme.Colors.accent)
-                        }
-                    }
-                    .frame(height: 150)
-                    .glassCard()
+                // SOC 历史（真实车端采样）
+                // 这里原来是 `store.energyHistory.prefix(7)` 画的"日期"轴曲线 ——
+                // 但 energyHistory 只是 20 条 / 60 秒的实时缓冲，7 个点全在同一分钟内，
+                // 图上写的"日期"根本不成立。现在读 HistoryStore 的真实采样。
+                let socPoints = HistoryStore.shared.socSeries(hours: 24 * 7)
+                    .map { DSTrendChart.Point(t: $0.t, v: $0.v) }
+                if socPoints.count >= 2 {
+                    DSTrendChart(points: socPoints,
+                                 unit: "%",
+                                 tint: DS.Palette.tint,
+                                 yDomain: 0...100,
+                                 valueText: { String(format: "%.0f", $0) })
+                } else {
+                    DSTrendEmpty(
+                        icon: "chart.xyaxis.line",
+                        title: "正在积累 SOC 数据",
+                        message: "服务端没有历史接口，曲线由 App 每 \(Int(HistoryStore.socInterval / 60)) 分钟采样一次。已记录 \(socPoints.count) 个点。"
+                    )
                 }
                 
                 // 驾驶评分

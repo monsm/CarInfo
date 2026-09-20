@@ -1,27 +1,31 @@
 import SwiftUI
 import Foundation
 
-// 消息中心：日期分组 + 就地展开详情 + 未读计数
+// =============================================================================
+//  消息 —— v4 信息架构
+// =============================================================================
+//  ① 搜索交给系统：.searchable（iOS 的消息搜索本来就长在那里）
+//  ② 筛选是「全部 / 未读」一个分段控件 + 标签胶囊，不再用两个语义不明的图标按钮
+//  ③ 列表按天分组：分组标题在画布上、行在分组表面上、行间发丝线
+//  ④ 行是邮件式排版：未读点 + 标题（未读加粗）+ 时间 + 正文两行 + 可展开明细
+//     阅读状态不再只靠颜色：未读有圆点，标题字重也不同（颜色 + 字重双通道）。
+// =============================================================================
+
 struct MessagesView: View {
     private let store = AppStore.shared
     @State private var items: [MessageItem] = []
     @State private var loading = true
     @State private var expanded: Set<String> = []
     @State private var loadTask: Task<Void, Never>? = nil
-    @State private var isRefreshing = false            // 下拉刷新进行中标志
-    // #NEW-5 搜索和筛选
     @State private var searchText = ""
     @State private var filterTag: String? = nil
     @State private var showUnreadOnly = false
-    @EnvironmentObject var nav: NavState                // C3: 用于 pushNavigation
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @EnvironmentObject var nav: NavState
 
     // 本地已读持久化（无服务端 mark-read 接口，用 UserDefaults 记已读消息 ID）。
     private static let readKey = "changan_read_message_ids"
     private static var localRead: Set<String> {
-        get {
-            Set(UserDefaults.standard.stringArray(forKey: readKey) ?? [])
-        }
+        get { Set(UserDefaults.standard.stringArray(forKey: readKey) ?? []) }
         set { UserDefaults.standard.set(Array(newValue), forKey: readKey) }
     }
 
@@ -47,107 +51,224 @@ struct MessagesView: View {
 
     var body: some View {
         ScrollView {
-            // #NEW-5 搜索和筛选栏
-            VStack(spacing: 10) {
-                HStack(spacing: 10) {
-                    TextField("搜索消息…", text: $searchText)
-                        .textFieldStyle(.roundedBorder)
-                        .font(Theme.caption)
-                    Button(action: { filterTag = nil }) {
-                        Image(systemName: filterTag != nil ? "xmark.circle.fill" : "line.3.horizontal.decrease")
-                            .font(Theme.caption)
-                            .foregroundStyle(filterTag != nil ? Theme.Colors.accent : .secondary)
-                    }
-                    .accessibilityLabel(Text(filterTag != nil ? "清除筛选" : "按标签筛选"))
-                    Button(action: { showUnreadOnly.toggle() }) {
-                        Image(systemName: showUnreadOnly ? "eye.fill" : "eye.slash.fill")
-                            .font(Theme.caption)
-                            .foregroundStyle(showUnreadOnly ? Theme.Colors.accent : .secondary)
-                    }
-                    .accessibilityLabel(Text(showUnreadOnly ? "显示全部消息" : "仅显示未读"))
-                }
-                // 筛选标签胶囊
-                if !allTags.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            Button(filterTag == nil ? "全部" : allTags.first ?? "全部") {
-                                filterTag = nil
-                            }
-                            .font(Theme.micro.bold())
-                            .padding(.horizontal, 12).padding(.vertical, 5)
-                            .background(filterTag == nil ? Theme.Colors.accent : Color.secondary.opacity(0.15), in: Capsule())
-                            .foregroundStyle(filterTag == nil ? .white : .secondary)
-                            ForEach(allTags.dropFirst(), id: \.self) { tag in
-                                Button(tag) {
-                                    filterTag = filterTag == tag ? nil : tag
-                                }
-                                .font(Theme.micro.bold())
-                                .padding(.horizontal, 12).padding(.vertical, 5)
-                                .background(filterTag == tag ? Theme.Colors.accent : Color.secondary.opacity(0.15), in: Capsule())
-                                .foregroundStyle(filterTag == tag ? .white : .secondary)
-                            }
-                        }
-                    }
-                }
-            }
+            VStack(alignment: .leading, spacing: DS.Space.gap) {
+                filterBar
 
-            if loading {
-                PageLoadingView("正在加载消息…")
-            } else if filteredItems.isEmpty {
-                PageEmptyView("暂无消息", subtitle: searchText.isEmpty ? "车辆暂无推送消息" : "没有找到匹配的消息", icon: "bubble.left.and.bubble.right")
-            } else {
-                LazyVStack(spacing: 10) {
-                    ForEach(Array(filteredGrouped.enumerated()), id: \.offset) { _, group in
-                        Section {
-                            ForEach(group.items) { item in
-                                messageRow(item)
+                if loading {
+                    loadingState
+                } else if filteredItems.isEmpty {
+                    if store.carId.isEmpty {
+                        DSPlaceholder(icon: "bubble.left.and.bubble.right",
+                                      title: "暂无消息",
+                                      message: emptyHint)
+                    } else {
+                        DSPlaceholder(icon: "bubble.left.and.bubble.right",
+                                      title: "暂无消息",
+                                      message: emptyHint,
+                                      actionTitle: "重新加载") { reload() }
+                    }
+                } else {
+                    ForEach(filteredGrouped) { group in
+                        DSGroup(title: group.label,
+                                trailing: group.unread > 0 ? "\(group.unread) 未读" : "\(group.items.count) 条") {
+                            ForEach(Array(group.items.enumerated()), id: \.element.id) { idx, item in
+                                messageRow(item, showsSeparator: idx < group.items.count - 1)
                             }
-                        } header: {
-                            HStack(spacing: 8) {
-                                Text(group.label)
-                                    .font(.headline.bold())
-                                    .foregroundStyle(.secondary)
-                                if group.unread > 0 {
-                                    Text("\(group.unread) 未读")
-                                        .font(Theme.micro.bold())
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 7).padding(.vertical, 2)
-                                        .background(Capsule().fill(Theme.Colors.accent))
-                                }
-                                Spacer()
-                            }
-                            .padding(.top, 6)
                         }
                     }
                 }
-                
             }
-            
+            .padding(.top, DS.Space.sm)
+            .padding(.bottom, DS.Space.xxxl)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground()
         .navigationTitle("消息")
-            .accessibilityLabel(Text("消息"))
-            .accessibilityHint(Text("车辆通知和历史消息列表，支持搜索和筛选"))
+        .navigationBarTitleDisplayMode(.large)
+        .searchable(text: $searchText,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: "搜索标题或内容")
+        .accessibilityLabel(Text("消息"))
+        .accessibilityHint(Text("车辆通知和历史消息，支持搜索、按标签筛选与只看未读"))
         .toolbar {
-            // #NEW-5 全部已读按钮
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    markAllRead()
-                } label: {
-                    Text("全部已读")
-                        .font(Theme.font(.caption as Font).bold())
-                        .foregroundStyle(Theme.Colors.accent)
-                }
-                .accessibilityLabel(Text("全部已读"))
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("全部已读") { markAllRead() }
+                    .font(DS.Typo.subheadline.weight(.semibold))
+                    .foregroundStyle(DS.Palette.tint)
+                    .disabled(items.allSatisfy { $0.read })
+                    .accessibilityLabel(Text("全部标为已读"))
             }
         }
         .onAppear { loadIfNeeded() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
-        .refreshable { isRefreshing = true; await load(); isRefreshing = false }
+        .refreshable { await load() }
     }
 
-    // #NEW-5 过滤后的消息列表
+    // MARK: - 筛选条（分段控件 + 标签胶囊）
+
+    private var filterBar: some View {
+        VStack(alignment: .leading, spacing: DS.Space.sm) {
+            DSSegmented(options: [(value: false, title: "全部"), (value: true, title: "未读")],
+                        selection: $showUnreadOnly)
+                .padding(.top, DS.Space.xs)
+
+            if !allTags.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DS.Space.sm) {
+                        tagChip(nil)
+                        ForEach(allTags, id: \.self) { tag in
+                            tagChip(tag)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
+    private func tagChip(_ tag: String?) -> some View {
+        let selected = filterTag == tag
+        let label = tag ?? "全部标签"
+        return Button {
+            withAnimation(DS.Motion.value) { filterTag = selected ? nil : tag }
+            DSHaptic.select()
+        } label: {
+            Text(label)
+                .font(DS.Typo.footnote.weight(selected ? .semibold : .regular))
+                .foregroundStyle(selected ? DS.Palette.tint : DS.Palette.labelSecondary)
+                .padding(.horizontal, DS.Space.md)
+                .frame(height: 30)
+                .background(Capsule().fill(selected ? DS.Palette.tintSoft : DS.Palette.fillSubtle))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    private var loadingState: some View {
+        VStack(alignment: .leading, spacing: DS.Space.md) {
+            HStack(spacing: DS.Space.sm) {
+                ProgressView().controlSize(.small)
+                Text("正在加载消息…")
+                    .font(DS.Typo.footnote)
+                    .foregroundStyle(DS.Palette.labelSecondary)
+            }
+            DSSkeleton(height: 88)
+            DSSkeleton(height: 88)
+            DSSkeleton(height: 88)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var emptyHint: String {
+        if store.carId.isEmpty { return "请先绑定车辆" }
+        if !searchText.isEmpty { return "没有找到匹配「\(searchText)」的消息" }
+        if showUnreadOnly { return "所有消息都已读" }
+        if let tag = filterTag { return "「\(tag)」标签下没有消息" }
+        return "车辆暂无推送消息"
+    }
+
+    // MARK: - 消息行
+
+    private func messageRow(_ item: MessageItem, showsSeparator: Bool) -> some View {
+        let isOpen = expanded.contains(item.id)
+        return DSGroupRow(showsSeparator: showsSeparator) {
+            Button { toggle(item) } label: {
+                HStack(alignment: .top, spacing: DS.Space.sm) {
+                    Circle()
+                        .fill(item.read ? Color.clear : DS.Palette.tint)
+                        .frame(width: 8, height: 8)
+                        .padding(.top, 6)
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: DS.Space.xs) {
+                        HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
+                            Text(item.title)
+                                .font(.system(size: 17, weight: item.read ? .regular : .semibold))
+                                .foregroundStyle(DS.Palette.label)
+                                .lineLimit(2)
+                            if !item.tag.isEmpty {
+                                Text(item.tag)
+                                    .font(DS.Typo.caption2.weight(.semibold))
+                                    .foregroundStyle(DS.Palette.status(item.tagCls))
+                            }
+                            Spacer(minLength: DS.Space.sm)
+                            Text(shortTime(item.time))
+                                .font(DS.Typo.footnote)
+                                .foregroundStyle(DS.Palette.labelSecondary)
+                            Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(DS.Palette.labelTertiary)
+                        }
+
+                        if !item.body.isEmpty {
+                            Text(item.body)
+                                .font(DS.Typo.subheadline)
+                                .foregroundStyle(DS.Palette.labelSecondary)
+                                .lineLimit(isOpen ? nil : 2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        if isOpen {
+                            VStack(alignment: .leading, spacing: 6) {
+                                if !item.plate.isEmpty { detailRow("car.fill", "车辆", item.plate) }
+                                if !item.location.isEmpty { detailRow("mappin.and.ellipse", "位置", item.location) }
+                                if !item.time.isEmpty { detailRow("clock", "时间", item.time) }
+                                if !item.read { detailRow("envelope.open", "状态", "已标记为已读") }
+                            }
+                            .padding(.top, DS.Space.xs)
+                        }
+                    }
+                }
+                .padding(.vertical, DS.Space.md)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(DSRowButtonStyle())
+            .accessibilityLabel(Text("\(item.read ? "已读" : "未读")，\(item.title)"))
+            .accessibilityHint(Text(isOpen ? "双击收起详情" : "双击展开详情并标记已读"))
+        }
+    }
+
+    private func detailRow(_ icon: String, _ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
+            Image(safeSymbol: icon, fallback: "circle")
+                .font(.system(size: 12))
+                .foregroundStyle(DS.Palette.labelTertiary)
+                .frame(width: 16, alignment: .center)
+            Text(label)
+                .font(DS.Typo.caption)
+                .foregroundStyle(DS.Palette.labelSecondary)
+            Spacer(minLength: DS.Space.sm)
+            Text(value)
+                .font(DS.Typo.caption)
+                .foregroundStyle(DS.Palette.label)
+                .multilineTextAlignment(.trailing)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func toggle(_ item: MessageItem) {
+        withAnimation(DS.Motion.value) {
+            if expanded.contains(item.id) {
+                expanded.remove(item.id)
+            } else {
+                expanded.insert(item.id)
+                markRead(item.id)
+            }
+        }
+        DSHaptic.select()
+    }
+
+    /// "2026-09-19 22:31:05" → "22:31"（列表里只需要时刻，完整时间在展开明细里）
+    private func shortTime(_ t: String) -> String {
+        guard let last = t.split(separator: " ").last else { return t }
+        let parts = last.split(separator: ":")
+        if parts.count >= 2 { return "\(parts[0]):\(parts[1])" }
+        return String(last)
+    }
+
+    // MARK: - 过滤与分组
+
     private var filteredItems: [MessageItem] {
         items.filter { item in
             let matchSearch = searchText.isEmpty ||
@@ -164,50 +285,35 @@ struct MessagesView: View {
         return Array(tags).sorted()
     }
 
-    private var filteredGrouped: [(label: String, items: [MessageItem], unread: Int)] {
-        let map: [String: [MessageItem]] = Dictionary(grouping: filteredItems) { dayKey($0.time) }
-        let dated = map
-            .map { key, its in
-                (label: dayLabel(key), items: its, unread: its.filter { !$0.read }.count,
-                 sortKey: its.first?.time ?? "")
-            }
-            .filter { $0.label != "更早" }
-            .sorted { a, b in a.sortKey > b.sortKey }
-        let earlier = map
-            .map { key, its in
-                (label: dayLabel(key), items: its, unread: its.filter { !$0.read }.count)
-            }
-            .filter { $0.label == "更早" }
-        return dated.map { ($0.label, $0.items, $0.unread) } + earlier.map { ($0.label, $0.items, $0.unread) }
+    /// 按天分组（今天 / 昨天 / 前天 / M月d日 / 更早），「更早」永远排在最后
+    struct DayGroup: Identifiable {
+        var id: String { label }
+        let label: String
+        let items: [MessageItem]
+        let unread: Int
+        let sortKey: String
     }
 
-    // #NEW-5 全部已读
+    private var filteredGrouped: [DayGroup] {
+        let map: [String: [MessageItem]] = Dictionary(grouping: filteredItems) { dayKey($0.time) }
+        let all = map.map { key, its in
+            DayGroup(label: dayLabel(key),
+                     items: its,
+                     unread: its.filter { !$0.read }.count,
+                     sortKey: its.first?.time ?? "")
+        }
+        let dated = all.filter { $0.label != "更早" }.sorted { $0.sortKey > $1.sortKey }
+        let earlier = all.filter { $0.label == "更早" }
+        return dated + earlier
+    }
+
     private func markAllRead() {
         var s = Self.localRead
         items.forEach { s.insert($0.id) }
         Self.localRead = s
         for i in items.indices { items[i].read = true }
+        DSHaptic.result(true)
         ToastManager.shared.show("已全部标为已读", icon: "checkmark.circle.fill")
-    }
-
-    // MARK: 分组（今天/昨天/前天/M月d日/更早）
-    private var grouped: [(label: String, items: [MessageItem], unread: Int)] {
-        let map: [String: [MessageItem]] = Dictionary(grouping: items) { dayKey($0.time) }
-        let dated = map
-            .map { key, its in
-                (label: dayLabel(key), items: its, unread: its.filter { !$0.read }.count,
-                 sortKey: its.first?.time ?? "")
-            }
-            .filter { $0.label != "更早" }
-            .sorted { a, b in a.sortKey > b.sortKey }
-        let earlier = map
-            .map { key, its in
-                (label: dayLabel(key), items: its, unread: its.filter { !$0.read }.count)
-            }
-            .filter { $0.label == "更早" }
-        let result: [(label: String, items: [MessageItem], unread: Int)] =
-            dated.map { ($0.label, $0.items, $0.unread) } + earlier.map { ($0.label, $0.items, $0.unread) }
-        return result
     }
 
     private func dayKey(_ t: String) -> String {
@@ -234,103 +340,27 @@ struct MessagesView: View {
         }
     }
 
-    private func messageRow(_ item: MessageItem) -> some View {
-        let isOpen = expanded.contains(item.id)
-        return VStack(alignment: .leading, spacing: 0) {
-            // 顶部：标签 + 未读指示 + 标题
-            HStack(spacing: 10) {
-                // 读/未读：原来是纯色小圆点（只靠颜色区分），改成信封图标：未读实心、已读开口
-                Image(safeSymbol: item.read ? "envelope.open" : "envelope.fill", fallback: "envelope")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(item.read ? Color.secondary : Theme.Colors.accent)
-                    .frame(width: 14)
-                    .accessibilityLabel(Text(item.read ? "已读" : "未读"))
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(item.title)
-                            .font(Theme.h4)
-                            .lineLimit(1)
-                        if !item.tag.isEmpty {
-                            Text(item.tag)
-                                .font(Theme.micro.bold())
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(Capsule().fill(Theme.statusColor(item.tagCls).opacity(0.12)))
-                                .foregroundStyle(Theme.statusColor(item.tagCls))
-                        }
-                        Spacer()
-                        Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                            .font(Theme.font(.footnote as Font).bold())
-                            .foregroundStyle(.tertiary)
-                    }
-                    if !item.time.isEmpty {
-                        Text(item.time)
-                            .font(Theme.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            // 正文
-            if !item.body.isEmpty {
-                Text(item.body)
-                    .font(Theme.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(isOpen ? nil : 2)
-                    .padding(.top, 8)
-            }
-            // 展开详情
-            if isOpen && (!item.location.isEmpty || !item.time.isEmpty) {
-                VStack(spacing: 6) {
-                    if !item.location.isEmpty {
-                        HStack(spacing: 8) {
-                            Image(systemName: "map.pin").font(Theme.caption).foregroundStyle(.tertiary)
-                            Text(item.location).font(Theme.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    if !item.time.isEmpty {
-                        HStack(spacing: 8) {
-                            Image(systemName: "clock").font(Theme.caption).foregroundStyle(.tertiary)
-                            Text(item.time).font(Theme.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    if !item.plate.isEmpty {
-                        HStack(spacing: 8) {
-                            Image(systemName: "car.fill").font(Theme.caption).foregroundStyle(Theme.Colors.accent)
-                            Text(item.plate).font(Font.system(.caption, design: .monospaced).bold())
-                                .foregroundStyle(Theme.Colors.accent)
-                        }
-                    }
-                }
-                .padding(.top, 8)
-                .padding(.bottom, 4)
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .dynamicTypeCompress()
-        .glassCard(corner: 20)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                if expanded.contains(item.id) { expanded.remove(item.id) }
-                else {
-                    expanded.insert(item.id)
-                    markRead(item.id)
-                }
-            }
-        }
+    // MARK: - 数据
+
+    private func reload() {
+        loadTask?.cancel()
+        loading = true
+        loadTask = Task { await load() }
     }
 
     private func loadIfNeeded() {
-        guard !store.carId.isEmpty else { return }
+        guard !store.carId.isEmpty else { loading = false; return }
         guard loadTask == nil || loadTask!.isCancelled else { return }
         if store.needsRefresh("messages") {
             loadTask = Task { await load() }
+        } else {
+            loading = false
         }
     }
 
     @MainActor
     private func load() async {
-        guard !store.carId.isEmpty else { return }
+        guard !store.carId.isEmpty else { loading = false; return }
         loading = true
         do {
             let list = try await APIClient.shared.getMessages()

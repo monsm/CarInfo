@@ -154,26 +154,30 @@ struct MineView: View {
         return DSCard(padding: DS.Space.cardPadding, radius: DS.Radius.hero) {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
                 HStack(spacing: DS.Space.lg) {
-                    // 头像：扁平色块 + 首字（不用渐变球 + 投影）
+                    // 头像：系统填充色的圆底 + 首字（iOS 设置顶部的身份区做法）
                     Text(um?.avatar ?? "主")
-                        .font(DS.Typo.title.weight(.semibold))
-                        .foregroundStyle(DS.Palette.labelOnTint)
-                        .frame(width: 56, height: 56)
-                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(DS.Palette.tint))
+                        .font(DS.Typo.title2.weight(.semibold))
+                        .foregroundStyle(DS.Palette.labelSecondary)
+                        .frame(width: 64, height: 64)
+                        .background(Circle().fill(DS.Palette.fill))
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(um?.name ?? "车主")
-                            .font(DS.Typo.title3)
+                            .font(DS.Typo.title2)
                             .foregroundStyle(DS.Palette.label)
                         Text(um?.mobile ?? "--")
-                            .font(DS.Typo.dataSmall)
+                            .font(DS.Typo.footnote)
                             .foregroundStyle(DS.Palette.labelSecondary)
+                        if um?.authed == true {
+                            Text("已实名认证")
+                                .font(DS.Typo.footnote)
+                                .foregroundStyle(DS.Palette.ok)
+                        }
                     }
                     Spacer(minLength: DS.Space.sm)
-                    if um?.authed == true {
-                        DSChip(text: "已实名", cls: "ok", icon: "checkmark.seal.fill")
-                    }
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(DS.Palette.labelTertiary)
                 }
 
                 DSDivider()
@@ -273,7 +277,7 @@ struct MineView: View {
                     tile("doc.text.fill", "车辆档案", tint: .orange) { nav.pushNavigation(.vehicle, targetTab: 0) }
                 }
                 HStack(spacing: 10) {
-                    tile("bubble.left.fill", "消息中心", tint: .blue) { nav.pushNavigation(.messages, targetTab: 2) }
+                    tile("bubble.left.fill", "消息中心", tint: .blue) { nav.pushNavigation(.messages) }
                     tile("wrench.adjustable", "开发者工具", tint: .purple) { nav.pushNavigation(.dev, targetTab: 0) }
                 }
                 // #31 省电模式
@@ -479,7 +483,7 @@ struct MineView: View {
             Label("分享安装包", systemImage: "square.and.arrow.up")
                 .font(Theme.font(.caption as Font).bold())
                 .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(.ultraThinMaterial, in: Capsule())
+                .background(DS.Palette.fillSubtle, in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -493,7 +497,7 @@ struct MineView: View {
                 .font(Theme.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12).padding(.vertical, 10)
-                .background(.ultraThinMaterial, in: Capsule())
+                .background(DS.Palette.fillSubtle, in: Capsule())
         }
         .buttonStyle(.plain)
     }

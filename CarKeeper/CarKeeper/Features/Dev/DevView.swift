@@ -1,296 +1,263 @@
 import SwiftUI
+import UIKit
 
 // =============================================================================
-// ColorPreview —— 深色模式颜色预览面板
-// 覆盖 Theme 全量色板：品牌色 / 语义色 / 文字层级 / 系统填充 / 玻璃材质 / 背景
-// 用法：在任意页面嵌入，或作为独立导航页展示所有颜色在深浅双模式下的表现。
+//  开发者工具 —— v4 信息架构
 // =============================================================================
-
-// MARK: - 单色卡片
-
-private struct ColorSwatch: View {
-    let name: String
-    let color: Color
-    let sampleText: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(color)
-                    .frame(width: 36, height: 36)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name).font(Theme.font(.caption as Font).bold()).foregroundStyle(.primary)
-                    if let sampleText {
-                        Text(sampleText).font(Theme.footnote).foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
-        .padding(Theme.Spacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .dynamicTypeCompress()
-        .glassCard()
-    }
-}
-
-// MARK: - 颜色组（标签 + 多个色块）
-
-private struct ColorGroup: View {
-    let groupName: String
-    let items: [(name: String, color: Color, sample: String?)]
-    let gridCols = Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.sm), count: 2)
-
-    var body: some View {
-        CardBox(title: groupName, side: "\(items.count)") {
-            LazyVGrid(columns: gridCols, spacing: Theme.Spacing.sm) {
-                ForEach(items.indices, id: \.self) { i in
-                    let (name, color, sample) = items[i]
-                    HStack(spacing: Theme.Spacing.sm) {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(color)
-                            .frame(width: 28, height: 28)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(name).font(Theme.caption)
-                                .foregroundStyle(.primary)
-                            if let sample {
-                                Text(sample).font(Theme.micro).foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer()
-                    }
-                    .padding(.horizontal, Theme.Spacing.sm)
-                    .padding(.vertical, Theme.Spacing.sm)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
-                    )
-                }
-            }
-        }
-    }
-}
-
-// MARK: - 对比预览行（浅色 vs 深色同一颜色）
-
-private struct ContrastRow: View {
-    let name: String
-    let lightColor: Color
-    let darkColor: Color
-
-    var body: some View {
-        HStack(spacing: 0) {
-            VStack(spacing: 6) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(lightColor)
-                            .frame(width: 64, height: 48)
-                    )
-                Text("浅色").font(Theme.micro).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-
-            VStack(spacing: 6) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.black.opacity(0.55))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(darkColor)
-                            .frame(width: 64, height: 48)
-                    )
-                Text("深色").font(Theme.micro).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(name).font(Theme.font(.caption as Font).bold()).foregroundStyle(.primary)
-                Text("light: #\(lightColor.hexString())\ndark:  #\(darkColor.hexString())")
-                    .font(Theme.micro)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.horizontal, Theme.Spacing.md)
-        .padding(.vertical, Theme.Spacing.sm)
-        .dynamicTypeCompress()
-        .glassCard()
-    }
-}
-
-// MARK: - 主预览面板
+//  这一页是「设计令牌 + 运行状态」的检查器，用来在真机上核对深浅双模式。
+//  ① 令牌按类分组：画布与表面 / 文字 / 语义色 / 几何 / 动效
+//     —— 每个色块都带 HEX，每种字体都用自己的字号渲染出来（不是写一句话描述它）
+//  ② 运行状态：加载耗时、指令数、能耗记录数、缓存条目、网络状态
+//  ③ 操作：复制诊断信息 / 清除缓存（带确认）
+// =============================================================================
 
 struct DevView: View {
+    private let store = AppStore.shared
+    @State private var showClearConfirm = false
+
+    private struct SWatch: Identifiable {
+        let id = UUID()
+        let name: String
+        let color: Color
+        let note: String
+    }
+
+    private struct TypeToken: Identifiable {
+        let id = UUID()
+        let name: String
+        let metrics: String
+        let font: Font
+        let sample: String
+    }
+
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.Spacing.cardSpacing) {
-                // Hero 说明卡
-                VStack(spacing: Theme.Spacing.sm) {
-                    Text("颜色预览").font(Theme.h2.bold()).foregroundStyle(.primary)
-                    Text("iOS 27 Liquid Glass · 深浅双模式一致性检查")
-                        .font(Theme.caption).foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, Theme.Spacing.md)
-                .dynamicTypeCompress()
-                .glassHeroCard()
-        
-                // 品牌色
-                ColorGroup(groupName: "品牌色", items: [
-                    ("brand",         .blue,          "系统蓝色"),
-                    ("brandLight",    Color(hex: "0A84FF"), "高亮蓝 0A84FF"),
-                    ("brandDark",     Color(hex: "0056CC"), "深色蓝 0056CC"),
-                ])
-
-                // 语义色
-                ColorGroup(groupName: "语义色", items: [
-                    ("ok  通过",      .green,         "正常 / 成功"),
-                    ("warn  警告",    .orange,        "注意 / 预警"),
-                    ("bad  错误",     .red,           "故障 / 异常"),
-                    ("acc  强调",     Theme.Colors.accent,   "品牌强调色"),
-                    ("na   未知",     .secondary,     "无数据 / 未定义"),
-                ])
-
-                // 文字层级
-                ColorGroup(groupName: "文字层级", items: [
-                    ("primary",   .primary,   "主文本"),
-                    ("secondary", .secondary, "次要文本"),
-                    ("tertiary",  Color(.tertiaryLabel),  "辅助信息"),
-                    ("quaternary", Color(.systemGray4), "极低对比度"),
-                ])
-
-                // 系统填充色
-                ColorGroup(groupName: "系统填充色", items: [
-                    ("systemFill",       Color(.systemFill),       "通用填充"),
-                    ("secondaryFill",    Color(.secondarySystemFill),    "次级填充"),
-                    ("tertiaryFill",     Color(.tertiarySystemFill),     "三级填充"),
-                    ("quaternaryFill",   Color(.quaternarySystemFill),   "四级填充"),
-                ])
-
-                // 玻璃材质（Material 不能直接当 Color 预览，这里用等同的近似色展示）
-                ColorGroup(groupName: "玻璃材质", items: [
-                    ("thin",       Theme.ColorSystem.overlay,      "卡片材质（默认）"),
-                    ("regular",    Theme.ColorSystem.glass,        "常规材质"),
-                    ("ultraThin",  Theme.ColorSystem.fillSubtle,   "极淡材质"),
-                    ("bar",        Theme.ColorSystem.background,   "导航栏背景"),
-                    ("content",    Theme.ColorSystem.cardBg,       "内容背景"),
-                ])
-
-                // 表面色（ColorSystem）
-                ColorGroup(groupName: "表面色", items: [
-                    ("background",   Theme.ColorSystem.background,   "系统分组背景"),
-                    ("cardBg",       Theme.ColorSystem.cardBg,       "次级分组背景"),
-                    ("overlay",      Theme.ColorSystem.overlay,      "磨砂覆盖层"),
-                    ("glass",        Theme.ColorSystem.glass,        "玻璃材质（与 overlay 统一）"),
-                ])
-
-                // 边框与填充色
-                ColorGroup(groupName: "边框与填充", items: [
-                    ("border",          Theme.ColorSystem.border,          "分隔线"),
-                    ("borderSubtle",    Theme.ColorSystem.borderSubtle,    "浅边框"),
-                    ("fill",            Theme.ColorSystem.fill,            "次级填充"),
-                    ("fillSubtle",      Theme.ColorSystem.fillSubtle,      "三级填充"),
-                    ("fillHighlighted", Theme.ColorSystem.fillHighlighted, "四级填充"),
-                ])
-
-                // 阴影色
-                ColorGroup(groupName: "阴影色", items: [
-                    ("shadowLight",   Theme.ColorSystem.shadowLight,   "轻微阴影 4%"),
-                    ("shadowMedium",  Theme.ColorSystem.shadowMedium,  "中等阴影 8%"),
-                    ("shadowStrong",  Theme.ColorSystem.shadowStrong,  "强阴影 12%"),
-                ])
-
-                // 深浅双模式对比
-                ContrastRow(name: "语义色对比",
-                            lightColor: .green, darkColor: .green)
-                ContrastRow(name: "品牌色对比",
-                            lightColor: Color(hex: "0A84FF"),
-                            darkColor: Color(hex: "0056CC"))
-                ContrastRow(name: "状态色对比",
-                            lightColor: .orange, darkColor: .orange)
-                ContrastRow(name: "危险色对比",
-                            lightColor: .red, darkColor: .red)
-
-                // 自定义 HEX 色板
-                ColorGroup(groupName: "自定义 HEX 色", items: [
-                    ("#0A84FF", Color(hex: "0A84FF"), "高亮蓝"),
-                    ("#0056CC", Color(hex: "0056CC"), "深色蓝"),
-                ])
-
-                // #22 性能指标
-                PerformanceMetricsCard()
-
-                // Footer
-                Text("深色模式下请检查各颜色是否可读，尤其是 tertiary / quaternary 与玻璃背景的对比度")
-                    .font(Theme.footnote).foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, Theme.Spacing.xl)
+            VStack(alignment: .leading, spacing: DS.Space.gap) {
+                swatchGroup(title: "画布与表面", footer: "内容层不透明：玻璃只允许出现在导航栏、Tab 栏与弹层。", items: surfaceTokens)
+                swatchGroup(title: "语义色", footer: "颜色只来自系统，且只表达状态；界面里没有装饰性彩色。", items: semanticTokens)
+                typographyGroup
+                kvGroup("几何", geometry, footer: "页面边距 20pt、分组圆角 12pt、发丝线 0.5pt 是全 App 的定值。")
+                kvGroup("动效", motion, footer: "只有两类：状态变化的弹簧，以及一次性绘制。")
+                kvGroup("运行状态", runtime)
+                actionsGroup
+                kvGroup("关于", about)
             }
-            .padding(.horizontal, 16)
-            .safeAreaPadding(.bottom, 12)
+            .padding(.top, DS.Space.sm)
+            .padding(.bottom, DS.Space.xxxl)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollBounceBehavior(.basedOnSize)
         .pageBackground()
-        .navigationTitle("颜色预览")
+        .navigationTitle("设计令牌")
+        .confirmationDialog("清除全部车端缓存？", isPresented: $showClearConfirm, titleVisibility: .visible) {
+            Button("清除缓存", role: .destructive) {
+                store.clearCache()
+                DSHaptic.result(true)
+                ToastManager.shared.show("缓存已清除", icon: "trash")
+            }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("只清空内存中的车况 / 充电 / 定位 / 环境 / 检测 / 消息缓存，不会退出登录。")
+        }
+    }
+
+    // MARK: - 色板
+
+    private var surfaceTokens: [SWatch] {
+        [
+            SWatch(name: "canvas", color: DS.Palette.canvas, note: "页面画布 · systemGroupedBackground"),
+            SWatch(name: "surface", color: DS.Palette.surface, note: "分组表面 · secondarySystemGroupedBackground"),
+            SWatch(name: "surfaceRaised", color: DS.Palette.surfaceRaised, note: "内凹表面 · tertiarySystemGroupedBackground"),
+            SWatch(name: "hairline", color: DS.Palette.hairline, note: "发丝分隔线 · UIColor.separator"),
+            SWatch(name: "fill", color: DS.Palette.fill, note: "通用填充 · tertiarySystemFill"),
+            SWatch(name: "tintSoft", color: DS.Palette.tintSoft, note: "强调色淡底（选中胶囊）")
+        ]
+    }
+
+    private var semanticTokens: [SWatch] {
+        [
+            SWatch(name: "tint", color: DS.Palette.tint, note: "唯一强调色 · 系统蓝 #007AFF / #0A84FF"),
+            SWatch(name: "ok", color: DS.Palette.ok, note: "正常 / 已就绪 · systemGreen"),
+            SWatch(name: "warn", color: DS.Palette.warn, note: "预警 / 需关注 · systemOrange"),
+            SWatch(name: "bad", color: DS.Palette.bad, note: "故障 / 异常 · systemRed"),
+            SWatch(name: "charge", color: DS.Palette.charge, note: "充电 / 电驱状态"),
+            SWatch(name: "labelTertiary", color: DS.Palette.labelTertiary, note: "文字第三级 · 30%")
+        ]
+    }
+
+    private func swatchGroup(title: String, footer: String? = nil, items: [SWatch]) -> some View {
+        DSGroup(title: title, trailing: "\(items.count)", footer: footer) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+                DSGroupRow(showsSeparator: idx < items.count - 1) {
+                    HStack(spacing: DS.Space.md) {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(item.color)
+                            .frame(width: 28, height: 28)
+                            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .strokeBorder(DS.Palette.hairline, lineWidth: DS.Hair.line))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.name)
+                                .font(DS.Typo.body)
+                                .foregroundStyle(DS.Palette.label)
+                            Text(item.note)
+                                .font(DS.Typo.caption)
+                                .foregroundStyle(DS.Palette.labelSecondary)
+                                .lineLimit(2)
+                        }
+                        Spacer(minLength: DS.Space.sm)
+                        Text(item.color.hexString())
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundStyle(DS.Palette.labelSecondary)
+                    }
+                    .padding(.vertical, 6)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    // MARK: - 字体
+
+    private var typeTokens: [TypeToken] {
+        [
+            TypeToken(name: "display", metrics: "96 / ultraLight · 等宽数字", font: DS.Typo.display(96), sample: "88"),
+            TypeToken(name: "metric", metrics: "34 / light · 等宽数字", font: DS.Typo.metric(34), sample: "420 km"),
+            TypeToken(name: "largeTitle", metrics: "34 / bold", font: DS.Typo.largeTitle, sample: "车况"),
+            TypeToken(name: "title2", metrics: "22 / semibold", font: DS.Typo.title2, sample: "驾驶舱"),
+            TypeToken(name: "title3", metrics: "20 / semibold", font: DS.Typo.title3, sample: "充电设置"),
+            TypeToken(name: "headline", metrics: "17 / semibold", font: DS.Typo.headline, sample: "主操作按钮"),
+            TypeToken(name: "body", metrics: "17 / regular · 字距 −0.41", font: DS.Typo.body, sample: "正文与列表行标题"),
+            TypeToken(name: "callout", metrics: "16", font: DS.Typo.callout, sample: "次级正文"),
+            TypeToken(name: "subheadline", metrics: "15", font: DS.Typo.subheadline, sample: "字段名与说明"),
+            TypeToken(name: "footnote", metrics: "13", font: DS.Typo.footnote, sample: "分组标题与脚注"),
+            TypeToken(name: "caption", metrics: "12", font: DS.Typo.caption, sample: "标签"),
+            TypeToken(name: "data", metrics: "17 · 等宽数字", font: DS.Typo.data, sample: "356 V / 12 A")
+        ]
+    }
+
+    private var typographyGroup: some View {
+        DSGroup(title: "文字", trailing: "\(typeTokens.count)", footer: "字号用 iOS 的真实阶梯；仪器感来自字重差，不来自颜色。") {
+            ForEach(Array(typeTokens.enumerated()), id: \.element.id) { idx, token in
+                DSGroupRow(showsSeparator: idx < typeTokens.count - 1) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(token.sample)
+                            .font(token.font)
+                            .foregroundStyle(DS.Palette.label)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                        Text("\(token.name) · \(token.metrics)")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(DS.Palette.labelSecondary)
+                    }
+                    .padding(.vertical, 6)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    // MARK: - 通用键值组
+
+    private func kvGroup(_ title: String, _ rows: [(String, String)], footer: String? = nil) -> some View {
+        DSGroup(title: title, footer: footer) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { idx, row in
+                DSGroupRow(showsSeparator: idx < rows.count - 1) {
+                    DSKeyValueRow(key: row.0, value: row.1, mono: false)
+                }
+            }
+        }
+    }
+
+    // MARK: - 令牌数值
+
+    private var geometry: [(String, String)] {
+        [
+            ("页面边距", "\(Int(DS.Space.page)) pt"),
+            ("分组内边距", "\(Int(DS.Space.cardPadding)) pt"),
+            ("行高", "\(Int(DS.Space.row)) pt"),
+            ("圆角 · 小 / 分组 / 弹层", "\(Int(DS.Radius.small)) / \(Int(DS.Radius.card)) / \(Int(DS.Radius.hero)) pt"),
+            ("发丝线", "\(DS.Hair.line) pt"),
+            ("主按钮高度", "\(Int(DS.Size.button)) pt")
+        ]
+    }
+
+    private var motion: [(String, String)] {
+        [
+            ("press（按压）", "spring 0.30 / 0.86"),
+            ("value（数值变化）", "spring 0.36 / 0.88"),
+            ("screen（页面过渡）", "spring 0.42 / 0.90"),
+            ("draw（光条一次性绘制）", "easeOut 1.1 s")
+        ]
+    }
+
+    // MARK: - 运行状态与操作
+
+    private var runtime: [(String, String)] {
+        let homeLoad = UserDefaults.standard.double(forKey: "carkeeper_home_load_time")
+        let cachedCount = store.caches.compactMap { $0.value }.count
+        return [
+            ("首页加载耗时", homeLoad > 0 ? String(format: "%.2f s", homeLoad) : "—"),
+            ("指令历史", "\(store.commandHistory.count) 条"),
+            ("能耗记录", "\(store.energyHistory.count) 次"),
+            ("已缓存接口", "\(cachedCount) 项"),
+            ("网络状态", networkText),
+            ("车辆 ID", store.carId.isEmpty ? "—" : store.carId)
+        ]
+    }
+
+    private var networkText: String { store.networkStatus.rawValue }
+
+    private var actionsGroup: some View {
+        DSGroup(title: "操作", footer: "诊断信息包含版本、车辆 ID、缓存与网络状态，用于报障时贴给开发。") {
+            DSGroupRow {
+                DSRow(icon: "doc.on.doc", title: "复制诊断信息") {
+                    UIPasteboard.general.string = diagnostics
+                    DSHaptic.result(true)
+                    ToastManager.shared.show("诊断信息已复制", icon: "doc.on.doc.fill")
+                }
+            }
+            DSGroupRow(showsSeparator: false) {
+                DSRow(icon: "trash", title: "清除缓存", subtitle: "不会退出登录") {
+                    showClearConfirm = true
+                }
+            }
+        }
+    }
+
+    private var diagnostics: String {
+        var lines = ["【CarKeeper 诊断信息】", "版本 \(appVersion) (\(buildNumber))"]
+        lines.append("车辆 ID：\(store.carId.isEmpty ? "未绑定" : store.carId)")
+        lines.append("登录状态：\(store.isLoggedIn ? "已登录" : "未登录")")
+        lines.append("网络状态：\(networkText)")
+        for row in runtime { lines.append("\(row.0)：\(row.1)") }
+        return lines.joined(separator: "\n")
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+    }
+
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+    }
+
+    private var about: [(String, String)] {
+        [
+            ("版本", appVersion),
+            ("构建", buildNumber),
+            ("设计语言", "CarKeeper v4 · iOS 原生"),
+            ("外观", "跟随系统（浅色 / 深色各一套）")
+        ]
     }
 }
 
-// MARK: - 辅助扩展
+// MARK: - HEX 辅助
 
 extension Color {
-    /// 返回 6 位 HEX 字符串（不含 #）
+    /// 返回 6 位 HEX 字符串（不含 #），按当前外观解析动态色
     func hexString() -> String {
-        let components = UIColor(self).cgColor.components ?? [0, 0, 0]
-        let r = Int(components[0] * 255)
-        let g = Int(components[1] * 255)
-        let b = Int(components[2] * 255)
-        return String(format: "%02X%02X%02X", r, g, b)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return String(format: "%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
     }
 }
-
-// MARK: - 性能指标卡片 (#22)
-struct PerformanceMetricsCard: View {
-    private let homeLoadTime = UserDefaults.standard.double(forKey: "carkeeper_home_load_time")
-    private let commandCount = AppStore.shared.commandHistory.count
-    private let energyRecords = AppStore.shared.energyHistory.count
-
-    var body: some View {
-        CardBox(title: "性能指标", cornerRadius: Theme.Radius.card) {
-            VStack(spacing: 10) {
-                HStack {
-                    Text("首页加载耗时").font(Theme.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Text(homeLoadTime > 0 ? String(format: "%.2fs", homeLoadTime) : "—")
-                        .font(Theme.monoLg).foregroundStyle(homeLoadTime > 1.5 ? .orange : .green)
-                }
-                ListDivider()
-                HStack {
-                    Text("指令历史记录").font(Theme.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(commandCount) 条").font(Theme.monoLg).foregroundStyle(Theme.Colors.accent)
-                }
-                ListDivider()
-                HStack {
-                    Text("能耗记录次数").font(Theme.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(energyRecords) 次").font(Theme.monoLg).foregroundStyle(.green)
-                }
-            }
-            .padding(.vertical, 4)
-        }
-    }
-}
-
-// MARK: - Preview
-
-#if DEBUG
-struct DevView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationStack {
-            DevView()
-        }
-    }
-}
-#endif

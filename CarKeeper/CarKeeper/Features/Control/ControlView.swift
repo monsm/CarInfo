@@ -8,6 +8,21 @@ import AVFoundation
 struct ControlView: View {
     private let store = AppStore.shared
 
+    /// 协议里被允许作为快控入口的指令（与 mainCommands / moreCommands / hero 完全一致）
+    static let quickAllowlist: Set<String> = [
+        "LockDoor", "UnLockDoor", "OpenAir", "CloseAir",
+        "FlashLight", "Whistle", "RemoteSearchCar"
+    ]
+
+    /// 把首页传来的键解析成可执行指令；不认识的一律不执行（宁可不做，也不做错）
+    static func resolveQuick(_ raw: String) -> String? {
+        switch raw {
+        case "air":  return "OpenAir"
+        case "lock": return "LockDoor"
+        default:     return quickAllowlist.contains(raw) ? raw : nil
+        }
+    }
+
     private let hero: [(key: String, name: String, symbol: String)] = [
         ("LockDoor", "锁车", "lock.fill"),
         ("UnLockDoor", "解锁", "lock.open.fill")
@@ -204,18 +219,18 @@ struct ControlView: View {
     }
     var body: some View {
         ScrollView {
-            VStack(spacing: DS.Space.gap) {
-                carSelector
-                heroDiscs
-                // #18 快捷预设场景
-                presetScenesCard
+            VStack(alignment: .leading, spacing: DS.Space.gap) {
+                controlHeader
+                primarySceneButton
                 if let run = running { runningCard(run) }
-                SiriShortcutsCard()
-                commandCard
                 if let bd = bodyDetail { bodyDetailCard(bd) }
+                commandCard
+                presetScenesCard
+                SiriShortcutsCard()
                 if !history.isEmpty { historyCard }
             }
-            .padding(.bottom, DS.Space.xxl)
+            .padding(.top, DS.Space.sm)
+            .padding(.bottom, DS.Space.huge)
         }
         .scrollBounceBehavior(.basedOnSize)
         .refreshable {
@@ -282,9 +297,14 @@ struct ControlView: View {
             }
             if let q = store.pendingQuickCtrl {
                 store.pendingQuickCtrl = nil
-                let cmd = q == "air" ? "OpenAir" : (q == "lock" ? "LockDoor" : "UnLockDoor")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                    onCmd(cmd)
+                // 首页传过来的是协议里的真实指令名，原样执行；同时兼容历史的 "air"/"lock" 简写。
+                // （旧代码把除这两个简写外的一切都当成 UnLockDoor —— 于是首页的「锁车」
+                //   会反向把车解锁。这是真 bug，不能靠“反正只有两个键”蒙过去。）
+                let cmd = Self.resolveQuick(q)
+                if let cmd {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                        onCmd(cmd)
+                    }
                 }
             }
         }
@@ -308,41 +328,93 @@ struct ControlView: View {
         }
     }
 
-    // MARK: 车辆切换
-    private var carSelector: some View {
+    // MARK: 头部（v4：读数就在车上 —— 一屏不堆卡片）
+    private var controlHeader: some View {
         let carSel = VM.carSel(store.cars, store.carId)
-        return HStack(spacing: 10) {
-            Image(systemName: "car.2.fill")
-                .font(Theme.caption)
-                .foregroundStyle(Theme.brand)
-            Picker("车辆", selection: Binding(
-                get: { carSel.index },
-                set: { store.selectCar($0) }
-            )) {
-                ForEach(Array(carSel.options.enumerated()), id: \.offset) { idx, opt in
-                    Text(opt.name).tag(idx)
+        let name = carSel.options.indices.contains(carSel.index) ? carSel.options[carSel.index].name : "未绑定车辆"
+
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: DS.Space.sm) {
+                if carSel.count > 1 {
+                    Picker("车辆", selection: Binding(
+                        get: { carSel.index },
+                        set: { store.selectCar($0) }
+                    )) {
+                        ForEach(Array(carSel.options.enumerated()), id: \.offset) { idx, opt in
+                            Text(opt.name).tag(idx)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .font(DS.Typo.subheadline.weight(.semibold))
+                    .tint(DS.Palette.label)
+                } else {
+                    Text(name)
+                        .font(DS.Typo.subheadline.weight(.semibold))
+                        .foregroundStyle(DS.Palette.label)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: DS.Space.sm)
+                if let bd = bodyDetail {
+                    DSChip(text: bd.summary, cls: bd.cls)
                 }
             }
-            .font(Theme.h4)
-            Spacer()
+
+            CarTopView(
+                doorCls: doorStates(),
+                trunkOpen: trunkIsOpen(),
+                windowsOpen: windowsAreOpen()
+            )
+            .frame(height: 286)
+            .padding(.vertical, DS.Space.sm)
+
+            Text(statusLineText())
+                .font(DS.Typo.footnote)
+                .foregroundStyle(DS.Palette.labelSecondary)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
-        .dsSurface(padding: DS.Space.lg, radius: DS.Radius.card)
     }
 
-    // MARK: 主控双盘
-    private var heroDiscs: some View {
-        HStack(spacing: 20) {
-            ForEach(hero, id: \.key) { item in
-                heroDisc(item)
+    /// 一屏唯一的实心胶囊：状态有问题时就是“锁车关窗”，否则是降温场景
+    private var primarySceneButton: some View {
+        let issue = bodyDetail?.cls == "bad"
+        return Button {
+            DSHaptic.tap()
+            if issue {
+                onCmd("LockDoor")
+            } else if let scene = presetScenes.first(where: { $0.key == "summerCool" }) {
+                onPresetScene(scene)
             }
-            ACHeroDisc(pendingTemp: $pendingTemp, displayCount: $tempDisplayCount)
+        } label: {
+            Text(issue ? "一键锁车并关窗" : "极速降温 · 18℃ 强冷")
         }
-        .frame(maxWidth: .infinity)
-        .dsSurface(padding: DS.Space.xl, radius: DS.Radius.card)
+        .buttonStyle(DSPrimaryButtonStyle())
+        .accessibilityHint(Text(issue ? "锁车、关窗并折叠后视镜" : "空调设为 18℃ 最强风"))
     }
 
-    private func heroDisc(_ item: (key: String, name: String, symbol: String)) -> some View {
-        HeroDiscButton(key: item.key, name: item.name, symbol: item.symbol, disabled: busy || running != nil) { onCmd(item.key) }
+    /// 四门状态 → ["ok"/"bad"]（左前 / 右前 / 左后 / 右后，与俯视图顺序一致）
+    private func doorStates() -> [String] {
+        guard let bd = bodyDetail else { return ["ok", "ok", "ok", "ok"] }
+        return ["左前门", "右前门", "左后门", "右后门"].map { name in
+            bd.doorRows.first { $0.0 == name }?.2 ?? "ok"
+        }
+    }
+
+    private func trunkIsOpen() -> Bool {
+        guard let bd = bodyDetail else { return false }
+        let all = bd.doorRows + bd.windowRows + bd.extraRows
+        return all.first { $0.0.contains("后备箱") }?.2 == "bad"
+    }
+
+    private func windowsAreOpen() -> Bool {
+        (bodyDetail?.windowRows.contains { $0.2 == "bad" }) ?? false
+    }
+
+    private func statusLineText() -> String {
+        guard let bd = bodyDetail else { return "等待车辆上报" }
+        let bad = bd.doorRows.filter { $0.2 == "bad" }.map { $0.0 }
+            + bd.windowRows.filter { $0.2 == "bad" }.map { $0.0 }
+        return bad.isEmpty ? "四门已锁 · 车窗已关" : bad.joined(separator: " · ") + " 未关"
     }
 
     // MARK: 快捷预设场景 (#18)
@@ -358,7 +430,7 @@ struct ControlView: View {
                                 .font(Theme.bodyMd)
                                 .foregroundStyle(Theme.Colors.accent)
                                 .frame(width: 32, height: 32)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(scene.name).font(Theme.body)
                                 if let note = scene.note {
@@ -467,7 +539,7 @@ struct ControlView: View {
                     .font(Theme.bodyMd)
                     .foregroundStyle(Theme.brand)
                     .frame(width: 30, height: 30)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name).font(Theme.body)
                     if let note = item.note {
@@ -661,98 +733,150 @@ struct ControlView: View {
     }
 }
 
-// MARK: - 主控双盘按钮（按压回弹）
-struct HeroDiscButton: View {
-    let key: String
-    let name: String
-    let symbol: String
-    let disabled: Bool
-    let action: () -> Void
-    @State private var isPressed = false
+// MARK: - 俯视示意图（v4：薄线描、不着色 —— 一辆从天上看得懂的车）
+/// 车身是线描，只有「状态」带颜色：绿 = 已关，橙 = 未关。
+/// 填色会把示意变成插画，着色会把插画变成儿童 App —— 所以一辆车只用线。
+struct CarTopView: View {
+    /// 左前 / 右前 / 左后 / 右后
+    var doorCls: [String]
+    var trunkOpen: Bool
+    var windowsOpen: Bool
 
-    var body: some View {
-        Button(action: action) {
-            // Tesla 式磁贴：一张圆角表面 + 左上图标 + 下方标签。
-            // 一屏多个动作时，磁贴矩阵才是车内控制台该有的读数方式。
-            VStack(alignment: .leading, spacing: DS.Space.sm) {
-                Image(safeSymbol: symbol, fallback: "bolt.fill")
-                    .font(.system(size: DS.Size.tileIcon, weight: .regular))
-                    .foregroundStyle(isPressed ? DS.Palette.labelOnTint : Theme.brand)
-                    .frame(height: 30)
-                Text(name)
-                    .font(DS.Typo.subheadline.weight(.semibold))
-                    .foregroundStyle(isPressed ? DS.Palette.labelOnTint : DS.Palette.label)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(DS.Space.md)
-            .frame(minHeight: 84)
-            .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                .fill(isPressed ? Theme.brand : DS.Palette.surface))
-            .overlay(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                .strokeBorder(isPressed ? Color.clear : DS.Palette.hairline, lineWidth: DS.Hair.line))
-            .opacity(disabled ? 0.45 : 1)
-            .animation(.easeInOut(duration: 0.2), value: disabled)
-            .animation(DS.Motion.press, value: isPressed)
-        }
-        .buttonStyle(DSCardButtonStyle())
-        .disabled(disabled)
-        .accessibilityLabel(Text(name))
-        .accessibilityHint(Text(disabled ? "此功能当前不可用" : "点击" + name + "控制车辆"))
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in if !isPressed { isPressed = true } }
-                .onEnded { _ in isPressed = false }
-        )
-        // 磁贴直接到位：按下反馈只由上面的填充/描边过渡表达。
+    private func color(_ cls: String) -> Color {
+        cls == "bad" ? DS.Palette.warn : DS.Palette.ok
     }
-}
 
-// MARK: - 空调温度 HeroDisc（单一圆盘 + 数字滚动）
-struct ACHeroDisc: View {
-    @Binding var pendingTemp: Int
-    @Binding var displayCount: Int
-
-    // B4: 温度渐变颜色（低温蓝→高温红，16~32℃映射）
-    private var tempGradientColor: Color {
-        let t = Double(pendingTemp)
-        if t <= 18 { return .blue }
-        if t <= 24 { return .cyan }
-        if t <= 28 { return .green }
-        if t <= 30 { return .yellow }
-        return .orange
+    private func doorColor(_ idx: Int) -> Color {
+        guard doorCls.indices.contains(idx) else { return DS.Palette.ok }
+        return color(doorCls[idx])
     }
 
     var body: some View {
-        VStack(spacing: DS.Space.sm) {
-            ZStack {
-                // 单一圆盘：温度只靠颜色表达。
-                Circle()
-                    .fill(tempGradientColor.opacity(0.12))
-                    .frame(width: 92, height: 92)
-                Circle()
-                    .strokeBorder(tempGradientColor.opacity(0.35), lineWidth: 1)
-                    .frame(width: 92, height: 92)
-                // 温度数字（流体字体，随容器宽度自动缩放）
-                FluidTempHero(String(displayCount))
+        Canvas { ctx, size in
+            let scale = min(size.width / 320, size.height / 470)
+            let dx = (size.width - 320 * scale) / 2
+            let dy = (size.height - 470 * scale) / 2
+            let t = CGAffineTransform(translationX: dx, y: dy).scaledBy(x: scale, y: scale)
+            func xf(_ p: Path) -> Path { p.applying(t) }
+
+            // 地面反光（径向渐变，边界外恒为 0）
+            ctx.fill(
+                Path(CGRect(origin: .zero, size: size)),
+                with: .radialGradient(
+                    Gradient(colors: [
+                        DS.Palette.label.opacity(0.06),
+                        DS.Palette.label.opacity(0.015),
+                        DS.Palette.label.opacity(0.0)
+                    ]),
+                    center: CGPoint(x: size.width / 2, y: size.height * 0.52),
+                    startRadius: 0,
+                    endRadius: size.height * 0.48
+                )
+            )
+
+            // 车身轮廓（薄线）
+            var outline = Path()
+            outline.move(to: CGPoint(x: 160, y: 26))
+            outline.addCurve(to: CGPoint(x: 254, y: 50), control1: CGPoint(x: 206, y: 26), control2: CGPoint(x: 240, y: 34))
+            outline.addCurve(to: CGPoint(x: 267, y: 96), control1: CGPoint(x: 264, y: 61), control2: CGPoint(x: 267, y: 76))
+            outline.addLine(to: CGPoint(x: 267, y: 250))
+            outline.addCurve(to: CGPoint(x: 254, y: 312), control1: CGPoint(x: 267, y: 282), control2: CGPoint(x: 264, y: 300))
+            outline.addCurve(to: CGPoint(x: 160, y: 336), control1: CGPoint(x: 240, y: 328), control2: CGPoint(x: 206, y: 336))
+            outline.addCurve(to: CGPoint(x: 66, y: 312), control1: CGPoint(x: 114, y: 336), control2: CGPoint(x: 80, y: 328))
+            outline.addCurve(to: CGPoint(x: 53, y: 250), control1: CGPoint(x: 56, y: 300), control2: CGPoint(x: 53, y: 282))
+            outline.addLine(to: CGPoint(x: 53, y: 96))
+            outline.addCurve(to: CGPoint(x: 66, y: 50), control1: CGPoint(x: 53, y: 76), control2: CGPoint(x: 56, y: 61))
+            outline.addCurve(to: CGPoint(x: 160, y: 26), control1: CGPoint(x: 80, y: 34), control2: CGPoint(x: 114, y: 26))
+            outline.closeSubpath()
+            ctx.stroke(xf(outline), with: .color(DS.Palette.label.opacity(0.85)),
+                       style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
+
+            // 风挡 / 天窗 / 后风挡
+            var windshield = Path()
+            windshield.move(to: CGPoint(x: 84, y: 62))
+            windshield.addCurve(to: CGPoint(x: 160, y: 42), control1: CGPoint(x: 100, y: 48), control2: CGPoint(x: 128, y: 42))
+            windshield.addCurve(to: CGPoint(x: 236, y: 62), control1: CGPoint(x: 192, y: 42), control2: CGPoint(x: 220, y: 48))
+            windshield.addLine(to: CGPoint(x: 245, y: 84))
+            windshield.addLine(to: CGPoint(x: 75, y: 84))
+            windshield.closeSubpath()
+            ctx.stroke(xf(windshield), with: .color(DS.Palette.labelSecondary),
+                       style: StrokeStyle(lineWidth: 1.3, lineJoin: .round))
+
+            let roof = Path(roundedRect: CGRect(x: 92, y: 98, width: 136, height: 76), cornerRadius: 16)
+            ctx.stroke(xf(roof), with: .color(DS.Palette.labelSecondary), style: StrokeStyle(lineWidth: 1.3))
+
+            var rear = Path()
+            rear.move(to: CGPoint(x: 75, y: 278))
+            rear.addLine(to: CGPoint(x: 84, y: 316))
+            rear.addCurve(to: CGPoint(x: 160, y: 334), control1: CGPoint(x: 100, y: 328), control2: CGPoint(x: 128, y: 334))
+            rear.addCurve(to: CGPoint(x: 236, y: 316), control1: CGPoint(x: 192, y: 334), control2: CGPoint(x: 220, y: 328))
+            rear.addLine(to: CGPoint(x: 245, y: 278))
+            rear.closeSubpath()
+            ctx.stroke(xf(rear), with: .color(DS.Palette.labelSecondary), style: StrokeStyle(lineWidth: 1.3))
+
+            // 后视镜
+            var mirrorL = Path()
+            mirrorL.move(to: CGPoint(x: 56, y: 88))
+            mirrorL.addLine(to: CGPoint(x: 40, y: 97))
+            mirrorL.addLine(to: CGPoint(x: 43, y: 110))
+            mirrorL.addLine(to: CGPoint(x: 57, y: 105))
+            mirrorL.closeSubpath()
+            var mirrorR = Path()
+            mirrorR.move(to: CGPoint(x: 264, y: 88))
+            mirrorR.addLine(to: CGPoint(x: 280, y: 97))
+            mirrorR.addLine(to: CGPoint(x: 277, y: 110))
+            mirrorR.addLine(to: CGPoint(x: 263, y: 105))
+            mirrorR.closeSubpath()
+            ctx.stroke(xf(mirrorL), with: .color(DS.Palette.labelSecondary), style: StrokeStyle(lineWidth: 1.3))
+            ctx.stroke(xf(mirrorR), with: .color(DS.Palette.labelSecondary), style: StrokeStyle(lineWidth: 1.3))
+
+            // 四门状态线：绿 = 已关，橙 = 未关
+            let doorSpans: [(CGFloat, CGFloat, CGFloat)] = [
+                (53, 96, 144), (267, 96, 144), (53, 204, 252), (267, 204, 252)
+            ]
+            for (idx, span) in doorSpans.enumerated() {
+                let c = doorColor(idx)
+                var line = Path()
+                line.move(to: CGPoint(x: span.0, y: span.1))
+                line.addLine(to: CGPoint(x: span.0, y: span.2))
+                ctx.drawLayer { layer in
+                    layer.addFilter(.blur(radius: 4))
+                    layer.opacity = 0.35
+                    layer.stroke(xf(line), with: .color(c), style: StrokeStyle(lineWidth: 12, lineCap: .round))
+                }
+                ctx.stroke(xf(line), with: .color(c), style: StrokeStyle(lineWidth: 3, lineCap: .round))
             }
-            Text("空调")
-                .font(DS.Typo.subheadline.weight(.semibold))
-                .foregroundStyle(DS.Palette.labelSecondary)
-        }
-        .onAppear {
-            // 首次出现时把数字对齐到当前温度（一次性对齐，不是反复播放的动画）
-            withAnimation(.spring(response: 0.65, dampingFraction: 0.65, blendDuration: 0.9)) {
-                displayCount = pendingTemp
+
+            // 后备箱
+            var trunk = Path()
+            trunk.move(to: CGPoint(x: 112, y: 336))
+            trunk.addLine(to: CGPoint(x: 208, y: 336))
+            let trunkColor = trunkOpen ? DS.Palette.warn : DS.Palette.ok
+            if trunkOpen {
+                ctx.drawLayer { layer in
+                    layer.addFilter(.blur(radius: 5))
+                    layer.opacity = 0.3
+                    layer.stroke(xf(trunk), with: .color(trunkColor), style: StrokeStyle(lineWidth: 14, lineCap: .round))
+                }
+            }
+            ctx.stroke(xf(trunk), with: .color(trunkColor), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+
+            // 车窗开启时，两侧给一条细橙线
+            if windowsOpen {
+                var wl = Path()
+                wl.move(to: CGPoint(x: 53, y: 96))
+                wl.addLine(to: CGPoint(x: 53, y: 250))
+                var wr = Path()
+                wr.move(to: CGPoint(x: 267, y: 96))
+                wr.addLine(to: CGPoint(x: 267, y: 250))
+                ctx.stroke(xf(wl), with: .color(DS.Palette.warn.opacity(0.45)),
+                           style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                ctx.stroke(xf(wr), with: .color(DS.Palette.warn.opacity(0.45)),
+                           style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
             }
         }
-        // 温度变化时同步滚动
-        .onChange(of: pendingTemp) { newTemp in
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.6)) {
-                displayCount = newTemp
-            }
-        }
+        .accessibilityElement()
+        .accessibilityLabel(Text("车辆俯视状态图"))
     }
 }
 
@@ -775,7 +899,7 @@ struct PINKeypadView: View {
                     Text(i < pin.count ? String(pin[pin.index(pin.startIndex, offsetBy: i)]) : "")
                         .font(Theme.d4)
                         .frame(width: 42, height: 54)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(i == pin.count ? Theme.brand : Color(.systemGray4),
                                           lineWidth: i == pin.count ? 2 : 1))
@@ -793,7 +917,7 @@ struct PINKeypadView: View {
                         }
                         .font(Theme.d4)
                         .frame(maxWidth: .infinity, minHeight: 56)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .foregroundStyle(.primary)
                     }
                     .buttonStyle(.plain)

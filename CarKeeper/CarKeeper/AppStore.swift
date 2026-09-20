@@ -545,12 +545,47 @@ final class AppStore: @unchecked Sendable {
         }
         // 把最新车况同步到 App Group（小组件 / 表盘 / 灵动岛的数据源）
         syncSharedDefaults()
+        // 车端时间序列采样（SOC / 充电功率 / 胎压三条趋势曲线的唯一来源）
+        recordHistory()
     }
 
-    // MARK: - 与 Widget / Watch / Live Activity 共享数据
-    /// 把车况写进 App Group，供 Widgets/WidgetBundle.swift、WatchApp、LiveActivities 读取。
-    /// ⚠️ 键名必须与那三处读的键名一致，否则小组件／表盘永远是 0。
-    /// 没有 App Group 能力（未签名 / 侧载）时写入的是普通 UserDefaults：不会崩，只是不共享。
+    // MARK: - 车端时间序列采样
+    /// 每次拿到车端数据后采样一次。
+    /// ⚠️ 服务端只有"当前状态"接口（小程序也一样），曲线只能由 App 自己一点点积累；
+    /// 采样间隔与保留上限见 Services/HistoryStore.swift 顶部说明。
+    private func recordHistory() {
+        guard !carId.isEmpty else { return }
+        let e = VM.energy(caches, car)
+        let control = ciVal(caches, "control")
+
+        // 充电功率：EnergyModel 里的 power 是给人看的字符串（"7 kW"），
+        // 曲线要的是数值，所以直接读报文 —— 键名与 VM.energy 里完全一致。
+        let pow = ciNumber(ciVal(caches, "charge"), ["ChargPower", "ChargingPower"])
+
+        // 顺带把功率补进 AppStore 的短历史：实时功耗页与小组件读的都是它，
+        // 而它此前**没有任何地方写入过** —— 所以小组件上的功率永远显示 "--"。
+        if isCharging, let p = pow, p > 0.1 {
+            let due = chargingPowerHistory.last.map { Date().timeIntervalSince($0.time) >= 60 } ?? true
+            if due {
+                chargingPowerHistory.append(ChargingPowerRecord(time: Date(), power: p))
+                if chargingPowerHistory.count > 240 {
+                    chargingPowerHistory.removeFirst(chargingPowerHistory.count - 240)
+                }
+            }
+        }
+
+        // 四轮胎压（kPa）：顺序与键名与 VM.tyreStatus 保持一致
+        let tyres: [Double?] = ["LfTyrePressure", "RfTyrePressure", "LrTyrePressure", "RrTyrePressure"]
+            .map { ciNumber(control, [$0]) }
+
+        HistoryStore.shared.record(socPct: e.socPct, charging: isCharging, powerKW: pow, tyres: tyres)
+    }
+
+    // MARK: - 与 Widget / Watch / 实时活动共享数据
+    /// 把车况写进 App Group，供小组件（Widgets/WidgetBundle.swift）与表盘（WatchApp）读取。
+    /// · 零散键（widget_* / watch_*）给表盘用，键名与表盘代码必须一致。
+    /// · 结构化快照（SharedStore.snapshotKey）给小组件与实时活动用，字段只有一份定义。
+    /// 没有 App Group 能力（未签名 / 侧载重签）时写入的是普通 UserDefaults：不会崩，只是不共享。
     func syncSharedDefaults() {
         guard let defaults = UserDefaults(suiteName: Self.appGroupId) else { return }
         let e = VM.energy(caches, car)
@@ -581,6 +616,30 @@ final class AppStore: @unchecked Sendable {
         defaults.set(locked, forKey: "watch_locked")
         defaults.set(charging, forKey: "watch_charging")
         defaults.set(totalMileage, forKey: "watch_mileage")
+
+        // 结构化快照：小组件与充电实时活动读的就是这一个键。
+        // 字段只有一份定义（Shared/WidgetTokens.swift 的 VehicleSnapshot），
+        // 不再靠"键名字符串两边都对得上"来维系 —— 写错键名不会报错，只会安静地显示 0。
+        let snapshot = VehicleSnapshot(
+            soc: soc,
+            rangeKm: rangeKm,
+            cabinTemp: temp,
+            locked: locked,
+            charging: charging,
+            chargePower: chargingPowerHistory.last?.power,
+            // ⚠️ ChargingSession.timeToFull 本身就是 String?，
+            // 直接取会得到 String?? —— 用 ?? nil 拍平，否则赋给 String? 通不过编译
+            timeToFull: e.charging?.timeToFull ?? nil,
+            offline: isOfflineMode,
+            mileageKm: totalMileage,
+            chargeCls: e.chargeCls,
+            updatedAt: Date()
+        )
+        // 内容真变了才刷小组件时间线、才动实时活动：
+        // 车况每 60 秒轮询一次，无条件刷新会把小组件的刷新预算烧光。
+        if SharedStore.write(snapshot) {
+            LiveActivityBridge.sync(snapshot)
+        }
     }
 
     /// 返回指定 key 的缓存是否已过期（超过 TTL）
@@ -651,6 +710,12 @@ final class AppStore: @unchecked Sendable {
         chargingPowerHistory = []
         commandHistory = []
         pendingQuickCtrl = nil
+        // 实时活动与小组件快照同样绑定账号：退出时一起清掉，
+        // 否则锁屏 / 桌面上会继续显示上一个账号的车牌与电量。
+        LiveActivityBridge.endAll()
+        SharedStore.clear()
+        // 趋势曲线同样是这个账号的车端数据：不清理会留给下一个登录的账号
+        HistoryStore.shared.clear()
         isOfflineMode = false
         offlineMessage = ""
         parkingLocation = nil

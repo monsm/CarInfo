@@ -165,7 +165,7 @@ struct ExampleCard: View {
                 .foregroundStyle(Theme.Colors.accent)
         }
         .padding()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 40)
     }
 }

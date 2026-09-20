@@ -48,7 +48,9 @@ enum Deeplink: Hashable, CaseIterable {
     var hostTab: Int {
         switch self {
         case .control: return 1
-        case .messages: return 2
+        case .battery: return 2
+        case .trips: return 3
+        case .messages: return 4
         default: return 0
         }
     }
@@ -99,7 +101,7 @@ struct CarKeeperApp: App {
         nav.selectedTab = link.hostTab
         switch link.hostTab {
         case 1: nav.controlPath = [link]
-        case 2: nav.messagesPath = [link]
+        case 2: nav.chargePath = [link]
         case 3: nav.minePath = [link]
         default: nav.path = [link]
         }
@@ -124,12 +126,15 @@ struct CarKeeperApp: App {
                     .environmentObject(nav)
                     .onReceive(NotificationCenter.default.publisher(for: .navToVehicle)) { _ in nav.path = [.vehicle] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToHealth)) { _ in nav.path = [.health] }
-                    .onReceive(NotificationCenter.default.publisher(for: .navToBattery)) { _ in nav.path = [.battery] }
+                    .onReceive(NotificationCenter.default.publisher(for: .navToBattery)) { _ in
+                        nav.selectedTab = 2
+                        nav.chargePath = []
+                    }
                     .onReceive(NotificationCenter.default.publisher(for: .navToData)) { _ in nav.path = [.data] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToDev)) { _ in nav.path = [.dev] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToMessages)) { _ in
-                        nav.selectedTab = 2
-                        nav.messagesPath = [.messages]
+                        nav.selectedTab = 4
+                        nav.minePath = [.messages]
                     }
                     .onReceive(ToastManager.shared.$currentItem) { item in
                         nav.currentToast = item
@@ -201,12 +206,13 @@ final class NavState: ObservableObject, @unchecked Sendable {
     @Published var selectedTab: Int = 0
     @Published var currentToast: (text: String, icon: String)? = nil
     @Published var controlPath: [Deeplink] = []
-    @Published var messagesPath: [Deeplink] = []
+    @Published var chargePath: [Deeplink] = []
+    @Published var tripsPath: [Deeplink] = []
     @Published var minePath: [Deeplink] = []
 
     /// 每个 Tab 的 VoiceOver 描述（用于动态朗读切换时的页面名称）
     static let tabAccessibilityLabels: [Int: String] = [
-        0: "车况", 1: "车控", 2: "消息", 3: "我的"
+        0: "车况", 1: "车控", 2: "充电", 3: "行程", 4: "我的"
     ]
 
     private init() {}
@@ -224,15 +230,17 @@ final class NavState: ObservableObject, @unchecked Sendable {
         switch selectedTab {
         case 0: path.append(link)
         case 1: controlPath.append(link)
-        case 2: messagesPath.append(link)
-        case 3: minePath.append(link)
+        case 2: chargePath.append(link)
+        case 3: tripsPath.append(link)
+        case 4: minePath.append(link)
         default: path.append(link)
         }
     }
 
     func clearTabPaths() {
         controlPath = []
-        messagesPath = []
+        chargePath = []
+        tripsPath = []
         minePath = []
     }
 
@@ -290,10 +298,8 @@ struct MainTabView: View {
                 .navigationDestination(for: Deeplink.self) { link in
                     deeplinkDestination(link)
                 }
-                // iOS 26/27：导航栏用系统原生液态玻璃材质。
-                // 它是浮在内容之上的层，玻璃只用在这里才是层级正确的。
-                .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-                .toolbarBackground(.visible, for: .navigationBar)
+                // 导航栏材质交给系统：iOS 26/27 会在内容滚动到其下方时自动给出材质。
+                // 手写 .toolbarBackground 反而会把系统行为覆盖掉。
         }
             // #5 低电量角标：由统一的数据变更通知驱动
             .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
@@ -334,8 +340,6 @@ struct MainTabView: View {
                     .navigationDestination(for: Deeplink.self) { link in
                         deeplinkDestination(link)
                     }
-                    .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-                    .toolbarBackground(.visible, for: .navigationBar)
             }
             .accessibilitySortPriority(1)
             // ⚠️ 同 tab 0：.tabItem / .tag 必须最外层，否则标题与选中态都会失效
@@ -348,23 +352,39 @@ struct MainTabView: View {
 
     }
 
-    private var messagesTab: some View {
-            NavigationStack(path: $nav.messagesPath) {
-                MessagesView()
+    private var chargeTab: some View {
+            NavigationStack(path: $nav.chargePath) {
+                BatteryView()
                     .navigationDestination(for: Deeplink.self) { link in
                         deeplinkDestination(link)
                     }
-                    .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-                    .toolbarBackground(.visible, for: .navigationBar)
             }
             .accessibilitySortPriority(2)
-            // ⚠️ 同 tab 0：.tabItem / .tag 必须最外层
+            // ⚠️ 同 tab 0：.tabItem / .tag 必须最外层，否则标题与选中态都会失效
             .tabItem {
-                Label("消息", systemImage: "bubble.left.fill")
-                    .accessibilityLabel(Text("消息"))
-                    .accessibilityHint(Text("车辆通知和消息中心"))
+                Label("充电", systemImage: "bolt.fill")
+                    .accessibilityLabel(Text("充电"))
+                    .accessibilityHint(Text("充电状态、充电曲线与电费统计"))
             }
             .tag(2)
+
+    }
+
+    private var tripsTab: some View {
+            NavigationStack(path: $nav.tripsPath) {
+                TripAnalyticsView()
+                    .navigationDestination(for: Deeplink.self) { link in
+                        deeplinkDestination(link)
+                    }
+            }
+            .accessibilitySortPriority(3)
+            .tabItem {
+                // 图标名走 SafeSymbol：写错的 symbol 会渲染成空白（Tab 上就是“没图标”）
+                Label("行程", systemImage: SafeSymbol.name("point.topleft.down.to.point.bottomright.curvepath", fallback: "map.fill"))
+                    .accessibilityLabel(Text("行程"))
+                    .accessibilityHint(Text("里程、能耗与每一次出行记录"))
+            }
+            .tag(3)
 
     }
 
@@ -374,24 +394,23 @@ struct MainTabView: View {
                     .navigationDestination(for: Deeplink.self) { link in
                         deeplinkDestination(link)
                     }
-                    .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-                    .toolbarBackground(.visible, for: .navigationBar)
             }
-            .accessibilitySortPriority(3)
+            .accessibilitySortPriority(4)
             // ⚠️ 同 tab 0：.tabItem / .tag 必须最外层
             .tabItem {
                 Label("我的", systemImage: "person.fill")
                     .accessibilityLabel(Text("我的"))
                     .accessibilityHint(Text("账号设置和个人信息管理"))
             }
-            .tag(3)
+            .tag(4)
     }
 
     var body: some View {
         TabView(selection: $nav.selectedTab) {
             homeTab
             controlTab
-            messagesTab
+            chargeTab
+            tripsTab
             mineTab
         }
         // 选中色交给 SwiftUI（TabBar 保持系统原生液态玻璃外观）
@@ -412,7 +431,7 @@ struct MainTabView: View {
         .task { await store.bootstrap() }
         // 设置 TabView 整体无障碍描述和朗读顺序
         .accessibilityLabel(Text("主导航栏"))
-        .accessibilityHint(Text("四个主要功能模块：车况、车控、消息、我的。左右滑动可切换标签页"))
+        .accessibilityHint(Text("五个主要功能模块：车况、车控、充电、行程、我的。左右滑动可切换标签页"))
         .accessibilitySortPriority(0)
         // #4 网络状态指示器 + #NEW-3 离线模式提示
         .overlay(alignment: .top) {

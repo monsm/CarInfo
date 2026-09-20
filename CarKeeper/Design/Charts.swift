@@ -1,350 +1,274 @@
 // =============================================================================
-// N21-N25 数据可视化图表 — 雷达图/柱状图/历史曲线/饼图
+//  趋势图 — v4（Apple 原生语言）
+// =============================================================================
+//  三条曲线全部读 Services/HistoryStore.swift 的真实车端采样，
+//  **不再有示例值**：这个文件里原来有几个"接线前先摆着"的图表，其中一个
+//  （EnergyCompareChart 的便捷初始化）直接把 12 / 14 / 60 kWh 写死成柱状图 ——
+//  那种东西看起来像数据，但不是数据，比空图更坏，所以整批删除。
+//
+//  规则与全 App 一致：通栏、不装卡片；网格只用发丝线；颜色只表达语义；
+//  数字走等宽；没有足够采样时说清"为什么还没有数据"，不画灰色占位块。
 // =============================================================================
 
 import SwiftUI
 import Charts
-import MapKit
 
-// MARK: - N21 驾驶行为雷达图
-struct DrivingRadarChart: View {
-    let aggressiveAccel: Int
-    let harshBrake: Int
-    let smoothDrive: Int
-    let speedLimit: Int
-    
-    var body: some View {
-        ZStack {
-            ForEach(0..<5, id: \.self) { i in
-                let radius = CGFloat(50 + i * 25)
-                Circle()
-                    .stroke(Color.secondary.opacity(0.1), lineWidth: 0.5)
-                    .frame(width: radius * 2, height: radius * 2)
-            }
-            
-            // 轴线
-            let dims = ["加速", "刹车", "平稳", "限速"]
-            Chart {
-                ForEach(0..<4, id: \.self) { i in
-                    LineMark(
-                        x: .value("轴", dims[i]),
-                        y: .value("值", 100)
-                    )
-                    .foregroundStyle(Color.secondary.opacity(0.2))
-                }
-            }
-            .frame(width: 160, height: 160)
+// MARK: - 单序列趋势（SOC 历史 / 充电功率共用）
 
-            // 数据多边形 (iOS 26: PolygonMark removed — use AreaMark + LineMark)
-            Chart {
-                ForEach(radarPoints(), id: \.dimension) { point in
-                    AreaMark(
-                        x: .value("角度", angle(for: point.dimension)),
-                        y: .value("强度", point.value)
-                    )
-                    .foregroundStyle(Theme.Colors.accent.opacity(0.2))
-
-                    LineMark(
-                        x: .value("角度", angle(for: point.dimension)),
-                        y: .value("强度", point.value)
-                    )
-                    .foregroundStyle(Theme.Colors.accent)
-
-                    PointMark(
-                        x: .value("角度", angle(for: point.dimension)),
-                        y: .value("强度", point.value)
-                    )
-                    .foregroundStyle(accentColor(for: point.dimension))
-                    .symbolSize(8)
-                }
-            }
-            .chartLegend(.hidden)
-            .frame(width: 160, height: 160)
-        }
-        .overlay(
-            VStack(spacing: 4) {
-                Text("加速").font(.caption2).foregroundColor(.secondary)
-                HStack {
-                    Text("刹车").font(.caption2).foregroundColor(.secondary)
-                    Spacer()
-                    Text("平稳").font(.caption2).foregroundColor(.secondary)
-                }
-                Text("限速").font(.caption2).foregroundColor(.secondary)
-            }
-        )
-    }
-    
-    private func radarPoints() -> [(dimension: String, value: Double)] {
-        [
-            ("加速", Double(aggressiveAccel)),
-            ("刹车", Double(harshBrake)),
-            ("平稳", Double(smoothDrive)),
-            ("限速", Double(speedLimit))
-        ]
-    }
-    
-    private func angle(for dimension: String) -> Double {
-        switch dimension {
-        case "加速": return 0
-        case "刹车": return 90
-        case "平稳": return 180
-        case "限速": return 270
-        default: return 0
-        }
-    }
-    
-    private func accentColor(for dimension: String) -> Color {
-        switch dimension {
-        case "加速": return .orange
-        case "刹车": return .red
-        case "平稳": return .green
-        case "限速": return .blue
-        default: return Theme.Colors.accent
-        }
-    }
-}
-
-// MARK: - N23 能耗对比柱状图
-struct EnergyCompareChart: View {
-    let thisWeek: Double
-    let lastWeek: Double
-    let lastMonth: Double
-
-    init(thisWeek: Double, lastWeek: Double, lastMonth: Double) {
-        self.thisWeek = thisWeek
-        self.lastWeek = lastWeek
-        self.lastMonth = lastMonth
-    }
-
-    /// 便捷初始化：从 AppStore 读取（当前使用示例值，接口接入后替换）
-    init(store: Any) {
-        self.thisWeek = 12
-        self.lastWeek = 14
-        self.lastMonth = 60
-    }
-    
-    var body: some View {
-        Chart {
-            BarMark(
-                x: .value("周期", "本周"),
-                y: .value("能耗 kWh", thisWeek),
-                width: .fixed(30)
-            )
-            .foregroundStyle(Theme.Colors.accent)
-            
-            BarMark(
-                x: .value("周期", "上周"),
-                y: .value("能耗 kWh", lastWeek),
-                width: .fixed(30)
-            )
-            .foregroundStyle(.secondary.opacity(0.5))
-            
-            BarMark(
-                x: .value("周期", "上月"),
-                y: .value("能耗 kWh", lastMonth),
-                width: .fixed(30)
-            )
-            .foregroundStyle(.tertiary.opacity(0.5))
-        }
-        .chartXAxis {
-            AxisMarks(values: ["本周", "上周", "上月"])
-        }
-        .frame(height: 140)
-    }
-}
-
-// MARK: - N24 车辆状态历史曲线
-struct VehicleStatusChart: View {
-    let socHistory: [(Date, Int)]
-    let tempHistory: [(Date, Double)]
-    
-    var body: some View {
-        Chart {
-            ForEach(Array(socHistory.enumerated()), id: \.offset) { _, point in
-                LineMark(
-                    x: .value("时间", point.0),
-                    y: .value("SOC %", point.1)
-                )
-                .foregroundStyle(.green)
-                .lineStyle(StrokeStyle(lineWidth: 2))
-            }
-            ForEach(Array(tempHistory.enumerated()), id: \.offset) { _, point in
-                LineMark(
-                    x: .value("时间", point.0),
-                    y: .value("温度 °C", point.1)
-                )
-                .foregroundStyle(.orange)
-                .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
-            }
-        }
-        .frame(height: 120)
-    }
-}
-
-// MARK: - N25 里程费用饼图
-struct CostPieChart: View {
-    let chargeCost: Double
-    let fuelCost: Double
-    let parkingCost: Double
-    let maintenanceCost: Double
-    
-    private struct Slice: Identifiable {
+struct DSTrendChart: View {
+    struct Point: Identifiable {
         let id = UUID()
-        let name: String
-        let value: Double
-        let color: Color
+        let t: Date
+        let v: Double
     }
 
-    private var total: Double { chargeCost + fuelCost + parkingCost + maintenanceCost }
+    var points: [Point]
+    /// Y 轴单位（也用于无障碍描述）
+    var unit: String
+    var tint: Color
+    var height: CGFloat = 148
+    /// 固定量程（SOC 用 0...100，因为"百分比"本身有自然边界）；nil = 按数据自适应
+    var yDomain: ClosedRange<Double>? = nil
+    var valueText: (Double) -> String = { String(format: "%.0f", $0) }
 
-    private var slices: [Slice] {
-        [
-            Slice(name: "充电", value: chargeCost, color: .green),
-            Slice(name: "加油", value: fuelCost, color: .orange),
-            Slice(name: "停车", value: parkingCost, color: .blue),
-            Slice(name: "保养", value: maintenanceCost, color: .purple)
-        ]
+    private var domain: ClosedRange<Double> {
+        if let yDomain { return yDomain }
+        let values = points.map(\.v)
+        guard let lo = values.min(), let hi = values.max() else { return 0...1 }
+        if hi - lo < 0.5 { return (lo - 1)...(hi + 1) }
+        let pad = (hi - lo) * 0.18
+        return (lo - pad)...(hi + pad)
     }
 
     var body: some View {
-        if total > 0 {
-            Chart {
-                ForEach(slices) { slice in
-                    SectorMark(
-                        angle: .value("金额", slice.value),
-                        innerRadius: .ratio(0.55),
-                        outerRadius: .ratio(1)
-                    )
-                    .foregroundStyle(slice.color)
-                    .annotation(position: .overlay) {
-                        Text("\(slice.name)")
-                            .font(.caption2)
-                            .foregroundColor(.white)
+        Chart {
+            ForEach(points) { p in
+                AreaMark(
+                    x: .value("时间", p.t),
+                    y: .value(unit, p.v)
+                )
+                .foregroundStyle(
+                    LinearGradient(colors: [tint.opacity(0.18), tint.opacity(0.01)],
+                                   startPoint: .top, endPoint: .bottom)
+                )
+                .interpolationMethod(.monotone)
+
+                LineMark(
+                    x: .value("时间", p.t),
+                    y: .value(unit, p.v)
+                )
+                .foregroundStyle(tint)
+                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                .interpolationMethod(.monotone)
+            }
+            // 只给最后一个点画标记：曲线本身已经说明了方向，不用一串圆点装饰。
+            // （写成 ForEach(suffix(1)) 而不是 if-let：Chart 的 buildIf 分支尽量少用）
+            ForEach(points.suffix(1)) { last in
+                PointMark(
+                    x: .value("时间", last.t),
+                    y: .value(unit, last.v)
+                )
+                .foregroundStyle(tint)
+                .symbolSize(46)
+            }
+        }
+        .chartYScale(domain: domain)
+        .chartYAxis {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                    .foregroundStyle(DS.Palette.hairline)
+                AxisValueLabel {
+                    if let v = value.as(Double.self) {
+                        Text(valueText(v))
+                            .font(DS.Typo.caption2)
+                            .foregroundStyle(DS.Palette.labelTertiary)
                     }
                 }
             }
-            .frame(width: 100, height: 100)
-        } else {
-            Text("暂无数据").font(.caption)
         }
-    }
-}
-
-// MARK: - N22 充电站热力图（简化版，使用 MKCircle）
-struct ChargingHeatOverlay: View {
-    let stations: [(lat: Double, lng: Double, count: Int)]
-
-    private struct HeatPoint: Identifiable {
-        let id: Int
-        let diameter: CGFloat
-        let centerX: CGFloat
-    }
-
-    private var points: [HeatPoint] {
-        stations.enumerated().map { idx, station in
-            HeatPoint(id: idx,
-                      diameter: CGFloat(station.count) * 30 + 20,
-                      centerX: CGFloat(idx) * 50 + 25)
-        }
-    }
-
-    var body: some View {
-        ZStack {
-            ForEach(points) { p in
-                Circle()
-                    .fill(LinearGradient(colors: [Color.red.opacity(0.6), Color.orange.opacity(0.2), Color.clear],
-                                         startPoint: .center,
-                                         endPoint: .bottom))
-                    .frame(width: p.diameter, height: p.diameter)
-                    .position(x: p.centerX, y: 25)
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                AxisGridLine()
+                    .foregroundStyle(DS.Palette.hairline.opacity(0.6))
+                AxisValueLabel {
+                    if let d = value.as(Date.self) {
+                        Text(Self.axisTime(d))
+                            .font(DS.Typo.caption2)
+                            .foregroundStyle(DS.Palette.labelTertiary)
+                    }
+                }
             }
         }
-        .frame(height: 100)
+        .frame(height: height)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("趋势图，共 \(points.count) 个采样点"))
+        .accessibilityValue(Text(points.last.map { "最新 \(valueText($0.v)) \(unit)" } ?? "暂无数据"))
+    }
+
+    /// 轴上的时间：同一天只显示时刻，跨天显示"日 时"
+    private static func axisTime(_ d: Date) -> String {
+        Calendar.current.isDateInToday(d)
+            ? d.formatted(date: .omitted, time: .shortened)
+            : d.formatted(.dateTime.month().day().hour())
     }
 }
 
-// MARK: - 缺失的圖表組件存根（用於編譯通過）
+// MARK: - 胎压趋势（四条曲线：左前 / 右前 / 左后 / 右后）
 
-struct BatteryHealthCard: View {
-    let model: Any
+struct DSTyreTrendChart: View {
+    var points: [HistoryStore.TyrePoint]
+    var tint: Color = DS.Palette.tint
+    var height: CGFloat = 156
+
+    /// 四条线只用一支强调色的四个明度档 + 不同虚实，不引入第二支彩色
+    private enum Wheel: String, CaseIterable {
+        case fl = "左前", fr = "右前", rl = "左后", rr = "右后"
+        var opacity: Double {
+            switch self {
+            case .fl: return 1.00
+            case .fr: return 0.78
+            case .rl: return 0.58
+            case .rr: return 0.40
+            }
+        }
+        var dash: [CGFloat] {
+            switch self {
+            case .fl: return []
+            case .fr: return [6, 3]
+            case .rl: return [2, 2.5]
+            case .rr: return [8, 3, 2, 3]
+            }
+        }
+        func value(_ p: HistoryStore.TyrePoint) -> Double? {
+            switch self {
+            case .fl: return p.fl
+            case .fr: return p.fr
+            case .rl: return p.rl
+            case .rr: return p.rr
+            }
+        }
+    }
+
+    /// 一条待绘制的序列。写成小结构体而不是元组：
+    /// Chart 的 `ForEach` 需要 Identifiable/键路径，而 Swift 的键路径不能指向元组元素。
+    private struct Series: Identifiable {
+        let id: String
+        let value: Double
+        let dash: [CGFloat]
+        let opacity: Double
+    }
+
+    private func series(in p: HistoryStore.TyrePoint) -> [Series] {
+        Wheel.allCases.compactMap { wheel in
+            wheel.value(p).map {
+                Series(id: wheel.rawValue, value: $0, dash: wheel.dash, opacity: wheel.opacity)
+            }
+        }
+    }
+
+    private var allValues: [Double] {
+        points.flatMap { $0.values.map(\.v) }
+    }
+
+    private var domain: ClosedRange<Double> {
+        guard let lo = allValues.min(), let hi = allValues.max() else { return 200...260 }
+        let pad = max((hi - lo) * 0.25, 8)
+        return (lo - pad)...(hi + pad)
+    }
+
     var body: some View {
-        Text("電池健康度卡片")
-            .font(.title3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
+        VStack(alignment: .leading, spacing: DS.Space.sm) {
+            Chart {
+                ForEach(points) { p in
+                    ForEach(series(in: p)) { s in
+                        LineMark(
+                            x: .value("时间", p.t),
+                            y: .value("kPa", s.value),
+                            series: .value("轮位", s.id)
+                        )
+                        .foregroundStyle(tint.opacity(s.opacity))
+                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, dash: s.dash))
+                        .interpolationMethod(.monotone)
+                    }
+                }
+            }
+            .chartYScale(domain: domain)
+            .chartYAxis {
+                AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                        .foregroundStyle(DS.Palette.hairline)
+                    AxisValueLabel {
+                        if let v = value.as(Double.self) {
+                            Text(String(format: "%.0f", v))
+                                .font(DS.Typo.caption2)
+                                .foregroundStyle(DS.Palette.labelTertiary)
+                        }
+                    }
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                    AxisGridLine()
+                        .foregroundStyle(DS.Palette.hairline.opacity(0.6))
+                    AxisValueLabel {
+                        if let d = value.as(Date.self) {
+                            Text(d.formatted(.dateTime.month().day().hour()))
+                                .font(DS.Typo.caption2)
+                                .foregroundStyle(DS.Palette.labelTertiary)
+                        }
+                    }
+                }
+            }
+            .frame(height: height)
+
+            // 图例：直接给当前值，省得在曲线上一根根找
+            HStack(spacing: DS.Space.md) {
+                ForEach(Wheel.allCases, id: \.rawValue) { wheel in
+                    let last = points.last.flatMap { wheel.value($0) }
+                    HStack(spacing: DS.Space.xs) {
+                        Capsule()
+                            .fill(tint.opacity(wheel.opacity))
+                            .frame(width: 12, height: 2.5)
+                        Text(wheel.rawValue)
+                            .font(DS.Typo.caption2)
+                            .foregroundStyle(DS.Palette.labelSecondary)
+                        Text(last.map { String(format: "%.0f", $0) } ?? "--")
+                            .font(DS.Typo.data(11))
+                            .foregroundStyle(DS.Palette.label)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .accessibilityHidden(true)
+        }
     }
 }
 
-struct ChargePowerChart: View {
-    let model: Any
-    var body: some View {
-        Text("充電功率曲線")
-            .font(.title3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-    }
-}
+// MARK: - 数据还不够时的说明（不是灰色占位块）
 
-struct SOCHistoryChart: View {
-    let store: Any
-    var body: some View {
-        Text("SOC 歷史曲線")
-            .font(.title3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-    }
-}
+struct DSTrendEmpty: View {
+    var icon: String
+    var title: String
+    var message: String
 
-struct TireTrendChart: View {
-    let checkRaw: [String: Any]
     var body: some View {
-        Text("車胎趨勢圖")
-            .font(.title3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-    }
-}
-
-struct DrivingStyleHeatmap: View {
-    let store: Any
-    var body: some View {
-        Text("駕駛風格熱力圖")
-            .font(.title3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-    }
-}
-
-struct ChargeCostChart: View {
-    let store: Any
-    var body: some View {
-        Text("充電成本圖")
-            .font(.title3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-    }
-}
-
-struct SiriInsightView: View {
-    let store: Any
-    var body: some View {
-        Text("Siri 使用洞察")
-            .font(.title3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
+        HStack(alignment: .top, spacing: DS.Space.md) {
+            Image(safeSymbol: icon, fallback: "chart.xyaxis.line")
+                .font(.system(size: 20, weight: .light))
+                .foregroundStyle(DS.Palette.labelTertiary)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: DS.Space.xxs) {
+                Text(title)
+                    .font(DS.Typo.subheadline.weight(.semibold))
+                    .foregroundStyle(DS.Palette.label)
+                Text(message)
+                    .font(DS.Typo.footnote)
+                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, DS.Space.xs)
+        .accessibilityElement(children: .combine)
     }
 }

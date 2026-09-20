@@ -22,6 +22,8 @@ targets:
     - path: Models
     - path: CarKeeper/Models
     - path: HealthKit
+    # 与小组件/实时活动共享的设计令牌与数据契约（同一批文件也被 WidgetBundle 编译）
+    - path: Shared
     resources:
     - path: CarKeeper/Resources/Assets.xcassets
       group: Resources/Assets.xcassets
@@ -66,6 +68,8 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UIRequiresFullScreen: true
+        # 实时活动总开关：缺这个键 Activity.request 不会生效，锁屏/灵动岛永远不会出现
+        NSSupportsLiveActivities: true
         UIRequiredDeviceCapabilities:
         - arm64
     settings:
@@ -75,15 +79,24 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: 1,2
         ENABLE_USER_SCRIPT_SANDBOXING: 'NO'
-        CODE_SIGN_ENTITLEMENTS: CarKeeper/CarKeeper/CarKeeper.entitlements
-    dependencies: []
+        # ⚠️ 路径相对 SRCROOT（即本目录），原值 CarKeeper/CarKeeper/… 多了一层，
+        # 指向的是不存在的文件 —— 于是 App Group 等 entitlements 一直没被用上。
+        CODE_SIGN_ENTITLEMENTS: CarKeeper/CarKeeper.entitlements
+    dependencies:
+    # 小组件/实时活动扩展必须由 App 依赖，才会被构建并嵌入 App 包里；
+    # 反过来写（扩展依赖 App）不会产生 Embed 阶段，小组件在系统里永远不出现。
+    - target: WidgetBundle
   WidgetBundle:
-    type: bundle
+    # app-extension（不是 bundle）：只有真正的 appex 才会被系统注册为小组件宿主，
+    # 也只有它才能被 Embed 进 App 包里。
+    type: app-extension
     platform: iOS
     sources:
     - path: Widgets/
       excludes:
       - '**/.*'
+    # 设计令牌（WT）与实时活动数据契约（ChargingActivityAttributes）与 App 同一份源文件
+    - path: Shared
     info:
       path: Widgets/Info.plist
       properties:
@@ -97,30 +110,19 @@ targets:
         GENERATE_INFOPLIST_FILE: 'YES'
         ENABLE_PREVIEWS: 'NO'
         CODE_SIGNING_ALLOWED: 'NO'
-    dependencies:
-    - target: CarKeeper
-  ChargingLiveActivity:
-    type: bundle
-    platform: iOS
-    sources:
-    - path: LiveActivities/
-      excludes:
-      - '**/.*'
-    info:
-      path: LiveActivities/Info.plist
-      properties:
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.usernotifications.liveactivity
-          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ChargingLiveActivityView
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper.liveactivity
-        PRODUCT_NAME: ChargingLiveActivity
-        GENERATE_INFOPLIST_FILE: 'YES'
-        ENABLE_PREVIEWS: 'NO'
-        CODE_SIGNING_ALLOWED: 'NO'
-    dependencies:
-    - target: CarKeeper
+        # 扩展要读 App 写在同一 App Group 里的快照，没有这份 entitlements 就只能读到 0
+        CODE_SIGN_ENTITLEMENTS: Widgets/Widgets.entitlements
+        TARGETED_DEVICE_FAMILY: 1,2
+    # 这里原来写的是「扩展依赖 App」—— 方向反了：
+    #   · 扩展无法 import App 模块（东西拿不到），
+    #   · 而且 App 现在依赖本目标，两边互指会构成依赖循环。
+    # 扩展真正需要的东西（设计令牌 + 数据契约）由上面的 Shared/ 直接提供。
+    dependencies: []
+  # 原来的 ChargingLiveActivity 目标已删除：实时活动的界面必须住在**小组件扩展**里
+  # （扩展点 com.apple.widgetkit-extension + ActivityConfiguration），
+  # 而原目标用的是 com.apple.usernotifications.liveactivity —— 那个扩展点不存在，
+  # 而且它只声明了一个普通 View，所以实时活动从未出现过。
+  # 现在：界面在 Widgets/WidgetBundle.swift，数据契约在 Shared/ChargingActivityAttributes.swift。
   WatchApp:
     type: bundle
     platform: watchOS

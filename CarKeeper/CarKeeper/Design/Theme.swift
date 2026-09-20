@@ -301,7 +301,7 @@ extension View {
     // 刻意不接受任何颜色参数：页面底色只能是 DS.Palette.canvas 这一层。
     func pageBackground() -> some View {
         contentMargins(.horizontal, DS.Space.page, for: .scrollContent)
-            .background(DS.Palette.canvas.ignoresSafeArea())
+            .background(DS.Palette.canvasGradient.ignoresSafeArea())
     }
 
     // MARK: - 卡片修饰符
@@ -334,13 +334,11 @@ struct GlassCardModifier: ViewModifier {
         content
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    // 内容卡片一律不透明（hero 也一样）：玻璃只允许出现在浮层。
+                    // 内容一律不透明（hero 也一样）：玻璃只允许出现在浮层。
                     .fill(DS.Palette.surface)
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(DS.Palette.hairline, lineWidth: DS.Hair.line)
-            }
+            // v4：内容层没有描边、没有阴影 —— 深度只由系统表面色表达。
+            // （它们曾经是“卡片感”的来源，也是界面显廉价的主因。）
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 }
@@ -634,34 +632,6 @@ struct FluidTempHero: View {
             minSize: minSize,
             maxSize: maxSize
         )
-    }
-}
-
-// MARK: - 健康系统小圆环统计（单色弧 + 轨道）
-struct HealthSystemRing: View {
-    let name: String
-    let statusCls: String
-    let statusText: String
-    let pct: Int
-
-    private var ringColor: Color { DS.Palette.status(statusCls) }
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(DS.Palette.surfaceSunken, style: StrokeStyle(lineWidth: 5))
-            Circle()
-                .trim(from: 0, to: max(0.02, min(1, CGFloat(pct) / 100)))
-                .stroke(ringColor, style: StrokeStyle(lineWidth: 5, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .animation(DS.Motion.value, value: pct)
-            Text("\(pct)%")
-                .font(.system(size: 10, weight: .semibold, design: .rounded).monospacedDigit())
-                .foregroundStyle(ringColor)
-        }
-        .frame(width: 48, height: 48)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text("\(name) \(statusText) \(pct)%"))
     }
 }
 

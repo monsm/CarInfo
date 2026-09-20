@@ -16,14 +16,22 @@ struct BatteryView: View {
     @State private var showDestinationCalc = false
     @State private var destinationDistance: String = ""
     @State private var canReach: Bool?
-    // #NEW-8 能耗趋势视图切换（实时/本周/本月）
-    enum EnergyTrendPeriod: String, CaseIterable, Identifiable {
-        case realtime = "实时"
-        case week = "本周"
-        case month = "本月"
+    // 趋势周期。旧的「实时/本周/本月」是假的：它读的是 energyHistory —— 一个 20 条 /
+    // 60 秒的实时缓冲，选"本周"永远只有最近一分钟的数据，图是空的一条线。
+    enum TrendPeriod: String, CaseIterable, Identifiable {
+        case day = "24 小时"
+        case week = "7 天"
+        case month = "30 天"
         var id: String { rawValue }
+        var hours: Double {
+            switch self {
+            case .day: return 24
+            case .week: return 24 * 7
+            case .month: return 24 * 30
+            }
+        }
     }
-    @State private var energyTrendPeriod: EnergyTrendPeriod = .realtime
+    @State private var trendPeriod: TrendPeriod = .day
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
@@ -33,9 +41,10 @@ struct BatteryView: View {
             }
         }
         .scrollBounceBehavior(.basedOnSize)
-        .pageBackground()
-        .navigationTitle("电池与充电")
-            .accessibilityLabel(Text("电池与充电"))
+        .dsCanvas()
+        .navigationTitle("充电")
+        .navigationBarTitleDisplayMode(.large)
+            .accessibilityLabel(Text("充电"))
             .accessibilityHint(Text("电池状态、充电历史与诊断报告"))
         .onAppear { loadIfNeeded(); startSocAnimation() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
@@ -77,82 +86,72 @@ struct BatteryView: View {
         socHero(e)
         verdictCard(cache, b)
         consistencyCard(b)
-        // E2 电池健康度 SOH
-        BatteryHealthCard(model: b)
-        // E7 充电功率曲线
-        ChargePowerChart(model: b)
         chargeCard(b)
-        // #13 能耗历史折线图 / E26 充电效率趋势
-        ChargeEfficiencyTrend(store: store)
-        // E22 能耗对比柱状图
-        EnergyCompareChart(store: store)
-        energyHistoryChart
+        // 趋势（SOC 历史 / 充电功率）—— 真实车端采样，见 Services/HistoryStore.swift
+        trendSection
         subsystemCard(b)
         motorCard(b)
         faultCard(b)
-        // E56 SOC历史曲线
-        SOCHistoryChart(store: store)
-        // E3 胎压趋势折线图
-        TireTrendChart(checkRaw: store.caches["check"] as? [String: Any] ?? [:])
         alarmCard(b)
     }
 
-    // MARK: 电池 Hero（Tesla 式：大数字 + 单色电量条 + 关键数据格）
+    // MARK: 电池头部（v4：一个巨大数字 + 一条光条 + 三条事实，不装容器）
     private func socHero(_ e: EnergyModel) -> some View {
         let tint = socTint(e.socPct)
         let socText = e.soc == "--" ? "--" : "\(socCount)"
+        let fraction = max(0, min(1, Double(e.socPct) / 100.0))
+        let rangeText = e.range == "--" ? "--" : (rangeCount > 0 ? String(rangeCount) : e.range)
 
-        return DSCard(padding: DS.Space.xl, radius: DS.Radius.hero) {
-            VStack(alignment: .leading, spacing: DS.Space.lg) {
-                HStack(alignment: .top) {
-                    DSMetric(value: socText, unit: "%", caption: "电池电量", size: 64, tint: tint)
-                    Spacer(minLength: DS.Space.md)
-                    VStack(alignment: .trailing, spacing: DS.Space.sm) {
-                        DSChip(text: e.online.text, cls: e.online.cls)
-                        if !e.socWarn.isEmpty {
-                            DSChip(text: e.socWarn, cls: e.socCls)
-                        }
-                    }
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
+                Text(e.chargeText)
+                    .font(DS.Typo.footnote)
+                    .foregroundStyle(e.chargeCls == "ok" || e.chargeCls == "charge"
+                                     ? DS.Palette.charge : DS.Palette.labelSecondary)
+                Spacer(minLength: DS.Space.sm)
+                if !e.socWarn.isEmpty {
+                    Text(e.socWarn)
+                        .font(DS.Typo.footnote)
+                        .foregroundStyle(DS.Palette.status(e.socCls))
                 }
-                .dynamicTypeCompress()
-
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(DS.Palette.surfaceSunken)
-                        Capsule()
-                            .fill(tint)
-                            .frame(width: max(6, geo.size.width * min(1, max(0, socProgress / 100))))
-                            .animation(DS.Motion.value, value: socProgress)
-                    }
-                }
-                .frame(height: 10)
-                .accessibilityElement()
-                .accessibilityLabel(Text("电池电量 \(e.socPct)%"))
-
-                DSDivider()
-
-                HStack(alignment: .top, spacing: DS.Space.md) {
-                    DSStatTile(label: "续航",
-                               value: e.range == "--" ? "--" : (rangeCount > 0 ? String(rangeCount) : e.range),
-                               unit: "km",
-                               icon: "road.lanes")
-                    DSStatTile(label: "充电状态", value: e.chargeText, cls: e.chargeCls, icon: "bolt.fill")
-                    DSStatTile(label: "电压/电流", value: e.voltAmp, icon: "waveform.path.ecg")
-                }
-
-                HStack(spacing: DS.Space.lg) {
-                    Text("电池温度 \(e.battTemp)")
-                    if let tte = e.timeToEmpty, tte != "--" {
-                        Text("预计可行驶 \(tte)")
-                    }
-                    Spacer(minLength: 0)
-                    Text("更新 \(e.updated == "--" ? "--" : String(e.updated.suffix(5)))")
-                }
-                .font(DS.Typo.footnote)
-                .foregroundStyle(DS.Palette.labelSecondary)
             }
+
+            DSBigNumber(value: socText, unit: "%", caption: "电池电量", size: 116, tint: tint)
+                .padding(.top, DS.Space.md)
+
+            DSLightBar(
+                progress: fraction,
+                tint: LinearGradient(colors: [Color.white, tint.opacity(0.75), tint],
+                                     startPoint: .leading, endPoint: .trailing)
+            )
+            .padding(.top, DS.Space.xl)
+
+            HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
+                Text("续航 \(rangeText) km")
+                    .font(DS.Typo.footnote)
+                    .foregroundStyle(DS.Palette.labelSecondary)
+                Spacer(minLength: DS.Space.sm)
+                if let ttf = e.timeToFull, ttf != "--" {
+                    Text("预计充满 \(ttf)")
+                        .font(DS.Typo.footnote)
+                        .foregroundStyle(DS.Palette.labelSecondary)
+                } else if let tte = e.timeToEmpty, tte != "--" {
+                    Text("可行驶 \(tte)")
+                        .font(DS.Typo.footnote)
+                        .foregroundStyle(DS.Palette.labelSecondary)
+                }
+            }
+            .padding(.top, DS.Space.md)
+
+            DSStatStrip(items: [
+                .init("电池温度", e.battTemp),
+                .init("电压 / 电流", e.voltAmp),
+                .init(e.online.text, e.updated == "--" ? "--" : String(e.updated.suffix(5)))
+            ])
+            .padding(.top, DS.Space.xl)
+            .overlay(alignment: .top) { DSDivider() }
+            .overlay(alignment: .bottom) { DSDivider() }
         }
-        .dynamicTypeCompress()
         .accessibilityElement(children: .contain)
     }
 
@@ -324,7 +323,7 @@ struct BatteryView: View {
                             }
                         }
                         .padding(10)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                 }
             }
@@ -369,7 +368,7 @@ struct BatteryView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private struct R { let k: String; let v: String; var cls: String = "" }
@@ -407,86 +406,83 @@ struct BatteryView: View {
         return rows
     }
 
-    // MARK: 能耗趋势折线图 (#13 + #NEW-8)
+    // MARK: 趋势（SOC 历史 + 充电功率）
+    /// 数据全部来自 HistoryStore 的真实采样：服务端只有"当前状态"接口（小程序也一样），
+    /// 所以曲线是 App 一点点攒出来的。攒不够时说清原因，不画灰块、不编数字。
     @ViewBuilder
-    private var energyHistoryChart: some View {
-        if store.energyHistory.count >= 2 {
-        VStack(spacing: 0) {
-            // 视图切换胶囊
-            HStack(spacing: 6) {
-                ForEach(EnergyTrendPeriod.allCases) { period in
-                    Button(period.rawValue) {
-                        let anim = Animation.spring(response: 0.4, dampingFraction: 0.7)
-                        withAnimation(anim) {
-                            energyTrendPeriod = period
-                        }
+    private var trendSection: some View {
+        let socPoints = HistoryStore.shared.socSeries(hours: trendPeriod.hours)
+            .map { DSTrendChart.Point(t: $0.t, v: $0.v) }
+        let powerPoints = HistoryStore.shared.powerSeries(hours: trendPeriod.hours)
+            .map { DSTrendChart.Point(t: $0.t, v: $0.v) }
+        let e = VM.energy(store.caches, store.car)
+        let socMinutes = Int(HistoryStore.socInterval / 60)
+        let powerMinutes = Int(HistoryStore.powerInterval / 60)
+
+        VStack(alignment: .leading, spacing: DS.Space.lg) {
+            DSSectionHeader(title: "趋势", trailing: "采样自车端实时数据")
+
+            Picker("周期", selection: $trendPeriod) {
+                ForEach(TrendPeriod.allCases) { p in
+                    Text(p.rawValue).tag(p)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            // ---- SOC 历史 ----
+            VStack(alignment: .leading, spacing: DS.Space.sm) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("SOC 历史")
+                        .font(DS.Typo.subheadline.weight(.semibold))
+                        .foregroundStyle(DS.Palette.label)
+                    Spacer(minLength: DS.Space.sm)
+                    Text("当前 \(e.socPct)%")
+                        .font(DS.Typo.data(13))
+                        .foregroundStyle(DS.Palette.labelSecondary)
+                }
+                if socPoints.count >= 2 {
+                    DSTrendChart(points: socPoints,
+                                 unit: "%",
+                                 tint: socTint(e.socPct),
+                                 yDomain: 0...100,
+                                 valueText: { String(format: "%.0f", $0) })
+                } else {
+                    DSTrendEmpty(
+                        icon: "chart.xyaxis.line",
+                        title: "正在积累 SOC 数据",
+                        message: "服务端没有历史接口，这条曲线由 App 每 \(socMinutes) 分钟采一次（电量变化 ≥ \(Int(HistoryStore.socJump))% 也会立刻留一个点）。已记录 \(socPoints.count) 个点。"
+                    )
+                }
+            }
+
+            // ---- 充电功率 ----
+            VStack(alignment: .leading, spacing: DS.Space.sm) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("充电功率")
+                        .font(DS.Typo.subheadline.weight(.semibold))
+                        .foregroundStyle(DS.Palette.label)
+                    Spacer(minLength: DS.Space.sm)
+                    if let c = e.charging {
+                        Text(c.power)
+                            .font(DS.Typo.data(13))
+                            .foregroundStyle(DS.Palette.charge)
                     }
-                    .font(Theme.micro.bold())
-                    .padding(.horizontal, 12).padding(.vertical, 5)
-                    .background(energyTrendPeriod == period ? Theme.Colors.accent : Color.secondary.opacity(0.15), in: Capsule())
-                    .foregroundStyle(energyTrendPeriod == period ? .white : .secondary)
+                }
+                if powerPoints.count >= 2 {
+                    DSTrendChart(points: powerPoints,
+                                 unit: "kW",
+                                 tint: DS.Palette.charge,
+                                 height: 132,
+                                 valueText: { String(format: "%.0f", $0) })
+                } else {
+                    DSTrendEmpty(
+                        icon: "bolt",
+                        title: "还没有充电曲线",
+                        message: "只在充电中每 \(powerMinutes) 分钟记一个点，所以这条曲线要真正充过一次电才会长出来。已记录 \(powerPoints.count) 个点。"
+                    )
                 }
             }
-            .padding(.horizontal)
-            .padding(.bottom, 4)
-            // 图表
-            Chart {
-                ForEach(filteredEnergyRecords, id: \.id) { rec in
-                    LineMark(
-                        x: .value("时间", rec.timestamp, unit: .second),
-                        y: .value("SOC %", rec.soc)
-                    )
-                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: energyTrendPeriod == .realtime ? [] : [4, 2]))
-                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : Theme.Colors.accent)
-                    PointMark(
-                        x: .value("时间", rec.timestamp, unit: .second),
-                        y: .value("SOC %", rec.soc)
-                    )
-                    .foregroundStyle(energyTrendPeriod == .realtime ? .green : Theme.Colors.accent)
-                    .symbolSize(8)
-                }
-                // 填充区域
-                ForEach(filteredEnergyRecords, id: \.id) { rec in
-                    AreaMark(
-                        x: .value("时间", rec.timestamp, unit: .second),
-                        y: .value("SOC %", rec.soc)
-                    )
-                    .foregroundStyle(LinearGradient(colors: [.green.opacity(0.2), .green.opacity(0.02)], startPoint: .top, endPoint: .bottom))
-                }
-            }
-            .chartXAxis {
-                AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
-                    AxisValueLabel(format: timeFormat())
-                }
-            }
-            .chartYScale(domain: 0...100)
-            .frame(height: 160)
-            .padding(.vertical, 4)
-        }
-        .glassCard(corner: Theme.Radius.card)
-        }
-    }
-
-    private func timeFormat() -> Date.FormatStyle {
-        switch energyTrendPeriod {
-        case .realtime: return .dateTime.hour()
-        case .week: return .dateTime.hour().weekday()
-        case .month: return .dateTime.month().day()
-        }
-    }
-
-    private var filteredEnergyRecords: [AppStore.EnergyRecord] {
-        let now = Date()
-        switch energyTrendPeriod {
-        case .realtime:
-            return store.energyHistory.filter { now.timeIntervalSince($0.timestamp) < 3600 }
-        case .week:
-            let weekStart = Calendar.current.date(byAdding: .day, value: -Calendar.current.component(.weekday, from: now), to: now) ?? now
-            return store.energyHistory.filter { $0.timestamp >= weekStart }
-        case .month:
-            let monthStart = Calendar.current.date(from: Calendar.current.dateComponents([.year, .month], from: now)) ?? now
-            return store.energyHistory.filter { $0.timestamp >= monthStart }
         }
     }
 
@@ -564,7 +560,7 @@ struct DestinationCalculatorView: View {
                 .keyboardType(.decimalPad)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                .background(DS.Palette.fillSubtle, in: RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1))
 
             if let reach = canReach {

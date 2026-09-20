@@ -1,8 +1,16 @@
 import SwiftUI
+import UIKit
 
-// 健康报告 —— DS 设计系统：
-// 评分单色弧 + 三项计数徽章 + 系统列表（可展开）+ 历史趋势。
-// 只有一条轨道、一段进度和一组计数：所有信息都由排版与颜色表达。
+// =============================================================================
+//  健康报告 —— v4 信息架构
+// =============================================================================
+//  ① 评分区：一个大数字（综合评分）+ 一句结论 + 一条光条 + 三条带图标的计数
+//     没有仪表环：环和数字说的是同一件事，v4 用它只表达一次。
+//  ② 检测系统：inset-grouped 分组，逐项可展开（展开区是内凹表面 + 发丝线）
+//  ③ 检测信息：检测 ID / 数据更新 / 最近检测 / 车辆状态，ID 可一键复制
+//
+//  规则：分组标题在画布上、行在分组表面上；颜色只表达状态；玻璃不进入内容层。
+// =============================================================================
 
 struct HealthView: View {
     private let store = AppStore.shared
@@ -12,36 +20,36 @@ struct HealthView: View {
     @State private var expandedSystems: Set<String> = []
     @State private var loadTask: Task<Void, Never>? = nil
 
-    // MARK: 动画状态
-    @State private var isRefreshing = false            // 下拉刷新进行中
-    @State private var heroExpanded = false            // Hero 卡片整体展开/收起系统列表
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.Spacing.cardSpacing) {
+            VStack(alignment: .leading, spacing: DS.Space.gap) {
                 if loading {
-                    loadingView
+                    loadingState
                 } else if let model {
-                    scoreHeroListWrapper(model)
-                    // E54 胎压趋势折线图
-                    TireTrendChart(checkRaw: store.caches["check"] as? [String: Any] ?? [:])
-                    // E55 实时能耗率显示
-                    RealtimeEnergyDisplay(store: store)
-                    // E56 SOC历史曲线
-                    SOCHistoryChart(store: store)
-                    // E62 驾驶风格热力图
-                    DrivingStyleHeatmap(store: store)
+                    scoreSection(model)
+                    systemsSection(model)
+                    infoSection(model)
                 } else if let err = errText {
-                    PageErrorView(err) { Task { await load() } }
+                    DSPlaceholder(icon: "exclamationmark.triangle",
+                                  title: "读取失败",
+                                  message: err,
+                                  actionTitle: "重新加载",
+                                  cls: "warn") { Task { await load() } }
+                } else {
+                    DSPlaceholder(icon: "checkmark.shield",
+                                  title: "暂无检测报告",
+                                  message: "车辆完成一次全车检测后，这里会显示评分与逐系统明细",
+                                  actionTitle: "重新加载") { Task { await load() } }
                 }
             }
-            
-            
+            .padding(.top, DS.Space.sm)
+            .padding(.bottom, DS.Space.xxxl)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
         .pageBackground()
         .navigationTitle("健康报告")
+        .refreshable { await load() }
         .onAppear {
             if expandedSystems.isEmpty, let m = model {
                 for sys in m.systems where sys.statusCls == "bad" { expandedSystems.insert(sys.name) }
@@ -49,344 +57,160 @@ struct HealthView: View {
             loadIfNeeded()
         }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
-        .refreshable { isRefreshing = true; await load(); isRefreshing = false }
     }
 
-    // MARK: 加载状态
-    private var loadingView: some View {
-        PageLoadingView("正在读取健康报告…")
-    }
+    // MARK: - 加载态（安静的内容占位，不加边距 —— 画布已经统一给了 20pt）
 
-    // MARK: 评分 Hero — Apple Watch Activity Rings + Liquid Glass
-    private func scoreHero(_ m: HealthModel) -> some View {
-        VStack(spacing: 22) {
-            // 评分圆环
-            scoreRing(m)
-
-            // 三项计数徽章
-            HStack(spacing: DS.Space.md) {
-                ForEach(Array(m.counts.enumerated()), id: \ .offset) { _, c in
-                    countPill(c)
-                }
+    private var loadingState: some View {
+        VStack(alignment: .leading, spacing: DS.Space.md) {
+            HStack(spacing: DS.Space.sm) {
+                ProgressView().controlSize(.small)
+                Text("正在读取健康报告…")
+                    .font(DS.Typo.footnote)
+                    .foregroundStyle(DS.Palette.labelSecondary)
             }
-
-            // 时间信息行
-            infoRow(m)
+            DSSkeleton(height: 96)
+            DSSkeleton(height: 64)
+            DSSkeleton(height: 44)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, DS.Space.xxxl)
-        .glassHeroCard(corner: Theme.Radius.hero)
-    }
-
-    // MARK: Hero 卡片 + 系统列表（整体可展开/收起）
-    /// 点击 scoreHero 区域切换展开状态：系统列表弹簧高度展开 + 整体玻璃压缩形变
-    private func scoreHeroListWrapper(_ m: HealthModel) -> some View {
-        let chevronAngle: Angle = heroExpanded ? .degrees(90) : .degrees(0)
-        return Button {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.35)) {
-                heroExpanded.toggle()
-            }
-        } label: {
-            VStack(spacing: 0) {
-                scoreHero(m)
-                // 展开内容区：系统列表弹簧高度过渡
-                if heroExpanded {
-                    systemList(m)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .scaleEffect(heroExpanded ? 0.97 : 1.0)
-        .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: heroExpanded)
-        .accessibilityLabel(Text("健康评分报告"))
-        .accessibilityHint(Text(heroExpanded ? "点击收起系统详情" : "点击展开系统详情，查看各子系统状态"))
-        .overlay(alignment: .bottomTrailing) {
-            Image(systemName: "chevron.down")
-                .font(Theme.font(.footnote as Font).bold())
-                .foregroundStyle(.tertiary)
-                .rotationEffect(chevronAngle)
-                .animation(.spring(response: 0.35, dampingFraction: 0.6), value: heroExpanded)
-                .padding([.bottom, .trailing], 18)
-        }
-    }
-
-    // MARK: 健康评分环
-    // 规则：一条单色轨道 + 一条单色进度。环只负责「读数刻度」，颜色只表达健康度分级。
-    private func scoreRing(_ m: HealthModel) -> some View {
-        DSGauge(progress: Double(m.scorePct) / 100.0,
-                lineWidth: 16,
-                tint: scoreShadowColor(m.scorePct),
-                value: m.score,
-                caption: "健康评分",
-                size: 200)
-        .frame(width: 216, height: 216)
-    }
-
-    // MARK: 三项计数徽章
-    private func countPill(_ c: CountPill) -> some View {
-        let clsColor = DS.Palette.status(c.cls)
-        return VStack(spacing: DS.Space.xs) {
-            // 补齐图标：原来这一格只有数字 + 颜色，没有图标
-            Image(safeSymbol: c.iconName, fallback: "info.circle.fill")
-                .font(Theme.footnote.weight(.semibold))
-                .foregroundStyle(clsColor)
-            Text(c.n)
-                .font(Theme.d4)
-                .foregroundStyle(clsColor)
-            Text(c.key)
-                .font(Theme.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, DS.Space.md)
-        .background(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-            .fill(DS.Palette.surfaceRaised))
-        .overlay(
-            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                .strokeBorder(clsColor.opacity(0.20), lineWidth: DS.Hair.line)
-        )
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text("正在读取健康报告"))
     }
 
-    // MARK: 时间信息行
-    private func infoRow(_ m: HealthModel) -> some View {
-        VStack(spacing: 8) {
-            if !m.time.isEmpty {
-                HStack(spacing: 6) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(Theme.footnote)
-                        .foregroundStyle(.secondary)
-                    Text("最近检测  \(m.time)")
-                        .font(Theme.footnote)
-                        .foregroundStyle(.secondary)
+    // MARK: - ① 评分区
+
+    private func scoreSection(_ m: HealthModel) -> some View {
+        let tint = scoreColor(m.scorePct)
+        return VStack(alignment: .leading, spacing: 0) {
+            DSSectionHeader(title: "健康评分")
+
+            HStack(spacing: DS.Space.sm) {
+                if let vs = m.vehicleStatus, !vs.isEmpty {
+                    DSChip(text: vehicleText(vs), cls: vehicleCls(vs), icon: vehicleIcon(vs))
+                }
+                Spacer(minLength: DS.Space.sm)
+                if !m.time.isEmpty {
+                    Text("最近检测 \(m.time)")
+                        .font(DS.Typo.footnote)
+                        .foregroundStyle(DS.Palette.labelSecondary)
                 }
             }
-            if m.checkId != nil || m.endTime != nil {
-                VStack(alignment: .leading, spacing: 4) {
-                    if let id = m.checkId, !id.isEmpty {
-                        HStack(spacing: 6) {
-                            Image(systemName: "doc.text.fill")
-                                .font(Theme.micro)
-                                .foregroundStyle(.secondary)
-                            Text("检测 ID: \(id.prefix(16))…")
-                                .font(Theme.mono)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    if let et = m.endTime, !et.isEmpty {
-                        HStack(spacing: 6) {
-                            Image(systemName: "clock.fill")
-                                .font(Theme.micro)
-                                .foregroundStyle(.secondary)
-                            Text("数据更新: \(et)")
-                                .font(Theme.mono)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-            if let vs = m.vehicleStatus, !vs.isEmpty {
-                let vsCN: [String: String] = ["normal": "正常", "fault": "故障", "warning": "预警"]
-                let vsCls: [String: String] = ["normal": "ok", "fault": "bad", "warning": "warn"]
-                HStack(spacing: 6) {
-                    StatusDot(cls: vsCls[vs] ?? "na")
-                    Text(vsCN[vs] ?? vs)
-                        .font(Theme.footnote)
-                        .foregroundStyle(Theme.statusColor(vsCls[vs] ?? "na"))
-                }
+
+            DSBigNumber(value: m.score.isEmpty ? "--" : m.score,
+                        unit: "分",
+                        caption: verdict(m.scorePct),
+                        size: 96,
+                        tint: tint)
+                .padding(.top, DS.Space.lg)
+
+            DSLightBar(progress: Double(max(0, min(100, m.scorePct))) / 100.0,
+                       height: 6,
+                       tint: LinearGradient(colors: [Color.white, tint.opacity(0.72), tint],
+                                            startPoint: .leading, endPoint: .trailing))
+                .padding(.top, DS.Space.xl)
+                .padding(.bottom, DS.Space.xl)
+
+            if !m.counts.isEmpty {
+                DSStatStrip(items: m.counts.map {
+                    DSStatStrip.Item($0.key, $0.n, cls: $0.cls, icon: $0.iconName)
+                })
+                    .overlay(alignment: .top) { DSDivider() }
+                    .overlay(alignment: .bottom) { DSDivider() }
             }
         }
+        .accessibilityElement(children: .contain)
     }
 
-    // MARK: 颜色辅助
-    private func scoreRingColors(_ pct: Int) -> [Color] {
-        switch pct {
-        case 0...39:   return [.red, .red, .orange]
-        case 40...69:  return [.orange, .orange, .yellow]
-        case 70...89:  return [.yellow, .green, .green]
-        default:       return [.green, .green, .teal]
-        }
-    }
+    // MARK: - ② 检测系统（inset-grouped，逐项可展开）
 
-    private func scoreShadowColor(_ pct: Int) -> Color {
-        switch pct {
-        case 0...39: return .red
-        case 40...69: return .orange
-        case 70...89: return .yellow
-        default: return .green
-        }
-    }
-
-    // MARK: 检测系统列表
-    private func systemList(_ m: HealthModel) -> some View {
-        // 展开由内容高度 + 发丝线表达；卡片只做轻微的压缩/回弹
-        CardBox(title: "检测系统", side: "\(m.systems.count) 项", sideCls: "na") {
-            VStack(spacing: 0) {
-                ForEach(Array(m.systems.enumerated()), id: \.element.id) { idx, sys in
-                    systemRow(sys) { toggleExpand(sys.name) }
-                    if idx < m.systems.count - 1 { ListDivider().padding(.vertical, 4) }
-                }
+    private func systemsSection(_ m: HealthModel) -> some View {
+        DSGroup(title: "检测系统",
+                trailing: "\(m.systems.count) 项",
+                footer: m.systems.isEmpty ? "本次检测没有返回分系统数据" : nil) {
+            ForEach(Array(m.systems.enumerated()), id: \.element.id) { idx, sys in
+                systemRow(sys, showsSeparator: idx < m.systems.count - 1)
             }
         }
-        .scaleEffect(expandedSystems.isEmpty ? 1.0 : 0.98)
-        .animation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.4), value: expandedSystems.isEmpty)
     }
 
-    private func systemRow(_ sys: HealthSystem, toggle: @escaping () -> Void) -> some View {
+    private func systemRow(_ sys: HealthSystem, showsSeparator: Bool) -> some View {
         let isOpen = expandedSystems.contains(sys.name)
-        return SystemRowView(sys: sys, isOpen: isOpen, onToggle: toggle)
-    }
-
-    private func toggleExpand(_ name: String) {
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.7, blendDuration: 0.3)) {
-            if expandedSystems.contains(name) {
-                expandedSystems.remove(name)
-            } else {
-                expandedSystems.insert(name)
-            }
-        }
-    }
-
-    // MARK: 数据加载
-    private func loadIfNeeded() {
-        guard model == nil || store.isCacheExpired("check") else { return }
-        loadTask = Task { await load() }
-    }
-
-    @MainActor
-    private func load() async {
-        guard !store.carId.isEmpty else { return }
-        let api = APIClient.shared
-        do {
-            // ⚠️ 必须用 try：原来用 try? 时 do 体内不会抛错，下面的 catch 是死代码
-            //（CI 日志里的 'catch block is unreachable' 警告就是它）
-            let checkRaw = try await api.getCarCheck(carId: store.carId)
-            store.saveCache(["check": checkRaw])
-            model = VM.healthModel(store.caches["check"] as? [String: Any])
-            errText = nil
-        } catch {
-            errText = error.localizedDescription
-            let errDesc = error.localizedDescription.lowercased()
-            if errDesc.contains("未找到") || errDesc.contains("登录") || errDesc.contains("token") {
-                // token 失效：真正需要重新登录
-                AppStore.shared.logout()
-            }
-        }
-    }
-
-// MARK: - #15 DTC 故障码翻译卡片（供 SystemRowView 复用）
-struct DTCCard: View {
-    let sys: HealthSystem
-
-    private var dtcItems: [HealthItem] {
-        sys.children.filter { $0.name.range(of: "P\\d", options: .regularExpression) != nil }
-    }
-
-    var body: some View {
-        if !dtcItems.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("故障码说明").font(Theme.caption).foregroundStyle(.secondary)
-                ForEach(dtcItems) { item in
-                    HStack {
-                        Text(item.name).font(Theme.mono).foregroundStyle(.orange)
-                        Spacer()
-                        Text(DTCDictionary.translate(item.name)).font(Theme.caption).foregroundStyle(.secondary)
+        let tint = DS.Palette.status(sys.statusCls)
+        return VStack(alignment: .leading, spacing: 0) {
+            Button { toggle(sys.name) } label: {
+                HStack(spacing: DS.Space.md) {
+                    Image(safeSymbol: systemIcon(sys.name), fallback: "circle")
+                        .font(.system(size: DS.Size.icon))
+                        .foregroundStyle(tint)
+                        .frame(width: DS.Size.iconColumn)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(sys.name)
+                            .font(DS.Typo.body)
+                            .foregroundStyle(DS.Palette.label)
+                        Text(sys.statusText.isEmpty ? "—" : sys.statusText)
+                            .font(DS.Typo.footnote)
+                            .foregroundStyle(tint)
+                        DSLightBar(progress: Double(max(0, min(100, sys.healthPct))) / 100.0,
+                                   height: 3,
+                                   showsGlow: false,
+                                   tint: LinearGradient(colors: [tint, tint],
+                                                        startPoint: .leading, endPoint: .trailing))
+                            .frame(width: 88)
+                            .padding(.top, 3)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
-                }
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 8)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.orange.opacity(0.2), lineWidth: 1))
-            .padding(.horizontal, 4)
-            .padding(.top, 4)
-        }
-    }
-}
-
-// MARK: - 检测系统行（液态玻璃形变动效）
-struct SystemRowView: View {
-    let sys: HealthSystem
-    let isOpen: Bool
-    let onToggle: () -> Void
-
-    var body: some View {
-        Button(action: onToggle) {
-            VStack(spacing: 0) {
-                // 标题行：状态点 + 名称 + 健康小环 + 展开箭头
-                HStack(spacing: DS.Space.sm) {
-                    StatusDot(cls: sys.statusCls)
-                    Text(sys.name).font(DS.Typo.headline)
                     Spacer(minLength: DS.Space.sm)
-                    HealthSystemRing(name: sys.name, statusCls: sys.statusCls,
-                                     statusText: sys.statusText, pct: sys.healthPct)
+                    Text("\(sys.healthPct)%")
+                        .font(DS.Typo.data)
+                        .foregroundStyle(tint)
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(DS.Palette.labelTertiary)
                         .rotationEffect(.degrees(isOpen ? 180 : 0))
                         .animation(DS.Motion.press, value: isOpen)
                 }
-                .padding(.vertical, DS.Space.md)
-                .padding(.horizontal, DS.Space.xs)
+                .frame(minHeight: DS.Space.row)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(DSRowButtonStyle())
+            .accessibilityLabel(Text("\(sys.name)，\(sys.statusText)，健康度 \(sys.healthPct)%"))
+            .accessibilityHint(Text(isOpen ? "点击收起明细" : "点击展开明细"))
 
-                // 展开内容
-                if isOpen {
-                    VStack(spacing: 0) {
-                        ForEach(Array(sys.children.enumerated()), id: \.element.id) { idx, item in
-                            SystemChildRow(item: item, idx: idx)
-                            if idx < sys.children.count - 1 {
-                                ListDivider().padding(.leading, 4)
-                            }
-                        }
-                        // #15 DTC 故障码翻译提示
-                        if sys.name.contains("故障") || sys.name.contains("DTC") {
-                            DTCCard(sys: sys)
+            if isOpen {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(sys.children.enumerated()), id: \.element.id) { cIdx, item in
+                        DSGroupRow(showsSeparator: cIdx < sys.children.count - 1 || !dtcItems(sys).isEmpty) {
+                            childRow(item)
                         }
                     }
-                    .padding(.leading, 22)
-                    .padding(.horizontal, 4)
+                    ForEach(Array(dtcItems(sys).enumerated()), id: \.element.id) { dIdx, code in
+                        DSGroupRow(showsSeparator: dIdx < dtcItems(sys).count - 1) {
+                            DSKeyValueRow(key: code.name,
+                                          value: DTCDictionary.translate(code.name),
+                                          valueCls: "warn")
+                        }
+                    }
                 }
+                .background(DS.Palette.surfaceRaised)
             }
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isOpen ? Color.white.opacity(0.06) : Color.clear)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(
-                        isOpen
-                            ? Theme.statusColor(sys.statusCls).opacity(0.20)
-                            : Color.clear,
-                        lineWidth: 1
-                    )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            if showsSeparator { DSSeparator(inset: 0) }
         }
-        .buttonStyle(.plain)
     }
-}
 
-// MARK: - 检测子项行
-struct SystemChildRow: View {
-    let item: HealthItem
-    let idx: Int
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: DS.Space.xs) {
-            HStack(spacing: DS.Space.sm) {
+    private func childRow(_ item: HealthItem) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
                 Text(item.name)
-                    .font(DS.Typo.caption)
-                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .font(DS.Typo.subheadline)
+                    .foregroundStyle(DS.Palette.label)
+                    .lineLimit(2)
                 Spacer(minLength: DS.Space.sm)
                 Text(item.statusText)
-                    .font(DS.Typo.footnote.weight(.semibold))
+                    .font(DS.Typo.subheadline)
                     .foregroundStyle(DS.Palette.status(item.statusCls))
             }
-            if let d = item.detect, !d.isEmpty { KVRow(k: "检测值", v: d) }
-            if let s = item.suggest, !s.isEmpty { KVRow(k: "参考范围", v: s) }
+            if let d = item.detect, !d.isEmpty { DSKeyValueRow(key: "检测值", value: d) }
+            if let s = item.suggest, !s.isEmpty { DSKeyValueRow(key: "参考范围", value: s) }
             if let desc = item.desc, !desc.isEmpty {
                 Text(desc)
                     .font(DS.Typo.footnote)
@@ -397,5 +221,163 @@ struct SystemChildRow: View {
         .padding(.vertical, DS.Space.sm)
         .accessibilityElement(children: .combine)
     }
-}
+
+    /// P 开头的故障码子项（#15 DTC 翻译）
+    private func dtcItems(_ sys: HealthSystem) -> [HealthItem] {
+        sys.children.filter { $0.name.range(of: "P\\d", options: .regularExpression) != nil }
+    }
+
+    // MARK: - ③ 检测信息
+
+    private func infoSection(_ m: HealthModel) -> some View {
+        let hasMeta = (m.checkId?.isEmpty == false) || (m.endTime?.isEmpty == false) || !m.time.isEmpty
+        return DSGroup(title: "检测信息",
+                       footer: hasMeta ? nil : "本次检测未返回检测 ID 与时间戳") {
+            if let cid = m.checkId, !cid.isEmpty { checkIdRow(cid) }
+            if let et = m.endTime, !et.isEmpty {
+                DSGroupRow {
+                    DSRow(icon: "clock.arrow.circlepath", title: "数据更新", value: et)
+                }
+            }
+            if !m.time.isEmpty {
+                DSGroupRow(showsSeparator: false) {
+                    DSRow(icon: "calendar.badge.clock", title: "最近检测", value: m.time)
+                }
+            }
+        }
+    }
+
+    private func checkIdRow(_ cid: String) -> some View {
+        DSGroupRow {
+            Button {
+                UIPasteboard.general.string = cid
+                DSHaptic.result(true)
+                ToastManager.shared.show("检测 ID 已复制", icon: "doc.on.doc.fill")
+            } label: {
+                HStack(spacing: DS.Space.md) {
+                    Image(safeSymbol: "number.square.fill", fallback: "number")
+                        .font(.system(size: DS.Size.icon))
+                        .foregroundStyle(DS.Palette.tint)
+                        .frame(width: DS.Size.iconColumn)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("检测 ID")
+                            .font(DS.Typo.body)
+                            .foregroundStyle(DS.Palette.label)
+                        Text(cid)
+                            .font(.system(size: 15, design: .monospaced))
+                            .foregroundStyle(DS.Palette.labelSecondary)
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: DS.Space.sm)
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 15))
+                        .foregroundStyle(DS.Palette.tint)
+                }
+                .frame(minHeight: DS.Space.row)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(DSRowButtonStyle())
+            .accessibilityLabel(Text("检测 ID \(cid)，点击复制"))
+        }
+    }
+
+    // MARK: - 语义映射
+
+    private func scoreColor(_ pct: Int) -> Color {
+        switch pct {
+        case 0...39:  return DS.Palette.bad
+        case 40...69: return DS.Palette.warn
+        case 70...89: return Color(uiColor: .systemYellow)
+        default:      return DS.Palette.ok
+        }
+    }
+
+    private func verdict(_ pct: Int) -> String {
+        switch pct {
+        case 0...39:  return "存在故障，建议尽快检修"
+        case 40...69: return "多项需要关注，建议安排检查"
+        case 70...89: return "车况正常，有少量项目需留意"
+        default:      return "车况良好，无需处理"
+        }
+    }
+
+    private func vehicleText(_ raw: String) -> String {
+        switch raw {
+        case "normal":  return "车辆状态正常"
+        case "fault":   return "车辆状态故障"
+        case "warning": return "车辆状态预警"
+        default:        return raw
+        }
+    }
+
+    private func vehicleCls(_ raw: String) -> String {
+        switch raw {
+        case "normal":  return "ok"
+        case "fault":   return "bad"
+        case "warning": return "warn"
+        default:        return "na"
+        }
+    }
+
+    private func vehicleIcon(_ raw: String) -> String {
+        switch raw {
+        case "normal":  return "checkmark.circle.fill"
+        case "fault":   return "xmark.octagon.fill"
+        case "warning": return "exclamationmark.triangle.fill"
+        default:        return "info.circle.fill"
+        }
+    }
+
+    private func systemIcon(_ name: String) -> String {
+        let n = name.lowercased()
+        if name.contains("电池") || n.contains("battery") { return "battery.100" }
+        if name.contains("充电") || n.contains("charge") { return "bolt.fill" }
+        if name.contains("电机") || name.contains("驱动") { return "gearshape.2.fill" }
+        if name.contains("制动") || name.contains("刹车") { return "octagon.fill" }
+        if name.contains("轮胎") || name.contains("胎压") { return "circle.dashed" }
+        if name.contains("灯光") || name.contains("照明") { return "lightbulb.fill" }
+        if name.contains("空调") || name.contains("温控") { return "snowflake" }
+        if name.contains("气囊") || name.contains("安全") { return "shield.fill" }
+        if name.contains("故障") || name.contains("dtc") { return "exclamationmark.triangle.fill" }
+        if name.contains("车身") || name.contains("门窗") { return "car.side.fill" }
+        return "checkmark.shield.fill"
+    }
+
+    // MARK: - 交互
+
+    private func toggle(_ name: String) {
+        withAnimation(DS.Motion.value) {
+            if expandedSystems.contains(name) { expandedSystems.remove(name) }
+            else { expandedSystems.insert(name) }
+        }
+        DSHaptic.select()
+    }
+
+    // MARK: - 数据
+
+    private func loadIfNeeded() {
+        guard model == nil || store.isCacheExpired("check") else { return }
+        loadTask = Task { await load() }
+    }
+
+    @MainActor
+    private func load() async {
+        guard !store.carId.isEmpty else { loading = false; return }
+        let api = APIClient.shared
+        do {
+            // ⚠️ 必须用 try：try? 不会让下面的 catch 生效，那会让错误永远被吞掉
+            let checkRaw = try await api.getCarCheck(carId: store.carId)
+            store.saveCache(["check": checkRaw])
+            model = VM.healthModel(store.caches["check"] as? [String: Any])
+            errText = nil
+        } catch {
+            errText = error.localizedDescription
+            if model == nil { loading = false }
+            let errDesc = error.localizedDescription.lowercased()
+            if errDesc.contains("未找到") || errDesc.contains("登录") || errDesc.contains("token") {
+                AppStore.shared.logout()
+            }
+        }
+        loading = false
+    }
 }

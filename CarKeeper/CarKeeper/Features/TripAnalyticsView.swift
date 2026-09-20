@@ -1,5 +1,8 @@
 // =============================================================================
-// TripAnalyticsView - 行程分析（里程趋势 + 驾驶模式统计 + 每周报告）
+//  行程 — v4（Apple 原生语言）
+// =============================================================================
+//  这一屏只有一个主角：里程数字。分段的柱状图通栏、不装进卡片 ——
+//  图表是内容本身，不是卡片里的插图（Health / 健身的做法）。
 // =============================================================================
 
 import SwiftUI
@@ -8,27 +11,45 @@ import Charts
 struct TripAnalyticsView: View {
     private let store = AppStore.shared
     @State private var period: AnalyticsPeriod = .week
-    
+
     enum AnalyticsPeriod: String, CaseIterable {
         case day = "今日"
         case week = "本周"
         case month = "本月"
         case all = "全部"
     }
-    
+
     // 聚合统计数据
     var tripStats: (totalKm: Double, avgKm: Double, totalTrips: Int, avgEfficiency: Double?) {
-        let trips = store.tripHistory
+        let trips = filteredTrips
         guard !trips.isEmpty else { return (0, 0, 0, nil) }
-        
+
         let totalKm = trips.reduce(0) { $0 + $1.distanceKm }
         let avgKm = totalKm / Double(trips.count)
         let efficiencies = trips.compactMap { $0.avgEfficiency }
         let avgEff = efficiencies.isEmpty ? nil : efficiencies.reduce(0, +) / Double(efficiencies.count)
-        
+
         return (totalKm, avgKm, trips.count, avgEff)
     }
-    
+
+    /// 周期筛选（此前 picker 只改了状态，没有任何一处读它 —— 选择器形同虚设）
+    private var filteredTrips: [AppStore.TripRecord] {
+        let cal = Calendar.current
+        let now = Date()
+        switch period {
+        case .day:
+            return store.tripHistory.filter { cal.isDate($0.startTime, inSameDayAs: now) }
+        case .week:
+            guard let start = cal.dateInterval(of: .weekOfYear, for: now)?.start else { return store.tripHistory }
+            return store.tripHistory.filter { $0.startTime >= start }
+        case .month:
+            guard let start = cal.dateInterval(of: .month, for: now)?.start else { return store.tripHistory }
+            return store.tripHistory.filter { $0.startTime >= start }
+        case .all:
+            return store.tripHistory
+        }
+    }
+
     var weeklyTrend: [(Date, Double)] {
         let calendar = Calendar.current
         let now = Date()
@@ -43,152 +64,174 @@ struct TripAnalyticsView: View {
         }
         return result
     }
-    
+
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // 周期选择
+            VStack(alignment: .leading, spacing: 0) {
                 periodPicker
-                
-                // 核心指标
-                statsGrid
-                
-                // 里程趋势图
-                trendChart
-                
-                // 驾驶行为分布
-                behaviorChart
-                
-                // 常用路线
-                commonRoutes
+                    .padding(.bottom, DS.Space.xxl)
+
+                totalHeader
+
+                trendSection
+                    .padding(.top, DS.Space.xxxl)
+
+                behaviorSection
+                    .padding(.top, DS.Space.xxxl)
+
+                routesSection
+                    .padding(.top, DS.Space.xxxl)
             }
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.vertical, Theme.Spacing.md)
+            .padding(.top, DS.Space.md)
+            .padding(.bottom, DS.Space.huge)
         }
-        .pageBackground()
-        .navigationTitle("行程分析")
-        .navigationBarTitleDisplayMode(.inline)
+        .dsCanvas()
+        .scrollBounceBehavior(.basedOnSize)
+        .navigationTitle("行程")
+        .navigationBarTitleDisplayMode(.large)
         .accessibilityLabel(Text("行程数据分析"))
     }
-    
-    // MARK: - 周期选择
+
+    // MARK: - 周期
+
     private var periodPicker: some View {
         Picker("周期", selection: $period) {
             ForEach(AnalyticsPeriod.allCases, id: \.self) { p in
                 Text(p.rawValue).tag(p)
             }
         }
-        .pickerStyle(SegmentedPickerStyle())
-        .glassCard(corner: Theme.Radius.medium)
+        .pickerStyle(.segmented)
     }
-    
-    // MARK: - 统计网格
-    private var statsGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            statTile(icon: "speedometer", label: "总里程", value: String(format: "%.1f", tripStats.totalKm) + " km", tint: .blue)
-            statTile(icon: "car.fill", label: "行程数", value: "\(tripStats.totalTrips)", tint: .green)
-            statTile(icon: "gauge", label: "平均单次", value: String(format: "%.1f", tripStats.avgKm) + " km", tint: .orange)
-            if let eff = tripStats.avgEfficiency {
-                statTile(icon: "bolt.fill", label: "平均能耗", value: String(format: "%.1f", eff) + " kWh", tint: .purple)
-            }
+
+    // MARK: - 唯一的大数字
+
+    private var totalHeader: some View {
+        VStack(alignment: .leading, spacing: DS.Space.sm) {
+            Text(period.rawValue + "合计")
+                .font(DS.Typo.footnote)
+                .foregroundStyle(DS.Palette.labelSecondary)
+            DSBigNumber(
+                value: String(format: "%.0f", tripStats.totalKm),
+                unit: "km",
+                size: 112
+            )
         }
-        .glassCard(corner: Theme.Radius.medium)
     }
-    
-    private func statTile(icon: String, label: String, value: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Image(safeSymbol: icon, fallback: "gauge")
-                    .font(.caption)
-                    .foregroundStyle(tint)
-                Spacer()
+
+    // MARK: - 趋势（通栏、无框）
+
+    private var trendSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("近 7 日里程")
+                    .font(DS.Typo.footnote)
+                    .foregroundStyle(DS.Palette.labelSecondary)
+                Spacer(minLength: DS.Space.sm)
+                Text(tripStats.avgKm > 0 ? String(format: "平均 %.0f km/次", tripStats.avgKm) : "--")
+                    .font(DS.Typo.caption)
+                    .foregroundStyle(DS.Palette.labelTertiary)
             }
-            Text(value)
-                .font(Theme.h3)
-                .foregroundStyle(.primary)
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    
-    // MARK: - 趋势图
-    private var trendChart: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("里程趋势").font(Theme.font(.subheadline as Font).bold())
+
             Chart {
                 ForEach(weeklyTrend.indices, id: \.self) { i in
                     let item = weeklyTrend[i]
                     BarMark(
-                        x: .value("日期", item.0.formatted(date: .abbreviated, time: .omitted)),
+                        x: .value("日期", item.0, unit: .day),
                         y: .value("里程", item.1)
                     )
-                    .foregroundStyle(item.1 > 0 ? Theme.Colors.accent : Color.secondary.opacity(0.3))
-                    .cornerRadius(4)
+                    .foregroundStyle(isToday(item.0) ? DS.Palette.tint : DS.Palette.track)
+                    .cornerRadius(6)
                 }
             }
             .chartXAxis {
-                AxisMarks(values: .stride(by: .day, count: 2)) { _ in
-                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                    AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
+                AxisMarks(values: .stride(by: .day)) { value in
+                    AxisValueLabel(format: .dateTime.weekday(.narrow))
+                        .font(DS.Typo.caption2)
+                        .foregroundStyle(DS.Palette.labelTertiary)
+                }
+            }
+            .chartYAxis(.hidden)
+            .chartLegend(.hidden)
+            .frame(height: 148)
+            .padding(.top, DS.Space.xl)
+        }
+    }
 
-                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                }
-            }
-            .frame(height: 160)
-            .glassCard(corner: Theme.Radius.medium)
-        }
+    private func isToday(_ date: Date) -> Bool {
+        Calendar.current.isDateInToday(date)
     }
-    
-    // MARK: - 驾驶行为分布
-    private var behaviorChart: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("驾驶行为评分").font(Theme.font(.subheadline as Font).bold())
-            HStack(spacing: 16) {
-                gaugeTile(icon: "checkmark.seal.fill", label: "平稳驾驶", value: "92%", color: .green)
-                gaugeTile(icon: "exclamationmark.triangle.fill", label: "急加速", value: "3次", color: .orange)
-                gaugeTile(icon: "stop.fill", label: "急刹车", value: "2次", color: .red)
-            }
-        }
-        .glassCard(corner: Theme.Radius.medium)
-    }
-    
-    private func gaugeTile(icon: String, label: String, value: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Image(safeSymbol: icon, fallback: "gauge")
-                .font(.title3)
-                .foregroundStyle(color)
-            Text(value).font(Theme.h4.bold()).foregroundStyle(color)
-            Text(label).font(.caption2).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-    
-    // MARK: - 常用路线
-    private var commonRoutes: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("常用目的地").font(Theme.font(.subheadline as Font).bold())
-            VStack(spacing: 0) {
-                ForEach(Array(0..<min(3, store.tripHistory.count)), id: \.self) { i in
-                    let trip = store.tripHistory[i]
-                    HStack {
-                        Text(String(i + 1)).font(.caption.monospaced()).foregroundStyle(.secondary)
-                        VStack(alignment: .leading) {
-                            Text(trip.endTime.map { $0.formatted(date: .abbreviated, time: .omitted) } ?? "")
-                                .font(.subheadline)
-                            Text(String(format: "%.1f", trip.distanceKm) + " km")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+
+    // MARK: - 汇总（iOS 行）
+
+    private var behaviorSection: some View {
+        VStack(alignment: .leading, spacing: DS.Space.sm) {
+            DSSectionHeader(title: "行程汇总")
+            DSCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    DSRow(icon: "car.fill", title: "行程数", value: "\(tripStats.totalTrips) 次")
+                    DSSeparator()
+                    DSRow(icon: "gauge", title: "平均单次",
+                          value: String(format: "%.1f km", tripStats.avgKm))
+                    if let eff = tripStats.avgEfficiency {
+                        DSSeparator()
+                        DSRow(icon: "bolt.fill", title: "平均电耗",
+                              value: String(format: "%.1f kWh/100km", eff))
                     }
-                    .padding(.vertical, 8)
-                    if i < 2 { Divider().opacity(0.3) }
+                    DSSeparator()
+                    DSRow(icon: "road.lanes", title: "本周期总里程",
+                          value: String(format: "%.1f km", tripStats.totalKm))
                 }
             }
         }
-        .glassCard(corner: Theme.Radius.medium)
+    }
+
+    // MARK: - 最近行程
+
+    private var routesSection: some View {
+        VStack(alignment: .leading, spacing: DS.Space.sm) {
+            DSSectionHeader(title: "最近行程")
+            DSCard {
+                VStack(alignment: .leading, spacing: 0) {
+                    let trips = Array(filteredTrips.prefix(5))
+                    if trips.isEmpty {
+                        DSPlaceholder(
+                            icon: "point.topleft.down.to.point.bottomright.curvepath",
+                            title: "还没有行程记录",
+                            message: "开始行驶后，这里会显示每一次出行的里程与能耗。"
+                        )
+                    } else {
+                        ForEach(Array(trips.enumerated()), id: \.offset) { idx, trip in
+                            DSRow(
+                                icon: tripIcon(idx),
+                                title: tripTitle(trip),
+                                subtitle: tripSubtitle(trip),
+                                value: String(format: "%.1f km", trip.distanceKm),
+                                showsChevron: true
+                            ) {
+                                NavState.shared.selectedTab = 0
+                            }
+                            if idx < trips.count - 1 { DSSeparator() }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func tripIcon(_ idx: Int) -> String {
+        idx == 0 ? "flag.checkered" : "arrow.triangle.turn.up.right.diamond.fill"
+    }
+
+    private func tripTitle(_ trip: AppStore.TripRecord) -> String {
+        if let end = trip.endTime {
+            return end.formatted(date: .abbreviated, time: .shortened)
+        }
+        return trip.startTime.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func tripSubtitle(_ trip: AppStore.TripRecord) -> String {
+        guard let eff = trip.avgEfficiency else { return "无能耗数据" }
+        return String(format: "电耗 %.1f kWh/100km", eff)
     }
 }
 

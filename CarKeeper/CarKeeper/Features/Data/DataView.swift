@@ -1,7 +1,17 @@
 import SwiftUI
 
-// 全量数据页：把原始报文逐字段结构化排版（对应小程序 data.js + texts.js 语义）
-// 支持 8 种 kind；analysis 为统一分析层输出的「结论树」。
+// =============================================================================
+//  全量数据 —— v4 信息架构
+// =============================================================================
+//  这一页是「原始报文检查器」：把车端返回的字段逐条摊开，供核对与复制导出。
+//
+//  ① 分类不再是一排彩色胶囊（8 个选项塞进横向滚动条，选中态全靠颜色），
+//     而是导航栏上的一个菜单 —— iOS 处理「多个互斥视图」的标准做法。
+//  ② 每个字段块是一个 inset-grouped 分组：分组标题在画布上，字段行在表面上。
+//  ③ 「全量分析」的结论树排在最前，异常项按语义着色（异常红 / 关注橙 / 正常绿）。
+//  ④ 图表存根（充电成本饼图、Siri 洞察、雷达图）已移除：它们渲染的是灰色方块，
+//     不是数据。真实图表接入后再回到这一页。
+// =============================================================================
 
 struct DataView: View {
     private let store = AppStore.shared
@@ -23,7 +33,6 @@ struct DataView: View {
     @State private var loading = true
     @State private var errText = ""
     @State private var loadTask: Task<Void, Never>? = nil
-    @State private var isRefreshing = false     // 下拉刷新进行中
 
     init(kind: Kind = .analysis) {
         _kind = State(wrappedValue: kind)
@@ -36,120 +45,197 @@ struct DataView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // E21 驾驶行为雷达图
-            DrivingRadarChart(aggressiveAccel: store.drivingScore/3, harshBrake: store.drivingScore/3, smoothDrive: store.drivingScore/3+10, speedLimit: store.drivingScore/3+20)
-            // E32 充电成本饼图
-            ChargeCostChart(store: store)
-            // E33 Siri 使用洞察
-            SiriInsightView(store: store)
-            kindSwitcher
-            ScrollView {
-                VStack(spacing: Theme.Spacing.cardSpacing) {
-                    if !loading && blocks.isEmpty {
-                        if !errText.isEmpty {
-                            PageErrorView(errText) { Task { await load() } }
-                        } else {
-                            PageEmptyView("暂无数据", subtitle: "下拉或点刷新按钮重试", icon: "doc.text")
-                        }
+        ScrollView {
+            VStack(alignment: .leading, spacing: DS.Space.gap) {
+                if loading {
+                    loadingState
+                } else if blocks.isEmpty {
+                    if !errText.isEmpty {
+                        DSPlaceholder(icon: "exclamationmark.triangle",
+                                      title: "读取失败",
+                                      message: errText,
+                                      actionTitle: "重新加载",
+                                      cls: "warn") { reload() }
                     } else {
-                        ForEach(Array(blocks.enumerated()), id: \.element.h) { idx, b in
-                            dataBlock(b, idx: idx)
-                        }
+                        DSPlaceholder(icon: "doc.text.magnifyingglass",
+                                      title: "暂无数据",
+                                      message: store.carId.isEmpty ? "请先绑定车辆" : "下拉或点右上角刷新重试",
+                                      actionTitle: "重新加载") { reload() }
                     }
+                } else {
+                    ForEach(Array(blocks.enumerated()), id: \.element.id) { idx, b in
+                        blockView(b, isFirst: idx == 0)
+                    }
+                    Text(footerText)
+                        .font(DS.Typo.footnote)
+                        .foregroundStyle(DS.Palette.labelTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, DS.Hair.inset)
                 }
-                
-                
-                .frame(maxWidth: .infinity, alignment: .top)
             }
+            .padding(.top, DS.Space.sm)
+            .padding(.bottom, DS.Space.xxxl)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollBounceBehavior(.basedOnSize)
         .pageBackground()
-        .navigationTitle(kind.title)
+        .navigationTitle("全量数据")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) { kindMenu }
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 16) {
+                HStack(spacing: DS.Space.lg) {
                     Button { copyAll() } label: { Image(systemName: "doc.on.doc") }
-                    Button { refresh() } label: { Image(systemName: "arrow.clockwise") }
-                    ShareLink(item: shareText, subject: Text("全量数据 · \(kind.title)"),
+                        .accessibilityLabel(Text("复制全部数据"))
+                    Button { reload() } label: { Image(systemName: "arrow.clockwise") }
+                        .accessibilityLabel(Text("刷新"))
+                    ShareLink(item: shareText,
+                              subject: Text("全量数据 · \(kind.title)"),
                               preview: SharePreview(kind.title)) {
                         Image(systemName: "square.and.arrow.up")
                     }
+                    .accessibilityLabel(Text("分享"))
                 }
             }
         }
         .onAppear { loadIfNeeded() }
-        .refreshable {
-            isRefreshing = true
-            loadTask?.cancel()
-            loadTask = Task { await load() }
-            isRefreshing = false
-        }
+        .onDisappear { loadTask?.cancel(); loadTask = nil }
+        .refreshable { await load() }
     }
 
-    // MARK: kind 切换条（横向滚动玻璃胶囊）
-    private var kindSwitcher: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(DataView.Kind.allCases) { k in
-                    kindChip(k)
+    // MARK: - 分类菜单（替代旧的彩色胶囊横向滚动条）
+
+    private var kindMenu: some View {
+        Menu {
+            ForEach(Kind.allCases) { k in
+                Button {
+                    guard k != kind else { return }
+                    kind = k
+                    onKindChange()
+                } label: {
+                    if k == kind {
+                        Label(k.title, systemImage: "checkmark")
+                    } else {
+                        Text(k.title)
+                    }
                 }
             }
-            
-            .padding(.vertical, 10)
-        }
-    }
-
-    // kind 切换胶囊
-    private func kindChip(_ k: Kind) -> some View {
-        let sel = (kind == k)
-        return Button {
-            kind = k
-            onKindChange()
         } label: {
-            Text(k.title)
-                .font(Theme.caption.weight(sel ? .semibold : .regular))
-                .foregroundStyle(sel ? .white : .primary)
-                .padding(.horizontal, 14).padding(.vertical, 9)
-                .background(sel ? Theme.Colors.accent : Color(.tertiarySystemFill), in: Capsule())
+            HStack(spacing: 4) {
+                Text(kind.title)
+                    .font(DS.Typo.subheadline.weight(.semibold))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundStyle(DS.Palette.tint)
         }
-        .buttonStyle(.plain)
+        .accessibilityLabel(Text("数据分类：\(kind.title)"))
     }
 
-    // MARK: 数据块
-    private func dataBlock(_ b: Block, idx: Int) -> some View {
-        CardBox(title: b.h) {
-            VStack(spacing: 0) {
-                ForEach(Array(b.rows.enumerated()), id: \.offset) { rowIdx, r in
-                    HStack(alignment: .top, spacing: DS.Space.md) {
-                        Text(r.k)
-                            .font(Theme.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 120, alignment: .leading)
-                        Text(r.v)
-                            .font(Theme.caption)
-                            .foregroundStyle(.primary)
-                            .multilineTextAlignment(.trailing).lineLimit(3)
-                        Spacer(minLength: 8)
-                    }
-                    .padding(.vertical, DS.Space.sm)
-                    // 行间隔线（仅非最后一行）
-                    if rowIdx < b.rows.count - 1 {
-                        Divider().opacity(0.4).padding(.leading, 120)
+    // MARK: - 状态
+
+    private var loadingState: some View {
+        VStack(alignment: .leading, spacing: DS.Space.md) {
+            HStack(spacing: DS.Space.sm) {
+                ProgressView().controlSize(.small)
+                Text("正在整理 \(kind.title)…")
+                    .font(DS.Typo.footnote)
+                    .foregroundStyle(DS.Palette.labelSecondary)
+            }
+            DSSkeleton(height: 44)
+            DSSkeleton(height: 132)
+            DSSkeleton(height: 88)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var footerText: String {
+        let fields = blocks.reduce(0) { $0 + $1.rows.count }
+        var s = "共 \(blocks.count) 组 · \(fields) 个字段"
+        let t = VM.nowText()
+        if !t.isEmpty { s += " · \(t)" }
+        return s
+    }
+
+    // MARK: - 字段块
+
+    @ViewBuilder
+    private func blockView(_ b: Block, isFirst: Bool) -> some View {
+        if kind == .analysis && isFirst {
+            analysisHero(b)
+        } else {
+            DSGroup(title: b.h, trailing: b.rows.isEmpty ? "无数据" : "\(b.rows.count)") {
+                ForEach(Array(b.rows.enumerated()), id: \.offset) { idx, r in
+                    DSGroupRow(showsSeparator: idx < b.rows.count - 1) {
+                        if kind == .analysis {
+                            DSKeyValueRow(key: r.v, value: r.k, valueCls: analysisCls(r.k), mono: false)
+                        } else {
+                            DSKeyValueRow(key: r.k, value: r.v, valueCls: rawCls(r.k, r.v))
+                        }
                     }
                 }
             }
         }
     }
 
-    private func refresh() {
+    /// 全量分析的结论：一句话 + 一条补充说明，不装容器。
+    private func analysisHero(_ b: Block) -> some View {
+        let headline = b.rows.first(where: { $0.k == "状态" })?.v ?? ""
+        let detail = b.rows.first(where: { $0.k == "说明" })?.v ?? ""
+        return VStack(alignment: .leading, spacing: 0) {
+            DSSectionHeader(title: b.h)
+            Text(headline.isEmpty ? "—" : headline)
+                .font(DS.Typo.title2)
+                .foregroundStyle(DS.Palette.label)
+                .fixedSize(horizontal: false, vertical: true)
+            if !detail.isEmpty {
+                Text(detail)
+                    .font(DS.Typo.subheadline)
+                    .foregroundStyle(DS.Palette.labelSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, DS.Space.xs)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - 语义着色
+
+    private func analysisCls(_ tag: String) -> String {
+        switch tag {
+        case "异常": return "bad"
+        case "关注": return "warn"
+        case "正常": return "ok"
+        default:     return "na"
+        }
+    }
+
+    /// 原始字段的值着色：只有「故障计数 / 故障码 / 状态」这三类字段带语义。
+    private func rawCls(_ key: String, _ value: String) -> String {
+        let k = key.lowercased()
+        let v = value.trimmingCharacters(in: .whitespaces)
+        if k.contains("faultcount") || k.contains("faultcode") {
+            if v.isEmpty || v == "0" || v == "--" || v == "无" { return "ok" }
+            return "bad"
+        }
+        if k == "carstatus" || k == "status" || k == "firestatus" || k == "validgps" {
+            let lower = v.lowercased()
+            if lower.contains("fault") || lower.contains("故障") { return "bad" }
+            if lower.contains("warn") || lower.contains("预警") || lower == "0" { return "warn" }
+            return "ok"
+        }
+        return "na"
+    }
+
+    // MARK: - 动作
+
+    private func reload() {
         loadTask?.cancel()
         loading = true
-        isRefreshing = true
-        loadTask = Task { await load(); isRefreshing = false }
+        loadTask = Task { await load() }
     }
 
     private func loadIfNeeded() {
-        guard !store.carId.isEmpty else { return }
+        guard !store.carId.isEmpty else { loading = false; return }
         guard loadTask == nil || loadTask!.isCancelled else { return }
         let needsFetch = switch kind {
         case .status: store.needsRefresh("control")
@@ -336,12 +422,8 @@ struct DataView: View {
     }
 
     private func copyAll() {
-        var lines: [String] = []
-        for b in blocks {
-            if !b.h.isEmpty { lines.append("【\(b.h)】") }
-            for r in b.rows { lines.append("\(r.k) : \(r.v)") }
-        }
-        UIPasteboard.general.string = lines.joined(separator: "\n")
+        UIPasteboard.general.string = shareText
+        DSHaptic.result(true)
         ToastManager.shared.show("数据已复制", icon: "doc.on.doc.fill")
     }
 

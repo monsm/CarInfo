@@ -76,24 +76,29 @@ struct LoginView: View {
     // MARK: 品牌区（扁平标 + 字标）
     private var brandHeader: some View {
         VStack(alignment: .leading, spacing: DS.Space.lg) {
+            // 品牌标：单一主色方标 + 顶部高光，不用渐变讲气氛
             Image(systemName: "car.side.fill")
-                .font(.system(size: 30, weight: .regular))
+                .font(.system(size: 34, weight: .medium))
                 .foregroundStyle(DS.Palette.labelOnTint)
-                .frame(width: 60, height: 60)
-                .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                    .fill(DS.Palette.tint))
+                .frame(width: 72, height: 72)
+                .background(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(DS.Palette.tint)
+                )
+                // v4：品牌标就是一块平坦的主色方标 —— 去除渐变描边与彩色柔印，
+                // 和系统图标一样只由形状与颜色构成。
 
             VStack(alignment: .leading, spacing: DS.Space.xs) {
                 Text("长安车管家")
-                    .font(DS.Typo.largeTitle)
+                    .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(DS.Palette.label)
                 Text("CHANGAN CONNECT")
-                    .font(DS.Typo.caption.weight(.semibold))
-                    .tracking(2.4)
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(2.6)
                     .foregroundStyle(DS.Palette.labelTertiary)
             }
             Text("登录后即可远程查看车辆状态、控制车锁与空调。")
-                .font(DS.Typo.subheadline)
+                .font(.system(size: 15))
                 .foregroundStyle(DS.Palette.labelSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }

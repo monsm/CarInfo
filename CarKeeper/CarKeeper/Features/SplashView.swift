@@ -16,24 +16,27 @@ struct SplashView: View {
 
     var body: some View {
         ZStack {
-            DS.Palette.canvas.ignoresSafeArea()
+            DS.Palette.canvasGradient.ignoresSafeArea()
 
             VStack(spacing: DS.Space.xxl) {
-                // 品牌标：圆角方块 + 车形图标（与登录页同一套视觉）
+                // 品牌标：与登录页同一套视觉（主色方标 + 顶部高光 + 柔印）
                 Image(systemName: "car.side.fill")
-                    .font(.system(size: 34, weight: .regular))
+                    .font(.system(size: 34, weight: .medium))
                     .foregroundStyle(DS.Palette.labelOnTint)
-                    .frame(width: 68, height: 68)
-                    .background(RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(DS.Palette.tint))
+                    .frame(width: 72, height: 72)
+                    .background(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .fill(DS.Palette.tint)
+                    )
+                    // v4：与登录页同一块的平坦主色方标（无梯度描边、无柔印）
 
                 VStack(spacing: DS.Space.sm) {
                     Text("长安车管家")
-                        .font(DS.Typo.title.weight(.semibold))
+                        .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(DS.Palette.label)
-                        .tracking(1.5)
+                        .tracking(1.2)
                     Text("CHANGAN CONNECT")
-                        .font(DS.Typo.caption.weight(.semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(DS.Palette.labelTertiary)
                         .tracking(3)
                 }
@@ -48,6 +51,7 @@ struct SplashView: View {
                     }
                 }
                 .frame(width: 180, height: 3)
+                .clipShape(Capsule())
                 .padding(.top, DS.Space.md)
                 .accessibilityHidden(true)
             }

@@ -139,7 +139,7 @@ struct ShortcutRow: View {
                 .font(.title3)
                 .foregroundStyle(Theme.Colors.accent)
                 .frame(width: 36, height: 36)
-                .background(.ultraThinMaterial, in: Circle())
+                .background(DS.Palette.fillSubtle, in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(Theme.body).foregroundStyle(.primary)
                 Text(subtitle).font(Theme.caption).foregroundStyle(.secondary)
