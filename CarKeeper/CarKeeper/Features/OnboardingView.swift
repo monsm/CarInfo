@@ -131,7 +131,7 @@ struct OnboardingView: View {
                     .foregroundStyle(.primary)
 
                 Text(page.description)
-                    .font(Kansei.Type.body)
+                    .font(KanseiTypo.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
@@ -161,7 +161,7 @@ struct ExampleCard: View {
                 .foregroundStyle(.secondary)
             Spacer()
             Text(value)
-                .font(Kansei.Type.body.monospaced())
+                .font(KanseiTypo.body.monospaced())
                 .foregroundStyle(Kansei.Color.ambient)
         }
         .padding()

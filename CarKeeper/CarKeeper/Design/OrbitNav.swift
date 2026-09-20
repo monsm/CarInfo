@@ -63,7 +63,7 @@ struct OrbitNavItemView: View {
 
                 if let badge = item.badge {
                     Text(badge)
-                        .font(Kansei.Type.micro)
+                        .font(KanseiTypo.micro)
                         .foregroundColor(.white)
                         .frame(width: 16, height: 16)
                         .background(Kansei.Color.error)
@@ -73,7 +73,7 @@ struct OrbitNavItemView: View {
             }
 
             Text(item.label)
-                .font(Kansei.Type.micro)
+                .font(KanseiTypo.micro)
                 .foregroundColor(isSelected ? Kansei.Color.ambient : Kansei.Color.tertiary)
 
             if isSelected {

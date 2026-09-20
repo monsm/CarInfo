@@ -306,14 +306,14 @@ struct MineView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("驾驶行为评分").font(Theme.h4)
                             Text("急加速 \(score.aggressiveAccel) 次 · 急刹车 \(score.harshBrake) 次")
-                                .font(Kansei.Type.caption).foregroundStyle(Kansei.Color.secondary)
+                                .font(KanseiTypo.caption).foregroundStyle(Kansei.Color.secondary)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
                             Text("\(score.score)")
                                 .font(Theme.d4).foregroundStyle(score.color)
                             Text(score.label)
-                                .font(Kansei.Type.caption).foregroundStyle(score.color)
+                                .font(KanseiTypo.caption).foregroundStyle(score.color)
                         }
                     }
                     .padding(16)
@@ -394,7 +394,7 @@ struct MineView: View {
                         ProgressView(value: downloadPct)
                             .tint(Kansei.Color.ambient)
                         Text("正在下载… \(downloadPctDisplay)%")
-                            .font(Kansei.Type.caption).foregroundStyle(Kansei.Color.secondary)
+                            .font(KanseiTypo.caption).foregroundStyle(Kansei.Color.secondary)
                     }
                 } else if let m = updateMsg {
                     // 错误或提示消息（图标由 updateMsgIsError 决定）

@@ -66,7 +66,7 @@ struct HealthView: View {
             HStack(spacing: DS.Space.sm) {
                 ProgressView().controlSize(.small)
                 Text("正在读取健康报告…")
-                    .font(Kansei.Type.footnote)
+                    .font(KanseiTypo.footnote)
                     .foregroundStyle(Kansei.Color.secondary)
             }
             DSSkeleton(height: 96)
@@ -213,7 +213,7 @@ struct HealthView: View {
             if let s = item.suggest, !s.isEmpty { DSKeyValueRow(key: "参考范围", value: s) }
             if let desc = item.desc, !desc.isEmpty {
                 Text(desc)
-                    .font(Kansei.Type.footnote)
+                    .font(KanseiTypo.footnote)
                     .foregroundStyle(Kansei.Color.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

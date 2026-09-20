@@ -94,7 +94,7 @@ struct MessagesView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("全部已读") { markAllRead() }
-                    .font(Kansei.Type.subheadline.weight(.semibold))
+                    .font(KanseiTypo.subheadline.weight(.semibold))
                     .foregroundStyle(Kansei.Color.ambient)
                     .disabled(items.allSatisfy { $0.read })
                     .accessibilityLabel(Text("全部标为已读"))
@@ -135,7 +135,7 @@ struct MessagesView: View {
             DSHaptic.select()
         } label: {
             Text(label)
-                .font(Kansei.Type.footnote.weight(selected ? .semibold : .regular))
+                .font(KanseiTypo.footnote.weight(selected ? .semibold : .regular))
                 .foregroundStyle(selected ? Kansei.Color.ambient : Kansei.Color.secondary)
                 .padding(.horizontal, Kansei.Spacing.md)
                 .frame(height: 30)
@@ -150,7 +150,7 @@ struct MessagesView: View {
             HStack(spacing: DS.Space.sm) {
                 ProgressView().controlSize(.small)
                 Text("正在加载消息…")
-                    .font(Kansei.Type.footnote)
+                    .font(KanseiTypo.footnote)
                     .foregroundStyle(Kansei.Color.secondary)
             }
             DSSkeleton(height: 88)
@@ -189,12 +189,12 @@ struct MessagesView: View {
                                 .lineLimit(2)
                             if !item.tag.isEmpty {
                                 Text(item.tag)
-                            .font(Kansei.Type.caption2.weight(.semibold))
+                            .font(KanseiTypo.caption2.weight(.semibold))
                             .foregroundStyle(Kansei.statusColor(item.tagCls))
                             }
                             Spacer(minLength: DS.Space.sm)
                             Text(shortTime(item.time))
-                            .font(Kansei.Type.footnote)
+                            .font(KanseiTypo.footnote)
                             .foregroundStyle(Kansei.Color.secondary)
                             Image(systemName: isOpen ? "chevron.up" : "chevron.down")
                                 .font(.system(size: 11, weight: .semibold))
@@ -203,7 +203,7 @@ struct MessagesView: View {
 
                         if !item.body.isEmpty {
                             Text(item.body)
-                                .font(Kansei.Type.subheadline)
+                                .font(KanseiTypo.subheadline)
                                 .foregroundStyle(Kansei.Color.secondary)
                                 .lineLimit(isOpen ? nil : 2)
                                 .fixedSize(horizontal: false, vertical: true)

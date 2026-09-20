@@ -115,10 +115,10 @@ struct DrivingScorePage: View {
                         .font(.system(size: 48, weight: .bold))
                         .foregroundStyle(scoreColor)
                     Text("分")
-                        .font(Kansei.Type.caption)
+                        .font(KanseiTypo.caption)
                         .foregroundStyle(Kansei.Color.secondary)
                     Text("等级 \(scoreGrade)")
-                        .font(Kansei.Type.subheadline)
+                        .font(KanseiTypo.subheadline)
                         .foregroundStyle(scoreColor)
                 }
             }
@@ -138,7 +138,7 @@ struct DrivingScorePage: View {
     // MARK: - 雷达图
     private var radarChart: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("驾驶能力雷达").font(Kansei.Type.subheadline.weight(.bold))
+            Text("驾驶能力雷达").font(KanseiTypo.subheadline.weight(.bold))
             Chart {
                 RadarSlice(value: smoothDrivingScore, label: "平稳", color: .green)
                 RadarSlice(value: safeSpeedScore, label: "守规", color: .blue)
@@ -185,7 +185,7 @@ struct DrivingScorePage: View {
             .frame(maxWidth: 100)
 
             Text("\(value)")
-                .font(Kansei.Type.subheadline.weight(.bold))
+                .font(KanseiTypo.subheadline.weight(.bold))
                 .foregroundStyle(color)
                 .frame(width: 30)
         }

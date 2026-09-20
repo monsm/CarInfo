@@ -174,7 +174,7 @@ struct BatteryView: View {
                         ForEach(Array(batt.reasons.enumerated()), id: \.offset) { _, r in
                             HStack(alignment: .top, spacing: 8) {
                                 StatusDot(cls: r.cls)
-                                Text(r.t).font(Kansei.Type.caption).foregroundStyle(Kansei.Color.secondary)
+                                Text(r.t).font(KanseiTypo.caption).foregroundStyle(Kansei.Color.secondary)
                             }
                         }
                     }
@@ -290,7 +290,7 @@ struct BatteryView: View {
                         ForEach(Array(b.motors.enumerated()), id: \.offset) { (_ idx, m) in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(m.num == "--" ? "驱动电机" : "驱动电机 #\(m.num)")
-                                    .font(Kansei.Type.caption.weight(.bold)).foregroundStyle(Kansei.Color.secondary)
+                                    .font(KanseiTypo.caption.weight(.bold)).foregroundStyle(Kansei.Color.secondary)
                                 let rows = motorRows(m)
                                 ForEach(Array(rows.enumerated()), id: \.offset) { (_ idx, r) in
                                     KVRow(k: r.k, v: r.v)
@@ -346,7 +346,7 @@ struct BatteryView: View {
                         ForEach(Array(b.alarms.enumerated()), id: \.offset) { (_ idx, a) in
                             HStack {
                                 StatusDot(cls: "bad")
-                                Text(a).font(Kansei.Type.caption)
+                                Text(a).font(KanseiTypo.caption)
                                 Spacer()
                                 Text("触发").font(Theme.font(.footnote as Font).bold())
                                     .foregroundStyle(Theme.bad)

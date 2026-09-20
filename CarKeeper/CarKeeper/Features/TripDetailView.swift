@@ -99,7 +99,7 @@ struct TripDetailView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(trip.startTime, style: .date)
-                        .font(Kansei.Type.caption)
+                        .font(KanseiTypo.caption)
                         .foregroundStyle(.secondary)
                     Text(trip.startTime, style: .time)
                         .font(Theme.subheadline)
@@ -109,10 +109,10 @@ struct TripDetailView: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(DurationFormatter.string(
                         from: max((trip.endTime ?? Date()).timeIntervalSince(trip.startTime), 1)))
-                        .font(Kansei.Type.caption)
+                        .font(KanseiTypo.caption)
                         .foregroundStyle(.secondary)
                     Text(trip.startTime, style: .date)
-                        .font(Kansei.Type.caption)
+                        .font(KanseiTypo.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -140,7 +140,7 @@ struct TripDetailView: View {
                     .foregroundStyle(.primary)
                 if !unit.isEmpty {
                     Text(unit)
-                        .font(Kansei.Type.caption)
+                        .font(KanseiTypo.caption)
                         .foregroundStyle(.secondary)
                 }
             }

@@ -106,7 +106,7 @@ struct LoginView: View {
             }
 
             Text("登录以管理您的爱车")
-                .font(Kansei.Type.caption)
+                .font(KanseiTypo.caption)
                 .foregroundColor(Kansei.Color.secondary)
         }
     }
@@ -118,12 +118,12 @@ struct LoginView: View {
                 // 手机号输入
                 VStack(alignment: .leading, spacing: Kansei.Spacing.xs) {
                     Text("手机号")
-                        .font(Kansei.Type.caption)
+                        .font(KanseiTypo.caption)
                         .foregroundColor(Kansei.Color.secondary)
                     TextField("请输入手机号", text: $phone)
                         .keyboardType(.phonePad)
                         .foregroundColor(Kansei.Color.primary)
-                        .font(Kansei.Type.subtitle)
+                        .font(KanseiTypo.subtitle)
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: Kansei.Radius.small, style: .continuous)
@@ -138,12 +138,12 @@ struct LoginView: View {
                 // 图形验证码
                 VStack(alignment: .leading, spacing: Kansei.Spacing.xs) {
                     Text("图形验证码")
-                        .font(Kansei.Type.caption)
+                        .font(KanseiTypo.caption)
                         .foregroundColor(Kansei.Color.secondary)
                     HStack(spacing: Kansei.Spacing.sm) {
                         TextField("输入验证码", text: $picCode)
                             .foregroundColor(Kansei.Color.primary)
-                            .font(Kansei.Type.subtitle)
+                            .font(KanseiTypo.subtitle)
                             .padding()
                             .background(
                                 RoundedRectangle(cornerRadius: Kansei.Radius.small, style: .continuous)
@@ -172,13 +172,13 @@ struct LoginView: View {
                 // 短信验证码
                 VStack(alignment: .leading, spacing: Kansei.Spacing.xs) {
                     Text("短信验证码")
-                        .font(Kansei.Type.caption)
+                        .font(KanseiTypo.caption)
                         .foregroundColor(Kansei.Color.secondary)
                     HStack(spacing: Kansei.Spacing.sm) {
                         TextField("6位数字", text: $smsCode)
                             .keyboardType(.numberPad)
                             .foregroundColor(Kansei.Color.primary)
-                            .font(Kansei.Type.hero)
+                            .font(KanseiTypo.hero)
                             .letterSpacing(8)
                             .padding()
                             .background(
@@ -191,7 +191,7 @@ struct LoginView: View {
                             sendSMS()
                         } label: {
                             Text(smsBtnText)
-                                .font(Kansei.Type.caption)
+                                .font(KanseiTypo.caption)
                                 .foregroundColor(smsBtnDisabled ? Kansei.Color.tertiary : Kansei.Color.ambient)
                                 .padding(.horizontal, Kansei.Spacing.md)
                                 .padding(.vertical, Kansei.Spacing.sm)
@@ -219,7 +219,7 @@ struct LoginView: View {
                     ProgressView().tint(.white)
                 }
                 Text(busy ? "登录中…" : "登录")
-                    .font(Kansei.Type.title)
+                    .font(KanseiTypo.title)
                     .foregroundColor(.white)
             }
             .frame(maxWidth: .infinity)
@@ -240,7 +240,7 @@ struct LoginView: View {
             HStack {
                 Image(systemName: "faceid")
                 Text("Face ID 登录")
-                    .font(Kansei.Type.subtitle)
+                    .font(KanseiTypo.subtitle)
                     .foregroundColor(Kansei.Color.secondary)
             }
             .frame(maxWidth: .infinity)

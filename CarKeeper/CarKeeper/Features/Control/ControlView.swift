@@ -221,9 +221,9 @@ struct ControlView: View {
                     let lit = bd.lampRows.filter { $0.1 == "亮" }
                     if !lit.isEmpty {
                         Text(lit.map { $0.0 }.joined(separator: " · "))
-                            .font(Kansei.Type.caption).foregroundStyle(Kansei.Color.warning)
+                            .font(KanseiTypo.caption).foregroundStyle(Kansei.Color.warning)
                     } else {
-                        Text("全部关闭").font(Kansei.Type.caption).foregroundStyle(Kansei.Color.secondary)
+                        Text("全部关闭").font(KanseiTypo.caption).foregroundStyle(Kansei.Color.secondary)
                     }
                 }
             }

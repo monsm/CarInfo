@@ -87,8 +87,6 @@ struct Kansei {
     static func hapticSelect() { UISelectionFeedbackGenerator().selectionChanged() }
     static func hapticHeavy() { UIImpactFeedbackGenerator(style: .heavy).impactOccurred() }
 
-    // MARK: - Typography (backtick to avoid Swift Type expression conflict)
-    static var `Type`: KanseiTypo { KanseiTypo() }
 
     // MARK: - Spacing
     static let spacingXs = CGFloat(4)
@@ -109,17 +107,19 @@ struct Kansei {
 }
 
 // MARK: - Typography accessor
-struct KanseiTypo {
-    var display: Font { Font.system(size: 72, weight: .thin).monospacedDigit() }
-    var hero: Font { Font.system(size: 48, weight: .light).monospacedDigit() }
-    var title: Font { Font.system(size: 24, weight: .semibold) }
-    var subtitle: Font { Font.system(size: 17, weight: .regular) }
-    var caption: Font { .caption }
-    var footnote: Font { .footnote }
-    var subheadline: Font { .subheadline }
-    var micro: Font { Font.system(size: 11, weight: .regular) }
-}
-
+enum KanseiTypo {
+    static var display: Font { Font.system(size: 72, weight: .thin).monospacedDigit() }
+    static var hero: Font { Font.system(size: 48, weight: .light).monospacedDigit() }
+    static var title: Font { Font.system(size: 24, weight: .semibold) }
+    static var subtitle: Font { Font.system(size: 17, weight: .regular) }
+    static var caption: Font { .caption }
+    static var caption2: Font { .caption2 }
+    static var footnote: Font { .footnote }
+    static var subheadline: Font { .subheadline }
+    static var body: Font { .body }
+    static var micro: Font { Font.system(size: 11, weight: .regular) }
+}
+
 // MARK: - View extensions for Kansei colors
 extension View {
     func kanseiBackground() -> some View {
@@ -251,4 +251,65 @@ enum DS {
         }
     }
 }
-
+
+
+// MARK: - Dotted-namespace compat (Kansei.Color.* / Spacing / Radius / Motion / Haptic)
+extension Kansei {
+    enum Color {
+        static var amber: SwiftUI.Color { Kansei.amber }
+        static var amberDark: SwiftUI.Color { Kansei.amberDark }
+        static var amberLight: SwiftUI.Color { Kansei.amberLight }
+        static var deepBlack: SwiftUI.Color { Kansei.deepBlack }
+        static var nightSurface: SwiftUI.Color { Kansei.nightSurface }
+        static var daySurface: SwiftUI.Color { Kansei.daySurface }
+        static var success: SwiftUI.Color { Kansei.success }
+        static var warning: SwiftUI.Color { Kansei.warning }
+        static var error: SwiftUI.Color { Kansei.error }
+        static var info: SwiftUI.Color { Kansei.info }
+        static var glassLight: SwiftUI.Color { Kansei.glassLight }
+        static var glassBorder: SwiftUI.Color { Kansei.glassBorder }
+        static var glassHighlight: SwiftUI.Color { Kansei.glassHighlight }
+        static var primary: SwiftUI.Color { Kansei.primary }
+        static var secondary: SwiftUI.Color { Kansei.secondary }
+        static var tertiary: SwiftUI.Color { Kansei.tertiary }
+        static var fillSubtle: SwiftUI.Color { Kansei.fillSubtle }
+        static var ambient: SwiftUI.Color { Kansei.ambient }
+        static var background: SwiftUI.Color { Kansei.background }
+    }
+
+    enum Spacing {
+        static var xxs: CGFloat { 2 }
+        static var xs: CGFloat { Kansei.spacingXs }
+        static var sm: CGFloat { Kansei.spacingSm }
+        static var md: CGFloat { Kansei.spacingMd }
+        static var lg: CGFloat { Kansei.spacingLg }
+        static var xl: CGFloat { Kansei.spacingXl }
+        static var xxl: CGFloat { Kansei.spacingXxl }
+        static var xxxl: CGFloat { Kansei.spacingXxxl }
+        static var page: CGFloat { Kansei.spacingPage }
+    }
+
+    enum Radius {
+        static var small: CGFloat { Kansei.radiusSmall }
+        static var medium: CGFloat { Kansei.radiusMedium }
+        static var large: CGFloat { Kansei.radiusLarge }
+        static var pill: CGFloat { Kansei.radiusPill }
+    }
+
+    enum Motion {
+        static var breathe: Animation { Kansei.breathe }
+        static var tap: Animation { Kansei.tap }
+        static var count: Animation { Kansei.count }
+        static var page: Animation { Kansei.page }
+        static var reveal: Animation { Kansei.reveal }
+    }
+
+    enum Haptic {
+        static func select() { Kansei.hapticSelect() }
+        static func tap() { Kansei.hapticPress() }
+        static func success() { Kansei.hapticSuccess() }
+        static func error() { Kansei.hapticError() }
+        static func warning() { Kansei.hapticWarning() }
+        static func heavy() { Kansei.hapticHeavy() }
+    }
+}

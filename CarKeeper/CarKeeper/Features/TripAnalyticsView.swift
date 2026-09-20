@@ -108,7 +108,7 @@ struct TripAnalyticsView: View {
     private var totalHeader: some View {
         VStack(alignment: .leading, spacing: Kansei.Spacing.sm) {
             Text(period.rawValue + "合计")
-                .font(Kansei.Type.footnote)
+                .font(KanseiTypo.footnote)
                 .foregroundStyle(Kansei.Color.secondary)
             DSBigNumber(
                 value: String(format: "%.0f", tripStats.totalKm),
@@ -125,11 +125,11 @@ struct TripAnalyticsView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 Text("近 7 日里程")
-                    .font(Kansei.Type.footnote)
+                    .font(KanseiTypo.footnote)
                     .foregroundStyle(Kansei.Color.secondary)
                 Spacer(minLength: Kansei.Spacing.sm)
                 Text(tripStats.avgKm > 0 ? String(format: "平均 %.0f km/次", tripStats.avgKm) : "--")
-                    .font(Kansei.Type.caption)
+                    .font(KanseiTypo.caption)
                     .foregroundStyle(Kansei.Color.tertiary)
             }
 
@@ -147,7 +147,7 @@ struct TripAnalyticsView: View {
             .chartXAxis {
                 AxisMarks(values: .stride(by: .day)) { value in
                     AxisValueLabel(format: .dateTime.weekday(.narrow))
-                        .font(Kansei.Type.caption2)
+                        .font(KanseiTypo.caption2)
                         .foregroundStyle(Kansei.Color.tertiary)
                 }
             }

@@ -146,8 +146,8 @@ struct ShortcutRow: View {
                 .frame(width: 36, height: 36)
                 .background(Kansei.Color.fillSubtle, in: Circle())
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(Kansei.Type.body).foregroundStyle(Kansei.Color.primary)
-                Text(subtitle).font(Kansei.Type.caption).foregroundStyle(Kansei.Color.secondary)
+                Text(title).font(KanseiTypo.body).foregroundStyle(Kansei.Color.primary)
+                Text(subtitle).font(KanseiTypo.caption).foregroundStyle(Kansei.Color.secondary)
             }
             Spacer()
             if usage > 0 {
