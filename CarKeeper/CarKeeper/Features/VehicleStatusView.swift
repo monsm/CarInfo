@@ -136,32 +136,46 @@ struct DriveModeDisplay: View {
 struct Vehicle2DStatusView: View {
     let control: [String: Any]?
     
+    // ⚠️ 字段名与取值语义必须对齐官方报文（对照小程序 utils/vm.js 的 bodyDetailModel / bodyStatus）：
+    // 门 / 后备箱 / 前舱盖 / 天窗 / 车窗开度 / 灯光：0 = 关闭或已锁，非 0 = 开启或未锁。
+    // 之前这里读的是 doorLocked / trunkOpen / hoodOpen / windowFrontLeft …… 这些键在长安接口里
+    // 根本不存在（小程序 0 处命中），而且用的是 `as? Bool`（报文里是 0/1）→ 整张 2D 车图恒定「全关」。
+    private func flag(_ names: [String]) -> Bool {
+        let x = ciNumber(control, names)
+        return x != nil && x != 0
+    }
+
+    /// 车窗：优先看开度（> 0 表示开启），没有开度再看状态位
+    private func windowOpen(_ degreeKeys: [String], _ stateKeys: [String]) -> Bool {
+        if let deg = ciNumber(control, degreeKeys) { return deg > 0 }
+        return flag(stateKeys)
+    }
+
     private var isDoorLocked: Bool {
-        (control?["doorLocked"] as? Bool) ?? false
+        // 锁止：DriverDoorLock == 0 表示已锁
+        ciNumber(control, ["DriverDoorLock"]).map { $0 == 0 } ?? false
     }
-    private var isTrunkOpen: Bool {
-        (control?["trunkOpen"] as? Bool) ?? false
-    }
-    private var isHoodOpen: Bool {
-        (control?["hoodOpen"] as? Bool) ?? false
-    }
+    private var isTrunkOpen: Bool { flag(["Trunk"]) }
+    private var isHoodOpen: Bool { flag(["Hood"]) }
+    private var isSunroofOpen: Bool { flag(["Sunroof"]) }
     private var isWindowFrontLeftOpen: Bool {
-        (control?["windowFrontLeft"] as? Bool) ?? false
+        windowOpen(["LeftAnteriorWindowDegree"], ["LeftFrontDoorrWindow"])
     }
     private var isWindowFrontRightOpen: Bool {
-        (control?["windowFrontRight"] as? Bool) ?? false
+        windowOpen(["RightAnteriorWindowDegree"], ["RightFrontDoorrWindow"])
     }
     private var isWindowRearLeftOpen: Bool {
-        (control?["windowRearLeft"] as? Bool) ?? false
+        windowOpen(["LeftRearWindowDegree"], ["LeftRearDoorrWindow"])
     }
     private var isWindowRearRightOpen: Bool {
-        (control?["windowRearRight"] as? Bool) ?? false
+        windowOpen(["RightRearWindowDegree"], ["RightRearWindow"])
     }
     private var isHeadlightOn: Bool {
-        (control?["headlight"] as? Bool) ?? false
+        flag(["LowBeam"]) || flag(["HighBeam"])
     }
+    /// 双闪：左右转向灯同时点亮（官方报文没有独立的 hazard 字段，故由转向灯推导）
     private var isHazardOn: Bool {
-        (control?["hazardLight"] as? Bool) ?? false
+        flag(["LeftTurnSignal", "TurnLndicatorLeft"]) && flag(["RightTurnSignal", "TurnLndicatorRight"])
     }
     
     var body: some View {
@@ -178,6 +192,15 @@ struct Vehicle2DStatusView: View {
                 .frame(width: 100, height: 100)
                 .offset(y: -30)
                 .cornerRadius(15)
+
+            // 天窗开启指示（Sunroof != 0）
+            if isSunroofOpen {
+                Image(safeSymbol: "rectangle.inset.filled", fallback: "rectangle")
+                    .font(.system(size: 26))
+                    .foregroundStyle(.orange)
+                    .offset(y: -30)
+                    .accessibilityLabel(Text("天窗已打开"))
+            }
             
             // 车门状态指示
             // 左前门

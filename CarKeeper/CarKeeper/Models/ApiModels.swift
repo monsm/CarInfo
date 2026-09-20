@@ -69,6 +69,21 @@ func ciObject(_ dict: [String: Any]?, _ names: [String]) -> [String: Any]? {
     return v as? [String: Any]
 }
 
+/// 剥壳：部分接口把真正的实体包在「单元素数组」或「单键包装对象」里
+/// （如 CarLocationResp / data / result）。
+/// ⚠️ 直接 `as? [String: Any]` 失败时会被调用处的 `try?` 静默吞掉，
+/// 表现为「接口其实有数据，但缓存里永远是 nil，界面上整块空白」。
+func unwrapEntity(_ any: Any?) -> [String: Any]? {
+    if let arr = any as? [Any] { return arr.compactMap { $0 as? [String: Any] }.first }
+    guard let dict = any as? [String: Any] else { return nil }
+    let wrapperKeys: Set<String> = ["carlocationresp", "data", "result", "entity", "row", "body"]
+    if dict.count == 1, let (k, v) = dict.first, wrapperKeys.contains(k.lowercased()) {
+        if let inner = v as? [String: Any] { return inner.isEmpty ? dict : inner }
+        if let arr = v as? [Any] { return arr.compactMap { $0 as? [String: Any] }.first ?? dict }
+    }
+    return dict
+}
+
 // MARK: - 缓存桥接
 // 缓存值是 [String: Any?]，取值后需要转成 [String: Any] 才能用 ci* 助手。
 

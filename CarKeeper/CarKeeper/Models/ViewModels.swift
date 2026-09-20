@@ -228,12 +228,14 @@ enum VM {
         let control = ciVal(cache, "control")
         let hasCtrl = control != nil
 
-        let motorArr: [String: Any]? = control.flatMap { c -> [String: Any]? in
-            let drive = ciObject(c, ["DriveMotorData"])
-            if drive != nil { return drive }
-            return ciObject(c, ["MotorData"])
-        }
-        let motor = motorArr
+        // ⚠️ 报文中 DriveMotorData / MotorData 是「数组」（小程序取 [0]，batteryModel 里也是数组），
+        // 之前按对象解析 → 永远取不到 → 首页/车况页的电机温度恒为 "--"。
+        let motor: [String: Any]? = {
+            guard let c = control else { return nil }
+            if let drive = ciArray(c, ["DriveMotorData"]), !drive.isEmpty { return drive[0] }
+            if let m = ciArray(c, ["MotorData"]), !m.isEmpty { return m[0] }
+            return nil
+        }()
 
         let gearCls = (hasCtrl && num(control?["ShiftPosition"]) != 0) ? "bad" : ""
 
@@ -263,7 +265,7 @@ enum VM {
             gear: hasCtrl ? (num(control?["ShiftPosition"]) == 0 ? "P" : "D") : "--",
             gearSub: hasCtrl ? (num(control?["ShiftPosition"]) == 0 ? "驻车" : "行驶") : "",
             gearCls: gearCls,
-            motorTemp: motor == nil ? "--" : (t != nil ? "\(Int(t!))°" : "--") + " / " + (ct != nil ? "\(Int(ct!))°" : "--"),
+            motorTemp: motor == nil ? "--" : "\(n0(t) ?? "--")℃ / \(n0(ct) ?? "--")℃",
             batteryNote: note,
             isMoving: hasCtrl && num(control?["VehicleSpeed"]) > 0,
             fireStatus: fireStatus
@@ -346,22 +348,38 @@ enum VM {
     // ---------- 位置 ----------
     static func locStatus(_ cache: [String: Any?]) -> LocModel {
         let control = ciVal(cache, "control")
-        let loc = ciVal(cache, "location")
+        let locRaw = ciVal(cache, "location")
         let hasCtrl = control != nil
-        let gpsOk = loc.map { $0 }.flatMap { $0["ValidGps"] as? NSNumber }.map { $0.boolValue }
+        // 位置接口偶尔返回空对象 / 失灵时，退回 pm25 报文里那份 CarLocationResp ——
+        // 小程序 utils/texts.js 的 envText 正是从 pm25 里读 AddrDesc / Lat / Lng。
+        let loc: [String: Any]? = {
+            guard let locRaw else { return ciObject(ciVal(cache, "pm25"), ["CarLocationResp", "carLocationResp"]) }
+            let hasAddr = !((ciString(locRaw, ["AddrDesc"]) ?? "").isEmpty)
+            let hasCoord = ciNumber(locRaw, ["Lat"]) != nil && ciNumber(locRaw, ["Lng"]) != nil
+            if hasAddr || hasCoord { return locRaw }
+            return ciObject(ciVal(cache, "pm25"), ["CarLocationResp", "carLocationResp"]) ?? locRaw
+        }()
+        // ValidGps 可能是布尔 / 0-1 数字 / "0"-"1" 字符串，统一走 ciBool
+        // （小程序用 !!loc.ValidGps；原来只认 NSNumber，字符串时整项变 "--"）
+        let gpsOk = ciBool(loc, ["ValidGps"])
         let heading = ciNumber(loc, ["Heading"])
         let deg = heading == nil ? 0 : norm360(heading!)
+        // 卫星数缺失时不要硬造 "0 颗"，直接显示 "--"
+        let sat = ciNumber(control, ["SatNum"])
+        let satAlt: String = (hasCtrl && sat != nil)
+            ? "\(Int(sat!)) 颗 · 海拔 \(n1(ciPick(control, ["Alti"])) ?? "--") m"
+            : "--"
         return LocModel(
-            addr: loc?["AddrDesc"] as? String ?? "",
-            snap: s(loc?["LocationImgurl"]) ?? s(loc?["ThumbnailLocationImgUrl"]) ?? "",
+            addr: ciString(loc, ["AddrDesc"]) ?? "",
+            snap: s(ciPick(loc, ["LocationImgurl"])) ?? s(ciPick(loc, ["ThumbnailLocationImgUrl"])) ?? "",
             gpsText: gpsOk == nil ? "--" : (gpsOk! ? "GPS 信号有效" : "GPS 信号异常"),
             gpsCls: gpsOk == nil ? "na" : (gpsOk! ? "ok" : "bad"),
             dir: heading == nil ? "--" : directionText(deg),
             deg: heading == nil ? "--" : "\(Int(deg.rounded()))°",
             degNum: heading == nil ? 0 : Int(deg.rounded()),
-            satAlt: hasCtrl ? "\(Int(num(control?["SatNum"]))) 颗 · 海拔 \(n1(control?["Alti"]) ?? "--") m" : "--",
-            lat: (loc?["Lat"] as? String) ?? (loc?["Lat"] as? NSNumber).map { $0.stringValue } ?? "--",
-            lng: (loc?["Lng"] as? String) ?? (loc?["Lng"] as? NSNumber).map { $0.stringValue } ?? "--"
+            satAlt: satAlt,
+            lat: s(ciPick(loc, ["Lat"])) ?? "--",
+            lng: s(ciPick(loc, ["Lng"])) ?? "--"
         )
     }
 

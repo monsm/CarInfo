@@ -63,9 +63,10 @@ class MockAPIClient {
     
     func getMockCarData() -> [String: Any] {
         return [
-            "energy": ["socPct": 75, "rangeKm": 280, "charging": false],
-            "control": ["doorLocked": true, "windowFrontLeft": false],
-            "location": ["lat": 39.9, "lng": 116.4]
+            // 用真实报文的键名，避免模拟数据与线上解析逻辑“互相印证”出错误结论
+            "charge": ["RemainPower": 75, "RemainedPowerMile": 280, "ChrgStatus": "0"],
+            "control": ["DriverDoorLock": 0, "Door": 0, "LeftAnteriorWindowDegree": 0],
+            "location": ["Lat": 39.9, "Lng": 116.4, "ValidGps": true]
         ]
     }
 }

@@ -9,12 +9,10 @@ struct DashboardView: View {
     private let store = AppStore.shared
     @State private var period: String = "7天"
 
-    private var energyDict: [String: Any] {
-        (store.car?["energy"] as? [String: Any]) ?? [:]
-    }
-    private var climateDict: [String: Any] {
-        (store.car?["climate"] as? [String: Any]) ?? [:]
-    }
+    // ⚠️ 报文里没有 car["energy"] / car["climate"] 这两个嵌套对象（小程序也是用 charge / control / pm25 现算的），
+    // 原来这样读 → 仪表盘的 SOC / 续航 / 温度恒显示 0% / 0km / 22°C。
+    private var energyModel: EnergyModel { VM.energy(store.caches, store.car) }
+    private var comfortModel: ComfortModel { VM.comfortStatus(store.caches) }
     
     let periods = ["24小时", "7天", "30天"]
     
@@ -32,9 +30,11 @@ struct DashboardView: View {
                 
                 // 核心指标
                 HStack(spacing: Theme.Spacing.sm) {
-                    DashTile(icon: "bolt.fill", label: "SOC", value: "\(energyDict["socPct"] as? Int ?? 0)%", color: .green)
-                    DashTile(icon: "gauge", label: "续航", value: "\(energyDict["rangeKm"] as? Int ?? 0)km", color: .blue)
-                    DashTile(icon: "thermometer", label: "温度", value: "\(climateDict["tempC"] as? Int ?? 22)°C", color: .orange)
+                    DashTile(icon: "bolt.fill", label: "SOC",
+                             value: energyModel.soc == "--" ? "--" : "\(energyModel.socPct)%", color: .green)
+                    DashTile(icon: "gauge", label: "续航",
+                             value: energyModel.range == "--" ? "--" : "\(energyModel.range)km", color: .blue)
+                    DashTile(icon: "thermometer", label: "温度", value: comfortModel.cabinTemp, color: .orange)
                 }
                 
                 // 能耗图表

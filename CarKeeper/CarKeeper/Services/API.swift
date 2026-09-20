@@ -306,7 +306,7 @@ final class APIClient: @unchecked Sendable {
             let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/carcheck/getCheckResult?carId=\(carId)&isNev=1&token=\(TokenStore.currentToken())",
                                         method: "POST", body: [:])
             let unpacked = unpack(res.text)
-            return unpacked.ok ? (unpacked.data as? [String: Any]) : nil
+            return unpacked.ok ? unwrapEntity(unpacked.data) : nil
         }
     }
 
@@ -315,7 +315,7 @@ final class APIClient: @unchecked Sendable {
             let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/car/pm/getCarPm25ByCarId?carId=\(carId)&token=\(TokenStore.currentToken())",
                                         method: "POST", body: [:])
             let unpacked = unpack(res.text)
-            return unpacked.ok ? (unpacked.data as? [String: Any]) : nil
+            return unpacked.ok ? unwrapEntity(unpacked.data) : nil
         }
     }
 
@@ -324,7 +324,7 @@ final class APIClient: @unchecked Sendable {
             let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/charge/info?carId=\(carId)&token=\(TokenStore.currentToken())",
                                         method: "POST", body: [:])
             let unpacked = unpack(res.text)
-            return unpacked.ok ? (unpacked.data as? [String: Any]) : nil
+            return unpacked.ok ? unwrapEntity(unpacked.data) : nil
         }
     }
 
@@ -333,7 +333,7 @@ final class APIClient: @unchecked Sendable {
             let res = try await request(url: "\(APIConfig.baseURL)/api/car/getControlStatus?carId=\(carId)&token=\(TokenStore.currentToken())",
                                         method: "POST", body: [:])
             let unpacked = unpack(res.text)
-            return unpacked.ok ? (unpacked.data as? [String: Any]) : nil
+            return unpacked.ok ? unwrapEntity(unpacked.data) : nil
         }
     }
 
@@ -355,7 +355,10 @@ final class APIClient: @unchecked Sendable {
             let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/cardata/getCarLocation?carId=\(carId)&mapType=GCJ02&token=\(TokenStore.currentToken())",
                                         method: "POST", body: [:])
             let unpacked = unpack(res.text)
-            return unpacked.ok ? (unpacked.data as? [String: Any]) : nil
+            // 定位报文可能是扁平对象，也可能被包在 CarLocationResp / 单元素数组里（剥壳后再用）。
+            // 请求/响应原文已由 RawLogStore 记录，排障时可在 App 的原始日志页直接看报文形状。
+            guard unpacked.ok, let d = unwrapEntity(unpacked.data) else { return nil }
+            return d
         }
     }
 

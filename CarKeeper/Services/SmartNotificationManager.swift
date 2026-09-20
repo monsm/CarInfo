@@ -212,10 +212,12 @@ extension AppStore {
     
     func checkNotificationsIfNeeded() {
         let notif = SmartNotificationManager.shared
-        guard let car = car, let energy = car["energy"] as? [String: Any] else { return }
-        
-        let soc = energy["socPct"] as? Int ?? energy["soc_pct"] as? Int ?? 0
-        let charging = energy["charging"] as? Bool ?? false
+        // ⚠️ 报文里没有 car["energy"] 这种嵌套结构（小程序也是从 charge / control 现算），
+        // 原来在这里 guard 直接 return → 低电量 / 充满提醒一次都不会触发。
+        guard cacheObject(caches, "control") != nil || cacheObject(caches, "charge") != nil else { return }
+
+        let soc = VM.energy(caches, car).socPct
+        let charging = isCharging
         
         notif.checkChargeNotification(soc: soc, charging: charging, lastCheck: lastChargeAlertTime)
         

@@ -244,8 +244,11 @@ final class AppStore: @unchecked Sendable {
               let soc = ciNumberInt(charge, ["RemainPower"]) else { return CCQuickStatus() }
         let rangeStr = ciString(charge, ["RemainedPowerMile"]) ?? "--"
         let ctrl = caches["control"] as? [String: Any]
-        let locked = (ciBool(ctrl, ["DoorLocked", "doorLocked"]) ?? true)
-        let temp = VM.n0(ctrl?["InteriorTemperature"] ?? ctrl?["interiorTemperature"]) ?? "--"
+        // ⚠️ 官方报文里没有 DoorLocked / InteriorTemperature（小程序 0 处引用）：
+        // 锁止状态是 DriverDoorLock（0 = 已锁），车内温度在 pm25 报文的 VehicleTemperature 里。
+        // 原来读不存在的键 → 恒显示「已锁」+ 温度 "--"。
+        let locked = ciNumber(ctrl, ["DriverDoorLock"]).map { $0 == 0 } ?? true
+        let temp = VM.n0(ciPick(caches["pm25"] as? [String: Any], ["VehicleTemperature"])) ?? "--"
         let charging = isCharging
         return CCQuickStatus(soc: soc, range: rangeStr, locked: locked, cabinTemp: "\(temp)℃", charging: charging, online: "在线")
     }
@@ -557,7 +560,8 @@ final class AppStore: @unchecked Sendable {
         let soc = e.socPct
         let rangeKm = Int(e.range.filter { $0.isNumber }) ?? 0
         let temp = comfort.cabinTemp
-        let locked = ciBool(control, ["DoorLocked", "doorLocked"]) ?? true
+        // 锁止状态：DriverDoorLock == 0 表示已锁（报文里没有 DoorLocked 这个键）
+        let locked = ciNumber(control, ["DriverDoorLock"]).map { $0 == 0 } ?? true
         let charging = isCharging
         let powerText = chargingPowerHistory.last.map { String(format: "%.1f", $0.power) } ?? ""
 
@@ -601,17 +605,25 @@ final class AppStore: @unchecked Sendable {
 
     // #24 首页卡片自定义排序
     static let cardOrderKey = "carkeeper_home_card_order"
+
+    /// 首页真正实现了渲染的卡片 id 全集。
+    /// ⚠️ 首页 `cardStack` 的 switch 里，未列出的 id 会落到 `default:`（原本渲染的是位置卡），
+    /// 而默认顺序里曾包含 `energyGauge` —— 它不在 switch 里，于是首页会**多出一张一模一样的位置卡**。
+    /// 所以这里给出唯一真源：不在这个列表里的 id 一律在渲染前过滤掉。
+    static let knownCardIds: [String] = [
+        "socHero", "driveMetrics", "carSelector", "quickControl", "domainCard",
+        "realtimeEnergy", "sohDashboard", "driveMode", "batterySection", "vehicle2D",
+        "tyreCard", "comfortCard", "carbonSavings", "locationCard"
+    ]
+
     var cardOrder: [String] {
         get {
             if let saved = UserDefaults.standard.array(forKey: Self.cardOrderKey) as? [String] {
-                return saved
+                // 过滤掉已不存在 / 拼错的 id（否则会被 switch 的 default 分支误当成位置卡）
+                let filtered = saved.filter { Self.knownCardIds.contains($0) }
+                return filtered.isEmpty ? Self.knownCardIds : filtered
             }
-            // 默认顺序（含 E1-E8 实时车况卡片）
-            return [
-                "socHero", "driveMetrics", "quickControl", "domainCard",
-                "realtimeEnergy", "sohDashboard", "energyGauge", "driveMode",
-                "batterySection", "tyreCard", "comfortCard", "vehicle2D", "locationCard"
-            ]
+            return Self.knownCardIds
         }
         set { UserDefaults.standard.set(newValue, forKey: Self.cardOrderKey) }
     }
@@ -667,7 +679,8 @@ final class AppStore: @unchecked Sendable {
         carId = newId
         UserDefaults.standard.set(newId, forKey: Self.selectedCarIdKey)
         // #N10 加密保存车牌号
-        if let plate = ciString(c, ["Plate", "plate", "plateNo"]) {
+        // 车牌键是 PlateNumber / plateNumber（Plate / plateNo 在报文里不存在）
+        if let plate = ciString(c, ["PlateNumber", "plateNumber"]) {
             SecureStorage.shared.savePlate(plate)
         }
         // 再清除旧缓存，后台异步拉新车数据
@@ -699,9 +712,11 @@ final class AppStore: @unchecked Sendable {
 
     // 当前位置（从缓存 location 取）
     var currentLocation: CLLocation? {
+        // ⚠️ 定位报文的键是 Lat / Lng（小程序 home.js 也是 Number(loc.lat)），
+        // 之前读 latitude/longitude 永远取不到 → 紧急面板「我的位置」与停车距离恒为空。
         guard let loc = caches["location"] as? [String: Any],
-              let lat = loc["latitude"] as? Double,
-              let lng = loc["longitude"] as? Double else { return nil }
+              let lat = ciNumber(loc, ["Lat"]),
+              let lng = ciNumber(loc, ["Lng"]) else { return nil }
         return CLLocation(latitude: lat, longitude: lng)
     }
 

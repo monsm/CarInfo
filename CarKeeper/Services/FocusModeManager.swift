@@ -54,11 +54,17 @@ class FocusModeManager: ObservableObject {
 struct FocusModeHomeView: View {
     let car: [String: Any]?
 
-    private var socPct: Int { (car?["energy"] as? [String: Any])?["socPct"] as? Int ?? 0 }
-    private var rangeKm: Int { (car?["energy"] as? [String: Any])?["rangeKm"] as? Int ?? 0 }
-    private var tempC: Int { (car?["climate"] as? [String: Any])?["tempC"] as? Int ?? 22 }
-    private var acOn: Bool { (car?["climate"] as? [String: Any])?["acOn"] as? Bool ?? false }
-    private var doorLocked: Bool { (car?["control"] as? [String: Any])?["doorLocked"] as? Bool ?? false }
+    // ⚠️ 报文里没有 car["energy"] / car["climate"]（小程序是现算的），car["control"]["doorLocked"]
+    // 这个键也不存在（锁止是 DriverDoorLock）。统一改为走视图模型 + 官方字段名。
+    private var cached: [String: Any?] { AppStore.shared.caches }
+    private var socPct: Int { VM.energy(cached, car).socPct }
+    private var rangeKm: Int { Int(VM.energy(cached, car).range.filter { $0.isNumber }) ?? 0 }
+    /// cabinTemp 形如 "23℃"，取数字部分；无数据回落 22
+    private var tempC: Int { Int(VM.comfortStatus(cached).cabinTemp.filter { $0.isNumber }) ?? 22 }
+    private var acOn: Bool { VM.comfortStatus(cached).acOn ?? false }
+    private var doorLocked: Bool {
+        ciNumber(cacheObject(cached, "control"), ["DriverDoorLock"]).map { $0 == 0 } ?? false
+    }
     @StateObject private var focusManager = FocusModeManager.shared
     
     var body: some View {

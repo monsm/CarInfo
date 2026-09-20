@@ -261,7 +261,10 @@ struct HomeView: View {
                             case "sohDashboard": SOHDashboard(store: store)
                             case "driveMode": DriveModeDisplay(currentMode: .eco, availableModes: [.eco, .comfort, .sport], onModeChange: {_ in })
                             case "vehicle2D": Vehicle2DStatusView(control: store.caches["control"] as? [String: Any])
-                            default: locationCard(loc)
+                            case "locationCard": locationCard(loc)
+                            // ⚠️ 不再用 default 兜位置卡：任何未实现的 id（历史上是 energyGauge）
+                            // 都会在这里再画一张位置卡，首页就多出一个重复的「位置」。
+                            default: EmptyView()
                             }
                         }
                         // 编辑模式：显示拖拽手柄和移除指示
@@ -980,11 +983,7 @@ struct HomeView: View {
         .padding(.vertical, 8)
     }
 
-    // #24 卡片排序：定义卡片ID映射
-    private let cardIds: [String] = [
-        "socHero", "driveMetrics", "carSelector", "quickControl", "domainCard",
-        "batterySection", "tyreCard", "comfortCard", "carbonSavings", "locationCard"
-    ]
+    // #24 卡片排序：id 全集以 AppStore.knownCardIds 为唯一真源（避免两处列表漂移）
 
     // #3 数据新鲜度徽章 — 返回缓存时间戳
     private func freshnessTimestamp(for key: String) -> Date? {
