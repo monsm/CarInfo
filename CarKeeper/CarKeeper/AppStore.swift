@@ -398,7 +398,8 @@ final class AppStore: @unchecked Sendable {
     /// 判断指定 key 是否需要重新拉取（缓存缺失 或 已过期）
     func needsRefresh(_ key: String) -> Bool {
         guard let v = caches[key] else { return true }
-        guard let d = v as? [String: Any] else { return true }
+        // 只判断类型是否正确（原来写成 guard let d = ... 但 d 从未被使用）
+        guard v is [String: Any] else { return true }
         return isCacheExpired(key)
     }
 

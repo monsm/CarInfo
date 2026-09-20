@@ -132,7 +132,7 @@ struct ParkingMapView: View {
     private var searchSheet: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                if let loc = store.parkingLocation {
+                if store.parkingLocation != nil {
                     // 历史停车点
                     VStack(alignment: .leading, spacing: 8) {
                         Text("最近停车点").font(.headline)
@@ -140,7 +140,8 @@ struct ParkingMapView: View {
                             HStack {
                                 Image(systemName: "mappin").foregroundStyle(Theme.Colors.accent)
                                 VStack(alignment: .leading) {
-                                    Text(p.address ?? "未知位置").font(.subheadline)
+                                    // address 是非可选 String，?? 永远不会生效；空串时兜底显示
+                                    Text(p.address.isEmpty ? "未知位置" : p.address).font(.subheadline)
                                     Text(p.time, style: .date).font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()

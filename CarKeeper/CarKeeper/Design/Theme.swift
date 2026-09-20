@@ -2608,7 +2608,7 @@ enum HapticFeedback {
     static func lightTap() {
         guard let engine = try? CHHapticEngine() else { return }
         do {
-            let pattern = try CHHapticEvent(eventType: .hapticContinuous, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3)], relativeTime: 0, duration: 0.05)
+            let pattern = CHHapticEvent(eventType: .hapticContinuous, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3)], relativeTime: 0, duration: 0.05)
             let event = try CHHapticPattern(events: [pattern], parameters: [])
             try engine.start()
             let player = try engine.makePlayer(with: event)
@@ -2622,8 +2622,8 @@ enum HapticFeedback {
     static func success() {
         guard let engine = try? CHHapticEngine() else { return }
         do {
-            let event1 = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5)], relativeTime: 0, duration: 0.1)
-            let event2 = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3)], relativeTime: 0.1, duration: 0.15)
+            let event1 = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5)], relativeTime: 0, duration: 0.1)
+            let event2 = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.3)], relativeTime: 0.1, duration: 0.15)
             let pattern = try CHHapticPattern(events: [event1, event2], parameters: [])
             try engine.start()
             let player = try engine.makePlayer(with: pattern)
@@ -2637,9 +2637,9 @@ enum HapticFeedback {
     static func warning() {
         guard let engine = try? CHHapticEngine() else { return }
         do {
-            let event1 = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8)], relativeTime: 0, duration: 0.15)
-            let event2 = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6)], relativeTime: 0.12, duration: 0.15)
-            let event3 = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8)], relativeTime: 0.24, duration: 0.15)
+            let event1 = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8)], relativeTime: 0, duration: 0.15)
+            let event2 = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6)], relativeTime: 0.12, duration: 0.15)
+            let event3 = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8)], relativeTime: 0.24, duration: 0.15)
             let pattern = try CHHapticPattern(events: [event1, event2, event3], parameters: [])
             try engine.start()
             let player = try engine.makePlayer(with: pattern)
@@ -2653,7 +2653,7 @@ enum HapticFeedback {
     static func unlock() {
         guard let engine = try? CHHapticEngine() else { return }
         do {
-            let event = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.4)], relativeTime: 0, duration: 0.2)
+            let event = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.4)], relativeTime: 0, duration: 0.2)
             let pattern = try CHHapticPattern(events: [event], parameters: [])
             try engine.start()
             let player = try engine.makePlayer(with: pattern)
@@ -2665,7 +2665,7 @@ enum HapticFeedback {
     static func lock() {
         guard let engine = try? CHHapticEngine() else { return }
         do {
-            let event = try CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6)], relativeTime: 0, duration: 0.15)
+            let event = CHHapticEvent(eventType: .hapticTransient, parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6)], relativeTime: 0, duration: 0.15)
             let pattern = try CHHapticPattern(events: [event], parameters: [])
             try engine.start()
             let player = try engine.makePlayer(with: pattern)

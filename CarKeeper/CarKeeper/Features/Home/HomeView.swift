@@ -1001,7 +1001,8 @@ struct HomeView: View {
     // 注：文字里不再夹 emoji，时段感由 greetingSymbol(_:) 提供的图标表达
     private var localizedGreeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
-        let lang = Locale.current.languageCode ?? "zh"
+        // languageCode 在 iOS 16 起已废弃，改用 language.languageCode.identifier
+        let lang = Locale.current.language.languageCode?.identifier ?? "zh"
         switch lang {
         case "en":
             return hour < 6 ? "Good Night" : hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening"

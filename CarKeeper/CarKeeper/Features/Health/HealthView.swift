@@ -375,9 +375,10 @@ struct HealthView: View {
         guard !store.carId.isEmpty else { return }
         let api = APIClient.shared
         do {
-            if let checkRaw = try? await api.getCarCheck(carId: store.carId) {
-                store.saveCache(["check": checkRaw])
-            }
+            // ⚠️ 必须用 try：原来用 try? 时 do 体内不会抛错，下面的 catch 是死代码
+            //（CI 日志里的 'catch block is unreachable' 警告就是它）
+            let checkRaw = try await api.getCarCheck(carId: store.carId)
+            store.saveCache(["check": checkRaw])
             model = VM.healthModel(store.caches["check"] as? [String: Any])
             errText = nil
             // 刷新后重置并重播入场动画
@@ -391,6 +392,11 @@ struct HealthView: View {
             startAnimations()
         } catch {
             errText = error.localizedDescription
+            let errDesc = error.localizedDescription.lowercased()
+            if errDesc.contains("未找到") || errDesc.contains("登录") || errDesc.contains("token") {
+                // token 失效：真正需要重新登录
+                AppStore.shared.logout()
+            }
         }
     }
 

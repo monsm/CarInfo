@@ -68,7 +68,7 @@ class MileageTracker : ObservableObject {
     }
     
     func deleteEntry(_ id: UUID) {
-        var list = entries.filter { $0.id != id }
+        let list = entries.filter { $0.id != id }
         if let data = try? JSONEncoder().encode(list) {
             UserDefaults.standard.set(data, forKey: "carkeeper_mileage_entries")
         }

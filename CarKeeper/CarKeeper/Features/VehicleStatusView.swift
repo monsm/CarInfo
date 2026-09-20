@@ -251,7 +251,8 @@ struct Vehicle2DStatusView: View {
                     .offset(x: 35, y: -85)
             }
             
-            // 锁止状态中心图标                Image(safeSymbol: isDoorLocked ? "lock.fill" : "lock.open.fill", fallback: "lock.fill")
+            // 锁止状态中心图标
+            Image(safeSymbol: isDoorLocked ? "lock.fill" : "lock.open.fill", fallback: "lock.fill")
                 .font(.title2)
                 .foregroundColor(isDoorLocked ? .green : .orange)
                 .offset(y: 50)
