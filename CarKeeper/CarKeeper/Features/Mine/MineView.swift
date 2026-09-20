@@ -28,13 +28,9 @@ struct MineView: View {
     @State private var showInspection = false
     @State private var showValuation = false
     @State private var showChargeBill = false
-    @State private var showTripAnalytics = false
-    @State private var showCommandHistory = false
-    @State private var showServiceHistory = false
-    @State private var showParkingMap = false
-    @State private var showEmergency = false
-    @State private var showVehicleTips = false
-    @State private var showDrivingScore = false
+    // 行程分析 / 指令历史 / 维保记录 / 停车位置 / 紧急求助 / 车辆提示 / 驾驶评分
+    // 走 nav.pushNavigation（这些页已在壳层 navigationDestination 注册），
+    // 不再保留一堆从未绑定 sheet 的 @State（此前 7 个磁贴设了状态却没人监听 = 死按钮）。
     @EnvironmentObject var nav: NavState            // C3: 用于 pushNavigation
     // #NEW-115 夜间模式管理
     @StateObject private var nightModeManager = NightModeManager.shared
@@ -230,7 +226,9 @@ struct MineView: View {
     private func carCard(_ car: [String: Any]) -> some View {
         let sum = VM.vehicleSummary(car)
         return Button {
-            NotificationCenter.default.post(name: .navToVehicle, object: nil)
+            // 此前发 .navToVehicle 通知，根视图只写首页的 path —— 在「我的」Tab 点了毫无反应，
+            // 要再点一次首页 Tab 才“突然出现”。改走统一导航：切到首页 Tab 并 push。
+            nav.pushNavigation(.vehicle, targetTab: 0)
         } label: {
             HStack(spacing: DS.Space.lg) {
                 Image(systemName: "car.fill")
@@ -330,17 +328,19 @@ struct MineView: View {
                 // #NEW-128 里程记账本入口
                 HStack(spacing: 10) {
                     tile("banknote.fill", "里程记账", tint: .green) { showMileageJournal = true }
-                    tile("clock.fill", "维保提醒", tint: .orange) { nav.pushNavigation(.dashboard, targetTab: 3) }
+                    tile("clock.fill", "维保提醒", tint: .orange) { nav.pushNavigation(.service) }
                 }
                 // #NEW-38 OTA 版本日志入口
                 HStack(spacing: 10) {
                     tile("tray.fill", "OTA日志", tint: .blue) { showOTAChangelog = true }
-                    tile("doc.plaintext.fill", "专注模式", tint: .purple) { nav.pushNavigation(.dashboard, targetTab: 3) }
+                    tile("doc.plaintext.fill", "专注模式", tint: .purple) { toggleFocus() }
                 }
                 // #N11 隐私仪表盘 + N43 语音播报
                 HStack(spacing: 10) {
                     tile("eye.fill", "隐私与数据", tint: .teal) { showPrivacyDashboard = true }
-                    tile("speaker.wave.3.fill", "语音播报", tint: .indigo) { /* VoiceBroadcastManager 已自动启动 */ }
+                    // 此前是空操作（VoiceBroadcastManager 自动启动，点这里什么都不发生）。
+                    // 现在是真能用的开关：翻转 VoiceBroadcastManager 读取的 UserDefaults 键。
+                    tile("speaker.wave.3.fill", "语音播报", tint: .indigo) { toggleVoice() }
                 }
                 // #N30/N31 临时钥匙 + 家庭管理
                 HStack(spacing: 10) {
@@ -356,18 +356,18 @@ struct MineView: View {
                 tile("doc.plaintext.fill", "充电账单", tint: .cyan) { showChargeBill = true }
                 // E新增功能入口
                 HStack(spacing: 10) {
-                    tile("chart.bar.fill", "行程分析", tint: .blue) { showTripAnalytics = true }
-                    tile("clock.fill", "指令历史", tint: .purple) { showCommandHistory = true }
+                    tile("chart.bar.fill", "行程分析", tint: .blue) { nav.pushNavigation(.trips, targetTab: 3) }
+                    tile("clock.fill", "指令历史", tint: .purple) { nav.pushNavigation(.commands) }
                 }
                 HStack(spacing: 10) {
-                    tile("wrench.and.screwdriver.fill", "维保记录", tint: .orange) { showServiceHistory = true }
-                    tile("mappin.circle.fill", "停车位置", tint: .green) { showParkingMap = true }
+                    tile("wrench.and.screwdriver.fill", "维保记录", tint: .orange) { nav.pushNavigation(.service) }
+                    tile("mappin.circle.fill", "停车位置", tint: .green) { nav.pushNavigation(.parking) }
                 }
                 HStack(spacing: 10) {
-                    tile("exclamationmark.octagon.fill", "紧急求助", tint: .red) { showEmergency = true }
-                    tile("lightbulb.fill", "车辆提示", tint: .yellow) { showVehicleTips = true }
+                    tile("exclamationmark.octagon.fill", "紧急求助", tint: .red) { nav.pushNavigation(.emergency) }
+                    tile("lightbulb.fill", "车辆提示", tint: .yellow) { nav.pushNavigation(.tips) }
                 }
-                tile("trophy.fill", "驾驶评分", tint: Theme.Colors.accent) { showDrivingScore = true }
+                tile("trophy.fill", "驾驶评分", tint: Theme.Colors.accent) { nav.pushNavigation(.score) }
             }
         }
     }
@@ -502,10 +502,6 @@ struct MineView: View {
         .buttonStyle(.plain)
     }
 
-    private func post(_ name: Notification.Name) {
-        NotificationCenter.default.post(name: name, object: nil)
-    }
-
     private var aboutText: String {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
@@ -515,6 +511,35 @@ struct MineView: View {
     private func logout() {
         store.logout()
         // RootView 监听 isLoggedIn 变化后自动切回登录页
+    }
+
+    // MARK: 真开关（此前这两个磁贴一个空操作、一个跳错页）
+
+    /// 语音播报开关：VoiceBroadcastManager 每次播报前都读这个键，翻转后立即生效
+    private func toggleVoice() {
+        let key = "carkeeper_voice_enabled"
+        let next = !UserDefaults.standard.bool(forKey: key)
+        UserDefaults.standard.set(next, forKey: key)
+        ToastManager.shared.show(next ? "语音播报已开启" : "语音播报已关闭",
+                                 icon: next ? "speaker.wave.3.fill" : "speaker.slash.fill")
+        DSHaptic.select()
+    }
+
+    /// 专注模式开关：与首页 toggleFocusMode 同一套配置结构
+    private func toggleFocus() {
+        let fm = FocusModeManager.shared
+        let next = FocusModeConfig(
+            enabled: !fm.config.enabled,
+            hideSensitiveData: fm.config.hideSensitiveData,
+            showEssentialOnly: fm.config.showEssentialOnly,
+            doNotDisturb: fm.config.doNotDisturb,
+            autoStartDriving: fm.config.autoStartDriving,
+            customMessage: fm.config.customMessage
+        )
+        fm.saveConfig(next)
+        ToastManager.shared.show(next.enabled ? "专注模式已开启" : "专注模式已关闭",
+                                 icon: next.enabled ? "moon.fill" : "moon.zzz.fill")
+        DSHaptic.select()
     }
 
     private func checkUpdate() {

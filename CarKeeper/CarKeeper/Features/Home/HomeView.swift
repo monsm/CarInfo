@@ -786,7 +786,6 @@ struct HomeView: View {
                         }
                     }
                     .frame(height: 180)
-                    .clipShape(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous))
                 }
 
                 HStack(spacing: DS.Space.md) {
@@ -879,10 +878,17 @@ struct HomeView: View {
         withAnimation(DS.Motion.press) { focusEnabled = next.enabled }
     }
 
+    /// 导航交给系统地图（MKMapItem 驾车模式）。
+    /// 此前跳的是网页高德（http://uri.amap.com）—— 先起浏览器再授权，慢且体验断裂；
+    /// 系统地图直达导航界面，无需任何授权弹窗。
     private func openNav(_ loc: LocModel) {
-        guard loc.lat != "--", loc.lng != "--" else { return }
-        guard let url = URL(string: "http://uri.amap.com/navigation?to=\(loc.lng),\(loc.lat)&mode=car") else { return }
-        UIApplication.shared.open(url, options: [:], completionHandler: nil)
+        guard let lat = Double(loc.lat), let lng = Double(loc.lng) else { return }
+        let coord = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        let item = MKMapItem(placemark: MKPlacemark(coordinate: coord))
+        item.name = loc.addr.isEmpty ? "车辆位置" : loc.addr
+        item.openInMaps(launchOptions: [
+            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
+        ])
     }
 
     private func saveParking(_ loc: LocModel) {
@@ -1245,7 +1251,8 @@ struct LocationMapView: View {
         MapView(
             coordinate: parseCoordinate() ?? CLLocationCoordinate2D(latitude: 39.9, longitude: 116.4),
             span: region.span,
-            points: []
+            points: [],
+            title: addr.isEmpty ? "车辆位置" : addr
         )
     }
 

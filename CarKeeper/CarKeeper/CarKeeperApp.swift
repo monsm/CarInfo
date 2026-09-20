@@ -102,7 +102,8 @@ struct CarKeeperApp: App {
         switch link.hostTab {
         case 1: nav.controlPath = [link]
         case 2: nav.chargePath = [link]
-        case 3: nav.minePath = [link]
+        case 3: nav.tripsPath = [link]   // hostTab 3 = 行程；此前误写进 minePath，深链打不开
+        case 4: nav.minePath = [link]
         default: nav.path = [link]
         }
     }

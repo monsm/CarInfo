@@ -349,31 +349,84 @@ struct TripDetailView: View {
 }
 
 // MARK: - MapKit Wrapper
+/// 通用地图包装：坐标在哪里，图上就有标注 —— 不允许再出现“有图无点”。
+/// 此前的问题：makeUIView 里算了 region 却从没赋给地图，也从不加任何标注，
+/// updateUIView 为空 —— 位置变化后图也不动，永远是一张空白世界地图。
+/// 行为：`coordinate` 变化 → 移动标注并把地图居中；`points` ≥ 2 → 画行程折线。
 struct MapView: UIViewRepresentable {
     var coordinate: CLLocationCoordinate2D
     var span: MKCoordinateSpan
     var points: [CLLocationCoordinate2D]
-    
+    /// 标注名称（可选）：首页传地址；不传则只显示车形大头针
+    var title: String = ""
+
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView()
         map.delegate = context.coordinator
-        let mapRegion = MKCoordinateRegion(center: coordinate, span: span)
-        // Add polyline
-        if points.count >= 2 {
-            let polyline = MKPolyline(coordinates: points, count: points.count)
-            map.addOverlay(polyline)
-        }
+        map.showsCompass = false
+        map.showsScale = false
+        map.isRotateEnabled = false
+        map.isPitchEnabled = false
+        context.coordinator.lastCoordinate = coordinate
+        context.coordinator.apply(map: map, coordinate: coordinate, span: span,
+                                  points: points, title: title, animate: false)
         return map
     }
-    
-    func updateUIView(_ mapView: MKMapView, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
-    
+
+    func updateUIView(_ map: MKMapView, context: Context) {
+        let c = context.coordinator
+        let moved = abs(c.lastCoordinate.latitude - coordinate.latitude) > 1e-9
+            || abs(c.lastCoordinate.longitude - coordinate.longitude) > 1e-9
+        guard moved else { return }
+        c.lastCoordinate = coordinate
+        c.apply(map: map, coordinate: coordinate, span: span,
+                points: points, title: title, animate: true)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     class Coordinator: NSObject, MKMapViewDelegate {
-        let parent: MapView
-        init(_ parent: MapView) { self.parent = parent }
-        
+        var lastCoordinate = CLLocationCoordinate2D(latitude: 39.9, longitude: 116.4)
+        private var annotation: MKPointAnnotation?
+
+        /// 统一入口（幂等）：移动标注 → 居中 → 重画折线，重复调用不会叠加标注/折线
+        func apply(map: MKMapView, coordinate: CLLocationCoordinate2D, span: MKCoordinateSpan,
+                   points: [CLLocationCoordinate2D], title: String, animate: Bool) {
+            if let a = annotation {
+                a.coordinate = coordinate
+                a.title = title.isEmpty ? nil : title
+            } else {
+                let a = MKPointAnnotation()
+                a.coordinate = coordinate
+                a.title = title.isEmpty ? nil : title
+                annotation = a
+                map.addAnnotation(a)
+            }
+            map.setRegion(MKCoordinateRegion(center: coordinate, span: span), animated: animate)
+
+            let existing = map.overlays.compactMap { $0 as? MKPolyline }
+            if let old = existing.first {
+                guard old.pointCount != points.count else { return }
+                map.removeOverlay(old)
+            }
+            if points.count >= 2 {
+                map.addOverlay(MKPolyline(coordinates: points, count: points.count))
+            }
+        }
+
+        // 车形大头针：一跟就能认出“这是车”，不是收藏点
+        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            guard annotation is MKPointAnnotation else { return nil }
+            let id = "car-pin"
+            let view = (mapView.dequeueReusableAnnotationView(withIdentifier: id) as? MKMarkerAnnotationView)
+                ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: id)
+            view.annotation = annotation
+            view.glyphImage = UIImage(systemName: "car.fill")
+            view.displayPriority = .required
+            view.canShowCallout = false
+            return view
+        }
+
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)

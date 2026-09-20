@@ -351,7 +351,13 @@ struct MessagesView: View {
     private func loadIfNeeded() {
         guard !store.carId.isEmpty else { loading = false; return }
         guard loadTask == nil || loadTask!.isCancelled else { return }
-        if store.needsRefresh("messages") {
+        // 与小程序一致：先渲染缓存（哪怕过期），再决定要不要联网。
+        // 此前的空白根因：缓存命中与请求失败两条路都停在空列表 ——
+        // 只有“网络成功”这一条路能填充 items，缓存只写不读。
+        if let cached = store.caches["messages"] as? [[String: Any]], !cached.isEmpty {
+            apply(cached)
+        }
+        if store.needsRefresh("messages") || items.isEmpty {
             loadTask = Task { await load() }
         } else {
             loading = false
@@ -364,31 +370,38 @@ struct MessagesView: View {
         loading = true
         do {
             let list = try await APIClient.shared.getMessages()
-            let readSet = Self.localRead
-            items = list.enumerated().compactMap { idx, m in
-                let id = ciString(m, ["Id", "id"]) ?? "row-\(idx)"
-                let title = ciString(m, ["Title", "title"]) ?? "车辆通知"
-                let body = Self.resolveBody(m)
-                let rawLoc = ciString(m, ["Content", "content"]) ?? ""
-                let location = (rawLoc != body && !rawLoc.isEmpty && rawLoc != "null" && rawLoc != "无") ? rawLoc : ""
-                let cat = Self.classify(title: title, content: body.isEmpty ? rawLoc : body)
-                // 未读判定：服务端用 `new` 字段标记新消息（日志证实 `new:false` 即已读），
-                // 其次 `readStatus` 非 0 视为已读，最后并本地已读集合（展开过即记入）。
-                let isNew = ciBool(m, ["New", "new"]) ?? false
-                let serverRead = (ciNumber(m, ["ReadStatus", "readStatus"]) ?? 0) != 0 || !isNew
-                let read = serverRead || readSet.contains(id)
-                return MessageItem(
-                    id: id, title: title, body: body, location: location,
-                    time: ciString(m, ["CreatedAt", "createdAt"]) ?? "",
-                    plate: ciString(m, ["realReceiverId", "RealReceiverId"]) ?? "",
-                    read: read, tag: cat.tag, tagCls: cat.cls
-                )
-            }
+            apply(list)
             store.saveCache(["messages": list])
         } catch {
+            // 失败时保留已渲染的缓存内容（与小程序一致），并明确告知，而不是悄悄清空
             NSLog("loadMessages: \(error.localizedDescription)")
+            ToastManager.shared.show("消息获取失败，展示缓存", icon: "wifi.exclamationmark")
         }
         loading = false
+    }
+
+    /// 服务端消息行 → 界面模型。缓存与网络共用同一条映射路径，两边永远一致。
+    private func apply(_ list: [[String: Any]]) {
+        let readSet = Self.localRead
+        items = list.enumerated().compactMap { idx, m in
+            let id = ciString(m, ["Id", "id"]) ?? "row-\(idx)"
+            let title = ciString(m, ["Title", "title"]) ?? "车辆通知"
+            let body = Self.resolveBody(m)
+            let rawLoc = ciString(m, ["Content", "content"]) ?? ""
+            let location = (rawLoc != body && !rawLoc.isEmpty && rawLoc != "null" && rawLoc != "无") ? rawLoc : ""
+            let cat = Self.classify(title: title, content: body.isEmpty ? rawLoc : body)
+            // 未读判定与小程序对齐（pages/messages/messages.js）：服务端 ReadStatus == 1 即已读。
+            // 此前多出的 `New` 字段反推分支是 App 自造的，服务端语义未知，已删除。
+            // 展开过的消息记入本地已读集合（无服务端标记接口）。
+            let serverRead = (ciNumber(m, ["ReadStatus", "readStatus"]) ?? 0) == 1
+            let read = serverRead || readSet.contains(id)
+            return MessageItem(
+                id: id, title: title, body: body, location: location,
+                time: ciString(m, ["CreatedAt", "createdAt"]) ?? "",
+                plate: ciString(m, ["realReceiverId", "RealReceiverId"]) ?? "",
+                read: read, tag: cat.tag, tagCls: cat.cls
+            )
+        }
     }
 
     private static func resolveBody(_ m: [String: Any]) -> String {
