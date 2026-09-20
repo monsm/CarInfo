@@ -125,7 +125,10 @@ struct CarKeeperApp: App {
             // N10 车牌加密初始化
             DataEncryption.ensureKey()
         }
-        .nightModeBreathing(enabled: store.isNightMode)
+        // ⚠️ 这里原本挂着 .nightModeBreathing(enabled: store.isNightMode)：那个修饰符会把「整个 App」的
+        // 透明度按 sin(时间) 在 0.7~1.0 之间反复抖动，而且每次渲染都会重启动画、让整棵视图树反复失效。
+        // 它的本意是 TabBar 图标的夜间呼吸微光，不该套在根视图上 —— 深色模式下整屏发暗发黏就是它干的。
+        // 需要呼吸效果时，请只对具体图标使用 NightModeBreathing.swift 里的修饰符。
     }
 }
 
@@ -210,71 +213,66 @@ struct TabCardTransition: ViewModifier {
     private var delay:    CGFloat { Self.layers[tabId].delay    }
 
     func body(content: Content) -> some View {
-        ZStack(alignment: .top) {
-            // ── 第 0 层：品牌光晕散斑（最慢、最深、最先淡入）──
-            // 在 isActive=true 之前即开始显示，作为背景氛围
-            if isActive {
-                ZStack {
-                    // 左上角青色散斑
-                    Circle()
-                        .fill(.green.opacity(0.08))
-                        .frame(width: 200, height: 200)
-                        .offset(x: -60, y: -30)
-                    // 右下角品牌色散斑
-                    Circle()
-                        .fill(Theme.brand.opacity(0.07))
-                        .frame(width: 180, height: 180)
-                        .offset(x: 50, y: 40)
-                    // 右上角微光
-                    Circle()
-                        .fill(.white.opacity(0.05))
-                        .frame(width: 120, height: 120)
-                        .offset(x: 70, y: -50)
-                }
-                .offset(y: glowY)
-                .opacity(isActive ? 1.0 : 0.0)
-                .scaleEffect(isActive ? 1.0 : 0.88)
-                .animation(
-                    .spring(response: 0.6, dampingFraction: 0.7, blendDuration: 0.5).delay(delay + 0.08),
-                    value: isActive
-                )
-            }
-
-            // ── 第 1 层：Liquid Glass 背景卡（中等速度）──
-            // 磨砂玻璃质感，随 spring 事务从下方滑入
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Material.thin)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [.white.opacity(0.22), .white.opacity(0.04)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 0.9
+        // ⚠️ 这里只能做「背景装饰」，绝不能再把 content 包进容器、更不能改动它的 opacity：
+        // 1) content.opacity 原本绑在「本次选中的 Tab 且 上次不是它」这个条件上，而首次进入时
+        //    两个条件相等（selectedTab == prevSelectedTab == 0）→ 透明度 0 → 首页整屏全黑，
+        //    登录成功后看到的黑屏就是这么来的；
+        // 2) 外层 ZStack 会让 TabView 读不到子视图上的 .tabItem / .tag（trait 不穿透容器）→
+        //    标题丢失、点其他 Tab 后被弹回第一个。
+        content
+            .background {
+                ZStack(alignment: .top) {
+                    // ── 第 0 层：品牌光晕散斑（最慢、最深，仅在选中时淡入）──
+                    if isActive {
+                        ZStack {
+                            // 左上角青色散斑
+                            Circle()
+                                .fill(.green.opacity(0.08))
+                                .frame(width: 200, height: 200)
+                                .offset(x: -60, y: -30)
+                            // 右下角品牌色散斑
+                            Circle()
+                                .fill(Theme.brand.opacity(0.07))
+                                .frame(width: 180, height: 180)
+                                .offset(x: 50, y: 40)
+                            // 右上角微光
+                            Circle()
+                                .fill(.white.opacity(0.05))
+                                .frame(width: 120, height: 120)
+                                .offset(x: 70, y: -50)
+                        }
+                        .offset(y: glowY)
+                        .scaleEffect(isActive ? 1.0 : 0.88)
+                        .animation(
+                            .spring(response: 0.6, dampingFraction: 0.7, blendDuration: 0.5).delay(delay + 0.08),
+                            value: isActive
                         )
-                )
-                .shadow(color: .black.opacity(0.10), radius: 18, y: 6)
-                .offset(y: glassY)
-                .scaleEffect(isActive ? 1.0 : 0.94)
-                .opacity(isActive ? 1.0 : 0.0)
-                .animation(
-                    .spring(response: 0.55, dampingFraction: 0.65, blendDuration: 0.4).delay(delay + 0.03),
-                    value: isActive
-                )
+                    }
 
-            // ── 第 2 层：前景内容（最快、最高优先级，跟随 spring transaction）──
-            content
-                .offset(y: contentY)
-                .scaleEffect(isActive ? 1.0 : 0.92)
-                .opacity(isActive ? 1.0 : 0.0)
-                .animation(
-                    .spring(response: 0.55, dampingFraction: 0.62, blendDuration: 0.35).delay(delay),
-                    value: isActive
-                )
-        }
-        .edgesIgnoringSafeArea(.all)
+                    // ── 第 1 层：Liquid Glass 背景卡（中等速度）──
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(Material.thin)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.22), .white.opacity(0.04)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 0.9
+                                )
+                        )
+                        .shadow(color: .black.opacity(0.10), radius: 18, y: 6)
+                        .offset(y: glassY)
+                        .scaleEffect(isActive ? 1.0 : 0.94)
+                        .opacity(isActive ? 1.0 : 0.0)
+                        .animation(
+                            .spring(response: 0.55, dampingFraction: 0.65, blendDuration: 0.4).delay(delay + 0.03),
+                            value: isActive
+                        )
+                }
+            }
     }
 }
 
@@ -419,7 +417,6 @@ struct BackGlassButton: View {
 
 struct MainTabView: View {
     @StateObject private var nav = NavState.shared
-    @State private var prevSelectedTab: Int = 0
     // VoiceOver：记录上次朗读的 Tab，避免重复播报
     @State private var lastAnnouncedTab: Int = 0
     private let store = AppStore.shared
@@ -496,25 +493,7 @@ struct MainTabView: View {
                 t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
             }
             .tabGlassContainer()
-            .tabItem {
-                ZStack(alignment: .topTrailing) {
-                    Label("车况", systemImage: "car.fill")
-                        .accessibilityLabel(Text("车况"))
-                        .accessibilityHint(Text("车辆状态概览，包含行驶里程、胎压、SOC 电量等关键信息"))
-                    if lowBatteryBadge {
-                        LowBatteryBadge(socPct: 0)
-                    }
-                }
-            }
-            .accessibilitySortPriority(0)
-            .tag(0)
-            .transaction { t in
-                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
-            }
-            .modifier(TabCardTransition(tabId: 0, isActive: nav.selectedTab == 0 && prevSelectedTab != 0))
-            .onChange(of: nav.selectedTab) { newTab in
-                prevSelectedTab = nav.selectedTab
-            }
+            .modifier(TabCardTransition(tabId: 0, isActive: nav.selectedTab == 0))
             .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
                 // #5 更新低电量角标状态
                 let energy = VM.energy(store.caches, store.car)
@@ -533,7 +512,17 @@ struct MainTabView: View {
                     }
                 }
             }
-
+            .accessibilitySortPriority(0)
+            // ⚠️ .tabItem / .tag 必须留在子视图的最外层：TabView 靠 trait 读取它们，
+            // 而 trait 不会穿透 ZStack 这类容器 —— 之前外面被套了一层 ZStack，
+            // 于是标题丢失（底部导航没文字）、选中态被弹回第一个 Tab。
+            // 另外 .tabItem 的内容只认 Label / Text / Image，塞 ZStack 同样会丢标题。
+            .tabItem {
+                Label("车况", systemImage: "car.fill")
+                    .accessibilityLabel(Text("车况"))
+                    .accessibilityHint(Text("车辆状态概览，包含行驶里程、胎压、SOC 电量等关键信息"))
+            }
+            .tag(0)
     }
 
     private var controlTab: some View {
@@ -574,20 +563,15 @@ struct MainTabView: View {
                 t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
             }
             .tabGlassContainer()
+            .modifier(TabCardTransition(tabId: 1, isActive: nav.selectedTab == 1))
+            .accessibilitySortPriority(1)
+            // ⚠️ 同 tab 0：.tabItem / .tag 必须最外层，否则标题与选中态都会失效
             .tabItem {
                 Label("车控", systemImage: "slider.horizontal.3")
                     .accessibilityLabel(Text("车控"))
                     .accessibilityHint(Text("远程控制车辆，包括锁车、解锁、空调控制等功能"))
             }
-            .accessibilitySortPriority(1)
             .tag(1)
-            .transaction { t in
-                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
-            }
-            .modifier(TabCardTransition(tabId: 1, isActive: nav.selectedTab == 1 && prevSelectedTab != 1))
-            .onChange(of: nav.selectedTab) { newTab in
-                prevSelectedTab = nav.selectedTab
-            }
 
     }
 
@@ -629,20 +613,15 @@ struct MainTabView: View {
                 t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
             }
             .tabGlassContainer()
+            .modifier(TabCardTransition(tabId: 2, isActive: nav.selectedTab == 2))
+            .accessibilitySortPriority(2)
+            // ⚠️ 同 tab 0：.tabItem / .tag 必须最外层
             .tabItem {
                 Label("消息", systemImage: "bubble.left.fill")
                     .accessibilityLabel(Text("消息"))
                     .accessibilityHint(Text("车辆通知和消息中心"))
             }
-            .accessibilitySortPriority(2)
             .tag(2)
-            .transaction { t in
-                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
-            }
-            .modifier(TabCardTransition(tabId: 2, isActive: nav.selectedTab == 2 && prevSelectedTab != 2))
-            .onChange(of: nav.selectedTab) { newTab in
-                prevSelectedTab = nav.selectedTab
-            }
 
     }
 
@@ -684,20 +663,15 @@ struct MainTabView: View {
                 t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
             }
             .tabGlassContainer()
+            .modifier(TabCardTransition(tabId: 3, isActive: nav.selectedTab == 3))
+            .accessibilitySortPriority(3)
+            // ⚠️ 同 tab 0：.tabItem / .tag 必须最外层
             .tabItem {
                 Label("我的", systemImage: "person.fill")
                     .accessibilityLabel(Text("我的"))
                     .accessibilityHint(Text("账号设置和个人信息管理"))
             }
-            .accessibilitySortPriority(3)
             .tag(3)
-            .transaction { t in
-                t.animation = Animation.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.3)
-            }
-            .modifier(TabCardTransition(tabId: 3, isActive: nav.selectedTab == 3 && prevSelectedTab != 3))
-            .onChange(of: nav.selectedTab) { newTab in
-                prevSelectedTab = nav.selectedTab
-            }
     }
 
     var body: some View {
@@ -707,6 +681,8 @@ struct MainTabView: View {
             messagesTab
             mineTab
         }
+        // 选中态颜色交给 SwiftUI，避免再去动 UITabBar.appearance()
+        .tint(Theme.Colors.accent)
         // VoiceOver：切换 Tab 时朗读当前页面名称（仅首次切换到新 Tab）
         .onChange(of: nav.selectedTab) { newTab in
             if newTab != lastAnnouncedTab {
@@ -1070,34 +1046,17 @@ struct LiquidGlassTabBar: UIViewRepresentable {
     @Binding var selectedTab: Int
 
     func makeUIView(context: Context) -> UIView {
-        // 配置全局 TabBar 外观（磨砂玻璃 + 选中色）
-        let appearance = UITabBarAppearance()
-        // 磨砂玻璃背景
-        appearance.backgroundEffect = UIBlurEffect(style: .regular)
-        appearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.72)
-        // 分隔线
-        appearance.shadowColor = UIColor.white.withAlphaComponent(0.15)
-        appearance.shadowImage = UIImage()
-        // 未选中图标 / 文字
-        let unselected = UITabBarItemAppearance()
-        unselected.normal.iconColor = UIColor.secondaryLabel
-        unselected.normal.titleTextAttributes = [.foregroundColor: UIColor.secondaryLabel]
-        appearance.stackedLayoutAppearance = unselected
-        appearance.inlineLayoutAppearance = unselected
-        // 选中图标 / 文字
-        let selected = UITabBarItemAppearance()
-        selected.selected.iconColor = UI.accent
-        selected.selected.titleTextAttributes = [.foregroundColor: UI.accent]
-        appearance.stackedLayoutAppearance = selected
-        appearance.inlineLayoutAppearance = selected
-        UITabBar.appearance().standardAppearance = appearance
-        if #available(iOS 15.0, *) {
-            UITabBar.appearance().scrollEdgeAppearance = appearance
-        }
+        // ⚠️ 这里刻意不再设置 UITabBar.appearance()：
+        // 原实现先 `stackedLayoutAppearance = unselected`，紧接着又被 `= selected` 覆盖，
+        // 未选中态的样式整段丢失；在 iOS 26 的 Liquid Glass TabBar 上，标题就变成低对比度 ——
+        // 看起来正是「底部导航没文字」。系统默认样式本身就是磨砂玻璃，
+        // 选中色改用 SwiftUI 的 .tint()（见 MainTabView.body），这样风险最低。
 
         // 光晕 + 指示条叠加层
         let overlay = TabBarGlowOverlay()
         overlay.isHidden = true
+        // 它纯粹是绘制层，绝不能抢走 TabBar 的点击（否则整个底部导航会点不动）
+        overlay.isUserInteractionEnabled = false
         return overlay
     }
 
