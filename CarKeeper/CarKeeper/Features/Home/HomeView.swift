@@ -511,11 +511,15 @@ struct HomeView: View {
 
     // MARK: - ⑤ 分组容器（iOS inset-grouped）
 
+    /// ⚠️ `content` 必须标 `@escaping`：它会被交给 `DSCard`，而 `DSCard` 把闭包
+    /// 存成了属性（`init(content: @escaping () -> Content)`）。函数参数默认是
+    /// **非逃逸**的，漏掉 `@escaping` 就会编译报错：
+    /// `escaping closure captures non-escaping parameter 'content'`。
     @ViewBuilder
     private func group<Content: View>(
         _ title: String,
         trailing: String? = nil,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: DS.Space.sm) {
             DSSectionHeader(title: title, trailing: trailing)
