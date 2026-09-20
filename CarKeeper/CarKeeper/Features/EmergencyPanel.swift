@@ -62,7 +62,7 @@ struct EmergencyPanel: View {
                     .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: activeEmergency)
                 
                 VStack(spacing: 4) {
-                    Image(systemName: "siren.fill")
+                    Image(systemName: "exclamationmark.octagon.fill")
                         .font(.system(size: 28))
                         .foregroundStyle(.red)
                     Text("SOS")
@@ -81,7 +81,7 @@ struct EmergencyPanel: View {
             Text("快捷操作").font(Theme.font(.subheadline as Font).bold())
             HStack(spacing: 12) {
                 actionButton(icon: "car.fill", title: "远程锁车", color: .blue) { Task { await lockCar() } }
-                actionButton(icon: "horn.fill", title: "鸣笛寻车", color: .orange) { Task { await honkCar() } }
+                actionButton(icon: "speaker.wave.3.fill", title: "鸣笛寻车", color: .orange) { Task { await honkCar() } }
                 actionButton(icon: "lightbulb.fill", title: "闪灯", color: .yellow) { Task { await flashLights() } }
                 actionButton(icon: "fan.fill", title: "开空调", color: .cyan) { Task { await turnOnAC() } }
             }
@@ -92,7 +92,7 @@ struct EmergencyPanel: View {
     private func actionButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 6) {
-                Image(systemName: icon)
+                Image(safeSymbol: icon, fallback: "exclamationmark.triangle.fill")
                     .font(.title2)
                     .foregroundStyle(color)
                 Text(title)
@@ -155,7 +155,7 @@ struct EmergencyPanel: View {
         ZStack {
             Color.black.opacity(0.8).ignoresSafeArea()
             VStack(spacing: 20) {
-                Image(systemName: "siren.fill")
+                Image(systemName: "exclamationmark.octagon.fill")
                     .font(.system(size: 64))
                     .foregroundStyle(.red)
                     .animation(.spring(response: 0.4).repeatForever(autoreverses: true), value: activeEmergency)
@@ -201,7 +201,7 @@ struct EmergencyPanel: View {
     
     private func honkCar() async {
         _ = await store.sendControlCommand("honk")
-        EnhancedToastManager.shared.show("鸣笛中...", icon: "horn.fill")
+        EnhancedToastManager.shared.show("鸣笛中...", icon: "speaker.wave.3.fill")
     }
     
     private func flashLights() async {

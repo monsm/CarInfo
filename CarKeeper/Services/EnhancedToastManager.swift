@@ -58,7 +58,7 @@ struct EnhancedToastView: View {
     
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: item.icon)
+            Image(safeSymbol: item.icon, fallback: "checkmark.circle.fill")
                 .font(.title3)
             Text(item.text)
                 .font(.subheadline)
@@ -111,7 +111,7 @@ struct EmptyStateView: View {
                     .fill(LinearGradient(colors: [Theme.Colors.accent.opacity(0.2), Theme.Colors.accent.opacity(0.05)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 100, height: 100)
-                Image(systemName: icon)
+                Image(safeSymbol: icon, fallback: "checkmark.circle.fill")
                     .font(.system(size: 40))
                     .foregroundColor(Theme.Colors.accent)
                     .scaleEffect(1)

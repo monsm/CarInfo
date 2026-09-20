@@ -127,14 +127,16 @@ struct CommandHistoryView: View {
         }) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    // 状态指示
-                    Circle()
-                        .fill(cmd.statusColor.opacity(0.2))
-                        .frame(width: 10, height: 10)
-                        .overlay(Circle().stroke(cmd.statusColor, lineWidth: 1.5))
+                    // 状态图标（原来是一个纯色圆环 dot —— 只靠颜色区分成功/失败）
+                    Image(safeSymbol: cmd.success ? "checkmark.seal.fill" : "exclamationmark.triangle.fill",
+                          fallback: cmd.iconName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(cmd.statusColor)
+                        .frame(width: 14)
+                        .accessibilityLabel(Text(cmd.success ? "执行成功" : "执行失败"))
                     
                     // 图标
-                    Image(systemName: cmd.iconName)
+                    Image(safeSymbol: cmd.iconName, fallback: "checkmark.circle.fill")
                         .font(.caption)
                         .foregroundStyle(cmd.statusColor)
                         .frame(width: 28, height: 28)

@@ -36,7 +36,7 @@ struct CarbonSavingsCard: View {
                 
                 // 等效树木
                 HStack {
-                    Image(systemName: "tree.fill")
+                    Image(safeSymbol: "leaf.fill", fallback: "leaf.fill")
                         .foregroundStyle(.green)
                     Text("相当于 \(stats.equivalentTrees) 棵树吸收的碳")
                         .font(Theme.caption)

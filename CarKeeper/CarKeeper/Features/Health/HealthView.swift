@@ -207,6 +207,10 @@ struct HealthView: View {
     private func countPill(_ c: CountPill, phase: Int, active: Bool) -> some View {
         let clsColor = Theme.statusColor(c.cls)
         return VStack(spacing: 4) {
+            // 补齐图标：原来这一格只有数字 + 颜色，没有图标
+            Image(safeSymbol: c.iconName, fallback: "info.circle.fill")
+                .font(Theme.footnote.weight(.semibold))
+                .foregroundStyle(clsColor)
             Text(c.n)
                 .font(Theme.d4)
                 .foregroundStyle(clsColor)

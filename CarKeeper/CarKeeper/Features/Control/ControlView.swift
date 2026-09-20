@@ -15,7 +15,7 @@ struct ControlView: View {
     // 高频指令（默认展示）
     private let mainCommands: [(key: String, name: String, symbol: String, note: String?)] = [
         ("OpenAir", "开启空调", "snowflake", "需设置温度"),
-        ("CloseAir", "关闭空调", "snowflake.slash", nil)
+        ("CloseAir", "关闭空调", "power", nil)
     ]
     // 低频指令（折叠区）
     private let moreCommands: [(key: String, name: String, symbol: String, note: String?)] = [
@@ -363,7 +363,7 @@ struct ControlView: View {
                         onPresetScene(scene)
                     } label: {
                         HStack(spacing: 12) {
-                            Image(systemName: scene.symbol)
+                            Image(safeSymbol: scene.symbol, fallback: "car.fill")
                                 .font(Theme.bodyMd)
                                 .foregroundStyle(Theme.Colors.accent)
                                 .frame(width: 32, height: 32)
@@ -477,7 +477,7 @@ struct ControlView: View {
             onCmd(item.key)
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: item.symbol)
+                Image(safeSymbol: item.symbol, fallback: "bolt.fill")
                     .font(Theme.bodyMd)
                     .foregroundStyle(Theme.brand)
                     .frame(width: 30, height: 30)
@@ -713,7 +713,7 @@ struct HeroDiscButton: View {
                         .strokeBorder(Theme.brand.opacity(0.30), lineWidth: 1.5)
                         .frame(width: 80, height: 80)
                     // 第 5 层：图标（按压时旋转 + 颜色反转）
-                    Image(systemName: symbol)
+                    Image(safeSymbol: symbol, fallback: "bolt.fill")
                         .font(Theme.d3)
                         .foregroundStyle(isPressed ? .white : Theme.brand)
                         .rotationEffect(iconRotation)

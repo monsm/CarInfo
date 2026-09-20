@@ -319,6 +319,10 @@ struct HomeView: View {
         let greeting = localizedGreeting
         let dateStr = DateFormatter.relative(Date())
         return HStack {
+            // 原来问候语里塞的是 emoji（🌙/☀️），改成真正的 SF Symbol 图标
+            Image(safeSymbol: greetingSymbol(hour), fallback: "sun.max.fill")
+                .font(Theme.h4)
+                .foregroundStyle(Theme.Colors.accent)
             Text(greeting)
                 .font(Theme.h4)
             Spacer()
@@ -522,7 +526,7 @@ struct HomeView: View {
             }
             // 速度 + 里程：流体数字字体，随容器宽度自动缩放
             MetricPill(icon: "speedometer", value: d.speed, unit: "km/h", tint: Theme.brand, fluidValue: true)
-            MetricPill(icon: "gauge.full", value: mileCount > 0 ? String(mileCount) : d.mile, unit: "km", tint: Theme.Colors.accent, fluidValue: true)
+            MetricPill(icon: "gauge", value: mileCount > 0 ? String(mileCount) : d.mile, unit: "km", tint: Theme.Colors.accent, fluidValue: true)
                 .valuePulse(tint: Theme.Colors.accent, watchValue: Binding(get: { pulseTrigger }, set: { _ in }))
         }            .padding(Theme.Spacing.xl)
             .dynamicTypeCompress()
@@ -546,7 +550,7 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             MetricPill(icon: "gearshape.fill", value: d.gear, unit: d.gearSub, tint: .purple)
-                            MetricPill(icon: "thermometer.super", value: d.motorTemp, unit: "℃", tint: .orange)
+                            MetricPill(icon: "thermometer", value: d.motorTemp, unit: "℃", tint: .orange)
                         }
                         if !d.batteryNote.isEmpty {
                             Text(d.batteryNote).font(Theme.footnote).foregroundStyle(.secondary)
@@ -637,7 +641,10 @@ struct HomeView: View {
     private func domainRow(_ d: DomainVerdict) -> some View {
         let icon = domainIcon(d.key)
         return HStack(spacing: 10) {
-            Text(icon)
+            // ⚠️ 这里原来写的是 Text(icon)：把 symbol 名当成普通文字渲染，
+            //    所以整行看不到任何图标（只会显示 "battery.75" 这类字符串）。
+            //    正确做法是用 Image(safeSymbol:)，名字无效时还能退回默认图标。
+            Image(safeSymbol: icon, fallback: "info.circle.fill")
                 .font(Theme.caption)
                 .foregroundStyle(Theme.statusColor(d.cls))
                 .frame(width: 20)
@@ -652,18 +659,23 @@ struct HomeView: View {
         .padding(.vertical, 6)
     }
 
+    /// 每个状态域对应的图标。
+    /// ⚠️ 这里的历史取值里有好几个并不存在的 symbol（"battery.3quarter.fill"、
+    ///    "lightning.bolt.fill"、"car.door"、"tire.flattraction"、
+    ///    "shield.lefthalf.fill"、"circle.fill"），Image(systemName:) 遇到无效名字
+    ///    会渲染成空白 —— 界面上就是「图标缺失」。已全部换成真实存在的 symbol。
     private func domainIcon(_ key: String) -> String {
         switch key {
-        case "battery": return "battery.3quarter.fill"
-        case "charge": return "lightning.bolt.fill"
-        case "body": return "car.door"
-        case "tyre": return "tire.flattraction"
-        case "climate": return "snowflake.fill"
+        case "battery": return "battery.75"
+        case "charge": return "bolt.fill"
+        case "body": return "car.side.fill"
+        case "tyre": return "circle.dashed"
+        case "climate": return "snowflake"
         case "power": return "bolt.circle.fill"
-        case "safety": return "shield.lefthalf.fill"
+        case "safety": return "shield.lefthalf.filled"
         case "network": return "antenna.radiowaves.left.and.right"
         case "service": return "wrench.and.screwdriver.fill"
-        default: return "circle.fill"
+        default: return "info.circle.fill"
         }
     }
 
@@ -789,7 +801,11 @@ struct HomeView: View {
                                 Text(item.label).font(Theme.footnote).foregroundStyle(.primary)
                                 Spacer()
                                 HStack(spacing: 12) {
-                                    Label(item.kpa + " kPa", systemImage: "tire")
+                                    Label {
+                                        Text(item.kpa + " kPa")
+                                    } icon: {
+                                        Image(safeSymbol: "circle.dashed", fallback: "car.fill")
+                                    }
                                         .font(Theme.caption)
                                         .foregroundStyle(item.cls == "bad" ? .red : .primary)
                                     Label(item.temp + " °C", systemImage: "thermometer")
@@ -832,11 +848,11 @@ struct HomeView: View {
                 sideCls: comfort.acCls == "ok" ? "ok" : "na", cornerRadius: 20) {
             VStack(spacing: 10) {
                 HStack(spacing: 10) {
-                    StatTile(icon: "thermometer.medium", label: "车内温度", value: comfort.cabinTemp == "--" ? "--" : String(comfort.cabinTemp.dropLast()), unit: "℃", tint: .orange)
+                    StatTile(icon: "thermometer", label: "车内温度", value: comfort.cabinTemp == "--" ? "--" : String(comfort.cabinTemp.dropLast()), unit: "℃", tint: .orange)
                     StatTile(icon: "wind", label: "车内 PM2.5", value: comfort.pmIn, unit: "", tint: .teal)
                 }
                 HStack(spacing: 10) {
-                    StatTile(icon: "air.purifier", label: "净化器", value: comfort.purifier, tint: .purple)
+                    StatTile(icon: "wind", label: "净化器", value: comfort.purifier, tint: .purple)
                     StatTile(icon: "cloud.sun", label: "车外温度", value: comfort.envTemp == "--" ? "--" : String(comfort.envTemp.dropLast()), unit: "℃", tint: Theme.brand)
                 }
                 Text(comfort.acText)
@@ -944,7 +960,7 @@ struct HomeView: View {
     private var footerNote: some View {
         let update = lastFetch.map { DateFormatter.relative($0) } ?? "刚刚"
         return HStack(spacing: 8) {
-            Image(systemName: "clock.badge.checkmark")
+            Image(safeSymbol: "clock.badge.checkmark", fallback: "clock.fill")
                 .font(Theme.footnote).foregroundStyle(.tertiary)
             Text("更新于 \(update)")
                 .font(Theme.caption).foregroundStyle(.secondary)
@@ -982,15 +998,24 @@ struct HomeView: View {
     }
 
     // #36 多语言国际化
+    // 注：文字里不再夹 emoji，时段感由 greetingSymbol(_:) 提供的图标表达
     private var localizedGreeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
         let lang = Locale.current.languageCode ?? "zh"
         switch lang {
         case "en":
-            return hour < 6 ? "🌙 Good Night" : hour < 12 ? "☀️ Good Morning" : hour < 18 ? "☀️ Good Afternoon" : "🌙 Good Evening"
+            return hour < 6 ? "Good Night" : hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening"
         default:
-            return hour < 6 ? "🌙 深夜了" : hour < 12 ? "☀️ 上午好" : hour < 18 ? "☀️ 下午好" : "🌙 晚上好"
+            return hour < 6 ? "深夜了" : hour < 12 ? "上午好" : hour < 18 ? "下午好" : "晚上好"
         }
+    }
+
+    /// 问候语旁的时段图标（替代原来的 emoji）
+    private func greetingSymbol(_ hour: Int) -> String {
+        if hour < 6 { return "moon.stars.fill" }
+        if hour < 12 { return "sunrise.fill" }
+        if hour < 18 { return "sun.max.fill" }
+        return "moon.fill"
     }
 
     // #19 车况快照分享

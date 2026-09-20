@@ -129,7 +129,7 @@ struct OnboardingView: View {
                         endPoint: .bottomTrailing
                     ))
                     .frame(width: 120, height: 120)
-                Image(systemName: page.icon)
+                Image(safeSymbol: page.icon, fallback: "car.fill")
                     .font(.system(size: 56))
                     .foregroundStyle(Theme.Colors.accent)
             }

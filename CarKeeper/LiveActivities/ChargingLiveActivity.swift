@@ -100,7 +100,7 @@ struct ChargingLiveActivityView: View {
             
             // 续航 + 功率
             HStack(spacing: 12) {
-                Label("\(state.range)km", systemImage: "gauge.high")
+                Label("\(state.range)km", systemImage: "gauge")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                 if !state.chargingPower.isEmpty {
@@ -146,7 +146,7 @@ class ChargingRefreshTask {
     
     private func refresh() {
         // 从 UserDefaults 读取最新数据并更新 Live Activity
-        let defaults = UserDefaults(suiteName: "group.com.carkeeper.data") ?? UserDefaults.standard
+        let defaults = UserDefaults(suiteName: "group.com.you.CarKeeper") ?? UserDefaults.standard
         let soc = defaults.integer(forKey: "widget_soc")
         let range = defaults.integer(forKey: "widget_range")
         let power = defaults.string(forKey: "widget_power") ?? ""

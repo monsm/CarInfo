@@ -113,7 +113,7 @@ struct AppClipEntranceView: View {
                 
                 // 功能说明
                 VStack(spacing: 12) {
-                    FeatureItem(icon: "battery.100.fill", label: "实时电量")
+                    FeatureItem(icon: "battery.100", label: "实时电量")
                     FeatureItem(icon: "thermometer", label: "车内温度")
                     FeatureItem(icon: "lock.fill", label: "门锁状态")
                 }
@@ -133,6 +133,8 @@ struct FeatureItem: View {
     
     var body: some View {
         HStack(spacing: 10) {
+            // 注：AppClip target 不包含 Design/Theme.swift，用不了 SafeSymbol 兜底，
+            // 所以这里只能用确实存在的 symbol 名（battery.100 / thermometer / lock.fill）
             Image(systemName: icon).font(.title3).foregroundStyle(.white.opacity(0.8))
             Text(label).font(.system(size: 14)).foregroundStyle(.white.opacity(0.8))
         }

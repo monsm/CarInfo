@@ -164,7 +164,7 @@ struct DrivingScorePage: View {
     private func scoreRow(icon: String, label: String, value: Int, color: Color) -> some View {
         HStack {
             HStack(spacing: 8) {
-                Image(systemName: icon)
+                Image(safeSymbol: icon, fallback: "gauge")
                     .font(.caption)
                     .foregroundStyle(color)
                 Text(label).font(.subheadline).foregroundStyle(.primary)

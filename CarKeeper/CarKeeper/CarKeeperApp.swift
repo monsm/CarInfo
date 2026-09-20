@@ -18,15 +18,62 @@ extension Notification.Name {
     static let locationUpdated = Notification.Name("locationUpdated")
 }
 
-enum Deeplink: Hashable {
+enum Deeplink: Hashable, CaseIterable {
     case vehicle, health, battery, data, dev, messages, control, dashboard
     case trips, commands, service, parking, export, emergency, tips, score
+
+    /// 深链 key，对应 carkeeper://<key>
+    var key: String {
+        switch self {
+        case .vehicle: return "vehicle"
+        case .health: return "health"
+        case .battery: return "battery"
+        case .data: return "data"
+        case .dev: return "dev"
+        case .messages: return "messages"
+        case .control: return "control"
+        case .dashboard: return "dashboard"
+        case .trips: return "trips"
+        case .commands: return "commands"
+        case .service: return "service"
+        case .parking: return "parking"
+        case .export: return "export"
+        case .emergency: return "emergency"
+        case .tips: return "tips"
+        case .score: return "score"
+        }
+    }
+
+    /// 该页所属的 Tab（打开时先切到对应 Tab）
+    var hostTab: Int {
+        switch self {
+        case .control: return 1
+        case .messages: return 2
+        default: return 0
+        }
+    }
+
+    /// 解析 carkeeper://vehicle 或 carkeeper:///vehicle；无法识别返回 nil
+    init?(url: URL) {
+        guard url.scheme?.lowercased() == "carkeeper" else { return nil }
+        let raw = (url.host ?? url.path)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            .lowercased()
+        guard !raw.isEmpty, let match = Self.allCases.first(where: { $0.key == raw }) else { return nil }
+        self = match
+    }
 }
 
 @main
 struct CarKeeperApp: App {
     private let store = AppStore.shared
     @StateObject private var nav = NavState.shared
+
+    init() {
+        // #NEW-109 后台刷新注册：必须在 App 启动完成前完成。
+        // 内部会先校验 Info.plist 是否声明了对应标识符，未声明则安静跳过（避免直接崩进程）。
+        BackgroundTaskManager.shared.registerTasks()
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -44,6 +91,20 @@ struct CarKeeperApp: App {
     // #NEW-113 Onboarding 引导状态
     @AppStorage("carkeeper_onboarding_seen") private var onboardingSeen = false
     
+    /// 处理 carkeeper:// 深链。
+    /// 此前 Info.plist 注册了 scheme，但全项目没有任何 onOpenURL 接收方 —— 扫二维码/点链接豪无反应。
+    private func openDeeplink(_ url: URL) {
+        guard let link = Deeplink(url: url) else { return }
+        guard store.isLoggedIn else { return }   // 未登录时先让用户完成登录，登录后可从界面进入
+        nav.selectedTab = link.hostTab
+        switch link.hostTab {
+        case 1: nav.controlPath = [link]
+        case 2: nav.messagesPath = [link]
+        case 3: nav.minePath = [link]
+        default: nav.path = [link]
+        }
+    }
+
     private var root: some View {
         Group {
             if showSplash {
@@ -124,6 +185,9 @@ struct CarKeeperApp: App {
             _ = ChargingStatusMonitor.shared
             // N10 车牌加密初始化
             DataEncryption.ensureKey()
+        }
+        .onOpenURL { url in
+            openDeeplink(url)
         }
         // ⚠️ 这里原本挂着 .nightModeBreathing(enabled: store.isNightMode)：那个修饰符会把「整个 App」的
         // 透明度按 sin(时间) 在 0.7~1.0 之间反复抖动，而且每次渲染都会重启动画、让整棵视图树反复失效。
@@ -740,212 +804,31 @@ struct MainTabView: View {
 
 /// TabBar 底部脉冲光晕 + 液态玻璃指示条视图
 private class TabBarGlowOverlay: UIView {
-    private let glowLayer = CAShapeLayer()
-    private let pressLayer = CAShapeLayer()
     private let indicatorLayer = CAShapeLayer()   // Liquid Glass 胶囊指示条
-    private let indicatorGlowLayer = CAShapeLayer() // 指示条外部光晕
-    private let floatRingLayer = CAShapeLayer()       // 选中图标上浮光环
     private var selectedItemIndex: Int = -1
-    private var pressAnimation: CABasicAnimation?
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        updateGlow()
+        // 只重绘选中指示条。原本这里还会画「选中图标光晕圆」
+        guard selectedItemIndex >= 0 else { return }
+        slideIndicator(from: selectedItemIndex, to: selectedItemIndex)
     }
 
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        super.touchesBegan(touches, with: event)
-        guard let tabBar = superview as? UITabBar, let touch = touches.first else { return }
-        let point = touch.location(in: self)
-        for (idx, item) in (tabBar.items ?? []).enumerated() {
-            guard let frame = item.frame(in: tabBar) else { continue }
-            if frame.contains(point) {
-                triggerPressGlow(at: frame.midX, y: frame.midY)
-                triggerIconBounce(at: frame.midX, y: frame.midY - 14)
-                break
-            }
-        }
-    }
-
-    /// 图标按压缩放弹跳：选中图标瞬间弹簧放大后回弹
-    private func triggerIconBounce(at cx: CGFloat, y cy: CGFloat) {
-        let radius: CGFloat = 14
-        let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)
-        let bounceLayer = CAShapeLayer()
-        bounceLayer.path = path
-        bounceLayer.fillColor = UI.accent.withAlphaComponent(0.25).cgColor
-        bounceLayer.strokeColor = nil
-        bounceLayer.opacity = 1.0
-
-        // 缩放：0.5 → 1.3 → 0.95 → 1.0（弹簧过冲）
-        let scaleAnim = CABasicAnimation(keyPath: "transform.scale")
-        scaleAnim.fromValue = 0.5
-        scaleAnim.toValue = 1.0
-        scaleAnim.duration = 0.35
-        scaleAnim.fillMode = .both
-        scaleAnim.isRemovedOnCompletion = false
-        bounceLayer.add(scaleAnim, forKey: "iconBounce")
-
-        layer.addSublayer(bounceLayer)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            withAnimation(.easeOut(duration: 0.1)) {
-                bounceLayer.opacity = 0
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                bounceLayer.removeFromSuperlayer()
-            }
-        }
-    }
+    // ⚠️ 这里原本重写了 touchesBegan，在 TabBar 被点时画出
+    //   ①「按压光圈」triggerPressGlow ②「图标弹跳圈」triggerIconBounce
+    // 两者都属于「点一下就出圈」的特效，已按需求整体移除。
 
     func selectItem(at index: Int, tabBarItemCount count: Int) {
         guard index != selectedItemIndex else { return }
         let prevIndex = selectedItemIndex
         selectedItemIndex = index
-        updateGlow()
         slideIndicator(from: prevIndex, to: index)
-        animateFloatRing(to: index)
     }
 
-    /// 图标上浮光环动画：spring 从 0→1 scale + 轻微上移，模拟选中时图标弹起
-    private func animateFloatRing(to index: Int) {
-        guard index >= 0, index < items.count else { return }
-        let frame = items[index]
-        let cx = frame.midX
-        let cy = frame.midY - 8  // 环中心略高于图标中心
-        let radius: CGFloat = 16
-
-        let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)
-        floatRingLayer.path = path
-        floatRingLayer.fillColor = UIColor.clear.cgColor
-        floatRingLayer.strokeColor = UI.accent.withAlphaComponent(0.5).cgColor
-        floatRingLayer.lineWidth = 2.0
-        floatRingLayer.shadowColor = UI.accent.withAlphaComponent(0.6).cgColor
-        floatRingLayer.shadowRadius = 8
-        floatRingLayer.shadowOffset = .zero
-        floatRingLayer.opacity = 0
-
-        if layer.sublayers?.contains(floatRingLayer) == false {
-            layer.addSublayer(floatRingLayer)
-        }
-
-        // 入场：scale 0→1 + opacity 0→1（弹簧回弹）
-        let scaleAnim = CABasicAnimation(keyPath: "transform.scale")
-        scaleAnim.fromValue = 0.3
-        scaleAnim.toValue = 1.0
-        scaleAnim.duration = 0.4
-        scaleAnim.fillMode = .both
-        scaleAnim.isRemovedOnCompletion = false
-        floatRingLayer.add(scaleAnim, forKey: "floatScale")
-
-        let opacityAnim = CABasicAnimation(keyPath: "opacity")
-        opacityAnim.fromValue = 0.0
-        opacityAnim.toValue = 1.0
-        opacityAnim.duration = 0.4
-        opacityAnim.fillMode = .both
-        opacityAnim.isRemovedOnCompletion = false
-        floatRingLayer.add(opacityAnim, forKey: "floatOpacity")
-
-        // 持续呼吸脉动（选中后每 2s 一次）
-        let pulse = CABasicAnimation(keyPath: "opacity")
-        pulse.fromValue = 0.5
-        pulse.toValue = 1.0
-        pulse.duration = 1.0
-        pulse.autoreverses = true
-        pulse.repeatCount = .greatestFiniteMagnitude
-        floatRingLayer.add(pulse, forKey: "floatPulse")
-
-        // 位置上移弹跳
-        let posAnim = CABasicAnimation(keyPath: "position")
-        posAnim.fromValue = NSValue(cgPoint: CGPoint(x: cx, y: cy + 12))
-        posAnim.toValue = NSValue(cgPoint: CGPoint(x: cx, y: cy))
-        posAnim.duration = 0.45
-        posAnim.fillMode = .both
-        posAnim.isRemovedOnCompletion = false
-        floatRingLayer.add(posAnim, forKey: "floatPos")
-    }
-
-    private func triggerPressGlow(at cx: CGFloat, y cy: CGFloat) {
-        // 取消上一次按压动画（若有）
-        pressLayer.removeAllAnimations()
-
-        let radius: CGFloat = 28
-        let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)
-        pressLayer.path = path
-        pressLayer.fillColor = UI.accent.withAlphaComponent(0.45).cgColor
-        pressLayer.strokeColor = nil
-        pressLayer.shadowColor = UI.accent.withAlphaComponent(0.8).cgColor
-        pressLayer.shadowRadius = 10
-        pressLayer.shadowOffset = .zero
-        pressLayer.opacity = 1.0
-
-        if layer.sublayers?.contains(pressLayer) == false {
-            layer.addSublayer(pressLayer)
-        }
-
-        // 弹簧缩放：从 0.6 膨胀到 1.2，模拟 Liquid Glass 压缩回弹
-        let scaleAnim = CABasicAnimation(keyPath: "transform.scale")
-        scaleAnim.fromValue = 0.5
-        scaleAnim.toValue = 1.15
-        scaleAnim.duration = 0.35
-        scaleAnim.fillMode = .both
-        scaleAnim.isRemovedOnCompletion = false
-        pressLayer.add(scaleAnim, forKey: "pressScale")
-        pressAnimation = scaleAnim
-
-        // 脉冲淡出：0.4s 内从 opacity=1 到 opacity=0
-        let fadeOut = CABasicAnimation(keyPath: "opacity")
-        fadeOut.fromValue = 1.0
-        fadeOut.toValue = 0.0
-        fadeOut.duration = 0.4
-        fadeOut.fillMode = .both
-        fadeOut.isRemovedOnCompletion = false
-        pressLayer.add(fadeOut, forKey: "pressFade")
-
-        // 延迟移除 layer
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            withAnimation(.easeOut(duration: 0.15)) {
-                self.pressLayer.opacity = 0
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                self.pressLayer.removeFromSuperlayer()
-            }
-        }
-    }
-
-    private func updateGlow() {
-        // 移除之前的脉冲动画
-        glowLayer.removeAllAnimations()
-
-        guard selectedItemIndex >= 0, selectedItemIndex < items.count else {
-            glowLayer.opacity = 0
-            return
-        }
-        let itemFrame = items[selectedItemIndex]
-        let cx = itemFrame.midX
-        let cy = bounds.height * 0.45
-        let radius: CGFloat = 18
-
-        let path = CGPath(ellipseIn: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2), transform: nil)
-        glowLayer.path = path
-        glowLayer.fillColor = UIColor.systemBlue.withAlphaComponent(0.35).cgColor
-        glowLayer.strokeColor = nil
-        glowLayer.shadowColor = UIColor.systemBlue.withAlphaComponent(0.6).cgColor
-        glowLayer.shadowRadius = 12
-        glowLayer.shadowOffset = .zero
-        glowLayer.opacity = 1
-
-        if layer.sublayers?.contains(glowLayer) == false {
-            layer.addSublayer(glowLayer)
-        }
-        // 脉冲动画
-        let pulse = CABasicAnimation(keyPath: "opacity")
-        pulse.fromValue = 0.3
-        pulse.toValue = 1.0
-        pulse.duration = 0.6
-        pulse.autoreverses = true
-        pulse.repeatCount = .greatestFiniteMagnitude
-        glowLayer.add(pulse, forKey: "pulse")
-    }
+    // ⚠️ 已移除的三个「圈」特效，勿再添加：
+    //   animateFloatRing —— 选中图标外圈持续呼吸的光环
+    //   triggerPressGlow —— 点击时膨胀并淡出的按压光圈
+    //   updateGlow       —— 选中项上方常驻的脉冲光晕圆
 
     private func slideIndicator(from prevIndex: Int, to newIndex: Int) {
         guard prevIndex >= 0, prevIndex < items.count, newIndex >= 0, newIndex < items.count else { return }
@@ -972,28 +855,11 @@ private class TabBarGlowOverlay: UIView {
         indicatorLayer.fillColor = UIColor.white.withAlphaComponent(0.85).cgColor
         indicatorLayer.strokeColor = UIColor.white.withAlphaComponent(0.5).cgColor
         indicatorLayer.lineWidth = 0.5
-        indicatorLayer.shadowColor = UIColor.white.withAlphaComponent(0.6).cgColor
-        indicatorLayer.shadowOpacity = 0.6
-        indicatorLayer.shadowRadius = 4
-        indicatorLayer.shadowOffset = .zero
         indicatorLayer.opacity = 1.0
 
-        // ── 光晕扩散层（稍大、更透明，营造玻璃折射感）──
-        indicatorGlowLayer.removeAllAnimations()
-        let glowPath = CGPath(ellipseIn: CGRect(x: targetX - barWidth / 2 - 4, y: targetY - barRadius - 2, width: barWidth + 8, height: barHeight + 4), transform: nil)
-        indicatorGlowLayer.path = glowPath
-        indicatorGlowLayer.fillColor = UIColor.systemBlue.withAlphaComponent(0.15).cgColor
-        indicatorGlowLayer.strokeColor = nil
-        indicatorGlowLayer.shadowColor = UIColor.systemBlue.withAlphaComponent(0.4).cgColor
-        indicatorGlowLayer.shadowRadius = 8
-        indicatorGlowLayer.shadowOffset = .zero
-        indicatorGlowLayer.opacity = 0.8
-
+        // 光晕扩散层已移除（不再有第二层圈）
         if layer.sublayers?.contains(indicatorLayer) == false {
             layer.addSublayer(indicatorLayer)
-        }
-        if layer.sublayers?.contains(indicatorGlowLayer) == false {
-            layer.addSublayer(indicatorGlowLayer)
         }
 
         // ── 弹簧滑动动画（CAKeyframeAnimation 实现过冲 + 回弹）──
@@ -1014,7 +880,6 @@ private class TabBarGlowOverlay: UIView {
         posAnim.fillMode = .both
         posAnim.isRemovedOnCompletion = false
         indicatorLayer.add(posAnim, forKey: "slidePos")
-        indicatorGlowLayer.add(posAnim.copy() as? CABasicAnimation ?? posAnim, forKey: "slidePosGlow")
 
         // 缩放弹性：0.6 → 1.05 → 0.98 → 1.0
         let scaleAnim = CABasicAnimation(keyPath: "transform.scale")
@@ -1024,15 +889,6 @@ private class TabBarGlowOverlay: UIView {
         scaleAnim.fillMode = .both
         scaleAnim.isRemovedOnCompletion = false
         indicatorLayer.add(scaleAnim, forKey: "slideScale")
-
-        // 光晕层缩放：更慢更柔和
-        let glowScale = CABasicAnimation(keyPath: "transform.scale")
-        glowScale.fromValue = 0.75
-        glowScale.toValue = 1.0
-        glowScale.duration = 0.55
-        glowScale.fillMode = .both
-        glowScale.isRemovedOnCompletion = false
-        indicatorGlowLayer.add(glowScale, forKey: "glowScale")
     }
 
     private var items: [CGRect] {

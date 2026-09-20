@@ -17,10 +17,12 @@ enum ServiceType: String, CaseIterable, Codable {
     var icon: String {
         switch self {
         case .oil: return "gearshape.fill"
-        case .filter: return "humidity.fill"
+        // 注：这几个名字原来都不存在（"humidity.fill" / "disc.fill" / "circle.fill"），
+        // Image(systemName:) 会渲染成空白 —— 已换成真实存在的 symbol。
+        case .filter: return "wind"
         case .spark: return "bolt.fill"
-        case .brake: return "disc.fill"
-        case .tire: return "circle.fill"
+        case .brake: return "octagon.fill"
+        case .tire: return "circle.dashed"
         case .coolant: return "drop.fill"
         case .inspection: return "doc.fill"
         }
@@ -121,7 +123,7 @@ struct ServiceReminderRow: View {
         let isUrgent = daysUntil <= 7 || kmUntil <= 500
         
         HStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: reminder.type.icon)
+            Image(safeSymbol: reminder.type.icon, fallback: "wrench.and.screwdriver.fill")
                 .font(.title2)
                 .frame(width: 40, height: 40)
                 .background(isUrgent ? Color.red.opacity(0.15) : Color.blue.opacity(0.15))

@@ -77,7 +77,7 @@ enum WeatherAlertType {
         case .rain: return "cloud.rain.fill"
         case .ice: return "snowflake.fill"
         case .highTemp: return "sun.max.fill"
-        case .storm: return "cloud.bolt.fill"
+        case .storm: return "cloud.bolt.rain.fill"
         }
     }
 }

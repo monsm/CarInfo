@@ -146,7 +146,7 @@ struct CarPlayStatusCardView: View {
 
             // 状态行
             HStack(spacing: 24) {
-                StatusItem(icon: "gauge.high", value: "\(range)", unit: "km", label: "续航")
+                StatusItem(icon: "gauge", value: "\(range)", unit: "km", label: "续航")
                 StatusItem(icon: "thermometer", value: "\(temp)", unit: "°C", label: "温度")
                 StatusItem(icon: locked ? "lock.fill" : "lock.open.fill", value: locked ? "已锁" : "未锁", unit: "", label: "车门")
                 if charging {

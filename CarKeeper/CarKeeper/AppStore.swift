@@ -58,6 +58,13 @@ final class AppStore: @unchecked Sendable {
 
     // #16 维保里程记录（UserDefaults 持久化）
     static let lastServiceMileageKey = "carkeeper_last_service_mileage"
+
+    /// 上次选中的车辆 id（重启后恢复，否则每次都跳回第一辆）
+    static let selectedCarIdKey = "carkeeper_selected_car_id"
+
+    /// App Group id：必须与 CarKeeper.entitlements / project.yml / Widgets / WatchApp 保持一致，
+    /// 不一致时小组件、表盘、灵动岛读不到任何数据（永远是 0）。
+    static let appGroupId = "group.com.you.CarKeeper"
     var lastServiceMileage: Int {
         get { UserDefaults.standard.integer(forKey: Self.lastServiceMileageKey) }
         set { UserDefaults.standard.set(newValue, forKey: Self.lastServiceMileageKey) }
@@ -107,7 +114,15 @@ final class AppStore: @unchecked Sendable {
     // #NEW-1 停车位置
     var parkingLocation: CLLocation? {
         get { if let data = UserDefaults.standard.data(forKey: "carkeeper_parking_loc"), let loc = try? NSKeyedUnarchiver.unarchivedObject(ofClass: CLLocation.self, from: data) { return loc } else { return nil } }
-        set { if let loc = newValue, let data = try? NSKeyedArchiver.archivedData(withRootObject: loc, requiringSecureCoding: true) { UserDefaults.standard.set(data, forKey: "carkeeper_parking_loc") }
+        set {
+            guard let loc = newValue else {
+                // ⚠️ 传 nil 必须真的清掉，否则停车位置永远删不掉
+                UserDefaults.standard.removeObject(forKey: "carkeeper_parking_loc")
+                return
+            }
+            if let data = try? NSKeyedArchiver.archivedData(withRootObject: loc, requiringSecureCoding: true) {
+                UserDefaults.standard.set(data, forKey: "carkeeper_parking_loc")
+            }
         }
     }
     var lastParkingTime: Date? {
@@ -226,13 +241,12 @@ final class AppStore: @unchecked Sendable {
     }
     func quickStatus() -> CCQuickStatus {
         guard let charge = caches["charge"] as? [String: Any],
-              let socStr = charge["RemainPower"] as? String,
-              let soc = Int(socStr) else { return CCQuickStatus() }
-        let rangeStr = charge["RemainedPowerMile"] as? String ?? "--"
+              let soc = ciNumberInt(charge, ["RemainPower"]) else { return CCQuickStatus() }
+        let rangeStr = ciString(charge, ["RemainedPowerMile"]) ?? "--"
         let ctrl = caches["control"] as? [String: Any]
         let locked = (ciBool(ctrl, ["DoorLocked", "doorLocked"]) ?? true)
         let temp = VM.n0(ctrl?["InteriorTemperature"] ?? ctrl?["interiorTemperature"]) ?? "--"
-        let charging = soc < 100
+        let charging = isCharging
         return CCQuickStatus(soc: soc, range: rangeStr, locked: locked, cabinTemp: "\(temp)℃", charging: charging, online: "在线")
     }
 
@@ -406,12 +420,13 @@ final class AppStore: @unchecked Sendable {
     // #28 Dynamic Island / Live Activity 状态
     var isCharging: Bool {
         guard let charge = caches["charge"] as? [String: Any] else { return false }
-        let status = charge["ChrgStatus"] as? String ?? ""
+        // ciString 同时兼容字符串 "1" 与数字 1 两种返回，避免服务端改类型后状态恒为 false
+        let status = ciString(charge, ["ChrgStatus"]) ?? ""
         return status == "1" || status == "2"
     }
     var chargingProgress: Double {
         guard let charge = caches["charge"] as? [String: Any] else { return 0 }
-        let soc = Double(charge["RemainPower"] as? String ?? "0") ?? 0
+        let soc = ciNumber(charge, ["RemainPower"]) ?? 0
         return min(1.0, max(0.0, soc / 100.0))
     }
 
@@ -422,10 +437,14 @@ final class AppStore: @unchecked Sendable {
             let userRes = try await api.getUser()
             self.cars = carsRes
             if let u = userRes { user = u }
-            if let first = self.cars.first {
+            // 优先恢复上次选中的车辆，否则每次重启都会跳回第一辆
+            let savedCarId = UserDefaults.standard.string(forKey: Self.selectedCarIdKey) ?? ""
+            let picked = self.cars.first { (ciString($0, ["CarId", "carId"]) ?? "") == savedCarId } ?? self.cars.first
+            if let first = picked {
                 let id = ciString(first, ["CarId", "carId"]) ?? ""
                 self.car = first
                 self.carId = id
+                if !savedCarId.isEmpty { UserDefaults.standard.set(id, forKey: Self.selectedCarIdKey) }
                 // #21 冷启动预加载：后台异步拉取所有数据，不阻塞 UI
                 preloadTask?.cancel()
                 preloadTask = Task {
@@ -485,6 +504,9 @@ final class AppStore: @unchecked Sendable {
             }
             var out: [String: Any?] = [:]
             for await (key, value) in group {
+                // ⚠️ 只收成功的结果。任何子请求失败都不要返回 nil ——
+                // 否则 saveCache 会把上一份好数据擦掉（弱网下整页从有值变成全 0）。
+                guard let value else { continue }
                 out[key] = value
             }
             return out
@@ -494,27 +516,66 @@ final class AppStore: @unchecked Sendable {
     func saveCache(_ patch: [String: Any?]) {
         let now = Date()
         for (k, v) in patch {
+            // ⚠️ nil = 该数据源本次拉取失败：保留旧值、不刷新时间戳，
+            // 绝不覆盖（这是弱网下数据凭空消失的根因）。
+            guard let v else { continue }
             caches[k] = v
             cacheTimestamps[k] = now
         }
-        // #13 记录能耗快照
+        // #13 记录能耗快照（ciNumberInt 同时兼容字符串与数字两种返回）
         if let charge = patch["charge"] as? [String: Any] {
-            if let socStr = charge["RemainPower"] as? String,
-               let soc = Int(socStr),
-               let rangeStr = charge["RemainedPowerMile"] as? String,
-               let range = Int(rangeStr) {
+            let soc = ciNumberInt(charge, ["RemainPower"])
+            let range = ciNumberInt(charge, ["RemainedPowerMile"])
+            if let soc, let range {
                 recordEnergySnapshot(soc: soc, rangeKm: range)
             }
         }
-        // #NEW-3 检测离线状态：缓存超过 TTL 则标记离线
-        let staleKeys = evictStale()
-        if !staleKeys.isEmpty && !isLoggedIn {
-            isOfflineMode = true
-            offlineMessage = "网络异常，显示缓存数据"
-        } else {
+        // #NEW-3 离线判定：真正断网（本次一个数据源都没拿到）且已登录时才提示
+        let anySuccess = patch.values.contains { $0 != nil }
+        if anySuccess {
             isOfflineMode = false
             offlineMessage = ""
+        } else if !patch.isEmpty && isLoggedIn {
+            isOfflineMode = true
+            offlineMessage = "网络异常，显示缓存数据"
         }
+        // 把最新车况同步到 App Group（小组件 / 表盘 / 灵动岛的数据源）
+        syncSharedDefaults()
+    }
+
+    // MARK: - 与 Widget / Watch / Live Activity 共享数据
+    /// 把车况写进 App Group，供 Widgets/WidgetBundle.swift、WatchApp、LiveActivities 读取。
+    /// ⚠️ 键名必须与那三处读的键名一致，否则小组件／表盘永远是 0。
+    /// 没有 App Group 能力（未签名 / 侧载）时写入的是普通 UserDefaults：不会崩，只是不共享。
+    func syncSharedDefaults() {
+        guard let defaults = UserDefaults(suiteName: Self.appGroupId) else { return }
+        let e = VM.energy(caches, car)
+        let comfort = VM.comfortStatus(caches)
+        let control = ciVal(caches, "control")
+
+        let soc = e.socPct
+        let rangeKm = Int(e.range.filter { $0.isNumber }) ?? 0
+        let temp = comfort.cabinTemp
+        let locked = ciBool(control, ["DoorLocked", "doorLocked"]) ?? true
+        let charging = isCharging
+        let powerText = chargingPowerHistory.last.map { String(format: "%.1f", $0.power) } ?? ""
+
+        // 小组件
+        defaults.set(soc, forKey: "widget_soc")
+        defaults.set(rangeKm, forKey: "widget_range")
+        defaults.set(temp, forKey: "widget_temp")
+        defaults.set(locked, forKey: "widget_locked")
+        defaults.set(charging, forKey: "widget_charging")
+        defaults.set(isOfflineMode, forKey: "widget_offline")
+        defaults.set(powerText, forKey: "widget_power")
+
+        // Watch
+        defaults.set(soc, forKey: "watch_soc")
+        defaults.set(rangeKm, forKey: "watch_range")
+        defaults.set(temp, forKey: "watch_temp")
+        defaults.set(locked, forKey: "watch_locked")
+        defaults.set(charging, forKey: "watch_charging")
+        defaults.set(totalMileage, forKey: "watch_mileage")
     }
 
     /// 返回指定 key 的缓存是否已过期（超过 TTL）
@@ -523,15 +584,13 @@ final class AppStore: @unchecked Sendable {
         return Date().timeIntervalSince(ts) > Self.cacheTTL
     }
 
-    /// 清理所有过期缓存，返回需要重拉的数据键列表
-    func evictStale() -> [String] {
-        var staleKeys: [String] = []
+    /// 返回「已过期、需要重新拉取」的数据键。
+    /// ⚠️ 不再删除缓存值：断网时必须继续显示旧数据，否则每次 TTL 到期整页都会变空。
+    func staleKeys() -> [String] {
         let now = Date()
-        for (k, ts) in cacheTimestamps where now.timeIntervalSince(ts) > Self.cacheTTL {
-            staleKeys.append(k)
-        }
-        for k in staleKeys { caches[k] = nil; cacheTimestamps.removeValue(forKey: k) }
-        return staleKeys
+        return cacheTimestamps
+            .filter { now.timeIntervalSince($0.value) > Self.cacheTTL }
+            .map(\.key)
     }
 
     func clearCache() {
@@ -559,8 +618,10 @@ final class AppStore: @unchecked Sendable {
     // MARK: 登录 / 退出
 
     func logout() {
+        cancelPreload()
         UserDefaults.standard.removeObject(forKey: tokenStorageKey)
         UserDefaults.standard.removeObject(forKey: cacheStorageKey)
+        UserDefaults.standard.removeObject(forKey: Self.selectedCarIdKey)
         deletePin()  // #8 退出时清除Keychain中的PIN
         isLoggedIn = false
         phone = ""
@@ -569,6 +630,30 @@ final class AppStore: @unchecked Sendable {
         car = nil
         user = nil
         clearCache()
+        // ⚠️ 以下都是「跟账号绑定」的数据：不清理的话，换账号后
+        // 前一个账号的行程轨迹 / 停车位置 / 车控历史 会对新用户直接可见。
+        tripHistory = []
+        currentTrip = nil
+        energyHistory = []
+        chargingPowerHistory = []
+        commandHistory = []
+        pendingQuickCtrl = nil
+        isOfflineMode = false
+        offlineMessage = ""
+        parkingLocation = nil
+        lastParkingTime = nil
+        lastCheckInDate = nil
+        checkInCount = 0
+        UserDefaults.standard.removeObject(forKey: Self.lastServiceMileageKey)
+        UserDefaults.standard.removeObject(forKey: "carkeeper_last_checkin")
+        UserDefaults.standard.removeObject(forKey: "carkeeper_checkin_count")
+        UserDefaults.standard.removeObject(forKey: "carkeeper_parking_time")
+        // 家庭成员 / 临时钥匙 / 里程账本 / 保险费 / Siri 使用统计 —— 全是跟账号绑定的数据
+        FamilyManager.shared.resetAll()
+        TempKeyManager.shared.resetAll()
+        UserDefaults.standard.removeObject(forKey: "carkeeper_mileage_entries")
+        UserDefaults.standard.removeObject(forKey: "carkeeper_insurance_policies")
+        UserDefaults.standard.removeObject(forKey: "carkeeper_siri_usage")
         NotificationCenter.default.post(name: .didLogout, object: nil)
     }
 
@@ -579,6 +664,7 @@ final class AppStore: @unchecked Sendable {
         // 先更新 carId（触发视图重建，缓存仍在，避免闪烁）
         car = c
         carId = newId
+        UserDefaults.standard.set(newId, forKey: Self.selectedCarIdKey)
         // #N10 加密保存车牌号
         if let plate = ciString(c, ["Plate", "plate", "plateNo"]) {
             SecureStorage.shared.savePlate(plate)

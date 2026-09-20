@@ -151,7 +151,7 @@ struct ServiceHistoryView: View {
         case "轮胎": icon = "circle.dashed"
         default: icon = "circle"
         }
-        return Image(systemName: icon)
+        return Image(safeSymbol: icon, fallback: "wrench.and.screwdriver.fill")
             .font(.caption)
             .foregroundStyle(Theme.Colors.accent)
             .frame(width: 28, height: 28)
@@ -190,7 +190,7 @@ struct ServiceHistoryView: View {
         return VStack(spacing: 0) {
             if filtered.isEmpty {
                 VStack(spacing: 12) {
-                    Image(systemName: "calendar.badge.off")
+                    Image(safeSymbol: "calendar.badge.minus", fallback: "calendar")
                         .font(.system(size: 36))
                         .foregroundStyle(.secondary.opacity(0.3))
                     Text("暂无记录").font(.subheadline).foregroundStyle(.tertiary)

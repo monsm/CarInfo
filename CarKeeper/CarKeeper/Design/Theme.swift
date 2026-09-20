@@ -5,6 +5,33 @@ import AVFoundation
 import Photos
 
 // =============================================================================
+// SafeSymbol —— SF Symbol 名称兜底
+// 背景：历史代码里散落着若干并不存在的图标名（例如 "tire"、"gauge.full"、
+//      "battery.3quarter.fill"），而 Image(systemName:) 遇到不存在的名字会渲染成
+//      空白 —— 在界面上看起来就是「这个位置的图标缺失了」。
+// 约定：凡是「图标名字是变量 / 拼出来的」地方，一律走 Image(safeSymbol:)，
+//      名字无效时退回一个一定存在的图标，保证界面永不出现空白图标。
+// =============================================================================
+enum SafeSymbol {
+    private static var cache: [String: String] = [:]
+
+    /// 返回一个可用的 symbol 名：请求的名字不存在时返回 fallback
+    static func name(_ requested: String, fallback: String = "questionmark.circle.fill") -> String {
+        if let hit = cache[requested] { return hit }
+        let resolved = UIImage(systemName: requested) != nil ? requested : fallback
+        cache[requested] = resolved
+        return resolved
+    }
+}
+
+extension Image {
+    /// 构造 systemName 图标，但名字无效时自动退回 fallback（避免图标凭空消失）
+    init(safeSymbol name: String, fallback: String = "questionmark.circle.fill") {
+        self.init(systemName: SafeSymbol.name(name, fallback: fallback))
+    }
+}
+
+// =============================================================================
 // 长安车管家 — iOS 27 Apple Premium Design System
 // ============================================================
 // 规范文档：所有页面的字号、间距、圆角、色彩体系
@@ -456,7 +483,6 @@ struct GlassLongPressDeformModifier: ViewModifier {
                     )
                     .shadow(color: glowTint.opacity(glowOpacity * 0.25), radius: glowOpacity * 10, y: 0)
             )
-            .onTapGesture(count: 1) { }  // 占位，确保手势接收
             .simultaneousGesture(
                 LongPressGesture(minimumDuration: pressDuration)
                     .onEnded { _ in
@@ -724,7 +750,7 @@ struct StatTile: View {
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
-            Image(systemName: icon)
+            Image(safeSymbol: icon, fallback: "gauge")
                 .font(Theme.font(14, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 22)
@@ -758,43 +784,8 @@ struct StatTile: View {
 }
 
 // MARK: - Liquid Glass Press Feedback（统一按压/悬停动效）
-/// 所有 Button 组件共享的液态玻璃按压反馈修饰符：scale 压缩 + glow 光晕
-/// 按压光晕跟随位置 —— 可复用的子视图
-private struct PressGlow: View {
-    let color: Color?
-    let intensity: CGFloat
-    let isPressed: Bool
-    let isHovered: Bool
-    let glowCenter: CGPoint  // 归一化坐标 0~1（几何读者传入）
-    let size: CGSize
-
-    private var active: Bool { isPressed || isHovered }
-    private var glowOpacity: CGFloat {
-        isPressed ? intensity * 0.65 : isHovered ? intensity * 0.20 : 0
-    }
-    private var blurRadius: CGFloat { isPressed ? 12 : 8 }
-
-    var body: some View {
-        ZStack {
-            // 柔和光晕圆：跟随触摸点，尺寸随 press 状态放大
-            Circle()
-                .fill(color?.opacity(glowOpacity) ?? .clear)
-                .frame(width: (80 + (isPressed ? 40 : 0)) / 390 * size.width,
-                       height: (80 + (isPressed ? 40 : 0)) / 390 * size.width)
-                .blur(radius: blurRadius)
-                .offset(x: glowCenter.x * size.width - size.width / 2,
-                        y: glowCenter.y * size.height - size.height / 2)
-            // 边缘高光描边（跟随手指，press 时更亮）
-            Circle()
-                .stroke(color?.opacity(isPressed ? intensity : isHovered ? intensity * 0.45 : 0) ?? .clear,
-                        lineWidth: isPressed ? 2.2 : isHovered ? 1.4 : 0)
-                .frame(width: isPressed ? 72 : 56, height: isPressed ? 72 : 56)
-                .offset(x: glowCenter.x * size.width - size.width / 2,
-                        y: glowCenter.y * size.height - size.height / 2)
-        }
-    }
-}
-
+/// 所有 Button 组件共享的液态玻璃按压反馈修饰符：只保留 scale 压缩 + 边框微光。
+/// （原「跟随手指的圆型光晕」已按需求移除：点击不再出现任何圈特效）
 struct PressFeedback: ViewModifier {
     /// 按下时的缩放比例（0.88 = 明显压缩，0.93 = 轻微压缩）
     let pressScale: CGFloat
@@ -809,52 +800,32 @@ struct PressFeedback: ViewModifier {
 
     @State private var isPressed  = false
     @State private var isHovered  = false
-    @State private var touchPoint = CGPoint.zero   // 触摸点（几何空间坐标）
-    @State private var geoSize    = CGSize.zero    // 容器尺寸
 
     func body(content: Content) -> some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let cx = touchPoint.x / max(w, 1)
-            let cy = touchPoint.y / max(h, 1)
-            content
-                // 缩放：按下压缩 / 悬停微放大
-                .scaleEffect(isPressed ? pressScale : (isHovered ? 1.02 : 1.0))
-                .animation(.spring(response: springResponse, dampingFraction: springDamping, blendDuration: 0.2),
-                           value: isPressed)
-                .animation(.spring(response: springResponse, dampingFraction: springDamping, blendDuration: 0.2),
-                           value: isHovered)
-                // 跟随手指的光晕叠加层
-                .overlay(alignment: .center) {
-                    PressGlow(color: glowColor, intensity: glowIntensity,
-                              isPressed: isPressed, isHovered: isHovered,
-                              glowCenter: CGPoint(x: cx, y: cy),
-                              size: geo.size)
-                }
-                // 整体边框（静态）
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(
-                            glowColor?.opacity(isPressed ? glowIntensity * 0.5 : isHovered ? glowIntensity * 0.25 : 0) ?? .clear,
-                            lineWidth: isPressed ? 1.5 : isHovered ? 1.0 : 0
-                        )
-                )
-                // 手势追踪：记录触摸位置 + press 状态
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                        .onChanged { v in
-                            touchPoint = v.location
-                            isPressed  = true
-                        }
-                        .onEnded   { _ in isPressed = false }
-                )
-                // 悬停（iPad / 桌面）
-                .onHover { hovered in isHovered = hovered }
-                // 记录容器尺寸
-                .onAppear { geoSize = geo.size }
-                .onChange(of: geo.size) { geoSize = $0 }
-        }
+        content
+            // 缩放：按下压缩 / 悬停微放大
+            .scaleEffect(isPressed ? pressScale : (isHovered ? 1.02 : 1.0))
+            .animation(.spring(response: springResponse, dampingFraction: springDamping, blendDuration: 0.2),
+                       value: isPressed)
+            .animation(.spring(response: springResponse, dampingFraction: springDamping, blendDuration: 0.2),
+                       value: isHovered)
+            // 边框高光（圆角矩形描边 —— 不是圈，也不再跟随手指）
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(
+                        glowColor?.opacity(isPressed ? glowIntensity * 0.5 : isHovered ? glowIntensity * 0.25 : 0) ?? .clear,
+                        lineWidth: isPressed ? 1.5 : isHovered ? 1.0 : 0
+                    )
+                    .allowsHitTesting(false)
+            )
+            // 只记录按压状态（不再记录触摸点、不再画任何圆形光晕）
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                    .onChanged { _ in isPressed = true }
+                    .onEnded   { _ in isPressed = false }
+            )
+            // 悬停（iPad / 桌面）
+            .onHover { hovered in isHovered = hovered }
     }
 }
 
@@ -950,7 +921,7 @@ struct MetricPill: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: icon)
+            Image(safeSymbol: icon, fallback: "gauge")
                 .font(Theme.micro)
                 .foregroundStyle(tint.opacity(0.85))
             if fluidValue {
@@ -991,7 +962,7 @@ struct QuickControlButton: View {
                 action()
             } label: {
                 VStack(spacing: Theme.Spacing.sm) {
-                    Image(systemName: icon)
+                    Image(safeSymbol: icon, fallback: "bolt.fill")
                         .font(Theme.font(24, weight: .semibold))
                         .foregroundStyle(tint)
                         .frame(width: 56, height: 56)
@@ -1025,7 +996,8 @@ struct TyreCell: View {
         VStack(spacing: 6) {
             // 位置标签
             HStack {
-                Image(systemName: "tire")
+                // 注：SF Symbols 里没有 "tire"，用圆环占位并保证渲染
+                Image(safeSymbol: "circle.dashed", fallback: "car.fill")
                     .font(Theme.micro)
                     .foregroundStyle(.secondary)
                 Text(label)
@@ -1387,72 +1359,24 @@ struct HealthSystemRing: View {
 }
 
 // =============================================================================
-// LiquidRipple —— iOS 27 液态玻璃水波纹点击反馈
-// 三层同心涟漪：中心白色高光 + 中层蓝色光晕 + 外层扩散淡出
-// 所有涟漪严格约束在卡片圆角内，不溢出边界
+// LiquidRipple —— 卡片圆角裁剪容器
+// （原「点击后三层同心圆圈」特效已按需求整体移除）
 // =============================================================================
 
-/// iOS 27 Liquid Glass 水波纹点击反馈（三层同心涟漪）
+/// 卡片圆角裁剪（不再有点击涟漪）
 struct LiquidRipple: ViewModifier {
-    @State private var rippleCenter: CGPoint = .zero
-    @State private var rippleActive = false
     let cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
-        // 先 clip 到圆角，再叠加涟漪
+        // 只保留圆角裁剪：点击后扩散的三层圆已移除（任意位置点击都不再出现圈特效）。
+        // 保留这个修饰符是因为各卡片/按钮仍依赖它的圆角裁剪，删掉会改变现有视觉。
         content
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            // 手势层（在 clip 之外，保证触摸坐标准确）
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                    .onChanged { v in
-                        rippleCenter = v.location
-                    }
-                    .onEnded { _ in
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.55, blendDuration: 0.2)) {
-                            rippleActive = true
-                        }
-                    }
-            )
-            // 三层同心涟漪叠加层
-            .overlay {
-                if rippleActive {
-                    ZStack {
-                        // 外层扩散环：最大半径，最淡，最先消失
-                        Circle()
-                            .fill(Color.white.opacity(0.18))
-                            .scaleEffect(rippleActive ? 6.0 : 0.0)
-                            .frame(width: 50, height: 50)
-                            .position(rippleCenter)
-                        // 中层蓝色光晕：中等半径，蓝色 tint，模拟液体折射
-                        Circle()
-                            .fill(Color.blue.opacity(0.12))
-                            .scaleEffect(rippleActive ? 4.0 : 0.0)
-                            .frame(width: 50, height: 50)
-                            .position(rippleCenter)
-                        // 内层白色高光：最小半径，最亮，模拟接触点
-                        Circle()
-                            .fill(Color.white.opacity(0.45))
-                            .scaleEffect(rippleActive ? 2.5 : 0.0)
-                            .frame(width: 50, height: 50)
-                            .position(rippleCenter)
-                    }
-                }
-            }
-            // 0.7s 后自动清除状态
-            .onChange(of: rippleActive) { active in
-                if !active { return }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        rippleActive = false
-                    }
-                }
-            }
     }
 }
 
-/// 为玻璃卡片添加水波纹涟漪效果
-/// - Parameter cornerRadius: 圆角半径，涟漪将严格约束在此范围内
+/// 卡片圆角裁剪（历史上还叠加过点击涟漪，现已移除）
+/// - Parameter cornerRadius: 圆角半径
 extension View {
     func liquidGlassRipple(cornerRadius: CGFloat = Theme.Radius.card) -> some View {
         self.modifier(LiquidRipple(cornerRadius: cornerRadius))
@@ -1928,7 +1852,7 @@ struct PageEmptyView: View {
                     .frame(width: 80, height: 80)
                     .overlay(Circle().strokeBorder(Color.white.opacity(0.2), lineWidth: 1))
                     .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
-                Image(systemName: icon)
+                Image(safeSymbol: icon, fallback: "car.fill")
                     .font(.system(size: 32, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -1982,7 +1906,7 @@ struct EKGFloRingDynamic: View {
 
 // =============================================================================
 // DataFreshnessBadge —— #3 数据新鲜度徽章
-// 根据时间差显示 🟢/🟡/🔴 颜色角标
+// 根据时间差显示不同图标 + 颜色（原来是纯色小圆点，只靠颜色区分）
 // =============================================================================
 struct DataFreshnessBadge: View {
     let timestamp: Date?
@@ -1993,8 +1917,12 @@ struct DataFreshnessBadge: View {
             let age = Int(Date().timeIntervalSince(ts) / 60)
             let color: Color = age < 3 ? .green : (age < 15 ? .orange : .red)
             let label: String = age < 1 ? "刚" : "\(age)分"
+            let symbol = age < 3 ? "checkmark.circle.fill"
+                        : (age < 15 ? "clock.fill" : "exclamationmark.triangle.fill")
             HStack(spacing: 3) {
-                Circle().fill(color).frame(width: 5, height: 5)
+                Image(safeSymbol: symbol, fallback: "clock.fill")
+                    .font(.system(size: fontSize, weight: .bold))
+                    .foregroundStyle(color)
                 Text(label).font(.system(size: fontSize, weight: .medium))
                     .foregroundStyle(color)
             }
@@ -2045,17 +1973,14 @@ struct LowBatteryBadge: View {
     let socPct: Int
     var body: some View {
         if socPct < 20 {
-            ZStack {
-                Circle()
-                    .fill(.red)
-                    .frame(width: 8, height: 8)
-                Circle()
-                    .strokeBorder(.red, lineWidth: 1.5)
-                    .frame(width: 12, height: 12)
-                    .opacity(0.5)
-                    .heartbeatPulse()
-            }
-            .offset(x: 10, y: -4)
+            // 原来是纯红色圆点（只靠颜色表达「低电量」），现在用电池图标 + 红底
+            Image(safeSymbol: "battery.25", fallback: "bolt.slash.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(3)
+                .background(Circle().fill(.red))
+                .offset(x: 10, y: -4)
+                .accessibilityLabel(Text("电量低于 20%"))
         }
     }
 }
@@ -2109,7 +2034,7 @@ struct ToastView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: icon)
+            Image(safeSymbol: icon, fallback: "info.circle.fill")
                 .font(Theme.caption.weight(.semibold))
                 .foregroundStyle(Theme.Colors.accent)
             Text(text)
@@ -2227,7 +2152,7 @@ struct MilestoneCelebration: ViewModifier {
                 if let prev = milestones.enumerated().first(where: { $0.element < newMileage })?.offset,
                    prev > 0 && milestones[prev - 1] < newMileage {
                     let milestone = milestones[min(prev, milestones.count - 1)]
-                    celebrationText = "🎉 恭喜！已突破 \(milestone) km 里程碑！"
+                    celebrationText = "恭喜！已突破 \(milestone) km 里程碑！"
                     showCelebration = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                         showCelebration = false
@@ -2236,8 +2161,12 @@ struct MilestoneCelebration: ViewModifier {
             }
             .overlay(alignment: .top) {
                 if showCelebration {
-                    Text(celebrationText)
-                        .font(Theme.caption.weight(.semibold))
+                    HStack(spacing: 6) {
+                        Image(safeSymbol: "star.fill", fallback: "checkmark.circle.fill")
+                            .font(Theme.caption.weight(.bold))
+                        Text(celebrationText)
+                            .font(Theme.caption.weight(.semibold))
+                    }
                         .foregroundStyle(.green)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
@@ -2358,7 +2287,7 @@ struct ChargingStationFinder: View {
             searchStations()
         } label: {
             HStack {
-                Image(systemName: "charging.station")
+                Image(safeSymbol: "ev.charger", fallback: "bolt.fill")
                     .font(Theme.bodyMd)
                 Text("附近充电站")
                     .font(Theme.body)

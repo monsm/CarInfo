@@ -48,7 +48,7 @@ struct VehicleTipsView: View {
         if doorOpen || windowOpen {
             result.append(VehicleTip(
                 category: .safety,
-                icon: "door.closed.fill",
+                icon: "lock.open.fill",
                 title: "门窗未关",
                 body: "检测到车门或车窗未关闭，请及时处理",
                 action: "远程关闭",
@@ -62,7 +62,7 @@ struct VehicleTipsView: View {
             let lowCount = tyres.items.filter { $0.warn }.count
             result.append(VehicleTip(
                 category: .safety,
-                icon: "circle.fill",
+                icon: "circle.dashed",
                 title: "胎压异常",
                 body: "\(lowCount)个轮胎胎压不足",
                 action: "充气建议",
@@ -175,13 +175,15 @@ struct VehicleTipsView: View {
     private func tipRow(_ tip: VehicleTip) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                // 严重度指示
-                Circle()
-                    .fill(tip.severity.color.opacity(0.2))
-                    .frame(width: 8, height: 8)
+                // 严重度图标（原来是纯色小圆点，只靠颜色区分 critical / warning / info）
+                Image(safeSymbol: tip.severity.iconName, fallback: "info.circle.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(tip.severity.color)
+                    .frame(width: 14)
+                    .accessibilityLabel(Text(tip.severity.label))
                 
                 // 图标
-                Image(systemName: tip.icon)
+                Image(safeSymbol: tip.icon, fallback: "info.circle.fill")
                     .font(.caption)
                     .foregroundStyle(tip.severity.color)
                     .frame(width: 28, height: 28)
@@ -285,11 +287,30 @@ struct VehicleTip: Identifiable {
 
 enum TipSeverity {
     case critical, warning, info
+
     var color: Color {
         switch self {
         case .critical: return .red
         case .warning: return .orange
         case .info: return .blue
+        }
+    }
+
+    /// 严重度图标（替代原来只靠颜色区分的纯色小圆点）
+    var iconName: String {
+        switch self {
+        case .critical: return "exclamationmark.octagon.fill"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .info: return "info.circle.fill"
+        }
+    }
+
+    /// 无障碍朗读用的文字
+    var label: String {
+        switch self {
+        case .critical: return "严重"
+        case .warning: return "警告"
+        case .info: return "提示"
         }
     }
 }

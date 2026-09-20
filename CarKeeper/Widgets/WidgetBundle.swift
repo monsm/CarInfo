@@ -46,7 +46,8 @@ struct CarWidgetProvider: TimelineProvider {
     
     func getTimeline(in context: Context, completion: @escaping (Timeline<CarWidgetEntry>) -> Void) {
         // 从 UserDefaults 读取实际数据（与 App 共享 App Group）
-        let defaults = UserDefaults(suiteName: "group.com.carkeeper.data") ?? UserDefaults.standard
+        // ⚠️ App Group id 必须与 entitlements / project.yml / WatchApp 完全一致
+        let defaults = UserDefaults(suiteName: "group.com.you.CarKeeper") ?? UserDefaults.standard
         let soc = defaults.integer(forKey: "widget_soc")
         let range = defaults.integer(forKey: "widget_range")
         let temp = defaults.string(forKey: "widget_temp") ?? "22℃"
@@ -116,7 +117,7 @@ struct CarWidgetSmallView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 if entry.charging {
-                    Label("⚡", systemImage: "bolt.fill")
+                    Label("充电", systemImage: "bolt.fill")
                         .font(.system(size: 9))
                         .foregroundStyle(.green)
                 }
@@ -198,7 +199,7 @@ struct CarWidgetMediumView: View {
             HStack(spacing: 12) {
                 CarWidgetButton(icon: entry.locked ? "lock.fill" : "lock.open.fill", label: entry.locked ? "已锁" : "未锁")
                 CarWidgetButton(icon: "fan.fill", label: "空调")
-                CarWidgetButton(icon: "horn.fill", label: "寻车")
+                CarWidgetButton(icon: "speaker.wave.3.fill", label: "寻车")
             }
             
             // 充电状态

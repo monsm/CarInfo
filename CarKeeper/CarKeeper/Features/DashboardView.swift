@@ -33,8 +33,8 @@ struct DashboardView: View {
                 // 核心指标
                 HStack(spacing: Theme.Spacing.sm) {
                     DashTile(icon: "bolt.fill", label: "SOC", value: "\(energyDict["socPct"] as? Int ?? 0)%", color: .green)
-                    DashTile(icon: "gauge.low", label: "续航", value: "\(energyDict["rangeKm"] as? Int ?? 0)km", color: .blue)
-                    DashTile(icon: "thermometer.medium", label: "温度", value: "\(climateDict["tempC"] as? Int ?? 22)°C", color: .orange)
+                    DashTile(icon: "gauge", label: "续航", value: "\(energyDict["rangeKm"] as? Int ?? 0)km", color: .blue)
+                    DashTile(icon: "thermometer", label: "温度", value: "\(climateDict["tempC"] as? Int ?? 22)°C", color: .orange)
                 }
                 
                 // 能耗图表
@@ -115,7 +115,7 @@ struct DashTile: View {
     
     var body: some View {
         VStack(spacing: Theme.Spacing.xs) {
-            Image(systemName: icon)
+            Image(safeSymbol: icon, fallback: "gauge")
                 .font(.title2)
                 .foregroundColor(color)
             Text(value)

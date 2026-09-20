@@ -116,7 +116,7 @@ struct ParkingMapView: View {
     
     private func infoChip(icon: String, text: String) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: icon)
+            Image(safeSymbol: icon, fallback: "map.fill")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Text(text)

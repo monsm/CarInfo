@@ -87,7 +87,7 @@ struct GlobalSearchHUD: View {
             SearchResult(
                 title: "远程控车",
                 subtitle: "锁车、解锁、开空调",
-                icon: "remote.fill",
+                icon: "dot.radiowaves.left.and.right",
                 action: {}
             ),
             SearchResult(
@@ -99,7 +99,7 @@ struct GlobalSearchHUD: View {
             SearchResult(
                 title: "胎压监测",
                 subtitle: "四轮胎压与温度",
-                icon: "tire.flat",
+                icon: "exclamationmark.triangle.fill",
                 action: {}
             ),
             SearchResult(
@@ -130,7 +130,7 @@ struct SearchResultRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: result.icon)
+                Image(safeSymbol: result.icon, fallback: "magnifyingglass")
                     .font(.title2)
                     .foregroundStyle(Theme.Colors.accent)
                     .frame(width: 36)

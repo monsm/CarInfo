@@ -7,6 +7,9 @@ struct MineView: View {
     // 检查更新状态
     @State private var updateBusy = false
     @State private var updateMsg: String? = nil
+    /// 提示是否为错误。原来是把 "❌" 拼进字符串再用 hasPrefix 反解 —— 用 emoji 当状态码，
+    /// 既不可本地化也无法换图标；改成显式布尔值，图标交给系统 symbol。
+    @State private var updateMsgIsError = false
     @State private var downloadPct: Double = 0
     @State private var downloadPctDisplay: Int = 0    // 下载进度数字滚动计数
     @State private var showDownload = false
@@ -58,6 +61,7 @@ struct MineView: View {
             // 其他 Tab 退出登录时，重置 OTA 状态，避免残留下载进度
             updateBusy = false
             updateMsg = nil
+            updateMsgIsError = false
             downloadPct = 0
             downloadPctDisplay = 0
             showDownload = false
@@ -82,6 +86,7 @@ struct MineView: View {
                 .keyboardType(.asciiCapable)
             Button("保存") {
                 UpdateService.githubToken = tokenDraft
+                updateMsgIsError = false
                 updateMsg = tokenDraft.isEmpty ? "已清空 Token" : "Token 已保存，点「检查更新」获取最新构建"
             }
             Button("取消", role: .cancel) { }
@@ -355,7 +360,7 @@ struct MineView: View {
                     tile("mappin.circle.fill", "停车位置", tint: .green) { showParkingMap = true }
                 }
                 HStack(spacing: 10) {
-                    tile("siren.fill", "紧急求助", tint: .red) { showEmergency = true }
+                    tile("exclamationmark.octagon.fill", "紧急求助", tint: .red) { showEmergency = true }
                     tile("lightbulb.fill", "车辆提示", tint: .yellow) { showVehicleTips = true }
                 }
                 tile("trophy.fill", "驾驶评分", tint: Theme.Colors.accent) { showDrivingScore = true }
@@ -388,11 +393,12 @@ struct MineView: View {
                             .font(Theme.caption).foregroundStyle(.secondary)
                     }
                 } else if let m = updateMsg {
-                    // 错误或提示消息
+                    // 错误或提示消息（图标由 updateMsgIsError 决定）
                     HStack(spacing: 6) {
-                        Image(systemName: m.hasPrefix("❌") ? "exclamationmark.triangle" : "info.circle")
+                        Image(safeSymbol: updateMsgIsError ? "exclamationmark.triangle.fill" : "info.circle.fill",
+                              fallback: "info.circle.fill")
                             .font(Theme.caption)
-                            .foregroundStyle(m.hasPrefix("❌") ? Theme.warn : Theme.Colors.accent)
+                            .foregroundStyle(updateMsgIsError ? Theme.warn : Theme.Colors.accent)
                         Text(m)
                             .font(Theme.caption)
                             .foregroundStyle(.secondary)
@@ -420,7 +426,7 @@ struct MineView: View {
                     Circle()
                         .fill(tint.opacity(0.10))
                         .frame(width: 48, height: 48)
-                    Image(systemName: symbol)
+                    Image(safeSymbol: symbol, fallback: "car.fill")
                         .font(Theme.d5.weight(.medium))
                         .foregroundStyle(tint)
                 }
@@ -510,6 +516,7 @@ struct MineView: View {
     private func checkUpdate() {
         updateBusy = true
         isChecking = true
+        updateMsgIsError = false
         updateMsg = "正在检查最新构建…"
         shareItems = []
         downloadPct = 0
@@ -518,12 +525,14 @@ struct MineView: View {
         Task { @MainActor in
             do {
                 if UpdateService.githubToken.isEmpty {
+                    updateMsgIsError = true
                     updateMsg = "请先点「GitHub Token」填入私库访问 Token"
                     isChecking = false
                     updateBusy = false
                     return
                 }
                 let rel = try await UpdateService.fetchLatestRelease(token: UpdateService.githubToken)
+                updateMsgIsError = false
                 updateMsg = "发现构建 \(rel.name) · \(rel.displaySize)，开始下载…"
                 isChecking = false
                 showDownload = true
@@ -535,7 +544,8 @@ struct MineView: View {
                 shareSheetFlag = true
                 ToastManager.shared.show("下载完成，点分享安装", icon: "checkmark.circle.fill")
             } catch {
-                updateMsg = "❌ \(error.localizedDescription)"
+                updateMsgIsError = true
+                updateMsg = error.localizedDescription
                 showDownload = false
                 ToastManager.shared.show(error.localizedDescription, icon: "xmark.circle.fill")
             }

@@ -98,7 +98,7 @@ struct TripAnalyticsView: View {
     private func statTile(icon: String, label: String, value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Image(systemName: icon)
+                Image(safeSymbol: icon, fallback: "gauge")
                     .font(.caption)
                     .foregroundStyle(tint)
                 Spacer()
@@ -147,7 +147,7 @@ struct TripAnalyticsView: View {
             Text("驾驶行为评分").font(Theme.font(.subheadline as Font).bold())
             HStack(spacing: 16) {
                 gaugeTile(icon: "checkmark.seal.fill", label: "平稳驾驶", value: "92%", color: .green)
-                gaugeTile(icon: "exclamation.triangle.fill", label: "急加速", value: "3次", color: .orange)
+                gaugeTile(icon: "exclamationmark.triangle.fill", label: "急加速", value: "3次", color: .orange)
                 gaugeTile(icon: "stop.fill", label: "急刹车", value: "2次", color: .red)
             }
         }
@@ -156,7 +156,7 @@ struct TripAnalyticsView: View {
     
     private func gaugeTile(icon: String, label: String, value: String, color: Color) -> some View {
         VStack(spacing: 4) {
-            Image(systemName: icon)
+            Image(safeSymbol: icon, fallback: "gauge")
                 .font(.title3)
                 .foregroundStyle(color)
             Text(value).font(Theme.h4.bold()).foregroundStyle(color)

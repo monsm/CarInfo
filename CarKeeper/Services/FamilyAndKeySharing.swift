@@ -67,6 +67,12 @@ class TempKeyManager: ObservableObject {
         saveKeys()
     }
     
+    /// 退出登录时清空（内存 + 磁盘）：临时钥匙是跟账号绑定的数据
+    func resetAll() {
+        keys = []
+        UserDefaults.standard.removeObject(forKey: "carkeeper_temp_keys")
+    }
+
     private func saveKeys() {
         if let data = try? JSONEncoder().encode(keys) {
             UserDefaults.standard.set(data, forKey: "carkeeper_temp_keys")
@@ -123,6 +129,13 @@ class FamilyManager: ObservableObject {
         }
     }
     
+    /// 退出登录时清空（内存 + 磁盘）：家庭成员列表是跟账号绑定的数据
+    func resetAll() {
+        members = []
+        ownerName = "我"
+        UserDefaults.standard.removeObject(forKey: "carkeeper_family_members")
+    }
+
     private func saveMembers() {
         if let data = try? JSONEncoder().encode(members) {
             UserDefaults.standard.set(data, forKey: "carkeeper_family_members")

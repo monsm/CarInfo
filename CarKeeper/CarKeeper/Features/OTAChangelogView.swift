@@ -27,8 +27,9 @@ struct OTAChangelogView: View {
                 }
                 ForEach(log.changes, id: \.self) { change in
                     HStack {
-                        Image(systemName: "circle.fill")
-                            .font(.system(size: 6))
+                        // 原来是一个 6pt 纯色圆点（只靠颜色当项目符号），改成真正的图标
+                        Image(safeSymbol: "checkmark.circle.fill", fallback: "checkmark")
+                            .font(.system(size: 12))
                             .foregroundStyle(Theme.Colors.accent)
                         Text(change)
                             .font(.caption)

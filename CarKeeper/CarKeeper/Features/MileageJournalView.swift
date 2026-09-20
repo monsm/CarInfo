@@ -32,7 +32,7 @@ enum TripCostType: String, CaseIterable, Identifiable, Codable {
         case .fuel: return "fuelpump.fill"
         case .parking: return "parkingsign.fill"
         case .maintenance: return "wrench.and.screwdriver.fill"
-        case .toll: return "bank.fill"
+        case .toll: return "building.columns.fill"
         case .wash: return "drop.fill"
         case .insurance: return "shield.fill"
         }
@@ -173,7 +173,7 @@ struct CostSummaryTile: View {
     let total: Double
     var body: some View {
         VStack(spacing: Theme.Spacing.xs) {
-            Image(systemName: type.icon)
+            Image(safeSymbol: type.icon, fallback: "doc.text.fill")
                 .font(.title2)
                 .foregroundColor(Theme.Colors.accent)
             Text("\(total, specifier: "%.1f")")
@@ -204,7 +204,14 @@ struct AddCostEntrySheet: View {
                 Section("类型") {
                     Picker("费用类型", selection: $selectedType) {
                         ForEach(TripCostType.allCases) { type in
-                            Text("\(type.icon) \(type.displayName)").tag(type)
+                            // 原先把 symbol 名当文字拼在标签里（会显示成 "fuelpump.fill 加油"），
+                            // 改成真正的图标 + 文字
+                            Label {
+                                Text(type.displayName)
+                            } icon: {
+                                Image(safeSymbol: type.icon, fallback: "doc.text.fill")
+                            }
+                            .tag(type)
                         }
                     }
                 }
@@ -252,7 +259,7 @@ struct CostEntryRow: View {
     let entry: CostEntry
     var body: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: entry.type.icon)
+            Image(safeSymbol: entry.type.icon, fallback: "doc.text.fill")
                 .font(.headline)
                 .frame(width: 36, height: 36)
                 .background(Theme.Colors.accent.opacity(0.15))

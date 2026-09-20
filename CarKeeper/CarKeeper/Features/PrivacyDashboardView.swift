@@ -56,7 +56,7 @@ struct PrivacyDashboardView: View {
                 VStack(spacing: Theme.Spacing.lg) {
                     // 汇总卡片
                     VStack(spacing: Theme.Spacing.sm) {
-                        Image(systemName: "shield.checkered")
+                        Image(safeSymbol: "checkerboard.shield", fallback: "shield.fill")
                             .font(.system(size: 48))
                             .foregroundColor(Theme.Colors.accent)
                         Text("数据透明度")

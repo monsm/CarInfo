@@ -226,7 +226,7 @@ struct LoginView: View {
             showBiometricPrompt = true
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: biometricAvailable ? "faceid" : "faceid.slash")
+                Image(safeSymbol: biometricAvailable ? "faceid" : "lock.fill", fallback: "faceid")
                     .font(.title3)
                 Text(biometricAvailable ? "Face ID 快速登录" : "未启用 Face ID")
                     .font(Theme.body)

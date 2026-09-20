@@ -12,7 +12,7 @@ struct GarageDoorStatus: View {
     
     var body: some View {
         HStack {
-            Image(systemName: garageOpen ? "garage" : "garage.closed")
+            Image(safeSymbol: garageOpen ? "door.garage.open" : "door.garage.closed", fallback: "house.fill")
                 .font(.title2)
                 .foregroundColor(garageOpen ? .orange : .green)
             

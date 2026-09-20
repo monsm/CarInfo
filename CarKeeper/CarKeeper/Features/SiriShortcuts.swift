@@ -119,7 +119,7 @@ struct SiriShortcutsCard: View {
                 ShortcutRow(icon: "lock.fill", title: "锁车", subtitle: "语音说「锁车」", usage: store.siriUsageCount["lock_true"] ?? 0)
                 ShortcutRow(icon: "lock.open.fill", title: "解锁", subtitle: "语音说「解锁」", usage: store.siriUsageCount["lock_false"] ?? 0)
                 ShortcutRow(icon: "fan.fill", title: "开空调", subtitle: "语音说「开空调」", usage: store.siriUsageCount["ac_on"] ?? 0)
-                ShortcutRow(icon: "fan.slash.fill", title: "关空调", subtitle: "语音说「关空调」", usage: store.siriUsageCount["ac_off"] ?? 0)
+                ShortcutRow(icon: "power", title: "关空调", subtitle: "语音说「关空调」", usage: store.siriUsageCount["ac_off"] ?? 0)
                 ShortcutRow(icon: "speaker.wave.2.fill", title: "寻车", subtitle: "语音说「寻车」", usage: store.siriUsageCount["find_car"] ?? 0)
             }
             .padding(.vertical, 8)
@@ -135,7 +135,7 @@ struct ShortcutRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: icon)
+            Image(safeSymbol: icon, fallback: "car.fill")
                 .font(.title3)
                 .foregroundStyle(Theme.Colors.accent)
                 .frame(width: 36, height: 36)

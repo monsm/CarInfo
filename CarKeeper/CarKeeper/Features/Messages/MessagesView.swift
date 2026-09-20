@@ -242,16 +242,12 @@ struct MessagesView: View {
         return VStack(alignment: .leading, spacing: 0) {
             // 顶部：标签 + 未读指示 + 标题
             HStack(spacing: 10) {
-                if !item.read {
-                    Circle()
-                        .fill(Theme.Colors.accent)
-                        .frame(width: 10, height: 10)
-                        .shadow(color: Theme.Colors.accent.opacity(0.5), radius: 4)
-                } else {
-                    Circle()
-                        .fill(Color.clear)
-                        .frame(width: 10, height: 10)
-                }
+                // 读/未读：原来是纯色小圆点（只靠颜色区分），改成信封图标：未读实心、已读开口
+                Image(safeSymbol: item.read ? "envelope.open" : "envelope.fill", fallback: "envelope")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(item.read ? Color.secondary : Theme.Colors.accent)
+                    .frame(width: 14)
+                    .accessibilityLabel(Text(item.read ? "已读" : "未读"))
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
                         Text(item.title)

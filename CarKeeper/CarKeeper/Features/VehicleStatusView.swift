@@ -47,7 +47,7 @@ struct DTCSeverityBadge: View {
     
     var body: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: severity.icon)
+            Image(safeSymbol: severity.icon, fallback: "exclamationmark.triangle.fill")
                 .foregroundColor(severity.color)
                 .font(.title3)
             
@@ -111,7 +111,7 @@ struct DriveModeDisplay: View {
                     onModeChange(mode)
                 } label: {
                     VStack(spacing: 4) {
-                        Image(systemName: mode.icon)
+                        Image(safeSymbol: mode.icon, fallback: "car.fill")
                             .font(.title3)
                         Text(mode.rawValue)
                             .font(.caption2)
@@ -229,44 +229,48 @@ struct Vehicle2DStatusView: View {
                     .offset(x: 54, y: 30)
             }
             
-            // 车灯状态
+            // 车灯状态（原来是无含义的纯色圆点，现在用灯光 / 危险警示图标）
             if isHeadlightOn {
-                Circle()
-                    .fill(.yellow.opacity(0.8))
-                    .frame(width: 12, height: 12)
+                Image(safeSymbol: "lightbulb.fill", fallback: "lightbulb")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.yellow)
                     .offset(x: -35, y: -85)
-                Circle()
-                    .fill(.yellow.opacity(0.8))
-                    .frame(width: 12, height: 12)
+                Image(safeSymbol: "lightbulb.fill", fallback: "lightbulb")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.yellow)
                     .offset(x: 35, y: -85)
             }
             if isHazardOn {
-                Circle()
-                    .fill(.orange.opacity(0.8))
-                    .frame(width: 10, height: 10)
+                Image(safeSymbol: "exclamationmark.triangle.fill", fallback: "exclamationmark.triangle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.orange)
                     .offset(x: -35, y: -85)
-                Circle()
-                    .fill(.orange.opacity(0.8))
-                    .frame(width: 10, height: 10)
+                Image(safeSymbol: "exclamationmark.triangle.fill", fallback: "exclamationmark.triangle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.orange)
                     .offset(x: 35, y: -85)
             }
             
-            // 锁止状态中心图标
-            Image(systemName: isDoorLocked ? "lock.fill" : "lock.open.fill")
+            // 锁止状态中心图标                Image(safeSymbol: isDoorLocked ? "lock.fill" : "lock.open.fill", fallback: "lock.fill")
                 .font(.title2)
                 .foregroundColor(isDoorLocked ? .green : .orange)
                 .offset(y: 50)
             
-            // 后备箱指示
+            // 后备箱指示（原来是 🔓 emoji，改成真正的图标）
             if isTrunkOpen {
-                Text("🔓")
+                Image(safeSymbol: "archivebox.fill", fallback: "shippingbox.fill")
                     .font(.title3)
+                    .foregroundStyle(.orange)
                     .offset(x: 0, y: 85)
+                    .accessibilityLabel(Text("后备箱已打开"))
             }
+            // 前机盖指示
             if isHoodOpen {
-                Text("🔓")
+                Image(safeSymbol: "exclamationmark.triangle.fill", fallback: "exclamationmark.triangle")
                     .font(.title3)
+                    .foregroundStyle(.orange)
                     .offset(x: 0, y: -65)
+                    .accessibilityLabel(Text("前机盖已打开"))
             }
         }
         .frame(width: 140, height: 220)

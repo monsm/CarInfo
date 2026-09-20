@@ -53,6 +53,12 @@ targets:
         # 构造 CKContainer 会抛出 Swift 无法捕获的 ObjC 异常并直接杀进程（表现为启动闪退）。
         # 只有用带 iCloud 容器的证书签名时才把它改成 true。
         CKCloudKitEnabled: false
+        # 后台刷新（BGTaskScheduler）：标识符必须在这里声明，否则 register/submit 会抛 ObjC 异常直接杀进程
+        UIBackgroundModes:
+        - fetch
+        BGTaskSchedulerPermittedIdentifiers:
+        - com.carkeeper.refresh
+        - com.carkeeper.longtask
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
         UISupportedInterfaceOrientations:

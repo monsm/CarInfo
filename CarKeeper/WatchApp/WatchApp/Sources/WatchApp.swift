@@ -35,7 +35,7 @@ struct WatchRoute: View {
             
             WatchControlView()
                 .tabItem {
-                    Image(systemName: "remote.fill")
+                    Image(systemName: "dot.radiowaves.left.and.right")
                     Text("控制")
                 }
                 .tag(1)
@@ -87,7 +87,7 @@ struct WatchStatusView: View {
             
             // 状态信息
             VStack(spacing: 12) {
-                WatchStatusRow(icon: "gauge.high", value: "\(range) km", label: "续航")
+                WatchStatusRow(icon: "gauge", value: "\(range) km", label: "续航")
                 WatchStatusRow(icon: "thermometer", value: temp, label: "温度")
                 WatchStatusRow(icon: locked ? "lock.fill" : "lock.open.fill", value: locked ? "已锁" : "未锁", label: "车门")
                 if charging {
@@ -118,7 +118,7 @@ struct WatchStatusView: View {
     }
     
     private func loadFromAppGroup() {
-        let defaults = UserDefaults(suiteName: "group.com.carkeeper.data") ?? UserDefaults.standard
+        let defaults = UserDefaults(suiteName: "group.com.you.CarKeeper") ?? UserDefaults.standard
         soc = defaults.integer(forKey: "watch_soc")
         range = defaults.integer(forKey: "watch_range")
         temp = defaults.string(forKey: "watch_temp") ?? "--"
@@ -183,7 +183,7 @@ struct WatchControlView: View {
                 
                 Button(action: toggleAC) {
                     HStack {
-                        Image(systemName: acOn ? "fan.fill" : "fan.slash.fill")
+                        Image(systemName: acOn ? "fan.fill" : "power")
                         Text(acOn ? "关闭空调" : "开启空调 \(temperature)°C")
                     }
                     .font(.system(size: 14, weight: .semibold))
@@ -202,7 +202,7 @@ struct WatchControlView: View {
                     WatchControlButton(icon: "lock.open.fill", label: "解锁", action: unlockCar, disabled: isBusy)
                 }
                 GridRow {
-                    WatchControlButton(icon: "horn.fill", label: "寻车", action: findCar, disabled: isBusy)
+                    WatchControlButton(icon: "speaker.wave.3.fill", label: "寻车", action: findCar, disabled: isBusy)
                     WatchControlButton(icon: "headlights.front", label: "闪灯", action: flashLights, disabled: isBusy)
                 }
             }

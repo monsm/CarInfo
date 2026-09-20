@@ -180,8 +180,10 @@ struct SwipeToDeleteCommand: View {
                     .foregroundColor(.secondary)
             }
             Spacer()
-            Text(command.success ? "✓" : "✗")
-                .foregroundColor(command.success ? .green : .red)
+            // 原来是文字字符 "✓" / "✗" 当图标用，改成真正的 SF Symbol
+            Image(safeSymbol: command.success ? "checkmark.circle.fill" : "xmark.circle.fill",
+                  fallback: command.success ? "checkmark" : "xmark")
+                .foregroundStyle(command.success ? Color.green : Color.red)
         }
         .padding()
         .glassCard()

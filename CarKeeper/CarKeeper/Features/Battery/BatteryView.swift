@@ -560,20 +560,23 @@ struct BatteryView: View {
         guard !store.carId.isEmpty else { return }
         let api = APIClient.shared
         do {
-            if let charge = try? await api.getCharge(carId: store.carId) { store.saveCache(["charge": charge]) }
-            if let control = try? await api.getControl(carId: store.carId) { store.saveCache(["control": control]) }
+            // ⚠️ 这里必须用 try（原来是 try?）：try? 会让 do 体不抛任何错误，
+            // 于是两个 catch 都成为死代码 —— errText 永远为空、token 失效也不会自动登出。
+            let charge = try await api.getCharge(carId: store.carId)
+            store.saveCache(["charge": charge])
+            let control = try await api.getControl(carId: store.carId)
+            store.saveCache(["control": control])
             loaded = true
             errText = ""
             // 刷新后重新播放 SOC 液态玻璃入场动画
             withAnimation(Theme.Duration.springFast) { socCardOpacity = 0; socProgress = 0; socCount = 0; pulseTrigger = "" }
             startSocAnimation()
         } catch {
-        } catch {
             errText = error.localizedDescription
             let errDesc = error.localizedDescription.lowercased()
             if errDesc.contains("未找到") || errDesc.contains("登录") || errDesc.contains("token") {
                 // token 过期，跳回登录页
-                await MainActor.run { AppStore.shared.logout() }
+                AppStore.shared.logout()
             }
         }
     }

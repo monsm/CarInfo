@@ -119,9 +119,9 @@ struct TripDetailView: View {
             Divider().opacity(0.3)
             
             HStack(spacing: 20) {
-                statItem(icon: "distance.walk", value: String(format: "%.1f", trip.distanceKm), unit: "km", label: "里程")
+                statItem(icon: "figure.walk", value: String(format: "%.1f", trip.distanceKm), unit: "km", label: "里程")
                 statItem(icon: "bolt.fill", value: "\(trip.socChange)%", unit: "", label: "SOC变化")
-                statItem(icon: "gauge.high", value: efficiencyText, unit: "", label: "能耗")
+                statItem(icon: "bolt.fill", value: efficiencyText, unit: "", label: "能耗")
             }
         }
         .padding()
@@ -131,7 +131,7 @@ struct TripDetailView: View {
     private func statItem(icon: String, value: String, unit: String, label: String) -> some View {
         VStack(spacing: 4) {
             HStack(spacing: 4) {
-                Image(systemName: icon)
+                Image(safeSymbol: icon, fallback: "gauge")
                     .font(.caption)
                     .foregroundStyle(Theme.Colors.accent)
                 Text(value)
@@ -200,7 +200,7 @@ struct TripDetailView: View {
     
     private func locationChip(icon: String, text: String, coord: CLLocation) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: icon)
+            Image(safeSymbol: icon, fallback: "gauge")
                 .font(.caption)
                 .foregroundStyle(Theme.Colors.accent)
             VStack(alignment: .leading) {
@@ -220,7 +220,7 @@ struct TripDetailView: View {
     private var energyCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "battery.100.fill")
+                Image(safeSymbol: "battery.100", fallback: "bolt.fill")
                     .font(.caption)
                     .foregroundStyle(.green)
                 Text("能耗分析")
@@ -252,7 +252,8 @@ struct TripDetailView: View {
     private var drivingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: " steeringwheel")
+                // 原来这里是 " steeringwheel"（多了一个前导空格）—— 名字非法会渲染成空白图标
+                Image(safeSymbol: "steeringwheel", fallback: "car.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
                 Text("驾驶行为")
@@ -319,7 +320,7 @@ struct TripDetailView: View {
             Circle()
                 .fill(color.opacity(0.2))
                 .frame(width: 32, height: 32)
-                .overlay(Image(systemName: icon).font(.caption).foregroundStyle(color))
+                .overlay(Image(safeSymbol: icon, fallback: "location.fill").font(.caption).foregroundStyle(color))
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(text).font(.caption).foregroundStyle(.primary)

@@ -40,7 +40,7 @@ struct AchievementBadge: View {
     let achievement: Achievement
     var body: some View {
         VStack {
-            Image(systemName: achievement.icon)
+            Image(safeSymbol: achievement.icon, fallback: "trophy.fill")
                 .font(.title)
                 .foregroundColor(achievement.unlocked ? .yellow : .secondary)
                 .opacity(achievement.unlocked ? 1 : 0.5)

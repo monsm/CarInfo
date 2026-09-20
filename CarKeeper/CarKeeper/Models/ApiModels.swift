@@ -335,6 +335,17 @@ struct CountPill: Identifiable {
     let key: String
     let n: String
     let cls: String
+
+    /// 状态图标（cls: ok / warn / bad）——
+    /// 三强健度卡片以前只靠颜色区分，现在补上对应图标
+    var iconName: String {
+        switch cls {
+        case "ok": return "checkmark.circle.fill"
+        case "warn": return "exclamationmark.triangle.fill"
+        case "bad": return "xmark.octagon.fill"
+        default: return "info.circle.fill"
+        }
+    }
 }
 
 struct UserVM {
