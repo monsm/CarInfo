@@ -481,7 +481,7 @@ struct ControlView: View {
 
     private func onPresetScene(
         _ scene: (key: String, name: String, symbol: String,
-                  commands: [String], note: String?)
+                  commands: [String], note: String?) {
         // 执行场景内的所有指令（按顺序）
         for _ in scene.commands {
             if !busy && running == nil {
