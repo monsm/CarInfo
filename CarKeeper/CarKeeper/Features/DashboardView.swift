@@ -73,7 +73,9 @@ struct DashboardView: View {
                             Circle()
                                 .stroke(style: StrokeStyle(lineWidth: 8, lineCap: .round))
                                 .foregroundStyle(
-                                    score >= 80 ? Color.green : score >= 60 ? Color.blue : Color.orange
+                                    score >= 80 ? TokensPalette.success
+                                        : score >= 60 ? TokensPalette.info
+                                        : TokensPalette.warning
                                 )
                                 .rotationEffect(.degrees(270))
                                 .animation(.easeInOut, value: score)
@@ -103,7 +105,7 @@ struct DashboardView: View {
     private func periodChip(text: String, selected: Bool) -> some View {
         Text(text)
             .font(.subheadline)
-            .foregroundColor(selected ? .white : .secondary)
+            .foregroundColor(selected ? TokensPalette.labelOnTint : TokensPalette.secondary)
             .padding(.horizontal, TokensSpacing.md)
             .padding(.vertical, TokensSpacing.xs)
             .background(selected ? TokensPalette.ambient : Color.clear)

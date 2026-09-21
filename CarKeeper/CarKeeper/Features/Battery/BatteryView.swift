@@ -121,7 +121,7 @@ struct BatteryView: View {
 
             DSLightBar(
                 progress: fraction,
-                tint: LinearGradient(colors: [Color.white, tint.opacity(0.75), tint],
+                tint: LinearGradient(colors: [TokensPalette.lightSource, tint.opacity(0.75), tint],
                                      startPoint: .leading, endPoint: .trailing)
             )
             .padding(.top, TokensSpacing.xl)

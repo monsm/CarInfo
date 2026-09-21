@@ -126,8 +126,8 @@ struct ServiceReminderRow: View {
             Image(safeSymbol: reminder.type.icon, fallback: "wrench.and.screwdriver.fill")
                 .font(.title2)
                 .frame(width: 40, height: 40)
-                .background(isUrgent ? Color.red.opacity(0.15) : Color.blue.opacity(0.15))
-                .foregroundColor(isUrgent ? .red : .blue)
+                .background(isUrgent ? TokensPalette.error.opacity(0.15) : TokensPalette.info.opacity(0.15))
+                .foregroundColor(isUrgent ? TokensPalette.error : TokensPalette.info)
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 4) {
@@ -147,8 +147,8 @@ struct ServiceReminderRow: View {
             .font(.caption)
             .padding(.horizontal, TokensSpacing.md)
             .padding(.vertical, TokensSpacing.xs)
-            .background(isUrgent ? Color.orange : Color.blue.opacity(0.2))
-            .foregroundColor(isUrgent ? .white : .blue)
+            .background(isUrgent ? TokensPalette.warning : TokensPalette.accent.opacity(0.2))
+            .foregroundColor(isUrgent ? TokensPalette.labelOnTint : TokensPalette.accent)
             .cornerRadius(TokensRadius.small)
         }
         .glassCard()

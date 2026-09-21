@@ -130,7 +130,7 @@ struct ServiceHistoryView: View {
                         let remaining = next - store.totalMileage
                         Text("\(max(0, remaining))km")
                             .font(.caption.monospaced())
-                            .foregroundStyle(remaining < 500 ? .red : .orange)
+                            .foregroundStyle(remaining < 500 ? TokensPalette.error : TokensPalette.warning)
                     }
                 }
                 .padding(.vertical, 6)
@@ -139,7 +139,7 @@ struct ServiceHistoryView: View {
         }
         .padding()
         .glassCard(corner: TokensRadius.medium)
-        .background(Color.orange.opacity(0.05))
+        .background(TokensPalette.warning.opacity(0.05))
     }
 
     private func typeIcon(_ type: String) -> some View {

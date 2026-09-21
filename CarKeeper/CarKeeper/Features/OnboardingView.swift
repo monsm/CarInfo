@@ -61,7 +61,7 @@ struct OnboardingView: View {
                         onboardingSeen = true
                     }
                     .font(TokensTypo.body.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(TokensPalette.labelOnTint)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(TokensPalette.ambient, in: RoundedRectangle(cornerRadius: TokensRadius.medium))
@@ -92,7 +92,7 @@ struct OnboardingView: View {
                             }
                         }
                         .font(TokensTypo.body.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(TokensPalette.labelOnTint)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
                         .background(TokensPalette.ambient, in: RoundedRectangle(cornerRadius: TokensRadius.medium))

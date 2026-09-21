@@ -178,7 +178,7 @@ struct TempKeyCard: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(TokensPalette.ambient)
-                        .foregroundColor(.white)
+                        .foregroundColor(TokensPalette.labelOnTint)
                         .cornerRadius(8)
                 }
             } else {

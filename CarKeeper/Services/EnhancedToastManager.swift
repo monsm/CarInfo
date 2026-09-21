@@ -131,7 +131,7 @@ struct EmptyStateView: View {
                 Button(action: action) {
                     Text(actionTitle)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(TokensPalette.labelOnTint)
                         .padding(.horizontal, TokensSpacing.xl)
                         .padding(.vertical, TokensSpacing.sm)
                         .background(TokensPalette.ambient)

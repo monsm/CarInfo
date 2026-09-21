@@ -105,7 +105,9 @@ struct MileageJournalView: View {
                         ForEach(months.indices, id: \.self) { i in
                             Text(months[i])
                                 .font(.subheadline)
-                                .foregroundColor(currentPeriod == i ? .white : .secondary)
+                                .foregroundColor(
+                                    currentPeriod == i ? TokensPalette.labelOnTint : TokensPalette.secondary
+                                )
                                 .padding(.horizontal, TokensSpacing.md)
                                 .padding(.vertical, TokensSpacing.xs)
                                 .background(currentPeriod == i ? TokensPalette.ambient : Color.clear)
@@ -146,7 +148,7 @@ struct MileageJournalView: View {
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(TokensPalette.ambient)
-                        .foregroundColor(.white)
+                        .foregroundColor(TokensPalette.labelOnTint)
                         .cornerRadius(TokensRadius.medium)
                 }
                 .padding(.top, TokensSpacing.sm)

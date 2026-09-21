@@ -165,7 +165,7 @@ struct ParkingMapView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(TokensPalette.ambient)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(TokensPalette.labelOnTint)
                     .cornerRadius(12)
                 }
             }

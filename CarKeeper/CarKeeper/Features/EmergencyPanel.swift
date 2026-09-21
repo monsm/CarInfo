@@ -53,10 +53,10 @@ struct EmergencyPanel: View {
         Button(action: { showConfirm = true }) {
             ZStack {
                 Circle()
-                    .fill(Color.red.opacity(0.15))
+                    .fill(TokensPalette.error.opacity(0.15))
                     .frame(width: 100, height: 100)
                 Circle()
-                    .strokeBorder(Color.red, lineWidth: 3)
+                    .strokeBorder(TokensPalette.error, lineWidth: 3)
                     .frame(width: 100, height: 100)
                     .opacity(activeEmergency ? 0.3 : 1)
                     .animation(.easeInOut(duration: 0.2), value: activeEmergency)

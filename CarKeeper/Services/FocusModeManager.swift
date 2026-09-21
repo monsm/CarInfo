@@ -110,8 +110,8 @@ struct FocusModeHomeView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.red.opacity(0.8))
-                    .foregroundColor(.white)
+                    .background(TokensPalette.error.opacity(0.8))
+                    .foregroundColor(TokensPalette.labelOnTint)
                     .cornerRadius(TokensRadius.medium)
                 }
                 .padding(.horizontal)

@@ -201,7 +201,7 @@ struct InspectionRow: View {
                 .foregroundColor(isExpired ? .red : isUrgent ? .orange : .blue)
                 .font(.title2)
                 .frame(width: 36, height: 36)
-                .background(isExpired ? Color.red.opacity(0.1) : isUrgent ? Color.orange.opacity(0.1) : Color.blue.opacity(0.1))
+                .background(isExpired ? TokensPalette.error.opacity(0.1) : isUrgent ? TokensPalette.warning.opacity(0.1) : TokensPalette.info.opacity(0.1))
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 4) {
@@ -439,7 +439,7 @@ struct ChargeBillSheet: View {
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(TokensPalette.ambient)
-                        .foregroundColor(.white)
+                        .foregroundColor(TokensPalette.labelOnTint)
                         .cornerRadius(TokensRadius.medium)
                 }
                 .padding(.horizontal)

@@ -1040,7 +1040,7 @@ struct ACStepperView: View {
             } label: {
                 Text("下一步 · 输入控车码")
                     .font(TokensTypo.title3)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(TokensPalette.labelOnTint)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 15)
                     .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(TokensPalette.ambient))

@@ -42,7 +42,7 @@ struct BiometricLockOverlay: View {
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(TokensPalette.ambient)
-                        .foregroundColor(.white)
+                        .foregroundColor(TokensPalette.labelOnTint)
                         .cornerRadius(TokensRadius.medium)
                 }
                 .padding(.horizontal, TokensSpacing.xl)

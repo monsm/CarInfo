@@ -50,6 +50,10 @@ enum TokensPalette {
     static var track: Color { spec.track }
     /// 铺在强调色之上的文字色。**不是全局常量** —— 琥珀底配白字不可读（1.9:1）。
     static var labelOnTint: Color { spec.onAccent }
+    /// 光从哪来（原生/夜光 = 暖白，纸上 = 朱红，巨字 = 近白）。
+    /// 用在「电量就是光」的光条起点、以及光池/光晕——**不要再用写死的 Color.white**：
+    /// 纸上主题里它是朱红，白色会在纸面上戳出一个洞。
+    static var lightSource: Color { spec.lightSource }
     /// 车灯光带渐变（原生主题 = 白 → 浅蓝 → 系统蓝）：只在「电量就是光」的地方出现
     static var lightBar: LinearGradient {
         LinearGradient(colors: spec.lightBar, startPoint: .leading, endPoint: .trailing)
@@ -81,10 +85,16 @@ enum TokensPalette {
     static var nightSurface: Color { spec.surface }
     /// 页面底色（旧名）
     static var background: Color { canvas }
-    static let glassLight = Color(uiColor: .quaternarySystemFill)
+    /// 浅填充（输入框、未选中的底）。
+    /// 原来这里是写死的 `Color(uiColor: .quaternarySystemFill)` —— 于是所有输入框
+    /// 在四套主题里都是同一块系统灰。现在它读主题（原生主题的值与原来逐值相同）。
+    static var fillSubtle: Color { spec.fillSubtle }
+    /// 兼容旧名：`glassLight` 与 `fillSubtle` 本来**是同一个值**（重复声明），
+    /// 合成一个取值、保留两个名字，等于让 ~30 处调用点零改动地跟随主题。
+    static var glassLight: Color { spec.fillSubtle }
     static var glassBorder: Color { spec.hairline }
-    static let glassHighlight = Color.white.opacity(0.15)
-    static let fillSubtle = Color(uiColor: .quaternarySystemFill)
+    /// 浮层高光边。原来写死 `Color.white.opacity(0.15)`。
+    static var glassHighlight: Color { spec.glassHighlight }
 
     /// 状态类名（ok / warn / charge…）→ 颜色。
     /// 原生主题下与小组件的 `WT.Palette.status(_:)` 逐个等价（同一套判定），

@@ -218,11 +218,11 @@ struct LoginView: View {
         } label: {
             HStack {
                 if busy {
-                    ProgressView().tint(.white)
+                    ProgressView().tint(TokensPalette.labelOnTint)
                 }
                 Text(busy ? "登录中…" : "登录")
                     .font(TokensTypo.heading)
-                    .foregroundColor(.white)
+                    .foregroundColor(TokensPalette.labelOnTint)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, TokensSpacing.lg)

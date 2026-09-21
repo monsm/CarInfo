@@ -84,6 +84,16 @@ struct ArtThemeSpec {
     // ---- 光条渐变：白 → 浅蓝 → 强调色 ----
     var lightBar: [Color]
 
+    // ---- 上一版还写死在令牌层里的三处（现在它们也是主题的一部分）----
+    /// 「光」的源头色：光条渐变的起点。
+    /// 纸面上不允许发光（allowsGlow = false），所以那里它是墨色而不是白色 ——
+    /// 否则纸主题会出现一条发光的白条，与「纸张没有发光」自相矛盾。
+    var lightSource: Color
+    /// 浅填充：输入框、未选中的底。glassLight / fillSubtle 都读它。
+    var fillSubtle: Color
+    /// 浮层 / 玻璃的高光边（暗底是白光，纸面是淡墨）
+    var glassHighlight: Color
+
     // ---- 艺术规则（不是颜色）----
     /// 画布装饰
     var decor: CanvasDecor
@@ -164,6 +174,9 @@ enum ArtTheme: String, CaseIterable, Identifiable {
                 info: artHex(0xFFB26E),
                 onAccent: artHex(0x1A1614),
                 lightBar: [artHex(0xFFF6E8), artHex(0xE7B27A), artHex(0xFFD9A8)],
+                lightSource: artHex(0xFFF6E8),
+                fillSubtle: artHex(0xF6EFE4, alpha: 0.06),
+                glassHighlight: artHex(0xFFE8C8, alpha: 0.15),
                 decor: .lightPool,
                 allowsGlow: true,
                 usesSerifTitles: false,
@@ -193,6 +206,9 @@ enum ArtTheme: String, CaseIterable, Identifiable {
                 info: artHex(0x2E7D4F),
                 onAccent: artHex(0xFBF7EE),
                 lightBar: [artHex(0x8E2A1E), artHex(0xC0392B), artHex(0xB33325)],
+                lightSource: artHex(0x8E2A1E),
+                fillSubtle: artHex(0x1E1B16, alpha: 0.05),
+                glassHighlight: artHex(0x1E1B16, alpha: 0.08),
                 decor: .paperGrain,
                 allowsGlow: false,
                 usesSerifTitles: true,
@@ -219,6 +235,9 @@ enum ArtTheme: String, CaseIterable, Identifiable {
                 info: artHex(0xEDEAE4),
                 onAccent: artHex(0x08080A),
                 lightBar: [artHex(0xF7F5F1), artHex(0xA8A2AE), artHex(0xEDEAE4)],
+                lightSource: artHex(0xF7F5F1),
+                fillSubtle: artHex(0xEDEAE4, alpha: 0.06),
+                glassHighlight: artHex(0xEDEAE4, alpha: 0.10),
                 decor: .hairlineGrid,
                 allowsGlow: false,
                 usesSerifTitles: false,
@@ -251,6 +270,10 @@ enum ArtTheme: String, CaseIterable, Identifiable {
             info: WT.Palette.charge,
             onAccent: Color.white,
             lightBar: [Color.white, Color(red: 0.612, green: 0.776, blue: 1.000), WT.Palette.tint],
+            // 下面三个刻意保留原来的写死值 —— 「原生」必须逐值等于切换前的 v4。
+            lightSource: Color.white,
+            fillSubtle: Color(uiColor: .quaternarySystemFill),
+            glassHighlight: Color.white.opacity(0.15),
             decor: .none,
             allowsGlow: true,
             usesSerifTitles: false,

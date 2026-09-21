@@ -510,7 +510,7 @@ struct HomeView: View {
 
     private func lightBarGradient(_ accent: Color) -> LinearGradient {
         LinearGradient(
-            colors: [Color.white, accent.opacity(0.75), accent],
+            colors: [TokensPalette.lightSource, accent.opacity(0.75), accent],
             startPoint: .leading,
             endPoint: .trailing
         )
@@ -1010,9 +1010,9 @@ struct CarStageView: View {
                 Path(CGRect(origin: .zero, size: size)),
                 with: .radialGradient(
                     Gradient(colors: [
-                        Color.white.opacity(0.10),
-                        Color.white.opacity(0.025),
-                        Color.white.opacity(0.0)
+                        TokensPalette.lightSource.opacity(0.10),
+                        TokensPalette.lightSource.opacity(0.025),
+                        TokensPalette.lightSource.opacity(0.0)
                     ]),
                     center: CGPoint(x: size.width / 2, y: size.height * 0.60),
                     startRadius: 0,

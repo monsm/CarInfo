@@ -117,13 +117,13 @@ struct InsuranceCard: View {
                 Spacer()
                 Text("\(policy.startDate.formatted(date: .numeric, time: .omitted)) ~ \(policy.endDate.formatted(date: .numeric, time: .omitted))")
                     .font(.caption)
-                    .foregroundColor(isExpired ? .red : .primary)
+                    .foregroundColor(isExpired ? TokensPalette.error : TokensPalette.primary)
             }
         }
         .glassCard()
         .overlay(
             RoundedRectangle(cornerRadius: TokensRadius.medium)
-                .stroke(isExpired ? Color.red : isExpiring ? Color.orange : Color.clear, lineWidth: 2)
+                .stroke(isExpired ? TokensPalette.error : isExpiring ? TokensPalette.warning : Color.clear, lineWidth: 2)
         )
     }
 }

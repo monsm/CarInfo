@@ -47,7 +47,7 @@ struct ExportDataView: View {
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(TokensPalette.ambient)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(TokensPalette.labelOnTint)
                         .cornerRadius(12)
                     }
 
@@ -59,8 +59,8 @@ struct ExportDataView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.green)
-                        .foregroundStyle(.white)
+                        .background(TokensPalette.success)
+                        .foregroundStyle(TokensPalette.labelOnTint)
                         .cornerRadius(12)
                     }
                 }

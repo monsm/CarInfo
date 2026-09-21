@@ -85,8 +85,8 @@ struct PrivacyDashboardView: View {
                                 .font(.subheadline.weight(.semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.red.opacity(0.15))
-                                .foregroundColor(.red)
+                                .background(TokensPalette.error.opacity(0.15))
+                                .foregroundColor(TokensPalette.error)
                                 .cornerRadius(TokensRadius.medium)
                         }
 
@@ -100,8 +100,8 @@ struct PrivacyDashboardView: View {
                                 .font(.subheadline)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.orange.opacity(0.1))
-                                .foregroundColor(.orange)
+                                .background(TokensPalette.warning.opacity(0.1))
+                                .foregroundColor(TokensPalette.warning)
                                 .cornerRadius(TokensRadius.medium)
                         }
                     }

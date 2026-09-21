@@ -465,11 +465,11 @@ struct MineView: View {
             checkUpdate()
         } label: {
             HStack(spacing: 6) {
-                if updateBusy { ProgressView().controlSize(.mini).tint(.white) }
+                if updateBusy { ProgressView().controlSize(.mini).tint(TokensPalette.labelOnTint) }
                 Text(updateBusy ? "检查中…" : "检查更新")
                     .font(Theme.font(.caption as Font).bold())
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(TokensPalette.labelOnTint)
             .padding(.vertical, 10)
             .background(Capsule().fill(TokensPalette.ambient))
         }

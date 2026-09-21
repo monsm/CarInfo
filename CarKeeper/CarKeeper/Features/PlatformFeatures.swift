@@ -42,7 +42,7 @@ struct LockScreenWidget: View {
                     Image(systemName: "lock.open.fill")
                         .font(.title2)
                         .frame(width: 44, height: 44)
-                        .background(Color.green.opacity(0.2))
+                        .background(TokensPalette.success.opacity(0.2))
                         .clipShape(Circle())
                 }
                 Button {
@@ -51,7 +51,7 @@ struct LockScreenWidget: View {
                     Image(systemName: "speaker.wave.3.fill")
                         .font(.title2)
                         .frame(width: 44, height: 44)
-                        .background(Color.blue.opacity(0.2))
+                        .background(TokensPalette.info.opacity(0.2))
                         .clipShape(Circle())
                 }
             }

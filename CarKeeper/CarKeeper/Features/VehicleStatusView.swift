@@ -118,7 +118,7 @@ struct DriveModeDisplay: View {
                     }
                     .frame(width: 56, height: 56)
                     .background(mode == currentMode ? mode.color : Color.clear)
-                    .foregroundColor(mode == currentMode ? .white : mode.color)
+                    .foregroundColor(mode == currentMode ? TokensPalette.labelOnTint : mode.color)
                     .cornerRadius(TokensRadius.medium)
                     .overlay(
                         RoundedRectangle(cornerRadius: TokensRadius.medium)
