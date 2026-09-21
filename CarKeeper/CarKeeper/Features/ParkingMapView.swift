@@ -81,7 +81,7 @@ struct ParkingMapView: View {
             HStack {
                 Image(systemName: "mappin.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(TokensPalette.error)
                 VStack(alignment: .leading) {
                     Text(addressText)
                         .font(Theme.font(.subheadline as Font).bold())

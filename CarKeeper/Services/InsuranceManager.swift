@@ -82,17 +82,17 @@ struct InsuranceCard: View {
                     if isExpired {
                         Text("已过期")
                             .font(.caption)
-                            .foregroundColor(.red)
+                            .foregroundColor(TokensPalette.error)
                             .bold()
                     } else if isExpiring {
                         Text("即将到期")
                             .font(.caption)
-                            .foregroundColor(.orange)
+                            .foregroundColor(TokensPalette.warning)
                             .bold()
                     } else {
                         Text("\(daysLeft)天后到期")
                             .font(.caption)
-                            .foregroundColor(.green)
+                            .foregroundColor(TokensPalette.success)
                     }
                     Text(policy.policyNumber)
                         .font(.caption2)

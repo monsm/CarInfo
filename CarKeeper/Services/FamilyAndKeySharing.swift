@@ -166,7 +166,7 @@ struct TempKeyCard: View {
                 if key.remainingUses > 0 {
                     Text("剩余 \(key.remainingUses) 次")
                         .font(.caption2)
-                        .foregroundColor(.green)
+                        .foregroundColor(TokensPalette.success)
                 }
             }
             Spacer()
@@ -200,7 +200,8 @@ struct FamilyMemberRow: View {
             Circle()
                 .fill(TokensPalette.ambient.opacity(0.2))
                 .frame(width: 40, height: 40)
-                .overlay(Text(member.avatar).font(.title3).fontWeight(.bold)                .foregroundColor(TokensPalette.ambient))
+                .overlay(Text(member.avatar).font(.title3).fontWeight(.bold)
+                .foregroundColor(TokensPalette.ambient))
 
             VStack(alignment: .leading) {
                 Text(member.name)

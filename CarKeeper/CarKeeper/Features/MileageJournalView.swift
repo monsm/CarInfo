@@ -133,7 +133,7 @@ struct MileageJournalView: View {
                             .swipeActions(edge: .trailing) {
                                 Button(role: .destructive) { tracker.deleteEntry(entry.id) }
                                     .labelStyle(.iconOnly)
-                                    .tint(.red)
+                                    .tint(TokensPalette.error)
                             }
                     }
                 }
@@ -282,7 +282,7 @@ struct CostEntryRow: View {
                 Text("-¥\(entry.amount, specifier: "%.2f")")
                     .font(.subheadline)
                     .fontWeight(.semibold)
-                    .foregroundColor(.red)
+                    .foregroundColor(TokensPalette.error)
                 if let km = entry.odometerKm {
                     Text(String(format: "%.0f km", km))
                         .font(.caption2)

@@ -64,10 +64,10 @@ struct EmergencyPanel: View {
                 VStack(spacing: 4) {
                     Image(systemName: "exclamationmark.octagon.fill")
                         .font(.system(size: 28))
-                        .foregroundStyle(.red)
+                        .foregroundStyle(TokensPalette.error)
                     Text("SOS")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.red)
+                        .foregroundStyle(TokensPalette.error)
                 }
             }
         }
@@ -118,7 +118,7 @@ struct EmergencyPanel: View {
                     .keyboardType(.phonePad)
                 Button(action: saveContact) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(TokensPalette.success)
                 }
             }
             .padding()
@@ -133,7 +133,7 @@ struct EmergencyPanel: View {
         Button(action: shareLocation) {
             HStack {
                 Image(systemName: "location.fill")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(TokensPalette.error)
                 VStack(alignment: .leading) {
                     Text("共享当前位置")
                         .font(Theme.font(.subheadline as Font).bold())
@@ -157,7 +157,7 @@ struct EmergencyPanel: View {
             VStack(spacing: 20) {
                 Image(systemName: "exclamationmark.octagon.fill")
                     .font(.system(size: 64))
-                    .foregroundStyle(.red)
+                    .foregroundStyle(TokensPalette.error)
 
                 Text("紧急呼叫中...")
                     .font(TokensTypo.title.bold())

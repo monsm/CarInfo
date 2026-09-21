@@ -202,7 +202,8 @@ struct TripDetailView: View {
     private func locationChip(icon: String, text: String, coord: CLLocation) -> some View {
         HStack(spacing: 6) {
             Image(safeSymbol: icon, fallback: "gauge")
-                .font(.caption)                    .foregroundStyle(TokensPalette.ambient)
+                .font(.caption)
+                    .foregroundStyle(TokensPalette.ambient)
             VStack(alignment: .leading) {
                 Text(text).font(.caption2).foregroundStyle(.secondary)
                 Text(String(format: "%.4f, %.4f", coord.coordinate.latitude, coord.coordinate.longitude))
@@ -222,7 +223,7 @@ struct TripDetailView: View {
             HStack {
                 Image(safeSymbol: "battery.100", fallback: "bolt.fill")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(TokensPalette.success)
                 Text("能耗分析")
                     .font(Theme.font(.subheadline as Font).bold())
                 Spacer()
@@ -255,7 +256,7 @@ struct TripDetailView: View {
                 // 原来这里是 " steeringwheel"（多了一个前导空格）—— 名字非法会渲染成空白图标
                 Image(safeSymbol: "steeringwheel", fallback: "car.fill")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(TokensPalette.warning)
                 Text("驾驶行为")
                     .font(Theme.font(.subheadline as Font).bold())
                 Spacer()
@@ -276,21 +277,21 @@ struct TripDetailView: View {
                 HStack {
                     Text("平稳驾驶").font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Text("良好").font(.caption).foregroundStyle(.green)
+                    Text("良好").font(.caption).foregroundStyle(TokensPalette.success)
                 }
                 ProgressBar(value: 0.8, color: .green)
 
                 HStack {
                     Text("急加速/刹车").font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Text("偶尔").font(.caption).foregroundStyle(.orange)
+                    Text("偶尔").font(.caption).foregroundStyle(TokensPalette.warning)
                 }
                 ProgressBar(value: 0.6, color: .orange)
 
                 HStack {
                     Text("超速次数").font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Text("0次").font(.caption).foregroundStyle(.green)
+                    Text("0次").font(.caption).foregroundStyle(TokensPalette.success)
                 }
                 ProgressBar(value: 1.0, color: .green)
             }
@@ -306,7 +307,7 @@ struct TripDetailView: View {
             HStack {
                 Image(systemName: "clock.fill")
                     .font(.caption)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(TokensPalette.info)
                 Text("时间线")
                     .font(Theme.font(.subheadline as Font).bold())
                 Spacer()

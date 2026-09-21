@@ -44,7 +44,8 @@ enum UpdateService {
         for (k, v) in apiHeader(token) { req.setValue(v, forHTTPHeaderField: k) }
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse else { throw URLError(.badServerResponse) }
-        guard http.statusCode == 200 else {                let msg = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
+        guard http.statusCode == 200 else {
+                let msg = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
             throw UpdateError.fetchFailed(String(msg.prefix(200)))
         }
         guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {

@@ -79,7 +79,7 @@ struct CheckInStreak: View {
             Spacer()
             if streakDays >= 7 {
                 Image(systemName: "trophy.fill")
-                    .foregroundColor(.yellow)
+                    .foregroundColor(TokensPalette.warning)
             }
         }
         .padding()
@@ -104,12 +104,12 @@ struct CarbonChallenge: View {
             ZStack {
                 Circle().stroke(Color.secondary.opacity(0.2), lineWidth: 10)
                 Circle().stroke(style: StrokeStyle(lineWidth: 10, lineCap: .round))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(TokensPalette.success)
                     .rotationEffect(.degrees(270))
                     .animation(.easeOut, value: progress)
                 Text("\(Int(progress * 100))%")
                     .font(.title2).fontWeight(.bold)
-                    .foregroundColor(.green)
+                    .foregroundColor(TokensPalette.success)
             }
             .frame(width: 80, height: 80)
 
@@ -118,7 +118,7 @@ struct CarbonChallenge: View {
                     .font(.caption).foregroundColor(.secondary)
                 Spacer()
                 Text("当前: \(String(format:"%.1f", currentSavings)) kg")
-                    .font(.caption).foregroundColor(.green)
+                    .font(.caption).foregroundColor(TokensPalette.success)
             }
         }
         .padding()
@@ -149,7 +149,7 @@ struct DrivingImprovementTips: View {
                 .font(.subheadline).fontWeight(.semibold)
             ForEach(tips, id: \.self) { tip in
                 HStack {
-                    Image(systemName: "lightbulb.fill").foregroundColor(.yellow)
+                    Image(systemName: "lightbulb.fill").foregroundColor(TokensPalette.warning)
                     Text(tip).font(.caption).foregroundColor(.secondary)
                 }
             }
@@ -171,7 +171,8 @@ struct FamilyLeaderboard: View {
                     .foregroundColor(idx == 0 ? .yellow : idx == 1 ? .gray : idx == 2 ? .orange : .secondary)
                     .frame(width: 30)
                 Circle().fill(TokensPalette.ambient.opacity(0.2)).frame(width: 36, height: 36)
-                    .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(TokensPalette.ambient))
+                       .overlay(Text(member.avatar).font(.title3).fontWeight(.bold)
+                           .foregroundColor(TokensPalette.ambient))
                     
                     
     
@@ -183,7 +184,7 @@ struct FamilyLeaderboard: View {
                 }
                 Spacer()
                 Text("驾驶评分 \(Int.random(in: 70...95))")
-                    .font(.caption).foregroundColor(.green)
+                    .font(.caption).foregroundColor(TokensPalette.success)
             }
         }
         .glassCard()

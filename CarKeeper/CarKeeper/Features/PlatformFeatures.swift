@@ -21,7 +21,7 @@ struct LockScreenWidget: View {
                    let soc = energy["socPct"] as? Int {
                     Text("\(soc)%")
                         .font(.caption).fontWeight(.bold)
-                        .foregroundColor(.green)
+                        .foregroundColor(TokensPalette.success)
                 }
             }
 

@@ -57,10 +57,10 @@ struct CommandHistoryView: View {
     // MARK: - 统计卡片
     private var statsCard: some View {
         HStack(spacing: 0) {
-            statBubble(label: "总指令", value: "\(store.commandHistory.count)", tint: .blue)
+            statBubble(label: "总指令", value: "\(store.commandHistory.count)", tint: TokensPalette.info)
             let rateStr = successRate > 0 ? String(format: "%.0f%%", successRate * 100) : "—"
-            statBubble(label: "成功率", value: rateStr, tint: .green)
-            statBubble(label: "进行中", value: "\(inProgressCount)", tint: .orange)
+            statBubble(label: "成功率", value: rateStr, tint: TokensPalette.success)
+            statBubble(label: "进行中", value: "\(inProgressCount)", tint: TokensPalette.warning)
         }
         .glassCard(corner: TokensRadius.medium)
     }
@@ -164,7 +164,7 @@ struct CommandHistoryView: View {
                     } else {
                         Image(systemName: "circle.dashed")
                             .font(.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(TokensPalette.warning)
                     }
                 }
                 .padding(.horizontal, 12)
@@ -179,7 +179,7 @@ struct CommandHistoryView: View {
                         DetailRow(label: "结果", value: cmd.success ? "成功" : "失败")
                         if !cmd.success {
                             DetailRow(label: "错误", value: "服务端返回异常（模拟）")
-                                .foregroundStyle(.red)
+                                .foregroundStyle(TokensPalette.error)
                         }
                     }
                     .padding(.horizontal, 12)

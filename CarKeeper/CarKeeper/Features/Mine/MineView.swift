@@ -266,18 +266,26 @@ struct MineView: View {
         CardBox(title: "常用功能") {
             VStack(spacing: 12) {
                 HStack(spacing: 10) {
-                    tile("shield.lefthalf.filled", "健康报告", tint: .green) {
+                    tile("shield.lefthalf.filled", "健康报告", tint: TokensPalette.success) {
                         nav.pushNavigation(.health, targetTab: .home)
                     }
-                    tile("battery.100", "电池充电", tint: .green) { nav.pushNavigation(.battery, targetTab: .home) }
+                       tile("battery.100", "电池充电", tint: TokensPalette.success) {
+                           nav.pushNavigation(.battery, targetTab: .home)
+                       }
                 }
                 HStack(spacing: 10) {
-                    tile("chart.bar.xaxis", "全量数据", tint: .indigo) { nav.pushNavigation(.data, targetTab: .home) }
-                    tile("doc.text.fill", "车辆档案", tint: .orange) { nav.pushNavigation(.vehicle, targetTab: .home) }
+                       tile("chart.bar.xaxis", "全量数据", tint: TokensPalette.accent) {
+                           nav.pushNavigation(.data, targetTab: .home)
+                       }
+                       tile("doc.text.fill", "车辆档案", tint: TokensPalette.warning) {
+                           nav.pushNavigation(.vehicle, targetTab: .home)
+                       }
                 }
                 HStack(spacing: 10) {
-                    tile("bubble.left.fill", "消息中心", tint: .blue) { nav.pushNavigation(.messages) }
-                    tile("wrench.adjustable", "开发者工具", tint: .purple) { nav.pushNavigation(.dev, targetTab: .home) }
+                    tile("bubble.left.fill", "消息中心", tint: TokensPalette.info) { nav.pushNavigation(.messages) }
+                       tile("wrench.adjustable", "开发者工具", tint: TokensPalette.accent) {
+                           nav.pushNavigation(.dev, targetTab: .home)
+                       }
                 }
                 // #31 省电模式
                 PowerSavingToggle()
@@ -317,45 +325,51 @@ struct MineView: View {
                 MonthlyReportGenerator()
                 // #NEW-128 里程记账本入口
                 HStack(spacing: 10) {
-                    tile("banknote.fill", "里程记账", tint: .green) { showMileageJournal = true }
-                    tile("clock.fill", "维保提醒", tint: .orange) { nav.pushNavigation(.service) }
+                    tile("banknote.fill", "里程记账", tint: TokensPalette.success) { showMileageJournal = true }
+                    tile("clock.fill", "维保提醒", tint: TokensPalette.warning) { nav.pushNavigation(.service) }
                 }
                 // #NEW-38 OTA 版本日志入口
                 HStack(spacing: 10) {
-                    tile("tray.fill", "OTA日志", tint: .blue) { showOTAChangelog = true }
-                    tile("doc.plaintext.fill", "专注模式", tint: .purple) { toggleFocus() }
+                    tile("tray.fill", "OTA日志", tint: TokensPalette.info) { showOTAChangelog = true }
+                    tile("doc.plaintext.fill", "专注模式", tint: TokensPalette.accent) { toggleFocus() }
                 }
                 // #N11 隐私仪表盘 + N43 语音播报
                 HStack(spacing: 10) {
-                    tile("eye.fill", "隐私与数据", tint: .teal) { showPrivacyDashboard = true }
+                    tile("eye.fill", "隐私与数据", tint: TokensPalette.accent) { showPrivacyDashboard = true }
                     // 此前是空操作（VoiceBroadcastManager 自动启动，点这里什么都不发生）。
                     // 现在是真能用的开关：翻转 VoiceBroadcastManager 读取的 UserDefaults 键。
-                    tile("speaker.wave.3.fill", "语音播报", tint: .indigo) { toggleVoice() }
+                    tile("speaker.wave.3.fill", "语音播报", tint: TokensPalette.accent) { toggleVoice() }
                 }
                 // #N30/N31 临时钥匙 + 家庭管理
                 HStack(spacing: 10) {
-                    tile("key.fill", "共享钥匙", tint: .pink) { showTempKeys = true }
-                    tile("person.2.fill", "家庭管理", tint: .orange) { showFamily = true }
+                    tile("key.fill", "共享钥匙", tint: TokensPalette.accent) { showTempKeys = true }
+                    tile("person.2.fill", "家庭管理", tint: TokensPalette.warning) { showFamily = true }
                 }
                 // #N33/N34 车辆估值 + 年检日历
                 HStack(spacing: 10) {
-                    tile("dollarsign.circle.fill", "车辆估值", tint: .green) { showValuation = true }
-                    tile("calendar.fill", "年检日历", tint: .purple) { showInspection = true }
+                    tile("dollarsign.circle.fill", "车辆估值", tint: TokensPalette.success) { showValuation = true }
+                    tile("calendar.fill", "年检日历", tint: TokensPalette.accent) { showInspection = true }
                 }
                 // #N32 充电账单 PDF
-                tile("doc.plaintext.fill", "充电账单", tint: .cyan) { showChargeBill = true }
+                tile("doc.plaintext.fill", "充电账单", tint: TokensPalette.accent) { showChargeBill = true }
                 // E新增功能入口
                 HStack(spacing: 10) {
-                    tile("chart.bar.fill", "行程分析", tint: .blue) { nav.pushNavigation(.trips, targetTab: .trips) }
-                    tile("clock.fill", "指令历史", tint: .purple) { nav.pushNavigation(.commands) }
+                       tile("chart.bar.fill", "行程分析", tint: TokensPalette.info) {
+                           nav.pushNavigation(.trips, targetTab: .trips)
+                       }
+                    tile("clock.fill", "指令历史", tint: TokensPalette.accent) { nav.pushNavigation(.commands) }
                 }
                 HStack(spacing: 10) {
-                    tile("wrench.and.screwdriver.fill", "维保记录", tint: .orange) { nav.pushNavigation(.service) }
-                    tile("mappin.circle.fill", "停车位置", tint: .green) { nav.pushNavigation(.parking) }
+                    tile("wrench.and.screwdriver.fill", "维保记录", tint: TokensPalette.warning) {
+                        nav.pushNavigation(.service)
+                    }
+                    tile("mappin.circle.fill", "停车位置", tint: TokensPalette.success) { nav.pushNavigation(.parking) }
                 }
                 HStack(spacing: 10) {
-                    tile("exclamationmark.octagon.fill", "紧急求助", tint: .red) { nav.pushNavigation(.emergency) }
-                    tile("lightbulb.fill", "车辆提示", tint: .yellow) { nav.pushNavigation(.tips) }
+                    tile("exclamationmark.octagon.fill", "紧急求助", tint: TokensPalette.error) {
+                        nav.pushNavigation(.emergency)
+                    }
+                    tile("lightbulb.fill", "车辆提示", tint: TokensPalette.warning) { nav.pushNavigation(.tips) }
                 }
                     tile("trophy.fill", "驾驶评分",
                           tint: TokensPalette.ambient) { nav.pushNavigation(.score) }

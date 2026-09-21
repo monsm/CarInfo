@@ -223,7 +223,7 @@ struct VehicleTipsView: View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 48))
-                .foregroundStyle(.green.opacity(0.5))
+                .foregroundStyle(TokensPalette.success.opacity(0.5))
             Text("一切正常")
                 .font(TokensTypo.subheadline)
                 .foregroundStyle(.secondary)

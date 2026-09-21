@@ -124,7 +124,7 @@ struct ReverseLinkageControl: View {
 
             HStack {
                 Image(systemName: "fan.fill")
-                    .foregroundColor(.blue)
+                    .foregroundColor(TokensPalette.info)
                 Text("到家提前开空调")
                     .font(.subheadline)
                 Spacer()

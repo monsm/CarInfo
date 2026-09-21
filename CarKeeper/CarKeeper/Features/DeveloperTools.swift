@@ -22,7 +22,7 @@ struct CrashLogViewer: View {
         .navigationTitle("崩溃日志")
         .toolbar {
             Button("清除日志") { reporter.clearCrashHistory() }
-                .foregroundColor(.red)
+                .foregroundColor(TokensPalette.error)
         }
     }
 }

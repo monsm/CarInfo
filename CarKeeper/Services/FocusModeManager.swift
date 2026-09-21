@@ -148,7 +148,7 @@ struct FocusModeHomeView: View {
             // 空调温度（必须）
             HStack {
                 Image(systemName: "fan.fill")
-                    .foregroundColor(.blue)
+                    .foregroundColor(TokensPalette.info)
                 Text("\(tempC)°C")
                     .font(.title2)
                     .fontWeight(.semibold)

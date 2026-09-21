@@ -91,9 +91,9 @@ struct ServiceHistoryView: View {
     // MARK: - 统计卡
     private var statsCard: some View {
         HStack(spacing: 0) {
-            statCell(label: "总花费", value: "¥\(Int(totalCost))", tint: .blue)
-            statCell(label: "年均花费", value: "¥\(Int(avgAnnualCost))/年", tint: .green)
-            statCell(label: "记录次数", value: "\(entries.count)", tint: .orange)
+            statCell(label: "总花费", value: "¥\(Int(totalCost))", tint: TokensPalette.info)
+            statCell(label: "年均花费", value: "¥\(Int(avgAnnualCost))/年", tint: TokensPalette.success)
+            statCell(label: "记录次数", value: "\(entries.count)", tint: TokensPalette.warning)
         }
         .glassCard(corner: TokensRadius.medium)
     }
@@ -112,7 +112,7 @@ struct ServiceHistoryView: View {
             HStack {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(TokensPalette.warning)
                 Text("即将到期").font(Theme.font(.subheadline as Font).bold())
                 Spacer()
             }

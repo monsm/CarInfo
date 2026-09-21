@@ -359,7 +359,7 @@ struct VehicleValuationView: View {
                             .foregroundColor(.secondary)
                         Text("¥\(String(format: "%.0f", estimatedValue))")
                             .font(.title).fontWeight(.bold)
-                            .foregroundColor(.green)
+                            .foregroundColor(TokensPalette.success)
                     }
                     Spacer()
                     VStack(alignment: .trailing) {
@@ -447,7 +447,7 @@ struct ChargeBillSheet: View {
                 if showingPDF {
                     Text("PDF 已保存到文件 App")
                         .font(.caption)
-                        .foregroundColor(.green)
+                        .foregroundColor(TokensPalette.success)
                 }
             }
             .sheet(isPresented: $showingPDF) {
