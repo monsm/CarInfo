@@ -366,6 +366,7 @@ VERIFIED_SDK_ADDITIONS = {
     "MapPolyline": "MapKit.MapPolyline struct（iOS 17+；用已核的 init(_ polyline: MKPolyline)）",
     "Annotation": "MapKit.Annotation struct（iOS 17+；屏幕空间标注，不随缩放变形）",
     "MKStandardMapConfiguration": "MapKit class（iOS 16+；init(elevationStyle:emphasisStyle:) 已核；EmphasisStyle.muted 已核）",
+    "squareRoot": "FloatingPoint.squareRoot()（Swift 标准库；评分页算电耗的离散程度用；已核 swift/floatingpoint/squareroot() 文档 JSON，externalID s:SF10squareRootxyF）",
     "Shape": "SwiftUI.Shape protocol（iOS 13+；本项目用它画车钉的三角形警告形状）",
     "UnevenRoundedRectangle": "SwiftUI.UnevenRoundedRectangle（iOS 16+；底部面板只要上面两角圆角）",
 }

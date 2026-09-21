@@ -348,7 +348,10 @@ struct MainTabView: View {
         case .dev: DevView().environmentObject(nav)
         case .messages: MessagesView().environmentObject(nav)
         case .control: ControlView().environmentObject(nav)
-        case .dashboard: DashboardView().environmentObject(nav)
+        // 仪表盘（DashboardView）已删除：它的三块内容（SOC 曲线 / 三个指标块 /
+        // 评分环）分别由电池页的趋势、地图主屏的「现在」层和评分页承接，
+        // 而它那三个子分数是用总分做算术编出来的（score / 3、+10、+20）。
+        case .dashboard: DrivingScorePage().environmentObject(nav)
         case .trips: TripAnalyticsView().environmentObject(nav)
         case .commands: CommandHistoryView().environmentObject(nav)
         case .service: ServiceHistoryView().environmentObject(nav)

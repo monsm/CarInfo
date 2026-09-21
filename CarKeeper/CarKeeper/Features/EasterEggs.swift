@@ -132,8 +132,13 @@ struct DrivingImprovementTips: View {
 
     var tips: [String] {
         var t = [String]()
-        if store.drivingScore < 70 { t.append("尝试更平稳的加速和减速") }
-        if store.drivingScore < 80 { t.append("保持恒定车速可提升效率") }
+        if let score = store.drivingScore {
+            if score < 70 { t.append("最近几段的平均电耗偏高，把加速放平缓一些会省电") }
+            if score < 80 { t.append("保持恒定车速可提升效率") }
+        } else {
+            // 评分是 nil = 还没有一段行程留下能耗读数。这时候不能说"表现优秀"。
+            t.append("还没有行程留下能耗读数 —— 攒到第一段之后这里才会有建议")
+        }
         if t.isEmpty { t.append("驾驶表现优秀，继续保持！") }
         return t
     }

@@ -144,16 +144,20 @@ final class AppStore: @unchecked Sendable {
     var isOfflineMode: Bool = false
     var offlineMessage: String = ""
 
-    // #驾驶安全评分 — 基于行程历史计算（0-100）
-    var drivingScore: Int {
-        guard !tripHistory.isEmpty else { return 75 } // 默认中等评分
+    // #驾驶安全评分 — 只由**行程里真有的事实**推出来（0-100）。没有事实就是 nil。
+    // 返回类型是 Int? 是刻意的：早先这里在"没有任何行程"时返回 75，
+    // 于是"不知道"和"中等水平"在界面上长得一模一样。不知道就得是不知道。
+    var drivingScore: Int? {
         let recent = Array(tripHistory.prefix(10))
-        let avgEfficiency = recent
-            .compactMap { $0.avgEfficiency }
-            .reduce(0.0, +) / Double(recent.count)
-        // 能耗越低评分越高（基准 18 kWh/100km，越低越好）
-        let efficiencyScore = max(0, min(100, Int(100 - (avgEfficiency - 10) * 5)))
-        // 短途行程越多越稳定
+        let efforts = recent.compactMap { $0.avgEfficiency }
+        // 一个能耗读数都没有 → 不给分。
+        // 分母也必须是**真有读数的条数**：原来除以 recent.count，
+        // 缺读数的行程会把平均值拉低成一个谁也不认识的数。
+        guard !efforts.isEmpty else { return nil }
+        let avg = efforts.reduce(0.0, +) / Double(efforts.count)
+        // 能耗越低评分越高：基准 15 kWh/100km，每高出 1 度扣 4 分（与评分页同一个口径）
+        let efficiencyScore = max(0, min(100, Int(100 - (avg - 15) * 4)))
+        // 短途占比：短途多说明这段时期跑得都不远，不完全是"稳"，所以只占一半权重
         let shortTripRatio = Double(recent.filter { $0.distanceKm < 5 }.count) / Double(recent.count)
         let stabilityScore = Int(shortTripRatio * 50 + 50)
         return max(0, min(100, (efficiencyScore + stabilityScore) / 2))
