@@ -33,7 +33,8 @@ struct MapSpineView: View {
 
     @AppStorage(ArtThemeStore.key) private var themeRaw: String = ArtTheme.native.rawValue
     /// 记住上次看的图层（地图主屏的"当前位置"应该被记住，不该每次回到默认）
-    @AppStorage("carkeeper_map_layer") private var layerRaw: String = MapSpineLayer.now.rawValue
+    // 键名定义在 MapSpineLayer.storageKey（别处把地图开到某一层也用同一个键）
+    @AppStorage(MapSpineLayer.storageKey) private var layerRaw: String = MapSpineLayer.now.rawValue
 
     @State private var camera: MapCameraPosition = .automatic
     @State private var didCenterOnce = false

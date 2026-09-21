@@ -302,28 +302,17 @@ struct MineView: View {
                 .padding(16)
                 .glassCard()
 
-                // #45 驾驶行为评分
-                if let score = calculateDriveBehaviorScore(store.caches) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("驾驶行为评分").font(TokensTypo.headline)
-                            Text("急加速 \(score.aggressiveAccel) 次 · 急刹车 \(score.harshBrake) 次")
-                                .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("\(score.score)")
-                                .font(TokensTypo.metric(26)).foregroundStyle(score.color)
-                            Text(score.label)
-                                .font(TokensTypo.caption).foregroundStyle(score.color)
-                        }
-                    }
-                    .padding(16)
-                    .glassCard()
+                // #45 驾驶行为评分：这里原来还有一块"急加速 N 次 · 急刹车 M 次"，
+                // 但车端报文里根本没有这两个键（AggressiveAccel / HarshBrake 全项目
+                // 只在那段代码里出现过），所以它永远是 0 次 + 100 分。
+                // 评分集中在评分页：只用行程里真有的事实算。这里只留入口。
+                // #44 充电站：地图主屏的「充电」层就是这件事 —— 它按**车的位置**实时搜，
+                // 这里不再自己搜一份（原来那份搜的是写死的北京坐标 39.9042, 116.4074）。
+                tile("bolt.fill", "附近充电站", tint: TokensPalette.ambient) {
+                    MapSpineLayer.charge.makeCurrent()
+                    nav.popToRoot()
+                    nav.selectedTab = .home
                 }
-                // #44 充电站地图入口
-                ChargingStationFinder()
-                    .padding(.horizontal, 4)
                 // #39 月度驾驶报告入口
                 MonthlyReportGenerator()
                 // #NEW-128 里程记账本入口

@@ -764,83 +764,6 @@ func generateShareableStatus(info: ShareableStatusInfo) -> String {
 }
 
 // =============================================================================
-// ChargingStationFinder — #44 充电站地图（MapKit POI 搜索）
-// 基于当前位置搜索附近充电站
-// =============================================================================
-struct ChargingStationFinder: View {
-    @State private var showMap = false
-    @State private var stations: [ChargingStation] = []
-    @State private var isLoading = false
-
-    struct ChargingStation: Identifiable {
-        let id = UUID()
-        let name: String
-        let distance: String
-        let address: String
-        let type: String  // 快充/慢充
-    }
-
-    var body: some View {
-        Button {
-            searchStations()
-        } label: {
-            HStack {
-                Image(safeSymbol: "ev.charger", fallback: "bolt.fill")
-                    .font(TokensTypo.body)
-                Text("附近充电站")
-                    .font(TokensTypo.body)
-                Spacer()
-                if isLoading {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Image(systemName: "chevron.right")
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .padding(.vertical, TokensSpacing.md)
-            .glassCard()
-        }
-        .buttonStyle(.plain)
-        .sheet(isPresented: $showMap) {
-            ChargingStationMapView(stations: stations)
-        }
-    }
-
-    private func searchStations() {
-        isLoading = true
-        // 使用 MapKit 搜索附近充电站
-        let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = "充电站"
-        request.region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 39.9042, longitude: 116.4074), // 北京默认
-            latitudinalMeters: 5000,
-            longitudinalMeters: 5000
-        )
-
-        let search = MKLocalSearch(request: request)
-        search.start { response, error in
-            isLoading = false
-            guard let response else { return }
-            let origin = CLLocation(latitude: 39.9042, longitude: 116.4074)
-            stations = response.mapItems.prefix(10).map { item in
-                let meters = item.location.distance(from: origin)
-                let coord = item.location.coordinate
-                return ChargingStation(
-                    name: item.name ?? "充电站",
-                    distance: "\(Int(meters / 1000)) km",
-                    address: String(format: "%.4f, %.4f", coord.latitude, coord.longitude),
-                    type: item.pointOfInterestCategory == .evCharger ? "快充" : "慢充"
-                )
-            }
-            showMap = true
-        }
-    }
-}
-
-
-
-// =============================================================================
 // =============================================================================
 // =============================================================================
 struct ImagePicker: UIViewControllerRepresentable {
@@ -872,21 +795,6 @@ struct ImagePicker: UIViewControllerRepresentable {
         }
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             picker.dismiss(animated: true)
-        }
-    }
-}
-
-/// 保存图片到相册
-func saveImageToPhotoLibrary(_ image: UIImage, completion: @escaping (Bool) -> Void) {
-    PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
-        guard status == .authorized || status == .limited else {
-            completion(false)
-            return
-        }
-        PHPhotoLibrary.shared().performChanges {
-            PHAssetChangeRequest.creationRequestForAsset(from: image)
-        } completionHandler: { success, error in
-            completion(success)
         }
     }
 }
@@ -943,40 +851,12 @@ extension View {
 }
 
 // =============================================================================
-// MARK: - 从 63decaa 被误删的实现（充电站地图 / 月报 / 省电开关 / 驾驶评分）
+// MARK: - 从 63decaa 被误删的实现（月报 / 省电开关）
+// 注意：这一节原来还包括"充电站地图"与"驾驶评分"，两者已删 ——
+// 它们各自是第二、第三套实现：充电站搜的是写死的北京坐标，评分用报文里
+// 根本不存在的急加速/急刹车键名（永远 0 次 + 100 分）。现在两者都归到
+// 地图主屏的「充电」层与评分页，那里才是唯一那份实现。
 // =============================================================================
-
-struct ChargingStationMapView: View {
-    let stations: [ChargingStationFinder.ChargingStation]
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        VStack {
-            Text("附近充电站 (\(stations.count) 个)")
-                .font(TokensTypo.title3)
-                .padding()
-            List(stations) { station in
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text(station.name).font(TokensTypo.body)
-                        Text(station.address).font(TokensTypo.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing) {
-                        Text(station.distance)
-                            .font(TokensTypo.caption.weight(.semibold))
-                            .foregroundStyle(TokensPalette.ambient)
-                        Text(station.type).font(TokensTypo.caption2).foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.vertical, 8)
-            }
-            Button("关闭") { dismiss() }
-                .padding()
-        }
-        .presentationDetents([.medium, .large])
-    }
-}
 
 // =============================================================================
 // MonthlyReportGenerator — #39 驾驶报告月报（PDFKit）
@@ -1164,47 +1044,4 @@ struct PowerSavingToggle: View {
             }
         }
     }
-}
-
-// =============================================================================
-// DriveBehaviorScore —— #45 驾驶行为评分
-// 根据急加速/急刹车频率给出评分
-// =============================================================================
-struct DriveBehaviorScore {
-    let aggressiveAccel: Int    // 急加速次数
-    let harshBrake: Int         // 急刹车次数
-    let totalTrips: Int         // 总行程数
-    let score: Int              // 综合评分 0-100
-
-    var label: String {
-        switch score {
-        case 80...100: return "优秀"
-        case 60...79: return "良好"
-        case 40...59: return "一般"
-        default: return "需改进"
-        }
-    }
-
-    var color: Color {
-        switch score {
-        case 80...100: return .green
-        case 60...79: return .blue
-        case 40...59: return .orange
-        default: return .red
-        }
-    }
-}
-
-func calculateDriveBehaviorScore(_ cache: [String: Any?]) -> DriveBehaviorScore? {
-    // 简化版：基于控制数据中的加速度相关指标
-    guard let control = cache["control"] as? [String: Any] else { return nil }
-    // 实际项目中需要从传感器数据计算，这里返回默认值
-    let aggressiveAccel = Int(control["AggressiveAccel"] as? Int ?? 0)
-    let harshBrake = Int(control["HarshBrake"] as? Int ?? 0)
-    let totalTrips = max(1, aggressiveAccel + harshBrake + 1)
-    let score = max(0, min(100, 100 - aggressiveAccel * 5 - harshBrake * 3))
-    return DriveBehaviorScore(aggressiveAccel: aggressiveAccel,
-                              harshBrake: harshBrake,
-                              totalTrips: totalTrips,
-                              score: score)
 }

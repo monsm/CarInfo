@@ -74,6 +74,15 @@ enum MapSpineLayer: String, CaseIterable, Identifiable {
     }
 }
 
+extension MapSpineLayer {
+    /// 主屏当前显示哪一层。存在 UserDefaults 里（MapSpineView 用 @AppStorage 读），
+    /// 所以"从别处把地图开到某一层"有正式入口 —— 不需要每个页面再各写一份充电站列表。
+    static let storageKey = "carkeeper_map_layer"
+
+    /// 把地图主屏切到这一层（只改意图，不负责跳转）
+    func makeCurrent() { UserDefaults.standard.set(rawValue, forKey: Self.storageKey) }
+}
+
 // MARK: - 图上元素
 /// 一条行程。**注意：这是起终点连线，不是行驶轨迹** —— TripRecord 里没有轨迹点。
 struct MapTripLine: Identifiable {
