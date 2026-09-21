@@ -1,2 +1,23 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# 源码一律 LF：CI 在 macOS 编译，本地是 Windows（autocrlf=true）。
+# 仓库里存 CRLF 时，Windows 检出会变成 `\r\r\n`（CR 写两遍），
+# 之后任何按文本处理的脚本都会再叠一层，裸 CR 混进字符串字面量就会
+# 直接编译失败（unterminated string literal）。这个坑已经踩过多次。
+*.swift        text eol=lf
+*.md           text eol=lf
+*.yml          text eol=lf
+*.yaml         text eol=lf
+*.js           text eol=lf
+*.py           text eol=lf
+*.sh           text eol=lf
+*.json         text eol=lf
+*.plist        text eol=lf
+*.entitlements text eol=lf
+
+# 二进制不要做行尾转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
