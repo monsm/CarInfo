@@ -1,0 +1,723 @@
+// =============================================================================
+// MapSpineView.swift — 以地图为主屏（落地版）
+// =============================================================================
+//
+// 这是「以地图为核心」那个方向的**真机实现**，不是样品：
+//   • 地图是 MapKit 的 `Map`（真瓦片、真坐标、真手势），不是手绘 SVG
+//   • 车钉位置来自 location 接口（Lat/Lng），车头朝向来自 Heading —— 都不是猜的
+//   • 行程线来自 tripHistory 的起终点；**没有轨迹点就不画轨迹**（照实写"起终点连线"）
+//   • 「为什么」每一行都由真实字段推出；推不出来就不显示
+//
+// 四个图层 = 四个真实问题（不是一个分类菜单）：
+//   现在 / 行程 / 停车 / 充电
+//
+// 三条架构规则（写错就出问题，不是风格问题）：
+//   ① 钉 = 屏幕空间（`Annotation`），面积/轨迹 = 地理空间（`MapPolyline`）。
+//   ② 内容层不透明：图层条与底部面板用 `TokensPalette.surface`，
+//      玻璃只允许出现在导航栏 / Tab 栏 / 弹层（这是 v4 就定下的规则）。
+//   ③ 地图样式来自 `ArtTheme.mapSpec` —— 换艺术主题 = 换真实 MapKit 配置，
+//      阈值与理由都写在 MapStyleSpec.swift 里。
+//
+// 已知缺口（故意不做假）：
+//   • 行程没有 GPS 轨迹点（TripRecord 只有 start/end），所以线是**起终点连线**。
+//   • 异常没有"发现地点"，只能挂在车当前坐标，文案照实写。
+//   • 充电站来自 MKLocalSearch 的实时搜索（按车的位置），不是数据库里的固定列表。
+// =============================================================================
+import SwiftUI
+import MapKit
+import CoreLocation
+
+struct MapSpineView: View {
+    private let store = AppStore.shared
+    @EnvironmentObject private var nav: NavState
+
+    @AppStorage(ArtThemeStore.key) private var themeRaw: String = ArtTheme.native.rawValue
+    /// 记住上次看的图层（地图主屏的"当前位置"应该被记住，不该每次回到默认）
+    @AppStorage("carkeeper_map_layer") private var layerRaw: String = MapSpineLayer.now.rawValue
+
+    @State private var camera: MapCameraPosition = .automatic
+    @State private var didCenterOnce = false
+    @State private var chargers: [MapCharger] = []
+    @State private var chargerCenterKey = ""
+    @State private var showIndex = false
+    @State private var isRefreshing = false
+
+    private var theme: ArtTheme { ArtTheme(rawValue: themeRaw) ?? .native }
+    private var spec: MapStyleSpec { theme.mapSpec }
+    private var layer: MapSpineLayer { MapSpineLayer(rawValue: layerRaw) ?? .now }
+
+    /// 数据在 main actor 上组装（AppStore 是 @MainActor @Observable）。
+    @MainActor private var data: MapSpineData { MapSpineData.build() }
+
+    var body: some View {
+        let d = data
+        ZStack(alignment: .bottom) {
+            mapCanvas(d)
+
+            VStack(spacing: 0) {
+                topBar(d)
+                Spacer(minLength: 0)
+                bottomPanel(d)
+            }
+        }
+        .background(TokensPalette.canvas)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { toolbarItems(d) }
+        .sheet(isPresented: $showIndex) { indexSheet(d) }
+        .task {
+            await refresh()
+            centerOnCar(force: true)
+            if layer == .charge { await searchChargersIfNeeded() }
+        }
+        .onChange(of: layer) { _, new in
+            TokensHaptic.select()
+            if new == .charge { Task { await searchChargersIfNeeded() } }
+        }
+        .onChange(of: d.carCoordinate?.latitude) { _, _ in centerOnCar(force: false) }
+        .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
+            centerOnCar(force: false)
+        }
+    }
+
+    // =========================================================================
+    // MARK: 地图
+    // =========================================================================
+
+    @ViewBuilder
+    private func mapCanvas(_ d: MapSpineData) -> some View {
+        Map(position: $camera) {
+            mapContent(d)
+        }
+        .mapStyle(spec.style)
+        .overlay {
+            // 系统瓦片的颜色改不了，只能盖一层。原生主题的不透明度是 0（不盖）。
+            spec.scrim
+                .opacity(spec.scrimOpacity)
+                .allowsHitTesting(false)
+        }
+        .ignoresSafeArea(edges: .top)
+        .accessibilityLabel(Text("地图，车在这张图上"))
+    }
+
+    @MapContentBuilder
+    private func mapContent(_ d: MapSpineData) -> some MapContent {
+        if let c = d.carCoordinate {
+            Annotation(d.carName, coordinate: c) {
+                MapCarPin(
+                    socPct: d.socPct,
+                    heading: d.headingDeg,
+                    style: spec.pinStyle,
+                    allowsGlow: spec.allowsGlow,
+                    isActive: false
+                )
+                .frame(width: 44, height: 44)   // HIG 最小触控目标就落在钉中心
+            }
+        }
+        tripLines(d)
+        holdPins(d)
+        chargerPins
+        issuePins(d)
+    }
+
+    /// 行程：**一条一条的起终点连线**（不是轨迹 —— TripRecord 里没有轨迹点）
+    @MapContentBuilder
+    private func tripLines(_ d: MapSpineData) -> some MapContent {
+        if layer == .trips {
+            ForEach(d.trips) { t in
+                MapPolyline(MKPolyline(coordinates: [t.from, t.to], count: 2))
+                    .stroke(TokensPalette.accent.opacity(0.9),
+                            style: StrokeStyle(lineWidth: 3, lineCap: .round))
+            }
+        }
+    }
+
+    @MapContentBuilder
+    private func holdPins(_ d: MapSpineData) -> some MapContent {
+        if layer == .holds {
+            ForEach(d.holds) { h in
+                Annotation("停车点", coordinate: h.coordinate) {
+                    MapSpotPin(kind: .hold(isLatest: h.isLatest),
+                               style: spec.pinStyle,
+                               allowsGlow: spec.allowsGlow)
+                }
+            }
+        }
+    }
+
+    @MapContentBuilder
+    private var chargerPins: some MapContent {
+        if layer == .charge {
+            ForEach(chargers) { c in
+                Annotation("充电站", coordinate: c.coordinate) {
+                    MapSpotPin(kind: .charger(distanceText: c.distanceText),
+                               style: spec.pinStyle,
+                               allowsGlow: spec.allowsGlow)
+                }
+            }
+        }
+    }
+
+    @MapContentBuilder
+    private func issuePins(_ d: MapSpineData) -> some MapContent {
+        if layer == .now {
+            ForEach(d.issues) { i in
+                Annotation("异常", coordinate: i.coordinate) {
+                    MapSpotPin(kind: .issue, style: spec.pinStyle, allowsGlow: spec.allowsGlow)
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // MARK: 顶部：图层 + 同步状态
+    // =========================================================================
+
+    @ViewBuilder
+    private func topBar(_ d: MapSpineData) -> some View {
+        VStack(spacing: TokensSpacing.sm) {
+            HStack(spacing: TokensSpacing.xs) {
+                ForEach(MapSpineLayer.allCases) { l in
+                    Button {
+                        layerRaw = l.rawValue
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: l.icon)
+                                .font(.system(size: 11, weight: .semibold))
+                            Text(l.title)
+                                .font(TokensTypo.caption)
+                        }
+                        .padding(.horizontal, TokensSpacing.sm + 2)
+                        .frame(height: 30)
+                        .background {
+                            Capsule().fill(l == layer ? TokensPalette.accent : TokensPalette.surface)
+                        }
+                        .foregroundStyle(l == layer ? TokensPalette.labelOnTint : TokensPalette.primary)
+                        .overlay {
+                            Capsule().strokeBorder(TokensPalette.hairline, lineWidth: l == layer ? 0 : 0.5)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("看\(l.title)"))
+                    .accessibilityAddTraits(l == layer ? [.isSelected] : [])
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: TokensSpacing.sm) {
+                statusDot(d.online)
+                Text(d.online.text)
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.secondary)
+                Text("·")
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.tertiary)
+                Text("上报 \(d.updatedText)")
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.tertiary)
+                Spacer(minLength: 0)
+                if d.hasLocation == false {
+                    Text("没有位置")
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.warning)
+                }
+            }
+            .padding(.horizontal, TokensSpacing.sm)
+            .padding(.vertical, 5)
+            .background {
+                Capsule().fill(TokensPalette.surface.opacity(0.94))
+            }
+        }
+        .padding(.horizontal, TokensSpacing.page)
+        .padding(.top, TokensSpacing.sm)
+    }
+
+    private func statusDot(_ online: OnlineState) -> some View {
+        Circle()
+            .fill(color(for: online.cls))
+            .frame(width: 6, height: 6)
+    }
+
+    // =========================================================================
+    // MARK: 底部面板
+    // =========================================================================
+
+    @ViewBuilder
+    private func bottomPanel(_ d: MapSpineData) -> some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.md) {
+            if d.hasLocation == false {
+                // 没有位置时，**不摆一堆 -- 占位**，只说清为什么
+                emptyNotice("还没收到车的位置上报。连上车之后这张图才会有东西可看。")
+            } else {
+                switch layer {
+                case .now: nowContent(d)
+                case .trips: tripsContent(d)
+                case .holds: holdsContent(d)
+                case .charge: chargeContent(d)
+                }
+            }
+        }
+        .padding(.horizontal, TokensSpacing.md)
+        .padding(.top, TokensSpacing.md)
+        .padding(.bottom, TokensSpacing.sm)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            UnevenRoundedRectangle(topLeadingRadius: TokensRadius.large,
+                                   topTrailingRadius: TokensRadius.large,
+                                   style: .continuous)
+                .fill(TokensPalette.surface)
+                .ignoresSafeArea(edges: .bottom)
+        }
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(TokensPalette.hairline)
+                .frame(height: TokensHair.line)
+        }
+    }
+
+    // ---- 现在 ----
+    @ViewBuilder
+    private func nowContent(_ d: MapSpineData) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+            Text(d.carName)
+                .font(TokensTypo.headline)
+                .foregroundStyle(TokensPalette.primary)
+            Text(d.address)
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.secondary)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            Text("车头朝\(d.headingText)")
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.tertiary)
+        }
+
+        HStack(alignment: .bottom, spacing: TokensSpacing.lg) {
+            DSBigNumber(value: "\(d.socPct)", unit: "%", size: 54, tint: TokensPalette.primary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("续航 \(d.rangeText)")
+                    .font(TokensTypo.subheadline)
+                    .foregroundStyle(TokensPalette.primary)
+                Text(d.chargeText)
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(color(for: d.chargeCls))
+                if let avg = d.avgConsumption {
+                    Text("百公里 \(avg) kWh")
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.tertiary)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+
+        // 光带 = 电量（全 App 唯一的形状，在地图上它是"车钉外面那圈弧"的展开）
+        DSLightBar(progress: Double(d.socPct) / 100,
+                   height: 5,
+                   showsGlow: spec.allowsGlow,
+                   tint: TokensPalette.lightBar)
+
+        if !d.reasons.isEmpty {
+            DSSectionHeader(title: "为什么")
+            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+                ForEach(d.reasons.prefix(4)) { r in
+                    HStack(alignment: .top, spacing: TokensSpacing.sm) {
+                        Circle()
+                            .fill(color(for: r.cls))
+                            .frame(width: 5, height: 5)
+                            .padding(.top, 6)
+                        Text(r.text)
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+
+        actionRow(d)
+    }
+
+    /// 控制长在对象上：不新写一套车控，直接进已有的车控 / 电池页
+    private func actionRow(_ d: MapSpineData) -> some View {
+        HStack(spacing: TokensSpacing.sm) {
+            action("车控", "slider.horizontal.3") { nav.pushNavigation(.control, targetTab: .control) }
+            action("找车", "location.circle") { centerOnCar(force: true) }
+            action("充电", "bolt.fill") { nav.pushNavigation(.battery, targetTab: .charge) }
+            action("异常", "exclamationmark.triangle") { nav.pushNavigation(.messages, targetTab: .mine) }
+        }
+    }
+
+    private func action(_ title: String, _ icon: String, _ run: @escaping () -> Void) -> some View {
+        Button {
+            TokensHaptic.tap()
+            run()
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .medium))
+                Text(title)
+                    .font(TokensTypo.caption)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: TokensSpacing.row)
+            .background {
+                RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                    .fill(TokensPalette.raised)
+            }
+            .foregroundStyle(TokensPalette.primary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(title))
+    }
+
+    // ---- 行程 ----
+    @ViewBuilder
+    private func tripsContent(_ d: MapSpineData) -> some View {
+        DSSectionHeader(title: "行程", trailing: d.trips.isEmpty ? nil : "\(d.trips.count) 段")
+        if d.trips.isEmpty {
+            emptyNotice(MapSpineLayer.trips.emptyNote)
+        } else {
+            // 把话说在前面：线是起终点，不是轨迹
+            Text("图上的线是**起点到终点**的连接 —— 这次行程没有记录逐点轨迹。")
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            ForEach(d.trips.prefix(3)) { t in
+                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+                    // 注意：`TokensTypo.data` 是**属性**，带尺寸的那支叫 digits(_:)
+                    Text(t.timeText)
+                        .font(TokensTypo.digits(13))
+                        .foregroundStyle(TokensPalette.primary)
+                    Text(String(format: "%.1f km", t.distanceKm))
+                        .font(TokensTypo.digits(13))
+                        .foregroundStyle(TokensPalette.primary)
+                    Text("\(t.startSoc)% → \(t.endSoc)%")
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.secondary)
+                    Spacer(minLength: 0)
+                    if let eff = t.efficiency {
+                        Text(String(format: "%.1f kWh/100km", eff))
+                            .font(TokensTypo.caption)
+                            .foregroundStyle(TokensPalette.tertiary)
+                    }
+                }
+            }
+            Button("全部行程") { nav.pushNavigation(.trips, targetTab: .trips) }
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.accent)
+                .buttonStyle(.plain)
+        }
+    }
+
+    // ---- 停车 ----
+    @ViewBuilder
+    private func holdsContent(_ d: MapSpineData) -> some View {
+        DSSectionHeader(title: "停车", trailing: d.holds.isEmpty ? nil : "\(d.holds.count) 个点")
+        if d.holds.isEmpty {
+            emptyNotice(MapSpineLayer.holds.emptyNote)
+        } else {
+            ForEach(d.holds.prefix(3)) { h in
+                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+                    Text(h.isLatest ? "上次" : h.agoText)
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(h.isLatest ? TokensPalette.accent : TokensPalette.tertiary)
+                    Text(h.address)
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.primary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Text(MapSpineData.agoText(h.time))
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.tertiary)
+                }
+            }
+            Button("停车位置详情") { nav.pushNavigation(.parking, targetTab: .home) }
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.accent)
+                .buttonStyle(.plain)
+        }
+    }
+
+    // ---- 充电 ----
+    @ViewBuilder
+    private func chargeContent(_ d: MapSpineData) -> some View {
+        DSSectionHeader(title: "充电", trailing: chargers.isEmpty ? nil : "附近 \(chargers.count) 个")
+        if let s = d.charging {
+            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+                Text(s.power)
+                    .font(TokensTypo.digits(17))
+                    .foregroundStyle(TokensPalette.info)
+                Text(s.start + " → " + s.end)
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.secondary)
+                Spacer(minLength: 0)
+                if let full = d.timeToFull {
+                    Text("充满还要 \(full)")
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.tertiary)
+                }
+            }
+        }
+        if chargers.isEmpty {
+            emptyNotice(MapSpineLayer.charge.emptyNote)
+        } else {
+            ForEach(chargers.prefix(3)) { c in
+                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+                    Text(c.name)
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.primary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Text(c.distanceText)
+                        .font(TokensTypo.digits(13))
+                        .foregroundStyle(TokensPalette.secondary)
+                    Text(c.isEVCharger ? "快充" : "—")
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.tertiary)
+                }
+            }
+            Text("来自按车的位置做的实时搜索（MKLocalSearch），不是写死的列表。")
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.tertiary)
+        }
+        Button("充电与账单") { nav.pushNavigation(.battery, targetTab: .charge) }
+            .font(TokensTypo.footnote)
+            .foregroundStyle(TokensPalette.accent)
+            .buttonStyle(.plain)
+    }
+
+    // =========================================================================
+    // MARK: 工具栏 + 索引
+    // =========================================================================
+
+    @ToolbarContentBuilder
+    private func toolbarItems(_ d: MapSpineData) -> some ToolbarContent {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button {
+                TokensHaptic.tap()
+                Task {
+                    await refresh()
+                    await searchChargersIfNeeded(force: true)
+                }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+            }
+            .disabled(isRefreshing)
+            .accessibilityLabel(Text("刷新车的数据"))
+        }
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button {
+                TokensHaptic.tap()
+                showIndex = true
+            } label: {
+                Image(systemName: "square.grid.2x2")
+            }
+            .accessibilityLabel(Text("全部功能"))
+        }
+        ToolbarItem(placement: .navigationBarLeading) {
+            Button {
+                TokensHaptic.tap()
+                centerOnCar(force: true)
+            } label: {
+                Image(systemName: "location.fill")
+            }
+            .disabled(d.hasLocation == false)
+            .accessibilityLabel(Text("回到车的位置"))
+        }
+    }
+
+    /// 索引页：**去掉 Tab 栏的代价在哪里，就补在哪里**。
+    /// 每一个深潜页都能从这里到达；旧版首页也留在这里（可对照、可回退）。
+    private func indexSheet(_ d: MapSpineData) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                    DSSectionHeader(title: "地图上的地方")
+                    VStack(spacing: 0) {
+                        ForEach(MapSpineLayer.allCases) { l in
+                            indexRow(l.title, "\(l.icon)", "看\(l.title)") {
+                                layerRaw = l.rawValue
+                                showIndex = false
+                            }
+                        }
+                    }
+                    .background(cardBackground)
+
+                    DSSectionHeader(title: "全部功能")
+                    VStack(spacing: 0) {
+                        ForEach(Deeplink.allCases, id: \.self) { link in
+                            indexRow(deeplinkTitle(link), "chevron.right", "") {
+                                showIndex = false
+                                nav.pushNavigation(link)
+                            }
+                        }
+                    }
+                    .background(cardBackground)
+
+                    DSSectionHeader(title: "对照与外观")
+                    VStack(spacing: 0) {
+                        indexRow("开发者工具 · 旧版首页与艺术主题", "chevron.right", "") {
+                            showIndex = false
+                            nav.pushNavigation(.dev)
+                        }
+                    }
+                    .background(cardBackground)
+
+                    Text("旧版首页（列表版）与三种艺术主题都住在开发者工具里。"
+                         + "这一页是"去掉 Tab 栏"之后它们的家：每一个深潜页都能在这里到达。")
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.top, TokensSpacing.sm)
+                .padding(.bottom, TokensSpacing.xxl)
+            }
+            .pageBackground()
+            .navigationTitle("全部功能")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("完成") { showIndex = false }
+                }
+            }
+        }
+    }
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+            .fill(TokensPalette.surface)
+    }
+
+    private func indexRow(_ title: String, _ icon: String, _ hint: String,
+                          _ run: @escaping () -> Void) -> some View {
+        Button {
+            TokensHaptic.tap()
+            run()
+        } label: {
+            HStack(spacing: TokensSpacing.md) {
+                Text(title)
+                    .font(TokensTypo.body)
+                    .foregroundStyle(TokensPalette.primary)
+                Spacer(minLength: TokensSpacing.sm)
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(TokensPalette.tertiary)
+            }
+            .padding(.vertical, TokensSpacing.md)
+            .padding(.horizontal, TokensSpacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(hint.isEmpty ? title : hint))
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(TokensPalette.hairline)
+                .frame(height: TokensHair.line)
+                .padding(.leading, TokensSpacing.md)
+        }
+    }
+
+    /// 深潜页的显示名。穷举（无 default）：新增深链时编译器会强制在这里表态。
+    private func deeplinkTitle(_ link: Deeplink) -> String {
+        switch link {
+        case .vehicle: return "车辆档案"
+        case .health: return "健康报告"
+        case .battery: return "电池与充电"
+        case .data: return "全量数据"
+        case .dev: return "开发者工具"
+        case .messages: return "消息与通知"
+        case .control: return "车控"
+        case .dashboard: return "仪表"
+        case .trips: return "行程分析"
+        case .commands: return "指令历史"
+        case .service: return "保养记录"
+        case .parking: return "停车位置"
+        case .export: return "导出数据"
+        case .emergency: return "应急面板"
+        case .tips: return "用车提示"
+        case .score: return "驾驶评分"
+        }
+    }
+
+    // =========================================================================
+    // MARK: 交互与数据
+    // =========================================================================
+
+    private func emptyNotice(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: TokensSpacing.sm) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 13))
+                .foregroundStyle(TokensPalette.tertiary)
+            Text(text)
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, TokensSpacing.sm)
+    }
+
+    private func color(for cls: String) -> Color {
+        switch cls {
+        case "ok": return TokensPalette.success
+        case "warn": return TokensPalette.warning
+        case "bad": return TokensPalette.error
+        case "charge": return TokensPalette.info
+        default: return TokensPalette.tertiary
+        }
+    }
+
+    /// 把相机移到车上。heading 来自**当前艺术方向**（夜光转 7°，让路网斜走）。
+    @MainActor
+    private func centerOnCar(force: Bool) {
+        guard let c = store.currentLocation?.coordinate else { return }
+        if didCenterOnce && !force { return }
+        didCenterOnce = true
+        withAnimation(TokensMotion.value) {
+            camera = .camera(MapCamera(centerCoordinate: c,
+                                       distance: spec.cameraDistance,
+                                       heading: spec.cameraHeading,
+                                       pitch: 0))
+        }
+    }
+
+    @MainActor
+    private func refresh() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        await store.fetchCore()
+        isRefreshing = false
+    }
+
+    /// 按**车的位置**搜附近充电站（搜索中心不再是写死的北京坐标）
+    @MainActor
+    private func searchChargersIfNeeded(force: Bool = false) async {
+        guard let car = store.currentLocation else { return }
+        let key = String(format: "%.4f,%.4f", car.coordinate.latitude, car.coordinate.longitude)
+        if !force, key == chargerCenterKey, !chargers.isEmpty { return }
+        chargerCenterKey = key
+
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = "充电站"
+        request.region = MKCoordinateRegion(center: car.coordinate,
+                                            latitudinalMeters: 8000,
+                                            longitudinalMeters: 8000)
+        let search = MKLocalSearch(request: request)
+        // 用完成回调版（项目里已有同样写法，编译过）；回调里再回主线程写状态。
+        search.start { response, _ in
+            guard let response else { return }
+            let found: [MapCharger] = response.mapItems.enumerated().map { idx, item in
+                MapCharger(
+                    id: "c\(idx)-\(item.name ?? "")",
+                    coordinate: item.location.coordinate,
+                    name: item.name ?? "充电站",
+                    distanceMeters: item.location.distance(from: car),
+                    isEVCharger: item.pointOfInterestCategory == .evCharger
+                )
+            }
+            let sorted = found.sorted { $0.distanceMeters < $1.distanceMeters }
+            Task { @MainActor in chargers = Array(sorted.prefix(12)) }
+        }
+    }
+}

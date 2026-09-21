@@ -139,6 +139,11 @@ struct CarKeeperApp: App {
     var body: some Scene {
         WindowGroup {
             root
+                // 艺术主题：明暗由主题自带（`.native` = nil，跟随系统，与切换前一致）
+                .preferredColorScheme(ArtThemeStore.current.spec.preferredScheme)
+                // 令牌是静态计算值，不产生 SwiftUI 依赖 —— 靠 .id 换值重建整棵树，
+                // 否则切主题后界面不会立刻重绘（要等下一次状态变化才生效）。
+                .id(artThemeRaw)
         }
         // #47 iPad 分屏：第二个窗口（原写成 `os(iOS) && os(macOS)` 恒为假，导致该场景从未注册）。
         // 能否真正被打开由「平台 + Info.plist 的 UIApplicationSceneManifest.UIApplicationSupportsMultipleScenes」
@@ -146,7 +151,11 @@ struct CarKeeperApp: App {
         //
         // ⚠️ 两个场景当前共用 NavState.shared（详见 DetailSplitView 的说明）：副窗口与主窗口是
         //    同一份导航状态 —— 同一个 Tab、同一条路径。即“能同时看两个窗口”，但还不是两块独立画布。
-        WindowGroup(id: SceneID.detail) { DetailSplitView() }
+        WindowGroup(id: SceneID.detail) {
+            DetailSplitView()
+                .preferredColorScheme(ArtThemeStore.current.spec.preferredScheme)
+                .id(artThemeRaw)
+        }
     }
 
     // #NEW-112 启动画面控制
@@ -154,6 +163,10 @@ struct CarKeeperApp: App {
     @State private var isAppLoading = false
     // #NEW-113 Onboarding 引导状态
     @AppStorage("carkeeper_onboarding_seen") private var onboardingSeen = false
+    /// 艺术主题（键见 ArtThemeStore.key）。它存在的意义只有一个：
+    /// **产生 SwiftUI 依赖** —— 令牌本身是静态计算值，不订阅任何东西，
+    /// 所以切换主题时靠它变化去驱动 root 上的 `.id(...)` 重建。
+    @AppStorage(ArtThemeStore.key) private var artThemeRaw: String = ArtTheme.native.rawValue
 
     /// 处理 carkeeper:// 深链。
     /// 此前 Info.plist 注册了 scheme，但全项目没有任何 onOpenURL 接收方 —— 扫二维码/点链接豪无反应。
@@ -357,7 +370,11 @@ struct MainTabView: View {
 
     private var homeTab: some View {
         NavigationStack(path: $nav.path) {
-            HomeView()
+            // 落地：首页改成**以地图为主屏**（Features/Map/MapSpineView.swift）。
+            // 车的一切都发生在某个地方，所以导航长在地方上；四个图层 = 四个真实问题，
+            // 全部功能与旧版首页在右上角的索引页里（去掉 Tab 栏的代价补在那里）。
+            // 想回到旧版本：把下一行换回 `HomeView()` 即可（那 1300 行一行没动）。
+            MapSpineView()
                 .navigationDestination(for: Deeplink.self) { link in
                     deeplinkDestination(link)
                 }

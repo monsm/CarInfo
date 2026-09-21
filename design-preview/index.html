@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CarKeeper · 夜航 —— 界面没有颜色，颜色来自你车所在地的天空</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap">
+<style>
+/* ==========================================================================
+   夜航  ·  一个点子，不是一套配色
+
+   界面本身没有颜色。颜色来自**你车此刻所在地的天空**：
+     破晓 05:40 冷钢蓝 / 正午 12:10 灰白 / 黄昏 19:20 熔橙 / 深夜 02:40 只剩车灯
+   同一个界面、同一套排版、同一个数字，只在四种光里出现。这是产品语义：
+   车主真正想知道的不是「电池 78%」，而是「我的车现在怎么样了」。
+
+   三个可识别的主形（identity marks）：
+     ① 窗（window）—— 顶部一块 340pt 的取景框：天空 + 车。车被**裁切出血**，
+        不以完整形态示人（完整线稿会暴露它是画出来的；裁切让它读成一张照片）。
+     ② 光带（the band）—— 同一条 4pt 光带，在车况是**地平线**、同时也是**电量**；
+        在充电是**充到 90% 的进度**；在行程是**折线的基线**。全 App 只有一个形状。
+     ③ 巨字（the figure）—— 电量数字以 200 字重、-0.045em 字距压在车身上，
+        单位收成 0.26 倍作注脚。
+
+   工艺（沿用第七稿的结论，未回退）：
+     字体 Inter 200–700 接拉丁与数字（Windows 无 SF Pro）；按 SF 字号—字距表排版；
+     车的比例量过：车长 442 / 车高 136（0.308L）/ 轮径 64（0.145L）/ 俯视宽 172（0.39L）。
+   ========================================================================== */
+
+:root{
+  --canvas:#000;
+  --surface:rgba(255,255,255,.055);
+  --hair:rgba(255,255,255,.11);
+  --hair-soft:rgba(255,255,255,.07);
+  --t1:#fff;
+  --t2:rgba(255,255,255,.56);
+  --t3:rgba(255,255,255,.34);
+  --brand:#E51937;
+  --ease:cubic-bezier(.32,.72,0,1);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#060608;color:#fff;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",Inter,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+.wrap{max-width:1240px;margin:0 auto;padding:40px 26px 100px}
+
+.head{padding-bottom:26px;border-bottom:1px solid var(--hair)}
+.head .eyebrow{font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;color:var(--t3)}
+.head h1{margin:10px 0 0;font-size:30px;font-weight:250;letter-spacing:-.9px;line-height:1.2}
+.head h1 b{font-weight:600}
+.head p{margin:14px 0 0;font-size:13.5px;line-height:1.85;color:var(--t2);max-width:790px}
+.head p b{color:#fff;font-weight:600}
+.head .idea{margin-top:16px;font-size:15px;line-height:1.7;color:#fff;font-weight:450;max-width:790px;
+  border-left:2px solid var(--t3);padding-left:14px}
+
+/* ---------- 设备框 ---------- */
+.stack{display:flex;flex-wrap:wrap;gap:34px;margin-top:34px}
+.slot{width:405px}
+.slot .cap{margin:0 0 4px;font-size:12px;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:var(--t3)}
+.slot .sub{margin:0 0 12px;font-size:12.5px;line-height:1.6;color:var(--t2)}
+.slot .sub b{color:#fff;font-weight:600}
+.phone{position:relative;width:405px;height:864px;border-radius:56px;padding:6px;
+  background:linear-gradient(160deg,#3A3C42,#0D0E11 60%);box-shadow:0 40px 90px -30px rgba(0,0,0,.95)}
+.phone::after{content:"";position:absolute;inset:0;border-radius:56px;pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.13),inset 0 1px 1px rgba(255,255,255,.20)}
+.screen{position:relative;width:393px;height:852px;border-radius:50px;overflow:hidden;color:var(--t1);background:#000}
+.island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:110px;height:32px;border-radius:17px;background:#000;z-index:60}
+.status{position:absolute;top:0;left:0;right:0;height:52px;z-index:55;display:flex;align-items:center;
+  justify-content:space-between;padding:15px 30px 0;font-size:15px;font-weight:600;letter-spacing:-.2px;font-variant-numeric:tabular-nums}
+.status .ri{display:flex;align-items:center;gap:5px}
+.status svg{display:block}
+.page{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;padding-top:52px}
+
+/* ---------- 字号阶梯（SF 字号—字距表，1/1000 em） ---------- */
+.t-meta{font-size:12.5px;font-weight:500;letter-spacing:-.04px;line-height:16px}
+.t-largetitle{font-size:30px;font-weight:600;letter-spacing:-.33px;line-height:36px}
+.t-body{font-size:17px;font-weight:400;letter-spacing:-.41px;line-height:22px}
+.t-subhead{font-size:15px;font-weight:400;letter-spacing:-.24px;line-height:20px}
+.t-foot{font-size:13px;font-weight:400;letter-spacing:-.08px;line-height:18px}
+.t-cap1{font-size:12px;font-weight:400;letter-spacing:0;line-height:16px}
+.t-cap2{font-size:11px;font-weight:500;letter-spacing:.07px;line-height:13px}
+.t-sec{font-size:11px;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:var(--t3)}
+.semib{font-weight:600}
+.c2{color:var(--t2)} .c3{color:var(--t3)}
+.mono{font-variant-numeric:tabular-nums}
+
+/* 巨字：200 字重 + 更紧字距 + 等宽数字（SF Pro Display 在大字号收紧的规则） */
+.figure{font-weight:200;letter-spacing:-.045em;line-height:.8;font-variant-numeric:tabular-nums}
+.figure .u{font-size:.26em;font-weight:400;letter-spacing:0;color:rgba(255,255,255,.62);margin-left:.2em;vertical-align:.14em}
+.figure .cap{display:block;font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:6px}
+
+/* ---------- 组件 ---------- */
+.meta{display:flex;align-items:baseline;padding:0 20px;height:34px}
+.meta .dot{width:6px;height:6px;border-radius:3px;background:var(--brand);margin-right:8px;align-self:center}
+.row{display:flex;align-items:center;gap:12px;min-height:46px;padding:0 20px}
+.row .k{font-size:17px;letter-spacing:-.41px}
+.row .v{margin-left:auto;font-size:15px;letter-spacing:-.24px;color:var(--t2);font-variant-numeric:tabular-nums}
+.row .v.s{color:var(--t1);font-weight:600}
+.hr{height:1px;background:var(--hair);flex:none}
+.hr.in{margin-left:20px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;letter-spacing:-.04px;padding:5px 10px;border-radius:999px;background:var(--surface)}
+
+.tabbar{margin-top:auto;height:83px;padding:8px 6px 22px;display:flex;background:#000;border-top:1px solid var(--hair-soft)}
+.tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--t3)}
+.tb.on{color:#fff}
+.tb svg{width:25px;height:25px;stroke:currentColor;fill:none;stroke-width:1.55;stroke-linecap:round;stroke-linejoin:round}
+.tb span{font-size:10px;font-weight:500;letter-spacing:.07px}
+.homebar{margin-top:-18px;display:flex;justify-content:center}
+.homebar i{width:139px;height:5px;border-radius:3px;background:#fff;opacity:.85}
+
+/* ==========================================================================
+   窗：天空 + 车 + 巨字 + 光带（地平线）
+   四种光只改 CSS 变量 —— 标记完全相同。车内部用 style="fill:var(--tint)"
+   与 <use> 实例的继承关系着色，所以整个 App 只有一份车的定义。
+   ========================================================================== */
+.win{position:relative;height:430px;overflow:hidden;isolation:isolate}
+.sky{position:absolute;inset:0;background:linear-gradient(180deg,var(--sky1) 0%,var(--sky2) 54%,var(--sky3) 100%)}
+.sky::after{content:"";position:absolute;inset:0;background:radial-gradient(62% 46% at var(--lx) var(--ly),var(--glow) 0%,rgba(0,0,0,0) 72%)}
+.ground{position:absolute;left:0;right:0;bottom:0;height:120px;
+  background:radial-gradient(52% 62% at 50% 100%,var(--pool) 0%,rgba(0,0,0,0) 74%)}
+/* bottom 为负：让 SVG 里车底下那片空白落到窗口外，倒影刚好停在光带上方 */
+.carfig{position:absolute;left:0;right:0;bottom:-10px;width:100%;height:auto;display:block}
+.scrim{position:absolute;left:0;right:0;bottom:0;height:150px;
+  background:linear-gradient(to top,#000 0%,rgba(0,0,0,.86) 26%,rgba(0,0,0,.35) 60%,rgba(0,0,0,0) 100%)}
+.figwrap{position:absolute;left:20px;right:20px;bottom:16px;display:flex;align-items:flex-end;gap:14px}
+.figwrap .side{margin-left:auto;text-align:right;padding-bottom:6px}
+.band{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.13)}
+.band i{position:absolute;left:0;top:0;bottom:0;background:var(--band);
+  box-shadow:0 0 20px var(--bandGlow),0 0 44px var(--bandGlow)}
+.bandcap{display:flex;align-items:baseline;padding:10px 20px 0}
+
+/* 四种光 —— 只有这些数字在变 */
+/* 破晓 05:40 · 光源在低左，冷钢蓝 */
+.state-dawn{--sky1:#050A12;--sky2:#152639;--sky3:#4C6A80;--lx:16%;--ly:90%;
+  --glow:rgba(160,196,224,.38);--pool:rgba(126,164,198,.30);
+  --tint:#8FB6D6;--tintA:.24;--shadeA:.10;--streakA:.16;
+  --rim:#C6DAEC;--rimBloom:.55;--lamp:#FFF4DE;--lampA:.55;
+  --band:#DCEAF6;--bandGlow:rgba(190,215,240,.55)}
+/* 正午 12:10 · 顶光偏右，灰白，几乎没有颜色 */
+.state-noon{--sky1:#2E353C;--sky2:#69737C;--sky3:#A7B0B7;--lx:64%;--ly:40%;
+  --glow:rgba(255,255,255,.46);--pool:rgba(210,220,228,.34);
+  --tint:#CFD8DF;--tintA:.30;--shadeA:.05;--streakA:.30;
+  --rim:#FFFFFF;--rimBloom:.75;--lamp:#FFFBEE;--lampA:.2;
+  --band:#F2F5F8;--bandGlow:rgba(226,234,240,.5)}
+/* 黄昏 19:20 · 光源贴着地平线，熔橙 */
+.state-dusk{--sky1:#150C1C;--sky2:#4A1E32;--sky3:#C25529;--lx:76%;--ly:94%;
+  --glow:rgba(255,176,96,.52);--pool:rgba(214,120,52,.32);
+  --tint:#DB7A33;--tintA:.27;--shadeA:.15;--streakA:.24;
+  --rim:#FFC189;--rimBloom:.9;--lamp:#FFE9C6;--lampA:.9;
+  --band:#FFB162;--bandGlow:rgba(255,138,60,.55)}
+/* 深夜 02:40 · 没有天空，只有车灯自己是光源 */
+.state-night{--sky1:#030509;--sky2:#070B12;--sky3:#0F151D;--lx:20%;--ly:26%;
+  --glow:rgba(110,140,190,.24);--pool:rgba(78,110,160,.20);
+  --tint:#3A5276;--tintA:.16;--shadeA:.44;--streakA:.10;
+  --rim:#7E9AC0;--rimBloom:.35;--lamp:#FFEFD2;--lampA:1;
+  --band:#CFE0F2;--bandGlow:rgba(160,190,225,.5)}
+
+/* 入场：只有一次，车从下方 10pt 升起（车醒了）；不常驻、不呼吸 */
+.rise{animation:rise 1s var(--ease) .12s backwards}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}}
+.band i{animation:grow 1.2s var(--ease) .3s backwards}
+@keyframes grow{from{transform:scaleX(0);transform-origin:left}}
+@media (prefers-reduced-motion:reduce){ .rise,.band i{animation:none} }
+
+/* ---------- 1:1 细节 ---------- */
+.detail{margin-top:56px;padding-top:26px;border-top:1px solid var(--hair)}
+.detail h2{margin:0 0 6px;font-size:15px;font-weight:600;letter-spacing:-.24px}
+.detail .hint{margin:0 0 18px;font-size:12.5px;line-height:1.65;color:var(--t2);max-width:760px}
+.rail{display:flex;gap:16px;overflow-x:auto;padding:4px 2px 16px}
+.rail::-webkit-scrollbar{height:8px}
+.rail::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:4px}
+.card{flex:none;width:393px;background:#0B0C0F;border-radius:22px;overflow:hidden;border:1px solid var(--hair-soft)}
+.card .bar-top{padding:11px 16px;font-size:10.5px;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:var(--t3);border-bottom:1px solid var(--hair-soft)}
+.card .why{padding:12px 16px 14px;font-size:12px;line-height:1.7;color:var(--t2)}
+.card .why b{color:#fff;font-weight:600}
+.bandrow{display:flex;flex-direction:column;gap:14px;padding:18px 20px}
+.bandrow div{position:relative;height:4px;background:rgba(255,255,255,.13)}
+.bandrow div i{position:absolute;left:0;top:0;bottom:0;box-shadow:0 0 18px currentColor,0 0 40px currentColor}
+.bandrow b{position:absolute;right:0;top:9px;font-size:10px;font-weight:500;color:var(--t3);letter-spacing:.07px}
+
+/* ---------- 说明 ---------- */
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px;margin-top:46px}
+.note{background:#0E0F12;border-radius:18px;padding:18px 20px}
+.note h3{margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:var(--t3)}
+.note p{margin:0;font-size:12.5px;line-height:1.9;color:var(--t2)}
+.note p b{color:#fff;font-weight:600}
+.note table{width:100%;border-collapse:collapse;font-size:12px}
+.note td{padding:5px 0;color:var(--t2);font-variant-numeric:tabular-nums}
+.note td:first-child{color:#fff;font-weight:550;white-space:nowrap;padding-right:10px}
+.note tr+tr td{border-top:1px solid var(--hair-soft)}
+.sw{display:flex;gap:6px;margin-top:14px}
+.sw i{flex:1;height:34px;border-radius:8px;display:block}
+
+@media (max-width:900px){ .wrap{padding:24px 16px 70px} .stack{gap:26px} }
+@media (max-width:760px){ .slot{width:100%;display:flex;flex-direction:column;align-items:center} .slot .cap,.slot .sub{text-align:center} .phone{zoom:.8} }
+@media (max-width:520px){ .phone{zoom:.72} .head h1{font-size:23px} }
+@media (max-width:420px){ .phone{zoom:.68} }
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="st-signal" viewBox="0 0 18 12"><rect x="0" y="7.5" width="3" height="4.5" rx="1" fill="#fff"/><rect x="4.7" y="5" width="3" height="7" rx="1" fill="#fff"/><rect x="9.4" y="2.6" width="3" height="9.4" rx="1" fill="#fff"/><rect x="14.1" y="0" width="3" height="12" rx="1" fill="#fff"/></symbol>
+  <symbol id="st-wifi" viewBox="0 0 16 12"><path d="M1 4.3a10.5 10.5 0 0114 0" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M3.6 7.1a6.7 6.7 0 018.8 0" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round"/><circle cx="8" cy="10.2" r="1.5" fill="#fff"/></symbol>
+  <symbol id="st-batt" viewBox="0 0 27 12"><rect x=".6" y=".6" width="22" height="10.8" rx="3.2" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.2"/><rect x="2.4" y="2.4" width="18.4" height="7.2" rx="2" fill="#fff"/><path d="M24.2 4.2v3.6a2 2 0 000-3.6z" fill="rgba(255,255,255,.45)"/></symbol>
+  <symbol id="i-car" viewBox="0 0 24 24"><path d="M4.2 13.6l1.6-4.1a2.6 2.6 0 012.4-1.6h7.6a2.6 2.6 0 012.4 1.6l1.6 4.1"/><path d="M4.2 13.6h15.6v3.5a1.5 1.5 0 01-1.5 1.5h-.8v1a1.2 1.2 0 01-2.4 0v-1H8.9v1a1.2 1.2 0 01-2.4 0v-1h-.8a1.5 1.5 0 01-1.5-1.5v-3.5z"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 8.8h16M4 15.2h16"/><circle cx="9.6" cy="8.8" r="2.2" fill="#000"/><circle cx="14.4" cy="15.2" r="2.2" fill="#000"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.6 3l-7 10h4.3l-1 8 7.1-10.4h-4.3L13.6 3z"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><path d="M4.4 17.4l4.4-5.2 3.3 3 7.1-8.2"/><circle cx="4.4" cy="17.4" r="1.4" fill="#000"/><circle cx="19.2" cy="7" r="1.4" fill="#000"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.2"/><path d="M5.6 20c1.2-3.5 3.7-5.2 6.4-5.2s5.2 1.7 6.4 5.2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.4" y="10.8" width="13.2" height="8.8" rx="2.8"/><path d="M8.6 10.8V8.4a3.4 3.4 0 016.8 0v2.4"/></symbol>
+  <symbol id="i-fan" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.9"/><path d="M12 10.1c-.4-2.5.6-5.1 2.9-5.1 1.8 0 2.5 2.5 0 4M13.9 12c2.5-.4 5.1.6 5.1 2.9 0 1.8-2.5 2.5-4 0M12 13.9c.4 2.5-.6 5.1-2.9 5.1-1.8 0-2.5-2.5 0-4M10.1 12c-2.5.4-5.1-.6-5.1-2.9 0-1.8 2.5-2.5 4 0"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7.8V12l2.9 1.7"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M5 16.4a8 8 0 1114 0"/><path d="M12 14.6l3.4-4.2"/><circle cx="12" cy="15.4" r="1.3"/></symbol>
+</svg>
+
+<!-- ============ 车：全 App 只有这一份定义。四种光靠 CSS 变量注入 ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="paint" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5A6068"/><stop offset=".14" stop-color="#31363D"/>
+      <stop offset=".46" stop-color="#171A1F"/><stop offset="1" stop-color="#07080B"/>
+    </linearGradient>
+    <linearGradient id="pillar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3B4149"/><stop offset=".5" stop-color="#1C1F24"/><stop offset="1" stop-color="#0C0E11"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2=".85" y2="1">
+      <stop offset="0" stop-color="#1B222B"/><stop offset=".42" stop-color="#0A0D12"/><stop offset="1" stop-color="#161C24"/>
+    </linearGradient>
+    <linearGradient id="glare" x1="0" y1="1" x2="1" y2="0">
+      <stop offset=".18" stop-color="rgba(255,255,255,0)"/><stop offset=".38" stop-color="rgba(255,255,255,.16)"/>
+      <stop offset=".52" stop-color="rgba(255,255,255,.05)"/><stop offset="1" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+    <linearGradient id="tyre" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#23262B"/><stop offset=".35" stop-color="#0D0F12"/><stop offset="1" stop-color="#040506"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2=".4" y2="1">
+      <stop offset="0" stop-color="#6E747C"/><stop offset=".5" stop-color="#2A2E34"/><stop offset="1" stop-color="#14171B"/>
+    </linearGradient>
+    <!-- 倒影遮罩：梯度作用域就是这个 34 高的矩形，必须在 y=210 之前归零（否则被视图硬切一条横线） -->
+    <linearGradient id="reflfade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="reflmask"><rect x="0" y="176" width="480" height="34" fill="url(#reflfade)"/></mask>
+    <filter id="b2" x="-30%" y="-300%" width="160%" height="700%"><feGaussianBlur stdDeviation="2.6"/></filter>
+    <filter id="b5" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
+    <filter id="b10" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10"/></filter>
+
+    <!-- 车长 442 · 车高 136（0.308L）· 腰线 y=77 · 裙边 y=154 · 车头在左（大灯 x≈32）
+         窗高（车顶 40 → 腰线 77）= 37 = 27% 车高 —— 与真实轿车一致（Model 3：车顶 1443 / 腰线 ≈1050）。
+         首版腰线在 88，窗高 35% —— 那是老爷车的比例，所以车看着“复古”。 -->
+    <path id="sidebody" d="M27,154 C20,150 18,140 20,127 C23,112 33,104 47,96 C71,90 95,85 121,81 C142,78 150,77 158,77 L402,77 C424,79 442,84 452,92 C460,99 462,116 461,127 C460,141 458,148 452,154 Z"/>
+    <path id="sidehouse" d="M158,77 C170,63 185,49 199,42 C205,38 213,40 223,40 L321,40 C331,40 339,42 345,46 C363,57 383,70 402,77 Z"/>
+    <path id="sideglass" d="M170,71 C180,59 192,49 205,45 C210,42 216,44 224,44 L318,44 C326,44 332,46 337,50 C352,60 368,68 384,71 Z"/>
+    <path id="archF" d="M64,154 L64,144 A36,36 0 0 1 136,144 L136,154 Z"/>
+    <path id="archR" d="M339,154 L339,144 A36,36 0 0 1 411,144 L411,154 Z"/>
+    <clipPath id="carpaint"><path d="M27,154 C20,150 18,140 20,127 C23,112 33,104 47,96 C71,90 95,85 121,81 C142,78 150,77 158,77 L402,77 C424,79 442,84 452,92 C460,99 462,116 461,127 C460,141 458,148 452,154 Z"/><path d="M158,77 C170,63 185,49 199,42 C205,38 213,40 223,40 L321,40 C331,40 339,42 345,46 C363,57 383,70 402,77 Z"/></clipPath>
+
+    <!-- 以下是「随光变色」的部分：它们不在 #car 里，而是在每个实例的普通 DOM 中着色。
+         原因：<use> 的影子树能不能继承 CSS 变量无法在本地验证（Chrome 不暴露 shadowRoot），
+         而整个方向的成立与否全押在这上面 —— 所以不做这个赌注。
+         附带好处：落到 Swift 时它就是「车视图 + 一个光照修饰符」。 -->
+    <path id="rimline" d="M158,77 C170,63 185,49 199,42 C205,38 213,40 223,40 L321,40 C331,40 339,42 345,46"/>
+    <path id="lampF" d="M32,99 C42,94 54,91 68,90"/>
+    <path id="pillarB" d="M255,44 L251,71"/>
+    <path id="tyreHL_F" d="M79,120 A28,28 0 0 1 121,122"/>
+    <path id="tyreHL_R" d="M354,120 A28,28 0 0 1 396,122"/>
+
+    <!-- 车拆成「底」与「盖」两组，好让色光恰好夹在中间：
+         底 = 倒影/车柱/玻璃/车身；色光（天空打在金属上）；盖 = 腰线/车缝/轮拱/车轮。
+         若不分，色光会盖在轮拱暗腔上把它照亮成灰的。 -->
+    <g id="carUnder">
+      <!-- 地面倒影（模糊 + 垂直翻转 + 遮罩淡出） -->
+      <g mask="url(#reflmask)" transform="translate(0,352) scale(1,-1)" filter="url(#b10)" opacity=".30">
+        <use href="#sidebody" fill="#2C3138"/><use href="#sidehouse" fill="#20242A"/>
+      </g>
+      <!-- 车柱与车顶 -->
+      <use href="#sidehouse" fill="url(#pillar)"/>
+      <!-- 玻璃 + 一道斜反射（B 柱由实例着色，见上方说明） -->
+      <use href="#sideglass" fill="url(#glass)"/>
+      <use href="#sideglass" fill="url(#glare)"/>
+      <path d="M219,44 L213.5,71" stroke="rgba(255,255,255,.13)" stroke-width="1.2"/>
+      <path d="M262,44 L258.5,71" stroke="rgba(255,255,255,.13)" stroke-width="1.2"/>
+      <path d="M176,66 C185,56 196,47 207,44" stroke="rgba(255,255,255,.26)" stroke-width="1.1" fill="none"/>
+      <!-- 车身 -->
+      <use href="#sidebody" fill="url(#paint)"/>
+    </g>
+    <g id="carOver">
+      <!-- 腰线转折（金属感的来源：上亮下暗两道） -->
+      <path d="M40,90 C120,85 260,83 452,90" stroke="rgba(255,255,255,.30)" stroke-width="1.15" fill="none"/>
+      <path d="M40,93 C120,88 260,86 452,93" stroke="rgba(0,0,0,.55)" stroke-width="1.6" fill="none"/>
+      <!-- 门槛阴影 -->
+      <path d="M27,154 C120,150 360,150 452,154" stroke="rgba(0,0,0,.9)" stroke-width="7" fill="none" filter="url(#b2)"/>
+      <!-- 门缝与把手 -->
+      <path d="M166,77 L170,153" stroke="rgba(255,255,255,.11)" stroke-width="1.2"/>
+      <path d="M262,77 L266,153" stroke="rgba(255,255,255,.11)" stroke-width="1.2"/>
+      <path d="M340,77 L344,153" stroke="rgba(255,255,255,.11)" stroke-width="1.2"/>
+      <path d="M194,90 h20" stroke="rgba(255,255,255,.36)" stroke-width="1.7" stroke-linecap="round"/>
+      <path d="M290,90 h20" stroke="rgba(255,255,255,.28)" stroke-width="1.7" stroke-linecap="round"/>
+      <path d="M203,74 L188,68 L184,76 L201,80 Z" fill="#0A0B0E" stroke="rgba(255,255,255,.26)" stroke-width="1"/>
+      <!-- 尾灯：永远是暗红（车灯是车自己的语言，不受天空影响） -->
+      <path d="M453,101 C458,104 460,109 461,114" stroke="rgba(229,25,55,.62)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <!-- 后备箱未关：满红。车头在左，所以它必须在车尾（x≈440）—— 首版画在 x=32，那是前保险杠。
+           另外：这段注释的首版结尾写成了 CSS 风格的星号斜杠，导致注释一路吞到下一段注释，
+           这条红线实际上从未被渲染过。（注释文字里绝不能出现注释结束符序列。） -->
+      <path d="M454,92 L442,80" stroke="#E51937" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      <!-- 轮拱与车轮 -->
+      <use href="#archF" fill="#050608"/><use href="#archR" fill="#050608"/>
+      <g>
+        <circle cx="100" cy="144" r="32" fill="url(#tyre)"/>
+        <circle cx="100" cy="144" r="21" fill="url(#rim)"/>
+        <circle cx="100" cy="144" r="20" fill="#0B0D10"/><circle cx="100" cy="144" r="21" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="1.1"/>
+        <g stroke="rgba(255,255,255,.30)" stroke-width="2.1" stroke-linecap="round">
+          <path d="M100,144 L100,125"/><path d="M100,144 L118,138"/><path d="M100,144 L111,159"/><path d="M100,144 L89,159"/><path d="M100,144 L82,138"/>
+        </g>
+        <circle cx="100" cy="144" r="5" fill="#20242A" stroke="rgba(255,255,255,.30)" stroke-width="1.1"/>
+      </g>
+      <g>
+        <circle cx="375" cy="144" r="32" fill="url(#tyre)"/>
+        <circle cx="375" cy="144" r="21" fill="url(#rim)"/>
+        <circle cx="375" cy="144" r="20" fill="#0B0D10"/><circle cx="375" cy="144" r="21" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="1.1"/>
+        <g stroke="rgba(255,255,255,.30)" stroke-width="2.1" stroke-linecap="round">
+          <path d="M375,144 L375,125"/><path d="M375,144 L393,138"/><path d="M375,144 L386,159"/><path d="M375,144 L364,159"/><path d="M375,144 L357,138"/>
+        </g>
+        <circle cx="375" cy="144" r="5" fill="#20242A" stroke="rgba(255,255,255,.30)" stroke-width="1.1"/>
+      </g>
+    </g>
+  </defs>
+</svg>
+
+<div class="wrap">
+
+  <div class="head">
+    <div class="eyebrow">第八稿 · 方向「夜航」</div>
+    <h1>同一个界面，<b>四种光</b></h1>
+    <div class="idea">界面本身没有颜色。颜色来自你车此刻所在地的天空 —— 车停在雨里、在黄昏、在凌晨两点，首页就是那个光。<br>
+      你的车现在怎么样了？这才是车主真正在问的问题，而不是「电池 78%」。</div>
+    <p style="margin-top:16px">下面是<strong>同一个界面</strong>在四个时刻的样子：同一套排版、同一个数字、同一个光带，只有光在变。
+      工艺沿用第七稿的结论没有回退：<b>Inter 200–700</b> 接拉丁与数字、按 SF 字号—字距表排版、车的比例量过
+      （车长 442 / 车高 136 = 0.308L / 轮径 64 = 0.145L）。</p>
+  </div>
+
+  <div class="stack">
+
+  <!-- 破晓 -->
+  <div class="slot">
+    <p class="cap">破晓 05:40</p>
+    <p class="sub">光源低左，冷钢蓝。<b>车灯还亮着</b>（停了一夜，正在等你）。</p>
+    <div class="phone"><div class="screen state-dawn">
+      <div class="island"></div>
+      <div class="status"><span>5:40</span><div class="ri"><svg width="18" height="12"><use href="#st-signal"/></svg><svg width="16" height="12"><use href="#st-wifi"/></svg><svg width="27" height="12"><use href="#st-batt"/></svg></div></div>
+      <div class="page">
+        <div class="meta"><span class="dot"></span><span class="t-meta semib">京A·88888</span><span style="flex:1"></span><span class="t-meta c3">停放 · 家 · 3 小时前</span></div>
+        <div class="win">
+          <div class="sky"></div><div class="ground"></div>
+          <svg class="carfig rise" viewBox="0 0 393 320"><g transform="translate(-55,70) scale(1.0479)">
+            <use href="#carUnder"/>
+            <g clip-path="url(#carpaint)">
+              <rect x="0" y="0" width="480" height="250" style="fill:var(--tint);opacity:var(--tintA);mix-blend-mode:screen"/>
+              <rect x="0" y="60" width="480" height="180" fill="#000" style="opacity:var(--shadeA)"/>
+              <rect x="0" y="92" width="480" height="8" style="fill:var(--rim);opacity:var(--streakA);mix-blend-mode:screen"/>
+            </g>
+            <use href="#carOver"/>
+            <use href="#pillarB" fill="none" style="stroke:var(--rim);opacity:.5" stroke-width="2.2"/>
+            <use href="#rimline" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:var(--rim);opacity:var(--rimBloom)" stroke-width="6"/>
+            <use href="#rimline" fill="none" stroke-linecap="round" style="stroke:var(--rim)" stroke-width="1.7"/>
+            <use href="#lampF" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:var(--lamp);opacity:calc(var(--lampA) * .5)" stroke-width="11"/>
+            <use href="#lampF" fill="none" stroke-linecap="round" style="stroke:var(--lamp);opacity:var(--lampA)" stroke-width="2.6"/>
+            <use href="#tyreHL_F" fill="none" stroke-linecap="round" style="stroke:var(--rim);opacity:.42" stroke-width="1.7"/>
+            <use href="#tyreHL_R" fill="none" stroke-linecap="round" style="stroke:var(--rim);opacity:.42" stroke-width="1.7"/>
+          </g></svg>
+          <div class="scrim"></div>
+          <div class="figwrap">
+            <div class="figure" style="font-size:104px"><span class="cap">当前电量</span>78<span class="u">%</span></div>
+            <div class="side"><div class="t-foot c2">剩余 <span class="semib" style="color:#fff">420 km</span></div><div class="t-foot c2 mono" style="margin-top:2px">停放中 · 车窗已关</div></div>
+          </div>
+          <div class="band"><i style="width:78%"></i></div>
+        </div>
+        <div class="bandcap"><span class="t-cap1 c3">单次充电上限 90%</span><span style="flex:1"></span><span class="t-cap1 c3">预计 1 小时 10 分充满</span></div>
+        <div class="hr" style="margin-top:12px"></div>
+        <div class="row"><span class="k">后备箱</span><span class="v" style="color:var(--brand);font-weight:600">未关闭</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">车门</span><span class="v">4 / 4 已关</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">车窗</span><span class="v">已关闭</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">胎压</span><span class="v">2.4 bar · 正常</span></div>
+        <div class="hr"></div>
+        <div class="tabbar">
+          <div class="tb on"><svg><use href="#i-car"/></svg><span>车况</span></div>
+          <div class="tb"><svg><use href="#i-sliders"/></svg><span>车控</span></div>
+          <div class="tb"><svg><use href="#i-bolt"/></svg><span>充电</span></div>
+          <div class="tb"><svg><use href="#i-route"/></svg><span>行程</span></div>
+          <div class="tb"><svg><use href="#i-person"/></svg><span>我的</span></div>
+        </div>
+        <div class="homebar"><i></i></div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 正午 -->
+  <div class="slot">
+    <p class="cap">正午 12:10</p>
+    <p class="sub">顶光偏右，几乎没有颜色。天空最亮的时刻，<b>车顶轮廓光最薄</b>。</p>
+    <div class="phone"><div class="screen state-noon">
+      <div class="island"></div>
+      <div class="status"><span>12:10</span><div class="ri"><svg width="18" height="12"><use href="#st-signal"/></svg><svg width="16" height="12"><use href="#st-wifi"/></svg><svg width="27" height="12"><use href="#st-batt"/></svg></div></div>
+      <div class="page">
+        <div class="meta"><span class="dot"></span><span class="t-meta semib">京A·88888</span><span style="flex:1"></span><span class="t-meta c3">停放 · 公司地库 · 刚刚</span></div>
+        <div class="win">
+          <div class="sky"></div><div class="ground"></div>
+          <svg class="carfig rise" viewBox="0 0 393 320"><g transform="translate(-55,70) scale(1.0479)">
+            <use href="#carUnder"/>
+            <g clip-path="url(#carpaint)">
+              <rect x="0" y="0" width="480" height="250" style="fill:var(--tint);opacity:var(--tintA);mix-blend-mode:screen"/>
+              <rect x="0" y="60" width="480" height="180" fill="#000" style="opacity:var(--shadeA)"/>
+              <rect x="0" y="92" width="480" height="8" style="fill:var(--rim);opacity:var(--streakA);mix-blend-mode:screen"/>
+            </g>
+            <use href="#carOver"/>
+            <use href="#pillarB" fill="none" style="stroke:var(--rim);opacity:.5" stroke-width="2.2"/>
+            <use href="#rimline" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:var(--rim);opacity:var(--rimBloom)" stroke-width="6"/>
+            <use href="#rimline" fill="none" stroke-linecap="round" style="stroke:var(--rim)" stroke-width="1.7"/>
+            <use href="#lampF" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:var(--lamp);opacity:calc(var(--lampA) * .5)" stroke-width="11"/>
+            <use href="#lampF" fill="none" stroke-linecap="round" style="stroke:var(--lamp);opacity:var(--lampA)" stroke-width="2.6"/>
+            <use href="#tyreHL_F" fill="none" stroke-linecap="round" style="stroke:var(--rim);opacity:.42" stroke-width="1.7"/>
+            <use href="#tyreHL_R" fill="none" stroke-linecap="round" style="stroke:var(--rim);opacity:.42" stroke-width="1.7"/>
+          </g></svg>
+          <div class="scrim"></div>
+          <div class="figwrap">
+            <div class="figure" style="font-size:104px"><span class="cap">当前电量</span>62<span class="u">%</span></div>
+            <div class="side"><div class="t-foot c2">剩余 <span class="semib" style="color:#fff">334 km</span></div><div class="t-foot c2 mono" style="margin-top:2px">未充电 · 车内 24℃</div></div>
+          </div>
+          <div class="band"><i style="width:62%"></i></div>
+        </div>
+        <div class="bandcap"><span class="t-cap1 c3">单次充电上限 90%</span><span style="flex:1"></span><span class="t-cap1 c3">按当前电耗可行驶 334 km</span></div>
+        <div class="hr" style="margin-top:12px"></div>
+        <div class="row"><span class="k">后备箱</span><span class="v">已关闭</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">车门</span><span class="v">4 / 4 已关</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">车窗</span><span class="v">已关闭</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">胎压</span><span class="v">2.4 bar · 正常</span></div>
+        <div class="hr"></div>
+        <div class="tabbar">
+          <div class="tb on"><svg><use href="#i-car"/></svg><span>车况</span></div>
+          <div class="tb"><svg><use href="#i-sliders"/></svg><span>车控</span></div>
+          <div class="tb"><svg><use href="#i-bolt"/></svg><span>充电</span></div>
+          <div class="tb"><svg><use href="#i-route"/></svg><span>行程</span></div>
+          <div class="tb"><svg><use href="#i-person"/></svg><span>我的</span></div>
+        </div>
+        <div class="homebar"><i></i></div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 黄昏 -->
+  <div class="slot">
+    <p class="cap">黄昏 19:20 &nbsp;·&nbsp; 这一张是主推</p>
+    <p class="sub">光源贴着地平线，熔橙。金属把天空的颜色<b>反射到车身上</b> —— 界面的光带也是橙的。</p>
+    <div class="phone"><div class="screen state-dusk">
+      <div class="island"></div>
+      <div class="status"><span>19:20</span><div class="ri"><svg width="18" height="12"><use href="#st-signal"/></svg><svg width="16" height="12"><use href="#st-wifi"/></svg><svg width="27" height="12"><use href="#st-batt"/></svg></div></div>
+      <div class="page">
+        <div class="meta"><span class="dot"></span><span class="t-meta semib">京A·88888</span><span style="flex:1"></span><span class="t-meta c3">行驶中 · 建国路 · 现在</span></div>
+        <div class="win">
+          <div class="sky"></div><div class="ground"></div>
+          <svg class="carfig rise" viewBox="0 0 393 320"><g transform="translate(-55,70) scale(1.0479)">
+            <use href="#carUnder"/>
+            <g clip-path="url(#carpaint)">
+              <rect x="0" y="0" width="480" height="250" style="fill:var(--tint);opacity:var(--tintA);mix-blend-mode:screen"/>
+              <rect x="0" y="60" width="480" height="180" fill="#000" style="opacity:var(--shadeA)"/>
+              <rect x="0" y="92" width="480" height="8" style="fill:var(--rim);opacity:var(--streakA);mix-blend-mode:screen"/>
+            </g>
+            <use href="#carOver"/>
+            <use href="#pillarB" fill="none" style="stroke:var(--rim);opacity:.5" stroke-width="2.2"/>
+            <use href="#rimline" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:var(--rim);opacity:var(--rimBloom)" stroke-width="6"/>
+            <use href="#rimline" fill="none" stroke-linecap="round" style="stroke:var(--rim)" stroke-width="1.7"/>
+            <use href="#lampF" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:var(--lamp);opacity:calc(var(--lampA) * .5)" stroke-width="11"/>
+            <use href="#lampF" fill="none" stroke-linecap="round" style="stroke:var(--lamp);opacity:var(--lampA)" stroke-width="2.6"/>
+            <use href="#tyreHL_F" fill="none" stroke-linecap="round" style="stroke:var(--rim);opacity:.42" stroke-width="1.7"/>
+            <use href="#tyreHL_R" fill="none" stroke-linecap="round" style="stroke:var(--rim);opacity:.42" stroke-width="1.7"/>
+          </g></svg>
+          <div class="scrim"></div>
+          <div class="figwrap">
+            <div class="figure" style="font-size:104px"><span class="cap">当前电量</span>78<span class="u">%</span></div>
+            <div class="side"><div class="t-foot c2">剩余 <span class="semib" style="color:#fff">420 km</span></div><div class="t-foot c2 mono" style="margin-top:2px">充电中 · 6.8 kW</div></div>
+          </div>
+          <div class="band"><i style="width:78%"></i></div>
+        </div>
+        <div class="bandcap"><span class="t-cap1 c3">单次充电上限 90%</span><span style="flex:1"></span><span class="t-cap1 c3">预计 1 小时 10 分充满</span></div>
+        <div class="hr" style="margin-top:12px"></div>
+        <div class="row"><span class="k">后备箱</span><span class="v" style="color:var(--brand);font-weight:600">未关闭</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">车门</span><span class="v">4 / 4 已关</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">车窗</span><span class="v">已关闭</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">胎压</span><span class="v">2.4 bar · 正常</span></div>
+        <div class="hr"></div>
+        <div class="tabbar">
+          <div class="tb on"><svg><use href="#i-car"/></svg><span>车况</span></div>
+          <div class="tb"><svg><use href="#i-sliders"/></svg><span>车控</span></div>
+          <div class="tb"><svg><use href="#i-bolt"/></svg><span>充电</span></div>
+          <div class="tb"><svg><use href="#i-route"/></svg><span>行程</span></div>
+          <div class="tb"><svg><use href="#i-person"/></svg><span>我的</span></div>
+        </div>
+        <div class="homebar"><i></i></div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 深夜 -->
+  <div class="slot">
+    <p class="cap">深夜 02:40</p>
+    <p class="sub">没有天空。<b>车灯自己是唯一的光源</b> —— 车身几乎全暗，只剩灯与轮廓。</p>
+    <div class="phone"><div class="screen state-night">
+      <div class="island"></div>
+      <div class="status"><span>2:40</span><div class="ri"><svg width="18" height="12"><use href="#st-signal"/></svg><svg width="16" height="12"><use href="#st-wifi"/></svg><svg width="27" height="12"><use href="#st-batt"/></svg></div></div>
+      <div class="page">
+        <div class="meta"><span class="dot"></span><span class="t-meta semib">京A·88888</span><span style="flex:1"></span><span class="t-meta c3">停放 · 家 · 41 分钟前</span></div>
+        <div class="win">
+          <div class="sky"></div><div class="ground"></div>
+          <svg class="carfig rise" viewBox="0 0 393 320"><g transform="translate(-55,70) scale(1.0479)">
+            <use href="#carUnder"/>
+            <g clip-path="url(#carpaint)">
+              <rect x="0" y="0" width="480" height="250" style="fill:var(--tint);opacity:var(--tintA);mix-blend-mode:screen"/>
+              <rect x="0" y="60" width="480" height="180" fill="#000" style="opacity:var(--shadeA)"/>
+              <rect x="0" y="92" width="480" height="8" style="fill:var(--rim);opacity:var(--streakA);mix-blend-mode:screen"/>
+            </g>
+            <use href="#carOver"/>
+            <use href="#pillarB" fill="none" style="stroke:var(--rim);opacity:.5" stroke-width="2.2"/>
+            <use href="#rimline" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:var(--rim);opacity:var(--rimBloom)" stroke-width="6"/>
+            <use href="#rimline" fill="none" stroke-linecap="round" style="stroke:var(--rim)" stroke-width="1.7"/>
+            <use href="#lampF" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:var(--lamp);opacity:calc(var(--lampA) * .5)" stroke-width="11"/>
+            <use href="#lampF" fill="none" stroke-linecap="round" style="stroke:var(--lamp);opacity:var(--lampA)" stroke-width="2.6"/>
+            <use href="#tyreHL_F" fill="none" stroke-linecap="round" style="stroke:var(--rim);opacity:.42" stroke-width="1.7"/>
+            <use href="#tyreHL_R" fill="none" stroke-linecap="round" style="stroke:var(--rim);opacity:.42" stroke-width="1.7"/>
+          </g></svg>
+          <div class="scrim"></div>
+          <div class="figwrap">
+            <div class="figure" style="font-size:104px"><span class="cap">当前电量</span>43<span class="u">%</span></div>
+            <div class="side"><div class="t-foot c2">剩余 <span class="semib" style="color:#fff">232 km</span></div><div class="t-foot c2 mono" style="margin-top:2px">充电中 · 2.1 kW（夜间谷电）</div></div>
+          </div>
+          <div class="band"><i style="width:43%"></i></div>
+        </div>
+        <div class="bandcap"><span class="t-cap1 c3">单次充电上限 90%</span><span style="flex:1"></span><span class="t-cap1 c3">设定 06:30 前充满</span></div>
+        <div class="hr" style="margin-top:12px"></div>
+        <div class="row"><span class="k">后备箱</span><span class="v">已关闭</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">车门</span><span class="v">4 / 4 已关</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">车窗</span><span class="v">已关闭</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">胎压</span><span class="v">2.4 bar · 正常</span></div>
+        <div class="hr"></div>
+        <div class="tabbar">
+          <div class="tb on"><svg><use href="#i-car"/></svg><span>车况</span></div>
+          <div class="tb"><svg><use href="#i-sliders"/></svg><span>车控</span></div>
+          <div class="tb"><svg><use href="#i-bolt"/></svg><span>充电</span></div>
+          <div class="tb"><svg><use href="#i-route"/></svg><span>行程</span></div>
+          <div class="tb"><svg><use href="#i-person"/></svg><span>我的</span></div>
+        </div>
+        <div class="homebar"><i></i></div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 充电：证明这条光带是一个系统，不是一次性装饰 -->
+  <div class="slot">
+    <p class="cap">充电 · 黄昏（同一条光带）</p>
+    <p class="sub">在车况它是<b>地平线</b>，在这里它是<b>充到 90% 的进度</b>；在行程它是折线的基线。<b>全 App 只有一个形状。</b></p>
+    <div class="phone"><div class="screen state-dusk">
+      <div class="island"></div>
+      <div class="status"><span>19:22</span><div class="ri"><svg width="18" height="12"><use href="#st-signal"/></svg><svg width="16" height="12"><use href="#st-wifi"/></svg><svg width="27" height="12"><use href="#st-batt"/></svg></div></div>
+      <div class="page">
+        <div class="meta"><span class="dot"></span><span class="t-meta semib">京A·88888</span><span style="flex:1"></span><span class="t-meta c3">充电桩 · 家 · 14:32 开始</span></div>
+        <div class="win">
+          <div class="sky"></div><div class="ground"></div>
+          <svg class="carfig rise" viewBox="0 0 393 320"><g transform="translate(-55,70) scale(1.0479)">
+            <use href="#carUnder"/>
+            <g clip-path="url(#carpaint)">
+              <rect x="0" y="0" width="480" height="250" style="fill:var(--tint);opacity:var(--tintA);mix-blend-mode:screen"/>
+              <rect x="0" y="60" width="480" height="180" fill="#000" style="opacity:var(--shadeA)"/>
+              <rect x="0" y="92" width="480" height="8" style="fill:var(--rim);opacity:var(--streakA);mix-blend-mode:screen"/>
+            </g>
+            <use href="#carOver"/>
+            <use href="#pillarB" fill="none" style="stroke:var(--rim);opacity:.5" stroke-width="2.2"/>
+            <use href="#rimline" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:var(--rim);opacity:var(--rimBloom)" stroke-width="6"/>
+            <use href="#rimline" fill="none" stroke-linecap="round" style="stroke:var(--rim)" stroke-width="1.7"/>
+            <use href="#lampF" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:var(--lamp);opacity:calc(var(--lampA) * .5)" stroke-width="11"/>
+            <use href="#lampF" fill="none" stroke-linecap="round" style="stroke:var(--lamp);opacity:var(--lampA)" stroke-width="2.6"/>
+            <use href="#tyreHL_F" fill="none" stroke-linecap="round" style="stroke:var(--rim);opacity:.42" stroke-width="1.7"/>
+            <use href="#tyreHL_R" fill="none" stroke-linecap="round" style="stroke:var(--rim);opacity:.42" stroke-width="1.7"/>
+          </g></svg>
+          <div class="scrim"></div>
+          <div class="figwrap">
+            <div class="figure" style="font-size:104px"><span class="cap">当前功率</span>6.8<span class="u">kW</span></div>
+            <div class="side"><div class="t-foot c2">已充 <span class="semib" style="color:#fff">24.8 kWh</span></div><div class="t-foot c2 mono" style="margin-top:2px">78% → 90%</div></div>
+          </div>
+          <div class="band"><i style="width:87%"></i></div>
+        </div>
+        <div class="bandcap"><span class="t-cap1 c3">已充至 78% / 上限 90%</span><span style="flex:1"></span><span class="t-cap1 c3">预计 1 小时 10 分充满</span></div>
+        <div class="hr" style="margin-top:12px"></div>
+        <div class="row"><span class="k">本次充电</span><span class="v s mono">24.8 kWh</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">充电功率</span><span class="v">6.8 kW · 慢充</span></div>
+        <div class="hr in"></div>
+        <div class="row"><span class="k">电价</span><span class="v">¥0.58 / kWh · 家充</span></div>
+        <div class="hr"></div>
+        <div class="tabbar">
+          <div class="tb"><svg><use href="#i-car"/></svg><span>车况</span></div>
+          <div class="tb"><svg><use href="#i-sliders"/></svg><span>车控</span></div>
+          <div class="tb on"><svg><use href="#i-bolt"/></svg><span>充电</span></div>
+          <div class="tb"><svg><use href="#i-route"/></svg><span>行程</span></div>
+          <div class="tb"><svg><use href="#i-person"/></svg><span>我的</span></div>
+        </div>
+        <div class="homebar"><i></i></div>
+      </div>
+    </div></div>
+  </div>
+
+  </div><!-- /stack -->
+
+  <!-- ===================== 1:1 ===================== -->
+  <div class="detail">
+    <h2>1:1 细节 —— 工艺只能在这个尺度上判断</h2>
+    <p class="hint">真实像素（393pt 宽、未缩放）。上面的手机框会被面板宽度缩放，字重、发丝线、光带的厚度只有在这里看得准。<b>横向滚动</b>看更多。</p>
+    <div class="rail">
+
+      <div class="card">
+        <div class="bar-top">光带 —— 一个形状，四个用途</div>
+        <div class="bandrow">
+          <div style="background:rgba(255,255,255,.13)"><i style="width:78%;background:#DCEAF6;color:#DCEAF6"></i><b>破晓 · 电量 78%</b></div>
+          <div style="background:rgba(255,255,255,.13)"><i style="width:62%;background:#F2F5F8;color:#F2F5F8"></i><b>正午 · 电量 62%</b></div>
+          <div style="background:rgba(255,255,255,.13)"><i style="width:78%;background:#FFB162;color:#FFB162"></i><b>黄昏 · 电量 78%</b></div>
+          <div style="background:rgba(255,255,255,.13)"><i style="width:43%;background:#CFE0F2;color:#CFE0F2"></i><b>深夜 · 电量 43%</b></div>
+        </div>
+        <div class="why">同一根 4pt 的光带：在车况是<b>地平线</b>、也同时是电量；在充电是<b>充到 90% 的进度</b>；
+          在行程是<b>折线的基线</b>。光带自身的颜色 = 你车所在地天空的颜色。
+          <b>全 App 只有一个形状</b>——这就是可识别性：换到任何一屏你都还认得它。</div>
+      </div>
+
+      <div class="card">
+        <div class="bar-top">巨字 —— 200 字重，字距 -0.045em</div>
+        <div style="padding:22px 20px 20px">
+          <div class="figure" style="font-size:132px"><span class="cap">当前电量</span>78<span class="u">%</span></div>
+          <div style="display:flex;margin-top:18px;align-items:baseline">
+            <span class="t-foot c2">剩余 <span class="semib" style="color:#fff">420 km</span></span>
+            <span style="flex:1"></span><span class="t-foot c2 mono">充电中 · 6.8 kW</span>
+          </div>
+        </div>
+        <div class="why">200 字重是这个方向的性格：**细到像光，而不是像 UI**。字距按 SF Pro Display 的规则收到
+          <b>-0.045em</b>（字号越大越紧），数字是等宽所以变化时不抖；单位收成 0.26 倍并抬到基线之上 ——
+          数字是主角，单位是注脚。</div>
+      </div>
+
+      <div class="card">
+        <div class="bar-top">黄昏 · 窗口 1:1</div>
+        <div class="win state-dusk" style="height:300px">
+          <div class="sky"></div><div class="ground"></div>
+          <svg class="carfig" viewBox="0 0 393 320"><g transform="translate(-55,70) scale(1.0479)">
+            <use href="#carUnder"/>
+            <g clip-path="url(#carpaint)">
+              <rect x="0" y="0" width="480" height="250" style="fill:var(--tint);opacity:var(--tintA);mix-blend-mode:screen"/>
+              <rect x="0" y="60" width="480" height="180" fill="#000" style="opacity:var(--shadeA)"/>
+              <rect x="0" y="92" width="480" height="8" style="fill:var(--rim);opacity:var(--streakA);mix-blend-mode:screen"/>
+            </g>
+            <use href="#carOver"/>
+            <use href="#pillarB" fill="none" style="stroke:var(--rim);opacity:.5" stroke-width="2.2"/>
+            <use href="#rimline" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:var(--rim);opacity:var(--rimBloom)" stroke-width="6"/>
+            <use href="#rimline" fill="none" stroke-linecap="round" style="stroke:var(--rim)" stroke-width="1.7"/>
+            <use href="#lampF" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:var(--lamp);opacity:calc(var(--lampA) * .5)" stroke-width="11"/>
+            <use href="#lampF" fill="none" stroke-linecap="round" style="stroke:var(--lamp);opacity:var(--lampA)" stroke-width="2.6"/>
+            <use href="#tyreHL_F" fill="none" stroke-linecap="round" style="stroke:var(--rim);opacity:.42" stroke-width="1.7"/>
+            <use href="#tyreHL_R" fill="none" stroke-linecap="round" style="stroke:var(--rim);opacity:.42" stroke-width="1.7"/>
+          </g></svg>
+          <div class="scrim"></div>
+          <div class="figwrap"><div class="figure" style="font-size:96px"><span class="cap">当前电量</span>78<span class="u">%</span></div></div>
+          <div class="band"><i style="width:78%"></i></div>
+        </div>
+        <div class="why">车被<b>裁切出血</b>（左右各切掉约 35pt），停在低处 —— 完整线稿会暴露「这是画出来的」，
+          裁切让它读成一张照片。光源在右下、贴着地平线，所以车身右下侧最亮，
+          天空的颜色被金属<b>反射</b>回画面。压在车身上的巨字底下有一层渐变遮罩（scrim），保证任何光下都读得清。</div>
+      </div>
+
+      <div class="card">
+        <div class="bar-top">事实行 · 发丝线内缩 20pt</div>
+        <div style="padding:0">
+          <div class="hr"></div>
+          <div class="row"><span class="k">后备箱</span><span class="v" style="color:var(--brand);font-weight:600">未关闭</span></div>
+          <div class="hr in"></div>
+          <div class="row"><span class="k">车门</span><span class="v">4 / 4 已关</span></div>
+          <div class="hr in"></div>
+          <div class="row"><span class="k">胎压</span><span class="v">2.4 bar · 正常</span></div>
+          <div class="hr"></div>
+        </div>
+        <div class="why">行高 46pt；分隔线在文字左侧内缩 20pt、不通栏（iOS 分组列表规则）；
+          数值右对齐且等宽，形成一条干净的右侧栏。红色只出现在<b>危险</b>（后备箱未关）与品牌点。</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== 说明 ===================== -->
+  <div class="notes">
+    <div class="note">
+      <h3>四种光 · 具体数值</h3>
+      <table>
+        <tr><td>破晓 05:40</td><td>#050A12 → #4C6A80 · 冷钢 · 灯 55%</td></tr>
+        <tr><td>正午 12:10</td><td>#2E353C → #A7B0B7 · 近无彩 · 灯 20%</td></tr>
+        <tr><td>黄昏 19:20</td><td>#150C1C → #C25529 · 熔橙 · 灯 90%</td></tr>
+        <tr><td>深夜 02:40</td><td>#030509 → #0F151D · 无天光 · 灯 100%</td></tr>
+      </table>
+      <p style="margin-top:10px">每种光只有一个光源坐标、一组色值与一个「车灯亮度」——上车灯亮度是真实的：
+        <b>深夜它是唯一光源</b>，所以 100%；正午几乎不需要它，20%。</p>
+    </div>
+    <div class="note">
+      <h3>为什么这次不是换皮</h3>
+      <p><b>换皮</b>是同一套骨架换颜色。<b>这次是骨架本身在讲事情</b>：<br><br>
+        ① 车不再是一个图标，而是「你的车现在在哪、那边什么光」的画面；<br>
+        ② 光带把「地平线 / 电量 / 充电进度 / 折线基线」统一成一个形状 —— 这是<b>系统</b>，不是装饰；<br>
+        ③ 巨字压在车身上，把「数据」和「对象」放进同一张画面里，界面不再分成上下两块。</p>
+    </div>
+    <div class="note">
+      <h3>一份车的定义，四种光</h3>
+      <p>整个页面里车只有<b>一份</b> SVG 定义（<code>&lt;defs&gt;</code> 里的 <code>#car</code>），
+        四屏用 <code>&lt;use&gt;</code> 复用；四种光通过 CSS 变量注入：
+        <code>--tint</code> 以 screen 混合打在金属上、<code>--rim</code> 是轮廓光色、
+        <code>--lampA</code> 是车灯亮度。<br><br>
+        这意味着落到 Swift 侧时，<b>车也只需要实现一次</b>，光是一个参数。</p>
+    </div>
+    <div class="note">
+      <h3>动效：仍然只有一次</h3>
+      <p>① 车从下方 10pt 升起淡入（车醒了）② 光带从 0 长到位。没有呼吸、没有常驻发光、没有粒子 ——
+        停在静止画面时它是一张产品照。<br><br>
+        遵守 <code>prefers-reduced-motion</code>。<br><br>
+        <b>可以再往上加一层</b>：让光随你车所在地的<b>真实时间</b>缓慢漂移（90 秒一个循环），
+        App 就真的「活」在你的当下 —— 这是这个方向天然能长出来的东西。</p>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

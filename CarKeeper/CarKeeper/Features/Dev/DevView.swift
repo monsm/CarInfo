@@ -33,6 +33,8 @@ struct DevView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                themeEntry
+                legacyHomeEntry
                 swatchGroup(title: "画布与表面", footer: "内容层不透明：玻璃只允许出现在导航栏、Tab 栏与弹层。", items: surfaceTokens)
                 swatchGroup(title: "语义色", footer: "颜色只来自系统，且只表达状态；界面里没有装饰性彩色。", items: semanticTokens)
                 typographyGroup
@@ -58,6 +60,86 @@ struct DevView: View {
             Button("取消", role: .cancel) { }
         } message: {
             Text("只清空内存中的车况 / 充电 / 定位 / 环境 / 检测 / 消息缓存，不会退出登录。")
+        }
+    }
+
+    // MARK: - 艺术主题入口
+
+    /// 艺术主题入口。切换后**全 App** 立刻变 ——
+    /// 令牌（TokensPalette）是唯一读取点，而这里换的是值，不是名字。
+    /// 样张页：Features/ThemeGalleryView.swift；取值：Design/ArtTheme.swift。
+    private var themeEntry: some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+            DSSectionHeader(title: "艺术主题")
+            NavigationLink {
+                ThemeGalleryView()
+            } label: {
+                HStack(spacing: TokensSpacing.md) {
+                    Circle()
+                        .fill(TokensPalette.accent)
+                        .frame(width: 10, height: 10)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(ArtThemeStore.current.title)
+                            .font(TokensTypo.subheadline)
+                            .foregroundStyle(TokensPalette.primary)
+                        Text(ArtThemeStore.current.mechanism)
+                            .font(TokensTypo.caption)
+                            .foregroundStyle(TokensPalette.secondary)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: TokensSpacing.sm)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: TokensSize.iconSm, weight: .semibold))
+                        .foregroundStyle(TokensPalette.tertiary)
+                }
+                .padding(TokensSpacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background {
+                    RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                        .fill(TokensPalette.surface)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: - 旧版首页（对照）
+
+    /// 首页改成以地图为主屏之后，旧版首页仍然随时可看。
+    /// 它的价值不是“留着不用”，而是：**任何一个新方向都该有一个可信的对照** ——
+    /// 能随时切回去比较，才不会因为“只见过新的”而误以为新的更好。
+    private var legacyHomeEntry: some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+            DSSectionHeader(title: "旧版首页（对照）")
+            NavigationLink {
+                HomeView()
+            } label: {
+                HStack(spacing: TokensSpacing.md) {
+                    Image(systemName: "list.bullet.rectangle")
+                        .font(.system(size: 14))
+                        .foregroundStyle(TokensPalette.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("车况列表版")
+                            .font(TokensTypo.subheadline)
+                            .foregroundStyle(TokensPalette.primary)
+                        Text("现在首页是以地图为主屏；这一版是切换前的列表版")
+                            .font(TokensTypo.caption)
+                            .foregroundStyle(TokensPalette.secondary)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: TokensSpacing.sm)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: TokensSize.iconSm, weight: .semibold))
+                        .foregroundStyle(TokensPalette.tertiary)
+                }
+                .padding(TokensSpacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background {
+                    RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                        .fill(TokensPalette.surface)
+                }
+            }
+            .buttonStyle(.plain)
         }
     }
 

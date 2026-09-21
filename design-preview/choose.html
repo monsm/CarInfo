@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>选一个 · 今天这条时间线 / 五种画册版式</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=Noto+Serif+SC:wght@300;400;600&display=swap">
+<style>
+/* ============================================================
+   基础：纸
+   ============================================================ */
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+html,body{margin:0;padding:0}
+body{
+  background:#E9E6E0;
+  color:#141412;
+  font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;
+  font-weight:400;
+  padding:22px 14px 70px;
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  opacity:.05;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
+   选单头（给用户看的导航，不属于设计本身）
+   ============================================================ */
+.pick{position:relative;z-index:1;max-width:760px;margin:0 auto 26px}
+.pick h1{font-size:15px;font-weight:600;letter-spacing:.01em;margin:0 0 6px}
+.pick p{font-size:12.5px;line-height:1.7;color:#5C574E;margin:0 0 14px}
+.pick .keys{display:flex;flex-wrap:wrap;gap:6px}
+.pick .keys span{
+  font-size:11.5px;font-weight:500;padding:5px 9px;border-radius:999px;
+  background:#141412;color:#F6F3EE;letter-spacing:.02em;
+}
+.pick .keys span i{font-style:normal;opacity:.55;margin-left:5px;font-weight:400}
+
+/* ============================================================
+   设备框 + 缩放到面板宽度
+   ============================================================ */
+.stage{position:relative;z-index:1;max-width:760px;margin:0 auto}
+.block{margin:0 0 46px}
+.block > h2{
+  font-family:"Noto Serif SC",Songti SC,serif;
+  font-size:15px;font-weight:600;letter-spacing:.06em;margin:0 0 3px;
+}
+.block > .why{font-size:12px;line-height:1.65;color:#6B655B;margin:0 0 12px;max-width:520px}
+.block > .why b{color:#141412;font-weight:600}
+
+.device{
+  width:390px;height:844px;overflow:hidden;position:relative;
+  background:#FAF8F5;border-radius:44px;flex:none;
+  box-shadow:0 0 0 1px rgba(20,20,18,.10), 0 18px 40px -22px rgba(20,20,18,.42);
+}
+@media (max-width:440px){ .device{zoom:.80} }
+@media (max-width:325px){ .device{zoom:.70} }
+
+/* 状态条 */
+.statusbar{
+  position:absolute;top:0;left:0;right:0;height:54px;z-index:9;
+  display:flex;align-items:flex-end;justify-content:space-between;
+  padding:0 30px 7px;font-size:12.5px;font-weight:500;letter-spacing:.02em;
+  font-variant-numeric:tabular-nums;
+}
+.statusbar .glyph{letter-spacing:.06em;font-size:11px;opacity:.75}
+
+/* 纸张质感（每屏一层细颗粒） */
+.device::after{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:20;
+  opacity:.045;mix-blend-mode:multiply;border-radius:44px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.7'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
+   照片（用图层模拟，真机上换成你自己的照片）
+   ============================================================ */
+.ph{position:relative;overflow:hidden;background:#111}
+.ph .b0,.ph .b1,.ph .b2,.ph .b3{position:absolute;border-radius:50%}
+.ph .ground{position:absolute;left:-6%;right:-6%;bottom:0}
+.ph .car{position:absolute;border-radius:42% 42% 12% 12%/70% 70% 10% 10%}
+.ph .vig{position:absolute;inset:0;
+  background:radial-gradient(120% 90% at 50% 42%,rgba(0,0,0,0) 38%,rgba(0,0,0,.42) 100%)}
+.ph .grain{position:absolute;inset:0;opacity:.17;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='130'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='130' height='130' filter='url(%23n)' opacity='0.7'/%3E%3C/svg%3E")}
+
+/* 深夜 21:40 — 唯一的光是地库灯与车灯 */
+.pl-night{background:linear-gradient(180deg,#0B0E14 0%,#141922 46%,#1B2029 62%,#0A0C10 100%)}
+.pl-night .b0{width:120px;height:120px;left:-24px;top:16%;background:radial-gradient(circle,rgba(255,196,120,.85),rgba(255,196,120,0) 68%);filter:blur(14px)}
+.pl-night .b1{width:70px;height:70px;right:8%;top:30%;background:radial-gradient(circle,rgba(255,225,190,.55),rgba(255,225,190,0) 70%);filter:blur(16px)}
+.pl-night .b2{width:96px;height:96px;right:22%;top:52%;background:radial-gradient(circle,rgba(255,70,60,.5),rgba(255,70,60,0) 70%);filter:blur(20px)}
+.pl-night .ground{height:38%;background:linear-gradient(180deg,rgba(22,26,34,.2),#080A0D 60%)}
+.pl-night .car{width:150px;height:44px;right:14%;bottom:23%;background:linear-gradient(180deg,#2A3038,#101318);filter:blur(1.4px)}
+
+/* 破晓 07:42 */
+.pl-dawn{background:linear-gradient(180deg,#2E3C56 0%,#6C7392 34%,#C79A8E 54%,#8A7480 70%,#3A3540 100%)}
+.pl-dawn .b0{width:150px;height:150px;right:-30px;top:22%;background:radial-gradient(circle,rgba(255,214,174,.72),rgba(255,214,174,0) 66%);filter:blur(20px)}
+.pl-dawn .b1{width:90px;height:90px;left:6%;top:44%;background:radial-gradient(circle,rgba(255,240,225,.4),rgba(255,240,225,0) 70%);filter:blur(18px)}
+.pl-dawn .ground{height:32%;background:linear-gradient(180deg,rgba(58,53,64,.28),#26232B 70%)}
+.pl-dawn .car{width:140px;height:40px;left:16%;bottom:20%;background:linear-gradient(180deg,#3A3540,#1B1920);filter:blur(1.6px)}
+
+/* 清晨 08:20 */
+.pl-morn{background:linear-gradient(180deg,#93A8BF 0%,#BBC7D4 40%,#D6D9DA 60%,#9A9B99 100%)}
+.pl-morn .b0{width:180px;height:180px;left:4%;top:8%;background:radial-gradient(circle,rgba(255,255,255,.75),rgba(255,255,255,0) 66%);filter:blur(24px)}
+.pl-morn .b1{width:110px;height:110px;right:12%;top:34%;background:radial-gradient(circle,rgba(255,247,230,.5),rgba(255,247,230,0) 70%);filter:blur(20px)}
+.pl-morn .ground{height:34%;background:linear-gradient(180deg,rgba(120,122,124,.35),#6E7073 78%)}
+.pl-morn .car{width:156px;height:46px;right:12%;bottom:21%;background:linear-gradient(180deg,#5A5F66,#2C3036);filter:blur(1.3px)}
+
+/* 正午 12:10 */
+.pl-noon{background:linear-gradient(180deg,#C6D3DE 0%,#E2E7EA 44%,#EDE9E2 58%,#B9B4AB 100%)}
+.pl-noon .b0{width:220px;height:220px;left:50%;top:2%;transform:translateX(-50%);background:radial-gradient(circle,rgba(255,255,255,.9),rgba(255,255,255,0) 62%);filter:blur(28px)}
+.pl-noon .b1{width:120px;height:120px;right:4%;top:40%;background:radial-gradient(circle,rgba(255,240,214,.45),rgba(255,240,214,0) 70%);filter:blur(22px)}
+.pl-noon .ground{height:36%;background:linear-gradient(180deg,rgba(180,175,166,.4),#A39E95 80%)}
+.pl-noon .car{width:150px;height:44px;left:18%;bottom:22%;background:linear-gradient(180deg,#8D8A85,#4E4C4A);filter:blur(1.5px)}
+
+/* 黄昏 18:05 */
+.pl-dusk{background:linear-gradient(180deg,#221C33 0%,#5A3350 30%,#B3543F 52%,#E8843C 66%,#4A2A28 100%)}
+.pl-dusk .b0{width:230px;height:230px;right:-40px;top:40%;background:radial-gradient(circle,rgba(255,168,86,.85),rgba(255,168,86,0) 62%);filter:blur(22px)}
+.pl-dusk .b1{width:100px;height:100px;left:10%;top:24%;background:radial-gradient(circle,rgba(216,180,220,.4),rgba(216,180,220,0) 70%);filter:blur(20px)}
+.pl-dusk .b2{width:90px;height:90px;left:38%;top:58%;background:radial-gradient(circle,rgba(255,96,64,.6),rgba(255,96,64,0) 70%);filter:blur(18px)}
+.pl-dusk .ground{height:30%;background:linear-gradient(180deg,rgba(58,34,32,.4),#20161A 72%)}
+.pl-dusk .car{width:162px;height:48px;left:12%;bottom:18%;background:linear-gradient(180deg,#2A1A20,#100B0E);filter:blur(1.4px)}
+
+/* 入夜 18:52 */
+.pl-eve{background:linear-gradient(180deg,#111528 0%,#28304F 34%,#5A5480 54%,#2A2A3C 72%,#0D0F18 100%)}
+.pl-eve .b0{width:130px;height:130px;left:-20px;top:38%;background:radial-gradient(circle,rgba(255,180,120,.6),rgba(255,180,120,0) 68%);filter:blur(18px)}
+.pl-eve .b1{width:80px;height:80px;right:14%;top:44%;background:radial-gradient(circle,rgba(255,86,70,.55),rgba(255,86,70,0) 70%);filter:blur(18px)}
+.pl-eve .b2{width:70px;height:70px;right:34%;top:22%;background:radial-gradient(circle,rgba(200,214,255,.35),rgba(200,214,255,0) 72%);filter:blur(18px)}
+.pl-eve .ground{height:34%;background:linear-gradient(180deg,rgba(26,28,40,.4),#0B0C12 74%)}
+.pl-eve .car{width:150px;height:44px;right:16%;bottom:22%;background:linear-gradient(180deg,#232634,#0C0D13);filter:blur(1.4px)}
+
+/* ============================================================
+   画册排版基元
+   ============================================================ */
+.serif{font-family:"Noto Serif SC",Songti SC,serif}
+.tnum{font-variant-numeric:tabular-nums}
+.rule{height:1px;background:rgba(20,20,18,.16)}
+.cap{font-size:10.5px;line-height:1.62;color:#57524A;letter-spacing:.02em}
+.plateNo{font-size:10px;letter-spacing:.14em;color:#8A8378;text-transform:uppercase;font-weight:500}
+.folio{font-size:11px;letter-spacing:.08em;color:#8A8378;font-variant-numeric:tabular-nums}
+
+/* ============================================================
+   A · 跨页
+   ============================================================ */
+#A .spread{position:absolute;inset:0;display:flex;padding-top:54px}
+#A .pg{width:50%;padding:16px 20px 22px;display:flex;flex-direction:column}
+#A .pgL{border-right:1px solid rgba(20,20,18,.11)}
+#A .bkTitle{font-size:30px;font-weight:600;letter-spacing:.28em;margin:8px 0 2px}
+#A .bkSub{font-size:10.5px;letter-spacing:.2em;color:#8A8378;margin-bottom:18px}
+#A .toc{list-style:none;margin:0;padding:0}
+#A .toc li{display:flex;align-items:baseline;gap:7px;padding:6.5px 0;border-bottom:1px solid rgba(20,20,18,.08)}
+#A .toc li.on{color:#C0392B}
+#A .toc .no{font-size:9.5px;color:#8A8378;letter-spacing:.08em;width:15px;flex:none}
+#A .toc li.on .no{color:#C0392B}
+#A .toc .t{font-size:11px;font-weight:500;letter-spacing:.02em;font-variant-numeric:tabular-nums;width:36px;flex:none}
+#A .toc .w{font-size:11.5px;color:#3A362F}
+#A .toc .m{margin-left:auto;font-size:10px;color:#8A8378}
+#A .pgR{padding:16px 18px 20px}
+#A .pgR .ph{flex:1;border-radius:2px}
+#A .pgR .cap{margin-top:12px}
+#A .folioRow{position:absolute;left:20px;right:20px;bottom:26px;display:flex;justify-content:space-between}
+
+/* ============================================================
+   B · 印样
+   ============================================================ */
+#B .sheetWrap{position:absolute;inset:0;padding:66px 22px 0;display:flex;flex-direction:column}
+#B .sheetHead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px}
+#B .sheetHead .l{font-size:15px;font-weight:600;letter-spacing:.16em}
+#B .sheetHead .r{font-size:10.5px;color:#8A8378;letter-spacing:.06em;font-variant-numeric:tabular-nums}
+#B .sheetMeta{font-size:10px;color:#8A8378;letter-spacing:.04em;margin-bottom:14px}
+#B .sheet{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+#B .fr{position:relative;aspect-ratio:1/1;border-radius:1.5px;overflow:hidden}
+#B .fr .n{position:absolute;left:3px;bottom:1px;font-size:7px;color:rgba(255,255,255,.62);letter-spacing:.06em;z-index:4;font-variant-numeric:tabular-nums}
+#B .fr.mark::after{
+  content:"";position:absolute;inset:-3px;z-index:5;border:1.7px solid #D8382C;
+  border-radius:52% 48% 51% 49%/49% 53% 47% 51%;transform:rotate(-4deg);opacity:.9
+}
+#B .sheetFoot{margin-top:16px}
+#B .sheetFoot .rule{margin-bottom:9px}
+#B .sheetFoot .cap{max-width:280px}
+#B .sheetFoot .cap b{color:#D8382C;font-weight:500}
+
+/* ============================================================
+   C · 胶片条
+   ============================================================ */
+#C .filmWrap{position:absolute;inset:0;padding:66px 0 0;display:flex;flex-direction:column}
+#C .filmHead{padding:0 24px;display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px}
+#C .filmHead .l{font-size:15px;font-weight:600;letter-spacing:.16em}
+#C .filmHead .r{font-size:10.5px;color:#8A8378;font-variant-numeric:tabular-nums}
+#C .filmHead .r b{color:#141412;font-weight:500}
+#C .film{background:#141412;padding:9px 0;position:relative}
+#C .film::before,#C .film::after{content:"";position:absolute;left:0;right:0;height:9px;
+  background:repeating-linear-gradient(90deg,rgba(250,248,245,.9) 0 5px,transparent 5px 15px)}
+#C .film::before{top:0}#C .film::after{bottom:0}
+#C .frames{display:flex;gap:5px;padding:0 6px;overflow:hidden}
+#C .fm{flex:none;position:relative;border-radius:1px;overflow:hidden}
+#C .fm .tn{position:absolute;right:3px;top:2px;font-size:7px;color:rgba(255,255,255,.6);z-index:4;font-variant-numeric:tabular-nums}
+#C .rail{padding:20px 24px 0;position:relative}
+#C .railLine{height:1px;background:rgba(20,20,18,.2);position:relative}
+#C .tick{position:absolute;top:-4px;width:1px;height:9px;background:rgba(20,20,18,.32)}
+#C .tick.on{background:#C0392B;height:16px;top:-8px;width:1.5px}
+#C .railT{position:relative;height:14px;margin-top:5px}
+#C .railT span{position:absolute;font-size:8.5px;color:#8A8378;font-variant-numeric:tabular-nums;transform:translateX(-50%)}
+#C .railT span.on{color:#C0392B}
+#C .cur{margin-top:22px;padding:0 24px}
+#C .cur .rule{margin-bottom:10px}
+#C .cur .t{font-size:19px;font-weight:500;letter-spacing:.01em;font-variant-numeric:tabular-nums;margin-bottom:5px}
+#C .cur .cap{max-width:300px}
+
+/* ============================================================
+   D · 单页大图
+   ============================================================ */
+#D .hero{position:absolute;left:0;right:0;top:0;height:610px}
+#D .heroCap{position:absolute;left:30px;right:30px;top:566px;color:#F3EFE8;
+  text-shadow:0 1px 14px rgba(0,0,0,.55)}
+#D .heroCap .n{font-size:10px;letter-spacing:.16em;opacity:.82;font-variant-numeric:tabular-nums}
+#D .heroCap .t{font-size:26px;font-weight:400;letter-spacing:.02em;margin:5px 0 6px}
+#D .heroCap .m{font-size:11.5px;opacity:.85;letter-spacing:.03em;font-variant-numeric:tabular-nums}
+#D .below{position:absolute;left:30px;right:30px;top:648px}
+#D .below .cap{font-size:12px;line-height:1.78;color:#3A362F;max-width:300px}
+#D .below .cap b{font-weight:600;color:#141412}
+#D .dnav{position:absolute;left:30px;right:30px;bottom:38px;display:flex;align-items:center;gap:10px}
+#D .dot{width:5px;height:5px;border-radius:50%;background:rgba(20,20,18,.18)}
+#D .dot.on{background:#C0392B;width:16px;border-radius:3px}
+#D .dnav .folio{margin-left:auto}
+
+/* ============================================================
+   E · 长卷
+   ============================================================ */
+#E .scrollWrap{position:absolute;inset:0;padding:66px 22px 0;display:flex;flex-direction:column}
+#E .sHead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+#E .sHead .l{font-size:15px;font-weight:600;letter-spacing:.16em}
+#E .sHead .r{font-size:10.5px;color:#8A8378;font-variant-numeric:tabular-nums}
+#E .sSub{font-size:10px;color:#8A8378;letter-spacing:.04em;margin-bottom:16px}
+#E .spine{position:relative;padding-left:46px;flex:1;overflow:hidden}
+#E .spineLine{position:absolute;left:38px;top:6px;bottom:0;width:1px;background:rgba(20,20,18,.16)}
+#E .ev{position:relative;padding:0 0 15px;display:flex;gap:11px;align-items:flex-start}
+#E .ev .tm{position:absolute;left:-46px;top:1px;font-size:9.5px;color:#8A8378;
+  font-variant-numeric:tabular-nums;letter-spacing:.02em}
+#E .ev .node{position:absolute;left:-11px;top:4px;width:5px;height:5px;border-radius:50%;
+  background:#FAF8F5;box-shadow:0 0 0 1.2px rgba(20,20,18,.3)}
+#E .ev.now .tm{color:#C0392B;font-weight:500}
+#E .ev.now .node{background:#C0392B;box-shadow:0 0 0 1.2px #C0392B}
+#E .ev .body{flex:1;min-width:0}
+#E .ev .ttl{font-size:12.5px;font-weight:500;letter-spacing:.01em;margin-bottom:3px}
+#E .ev .sub{font-size:10.5px;color:#6B655B;line-height:1.55}
+#E .ev .ph{width:64px;height:44px;border-radius:1.5px;flex:none}
+#E .ev.wide .ph{width:112px;height:74px}
+#E .ev .why{margin-top:5px;font-size:10.5px;line-height:1.6;color:#3A362F;
+  border-left:1.5px solid rgba(192,57,43,.55);padding-left:8px}
+#E .end{padding:2px 0 0;display:flex;justify-content:space-between;align-items:baseline}
+#E .end .folio{font-size:11px}
+</style>
+</head>
+<body>
+
+<header class="pick">
+  <h1>选一个版式 · 同一个「今天」，五种排法</h1>
+  <p>
+    内容全部相同：今天这条时间线（停在家 → 出发 → 到达 → 充电 → 返程 → 到家 → 现在）。
+    不同的只是<b>它被排成什么样</b>。照片位置是占位图 —— 真机上换成你自己的车与地点。<br>
+    直接回我字母即可，也可以说「A 的排版 + C 的时间轴」这种拼法。
+  </p>
+  <div class="keys">
+    <span>A 跨页<i>左右两页·左目录右大图</i></span>
+    <span>B 印样<i>一整天的接触印样·红圈标要事</i></span>
+    <span>C 胶片条<i>横向胶片·底部时间轴</i></span>
+    <span>D 单页大图<i>一屏一张·左右翻</i></span>
+    <span>E 长卷<i>时间往下流·事件即照片</i></span>
+  </div>
+</header>
+
+<main class="stage">
+
+<!-- ================= A · 跨页 ================= -->
+<section class="block" id="A">
+  <h2>A · 跨页</h2>
+  <p class="why">像翻开一本画册：左页是今天的<b>目录</b>，右页是<b>当前这一张</b>。你永远同时看到「今天有什么」和「正在看什么」。</p>
+  <div class="device">
+    <div class="statusbar"><span>21:40</span><span class="glyph">5G&nbsp;&nbsp;▮▮▮▮</span></div>
+    <div class="spread">
+      <div class="pg pgL">
+        <div class="folio">09 · 21</div>
+        <div class="bkTitle serif">今天</div>
+        <div class="bkSub">七段 · 52.9 km · 38 kWh</div>
+        <ul class="toc">
+          <li><span class="no">01</span><span class="t">00:00</span><span class="w">静置</span><span class="m">家</span></li>
+          <li><span class="no">02</span><span class="t">07:42</span><span class="w">出发</span><span class="m">地库</span></li>
+          <li><span class="no">03</span><span class="t">08:20</span><span class="w">到达</span><span class="m">52 分</span></li>
+          <li class="on"><span class="no">04</span><span class="t">08:20</span><span class="w">到达</span><span class="m">24.8 km</span></li>
+          <li><span class="no">05</span><span class="t">12:10</span><span class="w">充电</span><span class="m">¥46</span></li>
+          <li><span class="no">06</span><span class="t">18:05</span><span class="w">出发</span><span class="m">返程</span></li>
+          <li><span class="no">07</span><span class="t">18:52</span><span class="w">到家</span><span class="m">26.1 km</span></li>
+        </ul>
+      </div>
+      <div class="pg pgR">
+        <div class="ph pl-morn">
+          <div class="b0"></div><div class="b1"></div>
+          <div class="ground"></div><div class="car"></div>
+          <div class="vig"></div><div class="grain"></div>
+        </div>
+        <div class="plateNo" style="margin-top:12px">图版 04</div>
+        <div class="cap">08:20 到达 · 中关村<br>24.8 km · 52 分钟 · 平均 28 km/h</div>
+      </div>
+    </div>
+    <div class="folioRow"><span class="folio">今天</span><span class="folio">12</span></div>
+  </div>
+</section>
+
+<!-- ================= B · 印样 ================= -->
+<section class="block" id="B">
+  <h2>B · 印样</h2>
+  <p class="why">摄影师先看<b>一整天的接触印样</b>，再用红笔圈出要放大的那几张。今天一眼看完，<b>值得看的只有两处</b>。</p>
+  <div class="device">
+    <div class="statusbar"><span>21:40</span><span class="glyph">5G&nbsp;&nbsp;▮▮▮▮</span></div>
+    <div class="sheetWrap">
+      <div class="sheetHead"><span class="l serif">今天 · 印样</span><span class="r">09 · 21</span></div>
+      <div class="sheetMeta">16 帧 · 52.9 km · 38 kWh · 每帧 = 90 分钟</div>
+      <div class="sheet">
+        <div class="fr ph pl-night"><div class="n">01</div></div>
+        <div class="fr ph pl-night"><div class="n">02</div></div>
+        <div class="fr ph pl-night"><div class="n">03</div></div>
+        <div class="fr ph pl-night"><div class="n">04</div></div>
+        <div class="fr ph pl-night"><div class="n">05</div></div>
+        <div class="fr ph pl-dawn mark"><div class="n">06</div><div class="b0"></div></div>
+        <div class="fr ph pl-dawn"><div class="n">07</div></div>
+        <div class="fr ph pl-morn"><div class="n">08</div></div>
+        <div class="fr ph pl-morn mark"><div class="n">09</div><div class="b0"></div></div>
+        <div class="fr ph pl-noon"><div class="n">10</div></div>
+        <div class="fr ph pl-noon"><div class="n">11</div></div>
+        <div class="fr ph pl-noon"><div class="n">12</div></div>
+        <div class="fr ph pl-dusk mark"><div class="n">13</div><div class="b0"></div></div>
+        <div class="fr ph pl-eve"><div class="n">14</div></div>
+        <div class="fr ph pl-eve"><div class="n">15</div></div>
+        <div class="fr ph pl-night"><div class="n">16</div></div>
+      </div>
+      <div class="sheetFoot">
+        <div class="rule"></div>
+        <div class="cap">
+          红圈三帧：<b>06 出发</b>（07:42 · 空调提前开了 10 分钟）、<b>09 到达</b>（08:20 · 24.8 km）、<b>13 返程</b>（18:05 · 一路顶着风）。<br>
+          其余十三帧：正常，未放大。
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= C · 胶片条 ================= -->
+<section class="block" id="C">
+  <h2>C · 胶片条</h2>
+  <p class="why">今天是一条可以横向拉的<b>胶片</b>，底下那条细线就是<b>一天 24 小时</b>；红点是你现在的位置，不是装饰。</p>
+  <div class="device">
+    <div class="statusbar"><span>21:40</span><span class="glyph">5G&nbsp;&nbsp;▮▮▮▮</span></div>
+    <div class="filmWrap">
+      <div class="filmHead"><span class="l serif">今天 · 胶片</span><span class="r">第 <b>09</b> / 16 帧</span></div>
+      <div class="film">
+        <div class="frames">
+          <div class="fm ph pl-night" style="width:34px;height:128px"><div class="tn">04</div></div>
+          <div class="fm ph pl-night" style="width:44px;height:128px"><div class="tn">05</div></div>
+          <div class="fm ph pl-dawn" style="width:74px;height:128px"><div class="tn">06</div><div class="b0"></div></div>
+          <div class="fm ph pl-dawn" style="width:60px;height:128px"><div class="tn">07</div></div>
+          <div class="fm ph pl-morn" style="width:132px;height:128px"><div class="tn">08</div><div class="b0"></div><div class="ground"></div><div class="car"></div></div>
+          <div class="fm ph pl-morn" style="width:52px;height:128px"><div class="tn">09</div></div>
+          <div class="fm ph pl-noon" style="width:78px;height:128px"><div class="tn">10</div><div class="b0"></div></div>
+        </div>
+      </div>
+      <div class="rail">
+        <div class="railLine">
+          <div class="tick" style="left:0%"></div>
+          <div class="tick" style="left:25%"></div>
+          <div class="tick on" style="left:32%"></div>
+          <div class="tick" style="left:50%"></div>
+          <div class="tick" style="left:75%"></div>
+          <div class="tick" style="left:100%"></div>
+        </div>
+        <div class="railT">
+          <span style="left:0%">00</span>
+          <span style="left:25%">06</span>
+          <span class="on" style="left:32%">07:42</span>
+          <span style="left:50%">12</span>
+          <span style="left:75%">18</span>
+          <span style="left:100%">24</span>
+        </div>
+      </div>
+      <div class="cur">
+        <div class="rule"></div>
+        <div class="t tnum">07:42 出发</div>
+        <div class="cap">地库 · 12℃ · 空调提前开了 10 分钟，所以这段比平时多耗 3% 电。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= D · 单页大图 ================= -->
+<section class="block" id="D">
+  <h2>D · 单页大图</h2>
+  <p class="why">一屏<b>只放一张</b>，图占到底，说明压在图上。左右翻页。最像画册、也最考验照片 —— <b>需要你有自己的照片</b>。</p>
+  <div class="device">
+    <div class="statusbar" style="color:#F3EFE8"><span>21:40</span><span class="glyph">5G&nbsp;&nbsp;▮▮▮▮</span></div>
+    <div class="hero ph pl-dusk">
+      <div class="b0"></div><div class="b1"></div><div class="b2"></div>
+      <div class="ground"></div><div class="car"></div>
+      <div class="vig"></div><div class="grain"></div>
+    </div>
+    <div class="heroCap">
+      <div class="n">图版 13 · 18:05</div>
+      <div class="t serif">返程</div>
+      <div class="m">建国路 → 家 · 26.1 km · 47 分钟</div>
+    </div>
+    <div class="below">
+      <div class="cap">
+        今天最费电的一段。<b>一路顶着西风</b>，同样路程比上周多用了 4%。<br>
+        到家剩 78%，早上 3℃ —— 明早大概掉到 66%。
+      </div>
+    </div>
+    <div class="dnav">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="dot on"></span><span class="dot"></span><span class="dot"></span>
+      <span class="dot"></span>
+      <span class="folio">04 / 07</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= E · 长卷 ================= -->
+<section class="block" id="E">
+  <h2>E · 长卷</h2>
+  <p class="why">时间<b>从上往下流</b>，每条事件紧跟着它那一刻的照片。最像"读"而不是"看"，也最接近你选的「今天这条时间线」。</p>
+  <div class="device">
+    <div class="statusbar"><span>21:40</span><span class="glyph">5G&nbsp;&nbsp;▮▮▮▮</span></div>
+    <div class="scrollWrap">
+      <div class="sHead"><span class="l serif">今天</span><span class="r">52.9 km · 38 kWh</span></div>
+      <div class="sSub">2026 · 09 · 21 · 星期日</div>
+      <div class="spine">
+        <div class="spineLine"></div>
+        <div class="ev">
+          <span class="tm">00:00</span><span class="node"></span>
+          <div class="ph pl-night" style="width:64px;height:44px"><div class="b0"></div></div>
+          <div class="body"><div class="ttl">静置</div><div class="sub">家 · 地库 B2 · 一夜无事</div></div>
+        </div>
+        <div class="ev">
+          <span class="tm">07:42</span><span class="node"></span>
+          <div class="ph pl-dawn" style="width:64px;height:44px"><div class="b0"></div></div>
+          <div class="body"><div class="ttl">出发</div><div class="sub">12℃ · 空调提前 10 分钟</div></div>
+        </div>
+        <div class="ev">
+          <span class="tm">08:20</span><span class="node"></span>
+          <div class="ph pl-morn" style="width:112px;height:74px"><div class="b0"></div><div class="ground"></div><div class="car"></div></div>
+          <div class="body"><div class="ttl">到达 中关村</div><div class="sub">24.8 km · 52 分钟 · 28 km/h</div></div>
+        </div>
+        <div class="ev">
+          <span class="tm">12:10</span><span class="node"></span>
+          <div class="ph pl-noon" style="width:64px;height:44px"><div class="b0"></div></div>
+          <div class="body"><div class="ttl">充电 38 kWh</div><div class="sub">¥46 · 谷电时段 · 92% 停</div>
+            <div class="why">比上周同样一次便宜 22% —— 这次赶上了谷电。</div>
+          </div>
+        </div>
+        <div class="ev">
+          <span class="tm">18:52</span><span class="node"></span>
+          <div class="ph pl-eve" style="width:64px;height:44px"><div class="b0"></div></div>
+          <div class="body"><div class="ttl">到家</div><div class="sub">26.1 km · 剩 78%</div></div>
+        </div>
+        <div class="ev now">
+          <span class="tm">21:40</span><span class="node"></span>
+          <div class="ph pl-night" style="width:64px;height:44px"><div class="b0"></div><div class="b1"></div></div>
+          <div class="body"><div class="ttl">现在</div><div class="sub">静置 · 明早 3℃，预计掉到 66%</div></div>
+        </div>
+        <div class="end"><span class="folio">今天 · 七段</span><span class="folio">12</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>同一屏 · 三种艺术方向</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&family=Noto+Serif+SC:wght@200;300;400;600;700&display=swap">
+<style>
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+html,body{margin:0;padding:0}
+body{background:#111013;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;padding-bottom:40px}
+.serif{font-family:"Noto Serif SC",Songti SC,serif}
+.tn{font-variant-numeric:tabular-nums}
+
+#idx{position:sticky;top:0;z-index:80;background:#111013;border-bottom:1px solid #24232B;
+  padding:9px 10px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+#idx::-webkit-scrollbar{display:none}
+.chip{flex:none;font-size:11px;line-height:1;padding:7px 10px;border-radius:999px;border:1px solid #36353E;
+  background:transparent;color:#C4BFC6;cursor:pointer;white-space:nowrap;font-family:inherit}
+.chip b{font-weight:600;margin-right:5px;opacity:.7}
+.chip.on{background:#F2EFE9;border-color:#F2EFE9;color:#111013}
+
+#board{position:relative;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none}
+#board::-webkit-scrollbar{display:none}
+.slide{flex:0 0 100%;scroll-snap-align:center;scroll-snap-stop:always;
+  display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px 0 30px}
+.meta{width:332px;flex:none}
+.meta .no{font-size:10.5px;letter-spacing:.2em;color:#77717E}
+.meta .nm{font-size:15.5px;font-weight:600;margin:4px 0 5px}
+.meta .de{font-size:12px;line-height:1.64;color:#9F99A6}
+.meta .de em{font-style:normal;color:#77717E;display:block;margin-top:4px}
+
+.dev{width:390px;height:844px;flex:none;border-radius:44px;position:relative;overflow:hidden;
+  background:#0B0A0C;color:#F2EFE9;box-shadow:0 0 0 1px #36353E,0 34px 64px -36px #000}
+@media (max-width:440px){.dev{zoom:.80}}
+@media (max-width:325px){.dev{zoom:.70}}
+.grain{position:absolute;inset:0;pointer-events:none;z-index:70;border-radius:44px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='130'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='130' height='130' filter='url(%23n)' opacity='0.7'/%3E%3C/svg%3E")}
+.sb{position:absolute;top:0;left:0;right:0;height:52px;z-index:40;display:flex;
+  align-items:flex-end;justify-content:space-between;padding:0 30px 6px;font-size:12.5px;font-weight:500;
+  font-variant-numeric:tabular-nums}
+.sb span{opacity:.8;letter-spacing:.08em;font-size:11px}
+.bm{position:absolute;inset:0}
+.lyr{position:absolute;inset:0;pointer-events:none;z-index:5}
+
+.pinWrap{position:absolute;z-index:15}
+.pinL{position:absolute;z-index:15;font-size:10px;letter-spacing:.14em;white-space:nowrap}
+.pinL b{font-weight:500}
+.bigL{position:absolute;z-index:6;font-family:"Noto Serif SC",serif;white-space:nowrap;line-height:1}
+
+.hud{position:absolute;left:18px;right:18px;top:60px;z-index:20;display:flex;align-items:center;gap:8px}
+.hud .pill{display:flex;align-items:center;gap:9px;border-radius:999px;padding:9px 14px;font-size:11.5px;
+  letter-spacing:.06em;backdrop-filter:blur(18px)}
+.hud .pill i{width:6px;height:6px;border-radius:50%;display:block;flex:none}
+.hud .btn{margin-left:auto;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.layers{position:absolute;left:0;right:0;z-index:20;display:flex;gap:8px;overflow-x:auto;
+  padding:0 18px;scrollbar-width:none}
+.layers::-webkit-scrollbar{display:none}
+.lay{flex:none;font-size:11.5px;padding:8px 13px;border-radius:999px;letter-spacing:.06em}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:25}
+.sheet .grab{width:40px;height:4px;border-radius:3px;margin:0 auto 18px}
+.sheet h3{margin:0;font-weight:500;letter-spacing:.02em}
+.sheet .sub{font-size:11.5px;margin-top:6px;letter-spacing:.06em}
+.sheet .rows{margin-top:16px}
+.sheet .row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  padding:12px 0;font-size:12.5px}
+.sheet .row .k{letter-spacing:.04em}
+.sheet .row .v{font-variant-numeric:tabular-nums;font-weight:500;text-align:right}
+.sheet .row .v em{font-style:normal;font-weight:400;margin-left:6px}
+.q4{display:flex;gap:10px;margin-top:18px}
+.q4 .qa{flex:1;border-radius:18px;padding:15px 8px 13px;text-align:center}
+.q4 .qa .l{font-size:11px;margin-top:9px;letter-spacing:.08em}
+.scale{position:absolute;left:26px;z-index:15}
+.scale .bar{height:7px}
+.scale .lb{font-size:9px;letter-spacing:.22em;margin-top:5px}
+
+/* ============ A · 夜光 ============ */
+#sA{background:#08070A}
+#sA .pill{background:rgba(20,17,22,.66);border:1px solid rgba(255,236,205,.14);color:#F6EFE4;
+  box-shadow:0 10px 24px -16px #000}
+#sA .pill.g i{background:#7FE0A0;box-shadow:0 0 10px rgba(127,224,160,.8)}
+#sA .pill.r i{background:#FF6A55;box-shadow:0 0 10px rgba(255,106,85,.8)}
+#sA .btn{background:rgba(20,17,22,.66);border:1px solid rgba(255,236,205,.14);backdrop-filter:blur(18px)}
+#sA .lay{background:rgba(20,17,22,.7);border:1px solid rgba(255,236,205,.13);color:#BDB4AC;backdrop-filter:blur(18px)}
+#sA .lay.on{background:#F6EFE4;border-color:#F6EFE4;color:#1A1614;font-weight:500}
+#sA .sheet{background:linear-gradient(180deg,#1B1715,#141110);border-radius:30px 30px 44px 44px;
+  padding:16px 24px 34px;box-shadow:inset 0 1px 0 rgba(255,226,180,.14),0 -30px 60px -34px #000}
+#sA .sheet .grab{background:rgba(255,232,200,.24)}
+#sA .sheet h3{font-size:23px}
+#sA .sheet .sub{color:rgba(246,239,228,.5)}
+#sA .sheet .row{border-top:1px solid rgba(255,232,200,.075)}
+#sA .sheet .row .k{color:rgba(246,239,228,.5)}
+#sA .sheet .row .v em{color:rgba(246,239,228,.42)}
+#sA .qa{background:#241F1D;box-shadow:inset 0 1px 0 rgba(255,226,180,.06)}
+#sA .qa.hot{background:#2E2724}
+#sA .qa .l{color:#BDB4AC}
+#sA .qa.hot .l{color:#F6EFE4}
+#sA .pinL{color:rgba(246,239,228,.78);text-shadow:0 1px 8px #000,0 0 18px rgba(0,0,0,.8)}
+#sA .pinL.gn{color:#8EEAB0}
+#sA .pinL.rd{color:#FF8070}
+#sA .scale .bar{border-left:1px solid rgba(246,239,228,.5);border-right:1px solid rgba(246,239,228,.5);
+  border-bottom:1px solid rgba(246,239,228,.5)}
+#sA .scale .lb{color:rgba(246,239,228,.42)}
+#sA .pool{position:absolute;border-radius:50%;z-index:4;pointer-events:none}
+#sA .haze{position:absolute;inset:0;z-index:4;pointer-events:none;
+  background:radial-gradient(120% 78% at 62% 44%,rgba(255,190,120,.10) 0%,rgba(255,190,120,0) 52%),
+             linear-gradient(180deg,rgba(30,24,42,.5),rgba(0,0,0,0) 34%,rgba(0,0,0,.42))}
+#sA .vig{position:absolute;inset:0;z-index:5;pointer-events:none;
+  background:radial-gradient(112% 76% at 62% 42%,rgba(0,0,0,0) 40%,rgba(8,4,6,.62) 100%)}
+#sA .grain{opacity:.055;mix-blend-mode:overlay}
+
+/* ============ B · 纸上 ============ */
+#sB{background:#F4EEE1;color:#1E1B16}
+#sB .pill{background:rgba(252,249,241,.8);border:1px solid rgba(30,27,22,.14);color:#1E1B16;
+  box-shadow:0 8px 20px -16px rgba(0,0,0,.5)}
+#sB .pill.g i{background:#2E7D4F}
+#sB .pill.r i{background:#C0392B}
+#sB .btn{background:rgba(252,249,241,.8);border:1px solid rgba(30,27,22,.14);backdrop-filter:blur(12px)}
+#sB .lay{background:rgba(252,249,241,.78);border:1px solid rgba(30,27,22,.16);color:#4A443A;backdrop-filter:blur(12px)}
+#sB .lay.on{background:#1E1B16;border-color:#1E1B16;color:#F4EEE1;font-weight:500}
+#sB .sheet{background:#FBF7EE;border-radius:26px 26px 44px 44px;padding:17px 24px 34px;
+  box-shadow:0 -1px 0 rgba(30,27,22,.14),0 -26px 54px -34px rgba(30,27,22,.55)}
+#sB .sheet .grab{background:rgba(30,27,22,.2)}
+#sB .sheet h3{font-size:23px}
+#sB .sheet .sub{color:#7C7466}
+#sB .sheet .row{border-top:0.5px solid rgba(30,27,22,.16)}
+#sB .sheet .row .k{color:#7C7466}
+#sB .sheet .row .v em{color:#8C8474}
+#sB .qa{background:#F1EBDE;box-shadow:inset 0 0 0 0.5px rgba(30,27,22,.12)}
+#sB .qa.hot{background:#E9E1D0}
+#sB .qa .l{color:#5C564A}
+#sB .qa.hot .l{color:#1E1B16}
+#sB .pinL{color:rgba(30,27,22,.72)}
+#sB .pinL.rd{color:#B33325}
+#sB .pinL.dim{color:rgba(30,27,22,.42)}
+#sB .scale .bar{border-left:1px solid rgba(30,27,22,.55);border-right:1px solid rgba(30,27,22,.55);
+  border-bottom:1px solid rgba(30,27,22,.55)}
+#sB .scale .lb{color:rgba(30,27,22,.5)}
+#sB .grain{opacity:.05;mix-blend-mode:multiply}
+#sB .sun{position:absolute;inset:0;z-index:4;pointer-events:none;
+  background:radial-gradient(90% 60% at 78% 16%,rgba(196,142,60,.10),rgba(196,142,60,0) 62%)}
+
+/* ============ C · 巨字 ============ */
+#sC{background:#08080A}
+#sC .pill{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#EDEAE4}
+#sC .pill.g i{background:#EDEAE4}
+#sC .pill.r i{background:#E8564A}
+#sC .btn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+#sC .lay{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#A8A2AE}
+#sC .lay.on{background:#EDEAE4;border-color:#EDEAE4;color:#08080A;font-weight:500}
+#sC .sheet{background:#0D0D10;border-radius:30px 30px 44px 44px;padding:20px 26px 34px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+#sC .sheet .grab{background:rgba(255,255,255,.16)}
+#sC .sheet h3{font-size:13px;font-weight:500;letter-spacing:.34em;text-transform:uppercase;color:#8E8894}
+#sC .sheet .sub{color:#6E6874;font-size:11px}
+#sC .sheet .row{border-top:1px solid rgba(255,255,255,.07);padding:13px 0}
+#sC .sheet .row .k{color:#8E8894;font-size:11px;letter-spacing:.16em}
+#sC .sheet .row .v{font-size:15px}
+#sC .sheet .row .v em{color:#6E6874;font-size:11px}
+#sC .qa{background:#141418;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+#sC .qa .l{color:#A8A2AE;font-size:10px;letter-spacing:.14em}
+#sC .pinL{color:rgba(237,234,228,.6);letter-spacing:.2em;font-size:9.5px}
+#sC .pinL.rd{color:#E8564A}
+#sC .scale .bar{border-left:1px solid rgba(237,234,228,.4);border-right:1px solid rgba(237,234,228,.4);
+  border-bottom:1px solid rgba(237,234,228,.4)}
+#sC .scale .lb{color:rgba(237,234,228,.35)}
+#sC .grain{opacity:.03}
+#sC .num{position:absolute;z-index:6;font-weight:100;letter-spacing:-.055em;line-height:.86;
+  font-variant-numeric:tabular-nums;color:#F7F5F1}
+#sC .numc{position:absolute;z-index:7}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="nBlk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1A1A22"/><stop offset="1" stop-color="#121218"/>
+    </linearGradient>
+    <radialGradient id="nBloom" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="rgba(255,214,160,.34)"/>
+      <stop offset="46%" stop-color="rgba(255,190,130,.10)"/>
+      <stop offset="100%" stop-color="rgba(255,190,130,0)"/>
+    </radialGradient>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+    <filter id="soft2" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="2.4"/>
+    </filter>
+  </defs>
+
+  <!-- A · 夜光地形（带旋角：路网斜着走） -->
+  <symbol id="terrainNight" viewBox="-60 -60 510 964">
+    <rect x="-60" y="-60" width="510" height="964" fill="#0A0A0E"/>
+    <path d="M-60 792 C 92 758, 168 826, 266 786 C 322 762, 360 790, 450 770 L450 964 L-60 964 Z" fill="#0C1017"/>
+    <path d="M-60 792 C 92 758, 168 826, 266 786 C 322 762, 360 790, 450 770" fill="none"
+      stroke="rgba(150,180,215,.16)" stroke-width="1"/>
+    <g fill="url(#nBlk)">
+      <rect x="-40" y="-20" width="88" height="220" rx="6"/>
+      <rect x="66" y="-20" width="52" height="220" rx="6"/>
+      <rect x="140" y="-20" width="86" height="220" rx="6"/>
+      <rect x="248" y="-20" width="60" height="220" rx="6"/>
+      <rect x="330" y="-20" width="110" height="220" rx="6"/>
+      <rect x="-40" y="244" width="88" height="108" rx="6"/>
+      <rect x="66" y="244" width="52" height="108" rx="6"/>
+      <rect x="140" y="244" width="86" height="108" rx="6"/>
+      <rect x="330" y="244" width="110" height="108" rx="6"/>
+      <rect x="-40" y="372" width="88" height="106" rx="6"/>
+      <rect x="66" y="372" width="52" height="106" rx="6"/>
+      <rect x="140" y="372" width="86" height="106" rx="6"/>
+      <rect x="248" y="372" width="60" height="106" rx="6"/>
+      <rect x="330" y="372" width="110" height="106" rx="6"/>
+      <rect x="-40" y="498" width="88" height="100" rx="6"/>
+      <rect x="66" y="498" width="52" height="100" rx="6"/>
+      <rect x="140" y="498" width="86" height="100" rx="6"/>
+      <rect x="248" y="498" width="60" height="100" rx="6"/>
+      <rect x="330" y="498" width="110" height="100" rx="6"/>
+    </g>
+    <g stroke="#07070A" stroke-width="10.5" stroke-linecap="round" fill="none">
+      <path d="M-60 232 H450"/><path d="M-60 486 H450"/><path d="M148 -40 V740"/><path d="M300 -40 V740"/>
+    </g>
+    <g stroke="#252A34" stroke-width="6" stroke-linecap="round" fill="none">
+      <path d="M-60 232 H450"/><path d="M-60 486 H450"/><path d="M148 -40 V740"/><path d="M300 -40 V740"/>
+    </g>
+    <g stroke="#07070A" stroke-width="8" stroke-linecap="round" fill="none">
+      <path d="M-60 360 H450"/><path d="M-60 606 H450"/><path d="M88 -40 V740"/><path d="M228 -40 V740"/>
+    </g>
+    <g stroke="#202430" stroke-width="4" stroke-linecap="round" fill="none">
+      <path d="M-60 360 H450"/><path d="M-60 606 H450"/><path d="M88 -40 V740"/><path d="M228 -40 V740"/>
+    </g>
+    <path d="M-60 700 C 120 670, 250 630, 450 600" stroke="#07070A" stroke-width="13" fill="none"/>
+    <path d="M-60 700 C 120 670, 250 630, 450 600" stroke="#292F3A" stroke-width="8.5" fill="none"/>
+    <g font-family="'Noto Serif SC',serif" font-size="10.5" letter-spacing="3.4" fill="rgba(246,239,228,.28)">
+      <text x="-40" y="224">北 四 环</text>
+      <text x="-40" y="478">京 密 路</text>
+      <text x="152" y="304">中 关 村</text>
+      <text x="318" y="100">T 3</text>
+      <text x="150" y="812">通 惠 河</text>
+    </g>
+  </symbol>
+
+  <!-- B · 纸上地形 -->
+  <symbol id="terrainPaper" viewBox="0 0 390 844">
+    <rect width="390" height="844" fill="#F4EEE1"/>
+    <path d="M-10 792 C 92 758, 168 826, 266 786 C 322 762, 360 790, 400 770 L400 856 L-10 856 Z" fill="#CBD9DC"/>
+    <path d="M-10 792 C 92 758, 168 826, 266 786 C 322 762, 360 790, 400 770" fill="none"
+      stroke="rgba(30,50,60,.45)" stroke-width="1"/>
+    <g fill="#E6DECB">
+      <rect x="16" y="60" width="64" height="164" rx="4"/>
+      <rect x="96" y="60" width="44" height="164" rx="4"/>
+      <rect x="160" y="60" width="60" height="164" rx="4"/>
+      <rect x="240" y="60" width="52" height="164" rx="4"/>
+      <rect x="16" y="244" width="64" height="108" rx="4"/>
+      <rect x="96" y="244" width="44" height="108" rx="4"/>
+      <rect x="160" y="244" width="60" height="108" rx="4"/>
+      <rect x="16" y="372" width="64" height="106" rx="4"/>
+      <rect x="96" y="372" width="44" height="106" rx="4"/>
+      <rect x="160" y="372" width="60" height="106" rx="4"/>
+      <rect x="240" y="372" width="52" height="106" rx="4"/>
+      <rect x="312" y="372" width="62" height="106" rx="4"/>
+      <rect x="16" y="498" width="64" height="100" rx="4"/>
+      <rect x="96" y="498" width="44" height="100" rx="4"/>
+      <rect x="160" y="498" width="60" height="100" rx="4"/>
+      <rect x="240" y="498" width="52" height="100" rx="4"/>
+      <rect x="312" y="498" width="62" height="100" rx="4"/>
+    </g>
+    <g fill="#D7E0CC">
+      <rect x="240" y="244" width="52" height="108" rx="4"/>
+      <rect x="16" y="618" width="64" height="82" rx="4"/>
+    </g>
+    <g stroke="#D9CFB8" stroke-width="7" fill="none">
+      <path d="M0 360 H390"/><path d="M0 606 H390"/><path d="M88 52 V712"/><path d="M228 52 V712"/>
+      <path d="M0 232 H390"/><path d="M0 486 H390"/><path d="M148 40 V724"/><path d="M300 40 V724"/>
+    </g>
+    <g stroke="rgba(30,27,22,.5)" stroke-width="0.9" fill="none">
+      <path d="M0 360 H390"/><path d="M0 606 H390"/><path d="M88 52 V712"/><path d="M228 52 V712"/>
+    </g>
+    <g stroke="rgba(30,27,22,.72)" stroke-width="1.5" fill="none">
+      <path d="M0 232 H390"/><path d="M0 486 H390"/><path d="M148 40 V724"/><path d="M300 40 V724"/>
+    </g>
+    <path d="M-10 700 C 120 670, 250 630, 400 600" stroke="rgba(30,27,22,.5)" stroke-width="5.5" fill="none"/>
+    <path d="M-10 700 C 120 670, 250 630, 400 600" stroke="rgba(30,27,22,.8)" stroke-width="1" fill="none"/>
+    <g font-family="'Noto Serif SC',serif" font-size="10" letter-spacing="3" fill="rgba(30,27,22,.5)">
+      <text x="16" y="224">北 四 环</text>
+      <text x="16" y="478">京 密 路</text>
+      <text x="152" y="304">中 关 村</text>
+      <text x="318" y="100">T 3</text>
+      <text x="150" y="812">通 惠 河</text>
+    </g>
+  </symbol>
+
+  <!-- C · 只剩路网（地图退为底） -->
+  <symbol id="terrainGrid" viewBox="0 0 390 844">
+    <rect width="390" height="844" fill="#08080A"/>
+    <g stroke="rgba(237,234,228,.075)" stroke-width="1" fill="none">
+      <path d="M0 232 H390"/><path d="M0 360 H390"/><path d="M0 486 H390"/><path d="M0 606 H390"/>
+      <path d="M88 40 V740"/><path d="M148 40 V740"/><path d="M228 40 V740"/><path d="M300 40 V740"/>
+    </g>
+    <g stroke="rgba(237,234,228,.14)" stroke-width="1" fill="none">
+      <path d="M0 232 H390"/><path d="M148 40 V740"/><path d="M300 40 V740"/>
+    </g>
+  </symbol>
+</svg>
+
+<div id="idx"></div>
+
+<main id="board">
+
+<!-- ================= A · 夜光 ================= -->
+<section class="slide" id="pA">
+  <div class="meta"><div class="no">A / 3</div><div class="nm">夜光 · 光就是秩序</div>
+  <div class="de">把地图转 7°、让路网斜着走；光池、雾、暗角把城市变成夜景。
+  <em>路线越近越亮：去程淡（早上）、回程亮（刚才）。地名是大字宋体，出血。</em></div></div>
+  <div class="dev tn" id="sA">
+    <svg class="bm" width="390" height="844" viewBox="0 0 390 844">
+      <g transform="translate(195 422) rotate(-7) scale(1.22) translate(-195 -422)">
+        <use href="#terrainNight"/>
+      </g>
+    </svg>
+    <div class="pool" style="left:-90px;top:180px;width:420px;height:420px;background:radial-gradient(circle,rgba(255,178,110,.17),rgba(255,178,110,0) 66%)"></div>
+    <div class="pool" style="left:150px;top:60px;width:320px;height:320px;background:radial-gradient(circle,rgba(140,180,235,.10),rgba(140,180,235,0) 68%)"></div>
+    <div class="pool" style="left:-40px;top:470px;width:300px;height:300px;background:radial-gradient(circle,rgba(255,150,90,.13),rgba(255,150,90,0) 68%)"></div>
+
+    <svg class="lyr" width="390" height="844" viewBox="0 0 390 844" fill="none">
+      <path d="M302 229 L146 229" stroke="rgba(255,226,182,.28)" stroke-width="2" stroke-linecap="round"/>
+      <path d="M302 360 L302 232" stroke="rgba(255,214,160,.20)" stroke-width="8" stroke-linecap="round" filter="url(#soft)"/>
+      <path d="M302 360 L302 230" stroke="rgba(255,230,190,.82)" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="148" cy="232" r="40" fill="rgba(255,106,85,.10)"/>
+    </svg>
+
+    <div class="haze"></div>
+    <div class="bigL" style="left:236px;top:122px;transform:rotate(-7deg);font-size:46px;font-weight:200;letter-spacing:.3em;
+      color:rgba(246,239,228,.11)">望 京</div>
+    <div class="vig"></div>
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+
+    <!-- 车钉：光来自它 -->
+    <svg class="pinWrap" style="left:222px;top:286px" width="150" height="150" viewBox="0 0 150 150">
+      <circle cx="75" cy="75" r="75" fill="url(#nBloom)"/>
+      <ellipse cx="88" cy="124" rx="30" ry="6" fill="rgba(0,0,0,.72)" filter="url(#soft)"/>
+      <circle cx="75" cy="75" r="60" fill="none" stroke="rgba(255,232,200,.14)" stroke-width="1"/>
+      <circle cx="75" cy="75" r="58" fill="none" stroke="rgba(255,232,200,.2)" stroke-width="9" stroke-dasharray="1.7 28.4"/>
+      <circle cx="75" cy="75" r="58" fill="none" stroke="#FFF6E8" stroke-width="3" stroke-linecap="round"
+        stroke-dasharray="284 364" transform="rotate(-90 75 75)"/>
+      <circle cx="75" cy="75" r="38" fill="#100C0A" stroke="rgba(255,232,200,.2)" stroke-width="1"/>
+      <path d="M56 86 L60.5 73 Q61.8 69 66.4 69 L83.6 69 Q88.2 69 89.5 73 L94 86"
+        stroke="#FFF6E8" stroke-width="1.9" fill="none" stroke-linejoin="round"/>
+      <path d="M53 86 H97" stroke="#FFF6E8" stroke-width="1.9" stroke-linecap="round"/>
+      <circle cx="66" cy="87" r="5.4" fill="none" stroke="#FFF6E8" stroke-width="1.7"/>
+      <circle cx="84" cy="87" r="5.4" fill="none" stroke="#FFF6E8" stroke-width="1.7"/>
+    </svg>
+
+    <svg class="pinWrap" style="left:206px;top:210px" width="32" height="32" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="4" fill="rgba(127,224,160,.25)"/>
+      <circle cx="16" cy="16" r="11" fill="none" stroke="#7FE0A0" stroke-width="1.5"/>
+      <path d="M17.6 9 L11 17.4h4.2L13.9 23.6 20.5 15.2h-4.2z" fill="#7FE0A0"/>
+    </svg>
+    <div class="pinL gn" style="left:244px;top:214px"><b>¥0.68</b> 谷电</div>
+
+    <svg class="pinWrap" style="left:128px;top:212px" width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="19" fill="rgba(255,106,85,.14)"/>
+      <circle cx="20" cy="20" r="19" fill="none" stroke="rgba(255,106,85,.4)" stroke-width="1"/>
+      <circle cx="20" cy="20" r="9.5" fill="#FF6A55"/>
+      <path d="M20 14v7M20 24.6v1.6" stroke="#100C0A" stroke-width="2.2" stroke-linecap="round"/>
+    </svg>
+    <div class="pinL rd" style="left:24px;top:266px"><b>14:20</b> 后备箱未关</div>
+
+    <div class="scale" style="top:394px"><div class="bar" style="width:64px"></div><div class="lb">500 M</div></div>
+
+    <div class="hud">
+      <div class="pill g"><i></i>已上锁 · 望京</div>
+      <div class="pill">12° 多云</div>
+      <div class="btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F6EFE4" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="6.4"/><path d="M12 2.4v3M12 18.6v3M2.4 12h3M18.6 12h3"/></svg></div>
+    </div>
+
+    <div class="layers" style="bottom:378px">
+      <span class="lay on">现在</span><span class="lay">今天</span><span class="lay">充电</span>
+      <span class="lay">花费</span><span class="lay">服务</span><span class="lay">共享</span><span class="lay">数据</span>
+    </div>
+
+    <div class="sheet">
+      <div class="grab"></div>
+      <h3 class="serif">车在这儿</h3>
+      <div class="sub">望京 · 地库 B2 · 21:40 起静置 · 距你 1.8 km</div>
+      <div class="rows">
+        <div class="row"><span class="k">电量</span><span class="v">78%<em>412 km</em></span></div>
+        <div class="row"><span class="k">今天</span><span class="v">52.9 km<em>7 段</em></span></div>
+        <div class="row"><span class="k">异常</span><span class="v" style="color:#FF8070">1 条<em>后备箱 · 14:20</em></span></div>
+      </div>
+      <div class="q4">
+        <div class="qa hot"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F6EFE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="9"/><path d="M8.4 10.5V8a3.6 3.6 0 0 1 7.2 0v2.5"/></svg><div class="l">解锁</div></div>
+        <div class="qa"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F6EFE4" stroke-width="1.6" stroke-linecap="round"><path d="M12 3.5v17M4.6 7.75l14.8 8.5M19.4 7.75l-14.8 8.5"/></svg><div class="l">空调</div></div>
+        <div class="qa"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F6EFE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8.2a4.2 4.2 0 0 1 4.2 4.2c0 1.7-1 2.4-1.5 3.1H9.3c-.5-.7-1.5-1.4-1.5-3.1A4.2 4.2 0 0 1 12 8.2z"/><path d="M10.2 17.6h3.6"/><path d="M12 3.4v1.9M4.9 6.6l1.3 1.3M19.1 6.6l-1.3 1.3M3.2 13.4h1.9M18.9 13.4h1.9"/></svg><div class="l">闪灯</div></div>
+        <div class="qa"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F6EFE4" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="2.3"/><path d="M8.2 8.2a5.4 5.4 0 0 0 0 7.6M15.8 8.2a5.4 5.4 0 0 1 0 7.6M5.4 5.4a9.4 9.4 0 0 0 0 13.2M18.6 5.4a9.4 9.4 0 0 1 0 13.2"/></svg><div class="l">找车</div></div>
+      </div>
+    </div>
+    <div class="grain"></div>
+  </div>
+</section>
+
+<!-- ================= B · 纸上 ================= -->
+<section class="slide" id="pB">
+  <div class="meta"><div class="no">B / 3</div><div class="nm">纸上 · 一张真的地图</div>
+  <div class="de">不再发光：成为纸与墨。细线道路、淡色地块、红笔路线带刻度、大字宋体地名。
+  <em>艺术感来自印刷物，不来自光。</em></div></div>
+  <div class="dev tn" id="sB">
+    <svg class="bm" width="390" height="844"><use href="#terrainPaper"/></svg>
+    <div class="sun"></div>
+
+    <svg class="lyr" width="390" height="844" viewBox="0 0 390 844" fill="none">
+      <path d="M300 360 L300 232 L148 232" stroke="rgba(179,51,37,.85)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="M300 360 L300 232 L148 232" stroke="rgba(179,51,37,.5)" stroke-width="11" stroke-dasharray="1.4 13" stroke-linejoin="round"/>
+      <circle cx="148" cy="232" r="7" fill="#B33325"/>
+      <circle cx="148" cy="232" r="15" fill="none" stroke="rgba(179,51,37,.5)" stroke-width="1"/>
+      <circle cx="300" cy="360" r="7" fill="#F4EEE1" stroke="#B33325" stroke-width="2.4"/>
+    </svg>
+
+    <div class="bigL" style="left:150px;top:380px;font-size:44px;font-weight:600;letter-spacing:.14em;
+      color:rgba(30,27,22,.14)">中关村</div>
+    <div class="bigL" style="left:268px;top:250px;font-size:44px;font-weight:600;letter-spacing:.14em;
+      color:rgba(30,27,22,.14)">望京</div>
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+
+    <!-- 车：一枚印章式的圈 -->
+    <svg class="pinWrap" style="left:234px;top:294px" width="132" height="132" viewBox="0 0 132 132">
+      <circle cx="66" cy="66" r="58" fill="#F7F2E7" opacity=".92"/>
+      <circle cx="66" cy="66" r="58" fill="none" stroke="rgba(30,27,22,.5)" stroke-width="0.9"/>
+      <circle cx="66" cy="66" r="52" fill="none" stroke="rgba(30,27,22,.2)" stroke-width="0.9"/>
+      <circle cx="66" cy="66" r="52" fill="none" stroke="#B33325" stroke-width="3.4" stroke-linecap="round"
+        stroke-dasharray="254.8 326.7" transform="rotate(-90 66 66)"/>
+      <path d="M50 76 L54 64 Q55.2 60.6 59.2 60.6 L72.8 60.6 Q76.8 60.6 78 64 L82 76"
+        stroke="#1E1B16" stroke-width="1.7" fill="none" stroke-linejoin="round"/>
+      <path d="M47 76 H85" stroke="#1E1B16" stroke-width="1.7" stroke-linecap="round"/>
+      <circle cx="58" cy="77" r="4.6" fill="none" stroke="#1E1B16" stroke-width="1.5"/>
+      <circle cx="74" cy="77" r="4.6" fill="none" stroke="#1E1B16" stroke-width="1.5"/>
+    </svg>
+    <div class="pinL" style="left:120px;top:402px;font-family:'Noto Serif SC',serif;font-size:11.5px;letter-spacing:.16em">
+      78% · 地库 B2</div>
+
+    <svg class="pinWrap" style="left:206px;top:210px" width="30" height="30" viewBox="0 0 30 30">
+      <circle cx="15" cy="15" r="10.5" fill="#F7F2E7" stroke="#2E7D4F" stroke-width="1.6"/>
+      <path d="M16.5 8.5 L10.5 15.9h3.9l-1.1 5.7 6-7.4h-3.9z" fill="#2E7D4F"/>
+    </svg>
+    <div class="pinL" style="left:242px;top:214px"><b>¥0.68</b> 谷电</div>
+
+    <svg class="pinWrap" style="left:128px;top:212px" width="38" height="38" viewBox="0 0 38 38">
+      <circle cx="19" cy="19" r="17" fill="#F7F2E7" stroke="#B33325" stroke-width="1.6"/>
+      <path d="M19 13v7M19 23.4v1.6" stroke="#B33325" stroke-width="2.2" stroke-linecap="round"/>
+    </svg>
+    <div class="pinL rd" style="left:22px;top:264px;font-family:'Noto Serif SC',serif;font-size:11.5px;letter-spacing:.14em">
+      14:20 后备箱未关</div>
+    <div class="pinL dim" style="left:22px;top:284px;font-family:'Noto Serif SC',serif;font-size:10px;letter-spacing:.12em">
+      停在这儿 4 小时｜7:42–18:05 的行程见「今天」</div>
+
+    <div class="scale" style="top:396px"><div class="bar" style="width:64px"></div><div class="lb">500 M</div></div>
+
+    <div class="hud">
+      <div class="pill g"><i></i>已上锁 · 望京</div>
+      <div class="pill">12° 多云</div>
+      <div class="btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E1B16" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="6.4"/><path d="M12 2.4v3M12 18.6v3M2.4 12h3M18.6 12h3"/></svg></div>
+    </div>
+
+    <div class="layers" style="bottom:378px">
+      <span class="lay on">现在</span><span class="lay">今天</span><span class="lay">充电</span>
+      <span class="lay">花费</span><span class="lay">服务</span><span class="lay">共享</span><span class="lay">数据</span>
+    </div>
+
+    <div class="sheet">
+      <div class="grab"></div>
+      <h3 class="serif">车在这儿</h3>
+      <div class="sub">望京 · 地库 B2 · 21:40 起静置 · 距你 1.8 km</div>
+      <div class="rows">
+        <div class="row"><span class="k">电量</span><span class="v">78%<em>412 km</em></span></div>
+        <div class="row"><span class="k">今天</span><span class="v">52.9 km<em>7 段</em></span></div>
+        <div class="row"><span class="k">异常</span><span class="v" style="color:#B33325">1 条<em>后备箱 · 14:20</em></span></div>
+      </div>
+      <div class="q4">
+        <div class="qa hot"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E1B16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="9"/><path d="M8.4 10.5V8a3.6 3.6 0 0 1 7.2 0v2.5"/></svg><div class="l">解锁</div></div>
+        <div class="qa"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E1B16" stroke-width="1.6" stroke-linecap="round"><path d="M12 3.5v17M4.6 7.75l14.8 8.5M19.4 7.75l-14.8 8.5"/></svg><div class="l">空调</div></div>
+        <div class="qa"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E1B16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8.2a4.2 4.2 0 0 1 4.2 4.2c0 1.7-1 2.4-1.5 3.1H9.3c-.5-.7-1.5-1.4-1.5-3.1A4.2 4.2 0 0 1 12 8.2z"/><path d="M10.2 17.6h3.6"/><path d="M12 3.4v1.9M4.9 6.6l1.3 1.3M19.1 6.6l-1.3 1.3M3.2 13.4h1.9M18.9 13.4h1.9"/></svg><div class="l">闪灯</div></div>
+        <div class="qa"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E1B16" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="2.3"/><path d="M8.2 8.2a5.4 5.4 0 0 0 0 7.6M15.8 8.2a5.4 5.4 0 0 1 0 7.6M5.4 5.4a9.4 9.4 0 0 0 0 13.2M18.6 5.4a9.4 9.4 0 0 1 0 13.2"/></svg><div class="l">找车</div></div>
+      </div>
+    </div>
+    <div class="grain"></div>
+  </div>
+</section>
+
+<!-- ================= C · 巨字 ================= -->
+<section class="slide" id="pC">
+  <div class="meta"><div class="no">C / 3</div><div class="nm">巨字 · 尺度就是艺术</div>
+  <div class="de">地图退成一层极淡的网格，让一个数字和一个词占满画面。
+  <em>艺术感来自极端的大小对比：190pt 的细字对 9pt 的小字。</em></div></div>
+  <div class="dev tn" id="sC">
+    <svg class="bm" width="390" height="844"><use href="#terrainGrid"/></svg>
+
+    <svg class="lyr" width="390" height="844" viewBox="0 0 390 844" fill="none">
+      <path d="M300 360 L300 232 L148 232" stroke="rgba(237,234,228,.28)" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M148 240 V404 H40" stroke="rgba(232,86,74,.4)" stroke-width="1" fill="none"/>
+      <circle cx="148" cy="232" r="9" fill="none" stroke="#E8564A" stroke-width="1.4"/>
+      <circle cx="148" cy="232" r="3.4" fill="#E8564A"/>
+    </svg>
+
+    <div class="num" style="left:26px;top:118px;font-size:188px">78</div>
+    <div class="numc" style="left:26px;top:292px;font-size:12px;letter-spacing:.42em;color:rgba(237,234,228,.5)">
+      P E R C E N T</div>
+    <div class="bigL" style="left:26px;top:330px;font-size:56px;font-weight:200;letter-spacing:.1em;
+      color:rgba(247,245,241,.13)">望京</div>
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+
+    <svg class="pinWrap" style="left:236px;top:292px" width="128" height="128" viewBox="0 0 128 128">
+      <circle cx="64" cy="64" r="58" fill="none" stroke="rgba(237,234,228,.14)" stroke-width="1"/>
+      <circle cx="64" cy="64" r="58" fill="none" stroke="#F7F5F1" stroke-width="2.4" stroke-linecap="round"
+        stroke-dasharray="284 364" transform="rotate(-90 64 64)"/>
+      <circle cx="64" cy="64" r="40" fill="none" stroke="rgba(237,234,228,.22)" stroke-width="1"/>
+      <path d="M50 74 L54 63 Q55 60 58.6 60 L69.4 60 Q73 60 74 63 L78 74"
+        stroke="#F7F5F1" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+      <path d="M47 74 H81" stroke="#F7F5F1" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="57" cy="75" r="4.4" fill="none" stroke="#F7F5F1" stroke-width="1.3"/>
+      <circle cx="71" cy="75" r="4.4" fill="none" stroke="#F7F5F1" stroke-width="1.3"/>
+    </svg>
+    <div class="pinL" style="left:248px;top:428px">车在这儿</div>
+
+    <div class="pinL" style="left:30px;top:418px;color:#E8564A"><b>1</b> 条异常</div>
+    <div class="pinL" style="left:30px;top:440px">后备箱 · 14:20 · 中关村</div>
+
+    <div class="scale" style="left:290px;top:118px"><div class="bar" style="width:64px"></div><div class="lb">500 M</div></div>
+
+    <div class="hud">
+      <div class="pill g"><i></i>已上锁</div>
+      <div class="pill">12°</div>
+      <div class="btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EDEAE4" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="6.4"/><path d="M12 2.4v3M12 18.6v3M2.4 12h3M18.6 12h3"/></svg></div>
+    </div>
+
+    <div class="layers" style="bottom:334px">
+      <span class="lay on">现在</span><span class="lay">今天</span><span class="lay">充电</span>
+      <span class="lay">花费</span><span class="lay">服务</span><span class="lay">共享</span><span class="lay">数据</span>
+    </div>
+
+    <div class="sheet">
+      <div class="grab"></div>
+      <h3 class="serif">车在这儿</h3>
+      <div class="sub">望京 地库 B2 · 距你 1.8 km · 21:40 起静置</div>
+      <div class="rows">
+        <div class="row"><span class="k">今天</span><span class="v">52.9<em>km · 7 段</em></span></div>
+        <div class="row"><span class="k">续航</span><span class="v">412<em>km</em></span></div>
+      </div>
+      <div class="q4">
+        <div class="qa hot"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EDEAE4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="9"/><path d="M8.4 10.5V8a3.6 3.6 0 0 1 7.2 0v2.5"/></svg><div class="l">解锁</div></div>
+        <div class="qa"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EDEAE4" stroke-width="1.5" stroke-linecap="round"><path d="M12 3.5v17M4.6 7.75l14.8 8.5M19.4 7.75l-14.8 8.5"/></svg><div class="l">空调</div></div>
+        <div class="qa"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EDEAE4" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="2.3"/><path d="M8.2 8.2a5.4 5.4 0 0 0 0 7.6M15.8 8.2a5.4 5.4 0 0 1 0 7.6"/></svg><div class="l">找车</div></div>
+      </div>
+    </div>
+    <div class="grain"></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(function(){
+  var items=["A 夜光","B 纸上","C 巨字"];
+  var idx=document.getElementById('idx'), board=document.getElementById('board'), chips=[];
+  items.forEach(function(n,i){
+    var b=document.createElement('button');
+    b.className='chip'+(i===0?' on':'');
+    b.innerHTML='<b>'+n.slice(0,1)+'</b>'+n.slice(1);
+    b.addEventListener('click',function(){ go(i); });
+    idx.appendChild(b); chips.push(b);
+  });
+  function go(i){ var sl=board.children[i]; if(sl) board.scrollTo({left:sl.offsetLeft,behavior:'auto'}); mark(i); }
+  function mark(i){ chips.forEach(function(c,k){ c.classList.toggle('on',k===i); }); }
+  var t=null;
+  board.addEventListener('scroll',function(){
+    if(t) clearTimeout(t);
+    t=setTimeout(function(){ mark(Math.round(board.scrollLeft/(board.clientWidth||1))); },90);
+  });
+  window.__go=go;
+})();
+</script>
+</body>
+</html>

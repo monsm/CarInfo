@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>20 套样品 · 横着挑</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;900&family=Noto+Serif+SC:wght@300;400;600&family=JetBrains+Mono:wght@400;500&family=Ma+Shan+Zheng&display=swap">
+<style>
+/* ============ 壳 ============ */
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+html,body{margin:0;padding:0}
+body{background:#17161A;color:#EDEAE4;font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;padding-bottom:40px}
+.mono{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace}
+.hand{font-family:"Ma Shan Zheng","Kaiti SC",KaiTi,"STKaiti","PingFang SC","Microsoft YaHei",cursive}
+.serif{font-family:"Noto Serif SC",Songti SC,serif}
+.tn{font-variant-numeric:tabular-nums}
+
+/* 顶部跳转条 */
+#idx{position:sticky;top:0;z-index:80;background:#17161A;border-bottom:1px solid #2B2A32;
+  padding:9px 10px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+#idx::-webkit-scrollbar{display:none}
+.chip{flex:none;font-size:11px;line-height:1;padding:7px 10px;border-radius:999px;
+  border:1px solid #3B3A44;background:transparent;color:#C6C1B8;cursor:pointer;white-space:nowrap;
+  font-family:inherit}
+.chip b{font-weight:600;margin-right:5px;opacity:.7}
+.chip.on{background:#EDEAE4;border-color:#EDEAE4;color:#17161A}
+.chip.on b{opacity:1}
+
+/* 横向幻灯片 */
+#board{position:relative;display:flex;overflow-x:auto;overflow-y:hidden;
+  scroll-snap-type:x mandatory;scrollbar-width:none}
+#board::-webkit-scrollbar{display:none}
+.slide{flex:0 0 100%;scroll-snap-align:center;scroll-snap-stop:always;
+  display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px 0 30px}
+.meta{width:330px;flex:none}
+.meta .no{font-size:10.5px;letter-spacing:.18em;color:#7E7885}
+.meta .nm{font-size:16px;font-weight:600;margin:3px 0 5px;letter-spacing:.01em}
+.meta .de{font-size:12px;line-height:1.62;color:#A29CA9}
+.meta .de em{font-style:normal;color:#7E7885}
+
+/* 设备 */
+.dev{width:390px;height:844px;flex:none;border-radius:44px;position:relative;overflow:hidden;
+  background:#0B0B0D;color:#131313;
+  box-shadow:0 0 0 1px #3A3941,0 30px 60px -34px #000}
+.sb{position:absolute;top:0;left:0;right:0;height:50px;z-index:30;display:flex;
+  align-items:flex-end;justify-content:space-between;padding:0 27px 6px;
+  font-size:12px;font-weight:500;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.sb span{opacity:.85;letter-spacing:.06em;font-size:11px}
+@media (max-width:440px){.dev{zoom:.80}}
+@media (max-width:325px){.dev{zoom:.70}}
+
+/* 模拟照片（真机上换成你自己的照片） */
+.ph{position:relative;overflow:hidden;background:#111}
+.ph .b0,.ph .b1,.ph .b2{position:absolute;border-radius:50%}
+.ph .gnd{position:absolute;left:-6%;right:-6%;bottom:0}
+.ph .cr{position:absolute;border-radius:44% 44% 12% 12%/72% 72% 10% 10%}
+.ph .vg{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 42%,rgba(0,0,0,0) 36%,rgba(0,0,0,.45) 100%)}
+.ph .gr{position:absolute;inset:0;opacity:.17;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='130'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='130' height='130' filter='url(%23n)' opacity='0.7'/%3E%3C/svg%3E")}
+.p-night{background:linear-gradient(180deg,#0A0D13,#141922 46%,#1B2029 62%,#080A0D)}
+.p-night .b0{width:120px;height:120px;left:-24px;top:14%;background:radial-gradient(circle,rgba(255,196,120,.85),rgba(255,196,120,0) 68%);filter:blur(14px)}
+.p-night .b1{width:70px;height:70px;right:10%;top:32%;background:radial-gradient(circle,rgba(255,70,60,.55),rgba(255,70,60,0) 70%);filter:blur(20px)}
+.p-night .gnd{height:38%;background:linear-gradient(180deg,rgba(22,26,34,.2),#07090C 60%)}
+.p-night .cr{width:150px;height:44px;right:14%;bottom:23%;background:linear-gradient(180deg,#2A3038,#0E1115);filter:blur(1.4px)}
+.p-dawn{background:linear-gradient(180deg,#2E3C56,#6C7392 34%,#C79A8E 56%,#8A7480 72%,#3A3540)}
+.p-dawn .b0{width:150px;height:150px;right:-30px;top:20%;background:radial-gradient(circle,rgba(255,214,174,.72),rgba(255,214,174,0) 66%);filter:blur(20px)}
+.p-dawn .gnd{height:32%;background:linear-gradient(180deg,rgba(58,53,64,.28),#26232B 70%)}
+.p-dawn .cr{width:140px;height:40px;left:16%;bottom:20%;background:linear-gradient(180deg,#3A3540,#191720);filter:blur(1.6px)}
+.p-morn{background:linear-gradient(180deg,#93A8BF,#BBC7D4 42%,#D6D9DA 60%,#9A9B99)}
+.p-morn .b0{width:180px;height:180px;left:4%;top:6%;background:radial-gradient(circle,rgba(255,255,255,.78),rgba(255,255,255,0) 66%);filter:blur(24px)}
+.p-morn .gnd{height:34%;background:linear-gradient(180deg,rgba(120,122,124,.35),#6C6E71 78%)}
+.p-morn .cr{width:152px;height:45px;right:12%;bottom:21%;background:linear-gradient(180deg,#5A5F66,#2A2E34);filter:blur(1.3px)}
+.p-noon{background:linear-gradient(180deg,#C6D3DE,#E2E7EA 44%,#EDE9E2 58%,#B7B2A9)}
+.p-noon .b0{width:220px;height:220px;left:50%;top:0;transform:translateX(-50%);background:radial-gradient(circle,rgba(255,255,255,.9),rgba(255,255,255,0) 62%);filter:blur(28px)}
+.p-noon .gnd{height:36%;background:linear-gradient(180deg,rgba(180,175,166,.4),#A19C93 80%)}
+.p-noon .cr{width:150px;height:44px;left:18%;bottom:22%;background:linear-gradient(180deg,#8D8A85,#4A4846);filter:blur(1.5px)}
+.p-dusk{background:linear-gradient(180deg,#221C33,#5A3350 30%,#B3543F 52%,#E8843C 66%,#4A2A28)}
+.p-dusk .b0{width:230px;height:230px;right:-40px;top:38%;background:radial-gradient(circle,rgba(255,168,86,.85),rgba(255,168,86,0) 62%);filter:blur(22px)}
+.p-dusk .b2{width:90px;height:90px;left:36%;top:58%;background:radial-gradient(circle,rgba(255,96,64,.6),rgba(255,96,64,0) 70%);filter:blur(18px)}
+.p-dusk .gnd{height:30%;background:linear-gradient(180deg,rgba(58,34,32,.4),#1D1419 72%)}
+.p-dusk .cr{width:160px;height:47px;left:12%;bottom:18%;background:linear-gradient(180deg,#2A1A20,#0E090C);filter:blur(1.4px)}
+
+/* ============ 01 单页大数 ============ */
+#s01 .n{position:absolute;left:0;right:0;top:262px;text-align:center;font-size:210px;font-weight:200;letter-spacing:-.05em;line-height:1}
+#s01 .n i{font-style:normal;font-size:52px;font-weight:300;vertical-align:28px;letter-spacing:0}
+#s01 .lb{position:absolute;left:0;right:0;top:480px;text-align:center;font-size:11px;letter-spacing:.44em;color:#9C968E;text-indent:.44em}
+#s01 .r{position:absolute;left:46px;right:46px;top:560px;height:1px;background:rgba(0,0,0,.13)}
+#s01 .ft{position:absolute;left:46px;right:46px;top:586px;display:flex;justify-content:space-between;font-size:10.5px;color:#9C968E;letter-spacing:.06em}
+#s01 .hz{position:absolute;left:0;right:0;bottom:150px;text-align:center;font-size:11px;color:#B4AEA6;letter-spacing:.1em}
+
+/* ============ 02 时间线 ============ */
+#s02 .hd{position:absolute;left:28px;top:72px;font-size:26px;font-weight:600;letter-spacing:.1em}
+#s02 .sub{position:absolute;left:29px;top:112px;font-size:11px;color:#8A8490;letter-spacing:.05em}
+#s02 .ln{position:absolute;left:28px;right:28px;top:430px;height:1px;background:rgba(255,255,255,.22)}
+#s02 .ln2{position:absolute;left:28px;right:28px;top:430px;height:1px;background:linear-gradient(90deg,rgba(255,255,255,.5),rgba(255,255,255,.12))}
+#s02 .nd{position:absolute;top:430px;transform:translate(-50%,-50%);width:3px;height:3px;border-radius:50%;background:#EDEAE4}
+#s02 .nd.on{width:9px;height:9px;background:#D8382C;box-shadow:0 0 0 5px rgba(216,56,44,.16)}
+#s02 .tg{position:absolute;transform:translateX(-50%);font-size:9.5px;color:#98929E;white-space:nowrap;letter-spacing:.02em}
+#s02 .tg b{display:block;font-size:11px;color:#EDEAE4;font-weight:500;margin-bottom:2px}
+#s02 .tg.onb b{color:#ED7A6E}
+#s02 .card{position:absolute;left:28px;right:28px;top:560px;background:#1D1C22;border-radius:14px;padding:18px 20px}
+#s02 .card .t{font-size:17px;font-weight:500;margin-bottom:6px}
+#s02 .card .m{font-size:12px;color:#9A94A0;line-height:1.65}
+#s02 .card .w{margin-top:12px;padding-left:10px;border-left:2px solid rgba(216,56,44,.6);font-size:12px;color:#CFC9D4;line-height:1.6}
+#s02 .ax{position:absolute;left:28px;right:28px;top:474px;display:flex;justify-content:space-between;font-size:9px;color:#6E6874;letter-spacing:.06em}
+
+/* ============ 03 印样 ============ */
+#s03 .hd{position:absolute;left:24px;top:74px;font-size:19px;font-weight:600;letter-spacing:.1em}
+#s03 .sb2{position:absolute;right:24px;top:82px;font-size:11px;color:#8A8490;letter-spacing:.06em}
+#s03 .meta2{position:absolute;left:25px;top:104px;font-size:10px;color:#7E7885;letter-spacing:.05em}
+#s03 .grid{position:absolute;left:24px;right:24px;top:136px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+#s03 .fr{position:relative;aspect-ratio:1/1;border-radius:2px;overflow:hidden}
+#s03 .fr .k{position:absolute;left:3px;bottom:1px;font-size:7px;color:rgba(255,255,255,.6);z-index:4}
+#s03 .fr.mk::after{content:"";position:absolute;inset:-3px;z-index:5;border:1.6px solid #D8382C;
+  border-radius:52% 48% 51% 49%/49% 53% 47% 51%;transform:rotate(-4deg);opacity:.92}
+#s03 .ft{position:absolute;left:24px;right:24px;bottom:104px}
+#s03 .ft .hr{height:1px;background:rgba(255,255,255,.16);margin-bottom:12px}
+#s03 .ft p{margin:0;font-size:11.5px;line-height:1.72;color:#A8A2AE}
+#s03 .ft b{color:#ED7A6E;font-weight:500}
+
+/* ============ 04 单张照片 ============ */
+#s04 .hero{position:absolute;left:0;right:0;top:0;height:100%}
+#s04 .ov{position:absolute;left:30px;right:30px;bottom:112px;color:#F6F2EB;text-shadow:0 1px 16px rgba(0,0,0,.6)}
+#s04 .ov .no{font-size:10px;letter-spacing:.2em;opacity:.85;font-variant-numeric:tabular-nums}
+#s04 .ov .t{font-size:30px;letter-spacing:.04em;margin:7px 0 7px;font-weight:400}
+#s04 .ov .m{font-size:12px;opacity:.88;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+#s04 .tk{position:absolute;left:30px;right:30px;bottom:74px;display:flex;gap:4px;align-items:center}
+#s04 .tk i{flex:1;height:2px;background:rgba(255,255,255,.26);border-radius:2px}
+#s04 .tk i.on{background:#F6F2EB}
+#s04 .tk i.rd{background:#E8564A}
+#s04 .fno{position:absolute;right:30px;bottom:44px;font-size:10.5px;color:rgba(255,255,255,.62);letter-spacing:.1em;font-variant-numeric:tabular-nums}
+
+/* ============ 05 暗座舱 ============ */
+#s05{background:#06070A!important}
+#s05 .lamps{position:absolute;left:26px;right:26px;top:78px;display:flex;justify-content:space-between;opacity:.085}
+#s05 .lamps i{width:26px;height:26px;border-radius:50%;box-shadow:inset 0 0 0 1.4px #FFF}
+#s05 .carline{position:absolute;left:50%;top:334px;transform:translateX(-50%);opacity:.13}
+#s05 .mid{position:absolute;left:0;right:0;top:552px;text-align:center;font-size:14px;letter-spacing:.16em;color:rgba(255,255,255,.42)}
+#s05 .mid b{display:block;font-size:34px;font-weight:200;letter-spacing:.02em;color:rgba(255,255,255,.9);margin-bottom:10px}
+#s05 .mp{position:absolute;left:0;right:0;top:644px;text-align:center;font-size:10.5px;letter-spacing:.14em;color:rgba(255,255,255,.26)}
+#s05 .taphint{position:absolute;left:0;right:0;bottom:56px;text-align:center;font-size:10.5px;letter-spacing:.16em;color:rgba(255,255,255,.22)}
+
+/* ============ 06 仪表台 ============ */
+#s06 .bench{position:absolute;left:0;right:0;top:64px;text-align:center;font-size:10px;letter-spacing:.3em;color:#6E6874}
+#s06 .gg{position:absolute;left:50%;top:206px;transform:translateX(-50%)}
+#s06 .gv{position:absolute;left:0;right:0;top:392px;text-align:center;font-size:13px;letter-spacing:.2em;color:#8A8490}
+#s06 .sub2{position:absolute;left:24px;right:24px;top:470px;display:flex;gap:12px}
+#s06 .gc{flex:1;background:#15141A;border-radius:16px;padding:14px 10px 12px;text-align:center;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+#s06 .gc .l{font-size:9.5px;letter-spacing:.18em;color:#7E7885;margin-top:8px}
+#s06 .gc .v{font-size:19px;font-weight:500;margin-top:3px;font-variant-numeric:tabular-nums}
+#s06 .gc .v i{font-style:normal;font-size:10px;opacity:.6;margin-left:2px}
+#s06 .strip{position:absolute;left:24px;right:24px;bottom:88px;display:flex;justify-content:space-between;font-size:10px;color:#6E6874;letter-spacing:.1em}
+
+/* ============ 07 一封信 ============ */
+#s07{background:#FAF7F1!important}
+#s07 .dt{position:absolute;left:36px;right:36px;top:84px;display:flex;justify-content:space-between;
+  font-size:10.5px;color:#9A9288;letter-spacing:.1em}
+#s07 .letter{position:absolute;left:36px;right:36px;top:130px;font-size:14.5px;line-height:2.02;color:#262320}
+#s07 .letter .f{font-size:26px;font-weight:400;letter-spacing:.08em;display:block;margin-bottom:20px}
+#s07 .letter p{margin:0 0 15px;text-indent:1.6em}
+#s07 .letter p:first-of-type{text-indent:0}
+#s07 .sig{position:absolute;right:40px;bottom:150px;text-align:right;font-size:12px;color:#4A453E;letter-spacing:.06em;line-height:1.9}
+#s07 .sig .r{width:120px;height:1px;background:rgba(0,0,0,.22);margin:0 0 10px auto}
+#s07 .ft2{position:absolute;left:36px;right:36px;bottom:92px;font-size:10px;color:#A79F95;letter-spacing:.08em}
+
+/* ============ 08 收据 ============ */
+#s08{background:#FFFDF9!important}
+#s08 .rec{position:absolute;left:44px;right:44px;top:66px;font-size:11.5px;line-height:1.62;color:#1E1C19}
+#s08 .rec .ct{text-align:center}
+#s08 .rec .ct .b{font-size:15px;font-weight:500;letter-spacing:.22em}
+#s08 .rec .ct .s{font-size:10px;color:#6B655D;letter-spacing:.1em;margin-top:4px}
+#s08 .dz{border-top:1px dashed #B9B2A8;margin:12px 0}
+#s08 .rw{display:flex;align-items:baseline;gap:6px}
+#s08 .rw .dot{flex:1;border-bottom:1px dotted #C6BFB4;transform:translateY(-3px)}
+#s08 .rw .v{font-variant-numeric:tabular-nums}
+#s08 .rw.hd{color:#8B8478;font-size:9.5px;letter-spacing:.14em}
+#s08 .tt{display:flex;justify-content:space-between;font-weight:500}
+#s08 .big{text-align:center;font-size:23px;font-weight:500;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+#s08 .bar{height:44px;margin-top:14px;opacity:.86;
+  background:repeating-linear-gradient(90deg,#1E1C19 0 2px,transparent 2px 3px,#1E1C19 3px 4px,transparent 4px 7px,#1E1C19 7px 8px,transparent 8px 13px)}
+#s08 .ty{text-align:center;font-size:10px;color:#8B8478;letter-spacing:.16em;margin-top:14px}
+
+/* ============ 09 天空 ============ */
+#s09 .sky{position:absolute;inset:0;background:linear-gradient(180deg,#0E1626 0%,#23324B 26%,#4A5D75 48%,#8E93A0 66%,#C0A794 80%,#5A4A48 100%)}
+#s09 .hk{position:absolute;left:-20%;right:-20%;top:62%;height:220px;
+  background:radial-gradient(60% 100% at 68% 0,rgba(255,190,120,.75),rgba(255,190,120,0) 70%);filter:blur(18px)}
+#s09 .top{position:absolute;left:32px;top:86px;color:#F2EEE7}
+#s09 .top .loc{font-size:11px;letter-spacing:.14em;opacity:.8}
+#s09 .top .t{font-size:82px;font-weight:200;letter-spacing:-.03em;line-height:1;margin:10px 0 6px}
+#s09 .top .t i{font-style:normal;font-size:26px;font-weight:300;vertical-align:26px;margin-left:3px}
+#s09 .top .c{font-size:12px;letter-spacing:.08em;opacity:.86}
+#s09 .band{position:absolute;left:32px;right:32px;top:498px;color:#F6F2EA;text-shadow:0 1px 14px rgba(0,0,0,.5)}
+#s09 .band .l{font-size:10px;letter-spacing:.2em;opacity:.8}
+#s09 .band .v{font-size:38px;font-weight:300;letter-spacing:.01em;margin:6px 0 8px;font-variant-numeric:tabular-nums}
+#s09 .band .bar{height:5px;border-radius:3px;background:rgba(255,255,255,.24);overflow:hidden}
+#s09 .band .bar i{display:block;height:100%;width:78%;background:linear-gradient(90deg,rgba(255,205,150,.95),#FFFDF6)}
+#s09 .note{position:absolute;left:32px;right:32px;bottom:62px;font-size:10px;letter-spacing:.1em;color:rgba(255,255,255,.55)}
+
+/* ============ 10 地图 ============ */
+#s10 .mp{position:absolute;inset:0;background:#14181C}
+#s10 .sheet{position:absolute;left:14px;right:14px;bottom:14px;background:#FBF9F6;border-radius:22px;padding:20px 22px 22px;color:#15130F}
+#s10 .sheet .g{width:38px;height:4px;border-radius:3px;background:rgba(0,0,0,.16);margin:0 auto 16px}
+#s10 .sheet .t{font-size:17px;font-weight:600;letter-spacing:.02em}
+#s10 .sheet .s{font-size:11.5px;color:#777269;margin-top:4px}
+#s10 .sheet .rows{margin-top:16px}
+#s10 .sheet .row{display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid rgba(0,0,0,.08);font-size:12.5px}
+#s10 .sheet .row .k{color:#777269}
+#s10 .sheet .row .v{font-variant-numeric:tabular-nums;font-weight:500}
+#s10 .nl{position:absolute;left:24px;top:74px;background:rgba(20,24,28,.72);border:1px solid rgba(255,255,255,.14);
+  border-radius:999px;padding:8px 13px;color:#EDEAE4;font-size:11px;letter-spacing:.08em;backdrop-filter:blur(8px)}
+/* ============ 11 遥控器 ============ */
+#s11{background:radial-gradient(120% 90% at 50% 26%,#2C2F35,#101113 72%)!important;color:#EDEAE4}
+#s11 .fob{position:absolute;left:32px;right:32px;top:118px;bottom:112px;border-radius:58px;
+  background:linear-gradient(180deg,#3C4048,#23262C 42%,#191C21);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 -2px 8px rgba(0,0,0,.6),0 34px 60px -34px #000}
+#s11 .led{position:absolute;left:50%;top:60px;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:#5FD07A;box-shadow:0 0 12px #5FD07A}
+#s11 .brand{position:absolute;left:0;right:0;top:82px;text-align:center;font-size:10px;letter-spacing:.34em;color:rgba(255,255,255,.36)}
+#s11 .keys{position:absolute;left:40px;right:40px;top:168px;display:grid;grid-template-columns:1fr 1fr;gap:18px}
+#s11 .kk{aspect-ratio:1/1;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  background:linear-gradient(180deg,#30343B,#1A1D22);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 8px 16px -10px #000}
+#s11 .kk b{font-size:11px;font-weight:500;color:#D8D3CA;letter-spacing:.06em}
+#s11 .kk.red b{color:#EE8A7E}
+#s11 .ring{position:absolute;left:50%;bottom:40px;transform:translateX(-50%);width:104px;height:5px;border-radius:4px;background:rgba(255,255,255,.16)}
+
+/* ============ 12 卡片堆 ============ */
+#s12{background:#101015!important;color:#EDEAE4}
+#s12 .stk{position:absolute;left:32px;right:32px;top:246px;height:352px}
+#s12 .cd{position:absolute;left:0;right:0;top:0;border-radius:26px;background:#FBFAF7;color:#15130F;padding:28px 24px;
+  box-shadow:0 26px 44px -26px rgba(0,0,0,.85)}
+#s12 .cd.b1{top:14px;transform:rotate(-2.6deg) scale(.962);background:#E7E4DE}
+#s12 .cd.b2{top:28px;transform:rotate(1.8deg) scale(.924);background:#CCC9C3}
+#s12 .cd h3{margin:0 0 10px;font-size:25px;font-weight:500;letter-spacing:.01em}
+#s12 .cd p{margin:0;font-size:13px;line-height:1.78;color:#5E5A52}
+#s12 .cd .tag{position:absolute;left:24px;top:-13px;background:#D8382C;color:#fff;font-size:10px;letter-spacing:.14em;padding:5px 11px;border-radius:999px}
+#s12 .cd .foot{position:absolute;left:24px;right:24px;bottom:22px;display:flex;justify-content:space-between;font-size:11px;color:#8B8579}
+#s12 .hint{position:absolute;left:0;right:0;bottom:150px;text-align:center;font-size:11.5px;color:#7E7885;letter-spacing:.08em}
+#s12 .dots{position:absolute;left:0;right:0;bottom:110px;display:flex;justify-content:center;gap:6px}
+#s12 .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.2)}
+#s12 .dots i.on{background:#EDEAE4;width:18px;border-radius:4px}
+
+/* ============ 13 聊天 ============ */
+#s13{background:#0E0E12!important;color:#EDEAE4}
+#s13 .ch{position:absolute;left:20px;right:20px;top:66px;bottom:104px;display:flex;flex-direction:column;gap:12px}
+#s13 .bb{max-width:76%;padding:12px 15px;border-radius:20px;font-size:13.5px;line-height:1.64}
+#s13 .bb.car{background:#22222A;border-bottom-left-radius:7px;align-self:flex-start}
+#s13 .bb.me{background:#2E5FE8;border-bottom-right-radius:7px;align-self:flex-end;color:#fff;
+  box-shadow:0 8px 18px -12px rgba(46,95,232,.9)}
+#s13 .bb .m{display:block;margin-top:8px;font-size:11px;color:#8A8490}
+#s13 .bb.me .m{color:rgba(255,255,255,.72)}
+#s13 .qm{display:flex;gap:8px;align-self:flex-end}
+#s13 .qm span{font-size:12px;padding:8px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.2);color:#CFC9D4}
+#s13 .inp{position:absolute;left:20px;right:20px;bottom:32px;height:48px;border-radius:999px;background:#1B1B22;
+  display:flex;align-items:center;padding:0 16px;font-size:13px;color:#6E6874;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+#s13 .inp .mic{margin-left:auto;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.12)}
+
+/* ============ 14 账本 ============ */
+#s14{background:#FFFFFF!important;color:#17161A}
+#s14 .lg{position:absolute;left:22px;right:22px;top:68px;font-size:12.5px}
+#s14 .lg h2{margin:0 0 4px;font-size:21px;font-weight:600;letter-spacing:.01em}
+#s14 .lg .sm{font-size:10.5px;color:#8A857C;letter-spacing:.06em}
+#s14 .tb{margin-top:22px;border-top:1.6px solid #17161A}
+#s14 .tr{display:grid;grid-template-columns:70px 1fr 58px 54px;align-items:baseline;gap:8px;
+  padding:9.5px 0;border-bottom:1px solid rgba(0,0,0,.09);font-size:11.5px}
+#s14 .tr.h{color:#8A857C;font-size:9.5px;letter-spacing:.12em;padding-bottom:7px}
+#s14 .tr .n{text-align:right;font-variant-numeric:tabular-nums}
+#s14 .tr .t{font-variant-numeric:tabular-nums;color:#5E594F}
+#s14 .tr.tot{border-bottom:none;border-top:1.6px solid #17161A;margin-top:2px;font-weight:600}
+#s14 .ft3{position:absolute;left:22px;right:22px;bottom:80px;font-size:10px;color:#8A857C;letter-spacing:.08em}
+
+/* ============ 15 刻度尺 ============ */
+#s15{background:#FAF8F4!important;color:#17161A}
+#s15 .hd{position:absolute;left:28px;right:28px;top:76px;display:flex;justify-content:space-between;align-items:baseline}
+#s15 .hd .l{font-size:21px;font-weight:600;letter-spacing:.02em}
+#s15 .hd .r{font-size:10.5px;color:#8A857C;letter-spacing:.08em}
+#s15 .rbar{position:absolute;left:26px;right:26px;top:300px;height:150px;border-radius:16px;background:#EFEBE3;overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+#s15 .fill{position:absolute;left:0;top:0;bottom:0;width:78%;background:linear-gradient(90deg,rgba(216,56,44,.05),rgba(216,56,44,.16))}
+#s15 .tk1{position:absolute;left:0;right:0;bottom:0;height:22px;
+  background:repeating-linear-gradient(90deg,rgba(0,0,0,.3) 0 1px,transparent 1px 13px)}
+#s15 .tk2{position:absolute;left:0;right:0;bottom:0;height:44px;
+  background:repeating-linear-gradient(90deg,rgba(0,0,0,.55) 0 1.5px,transparent 1.5px 65px)}
+#s15 .knob{position:absolute;top:0;bottom:0;left:78%;width:2px;background:#D8382C}
+#s15 .kb{position:absolute;left:78%;top:-46px;transform:translateX(-50%);background:#D8382C;color:#fff;
+  font-size:12px;font-weight:500;padding:6px 11px;border-radius:9px;font-variant-numeric:tabular-nums}
+#s15 .rnum{position:absolute;left:0;right:0;bottom:150px;display:flex;justify-content:space-between;
+  padding:0 26px;font-size:10px;color:#8A857C;font-variant-numeric:tabular-nums}
+#s15 .sub4{position:absolute;left:26px;right:26px;top:500px}
+#s15 .sub4 .rw{padding:12px 0;border-top:1px solid rgba(0,0,0,.1);display:flex;align-items:center;gap:12px}
+#s15 .sub4 .rw .k{font-size:10.5px;color:#8A857C;letter-spacing:.1em;width:44px;flex:none}
+#s15 .sub4 .rw .track{flex:1;height:6px;border-radius:4px;background:#E5E1D8;position:relative}
+#s15 .sub4 .rw .track i{position:absolute;top:0;bottom:0;border-radius:4px;background:#17161A}
+#s15 .sub4 .rw .track em{position:absolute;top:-3px;bottom:-3px;width:2px;background:#D8382C}
+#s15 .sub4 .rw .v{font-size:11.5px;font-variant-numeric:tabular-nums;width:66px;text-align:right}
+#s15 .note4{position:absolute;left:28px;right:28px;bottom:78px;font-size:11px;line-height:1.7;color:#3A362F}
+
+/* ============ 16 线框孪生 ============ */
+#s16{background:#0B0D10!important;color:#EDEAE4}
+#s16 .hd5{position:absolute;left:26px;top:74px;font-size:10px;letter-spacing:.3em;color:#6E6874}
+#s16 .nm5{position:absolute;left:26px;top:96px;font-size:22px;font-weight:300;letter-spacing:.06em}
+#s16 .wf{position:absolute;left:18px;right:18px;top:150px}
+#s16 .lgd{position:absolute;left:26px;right:26px;bottom:148px}
+#s16 .lgd .row{display:flex;align-items:center;gap:10px;font-size:11.5px;color:#A8A2AE;
+  padding:8px 0;border-top:1px solid rgba(255,255,255,.1)}
+#s16 .lgd .sw{width:18px;height:2px;border-radius:2px;background:#EDEAE4;flex:none}
+#s16 .lgd .sw.d{background:none;border-top:2px dashed #D8382C}
+#s16 .lgd .v{margin-left:auto;font-variant-numeric:tabular-nums;color:#EDEAE4}
+#s16 .rot{position:absolute;left:0;right:0;bottom:74px;text-align:center;font-size:10.5px;letter-spacing:.14em;color:#6E6874}
+
+/* ============ 17 海报 ============ */
+#s17{background:#F2EFE9!important;color:#17161A}
+#s17 .pl{position:absolute;left:30px;right:30px;top:110px}
+#s17 .pl h1{margin:0;font-size:102px;line-height:.88;font-weight:900;letter-spacing:-.045em}
+#s17 .bar{height:26px;background:#D8382C;margin:28px 0 24px}
+#s17 .cols{display:flex;gap:16px}
+#s17 .cols div{flex:1}
+#s17 .cols .v{font-size:31px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+#s17 .cols .k{font-size:9.5px;letter-spacing:.16em;color:#8A857C;margin-top:5px}
+#s17 .bk{position:absolute;right:30px;bottom:190px;width:118px;height:118px;background:#1B1A18}
+#s17 .bk2{position:absolute;left:30px;bottom:190px;width:118px;height:118px;border:2px solid #1B1A18}
+#s17 .cap{position:absolute;left:30px;right:30px;bottom:86px;font-size:10.5px;color:#8A857C;letter-spacing:.12em;line-height:1.9}
+
+/* ============ 18 腕表 ============ */
+#s18{background:radial-gradient(120% 90% at 50% 32%,#231F19,#0A0908 72%)!important;color:#E8DCC2}
+#s18 .brand{position:absolute;left:0;right:0;top:96px;text-align:center;font-size:13px;letter-spacing:.42em;text-indent:.42em}
+#s18 .auto{position:absolute;left:0;right:0;top:120px;text-align:center;font-size:8.5px;letter-spacing:.32em;color:rgba(232,220,194,.5)}
+#s18 .dial{position:absolute;left:50%;top:176px;transform:translateX(-50%);width:312px;height:312px;border-radius:50%;
+  background:radial-gradient(circle at 36% 28%,#312C23,#161411 72%);
+  box-shadow:inset 0 0 0 2px rgba(232,220,194,.24),inset 0 0 70px rgba(0,0,0,.75),0 34px 60px -34px #000}
+#s18 .sub{position:absolute;left:24px;right:24px;bottom:118px;display:flex;justify-content:space-between;font-size:10px;color:rgba(232,220,194,.62);letter-spacing:.14em}
+#s18 .ft5{position:absolute;left:0;right:0;bottom:74px;text-align:center;font-size:10px;letter-spacing:.2em;color:rgba(232,220,194,.55)}
+
+/* ============ 19 便签 ============ */
+#s19{background:radial-gradient(90% 70% at 50% 18%,#3A342C,#141110 72%)!important;color:#EDEAE4}
+#s19 .note{position:absolute;left:36px;right:44px;top:176px;padding:28px 24px 32px;transform:rotate(-3.2deg);
+  background:linear-gradient(180deg,#F5E7A8,#EDD98C);box-shadow:0 24px 44px -24px rgba(0,0,0,.8);color:#3A3324}
+#s19 .note .h{font-size:23px;line-height:1.66}
+#s19 .note p{margin:12px 0 0;font-size:17px;line-height:2.06;color:#4A4130}
+#s19 .tape{position:absolute;left:50%;top:-15px;transform:translateX(-50%) rotate(-2deg);width:98px;height:28px;
+  background:rgba(255,255,255,.3);box-shadow:inset 0 0 0 1px rgba(255,255,255,.24)}
+#s19 .pol{position:absolute;right:28px;bottom:158px;width:128px;background:#FBF8F1;padding:8px 8px 24px;transform:rotate(5deg);
+  box-shadow:0 18px 32px -20px #000}
+#s19 .pol .im{width:112px;height:84px;position:relative;overflow:hidden}
+#s19 .pol .cp{font-size:10px;color:#8A8172;margin-top:6px;text-align:center}
+#s19 .ft6{position:absolute;left:36px;bottom:82px;font-size:10.5px;color:rgba(255,255,255,.42);letter-spacing:.1em}
+
+/* ============ 20 无界面 ============ */
+#s20 .ls{position:absolute;inset:0;background:linear-gradient(180deg,#1E2739,#31405C 28%,#5A4E63 56%,#2A2333 78%,#121120)}
+#s20 .la{position:absolute;left:18px;right:18px;top:56px;background:rgba(255,255,255,.14);border-radius:26px;padding:15px 17px;
+  color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+#s20 .la .r1{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.06em;opacity:.92}
+#s20 .la .r1 i{width:7px;height:7px;border-radius:50%;background:#6FE08B;display:block}
+#s20 .la .r2{font-size:19px;font-weight:500;margin-top:8px;letter-spacing:.01em}
+#s20 .la .r3{font-size:11.5px;opacity:.82;margin-top:3px;font-variant-numeric:tabular-nums}
+#s20 .la .pb{height:3px;border-radius:2px;background:rgba(255,255,255,.28);margin-top:12px;overflow:hidden}
+#s20 .la .pb i{display:block;height:100%;width:62%;background:#fff}
+#s20 .time{position:absolute;left:0;right:0;top:210px;text-align:center;color:#fff}
+#s20 .time .t{font-size:84px;font-weight:200;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+#s20 .time .d{font-size:14px;margin-top:8px;opacity:.9;letter-spacing:.04em}
+#s20 .wg{position:absolute;left:18px;right:18px;top:406px;background:rgba(255,255,255,.13);border-radius:26px;padding:17px;
+  color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
+#s20 .wg .h{font-size:10.5px;letter-spacing:.18em;opacity:.75;margin-bottom:12px}
+#s20 .wg .row{display:flex;justify-content:space-between;font-size:12.5px;padding:7px 0;border-top:1px solid rgba(255,255,255,.14)}
+#s20 .wg .row:first-of-type{border-top:none}
+#s20 .wg .row b{font-variant-numeric:tabular-nums;font-weight:500}
+#s20 .btns{position:absolute;left:34px;right:34px;bottom:38px;display:flex;justify-content:space-between}
+#s20 .btns i{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.17);display:block}
+#s20 .msg{position:absolute;left:0;right:0;bottom:112px;text-align:center;font-size:11px;color:rgba(255,255,255,.62);letter-spacing:.1em}
+</style>
+</head>
+<body>
+
+<div id="idx"></div>
+
+<main id="board">
+
+<!-- ================= 01 ================= -->
+<section class="slide" id="p01">
+  <div class="meta"><div class="no">01 / 20</div><div class="nm">单页大数</div>
+  <div class="de">满屏只有一个数字，没有任何别的东西。<em>性格：无印良品那种"少到只剩必要"。</em></div></div>
+  <div class="dev tn" id="s01" style="background:#FBFAF8">
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="n">78<i>%</i></div>
+    <div class="lb">电量</div>
+    <div class="r"></div>
+    <div class="ft"><span>续航 412 km</span><span>21:40 更新</span></div>
+    <div class="hz">一切正常</div>
+  </div>
+</section>
+
+<!-- ================= 02 ================= -->
+<section class="slide" id="p02">
+  <div class="meta"><div class="no">02 / 20</div><div class="nm">今日时间线</div>
+  <div class="de">一条横线横贯屏幕，今天每件事标在它发生的位置。<em>性格：剪辑台 / 病历。</em></div></div>
+  <div class="dev tn" id="s02" style="background:#0C0B10;color:#EDEAE4">
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="hd serif">今天</div>
+    <div class="sub">星期日 · 七段 · 52.9 km · 38 kWh</div>
+    <div class="ln"></div><div class="ln2"></div>
+    <div class="nd" style="left:28px"></div>
+    <div class="tg" style="left:60px;top:378px"><b>00:00</b>静置</div>
+    <div class="nd" style="left:135px"></div>
+    <div class="tg" style="left:158px;top:340px"><b>07:42</b>出发</div>
+    <div class="nd" style="left:150px"></div>
+    <div class="tg" style="left:196px;top:466px"><b>08:20</b>到达</div>
+    <div class="nd on" style="left:198px"></div>
+    <div class="nd" style="left:279px"></div>
+    <div class="tg" style="left:262px;top:378px"><b>12:10</b>充电</div>
+    <div class="nd" style="left:322px"></div>
+    <div class="tg" style="left:340px;top:340px"><b>18:05</b>返程</div>
+    <div class="nd" style="left:352px"></div>
+    <div class="ax"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+    <div class="card">
+      <div class="t">充电 38 kWh · ¥46</div>
+      <div class="m">12:10 – 13:40 · 92% 停 · 谷电时段</div>
+      <div class="w">比上周同样一次便宜 22% —— 这次赶上了谷电。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 03 ================= -->
+<section class="slide" id="p03">
+  <div class="meta"><div class="no">03 / 20</div><div class="nm">印样</div>
+  <div class="de">一天的小样排成格子，红笔圈出值得看的三格。<em>性格：摄影师的看片台。</em></div></div>
+  <div class="dev tn" id="s03" style="background:#0F0E12;color:#EDEAE4">
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="hd serif">今天 · 印样</div>
+    <div class="sb2">09 · 21</div>
+    <div class="meta2">20 帧 · 每帧 72 分钟 · 52.9 km</div>
+    <div class="grid">
+      <div class="fr ph p-night"><div class="k">01</div></div>
+      <div class="fr ph p-night"><div class="k">02</div></div>
+      <div class="fr ph p-night"><div class="k">03</div></div>
+      <div class="fr ph p-night"><div class="k">04</div></div>
+      <div class="fr ph p-night"><div class="k">05</div></div>
+      <div class="fr ph p-night"><div class="k">06</div></div>
+      <div class="fr ph p-dawn mk"><div class="k">07</div><div class="b0"></div></div>
+      <div class="fr ph p-dawn"><div class="k">08</div></div>
+      <div class="fr ph p-morn"><div class="k">09</div></div>
+      <div class="fr ph p-morn mk"><div class="k">10</div><div class="b0"></div></div>
+      <div class="fr ph p-noon"><div class="k">11</div></div>
+      <div class="fr ph p-noon"><div class="k">12</div></div>
+      <div class="fr ph p-noon"><div class="k">13</div></div>
+      <div class="fr ph p-noon"><div class="k">14</div></div>
+      <div class="fr ph p-dusk"><div class="k">15</div></div>
+      <div class="fr ph p-dusk mk"><div class="k">16</div><div class="b0"></div></div>
+      <div class="fr ph p-dusk"><div class="k">17</div></div>
+      <div class="fr ph p-night"><div class="k">18</div></div>
+      <div class="fr ph p-night"><div class="k">19</div></div>
+      <div class="fr ph p-night"><div class="k">20</div></div>
+    </div>
+    <div class="ft"><div class="hr"></div>
+      <p>红圈三帧：<b>07 出发</b>（空调提前开了 10 分钟）、<b>10 到达</b>（24.8 km）、<b>16 返程</b>（一路顶着西风，多耗 4%）。<br>其余十七帧：正常，未放大。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 04 ================= -->
+<section class="slide" id="p04">
+  <div class="meta"><div class="no">04 / 20</div><div class="nm">单张照片</div>
+  <div class="de">满屏一张照片，说明压在照片上，左右翻页。<em>性格：杂志跨页。需要很美的照片。</em></div></div>
+  <div class="dev tn" id="s04" style="background:#0B0B0D;color:#EDEAE4">
+    <div class="hero ph p-dusk"><div class="b0"></div><div class="b2"></div><div class="gnd"></div><div class="cr"></div><div class="vg"></div><div class="gr"></div></div>
+    <div class="sb" style="color:#F4F0E9">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="ov">
+      <div class="no">图版 16 · 18:05</div>
+      <div class="t serif">返程</div>
+      <div class="m">建国路 → 家 · 26.1 km · 47 分钟</div>
+    </div>
+    <div class="tk">
+      <i></i><i></i><i></i><i class="on"></i><i class="rd"></i><i></i><i></i>
+    </div>
+    <div class="fno">05 / 20</div>
+  </div>
+</section>
+
+<!-- ================= 05 ================= -->
+<section class="slide" id="p05">
+  <div class="meta"><div class="no">05 / 20</div><div class="nm">暗座舱</div>
+  <div class="de">平时几乎全黑，只有一切正常这行字。出事时才会亮起一盏灯。<em>性格：飞机驾驶舱。</em></div></div>
+  <div class="dev tn" id="s05">
+    <div class="sb" style="color:rgba(255,255,255,.35)">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="lamps"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <svg class="carline" width="286" height="120" viewBox="0 0 286 120" fill="none">
+      <path d="M14 88 L30 58 Q40 44 62 42 L196 42 Q222 44 234 58 L268 88" stroke="#FFF" stroke-width="1.1"/>
+      <path d="M14 88 L268 88" stroke="#FFF" stroke-width="1.1"/>
+      <path d="M62 42 Q92 22 130 22 Q168 22 196 42" stroke="#FFF" stroke-width="1.1"/>
+      <circle cx="66" cy="90" r="19" stroke="#FFF" stroke-width="1.1"/>
+      <circle cx="216" cy="90" r="19" stroke="#FFF" stroke-width="1.1"/>
+    </svg>
+    <div class="mid"><b>21:40</b>一切正常</div>
+    <div class="mp">电量 78% · 续航 412 km · 无异常 0 条</div>
+    <div class="taphint">长按查看全部 ▾</div>
+  </div>
+</section>
+
+<!-- ================= 06 ================= -->
+<section class="slide" id="p06">
+  <div class="meta"><div class="no">06 / 20</div><div class="nm">仪表台</div>
+  <div class="de">几个圆表盘，指针会动，有真实刻度。<em>性格：保时捷中控 / Braun 台钟。</em></div></div>
+  <div class="dev tn" id="s06" style="background:#0A0A0C;color:#EDEAE4">
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="bench">C A R K E E P E R</div>
+    <svg class="gg" width="290" height="290" viewBox="0 0 290 290">
+      <circle cx="145" cy="145" r="128" fill="#101015" stroke="rgba(255,255,255,.09)"/>
+      <circle cx="145" cy="145" r="112" fill="none" stroke="rgba(255,255,255,.30)" stroke-width="12" stroke-dasharray="1.4 8.6"/>
+      <circle cx="145" cy="145" r="96" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="2"/>
+      <path d="M145 145 L145 45" stroke="#EDEAE4" stroke-width="2" stroke-linecap="round"/>
+      <path d="M145 145 L102 190" stroke="#D8382C" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="145" cy="145" r="5" fill="#EDEAE4"/>
+      <text x="145" y="228" text-anchor="middle" fill="#8A8490" font-size="11" letter-spacing="3">CHARGE</text>
+    </svg>
+    <div class="gv">78 % &nbsp;·&nbsp; 412 km</div>
+    <div class="sub2">
+      <div class="gc"><svg width="76" height="76" viewBox="0 0 76 76"><circle cx="38" cy="38" r="31" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="7" stroke-dasharray="1.1 5.2"/><path d="M38 38 L38 17" stroke="#EDEAE4" stroke-width="1.6" stroke-linecap="round"/><circle cx="38" cy="38" r="3" fill="#EDEAE4"/></svg><div class="l">胎压</div><div class="v">2.4<i>bar</i></div></div>
+      <div class="gc"><svg width="76" height="76" viewBox="0 0 76 76"><circle cx="38" cy="38" r="31" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="7" stroke-dasharray="1.1 5.2"/><path d="M38 38 L54 30" stroke="#D8382C" stroke-width="1.6" stroke-linecap="round"/><circle cx="38" cy="38" r="3" fill="#EDEAE4"/></svg><div class="l">舱温</div><div class="v">14<i>℃</i></div></div>
+      <div class="gc"><svg width="76" height="76" viewBox="0 0 76 76"><circle cx="38" cy="38" r="31" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="7" stroke-dasharray="1.1 5.2"/><path d="M38 38 L24 22" stroke="#EDEAE4" stroke-width="1.6" stroke-linecap="round"/><circle cx="38" cy="38" r="3" fill="#EDEAE4"/></svg><div class="l">续航</div><div class="v">412<i>km</i></div></div>
+    </div>
+    <div class="strip"><span>ODO 24,860 km</span><span>AVG 16.4 kWh/100km</span></div>
+  </div>
+</section>
+
+<!-- ================= 07 ================= -->
+<section class="slide" id="p07">
+  <div class="meta"><div class="no">07 / 20</div><div class="nm">一封信</div>
+  <div class="de">车用第一人称给你写一段话，没有图标没有卡片没有数字表。<em>性格：一封邮件。</em></div></div>
+  <div class="dev" id="s07">
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="dt"><span>2026 · 09 · 21</span><span>21:40</span></div>
+    <div class="letter serif">
+      <span class="f">今天我很好。</span>
+      <p>早上 7:42 你上车的时候，车厢是 21 度——我提前十分钟把空调开了，所以那一趟比平时多用了 3% 的电。我觉得值得。</p>
+      <p>中午你把我插上电，38 度电花了 46 块，比上周同样一次便宜了 22%，因为我们赶上了谷电。</p>
+      <p>傍晚回来的路上一直顶着西风，我比平时多费了 4% 才把你送到家。</p>
+      <p>现在还剩 78%。明早 3 度，我大概会掉到 66%——不用管我，够用。</p>
+    </div>
+    <div class="sig"><div class="r"></div>你的车<br><span style="font-size:11px;color:#8B847A">2026-09-21 21:40</span></div>
+  </div>
+</section>
+
+<!-- ================= 08 ================= -->
+<section class="slide" id="p08">
+  <div class="meta"><div class="no">08 / 20</div><div class="nm">收据</div>
+  <div class="de">今天像一张打印小票：等宽字、一行一条、末尾总额。<em>性格：冷，但一看就懂。</em></div></div>
+  <div class="dev mono tn" id="s08">
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="rec">
+      <div class="ct"><div class="b">CARKEEPER</div><div class="s">2026-09-21 星期日 · 小票 0012</div></div>
+      <div class="dz"></div>
+      <div class="rw hd"><span>时间</span><span class="dot"></span><span>项目</span></div>
+      <div class="rw"><span>00:00</span><span class="dot"></span><span>静置 · 家</span><span class="v">0.0</span></div>
+      <div class="rw"><span>07:42</span><span class="dot"></span><span>出发 · 地库</span><span class="v">0.0</span></div>
+      <div class="rw"><span>08:20</span><span class="dot"></span><span>到达 · 中关村</span><span class="v">24.8</span></div>
+      <div class="rw"><span>12:10</span><span class="dot"></span><span>充电 · 38 kWh</span><span class="v">46.0</span></div>
+      <div class="rw"><span>13:40</span><span class="dot"></span><span>离桩 · 92%</span><span class="v">0.0</span></div>
+      <div class="rw"><span>18:05</span><span class="dot"></span><span>返程 · 顶风</span><span class="v">26.1</span></div>
+      <div class="rw"><span>18:52</span><span class="dot"></span><span>到家 · 剩 78%</span><span class="v">0.0</span></div>
+      <div class="dz"></div>
+      <div class="tt"><span>里程合计</span><span class="v">52.9 km</span></div>
+      <div class="tt"><span>充电合计</span><span class="v">38.0 kWh</span></div>
+      <div class="dz"></div>
+      <div class="big">¥ 46.00</div>
+      <div class="bar"></div>
+      <div class="ty">今 天 没 有 一 条 异 常</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 09 ================= -->
+<section class="slide" id="p09">
+  <div class="meta"><div class="no">09 / 20</div><div class="nm">天空</div>
+  <div class="de">界面的颜色和质感来自你车所在地的**真实天气与时刻**。<em>性格：天气 App。依赖天气数据。</em></div></div>
+  <div class="dev tn" id="s09">
+    <div class="sky"></div><div class="hk"></div>
+    <div class="sb" style="color:#F2EEE7">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="top serif">
+      <div class="loc">车所在 · 北京 朝阳</div>
+      <div class="t">12<i>°</i></div>
+      <div class="c">多云转晴 · 东北风 3 级 · 体感 9°</div>
+    </div>
+    <div class="band">
+      <div class="l">电量 · 真实数据</div>
+      <div class="v">78 %</div>
+      <div class="bar"><i></i></div>
+    </div>
+    <div class="note">天空颜色 = 你车所在时刻的真实天气（此处为占位）</div>
+  </div>
+</section>
+
+<!-- ================= 10 ================= -->
+<section class="slide" id="p10">
+  <div class="meta"><div class="no">10 / 20</div><div class="nm">地图</div>
+  <div class="de">整个界面就是地图，车在地图上，数据贴着地图边。<em>性格：Find My。</em></div></div>
+  <div class="dev tn" id="s10" style="color:#EDEAE4">
+    <div class="mp"></div>
+    <svg style="position:absolute;inset:0" width="390" height="844" viewBox="0 0 390 844" fill="none">
+      <rect x="0" y="0" width="390" height="844" fill="#14181C"/>
+      <g opacity=".5" fill="#1D2329">
+        <rect x="18" y="120" width="112" height="86" rx="6"/>
+        <rect x="150" y="96" width="96" height="120" rx="6"/>
+        <rect x="266" y="130" width="106" height="76" rx="6"/>
+        <rect x="24" y="248" width="130" height="96" rx="6"/>
+        <rect x="176" y="248" width="76" height="72" rx="6"/>
+        <rect x="272" y="240" width="100" height="104" rx="6"/>
+        <rect x="30" y="384" width="104" height="92" rx="6"/>
+        <rect x="156" y="360" width="120" height="90" rx="6"/>
+        <rect x="296" y="372" width="80" height="118" rx="6"/>
+        <rect x="22" y="512" width="126" height="84" rx="6"/>
+        <rect x="170" y="500" width="92" height="108" rx="6"/>
+      </g>
+      <g stroke="#39434C" stroke-width="5" stroke-linecap="round">
+        <path d="M0 214 H390"/><path d="M0 356 H390"/><path d="M0 484 H390"/><path d="M0 606 H390"/>
+        <path d="M142 40 V720"/><path d="M262 60 V700"/>
+      </g>
+      <g stroke="#4A555F" stroke-width="2.4" stroke-linecap="round" opacity=".8">
+        <path d="M0 300 H390"/><path d="M0 430 H390"/><path d="M80 40 V720"/><path d="M200 40 V720"/><path d="M330 40 V720"/>
+      </g>
+      <path d="M110 700 C 130 610, 180 560, 200 500 C 216 452, 246 420, 246 380" stroke="#E0A24A" stroke-width="3" stroke-dasharray="7 6" fill="none" stroke-linecap="round"/>
+      <circle cx="246" cy="380" r="26" fill="rgba(224,162,74,.16)"/>
+      <circle cx="246" cy="380" r="7.5" fill="#F3EFE8"/>
+    </svg>
+    <div class="nl">家 · 地库 B2</div>
+    <div class="sheet">
+      <div class="g"></div>
+      <div class="t">车在这里</div>
+      <div class="s">望京 · 地库 B2 · 21:40 起静置</div>
+      <div class="rows">
+        <div class="row"><span class="k">距你</span><span class="v">1.8 km · 步行 24 分</span></div>
+        <div class="row"><span class="k">电量</span><span class="v">78% · 412 km</span></div>
+        <div class="row"><span class="k">今天</span><span class="v">52.9 km · 7 段</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 11 ================= -->
+<section class="slide" id="p11">
+  <div class="meta"><div class="no">11 / 20</div><div class="nm">遥控器</div>
+  <div class="de">一屏都是巨大的按钮，像一块实体车钥匙，按下去有声音和振动。<em>性格：车库门遥控。</em></div></div>
+  <div class="dev" id="s11">
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="led"></div>
+    <div class="brand">C A R K E E P E R</div>
+    <div class="fob">
+      <div class="keys">
+        <div class="kk"><svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="#EDEAE4" stroke-width="1.5"><rect x="7" y="13" width="16" height="12" rx="2.5"/><path d="M10.5 13V9.5a4.5 4.5 0 0 1 9 0V13"/></svg><b>解锁</b></div>
+        <div class="kk red"><svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="#EE8A7E" stroke-width="1.5"><rect x="7" y="13" width="16" height="12" rx="2.5"/><path d="M10.5 13V9.5a4.5 4.5 0 0 1 8.4-2.3"/></svg><b>上锁</b></div>
+        <div class="kk"><svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="#EDEAE4" stroke-width="1.5"><path d="M11 12h5l6-4v14l-6-4h-5z"/><path d="M8.5 13.5v3"/></svg><b>鸣笛</b></div>
+        <div class="kk"><svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="#EDEAE4" stroke-width="1.5"><path d="M9 15h12M12 11c2-3 4-3 6 0M12 19c2 3 4 3 6 0"/></svg><b>闪灯</b></div>
+        <div class="kk"><svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="#EDEAE4" stroke-width="1.5"><path d="M11 17a4 4 0 0 1 0-8 4.6 4.6 0 0 1 8.4-1 3.5 3.5 0 0 1-.4 9z"/></svg><b>空调</b></div>
+        <div class="kk"><svg width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="#EDEAE4" stroke-width="1.5"><path d="M16 8l-6 9h5l-1 6 6-9h-5z"/></svg><b>充电</b></div>
+      </div>
+    </div>
+    <div class="ring"></div>
+  </div>
+</section>
+
+<!-- ================= 12 ================= -->
+<section class="slide" id="p12">
+  <div class="meta"><div class="no">12 / 20</div><div class="nm">卡片堆</div>
+  <div class="de">一次一张卡片，左边划掉、右边留下。<em>性格：Tinder。适合偶尔看，不适合天天用。</em></div></div>
+  <div class="dev" id="s12">
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="stk">
+      <div class="cd b2"></div>
+      <div class="cd b1"></div>
+      <div class="cd">
+        <div class="tag">需要你决定</div>
+        <h3>今晚会掉 12%</h3>
+        <p>明早气温降到 3℃，电池会比较冷。<br>按现在的 78%，早上大约剩 66%——够你开到公司，但中午最好补一次。</p>
+        <div class="foot"><span>电量 · 21:40</span><span>04 / 20</span></div>
+      </div>
+    </div>
+    <div class="hint">← 知道了 &nbsp;&nbsp; 处理 →</div>
+    <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+  </div>
+</section>
+
+<!-- ================= 13 ================= -->
+<section class="slide" id="p13">
+  <div class="meta"><div class="no">13 / 20</div><div class="nm">聊天</div>
+  <div class="de">像和车发微信：它说一句，你回一句。<em>性格：微信。需要它真的会说话。</em></div></div>
+  <div class="dev" id="s13">
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="ch">
+      <div class="bb car">今天跑了 52.9 公里，充了 38 度电，花了 46 块。<span class="m">20:10</span></div>
+      <div class="bb me">今晚会掉多少？<span class="m">21:38</span></div>
+      <div class="bb car">大概 12%。明早 3℃，电池冷得比较快。你现在 78% 出门也够，但中午最好补一次。<span class="m">21:39</span></div>
+      <div class="qm"><span>为什么是 12%</span><span>中午去哪充</span></div>
+    </div>
+    <div class="inp">问点什么…<span class="mic"></span></div>
+  </div>
+</section>
+
+<!-- ================= 14 ================= -->
+<section class="slide" id="p14">
+  <div class="meta"><div class="no">14 / 20</div><div class="nm">账本</div>
+  <div class="de">像银行流水：日期、项目、里程、费用，极致对齐，一行不多。<em>性格：不讨喜，但极可信。</em></div></div>
+  <div class="dev tn" id="s14">
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="lg">
+      <h2>九月账本</h2>
+      <div class="sm">2026-09-01 至 09-21 · 21 天 · 1,204 km</div>
+      <div class="tb">
+        <div class="tr h"><span>日期</span><span>项目</span><span class="n">里程</span><span class="n">费用</span></div>
+        <div class="tr"><span>09-21</span><span>通勤 · 往返</span><span class="n">52.9</span><span class="n">46.0</span></div>
+        <div class="tr"><span>09-20</span><span>充电 · 家桩</span><span class="n">—</span><span class="n">31.2</span></div>
+        <div class="tr"><span>09-19</span><span>通勤 · 往返</span><span class="n">51.4</span><span class="n">44.8</span></div>
+        <div class="tr"><span>09-18</span><span>通勤 · 往返</span><span class="n">53.2</span><span class="n">47.5</span></div>
+        <div class="tr"><span>09-17</span><span>机场 · 往返</span><span class="n">86.0</span><span class="n">72.4</span></div>
+        <div class="tr"><span>09-16</span><span>通勤 · 往返</span><span class="n">52.6</span><span class="n">45.9</span></div>
+        <div class="tr tot"><span>合计</span><span>21 天</span><span class="n">1,204</span><span class="n">1,142</span></div>
+      </div>
+    </div>
+    <div class="ft3" style="bottom:96px">停车 3 次 · 罚款 0 · 保养 0 · 出险 0</div>
+  </div>
+</section>
+
+<!-- ================= 15 ================= -->
+<section class="slide" id="p15">
+  <div class="meta"><div class="no">15 / 20</div><div class="nm">刻度尺</div>
+  <div class="de">一切都是一把可以拖动的尺：电量是尺、里程是尺、时间是尺。<em>性格：手感强。要学怎么用。</em></div></div>
+  <div class="dev tn" id="s15">
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="hd"><span class="l">电量</span><span class="r">拖动尺子看任何位置</span></div>
+    <div class="rbar">
+      <div class="fill"></div>
+      <div class="tk1"></div><div class="tk2"></div>
+      <div class="knob"></div>
+      <div class="kb">78%</div>
+    </div>
+    <div class="rnum"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+    <div class="sub4">
+      <div class="rw"><span class="k">续航</span><span class="track"><i style="width:78%"></i><em style="left:64%"></em></span><span class="v">412 km</span></div>
+      <div class="rw"><span class="k">今天</span><span class="track"><i style="width:52%"></i><em style="left:52%"></em></span><span class="v">52.9 km</span></div>
+      <div class="rw"><span class="k">本月</span><span class="track"><i style="width:62%"></i><em style="left:88%"></em></span><span class="v">1,204 km</span></div>
+    </div>
+    <div class="note4">红线 = 你现在的位置。<br>灰色 = 明早预估（3℃ 会掉到 66%）。</div>
+  </div>
+</section>
+
+<!-- ================= 16 ================= -->
+<section class="slide" id="p16">
+  <div class="meta"><div class="no">16 / 20</div><div class="nm">线框孪生</div>
+  <div class="de">极细的线框车，能转动，异常用断线表达。<em>性格：工程图。冷。</em></div></div>
+  <div class="dev" id="s16">
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="hd5">D I G I T A L   T W I N</div>
+    <div class="nm5">车 · 线框</div>
+    <svg class="wf" width="354" height="300" viewBox="0 0 354 300" fill="none">
+      <g stroke="#EDEAE4" stroke-width="1" opacity=".72">
+        <path d="M62 96 L226 62 L300 104 L136 142 Z"/>
+        <path d="M136 142 L300 104 L300 164 L136 208 Z"/>
+        <path d="M62 96 L62 158 L136 208 L136 142 Z"/>
+        <path d="M96 108 L200 86"/>
+        <path d="M136 142 L262 122"/>
+      </g>
+      <g stroke="#EDEAE4" stroke-width="1" opacity=".4">
+        <path d="M62 214 L300 160"/><path d="M62 240 L300 186"/><path d="M62 266 L300 212"/>
+        <path d="M62 96 L62 266"/><path d="M136 142 L136 240"/><path d="M300 104 L300 212"/>
+      </g>
+      <g stroke="#D8382C" stroke-width="1.6" stroke-dasharray="5 5">
+        <path d="M226 62 L226 118"/>
+      </g>
+      <circle cx="226" cy="90" r="14" stroke="#D8382C" stroke-width="1.2" fill="none" opacity=".8"/>
+      <ellipse cx="106" cy="196" rx="24" ry="12" stroke="#EDEAE4" stroke-width="1.2" opacity=".7"/>
+      <ellipse cx="242" cy="166" rx="24" ry="12" stroke="#EDEAE4" stroke-width="1.2" opacity=".7"/>
+    </svg>
+    <div class="lgd">
+      <div class="row"><span class="sw d"></span>后备箱未关<span class="v">1 条</span></div>
+      <div class="row"><span class="sw"></span>电量线<span class="v">78%</span></div>
+      <div class="row"><span class="sw"></span>四轮在线<span class="v">4 / 4</span></div>
+    </div>
+    <div class="rot">↻ 拖动旋转 · 双指缩放</div>
+  </div>
+</section>
+
+<!-- ================= 17 ================= -->
+<section class="slide" id="p17">
+  <div class="meta"><div class="no">17 / 20</div><div class="nm">海报</div>
+  <div class="de">瑞士海报：巨大字号 + 几何分割 + 一根红条，一屏只说一件事。<em>性格：很硬，不像工具。</em></div></div>
+  <div class="dev tn" id="s17">
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="pl">
+      <h1>今天<br>没事</h1>
+      <div class="bar"></div>
+      <div class="cols">
+        <div><div class="v">52.9</div><div class="k">KM</div></div>
+        <div><div class="v">38.0</div><div class="k">KWH</div></div>
+        <div><div class="v">78</div><div class="k">%</div></div>
+      </div>
+    </div>
+    <div class="bk2"></div>
+    <div class="bk"></div>
+    <div class="cap">2026.09.21 · 星期日 · 21:40<br>七段行程 · 零条异常 · 明早 3℃</div>
+  </div>
+</section>
+
+<!-- ================= 18 ================= -->
+<section class="slide" id="p18">
+  <div class="meta"><div class="no">18 / 20</div><div class="nm">腕表</div>
+  <div class="de">全 App 像一块机械表：刻度、指针、小表盘。<em>性格：劳力士。容易做作。</em></div></div>
+  <div class="dev tn" id="s18">
+    <div class="sb" style="color:rgba(232,220,194,.7)">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="brand">CARKEEPER</div>
+    <div class="auto">AUTOMATIC · 41 JEWELS</div>
+    <div class="dial">
+      <svg width="312" height="312" viewBox="0 0 312 312" fill="none">
+        <circle cx="156" cy="156" r="140" fill="none" stroke="rgba(232,220,194,.34)" stroke-width="11" stroke-dasharray="1.2 7.1"/>
+        <circle cx="156" cy="156" r="118" fill="none" stroke="rgba(232,220,194,.2)" stroke-width="1.6"/>
+        <g stroke="rgba(232,220,194,.62)" stroke-width="1.6">
+          <path d="M156 38 V56"/><path d="M274 156 H256"/><path d="M156 274 V256"/><path d="M38 156 H56"/>
+        </g>
+        <path d="M156 156 L64.8 122.2" stroke="#E8DCC2" stroke-width="3" stroke-linecap="round"/>
+        <path d="M156 156 L40.7 221" stroke="#E8DCC2" stroke-width="2" stroke-linecap="round"/>
+        <path d="M156 156 L156 206" stroke="#D8382C" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="156" cy="156" r="4" fill="#E8DCC2"/>
+        <circle cx="112" cy="224" r="30" fill="none" stroke="rgba(232,220,194,.34)" stroke-width="1"/>
+        <path d="M112 224 L112 200" stroke="#E8DCC2" stroke-width="1.4" stroke-linecap="round"/>
+        <circle cx="200" cy="224" r="30" fill="none" stroke="rgba(232,220,194,.34)" stroke-width="1"/>
+        <path d="M200 224 L214 208" stroke="#E8DCC2" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="sub"><span>电量 78%</span><span>续航 412 KM</span><span>舱温 14°</span></div>
+    <div class="ft5">今 天 零 条 异 常</div>
+  </div>
+</section>
+
+<!-- ================= 19 ================= -->
+<section class="slide" id="p19">
+  <div class="meta"><div class="no">19 / 20</div><div class="nm">便签</div>
+  <div class="de">像贴在冰箱上的便利贴，手写字，有点歪。<em>性格：不严肃，但亲切。</em></div></div>
+  <div class="dev" id="s19">
+    <div class="sb" style="color:rgba(255,255,255,.6)">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="note hand">
+      <div class="tape"></div>
+      <div class="h">今天不错！</div>
+      <p>跑 52.9 公里，充了 38 度电，46 块。<br>中午赶上了谷电，比上周便宜 22%。<br>现在 78%。明早 3℃，会掉到 66% 左右。</p>
+    </div>
+    <div class="pol">
+      <div class="im ph p-dusk"><div class="b0"></div><div class="gnd"></div><div class="cr"></div><div class="vg"></div></div>
+      <div class="cp hand">今天 18:05 拍的</div>
+    </div>
+    <div class="ft6">明天记得中午补一次电</div>
+  </div>
+</section>
+
+<!-- ================= 20 ================= -->
+<section class="slide" id="p20">
+  <div class="meta"><div class="no">20 / 20</div><div class="nm">无界面</div>
+  <div class="de">**没有主界面**：锁屏 + 实时活动 + 小组件就是全部。<em>性格：Rivian 拿奖的方式。预览里最容易看不出来。</em></div></div>
+  <div class="dev tn" id="s20">
+    <div class="ls"></div>
+    <div class="sb" style="color:#fff">21:40<span>5G ▮▮▮▮</span></div>
+    <div class="la">
+      <div class="r1"><i></i>充电中 · 还有 12 分钟</div>
+      <div class="r2">62% → 80%</div>
+      <div class="r3">11 kW · 已充 12.4 kWh · ¥14.6</div>
+      <div class="pb"><i></i></div>
+    </div>
+    <div class="time">
+      <div class="t">21:40</div>
+      <div class="d">9月21日 星期日</div>
+    </div>
+    <div class="wg">
+      <div class="h">今 天</div>
+      <div class="row"><span>里程</span><b>52.9 km</b></div>
+      <div class="row"><span>充电</span><b>38.0 kWh · ¥46</b></div>
+      <div class="row"><span>电量</span><b>78% · 412 km</b></div>
+    </div>
+    <div class="msg">这就是全部界面 · 没有 App 可开</div>
+    <div class="btns"><i></i><i></i></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(function(){
+  var items=["01 单页大数","02 今日时间线","03 印样","04 单张照片","05 暗座舱","06 仪表台","07 一封信","08 收据","09 天空","10 地图","11 遥控器","12 卡片堆","13 聊天","14 账本","15 刻度尺","16 线框孪生","17 海报","18 腕表","19 便签","20 无界面"];
+  var idx=document.getElementById('idx'), board=document.getElementById('board');
+  var chips=[];
+  items.forEach(function(n,i){
+    var b=document.createElement('button');
+    b.className='chip'+(i===0?' on':'');
+    b.innerHTML='<b>'+n.slice(0,2)+'</b>'+n.slice(3);
+    b.addEventListener('click',function(){ go(i); });
+    idx.appendChild(b); chips.push(b);
+  });
+  function go(i){
+    var sl=board.children[i];
+    if(sl) board.scrollTo({left:sl.offsetLeft,behavior:'auto'});
+    mark(i);
+  }
+  function mark(i){
+    chips.forEach(function(c,k){ c.classList.toggle('on',k===i); });
+    if(chips[i] && chips[i].scrollIntoView) { try{ chips[i].scrollIntoView({block:'nearest',inline:'center'}); }catch(e){} }
+  }
+  var t=null;
+  board.addEventListener('scroll',function(){
+    if(t) clearTimeout(t);
+    t=setTimeout(function(){
+      var w=board.clientWidth||1;
+      mark(Math.round(board.scrollLeft/w));
+    },90);
+  });
+  window.__go=go;
+})();
+</script>
+</body>
+</html>

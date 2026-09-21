@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CarKeeper · 第九版原型 —— 天空给颜色，指尖给方向</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap">
+<style>
+/* ==========================================================================
+   第九版 · 原型（可上手，不是版面）
+
+   验收标准 = 你选的「分工」：
+     首屏负责惊叹 —— 一整面「车所在的世界」，你移动手指，光就移过去。
+     日常屏负责信任 —— 每一节不给状态，只给**原因**（为什么今晚会掉 12%）。
+     两者共用同一套机制：世界的光 + 车身即导航。
+
+   上一轮我自己处决掉的四条，这一版全部遵守：
+     ① 骨架必须换 —— 没有卡片行、没有图标 Tab 栏。世界占 69% 屏高，导航长在车身上，
+        底部只留一行「索引文字」作为可达性兜底。
+     ② 必须可触 —— 真实指针输入、声音、振动、惯性回弹，而不是一张静态版面。
+     ③ 不做通用 3D 模型（那是谎言）—— 车漆用的是**车辆配置色**（见下），形状共用。
+     ④ 每屏一个洞察 —— 不是「后备箱未关」这种状态，是**因果**。
+
+   物理是诚实的：
+     轮廓光永远出现在迎光的**那一侧**（用 stroke-dasharray 沿车顶路径滑动的窗口实现，
+     不是两端都亮）；地面光池与天空光源同向移动；车漆颜色不随光改变，只有光的颜色改变。
+   ========================================================================== */
+
+:root{
+  --canvas:#000;
+  --hair:rgba(255,255,255,.11);
+  --t1:#fff;
+  --t2:rgba(255,255,255,.56);
+  --t3:rgba(255,255,255,.34);
+  --ease:cubic-bezier(.32,.72,0,1);
+  --ease-in:cubic-bezier(.16,.9,.24,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#060608;color:#fff;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",Inter,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.wrap{max-width:900px;margin:0 auto;padding:34px 22px 90px}
+
+.head{padding-bottom:22px;border-bottom:1px solid var(--hair)}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;color:var(--t3)}
+.head h1{margin:10px 0 0;font-size:26px;font-weight:250;letter-spacing:-.8px;line-height:1.25}
+.head h1 b{font-weight:600}
+.head .mech{margin-top:14px;font-size:14.5px;line-height:1.75;color:#fff;font-weight:450;max-width:720px;
+  border-left:2px solid var(--t3);padding-left:14px}
+.head p{margin:12px 0 0;font-size:13px;line-height:1.8;color:var(--t2);max-width:720px}
+.head code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--t3)}
+
+.tools{display:flex;gap:8px;align-items:center;margin:20px 0 0}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:9px;border:1px solid var(--hair);
+  background:transparent;color:var(--t2);font-size:12.5px;font-weight:550;letter-spacing:-.04px;cursor:pointer;
+  font-family:inherit;transition:background .18s var(--ease),color .18s var(--ease)}
+.btn:hover{background:rgba(255,255,255,.06);color:#fff}
+.btn[aria-pressed=true]{background:#fff;color:#000;border-color:#fff}
+
+.stage{display:flex;justify-content:center;margin-top:26px}
+.phone{position:relative;width:405px;height:864px;border-radius:56px;padding:6px;
+  background:linear-gradient(160deg,#3A3C42,#0D0E11 60%);box-shadow:0 40px 90px -30px rgba(0,0,0,.95)}
+.phone::after{content:"";position:absolute;inset:0;border-radius:56px;pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.13),inset 0 1px 1px rgba(255,255,255,.2)}
+
+/* ==================== 屏幕 ==================== */
+.screen{--lx:74%;--ly:94%;--poolX:50%;--rim:#FFC189;--band:#FFB162;--glow:rgba(255,176,96,.5);
+  position:relative;width:393px;height:852px;border-radius:50px;overflow:hidden;background:#000;color:var(--t1);
+  touch-action:none;cursor:crosshair}
+.island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:110px;height:32px;border-radius:17px;background:#000;z-index:60}
+.status{position:absolute;top:0;left:0;right:0;height:52px;z-index:55;display:flex;align-items:center;
+  justify-content:space-between;padding:15px 30px 0;font-size:15px;font-weight:600;letter-spacing:-.2px;font-variant-numeric:tabular-nums}
+.status .ri{display:flex;align-items:center;gap:5px}
+.status svg{display:block}
+
+/* ==================== 世界（占 588/852 = 69% 屏高） ==================== */
+.world{position:absolute;left:0;right:0;top:52px;height:588px;overflow:hidden;isolation:isolate}
+.sky{position:absolute;inset:0;background:linear-gradient(180deg,#150C1C 0%,#4A1E32 54%,#C25529 100%)}
+.sky::after{content:"";position:absolute;inset:0;
+  background:radial-gradient(64% 48% at var(--lx) var(--ly),var(--glow) 0%,rgba(0,0,0,0) 72%)}
+.ground{position:absolute;left:0;right:0;bottom:0;height:150px;
+  background:radial-gradient(46% 60% at var(--poolX) 100%,rgba(214,120,52,.34) 0%,rgba(0,0,0,0) 74%)}
+.carfig{position:absolute;left:0;right:0;bottom:-10px;width:100%;height:auto;display:block;pointer-events:none}
+.scrim{position:absolute;left:0;right:0;bottom:0;height:250px;
+  background:linear-gradient(to top,#000 0%,rgba(0,0,0,.9) 30%,rgba(0,0,0,.42) 62%,rgba(0,0,0,0) 100%)}
+/* 指尖的可见性：光源处一层极淡的光雾（screen 混合）*/
+.glint{position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;opacity:.5;
+  background:radial-gradient(22% 16% at var(--lx) var(--ly),rgba(255,240,220,.13),rgba(0,0,0,0) 72%)}
+/* 光带 = 地平线 = 本节的量 */
+.band{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.13)}
+.band i{position:absolute;left:0;top:0;bottom:0;background:var(--band);
+  box-shadow:0 0 20px var(--bandGlow,rgba(255,138,60,.55)),0 0 44px var(--bandGlow,rgba(255,138,60,.55));
+  transition:width .5s var(--ease)}
+/* 数据长在世界里（不是卡片） */
+.figwrap{position:absolute;left:20px;right:20px;bottom:18px;display:flex;align-items:flex-end;gap:14px}
+.figure{font-weight:200;letter-spacing:-.045em;line-height:.8;font-variant-numeric:tabular-nums;
+  transition:opacity .28s var(--ease)}
+.figure .u{font-size:.26em;font-weight:400;letter-spacing:0;color:rgba(255,255,255,.62);margin-left:.2em;vertical-align:.14em}
+.figure .cap{display:block;font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;
+  color:rgba(255,255,255,.5);margin-bottom:6px}
+.sideinfo{margin-left:auto;text-align:right;padding-bottom:6px}
+
+/* 车身部位 = 导航（不是 Tab 栏） */
+.pin{position:absolute;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:15px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.42);background:rgba(0,0,0,.28);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  transition:transform .2s var(--ease),background .2s var(--ease),border-color .2s var(--ease)}
+.pin::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:3px;
+  background:rgba(255,255,255,.75);transition:background .2s var(--ease),box-shadow .2s var(--ease)}
+.pin:hover{transform:scale(1.14);border-color:#fff}
+.pin[aria-current=true]{background:rgba(255,255,255,.96);border-color:#fff}
+.pin[aria-current=true]::after{background:#000;box-shadow:0 0 0 3px rgba(0,0,0,.22)}
+
+.hint{position:absolute;left:0;right:0;bottom:296px;text-align:center;font-size:12.5px;font-weight:500;
+  letter-spacing:.2px;color:rgba(255,255,255,.62);pointer-events:none;
+  animation:hintout .9s var(--ease) 4.6s forwards}
+@keyframes hintout{to{opacity:0}}
+@media (prefers-reduced-motion:reduce){.hint{animation:none}}
+
+/* ==================== 世界之下：一个「为什么」 ==================== */
+.why{position:absolute;left:0;right:0;top:640px;padding:0 20px}
+.why .k{display:block;font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;color:var(--t3);margin-bottom:9px}
+.why .v{display:block;font-size:19px;font-weight:600;letter-spacing:-.4px;line-height:24px}
+.why .cause{display:block;margin-top:7px;font-size:13.5px;font-weight:400;letter-spacing:-.1px;line-height:20px;color:var(--t2)}
+
+/* 索引（一行字，不是 Tab 栏：无图标、无背景条、无毛玻璃） */
+.index{position:absolute;left:20px;right:20px;bottom:64px;display:flex;justify-content:space-between;align-items:baseline}
+.index button{all:unset;cursor:pointer;font-size:12.5px;font-weight:500;letter-spacing:.1px;color:var(--t3);
+  padding:6px 2px;transition:color .2s var(--ease)}
+.index button:hover{color:var(--t2)}
+.index button[aria-current=true]{color:#fff;font-weight:600}
+.homebar{position:absolute;left:50%;transform:translateX(-50%);bottom:10px;width:139px;height:5px;border-radius:3px;background:#fff;opacity:.85;z-index:55}
+
+/* ==================== 看板说明 ==================== */
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:13px;margin-top:46px}
+.note{background:#0E0F12;border-radius:16px;padding:17px 19px}
+.note h3{margin:0 0 9px;font-size:11px;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:var(--t3)}
+.note p{margin:0;font-size:12.5px;line-height:1.85;color:var(--t2)}
+.note p b{color:#fff;font-weight:600}
+.note table{width:100%;border-collapse:collapse;font-size:12px}
+.note td{padding:5px 0;color:var(--t2)}
+.note td:first-child{color:#fff;font-weight:550;white-space:nowrap;padding-right:10px}
+.note tr+tr td{border-top:1px solid rgba(255,255,255,.07)}
+.note code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--t3)}
+
+@media (max-width:900px){ .wrap{padding:22px 14px 70px} }
+@media (max-width:760px){ .stage{margin-top:20px} .phone{zoom:.84} }
+@media (max-width:520px){ .phone{zoom:.74} .head h1{font-size:21px} }
+@media (max-width:420px){ .phone{zoom:.68} }
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="st-signal" viewBox="0 0 18 12"><rect x="0" y="7.5" width="3" height="4.5" rx="1" fill="#fff"/><rect x="4.7" y="5" width="3" height="7" rx="1" fill="#fff"/><rect x="9.4" y="2.6" width="3" height="9.4" rx="1" fill="#fff"/><rect x="14.1" y="0" width="3" height="12" rx="1" fill="#fff"/></symbol>
+  <symbol id="st-wifi" viewBox="0 0 16 12"><path d="M1 4.3a10.5 10.5 0 0114 0" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M3.6 7.1a6.7 6.7 0 018.8 0" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round"/><circle cx="8" cy="10.2" r="1.5" fill="#fff"/></symbol>
+  <symbol id="st-batt" viewBox="0 0 27 12"><rect x=".6" y=".6" width="22" height="10.8" rx="3.2" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.2"/><rect x="2.4" y="2.4" width="18.4" height="7.2" rx="2" fill="#fff"/><path d="M24.2 4.2v3.6a2 2 0 000-3.6z" fill="rgba(255,255,255,.45)"/></symbol>
+</svg>
+
+<!-- ================= 车：一份定义，光由外部驱动 ================= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- 车漆：这是车辆配置色（深海蓝 #1E2A38），不是设计挑的颜色。
+         金属感来自这组中性明暗带，颜色来自打在它上面的光。 -->
+    <linearGradient id="paint" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4A5566"/><stop offset=".14" stop-color="#243040"/>
+      <stop offset=".46" stop-color="#131A24"/><stop offset="1" stop-color="#06080B"/>
+    </linearGradient>
+    <linearGradient id="pillar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2C3846"/><stop offset=".5" stop-color="#151B23"/><stop offset="1" stop-color="#0A0D12"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2=".85" y2="1">
+      <stop offset="0" stop-color="#161C26"/><stop offset=".42" stop-color="#080B10"/><stop offset="1" stop-color="#121820"/>
+    </linearGradient>
+    <linearGradient id="glare" x1="0" y1="1" x2="1" y2="0">
+      <stop offset=".18" stop-color="rgba(255,255,255,0)"/><stop offset=".38" stop-color="rgba(255,255,255,.15)"/>
+      <stop offset=".52" stop-color="rgba(255,255,255,.05)"/><stop offset="1" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+    <linearGradient id="tyre" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1E2126"/><stop offset=".35" stop-color="#0B0D10"/><stop offset="1" stop-color="#040506"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2=".4" y2="1">
+      <stop offset="0" stop-color="#676D75"/><stop offset=".5" stop-color="#262A30"/><stop offset="1" stop-color="#12151A"/>
+    </linearGradient>
+    <!-- 车身上的镜面：cx/cy 由指针驱动（这是「指尖的光」在金属上的落点） -->
+    <radialGradient id="spec" cx="72%" cy="30%" r="46%">
+      <stop offset="0" stop-color="rgba(255,255,255,.5)"/><stop offset=".45" stop-color="rgba(255,255,255,.12)"/>
+      <stop offset="1" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <linearGradient id="reflfade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="reflmask"><rect x="0" y="176" width="480" height="34" fill="url(#reflfade)"/></mask>
+    <filter id="b2" x="-30%" y="-300%" width="160%" height="700%"><feGaussianBlur stdDeviation="2.6"/></filter>
+    <filter id="b5" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
+    <filter id="b10" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10"/></filter>
+
+    <!-- 车长 442 · 车高 136（0.308L）· 腰线 y=77（窗高 27%）· 车头在左 -->
+    <path id="sidebody" d="M27,154 C20,150 18,140 20,127 C23,112 33,104 47,96 C71,90 95,85 121,81 C142,78 150,77 158,77 L402,77 C424,79 442,84 452,92 C460,99 462,116 461,127 C460,141 458,148 452,154 Z"/>
+    <path id="sidehouse" d="M158,77 C170,63 185,49 199,42 C205,38 213,40 223,40 L321,40 C331,40 339,42 345,46 C363,57 383,70 402,77 Z"/>
+    <path id="sideglass" d="M170,71 C180,59 192,49 205,45 C210,42 216,44 224,44 L318,44 C326,44 332,46 337,50 C352,60 368,68 384,71 Z"/>
+    <path id="archF" d="M64,154 L64,144 A36,36 0 0 1 136,144 L136,154 Z"/>
+    <path id="archR" d="M339,154 L339,144 A36,36 0 0 1 411,144 L411,154 Z"/>
+    <clipPath id="carpaint">
+      <path d="M27,154 C20,150 18,140 20,127 C23,112 33,104 47,96 C71,90 95,85 121,81 C142,78 150,77 158,77 L402,77 C424,79 442,84 452,92 C460,99 462,116 461,127 C460,141 458,148 452,154 Z"/>
+      <path d="M158,77 C170,63 185,49 199,42 C205,38 213,40 223,40 L321,40 C331,40 339,42 345,46 C363,57 383,70 402,77 Z"/>
+    </clipPath>
+    <!-- 车顶轮廓光：一条路径，靠滑动窗口只亮迎光的那一段 -->
+    <path id="rimline" d="M158,77 C170,63 185,49 199,42 C205,38 213,40 223,40 L321,40 C331,40 339,42 345,46"/>
+    <path id="lampF" d="M32,99 C42,94 54,91 68,90"/>
+
+    <g id="carUnder">
+      <g mask="url(#reflmask)" transform="translate(0,352) scale(1,-1)" filter="url(#b10)" opacity=".3">
+        <use href="#sidebody" fill="#1B2530"/><use href="#sidehouse" fill="#141C24"/>
+      </g>
+      <use href="#sidehouse" fill="url(#pillar)"/>
+      <use href="#sideglass" fill="url(#glass)"/>
+      <use href="#sideglass" fill="url(#glare)"/>
+      <path d="M219,44 L213.5,71" stroke="rgba(255,255,255,.13)" stroke-width="1.2"/>
+      <path d="M262,44 L258.5,71" stroke="rgba(255,255,255,.13)" stroke-width="1.2"/>
+      <path d="M176,66 C185,56 196,47 207,44" stroke="rgba(255,255,255,.26)" stroke-width="1.1" fill="none"/>
+      <use href="#sidebody" fill="url(#paint)"/>
+    </g>
+    <g id="carOver">
+      <path d="M40,90 C120,85 260,83 452,90" stroke="rgba(255,255,255,.28)" stroke-width="1.15" fill="none"/>
+      <path d="M40,93 C120,88 260,86 452,93" stroke="rgba(0,0,0,.55)" stroke-width="1.6" fill="none"/>
+      <path d="M27,154 C120,150 360,150 452,154" stroke="rgba(0,0,0,.9)" stroke-width="7" fill="none" filter="url(#b2)"/>
+      <path d="M166,77 L170,153" stroke="rgba(255,255,255,.11)" stroke-width="1.2"/>
+      <path d="M262,77 L266,153" stroke="rgba(255,255,255,.11)" stroke-width="1.2"/>
+      <path d="M340,77 L344,153" stroke="rgba(255,255,255,.11)" stroke-width="1.2"/>
+      <path d="M194,90 h20" stroke="rgba(255,255,255,.34)" stroke-width="1.7" stroke-linecap="round"/>
+      <path d="M290,90 h20" stroke="rgba(255,255,255,.26)" stroke-width="1.7" stroke-linecap="round"/>
+      <path d="M203,74 L188,68 L184,76 L201,80 Z" fill="#0A0B0E" stroke="rgba(255,255,255,.26)" stroke-width="1"/>
+      <path d="M453,101 C458,104 460,109 461,114" stroke="rgba(229,25,55,.62)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <path d="M454,92 L442,80" stroke="#E51937" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      <use href="#archF" fill="#04050A"/><use href="#archR" fill="#04050A"/>
+      <g>
+        <circle cx="100" cy="144" r="32" fill="url(#tyre)"/>
+        <circle cx="100" cy="144" r="21" fill="url(#rim)"/>
+        <circle cx="100" cy="144" r="20" fill="#090C11"/><circle cx="100" cy="144" r="21" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="1.1"/>
+        <g stroke="rgba(255,255,255,.26)" stroke-width="2.1" stroke-linecap="round">
+          <path d="M100,144 L100,125"/><path d="M100,144 L118,138"/><path d="M100,144 L111,159"/><path d="M100,144 L89,159"/><path d="M100,144 L82,138"/>
+        </g>
+        <circle cx="100" cy="144" r="5" fill="#1C222B" stroke="rgba(255,255,255,.26)" stroke-width="1.1"/>
+      </g>
+      <g>
+        <circle cx="375" cy="144" r="32" fill="url(#tyre)"/>
+        <circle cx="375" cy="144" r="21" fill="url(#rim)"/>
+        <circle cx="375" cy="144" r="20" fill="#090C11"/><circle cx="375" cy="144" r="21" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="1.1"/>
+        <g stroke="rgba(255,255,255,.26)" stroke-width="2.1" stroke-linecap="round">
+          <path d="M375,144 L375,125"/><path d="M375,144 L393,138"/><path d="M375,144 L386,159"/><path d="M375,144 L364,159"/><path d="M375,144 L357,138"/>
+        </g>
+        <circle cx="375" cy="144" r="5" fill="#1C222B" stroke="rgba(255,255,255,.26)" stroke-width="1.1"/>
+      </g>
+    </g>
+  </defs>
+</svg>
+
+<div class="wrap">
+
+  <div class="head">
+    <div class="eyebrow">第九版 · 可上手原型（不是版面）</div>
+    <h1>天空给颜色，<b>指尖给方向</b></h1>
+    <div class="mech">把指针移到屏幕上任意位置 —— 光就移过去：车顶的轮廓光沿车顶滑动、车身的镜面高光跟着走、
+      地面光池跟着挪、天空光源跟着偏。<b>世界的物理是诚实的</b>（轮廓光只出现在迎光的那一侧），
+      而你得到的是一个可以摸的物件，而不是一张数据表。</div>
+    <p><b>骨架换掉了</b>：世界占 69% 屏高，导航长在<b>车身上</b>（三个点），底部只有一行索引文字作兜底 ——
+      没有卡片行、没有图标 Tab 栏。<b>日常那一半</b>：每一节只给一个「为什么」，不给状态。
+      车漆是<b>车辆配置色</b>（深海蓝 <code>#1E2A38</code>），不是设计挑的颜色。</p>
+  </div>
+
+  <div class="tools">
+    <button class="btn" id="sound" aria-pressed="false">🔈 声音：关</button>
+    <button class="btn" id="demo">演示：光扫一遍</button>
+    <span style="font-size:12px;color:var(--t3)">指针在手机上就是手指</span>
+  </div>
+
+  <div class="stage">
+    <div class="phone"><div class="screen" id="scr">
+      <div class="island"></div>
+      <div class="status"><span>19:20</span><div class="ri"><svg width="18" height="12"><use href="#st-signal"/></svg><svg width="16" height="12"><use href="#st-wifi"/></svg><svg width="27" height="12"><use href="#st-batt"/></svg></div></div>
+
+      <div class="world" id="world">
+        <div class="sky"></div>
+        <div class="ground"></div>
+        <svg class="carfig" viewBox="0 0 393 320"><g transform="translate(-55,70) scale(1.0479)">
+          <use href="#carUnder"/>
+          <g clip-path="url(#carpaint)">
+            <rect x="0" y="0" width="480" height="250" fill="url(#spec)" style="mix-blend-mode:screen"/>
+            <!-- 天空色光：沿用第八版的「光打在金属上」，但方向不再固定 -->
+            <rect x="0" y="0" width="480" height="250" style="fill:var(--rim);opacity:.16;mix-blend-mode:screen"/>
+            <rect x="0" y="60" width="480" height="180" style="fill:#000;opacity:.16"/>
+          </g>
+          <use href="#carOver"/>
+          <use href="#rimline" class="rimline" fill="none" stroke-linecap="round" style="stroke:var(--rim)" stroke-width="1.7"/>
+          <use href="#rimline" class="rimline" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:var(--rim);opacity:.85" stroke-width="6"/>
+          <use href="#lampF" fill="none" stroke-linecap="round" filter="url(#b5)" style="stroke:#FFE9C6;opacity:.45" stroke-width="11"/>
+          <use href="#lampF" fill="none" stroke-linecap="round" style="stroke:#FFE9C6;opacity:.9" stroke-width="2.6"/>
+          <use href="#sidebody" fill="none" style="stroke:var(--rim);opacity:.22" stroke-width="1"/>
+        </g></svg>
+        <div class="glint"></div>
+        <div class="scrim"></div>
+
+        <!-- 车身部位 = 导航 -->
+        <!-- 导航长在车上：三点落在挡风玻璃 / 车顶 / 后窗上，不压住下方数据 -->
+        <button class="pin" data-go="control" style="left:132px;top:410px" aria-label="车控"></button>
+        <button class="pin" data-go="range"   style="left:218px;top:392px" aria-label="行程"></button>
+        <button class="pin" data-go="charge"  style="left:330px;top:405px" aria-label="充电"></button>
+
+        <div class="figwrap">
+          <div class="figure" style="font-size:74px"><span class="cap" id="cap">当前电量</span><span id="val">78</span><span class="u" id="unit">%</span></div>
+          <div class="sideinfo"><div class="t-foot c2" id="sub">剩余 <span class="semib" style="color:#fff" id="subA">420 km</span></div><div class="t-foot c2 mono" id="subB" style="margin-top:2px">充电中 · 6.8 kW</div></div>
+        </div>
+        <div class="hint" id="hint">移动手指 · 光会跟着走</div>
+        <div class="band"><i id="bandfill" style="width:78%"></i></div>
+      </div>
+
+      <div class="why">
+        <span class="k" id="whyK">为什么 · 今晚会掉约 12%</span>
+        <span class="v" id="whyV">电池要保温</span>
+        <span class="cause" id="cause">明早 3℃，保温本身要耗电；按你过去 14 天的停放曲线推算</span>
+      </div>
+
+      <div class="index" id="index">
+        <button data-go="status" aria-current="true">车况</button>
+        <button data-go="control">车控</button>
+        <button data-go="charge">充电</button>
+        <button data-go="range">行程</button>
+        <button data-go="mine">我的</button>
+      </div>
+      <div class="homebar"></div>
+    </div></div>
+  </div>
+
+  <div class="notes">
+    <div class="note">
+      <h3>① 惊叹那一半：光由你指</h3>
+      <p>轮廓光不是两端都亮的一道描边，而是<b>沿车顶路径滑动的窗口</b>（<code>stroke-dasharray</code> + <code>dashoffset</code>）——
+        所以它永远只亮<b>迎光</b>的那一段。镜面高光是<b>车身的 cs/cy 跟随指针</b>。
+        地面光池与天空光源同向。四件事联动，物理自洽：<b>你移动的是光，不是动画。</b></p>
+    </div>
+    <div class="note">
+      <h3>② 信任那一半：只给原因</h3>
+      <table>
+        <tr><td>车况</td><td>今晚掉 12% ← 明早 3℃ 保温</td></tr>
+        <tr><td>充电</td><td>慢 40 分钟 ← 桩在与人分载</td></tr>
+        <tr><td>车控</td><td>空调 19:24 自启 ← 你通常 19:30 到家</td></tr>
+        <tr><td>行程</td><td>电耗高 8% ← 四次行程都 &lt; 5 km</td></tr>
+        <tr><td>我的</td><td>保养还剩 5,140 km ← 你的年均里程</td></tr>
+      </table>
+      <p style="margin-top:9px">每一条都需要真实数据：天气 API、充电桩遥测、常去地点的到时习惯、行程里程分段。条目下都写明了依据。</p>
+    </div>
+    <div class="note">
+      <h3>③ 骨架：导航长在物件上</h3>
+      <p>三个点是车身部位（前轮/腰线/后轮），点它们切到车控 / 行程 / 充电。底部那行字<b>不是 Tab 栏</b>：
+        没有图标、没有背景条、没有毛玻璃，只是索引 —— 它是我对「物体优先会伤可达性」这一条自我批评的补丁。</p>
+    </div>
+    <div class="note">
+      <h3>④ 这一版仍然测不到的东西</h3>
+      <p>声音与振动是真的接了（<code>Web Audio</code> + <code>navigator.vibrate</code>），默认<b>关</b>——
+        不打招呼就发声是失礼。但真机上的触感曲线、以及 8 秒场景下的手感，这里仍只是近似。
+        另外：这是 HTML，不是 SwiftUI —— 真正的一见钟情只能在真机上验收。</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  const scr = document.getElementById('scr');
+  const spec = document.getElementById('spec');
+  const rimPaths = document.querySelectorAll('.rimline');
+  const rimSrc = document.getElementById('rimline');
+  const fill = document.getElementById('bandfill');
+  const world = document.getElementById('world');
+
+  /* ---------- 每节：一个量 + 一个原因 ---------- */
+  const SECTIONS = {
+    status:  { name:'车况', cap:'当前电量', val:'78', unit:'%', size:74, band:78,
+               subA:'剩余 420 km', subB:'充电中 · 6.8 kW',
+               whyK:'为什么 · 今晚会掉约 12%', whyV:'电池要保温',
+               cause:'明早 3℃，保温本身要耗电；按你过去 14 天的停放曲线推算' },
+    control: { name:'车控', cap:'车内温度', val:'22.5', unit:'℃', size:74, band:54,
+               subA:'已锁', subB:'空调 22.5℃ · 内循环',
+               whyK:'为什么 · 空调会在 19:24 自己启动', whyV:'你通常 19:30 到家',
+               cause:'依据你过去 4 周的工作日到家时间中位数，提前 6 分钟把温度调到位' },
+    charge:  { name:'充电', cap:'当前功率', val:'6.8', unit:'kW', size:74, band:87,
+               subA:'已充 24.8 kWh', subB:'78% → 上限 90%',
+               whyK:'为什么 · 比上周同一根桩慢了 40 分钟', whyV:'桩在与人分载',
+               cause:'这把枪的额定 11 kW 正在被旁边的车分走一半，凌晨 2 点后会恢复' },
+    range:   { name:'行程', cap:'总里程', val:'24,860', unit:'km', size:60, band:42,
+               subA:'平均 14.2 kWh/100km', subB:'本周 168 km',
+               whyK:'为什么 · 这周电耗高了 8%', whyV:'四次行程都不到 5 km',
+               cause:'冷车短途占比 63%：电池还没热就到地方了，空调占了其中一半' },
+    mine:    { name:'我的', cap:'距下次保养', val:'5,140', unit:'km', size:60, band:49,
+               subA:'京A·88888 · 车主', subB:'Model 3 · 长续航',
+               whyK:'为什么 · 保养在 11 月中旬', whyV:'按你的年均里程推算',
+               cause:'你年均行驶 18,000 km，上一份保养记录在 3 月 12 日' }
+  };
+
+  const $ = id => document.getElementById(id);
+  let cur = 'status';
+
+  function apply(key){
+    const s = SECTIONS[key]; if (!s) return;
+    cur = key;
+    $('cap').textContent = s.cap;
+    $('val').textContent = s.val;
+    $('unit').textContent = s.unit;
+    document.querySelector('.figure').style.fontSize = s.size + 'px';
+    $('subA').textContent = s.subA;
+    $('subB').textContent = s.subB;
+    $('whyK').textContent = s.whyK;
+    $('whyV').textContent = s.whyV;
+    $('cause').textContent = s.cause;
+    fill.style.width = s.band + '%';
+    document.querySelectorAll('.index button').forEach(b => b.setAttribute('aria-current', b.dataset.go === key));
+    document.querySelectorAll('.pin').forEach(p => {
+      const map = { control:'control', range:'range', charge:'charge' };
+      p.setAttribute('aria-current', map[p.dataset.go] === key);
+    });
+  }
+
+  document.querySelectorAll('.index button, .pin').forEach(el => {
+    el.addEventListener('click', () => { apply(el.dataset.go); blip(0.9); buzz(8); });
+  });
+
+  /* ---------- 光：指针驱动 ---------- */
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  function setLight(clientX, clientY){
+    const r = world.getBoundingClientRect();
+    const nx = clamp((clientX - r.left) / r.width, 0.06, 0.94);
+    const ny = clamp((clientY - r.top) / r.height, 0.05, 0.78);
+    scr.style.setProperty('--lx', (nx * 100).toFixed(1) + '%');
+    scr.style.setProperty('--ly', (ny * 100).toFixed(1) + '%');
+    // 地面光池：与光源同向，但只走中间 60%，避免贴边时穿帮
+    scr.style.setProperty('--poolX', (44 + nx * 22).toFixed(1) + '%');
+    // 车身的镜面落点（车坐标为 480×210）
+    spec.setAttribute('cx', (10 + nx * 80).toFixed(1) + '%');
+    spec.setAttribute('cy', (18 + ny * 52).toFixed(1) + '%');
+    paintRim(nx);
+  }
+  /* 轮廓光窗口：窗口宽度 = 路径的 46%，起点随光源滑动。
+     这样只有迎光的一段亮 —— 两端都亮是在骗物理。 */
+  const L = rimSrc.getTotalLength();
+  const WIN = 0.46;
+  function paintRim(nx){
+    const start = clamp(nx, 0, 1) * (L * (1 - WIN)) + L * 0.06;
+    const dash = (L * WIN).toFixed(1) + ' ' + L.toFixed(1);
+    rimPaths.forEach(p => { p.setAttribute('stroke-dasharray', dash); p.setAttribute('stroke-dashoffset', (-start).toFixed(1)); });
+  }
+  paintRim(0.74);
+
+  const DEFAULT_LIGHT = [0.74, 0.62];
+  function resetLight(){
+    const r = world.getBoundingClientRect();
+    setLight(r.left + r.width * DEFAULT_LIGHT[0], r.top + r.height * DEFAULT_LIGHT[1]);
+  }
+
+  world.addEventListener('pointermove', e => setLight(e.clientX, e.clientY));
+  world.addEventListener('pointerdown', e => setLight(e.clientX, e.clientY));
+  // 手指离开后回到「黄昏默认光位」，不让光停在边缘
+  world.addEventListener('pointerleave', resetLight);
+  world.addEventListener('pointercancel', resetLight);
+
+  /* 声音与振动：默认关，不打招呼不发声 */
+  let ac = null, muted = true;
+  function blip(g){ if (muted) return; try{
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const t = ac.currentTime, o = ac.createOscillator(), gn = ac.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(88, t + .12);
+    gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(.09 * g, t + .008);
+    gn.gain.exponentialRampToValueAtTime(.0001, t + .22);
+    o.connect(gn).connect(ac.destination); o.start(t); o.stop(t + .24);
+  }catch(_){}} 
+  function buzz(ms){ try{ navigator.vibrate && navigator.vibrate(ms); }catch(_){} }
+  const sbtn = document.getElementById('sound');
+  sbtn.addEventListener('click', () => {
+    muted = !muted;
+    sbtn.setAttribute('aria-pressed', String(!muted));
+    sbtn.textContent = muted ? '🔈 声音：关' : '🔊 声音：开';
+    if (!muted) blip(1);
+  });
+
+  /* 演示：光沿世界扫一遍（只在你按下时发生，不是常驻动画） */
+  document.getElementById('demo').addEventListener('click', () => {
+    const t0 = performance.now(), dur = 1800;
+    (function step(now){
+      const k = Math.min(1, (now - t0) / dur);
+      const nx = 0.12 + (0.8 * (0.5 - 0.5 * Math.cos(k * Math.PI)));
+      const r = world.getBoundingClientRect();
+      setLight(r.left + nx * r.width, r.top + (0.22 + 0.3 * k) * r.height);
+      if (k < 1) requestAnimationFrame(step);
+    })(t0);
+  });
+
+  apply('status');
+  resetLight();
+  // 入场：光扫一次（一次性，不是常驻动画）—— 它同时是「这东西能动」的提示
+  const t0 = performance.now();
+  (function once(now){
+    const k = Math.min(1, (now - t0) / 2200);
+    const e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    const r = world.getBoundingClientRect();
+    setLight(r.left + (0.20 + 0.54 * e) * r.width, r.top + (0.20 + 0.42 * e) * r.height);
+    if (k < 1) requestAnimationFrame(once);
+  })(t0);
+})();
+</script>
+</body>
+</html>

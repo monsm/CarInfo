@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>光 = 真实物理 · 界面由太阳与天气算出</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&family=Noto+Serif+SC:wght@200;300;400;600;700&display=swap">
+<style>
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+html,body{margin:0;padding:0}
+body{background:#0E0D11;color:#EDEAE4;font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;padding:0 0 46px}
+.tn{font-variant-numeric:tabular-nums}
+.serif{font-family:"Noto Serif SC",Songti SC,serif}
+
+/* ============ 顶部控制台（吸顶） ============ */
+#bar{position:sticky;top:0;z-index:80;background:#0E0D11;border-bottom:1px solid #24232B;padding:10px 12px 12px}
+#status{font-size:11.5px;letter-spacing:.06em;color:#B8B2BC;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}
+#status b{color:#EDEAE4;font-weight:600}
+#status .live{color:#7FE0A0}
+#status .sim{color:#F0B24A}
+#status .err{color:#FF8070}
+#strip{display:flex;gap:3px;margin:10px 0 0}
+.sw{flex:1;height:34px;border-radius:5px;position:relative;cursor:pointer;border:0;padding:0;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.sw i{position:absolute;left:50%;transform:translateX(-50%);width:2px;height:2px;border-radius:50%;background:#fff;opacity:.85}
+.sw.on{box-shadow:inset 0 0 0 2px #EDEAE4}
+.sw span{position:absolute;bottom:-13px;left:0;right:0;text-align:center;font-size:8px;color:#6E6874}
+#ctl{display:flex;align-items:center;gap:12px;margin-top:22px;flex-wrap:wrap}
+#h{flex:1;min-width:190px;accent-color:#EDEAE4}
+#chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:11px;line-height:1;padding:7px 10px;border-radius:999px;border:1px solid #36353E;
+  background:transparent;color:#C4BFC6;cursor:pointer;font-family:inherit;white-space:nowrap}
+.chip.on{background:#EDEAE4;border-color:#EDEAE4;color:#0E0D11;font-weight:600}
+
+/* ============ 手机 ============ */
+#stage{display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 0 8px}
+.dev{width:390px;height:844px;flex:none;border-radius:44px;position:relative;overflow:hidden;
+  background:var(--bg);color:var(--ink);box-shadow:0 0 0 1px #36353E,0 34px 64px -36px #000}
+@media (max-width:440px){.dev{zoom:.80}}
+@media (max-width:325px){.dev{zoom:.70}}
+.bm{position:absolute;inset:0}
+.lyr{position:absolute;inset:0;pointer-events:none;z-index:5}
+.caster{position:absolute;left:195px;top:422px;width:0;height:0;z-index:4;pointer-events:none}
+.pool{position:absolute;border-radius:50%}
+.haze{position:absolute;inset:0;z-index:4;pointer-events:none;background:var(--haze)}
+.vig{position:absolute;inset:0;z-index:5;pointer-events:none;background:var(--vig)}
+.grain{position:absolute;inset:0;pointer-events:none;z-index:70;border-radius:44px;opacity:var(--grainA);
+  mix-blend-mode:var(--grainBlend);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='130'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='130' height='130' filter='url(%23n)' opacity='0.7'/%3E%3C/svg%3E")}
+
+.sb{position:absolute;top:0;left:0;right:0;height:52px;z-index:40;display:flex;align-items:flex-end;
+  justify-content:space-between;padding:0 30px 6px;font-size:12.5px;font-weight:500;color:var(--sbTx)}
+.sb span{opacity:.8;letter-spacing:.08em;font-size:11px}
+.hud{position:absolute;left:18px;right:18px;top:60px;z-index:20;display:flex;align-items:center;gap:8px}
+.hud .pill{display:flex;align-items:center;gap:9px;border-radius:999px;padding:9px 14px;font-size:11.5px;
+  letter-spacing:.06em;background:var(--pillBg);border:1px solid var(--pillBd);color:var(--pillTx);
+  backdrop-filter:blur(18px)}
+.hud .pill i{width:6px;height:6px;border-radius:50%;display:block;flex:none}
+.hud .pill.g i{background:var(--ok);box-shadow:0 0 10px var(--okGlow)}
+.hud .btn{margin-left:auto;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;background:var(--pillBg);border:1px solid var(--pillBd);backdrop-filter:blur(18px)}
+.hud .btn svg{stroke:var(--pillTx)}
+
+.pinWrap{position:absolute;z-index:15}
+.pinL{position:absolute;z-index:15;font-size:10px;letter-spacing:.14em;white-space:nowrap;color:var(--pinL);
+  text-shadow:var(--pinShadow)}
+.pinL b{font-weight:500}
+.pinL.rd{color:var(--danger)}
+.pinL.gn{color:var(--ok)}
+.bigL{position:absolute;z-index:6;font-family:"Noto Serif SC",serif;white-space:nowrap;line-height:1;
+  color:var(--place)}
+
+.layers{position:absolute;left:0;right:0;z-index:20;display:flex;gap:8px;overflow-x:auto;padding:0 18px;
+  scrollbar-width:none}
+.layers::-webkit-scrollbar{display:none}
+.lay{flex:none;font-size:11.5px;padding:8px 13px;border-radius:999px;letter-spacing:.06em;white-space:nowrap;
+  background:var(--layBg);border:1px solid var(--layBd);color:var(--layTx);backdrop-filter:blur(18px)}
+.lay.on{background:var(--layOnBg);border-color:var(--layOnBg);color:var(--layOnTx);font-weight:500}
+
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:25;background:var(--sheetGrad);
+  border-radius:30px 30px 44px 44px;padding:16px 24px 34px;box-shadow:var(--sheetShadow)}
+.sheet .grab{width:40px;height:4px;border-radius:3px;margin:0 auto 18px;background:var(--grab)}
+.sheet h3{margin:0;font-weight:500;letter-spacing:.02em;font-size:23px;color:var(--sheetTx)}
+.sheet .sub{font-size:11.5px;margin-top:6px;letter-spacing:.06em;color:var(--sheetMut)}
+.sheet .rows{margin-top:16px}
+.sheet .row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:12px 0;
+  font-size:12.5px;border-top:1px solid var(--hair)}
+.sheet .row .k{letter-spacing:.04em;color:var(--sheetMut)}
+.sheet .row .v{font-variant-numeric:tabular-nums;font-weight:500;text-align:right;color:var(--sheetTx)}
+.sheet .row .v em{font-style:normal;font-weight:400;margin-left:6px;color:var(--sheetMut)}
+.q4{display:flex;gap:10px;margin-top:18px}
+.q4 .qa{flex:1;border-radius:18px;padding:15px 8px 13px;text-align:center;background:var(--qaBg);
+  box-shadow:var(--qaShadow)}
+.q4 .qa.hot{background:var(--qaHot)}
+.q4 .qa svg{stroke:var(--qaTx)}
+.q4 .qa.hot svg{stroke:var(--qaHotTx)}
+.q4 .qa .l{font-size:11px;margin-top:9px;letter-spacing:.08em;color:var(--qaTxL)}
+.q4 .qa.hot .l{color:var(--qaHotTx)}
+.scale{position:absolute;left:26px;z-index:15}
+.scale .bar{height:7px;border-left:1px solid var(--ruleC);border-right:1px solid var(--ruleC);
+  border-bottom:1px solid var(--ruleC)}
+.scale .lb{font-size:9px;letter-spacing:.22em;margin-top:5px;color:var(--ruleC2)}
+
+/* ============ 说明面板 ============ */
+#why{max-width:560px;margin:26px auto 0;padding:0 18px}
+#why h2{font-size:13px;letter-spacing:.22em;color:#8E8894;font-weight:500;margin:0 0 12px}
+#why .row{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-top:1px solid #24232B;
+  font-size:12.5px;align-items:baseline}
+#why .row .k{color:#9F99A6}
+#why .row .v{text-align:right;color:#EDEAE4;font-variant-numeric:tabular-nums;font-weight:500}
+#why .row .v em{font-style:normal;color:#77717E;font-weight:400;margin-left:7px}
+#why .note{font-size:11.5px;line-height:1.75;color:#77717E;margin-top:18px}
+#why .note b{color:#B8B2BC;font-weight:500}
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <div id="status">载入真实数据…</div>
+  <div id="strip"></div>
+  <div id="ctl">
+    <input id="h" type="range" min="0" max="23" step="1" value="12" aria-label="小时">
+    <div id="chips"></div>
+  </div>
+</div>
+
+<div id="stage">
+  <div class="dev tn" id="sA">
+    <svg class="bm" width="390" height="844" viewBox="0 0 390 844">
+      <g transform="translate(195 422) rotate(-7) scale(1.22) translate(-195 -422)">
+        <use href="#terrain"/>
+      </g>
+    </svg>
+
+    <div class="caster" id="caster">
+      <div class="pool" id="p1" style="left:-260px;top:-260px;width:520px;height:520px"></div>
+      <div class="pool" id="p2" style="left:60px;top:-330px;width:360px;height:360px"></div>
+      <div class="pool" id="p3" style="left:-300px;top:20px;width:320px;height:320px"></div>
+    </div>
+    <div class="pool" id="lampPool" style="left:112px;top:170px;width:380px;height:380px;z-index:5"></div>
+
+    <svg class="lyr" width="390" height="844" viewBox="0 0 390 844" fill="none">
+      <path d="M302 229 L146 229" stroke="var(--routeLo)" stroke-width="2" stroke-linecap="round"/>
+      <path id="routeGlow" d="M302 360 L302 232" stroke="var(--routeHi)" stroke-width="8"
+        stroke-linecap="round" filter="url(#soft)"/>
+      <path d="M302 360 L302 230" stroke="var(--routeHi)" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="148" cy="232" r="40" fill="var(--dangerPool)"/>
+    </svg>
+
+    <div class="haze"></div>
+    <div class="bigL" style="left:236px;top:122px;transform:rotate(-7deg);font-size:46px;font-weight:200;
+      letter-spacing:.3em">望 京</div>
+    <div class="vig"></div>
+    <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
+
+    <svg class="pinWrap" style="left:222px;top:286px" width="150" height="150" viewBox="0 0 150 150">
+      <circle id="lampBloom" cx="75" cy="75" r="75" fill="var(--lampGlow)"/>
+      <ellipse cx="88" cy="124" rx="30" ry="6" fill="var(--shadowC)" filter="url(#soft)"/>
+      <circle cx="75" cy="75" r="60" fill="none" stroke="var(--ringTick)" stroke-width="1"/>
+      <circle cx="75" cy="75" r="58" fill="none" stroke="var(--ringTrack)" stroke-width="9"
+        stroke-dasharray="1.7 28.4"/>
+      <circle cx="75" cy="75" r="58" fill="none" stroke="var(--ringArc)" stroke-width="3" stroke-linecap="round"
+        stroke-dasharray="284 364" transform="rotate(-90 75 75)"/>
+      <circle cx="75" cy="75" r="38" fill="var(--pinDisc)" stroke="var(--ringTrack)" stroke-width="1"/>
+      <g stroke="var(--pinInk)" stroke-width="1.9" fill="none" stroke-linejoin="round">
+        <path d="M56 86 L60.5 73 Q61.8 69 66.4 69 L83.6 69 Q88.2 69 89.5 73 L94 86"/>
+        <path d="M53 86 H97" stroke-linecap="round"/>
+        <circle cx="66" cy="87" r="5.4" stroke-width="1.7"/>
+        <circle cx="84" cy="87" r="5.4" stroke-width="1.7"/>
+      </g>
+    </svg>
+
+    <svg class="pinWrap" style="left:206px;top:210px" width="32" height="32" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="4" fill="var(--okPool)"/>
+      <circle cx="16" cy="16" r="11" fill="none" stroke="var(--ok)" stroke-width="1.5"/>
+      <path d="M17.6 9 L11 17.4h4.2L13.9 23.6 20.5 15.2h-4.2z" fill="var(--ok)"/>
+    </svg>
+    <div class="pinL gn" style="left:244px;top:214px"><b>¥0.68</b> 谷电</div>
+
+    <svg class="pinWrap" style="left:128px;top:212px" width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="19" fill="var(--dangerPool)"/>
+      <circle cx="20" cy="20" r="19" fill="none" stroke="var(--dangerRing)" stroke-width="1"/>
+      <circle cx="20" cy="20" r="9.5" fill="var(--danger)"/>
+      <path d="M20 14v7M20 24.6v1.6" stroke="var(--dangerInk)" stroke-width="2.2" stroke-linecap="round"/>
+    </svg>
+    <div class="pinL rd" style="left:24px;top:266px"><b>14:20</b> 后备箱未关</div>
+
+    <div class="scale" style="top:394px"><div class="bar" style="width:64px"></div><div class="lb">500 M</div></div>
+
+    <div class="hud">
+      <div class="pill g"><i></i>已上锁 · 望京</div>
+      <div class="pill" id="pillWx">—</div>
+      <div class="btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="6.4"/><path d="M12 2.4v3M12 18.6v3M2.4 12h3M18.6 12h3"/></svg></div>
+    </div>
+
+    <div class="layers" style="bottom:378px">
+      <span class="lay on">现在</span><span class="lay">今天</span><span class="lay">充电</span>
+      <span class="lay">花费</span><span class="lay">服务</span><span class="lay">共享</span><span class="lay">数据</span>
+    </div>
+
+    <div class="sheet">
+      <div class="grab"></div>
+      <h3 class="serif">车在这儿</h3>
+      <div class="sub">望京 · 地库 B2 · 距你 1.8 km · 21:40 起静置</div>
+      <div class="rows">
+        <div class="row"><span class="k">电量</span><span class="v">78%<em>412 km</em></span></div>
+        <div class="row"><span class="k">今天</span><span class="v">52.9 km<em>7 段</em></span></div>
+        <div class="row"><span class="k">异常</span><span class="v" style="color:var(--danger)">1 条<em>后备箱 · 14:20</em></span></div>
+      </div>
+      <div class="q4">
+        <div class="qa hot"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="9"/><path d="M8.4 10.5V8a3.6 3.6 0 0 1 7.2 0v2.5"/></svg><div class="l">解锁</div></div>
+        <div class="qa"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><path d="M12 3.5v17M4.6 7.75l14.8 8.5M19.4 7.75l-14.8 8.5"/></svg><div class="l">空调</div></div>
+        <div class="qa"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8.2a4.2 4.2 0 0 1 4.2 4.2c0 1.7-1 2.4-1.5 3.1H9.3c-.5-.7-1.5-1.4-1.5-3.1A4.2 4.2 0 0 1 12 8.2z"/><path d="M10.2 17.6h3.6"/><path d="M12 3.4v1.9M4.9 6.6l1.3 1.3M19.1 6.6l-1.3 1.3M3.2 13.4h1.9M18.9 13.4h1.9"/></svg><div class="l">闪灯</div></div>
+        <div class="qa"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="2.3"/><path d="M8.2 8.2a5.4 5.4 0 0 0 0 7.6M15.8 8.2a5.4 5.4 0 0 1 0 7.6M5.4 5.4a9.4 9.4 0 0 0 0 13.2M18.6 5.4a9.4 9.4 0 0 1 0 13.2"/></svg><div class="l">找车</div></div>
+      </div>
+    </div>
+    <div class="grain"></div>
+  </div>
+</div>
+
+<div id="why">
+  <h2>为什么现在是这个样子</h2>
+  <div id="reasons"></div>
+  <div class="note">
+    <b>真实的部分</b>：太阳高度角与方位角由页面自己按天文公式算出（你的车所在的经纬度 + 真实时刻）；
+    云量、天气码、气温、辐照度（W/m²）取自 Open-Meteo 的实时与逐时数据。<br>
+    <b>仍是真的、但属于设计取舍</b>：「车灯亮度 = 1 − 辐照度/220」「辐照度 > 60 时界面从夜行模式切到日光模式」
+    这类映射是我定的规则 —— 它们不是气象事实，而是把气象事实翻译成界面的方式，规则都写在上面每一行里。
+  </div>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="7"/></filter>
+    <linearGradient id="blkGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--blkA)"/><stop offset="1" stop-color="var(--blkB)"/>
+    </linearGradient>
+  </defs>
+  <symbol id="terrain" viewBox="-60 -60 510 964">
+    <rect x="-60" y="-60" width="510" height="964" fill="var(--mapBg)"/>
+    <path d="M-60 792 C 92 758, 168 826, 266 786 C 322 762, 360 790, 450 770 L450 964 L-60 964 Z" fill="var(--water)"/>
+    <path d="M-60 792 C 92 758, 168 826, 266 786 C 322 762, 360 790, 450 770" fill="none"
+      stroke="var(--waterEdge)" stroke-width="1"/>
+    <g fill="var(--blkGrad)">
+      <rect x="-40" y="-20" width="88" height="220" rx="6"/><rect x="66" y="-20" width="52" height="220" rx="6"/>
+      <rect x="140" y="-20" width="86" height="220" rx="6"/><rect x="248" y="-20" width="60" height="220" rx="6"/>
+      <rect x="330" y="-20" width="110" height="220" rx="6"/>
+      <rect x="-40" y="244" width="88" height="108" rx="6"/><rect x="66" y="244" width="52" height="108" rx="6"/>
+      <rect x="140" y="244" width="86" height="108" rx="6"/><rect x="330" y="244" width="110" height="108" rx="6"/>
+      <rect x="-40" y="372" width="88" height="106" rx="6"/><rect x="66" y="372" width="52" height="106" rx="6"/>
+      <rect x="140" y="372" width="86" height="106" rx="6"/><rect x="248" y="372" width="60" height="106" rx="6"/>
+      <rect x="330" y="372" width="110" height="106" rx="6"/>
+      <rect x="-40" y="498" width="88" height="100" rx="6"/><rect x="66" y="498" width="52" height="100" rx="6"/>
+      <rect x="140" y="498" width="86" height="100" rx="6"/><rect x="248" y="498" width="60" height="100" rx="6"/>
+      <rect x="330" y="498" width="110" height="100" rx="6"/>
+    </g>
+    <g fill="var(--parkFill)" stroke="var(--parkEdge)" stroke-width="0.8">
+      <rect x="248" y="244" width="60" height="108" rx="6"/>
+      <rect x="-40" y="618" width="88" height="82" rx="6"/>
+    </g>
+    <g stroke="var(--roadCasing)" stroke-width="6" stroke-linecap="round" fill="none">
+      <path d="M-60 232 H450"/><path d="M-60 486 H450"/><path d="M148 -40 V740"/><path d="M300 -40 V740"/>
+    </g>
+    <g stroke="var(--roadMajor)" stroke-width="5.4" stroke-linecap="round" fill="none">
+      <path d="M-60 232 H450"/><path d="M-60 486 H450"/><path d="M148 -40 V740"/><path d="M300 -40 V740"/>
+    </g>
+    <g stroke="var(--roadCasing)" stroke-width="4" stroke-linecap="round" fill="none">
+      <path d="M-60 360 H450"/><path d="M-60 606 H450"/><path d="M88 -40 V740"/><path d="M228 -40 V740"/>
+    </g>
+    <g stroke="var(--roadMinor)" stroke-width="3.4" stroke-linecap="round" fill="none">
+      <path d="M-60 360 H450"/><path d="M-60 606 H450"/><path d="M88 -40 V740"/><path d="M228 -40 V740"/>
+    </g>
+    <g stroke="var(--roadCasing)" stroke-width="13" fill="none">
+      <path d="M-60 700 C 120 670, 250 630, 450 600"/>
+    </g>
+    <path d="M-60 700 C 120 670, 250 630, 450 600" stroke="var(--roadHighway)" stroke-width="8.5" fill="none"/>
+    <g font-family="'Noto Serif SC',serif" font-size="10.5" letter-spacing="3.4" fill="var(--placeDim)">
+      <text x="-40" y="224">北 四 环</text><text x="-40" y="478">京 密 路</text>
+      <text x="152" y="304">中 关 村</text><text x="318" y="100">T 3</text><text x="150" y="812">通 惠 河</text>
+    </g>
+  </symbol>
+</svg>
+
+<script>
+"use strict";
+/* =========================================================================
+   CarKeeper · 光引擎
+   输入：车所在经纬度 + 真实时刻 + 真实天气（云量/天气码/辐照度）
+   输出：整套界面的颜色、光的方向、对比度、以及"夜行 / 日光"模式
+   ========================================================================= */
+
+var CAR = { lat: 39.9963, lon: 116.4700, tz: "Asia/Shanghai", tzOffset: 8 };
+var RAD = Math.PI / 180;
+function rad(d){ return d * RAD; }
+function deg(r){ return r / RAD; }
+function clamp(v,a,b){ return v < a ? a : (v > b ? b : v); }
+function lerp(a,b,t){ return a + (b - a) * t; }
+
+/* ---------- 1. 真太阳位置（NOAA 简化算法）---------- */
+function solarPos(ms, lat, lon){
+  var jd = ms / 86400000 + 2440587.5;
+  var T = (jd - 2451545.0) / 36525;
+  var L0 = 280.46646 + T * (36000.76983 + 0.0003032 * T);
+  var M  = 357.52911 + T * (35999.05029 - 0.0001537 * T);
+  var e  = 0.016708634 - T * (0.000042037 + 0.0000001267 * T);
+  var C  = Math.sin(rad(M)) * (1.914602 - T * (0.004817 + 0.000014 * T))
+         + Math.sin(rad(2 * M)) * (0.019993 - 0.000101 * T)
+         + Math.sin(rad(3 * M)) * 0.000289;
+  var omega = 125.04 - 1934.136 * T;
+  var lambda = (L0 + C) - 0.00569 - 0.00478 * Math.sin(rad(omega));
+  var eps0 = 23 + (26 + (21.448 - T * (46.815 + T * (0.00059 - T * 0.001813))) / 60) / 60;
+  var eps = eps0 + 0.00256 * Math.cos(rad(omega));
+  var decl = deg(Math.asin(Math.sin(rad(eps)) * Math.sin(rad(lambda))));
+  var y = Math.tan(rad(eps / 2)); y = y * y;
+  var EoT = 4 * deg(y * Math.sin(2 * rad(L0)) - 2 * e * Math.sin(rad(M))
+        + 4 * e * y * Math.sin(rad(M)) * Math.cos(2 * rad(L0))
+        - 0.5 * y * y * Math.sin(4 * rad(L0)) - 1.25 * e * e * Math.sin(2 * rad(M)));
+  var utcMin = ((ms % 86400000) + 86400000) % 86400000 / 60000;
+  var tst = utcMin + EoT + 4 * lon;
+  var ha = tst / 4 - 180;
+  while (ha < -180) ha += 360;
+  while (ha > 180) ha -= 360;
+  var la = rad(lat), de = rad(decl), hr = rad(ha);
+  var alt = deg(Math.asin(Math.sin(la) * Math.sin(de) + Math.cos(la) * Math.cos(de) * Math.cos(hr)));
+  var az = deg(Math.atan2(Math.sin(hr), Math.cos(hr) * Math.sin(la) - Math.tan(de) * Math.cos(la))) + 180;
+  return { alt: alt, az: az, decl: decl, eot: EoT };
+}
+
+/* ---------- 2. 天气码 → 人话 ---------- */
+var WMO = {0:"晴",1:"少云",2:"多云",3:"阴",45:"雾",48:"雾凇",51:"毛毛雨",53:"毛毛雨",55:"毛毛雨",
+  56:"冻雨",57:"冻雨",61:"小雨",63:"中雨",65:"大雨",66:"冻雨",67:"冻雨",71:"小雪",73:"中雪",75:"大雪",
+  77:"雪粒",80:"阵雨",81:"阵雨",82:"强阵雨",85:"阵雪",86:"阵雪",95:"雷暴",96:"雷暴",99:"雷暴"};
+function isRain(c){ return (c>=51&&c<=67)||(c>=80&&c<=82)||c>=95; }
+function isSnow(c){ return (c>=71&&c<=77)||c===85||c===86; }
+function isFog(c){ return c===45||c===48; }
+
+/* ---------- 3. 两套调色板：夜行（深）↔ 日光（纸） ---------- */
+/* 全部由真实的"辐照度"决定混合比；色温由太阳高度角决定。 */
+var P_DARK = {
+  bg:"#08070A", mapBg:"#0A0A0E", blkA:"#1A1A22", blkB:"#121218",
+  roadCasing:"#07070A", roadMajor:"#252A34", roadMinor:"#202430", roadHighway:"#292F3A",
+  water:"#0C1017", waterEdge:"rgba(150,180,215,.16)",
+  parkFill:"#131A18", parkEdge:"rgba(127,224,160,.12)",
+  place:"rgba(246,239,228,.11)", placeDim:"rgba(246,239,228,.28)",
+  poolC:"#FFB26E", poolA1:.17, poolA2:.13,
+  hazeTop:"rgba(30,24,42,.5)", hazeWarm:"rgba(255,190,120,.10)", vigA:.62, vigC:"#080406",
+  grainA:.055, grainBlend:"overlay",
+  routeHi:"#FFE6BE", routeLo:"rgba(255,226,182,.28)", dangerPool:"rgba(255,106,85,.14)",
+  dangerRing:"rgba(255,106,85,.4)", danger:"#FF6A55", dangerInk:"#100C0A",
+  ok:"#7FE0A0", okPool:"rgba(127,224,160,.25)", okGlow:"rgba(127,224,160,.8)",
+  ink:"#F2EFE9", sbTx:"#F6EFE4",
+  pillBg:"rgba(20,17,22,.66)", pillBd:"rgba(255,236,205,.14)", pillTx:"#F6EFE4",
+  layBg:"rgba(20,17,22,.7)", layBd:"rgba(255,236,205,.13)", layTx:"#BDB4AC",
+  layOnBg:"#F6EFE4", layOnTx:"#1A1614",
+  sheetGrad:"linear-gradient(180deg,#1B1715,#141110)", sheetTx:"#F6EFE4",
+  sheetMut:"rgba(246,239,228,.5)", hair:"rgba(255,232,200,.075)", grab:"rgba(255,232,200,.24)",
+  qaBg:"#241F1D", qaHot:"#2E2724", qaTx:"#F6EFE4", qaHotTx:"#F6EFE4", qaTxL:"#BDB4AC", qaHotTxL:"#F6EFE4",
+  qaShadow:"inset 0 1px 0 rgba(255,226,180,.06)", sheetShadow:"inset 0 1px 0 rgba(255,226,180,.14), 0 -30px 60px -34px #000",
+  pinDisc:"#100C0A", pinInk:"#FFF6E8", ringArc:"#FFF6E8", ringTrack:"rgba(255,232,200,.2)",
+  ringTick:"rgba(255,232,200,.14)", shadowC:"rgba(0,0,0,.72)",
+  pinL:"rgba(246,239,228,.78)", pinShadow:"0 1px 8px #000, 0 0 18px rgba(0,0,0,.8)",
+  ruleC:"rgba(246,239,228,.5)", ruleC2:"rgba(246,239,228,.42)"
+};
+var P_LIGHT = {
+  bg:"#F4EEE1", mapBg:"#F4EEE1", blkA:"#EAE2CF", blkB:"#E3DBC7",
+  roadCasing:"#D9CFB8", roadMajor:"#CFC4AA", roadMinor:"#D7CCB4", roadHighway:"#C9BDA1",
+  water:"#CBD9DC", waterEdge:"rgba(30,50,60,.4)",
+  parkFill:"#D7E0CC", parkEdge:"rgba(46,125,79,.25)",
+  place:"rgba(30,27,22,.14)", placeDim:"rgba(30,27,22,.5)",
+  poolC:"#D9A24E", poolA1:.16, poolA2:.10,
+  hazeTop:"rgba(255,252,244,.34)", hazeWarm:"rgba(226,168,84,.12)", vigA:.14, vigC:"#6B5B3E",
+  grainA:.05, grainBlend:"multiply",
+  routeHi:"#C0392B", routeLo:"rgba(192,57,43,.5)", dangerPool:"rgba(179,51,37,.12)",
+  dangerRing:"rgba(179,51,37,.45)", danger:"#B33325", dangerInk:"#F7F2E7",
+  ok:"#2E7D4F", okPool:"rgba(46,125,79,.2)", okGlow:"rgba(46,125,79,.5)",
+  ink:"#1E1B16", sbTx:"#1E1B16",
+  pillBg:"rgba(252,249,241,.82)", pillBd:"rgba(30,27,22,.14)", pillTx:"#1E1B16",
+  layBg:"rgba(252,249,241,.8)", layBd:"rgba(30,27,22,.16)", layTx:"#4A443A",
+  layOnBg:"#1E1B16", layOnTx:"#F4EEE1",
+  sheetGrad:"linear-gradient(180deg,#FCF9F2,#F7F2E7)", sheetTx:"#1E1B16",
+  sheetMut:"#7C7466", hair:"rgba(30,27,22,.16)", grab:"rgba(30,27,22,.2)",
+  qaBg:"#F1EBDE", qaHot:"#E7DFCC", qaTx:"#1E1B16", qaHotTx:"#1E1B16", qaTxL:"#5C564A", qaHotTxL:"#1E1B16",
+  qaShadow:"inset 0 0 0 .5px rgba(30,27,22,.12)", sheetShadow:"0 -1px 0 rgba(30,27,22,.14), 0 -26px 54px -34px rgba(30,27,22,.55)",
+  pinDisc:"#F7F2E7", pinInk:"#1E1B16", ringArc:"#B33325", ringTrack:"rgba(30,27,22,.22)",
+  ringTick:"rgba(30,27,22,.16)", shadowC:"rgba(30,27,22,.22)",
+  pinL:"rgba(30,27,22,.72)", pinShadow:"none",
+  ruleC:"rgba(30,27,22,.55)", ruleC2:"rgba(30,27,22,.5)"
+};
+
+function hx(c){
+  if (c.charAt(0) !== "#") return null;
+  var s = c.slice(1);
+  return [parseInt(s.substr(0,2),16), parseInt(s.substr(2,2),16), parseInt(s.substr(4,2),16)];
+}
+function mixc(a, b, t){
+  var A = hx(a), B = hx(b);
+  if (!A || !B) return t < .5 ? a : b;
+  return "rgb(" + Math.round(lerp(A[0],B[0],t)) + "," + Math.round(lerp(A[1],B[1],t)) + "," +
+    Math.round(lerp(A[2],B[2],t)) + ")";
+}
+function tone(rgb, warm){
+  /* 色温：warm>0 往琥珀推，warm<0 往冷蓝推。
+     关键规则：染色强度随该颜色自身的明度 — 黑底几乎不染，白纸染色最明显。
+     （否则深夜会从 #08070A 被推成一团紫黑，实测就是这么错的。） */
+  if (rgb.charAt(0) === "#"){ var h0 = hx(rgb); if (h0) rgb = "rgb(" + h0[0] + "," + h0[1] + "," + h0[2] + ")"; }
+  var m = rgb.match(/(\d+),\s*(\d+),\s*(\d+)/);
+  if (!m) return rgb;
+  var r = +m[1], g = +m[2], b = +m[3];
+  var lum = .2126 * r + .7152 * g + .0722 * b;
+  var k = Math.abs(warm) * (0.16 + 0.84 * lum / 255);
+  if (warm > 0) { r = lerp(r,255,k*.46); g = lerp(g,232,k*.34); b = lerp(b,150,k*.52); }
+  else { r = lerp(r,74,k*.42); g = lerp(g,124,k*.30); b = lerp(b,186,k*.46); }
+  return "rgb(" + Math.round(clamp(r,0,255)) + "," + Math.round(clamp(g,0,255)) + "," + Math.round(clamp(b,0,255)) + ")";
+}
+
+/* ---------- 4. 光模型：真实物理 → 界面变量 ---------- */
+function lightModel(st){
+  var alt = st.alt, az = st.az, R = st.rad, C = st.cloud, W = st.code;
+
+  /* 4.1 环境光：辐照度直接决定"有多少光"。
+     S 形：95–205 W/m² 之间完成切换（对应真实日落前后约半小时）。
+     早先版本用线性 L = R/300，结果 08:00 时背景 rgb(142,138,132)、文字 rgb(122,119,113) ——
+     「深色↔纸色」线性混合会经过一段灰泥，文字几乎不可读。所以：**亮度不过渡，模式直接换**。 */
+  var tt = clamp((R - 95) / 110, 0, 1);
+  var L = tt * tt * (3 - 2 * tt);
+  var PAPER = L >= .5;      /* 模式由环境光决定：白天是纸，夜里是深色。“光”本身仍是连续的。 */
+  /* 4.2 色温：太阳贴近地平线→琥珀；太阳在地平线下较深→冷蓝。 */
+  var warm = 0;
+  if (alt > -3) warm = clamp(1 - Math.abs(alt) / 14, 0, 1);
+  else {
+    /* 蓝调是「暮光」现象：-6° 附近最强，越往深夜越退回中性深色 */
+    warm = -clamp((alt + 21) / 15, 0, 1);
+  }
+
+  /* 梯度/阴影这类含 rgba 的复合字符串不能走「取第一个 rgba」的通用插值，单独算 */
+  var FIXED = { grainBlend:1, sheetGrad:1, qaShadow:1, sheetShadow:1, pinShadow:1 };
+  /* 地图层染得重（它直接暴露在光里），界面层染得轻 */
+  var MAPKEY = { bg:1, mapBg:1, blkA:1, blkB:1, roadCasing:1, roadMajor:1, roadMinor:1, roadHighway:1,
+    water:1, waterEdge:1, parkFill:1, parkEdge:1, place:1, placeDim:1, routeHi:1, routeLo:1,
+    pinDisc:1, pinInk:1, shadowC:1 };
+  var v = {};
+  Object.keys(P_DARK).forEach(function(k){
+    var src = PAPER ? P_LIGHT[k] : P_DARK[k];
+    if (FIXED[k]) return;
+    if (typeof src === "number") { v[k] = src; return; }
+    var w = warm * (MAPKEY[k] ? .58 : .30);
+    if (src.charAt(0) === "#"){ v[k] = tone(src, w); return; }
+    v[k] = toneA(src, w);
+  });
+  v.grainBlend = PAPER ? "multiply" : "overlay";
+  v.sheetGrad = PAPER ? "linear-gradient(180deg,#FCF9F2,#F7F2E7)" : "linear-gradient(180deg,#1B1715,#141110)";
+  v.qaShadow = PAPER ? "inset 0 0 0 .5px rgba(30,27,22,.12)" : "inset 0 1px 0 rgba(255,226,180,.06)";
+  v.sheetShadow = PAPER
+    ? "inset 0 1px 0 rgba(255,255,255,.75), 0 -26px 54px -34px rgba(30,27,22,.5)"
+    : "inset 0 1px 0 rgba(255,226,180,.14), 0 -30px 60px -34px rgba(0,0,0,.85)";
+  v.pinShadow = PAPER ? "0 1px 8px rgba(30,27,22,.2)" : "0 1px 8px #000, 0 0 18px rgba(0,0,0,.8)";
+
+  /* 4.3 天气：云把光变得柔和，雨把地面变湿，雪把地面变亮，雾把一切推远 */
+  var cloudy = C / 100;
+  var wet = isRain(W) ? 1 : 0, snow = isSnow(W) ? 1 : 0, fog = isFog(W) ? 1 : 0;
+  /* 云：降低对比（街区更贴近底色）、加一层湿气 */
+  v.blkA = mixc(v.blkA, v.mapBg, cloudy * .55);
+  v.blkB = mixc(v.blkB, v.mapBg, cloudy * .55);
+  v.roadMajor = mixc(v.roadMajor, v.mapBg, cloudy * .30);
+  v.roadMinor = mixc(v.roadMinor, v.mapBg, cloudy * .30);
+  v.place = mixc(v.place, v.bg, cloudy * .25);
+  if (snow) { v.blkA = mixc(v.blkA, "#FFFFFF", .55); v.blkB = mixc(v.blkB, "#FFFFFF", .5);
+              v.mapBg = mixc(v.mapBg, "#FFFFFF", .35); v.roadMajor = mixc(v.roadMajor, "#FFFFFF", .35);
+              v.roadMinor = mixc(v.roadMinor, "#FFFFFF", .35); }
+  if (wet) { v.blkA = mixc(v.blkA, v.mapBg, .22); v.blkB = mixc(v.blkB, v.mapBg, .22);
+             v.roadHighway = mixc(v.roadHighway, v.poolC, .18 * L); }
+  if (fog) { v.blkA = mixc(v.blkA, v.mapBg, .6); v.blkB = mixc(v.blkB, v.mapBg, .6);
+             v.roadMajor = mixc(v.roadMajor, v.mapBg, .5); v.roadMinor = mixc(v.roadMinor, v.mapBg, .5); }
+
+  /* 4.4 光的方向：太阳的方位角 → 光落在哪一侧；太阳越低越"斜"（半径越大） */
+  var dayR = 340 * (1 - clamp(alt / 60, 0, 1));   /* 太阳越低越斜 → 影子越长 */
+  var nightR = 90;                                 /* 夜里没有太阳，剩下的是城市辉光 */
+  var hasSun = clamp((alt + 6) / 4, 0, 1);         /* -6° 以下视为没有太阳 */
+  /* 关键：方向性由**高度角**决定，不是亮度。
+     早先版本用亮度，结果 18:00（太阳高度 1.8°）的方向性只剩 90px —— 而恰恰日出日落
+     才是影子最长、光最有方向的时候。 */
+  var radius = lerp(nightR, dayR, hasSun);
+  var sunPresence = clamp((alt + 8) / 20, 0, 1);
+  var sx = Math.sin(rad(az)) * radius, sy = -Math.cos(rad(az)) * radius;
+  v._casterX = Math.round(sx); v._casterY = Math.round(sy);
+
+  /* 4.5 光池强度：夜里是城市辉光（冷、弱），白天是阳光（暖、强） */
+  v.poolA1 = lerp(.10, .20, Math.max(sunPresence, L)) * (1 - cloudy * .55) * (1 - fog * .5);
+  v.poolA2 = v.poolA1 * .7;
+  v._sunPresence = sunPresence;
+  /* 只有真的没有太阳（高度角 < -6°）时，光才换成城市辉光（冷）；
+     否则日落时会被错染成冷蓝 —— 而那一刻应该是全天的琥珀。 */
+  if (alt < -6) v.poolC = tone("#8FA8C8", -0.6);
+
+  /* 4.6 车灯：环境越亮越不需要（真实物理：日照下不需要开车灯） */
+  var lamp = clamp(1 - R / 220, .05, 1);
+  v._lamp = lamp;
+  v.lampGlow = "radial-gradient(circle," + tone("rgba(255,214,160," + (0.34 * lamp).toFixed(3) + ")", warm * .4)
+             + " 0%, rgba(255,190,130," + (0.10 * lamp).toFixed(3) + ") 46%, rgba(255,190,130,0) 100%)";
+
+  /* 4.7 湿气与暗角：雾/雨加重浑浊，日光下暗角退场 */
+  v.haze = "radial-gradient(120% 78% at " + (62 + sx / 12).toFixed(0) + "% " + (44 + sy / 12).toFixed(0) + "%," +
+           String(v.hazeWarm) + " 0%, rgba(255,190,120,0) 52%)," +
+           "linear-gradient(180deg," + String(v.hazeTop) + "," +
+           "rgba(0,0,0,0) 34%," + (L > .5 ? "rgba(0,0,0,0)" : "rgba(0,0,0,.42)") + ")";
+  var vr0 = hx(P_DARK.vigC), vr1 = hx(P_LIGHT.vigC);
+  var vr = [0,1,2].map(function(i){ return Math.round(lerp(vr0[i], vr1[i], L)); });
+  v.vig = "radial-gradient(112% 76% at " + (62 + sx / 14).toFixed(0) + "% " + (42 + sy / 14).toFixed(0) + "%," +
+          "rgba(0,0,0,0) 40%, rgba(" + vr[0] + "," + vr[1] + "," + vr[2] + "," + v.vigA.toFixed(2) + ") 100%)";
+  v.grainA = lerp(P_DARK.grainA * (1 + fog * .6 + wet * .3), P_LIGHT.grainA, L);
+
+  /* 4.8 命名：这一刻属于哪个"光名" */
+  var name;
+  if (alt >= 30) name = "白昼";
+  else if (alt >= 8) name = "低角度日光";
+  else if (alt >= 0) name = "日出 / 日落";
+  else if (alt >= -6) name = "民用暮光";
+  else if (alt >= -15) name = "蓝调";
+  else name = "深夜";
+  v._name = name;
+  v._L = L; v._warm = warm; v._cloudy = cloudy; v._wet = wet; v._snow = snow; v._fog = fog;
+  v._paper = PAPER;
+  v._mode = PAPER ? "日光模式（纸）" : "夜行模式（深）";
+  return v;
+}
+
+/* ---------- 5. 应用到 DOM ---------- */
+var root = document.getElementById("sA");
+function apply(v){
+  var s = root.style;
+  ["bg","mapBg","blkA","blkB","roadCasing","roadMajor","roadMinor","roadHighway","water","waterEdge",
+   "parkFill","parkEdge","place","placeDim","haze","vig","grainA","grainBlend","routeHi","routeLo",
+   "dangerPool","dangerRing","danger","dangerInk","ok","okPool","okGlow","ink","sbTx","pillBg",
+   "pillBd","pillTx","layBg","layBd","layTx","layOnBg","layOnTx","sheetGrad","sheetTx","sheetMut",
+   "hair","grab","qaBg","qaHot","qaTx","qaHotTx","qaTxL","qaHotTxL","qaShadow","sheetShadow",
+   "pinDisc","pinInk","ringArc","ringTrack","ringTick","shadowC","pinL","pinShadow","ruleC","ruleC2",
+   "lampGlow"].forEach(function(k){
+    if (v[k] !== undefined) s.setProperty("--" + k, String(v[k]));
+  });
+  document.getElementById("caster").style.transform =
+    "translate(" + v._casterX + "px," + v._casterY + "px)";
+  var pc1 = "radial-gradient(circle," + rgbaOf(v.poolC, v.poolA1) + "," + rgbaOf(v.poolC, 0) + " 66%)";
+  var pc2 = "radial-gradient(circle," + rgbaOf(v.poolC, v.poolA2) + "," + rgbaOf(v.poolC, 0) + " 68%)";
+  document.getElementById("p1").style.background = pc1;
+  document.getElementById("p2").style.background = pc2;
+  document.getElementById("p3").style.background = pc2;
+  var lampP = "radial-gradient(circle," + rgbaOf("#FFC98A", .30 * v._lamp) + "," + rgbaOf("#FFC98A", 0) + " 68%)";
+  document.getElementById("lampPool").style.background = v._lamp > .25 ? lampP : "none";
+  document.getElementById("lampBloom").setAttribute("fill", "none");
+  document.getElementById("routeGlow").style.opacity = (1 - v._L * .8).toFixed(2);
+  document.getElementById("pillWx").textContent = Math.round(WX.temp) + "° " + WX.desc;
+  document.querySelector(".sb").firstChild.textContent = CLOCK.label;
+}
+/* 给带 alpha 的颜色也上色温，同时保住 alpha */
+function toneA(col, warm){
+  var m = String(col).match(/rgba?\(([^)]+)\)/);
+  if (!m) return col;
+  var p = m[1].split(",").map(parseFloat);
+  var t = tone("rgb(" + p[0] + "," + p[1] + "," + p[2] + ")", warm).match(/(\d+),\s*(\d+),\s*(\d+)/);
+  if (!t) return col;
+  var a = (p.length > 3) ? p[3] : 1;
+  return "rgba(" + t[1] + "," + t[2] + "," + t[3] + "," + a + ")";
+}
+function rgbaOf(col, a){
+  if (col.charAt(0) === "#"){
+    var c = hx(col);
+    return "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + (+a).toFixed(3) + ")";
+  }
+  var m = col.match(/(\d+),\s*(\d+),\s*(\d+)/);
+  return m ? "rgba(" + m[1] + "," + m[2] + "," + m[3] + "," + (+a).toFixed(3) + ")" : col;
+}
+
+/* ---------- 6. 真实数据 ---------- */
+var DATA = null, WX = { temp: 12, desc: "—" }, CLOCK = { h: 12, label: "12:00", live: true };
+var OFF = {   /* 取不到网络时的离线样本（会明确标注"离线"） */
+  timezone_offset: 8, isOffline: true,
+  current: { time: "2026-09-21T17:45", temperature_2m: 22, weather_code: 3, cloud_cover: 60, is_day: 1 },
+  hourly: { time: [], is_day: [], temperature_2m: [], cloud_cover: [], weather_code: [], shortwave_radiation: [] },
+  daily: { sunrise: ["2026-09-21T06:00"], sunset: ["2026-09-21T18:13"] }
+};
+(function offlineFill(){
+  for (var h = 0; h < 24; h++){
+    OFF.hourly.time.push("2026-09-21T" + (h<10?"0":"") + h + ":00");
+    var s = solarPos(Date.UTC(2026,8,20,h-8,0,0), CAR.lat, CAR.lon);
+    OFF.hourly.is_day.push(s.alt > 0 ? 1 : 0);
+    OFF.hourly.temperature_2m.push(Math.round(12 + 12 * Math.max(0, s.alt) / 60));
+    OFF.hourly.cloud_cover.push(45);
+    OFF.hourly.weather_code.push(2);
+    OFF.hourly.shortwave_radiation.push(Math.max(0, 640 * Math.sin(rad(Math.max(0,s.alt)))));
+  }
+})();
+
+function localNow(){
+  var p = new Intl.DateTimeFormat("en-CA", { timeZone: CAR.tz, hour12: false,
+    year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" }).formatToParts(new Date());
+  var o = {}; p.forEach(function(x){ o[x.type] = x.value; });
+  return { y:+o.year, mo:+o.month, d:+o.day, h:+o.hour % 24, mi:+o.minute };
+}
+/* 本地时刻 → UTC 毫秒（Asia/Shanghai 无夏令时） */
+function localToUtcMs(y, mo, d, h, mi){ return Date.UTC(y, mo - 1, d, h - CAR.tzOffset, mi || 0); }
+
+fetch("https://api.open-meteo.com/v1/forecast?latitude=" + CAR.lat + "&longitude=" + CAR.lon +
+  "&current=temperature_2m,weather_code,cloud_cover,is_day,shortwave_radiation" +
+  "&hourly=is_day,temperature_2m,cloud_cover,weather_code,shortwave_radiation" +
+  "&daily=sunrise,sunset&timezone=Asia%2FShanghai&forecast_days=1")
+  .then(function(r){ return r.json(); })
+  .then(function(j){ DATA = j; DATA.isOffline = false; boot(); })
+  .catch(function(){ DATA = OFF; boot(); });
+
+/* ---------- 7. 状态与渲染 ---------- */
+var HOUR = 12, OVERRIDE = null, SOLAR_TODAY = [];
+function hourState(idx){
+  var H = DATA.hourly;
+  var n = localNow();
+  var ms = localToUtcMs(n.y, n.mo, n.d, idx, 0);
+  var s = solarPos(ms, CAR.lat, CAR.lon);
+  var R = H.shortwave_radiation && H.shortwave_radiation[idx] != null ? H.shortwave_radiation[idx] : 0;
+  var C = H.cloud_cover ? H.cloud_cover[idx] : 50;
+  var W = H.weather_code ? H.weather_code[idx] : 0;
+  var T = H.temperature_2m ? H.temperature_2m[idx] : 0;
+  if (OVERRIDE){ C = OVERRIDE.cloud; W = OVERRIDE.code; }
+  return { hour: idx, ms: ms, alt: s.alt, az: s.az, rad: R, cloud: C, code: W, temp: T,
+           live: idx === localNow().h };
+}
+function findHour(){
+  var H = DATA.hourly.time || [];
+  if (!H.length) return 12;
+  var n = localNow(), want = n.y + "-" + String(n.mo).padStart(2,"0") + "-" + String(n.d).padStart(2,"0") +
+    "T" + String(n.h).padStart(2,"0") + ":00";
+  var i = H.indexOf(want);
+  return i >= 0 ? i : n.h;
+}
+function dayRadiation(){
+  var H = DATA.hourly.shortwave_radiation || [];
+  var s = 0; H.forEach(function(x){ s += (x || 0) * 3600; });
+  return s / 3600000;   /* kWh/m² */
+}
+function render(){
+  var st = hourState(HOUR);
+  var v = lightModel(st);
+  WX = { temp: st.temp, desc: WMO[st.code] || ("码 " + st.code) };
+  var hh = String(st.hour).padStart(2,"0");
+  var live = (HOUR === localNow().h) && !OVERRIDE;
+  CLOCK = { h: st.hour, label: hh + ":00", live: live };
+  apply(v);
+  document.getElementById("status").innerHTML =
+    "光 = <b>" + (DATA.isOffline ? "离线样本" : (live ? "实时" : "回放")) + "</b>" +
+    "<span>" + CLOCK.label + "</span>" +
+    "<span>" + WMO[st.code] + " · 云量 " + Math.round(st.cloud) + "% · " + Math.round(st.temp) + "°</span>" +
+    "<span>辐照度 <b>" + Math.round(st.rad) + "</b> W/m²</span>" +
+    "<span>太阳高度 <b>" + st.alt.toFixed(1) + "°</b> · 方位 " + Math.round(st.az) + "°</span>" +
+    (OVERRIDE ? '<span class="sim">天气为假设</span>' :
+      (DATA.isOffline ? '<span class="err">取不到实时数据，用离线样本</span>' :
+        '<span class="live">Open-Meteo 实时</span>'));
+  paintStrip();
+  paintReasons(st, v);
+  document.getElementById("h").value = st.hour;
+  var sw = document.querySelectorAll(".sw");
+  [].forEach.call(sw, function(e, i){ e.classList.toggle("on", i === st.hour); });
+}
+function paintStrip(){
+  var strip = document.getElementById("strip");
+  if (strip.children.length !== 24){
+    strip.innerHTML = "";
+    for (var i = 0; i < 24; i++){
+      var b = document.createElement("button");
+      b.className = "sw"; b.type = "button";
+      b.innerHTML = '<i></i>' + (i % 3 === 0 ? "<span>" + i + "</span>" : "");
+      b.addEventListener("click", (function(k){ return function(){ HOUR = k; render(); }; })(i));
+      strip.appendChild(b);
+    }
+  }
+  [].forEach.call(strip.children, function(b, i){
+    var st = hourState(i), v = lightModel(st);
+    /* 光样 = 那一刻「光落在图上」的样子，不是底色：所以把它画成一束光 */
+    b.style.background = "radial-gradient(circle at 50% 42%," + rgbaOf(v.poolC, Math.min(.85, Math.max(.12, v.poolA1 * 3.4))) +
+      "," + v.mapBg + " 76%)";
+    var icon = b.querySelector("i");
+    icon.style.top = (32 - clamp((st.alt + 18) / 90, 0, 1) * 30).toFixed(0) + "px";
+    icon.style.background = st.alt > 0 ? "#FFF0CF" : "#9FB6D8";
+  });
+}
+function paintReasons(st, v){
+  var lamp = Math.round(v._lamp * 100), env = Math.round(v._L * 100);
+  var dirs = ["北","东北","东","东南","南","西南","西","西北"];
+  var dir = dirs[Math.round(st.az / 45) % 8];
+  var rows = [
+    ["太阳高度角", st.alt.toFixed(1) + "°<em>" + v._name + "</em>"],
+    ["太阳方位角", Math.round(st.az) + "°<em>" + dir + " → 光落在" + dir + "侧，阴影反侧</em>"],
+    ["辐照度", Math.round(st.rad) + " W/m²<em>约正午的 " + Math.round(st.rad / 900 * 100) + "%；< 95 即夜行模式，> 205 即纸</em>"],
+    ["云量", Math.round(st.cloud) + "%<em>街区与底色靠拢 " + Math.round(st.cloud * .55) + "%，对比度下降</em>"],
+    ["天气码", st.code + " " + WMO[st.code] +
+      "<em>" + (v._wet ? "地面加湿反光" : v._snow ? "地面提亮、天空去色" : v._fog ? "整体推远、对比压低" : "无额外影响") + "</em>"],
+    ["天气影响", (v._wet ? "雨" : v._snow ? "雪" : v._fog ? "雾" : "无") +
+      "<em>光池强度 " + (v.poolA1 * 100).toFixed(1) + "%</em>"],
+    ["光的方向", v._casterX + "," + v._casterY + " px<em>半径 " + Math.round(Math.sqrt(v._casterX*v._casterX + v._casterY*v._casterY)) +
+      "px：太阳越低越斜（影子越长），正午几乎垂直所以光回到中心</em>"],
+    ["车灯亮度", lamp + "%<em>1 − 辐照度/220：日照下不该开车灯</em>"],
+    ["界面模式", v._mode + "<em>辐照度 > 150 W/m² 切到纸；95–205 之间完成（真实日落前后约半小时）</em>"],
+    ["今日日照", dayRadiation().toFixed(2) + " kWh/m²<em>由逐时辐照度积分（真实数据）</em>"]
+  ];
+  document.getElementById("reasons").innerHTML = rows.map(function(r){
+    return '<div class="row"><span class="k">' + r[0] + '</span><span class="v">' + r[1] + '</span></div>';
+  }).join("");
+}
+var CHIPS = [{n:"实时",o:null},{n:"晴",o:{code:0,cloud:4}},{n:"阴",o:{code:3,cloud:92}},
+  {n:"小雨",o:{code:61,cloud:96}},{n:"雪",o:{code:73,cloud:93}},{n:"雾",o:{code:45,cloud:80}}];
+function paintChips(){
+  var box = document.getElementById("chips");
+  box.innerHTML = "";
+  CHIPS.forEach(function(c, i){
+    var b = document.createElement("button");
+    b.className = "chip"; b.type = "button"; b.textContent = c.n;
+    b.addEventListener("click", function(){
+      OVERRIDE = c.o; HOUR = (c.o === null) ? findHour() : HOUR;
+      [].forEach.call(box.children, function(x, j){ x.classList.toggle("on", j === i); });
+      render();
+    });
+    if (c.o === null) b.classList.add("on");
+    box.appendChild(b);
+  });
+}
+function boot(){
+  HOUR = findHour();
+  paintChips();
+  document.getElementById("h").addEventListener("input", function(e){ HOUR = +e.target.value; render(); });
+  document.getElementById("h").max = 23;
+  render();
+  setInterval(function(){ if (HOUR === localNow().h && !OVERRIDE) render(); }, 60000);
+}
+/* 供核验：把真太阳位置暴露出来，便于与权威日出日落对照 */
+window.LIGHT = { solarPos: solarPos, hourState: hourState, lightModel: lightModel,
+  get hour(){ return HOUR; }, set hour(v){ HOUR = v; render(); }, render: render,
+  localToUtcMs: localToUtcMs, findHour: findHour, dayRadiation: dayRadiation,
+  get data(){ return DATA; }, get override(){ return OVERRIDE; },
+  setWeather: function(n){ for (var i = 0; i < CHIPS.length; i++) if (CHIPS[i].n === n){
+    OVERRIDE = CHIPS[i].o; document.querySelectorAll("#chips .chip").forEach(function(x, j){
+      x.classList.toggle("on", j === i); }); render(); return true; } return false; } };
+</script>
+</body>
+</html>
