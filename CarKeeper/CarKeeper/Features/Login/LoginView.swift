@@ -113,8 +113,11 @@ struct LoginView: View {
     }
 
     // MARK: - 表单卡片
+    // 这里原本是 `GlassCard { … }` —— 那个类型在清理设计文件时被误判为「零引用」删掉了
+    // （grep 只看了 `GlassCard(` 这类写法，漏了「类型名 + 尾随闭包」这种容器用法）。
+    // 改用 v4 的 DSCard：不透明表面，padding 交给内层 VStack 自己控制。
     private var formCard: some View {
-        GlassCard {
+        DSCard(padding: 0, radius: TokensRadius.large) {
             VStack(spacing: TokensSpacing.lg) {
                 // 手机号输入
                 VStack(alignment: .leading, spacing: TokensSpacing.xs) {

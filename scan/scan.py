@@ -52,6 +52,13 @@ TYPE_REF = re.compile(r"(?::[ \t]*|->[ \t]*|\[\s*|<\s*|as[?!][ \t]*|is[ \t]+|&[ 
 CALL_REF = re.compile(r"(?<![A-Za-z0-9_.$])([A-Z][A-Za-z0-9_]*)\s*\(")
 METHOD_REF = re.compile(r"\.([a-z_][A-Za-z0-9_]*)\s*\(")
 MEMBER_REF = re.compile(r"(?<![A-Za-z0-9_.])([A-Z][A-Za-z0-9_]*)\.([a-z_][A-Za-z0-9_]*)")
+# 行首的「类型名 + 尾随闭包」：ViewBuilder 容器的标准写法（`VStack { }`、`DSCard { }`）。
+# 它既不是 TYPE_REF（前面没有 `:` `->` `[` `<` `as!` `is` `&`），也不是 CALL_REF（没有括号），
+# 所以旧版**完全看不见它** —— 2026-09-21 的 LoginView `GlassCard {`（编译报
+# "cannot find 'GlassCard' in scope"）就是这样溜到 macOS runner 上的：删文件时以为
+# 无人引用（当时 grep 只看 `GlassCard(` 这类写法），编译器不这么想。
+# 分析基线时用同一个正则，所以常用容器名会经 bref 进入白名单，不会新增假阳性。
+TRAILING_CLOSURE_REF = re.compile(r"(?m)^[ \t]*([A-Z][A-Za-z0-9_]*)[ \t]*\{")
 
 
 def read(p):
@@ -275,6 +282,8 @@ def analyze(paths):
                 problems.setdefault(p.name, []).append(f"L{i} 顶格可疑行: {s[:80]}")
 
         for m2 in TYPE_REF.finditer(cleaned):
+            refs.add(m2.group(1))
+        for m2 in TRAILING_CLOSURE_REF.finditer(cleaned):
             refs.add(m2.group(1))
         for m2 in CALL_REF.finditer(cleaned):
             calls[m2.group(1)] = calls.get(m2.group(1), 0) + 1
