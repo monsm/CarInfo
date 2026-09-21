@@ -135,7 +135,6 @@ struct SplitView<Sidebar: View, Detail: View>: View {
     }
 
     var body: some View {
-        #if os(iOS)
         GeometryReader { geometry in
             if geometry.size.width > 768 {
                 HStack(spacing: 0) {
@@ -147,9 +146,6 @@ struct SplitView<Sidebar: View, Detail: View>: View {
                 detail
             }
         }
-        #else
-        detail
-        #endif
     }
 }
 

@@ -81,10 +81,8 @@ struct CarKeeperApp: App {
         WindowGroup {
             root
         }
-        #if os(iOS) && os(macOS)
-        // #47 iPad Split View 支持
+        // #47 iPad Split View 支持（原写成 `os(iOS) && os(macOS)` 恒为假，导致该场景从未注册）
         WindowGroup(id: "detail") { DetailSplitView() }
-        #endif
     }
 
     // #NEW-112 启动画面控制
@@ -446,7 +444,6 @@ struct MainTabView: View {
 }
 
 // MARK: - #47 iPad Split View 支持
-#if os(iOS) && os(macOS)
 struct DetailSplitView: View {
     @StateObject private var nav = NavState.shared
     private let store = AppStore.shared
@@ -460,7 +457,6 @@ struct DetailSplitView: View {
         }
     }
 }
-#endif
 
 // MARK: - NetworkStatusIndicator
 struct NetworkStatusIndicator: View {

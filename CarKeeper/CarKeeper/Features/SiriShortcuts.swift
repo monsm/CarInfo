@@ -85,7 +85,6 @@ struct SiriCarController {
 // MARK: - Intent 定义（需在 Intents Extension 中实现）
 
 // 锁车/解锁
-@available(iOS 12.0, *)
 class CarLockIntent: INIntent {
     var locked: Bool?
     override init() { super.init() }
@@ -93,7 +92,6 @@ class CarLockIntent: INIntent {
 }
 
 // 空调控制
-@available(iOS 12.0, *)
 class CarSetAirConditioningIntent: INIntent {
     var airConditioningOn: Bool?
     override init() { super.init() }
@@ -101,7 +99,6 @@ class CarSetAirConditioningIntent: INIntent {
 }
 
 // 寻车
-@available(iOS 12.0, *)
 class CarFindIntent: INIntent {
     override init() { super.init() }
     required init?(coder: NSCoder) { fatalError() }

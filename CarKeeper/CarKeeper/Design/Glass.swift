@@ -1,7 +1,7 @@
 // =============================================================================
 // Glass.swift — 玻璃组件
 // 玻璃只出现在「浮在内容之上」的层：导航栏、Tab 栏、弹层
-// iOS 15+ 支持 backdrop-filter，旧版本降级为纯色
+// 基线 iOS 26：直接使用 Material（无需 backdrop-filter 降级分支）
 // =============================================================================
 import SwiftUI
 
@@ -16,18 +16,13 @@ struct GlassBackground: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        if #available(iOS 15, *) {
-            content
-                .background(
-                    Material.thickMaterial
-                        .blendMode(.overlay)
-                )
-                .background(Color.white.opacity(thickness / 100))
-                .blur(radius: blur)
-        } else {
-            content
-                .background(Color.black.opacity(0.3))
-        }
+        content
+            .background(
+                Material.thickMaterial
+                    .blendMode(.overlay)
+            )
+            .background(Color.white.opacity(thickness / 100))
+            .blur(radius: blur)
     }
 }
 
@@ -46,29 +41,18 @@ struct GlassCard<Content: View>: View {
     }
 
     var body: some View {
-        if #available(iOS 15, *) {
-            content()
-                .padding(Kansei.Spacing.md)
-                .background(
-                    Material.ultraThinMaterial
-                )
-                .background(Color.white.opacity(0.05))
-                .cornerRadius(cornerRadius)
-                .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(Kansei.Color.glassBorder, lineWidth: 1)
-                        .opacity(showBorder ? 1 : 0)
-                )
-        } else {
-            content()
-                .padding(Kansei.Spacing.md)
-                .background(Color.white.opacity(0.08))
-                .cornerRadius(cornerRadius)
-                .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(Kansei.Color.glassBorder, lineWidth: 1)
-                )
-        }
+        content()
+            .padding(Kansei.Spacing.md)
+            .background(
+                Material.ultraThinMaterial
+            )
+            .background(Color.white.opacity(0.05))
+            .cornerRadius(cornerRadius)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Kansei.Color.glassBorder, lineWidth: 1)
+                    .opacity(showBorder ? 1 : 0)
+            )
     }
 }
 
@@ -86,32 +70,20 @@ struct GlassNavBar: View {
 
     var body: some View {
         HStack {
-            if #available(iOS 15, *) {
-                Text(title)
-                    .font(KanseiTypo.title).fontWeight(.semibold)
-                    .foregroundColor(Kansei.Color.primary)
+            Text(title)
+                .font(KanseiTypo.title).fontWeight(.semibold)
+                .foregroundColor(Kansei.Color.primary)
 
-                if let subtitle {
-                    Text(subtitle)
-                        .font(KanseiTypo.caption)
-                        .foregroundColor(Kansei.Color.tertiary)
-                }
+            if let subtitle {
+                Text(subtitle)
+                    .font(KanseiTypo.caption)
+                    .foregroundColor(Kansei.Color.tertiary)
+            }
 
-                Spacer()
+            Spacer()
 
-                if let trailing = trailing {
-                    trailing()
-                }
-            } else {
-                Text(title)
-                    .font(KanseiTypo.title).fontWeight(.semibold)
-                    .foregroundColor(Kansei.Color.primary)
-
-                Spacer()
-
-                if let trailing = trailing {
-                    trailing()
-                }
+            if let trailing = trailing {
+                trailing()
             }
         }
         .padding(.horizontal, Kansei.Spacing.md)
@@ -136,27 +108,17 @@ struct GlassBottomBar<Content: View>: View {
     }
 
     var body: some View {
-        if #available(iOS 15, *) {
-            content()
-                .padding(.horizontal, Kansei.Spacing.md)
-                .padding(.vertical, Kansei.Spacing.sm)
-                .background(
-                    Material.thickMaterial
-                        .blendMode(.overlay)
-                )
-                .background(Color.black.opacity(0.15))
-                .overlay(alignment: .top) {
-                    DSDivider()
-                }
-        } else {
-            content()
-                .padding(.horizontal, Kansei.Spacing.md)
-                .padding(.vertical, Kansei.Spacing.sm)
-                .background(Color.black.opacity(0.3))
-                .overlay(alignment: .top) {
-                    DSDivider()
-                }
-        }
+        content()
+            .padding(.horizontal, Kansei.Spacing.md)
+            .padding(.vertical, Kansei.Spacing.sm)
+            .background(
+                Material.thickMaterial
+                    .blendMode(.overlay)
+            )
+            .background(Color.black.opacity(0.15))
+            .overlay(alignment: .top) {
+                DSDivider()
+            }
     }
 }
 

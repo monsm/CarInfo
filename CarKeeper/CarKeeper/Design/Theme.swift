@@ -97,7 +97,7 @@ enum Theme {
     }
 
     // =============================================================================
-    // 一、字号体系（Typography Scale）— iOS 27 Dynamic Type 兼容
+    // 一、字号体系（Typography Scale）— 适配 Dynamic Type
     // =============================================================================
     // 基准字号：17pt（iOS 标准正文）
     // 比例：1.25（Major Third）
@@ -797,14 +797,12 @@ extension ContentSizeCategory {
     }
 }
 
-// MARK: - DynamicTypeSize (iOS 17+) compatibility alias
-#if swift(>=5.9)
+// MARK: - DynamicTypeSize 辅助判断（基线 iOS 26 / Swift 6，无需版本分支）
 extension DynamicTypeSize {
     var isLargeOrBigger: Bool {
         self != .xSmall && self != .small
     }
 }
-#endif
 
 // =============================================================================
 // Page State Views —— 统一的加载 / 错误 / 空状态展示组件
