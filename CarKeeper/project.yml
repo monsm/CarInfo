@@ -27,10 +27,9 @@ targets:
     resources:
     - path: CarKeeper/Resources/Assets.xcassets
       group: Resources/Assets.xcassets
-    - path: CarKeeper/Resources/en.lproj
-      group: Resources/en.lproj
-    - path: CarKeeper/Resources/zh-Hans.lproj
-      group: Resources/zh-Hans.lproj
+    # 原本这里还有 en.lproj / zh-Hans.lproj 两条资源 —— 但两个目录是空的
+    # （一个 .strings 都没有），而且在干净检出里根本不存在（只有开发机的未跟踪目录）。
+    # CFBundleLocalizations 只声明 zh_CN，界面文案全部是内联中文，所以这两条是死配置。
     info:
       path: CarKeeper/Resources/Info.plist
       properties:
