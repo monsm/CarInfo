@@ -34,7 +34,9 @@ Swift 在 `是"` 处提前结束字符串，接着把 `去掉` 当成标识符�
 （这个检查器的第一版正是这样，55 处假阳性）。所以下面用**栈**来做：
 进插值压栈并数括号，括号配平就弹回字符串。
 
-顺带抓到的同族错误：字符串在行内未闭合、文件结束时字符串未闭合、全角标点写进代码。
+顺带抓到的同族错误：字符串在行内未闭合、文件结束时字符串未闭合、全角标点写进代码、
+「孤儿属性行」（真实发生过：批量删除声明块后留下光秃秃的 `@Model`，编译器只在文件尾报
+`expected declaration`，与原因毫无关系 —— AppDataModel.swift，CI 才抓到）。
 """
 import sys
 from pathlib import Path
@@ -186,20 +188,65 @@ def scan(path):
     return bad
 
 
+# ---------------------------------------------------------------------------
+# 孤儿属性行：整行恰好是一个声明属性，而它后面再没有声明 —— 编译必报错。
+# 判据刻意收窄到「整行 = 属性名」以避免假阳性：`@objc private func x()`
+# 这种同行写法不算；只有批量删除声明块时才会留下这种光秃秃的行。
+# 属性后面允许再跟一行属性（如 @Model 下一行是 @available），
+# 但链条的末端必须见到真正的声明关键字。
+# ---------------------------------------------------------------------------
+ORPHAN_ATTRS = {"@Model", "@main", "@objc", "@objcMembers", "@discardableResult",
+                "@IBAction", "@IBOutlet", "@NSManaged"}
+DECL_KEYWORDS = ("class ", "struct ", "enum ", "actor ", "func ", "extension ",
+                 "typealias ", "final ", "public ", "private ", "internal ",
+                 "fileprivate ", "open ", "static ", "var ", "let ")
+
+
+def orphan_attrs(path):
+    """返回 [(行号, 说明)]。只看「整行恰好是声明属性」的行。"""
+    lines = Path(path).read_text(encoding="utf-8").replace("\r\n", "\n").split("\n")
+    bad = []
+    for i, raw in enumerate(lines):
+        t = raw.strip()
+        if t not in ORPHAN_ATTRS:
+            continue
+        # 向后找第一个非空、非注释行
+        j = i + 1
+        while j < len(lines) and (not lines[j].strip() or lines[j].strip().startswith(("//", "/*", "*"))):
+            j += 1
+        nxt = lines[j].strip() if j < len(lines) else ""
+        if not nxt:
+            bad.append((i + 1, f"{t} 之后直到文件尾都没有任何声明"))
+        elif not (nxt.startswith("@") or nxt.startswith(DECL_KEYWORDS)):
+            bad.append((i + 1, f"{t} 后面跟的是『{nxt[:40]}』而不是声明（属性后面只能再跟属性或声明）"))
+    return bad
+
+
 def main():
     files = sorted({str(p) for tk in TK for p in Path(tk).rglob("*.swift")})
     hits = [(f, ln, why) for f in files for ln, why in scan(f)]
+    orphans = [(f, ln, why) for f in files for ln, why in orphan_attrs(f)]
 
     print(f"扫描 {len(files)} 个 Swift 文件（状态机：代码 / 注释 / 字符串 / 多行字符串 / 插值）")
-    print(f"字符串边界错误：{len(hits)} 处")
-    if not hits:
+    print(f"字符串边界错误：{len(hits)} 处；孤儿属性行：{len(orphans)} 处")
+    if not hits and not orphans:
         print("\n✅ 无『中文出现在代码位置』（嵌套双引号 / 未闭合字符串 / 全角标点）")
+        print("✅ 无『孤儿属性行』（删除声明块后残留的 @Model / @main 等）")
         return 0
-    print("\n❌ 中文出现在代码位置 —— 字符串边界错了，编译器会报一个与原因无关的错误：")
     for f, ln, why in hits:
+        print(f"\n❌ 字符串边界错误（编译器会报一个与原因无关的错误）：")
         print(f"   {f}:{ln}")
         print(f"       {why}")
-    print("\n修法：把内层的 ASCII 双引号换成中文引号「」（或转义成 \\\"）。")
+        break
+    for f, ln, why in orphans:
+        print(f"\n❌ 孤儿属性行（声明块被删后属性成了无主行，报 expected declaration）：")
+        print(f"   {f}:{ln}")
+        print(f"       {why}")
+        break
+    if hits:
+        print("\n修法：把内层的 ASCII 双引号换成中文引号「」（或转义成 \\\"）。")
+    if orphans:
+        print("\n修法：把残留的属性行连同它原属的声明一起删掉（属性不是独立语句）。")
     return 1
 
 

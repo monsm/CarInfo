@@ -66,17 +66,6 @@ class TripRecord {
     var socChange: Int { max(0, startSoc - endSoc) }
 }
 
-@Model
-
-@Model
-
-@Model
-
-// MARK: - ModelContainer 工厂方法
-
-
-// MARK: - 仓库类
-
 
 
 
