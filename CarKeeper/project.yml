@@ -3,7 +3,7 @@ options:
   bundleIdPrefix: com.you
   deploymentTarget:
     iOS: '26.0'
-    watchOS: '10.0'
+    watchOS: '26.0'
   createIntermediateGroups: true
 settings:
   base:
@@ -157,7 +157,7 @@ targets:
         GENERATE_INFOPLIST_FILE: 'YES'
         ENABLE_PREVIEWS: 'NO'
         CODE_SIGNING_ALLOWED: 'NO'
-        WATCHOS_DEPLOYMENT_TARGET: '10.0'
+        WATCHOS_DEPLOYMENT_TARGET: '26.0'
     dependencies:
     - target: CarKeeper
   WatchKitApp:
@@ -177,7 +177,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper.watchkitapp
         PRODUCT_NAME: WatchKitApp
         CODE_SIGN_ENTITLEMENTS: WatchApp/WatchApp.entitlements
-        WATCHOS_DEPLOYMENT_TARGET: '10.0'
+        WATCHOS_DEPLOYMENT_TARGET: '26.0'
         GENERATE_INFOPLIST_FILE: 'NO'
     dependencies:
     - target: WatchApp

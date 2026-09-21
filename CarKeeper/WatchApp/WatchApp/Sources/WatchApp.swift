@@ -1,11 +1,14 @@
 // =============================================================================
-// Watch App — #29 Apple Watch 完整实现（WatchKit Extension）
-// 创建 WatchKit Extension Target 后，将此文件内容复制到 Extension 中
+// Watch App — #29 Apple Watch 完整实现
+// 基线 watchOS 26（与 iOS 26 同一代系统），纯 SwiftUI App 生命周期
 // 支持：SOC显示、锁车、开空调、寻车、里程统计
+//
+// ⚠️ 本文件与 WatchApp/WatchApp/Sources/WatchApp.swift 是同一份代码的两个拷贝
+//    （WatchApp target = WatchKit 扩展，WatchKitApp target = 手表 App），
+//    修改时必须两份同步，否则手表端与扩展端行为会分叉。
 // =============================================================================
 
 import SwiftUI
-import WatchKit
 import Foundation
 
 // MARK: - Watch App Entry
@@ -278,8 +281,6 @@ struct WatchProfileView: View {
 
 // MARK: - 预览
 
-struct WatchRoute_Previews: PreviewProvider {
-    static var previews: some View {
-        WatchRoute()
-    }
+#Preview {
+    WatchRoute()
 }
