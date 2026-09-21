@@ -478,28 +478,6 @@ struct FluidHeroFont: View {
     }
 }
 
-/// 流体温度数字（空调 HeroDisc 专用）
-/// 在 80pt 圆形容器内自适应缩放，最小 30pt / 最大 44pt
-struct FluidTempHero: View {
-    let text: String
-    let minSize: CGFloat
-    let maxSize: CGFloat
-
-    init(_ text: String, minSize: CGFloat = 30, maxSize: CGFloat = 44) {
-        self.text = text
-        self.minSize = minSize
-        self.maxSize = maxSize
-    }
-
-    var body: some View {
-        FluidHeroFont(
-            text,
-            unit: nil,
-            minSize: minSize,
-            maxSize: maxSize
-        )
-    }
-}
 
 // =============================================================================
 // Dynamic Type —— 大字体模式自适应工具

@@ -131,11 +131,6 @@ struct TokenConfig: Codable {
 
 // MARK: - 页面模型（原始报文 → 可渲染结构）
 
-struct CarSel: Identifiable {
-    let id: String
-    let name: String
-    var car: [String: Any]?
-}
 
 struct EnergyModel {
     var soc: String

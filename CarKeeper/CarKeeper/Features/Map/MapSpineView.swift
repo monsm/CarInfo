@@ -30,6 +30,9 @@ import CoreLocation
 struct MapSpineView: View {
     private let store = AppStore.shared
     @EnvironmentObject private var nav: NavState
+    /// iPad 分栏用（SceneID.detail 的场景声明在 CarKeeperApp.swift）
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     @AppStorage(ArtThemeStore.key) private var themeRaw: String = ArtTheme.native.rawValue
     /// 记住上次看的图层（地图主屏的"当前位置"应该被记住，不该每次回到默认）
@@ -559,6 +562,20 @@ struct MapSpineView: View {
             }
             .disabled(d.hasLocation == false)
             .accessibilityLabel(Text("回到车的位置"))
+        }
+        // iPad：把车况另开一个窗口。场景声明在 CarKeeperApp（WindowGroup(id: SceneID.detail)），
+        // 能不能真开由平台 + Info.plist 的 UIApplicationSupportsMultipleScenes 决定 ——
+        // 所以这里只在常规宽度（iPad）出现，iPhone 上不摆一个必然失败的按钮。
+        if sizeClass == .regular {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    TokensHaptic.tap()
+                    openWindow(id: SceneID.detail)
+                } label: {
+                    Image(systemName: "rectangle.on.rectangle")
+                }
+                .accessibilityLabel(Text("在新窗口打开车况"))
+            }
         }
     }
 

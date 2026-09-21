@@ -179,7 +179,7 @@ extension ArtTheme { var mapSpec: MapStyleSpec { … } }
 
 | 文件 | 它负责什么 |
 |---|---|
-| `CarKeeper/Design/MapStyleSpec.swift` | 艺术方向 → **真实 MapKit 配置**（本文件就是上面那张对应表的代码形态）+ UIKit 侧 `MapKitConfigurator` |
+| `CarKeeper/Design/MapStyleSpec.swift` | 艺术方向 → **真实 MapKit 配置**（本文件就是上面那张对应表的代码形态） |
 | `CarKeeper/Features/Map/MapSpineData.swift` | 把 AppStore 的真实字段翻译成地图画得出来的东西（每个字段注明来自哪个接口；没有数据就是 nil，不用默认值填空） |
 | `CarKeeper/Features/Map/MapCarPin.swift` | 车钉（外面那圈弧就是电量、缺口就是真实 Heading）+ 停车/充电/异常三类小钉 |
 | `CarKeeper/Features/Map/MapSpineView.swift` | 地图主屏：四个图层（现在/行程/停车/充电）+ 底部「为什么」面板 + 全部功能索引页 |

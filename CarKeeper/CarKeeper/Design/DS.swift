@@ -449,44 +449,6 @@ struct DSStatRow: View {
     }
 }
 
-/// 紧凑指标（栏内两/三列）：大号超细数字在上、小号灰标签在下
-struct DSStatTile: View {
-    var label: String
-    var value: String
-    var unit: String? = nil
-    var cls: String = "na"
-    var icon: String? = nil
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(value)
-                    .font(TokensTypo.metric(28))
-                    .foregroundStyle(cls == "na" ? TokensPalette.primary : TokensPalette.statusColor(cls))
-                    .contentTransition(.numericText())
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                if let unit {
-                    Text(unit)
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(TokensPalette.secondary)
-                }
-            }
-            HStack(spacing: 4) {
-                if let icon {
-                    Image(safeSymbol: icon, fallback: "circle")
-                        .font(.system(size: 10))
-                }
-                Text(label)
-                    .lineLimit(1)
-            }
-            .font(TokensTypo.caption)
-            .foregroundStyle(TokensPalette.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-    }
-}
 
 /// 设置式行：图标 + 标题/+ 副标题 + 右侧值 + 箭头（iOS 列表的标准行）
 struct DSRow: View {

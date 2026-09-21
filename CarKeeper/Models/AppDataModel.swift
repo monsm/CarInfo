@@ -67,151 +67,16 @@ class TripRecord {
 }
 
 @Model
-class EnergySnapshot {
-    var id: UUID
-    var timestamp: Date
-    var soc: Int
-    var range: Int
-
-    init(timestamp: Date, soc: Int, range: Int) {
-        self.id = UUID()
-        self.timestamp = timestamp
-        self.soc = soc
-        self.range = range
-    }
-}
 
 @Model
-class MaintenancePhoto {
-    var id: UUID
-    var imageData: Data?
-    var capturedAt: Date
-    var notes: String?
-
-    init(imageData: Data?, capturedAt: Date, notes: String?) {
-        self.id = UUID()
-        self.imageData = imageData
-        self.capturedAt = capturedAt
-        self.notes = notes
-    }
-}
 
 @Model
-class UserSettings {
-    var id: UUID = UUID()
-    var darkModeEnabled: Bool = false
-    var reduceMotionEnabled: Bool = false
-    var powerSavingEnabled: Bool = false
-    var nightModeStartHour: Int = 21
-    var nightModeEndHour: Int = 7
-    var lastServiceMileage: Int = 0
-    var defaultTemperature: Int = 22
-
-    init() {}
-}
 
 // MARK: - ModelContainer 工厂方法
 
-enum AppModelContainer {
-    static let shared: ModelContainer = {
-        let schema = Schema([TripRecord.self, EnergySnapshot.self, MaintenancePhoto.self, UserSettings.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        // 不要用 try!：磁盘库损坏、迁移失败或存储不足时，它会在启动阶段直接崩进程。
-        // 退化成内存容器，至少让 App 能起来（当次会话可用，但不落盘）。
-        do {
-            return try ModelContainer(for: schema, configurations: [config])
-        } catch {
-            assertionFailure("ModelContainer 初始化失败：\(error)")
-            return try! ModelContainer(
-                for: schema,
-                configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)]
-            )
-        }
-    }()
-}
 
 // MARK: - 仓库类
 
-class TripRepository {
-    private let container: ModelContainer
 
-    init(container: ModelContainer = AppModelContainer.shared) {
-        self.container = container
-    }
 
-    @MainActor func fetchAll() -> [TripRecord] {
-        let descriptor = FetchDescriptor<TripRecord>(sortBy: [SortDescriptor(\.startTime, order: .reverse)])
-        return (try? container.mainContext.fetch(descriptor)) ?? []
-    }
 
-    @MainActor func add(_ trip: TripRecord) {
-        container.mainContext.insert(trip)
-        try? container.mainContext.save()
-    }
-
-    @MainActor func delete(_ trip: TripRecord) {
-        container.mainContext.delete(trip)
-        try? container.mainContext.save()
-    }
-}
-
-class EnergySnapshotRepository {
-    private let container: ModelContainer
-
-    init(container: ModelContainer = AppModelContainer.shared) {
-        self.container = container
-    }
-
-    @MainActor func fetchRecent(_ count: Int = 20) -> [EnergySnapshot] {
-        let descriptor = FetchDescriptor<EnergySnapshot>(
-            predicate: nil,
-            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
-        )
-        return (try? container.mainContext.fetch(descriptor)) ?? []
-    }
-
-    @MainActor func add(_ snapshot: EnergySnapshot) {
-        container.mainContext.insert(snapshot)
-        try? container.mainContext.save()
-    }
-}
-
-class MaintenancePhotoRepository {
-    private let container: ModelContainer
-
-    init(container: ModelContainer = AppModelContainer.shared) {
-        self.container = container
-    }
-
-    @MainActor func fetchAll() -> [MaintenancePhoto] {
-        let descriptor = FetchDescriptor<MaintenancePhoto>(sortBy: [SortDescriptor(\.capturedAt, order: .reverse)])
-        return (try? container.mainContext.fetch(descriptor)) ?? []
-    }
-
-    @MainActor func add(_ photo: MaintenancePhoto) {
-        container.mainContext.insert(photo)
-        try? container.mainContext.save()
-    }
-}
-
-class SettingsRepository {
-    private let container: ModelContainer
-
-    init(container: ModelContainer = AppModelContainer.shared) {
-        self.container = container
-    }
-
-    @MainActor func fetchOrCreate() -> UserSettings {
-        if let settings = (try? container.mainContext.fetch(FetchDescriptor<UserSettings>()))?.first {
-            return settings
-        }
-        let newSettings = UserSettings()
-        container.mainContext.insert(newSettings)
-        try? container.mainContext.save()
-        return newSettings
-    }
-
-    @MainActor func update(_ settings: UserSettings) {
-        try? container.mainContext.save()
-    }
-}

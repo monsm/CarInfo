@@ -120,31 +120,6 @@ extension ArtTheme {
     }
 }
 
-// MARK: - UIKit 侧（项目里 TripDetailView 的 MKMapView 走这条）
-//
-// 只做**两件已核实的事**：换强调度（.muted）与明暗。
-// 刻意不动 POI 过滤与路况 —— 那两个属性的确切名字本轮未逐个核实，
-// 而"猜一个属性名"正是这个项目栽过两次的那类错误（letterSpacing / Kansei.Color）。
-// 要用的时候先核实，别照着这里猜。
-enum MapKitConfigurator {
-    /// 让一个 MKMapView 跟随当前艺术方向。
-    /// - Parameter dimsSystemTiles: 夜光/纸上/巨字传 true，原生传 false。
-    static func apply(_ theme: ArtTheme, to map: MKMapView, dimsSystemTiles: Bool) {
-        let cfg: MKStandardMapConfiguration
-        if dimsSystemTiles {
-            cfg = MKStandardMapConfiguration(elevationStyle: .flat, emphasisStyle: .muted)
-        } else {
-            // 不给参数 = 系统默认（原生主题不做任何改动）
-            cfg = MKStandardMapConfiguration()
-        }
-        map.preferredConfiguration = cfg
-        switch theme.spec.preferredScheme {
-        case .dark: map.overrideUserInterfaceStyle = .dark
-        case .light: map.overrideUserInterfaceStyle = .light
-        default: map.overrideUserInterfaceStyle = .unspecified
-        }
-    }
-}
 
 // MARK: - 颜色构造
 /// 顶层私有工具：0xRRGGBB → Color。与 ArtTheme 的 artHex 同一套做法。

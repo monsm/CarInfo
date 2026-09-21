@@ -224,22 +224,6 @@ struct InspectionRow: View {
     }
 }
 
-struct InspectionCard: View {
-    let inspection: Inspection
-    @State private var showEdit = false
-
-    var body: some View {
-        InspectionRow(inspection: inspection, currentMileage: 0)
-            .onTapGesture { showEdit = true }
-            .sheet(isPresented: $showEdit) {
-                NavigationStack {
-                    InspectionEditForm(inspection: inspection)
-                        .navigationTitle("编辑年检")
-                        .navigationBarTitleDisplayMode(.inline)
-                }
-            }
-    }
-}
 
 struct InspectionEditForm: View {
     let inspection: Inspection

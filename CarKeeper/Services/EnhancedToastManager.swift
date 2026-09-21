@@ -51,41 +51,6 @@ class EnhancedToastManager: ObservableObject {
     }
 }
 
-// MARK: - N6 Toast 视图
-struct EnhancedToastView: View {
-    @StateObject private var manager = EnhancedToastManager.shared
-    var item: (text: String, icon: String, duration: Double)
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(safeSymbol: item.icon, fallback: "checkmark.circle.fill")
-                .font(.title3)
-            Text(item.text)
-                .font(.subheadline)
-                .lineLimit(2)
-        }
-        .padding(.horizontal, TokensSpacing.lg)
-        .padding(.vertical, TokensSpacing.md)
-        .background(Color(.systemBackground).opacity(0.95))
-        .foregroundColor(.primary)
-        .cornerRadius(TokensRadius.medium)
-        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
-        .scaleEffect(manager.dismissProgress)
-        .opacity(manager.dismissProgress)
-        .gesture(
-            DragGesture()
-                .onEnded { value in
-                    if abs(value.translation.width) > 50 {
-                        manager.swipeToDismiss()
-                    }
-                }
-        )
-        .transition(.asymmetric(
-            insertion: .move(edge: .top).combined(with: .opacity),
-            removal: .move(edge: .bottom).combined(with: .opacity)
-        ))
-    }
-}
 
 // MARK: - N7 空状态插画升级
 struct EmptyStateView: View {
