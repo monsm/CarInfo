@@ -76,10 +76,10 @@ struct TripDetailView: View {
                 // 时间线
                 timelineCard
             }
-            .padding(.horizontal, Kansei.Spacing.lg)
-            .padding(.vertical, Kansei.Spacing.md)
+            .padding(.horizontal, KanseiSpacing.lg)
+            .padding(.vertical, KanseiSpacing.md)
         }
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .navigationTitle("行程详情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -126,7 +126,7 @@ struct TripDetailView: View {
             }
         }
         .padding()
-        .glassCard(corner: Kansei.Radius.medium)
+        .glassCard(corner: KanseiRadius.medium)
     }
 
     private func statItem(icon: String, value: String, unit: String, label: String) -> some View {
@@ -134,7 +134,7 @@ struct TripDetailView: View {
             HStack(spacing: 4) {
                 Image(safeSymbol: icon, fallback: "gauge")
                     .font(.caption)
-                    .foregroundStyle(Kansei.Color.ambient)
+                    .foregroundStyle(KanseiPalette.ambient)
                 Text(value)
                     .font(Theme.heroNum)
                     .foregroundStyle(.primary)
@@ -156,21 +156,21 @@ struct TripDetailView: View {
             HStack {
                 Image(systemName: "map.fill")
                     .font(.caption)
-                    .foregroundStyle(Kansei.Color.ambient)
+                    .foregroundStyle(KanseiPalette.ambient)
                 Text("行驶路线")
                     .font(Theme.font(.subheadline as Font).bold())
                 Spacer()
                 Button(action: { showMap.toggle() }) {
                     Text(showMap ? "收起" : "展开")
                         .font(.caption)
-                        .foregroundStyle(Kansei.Color.ambient)
+                        .foregroundStyle(KanseiPalette.ambient)
                 }
             }
 
             if showMap, let start = trip.startLocation, let end = trip.endLocation {
                 MapView(coordinate: mapCenter, span: span, points: [start.coordinate, end.coordinate])
                     .frame(height: 200)
-                    .cornerRadius(Kansei.Radius.small)
+                    .cornerRadius(KanseiRadius.small)
             } else {
                 VStack(spacing: 8) {
                     Image(systemName: "map.fill")
@@ -181,7 +181,7 @@ struct TripDetailView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .frame(height: 120)
-                .glassCard(corner: Kansei.Radius.small)
+                .glassCard(corner: KanseiRadius.small)
             }
 
             // 起点/终点信息
@@ -196,13 +196,13 @@ struct TripDetailView: View {
             }
         }
         .padding()
-        .glassCard(corner: Kansei.Radius.medium)
+        .glassCard(corner: KanseiRadius.medium)
     }
 
     private func locationChip(icon: String, text: String, coord: CLLocation) -> some View {
         HStack(spacing: 6) {
             Image(safeSymbol: icon, fallback: "gauge")
-                .font(.caption)                    .foregroundStyle(Kansei.Color.ambient)
+                .font(.caption)                    .foregroundStyle(KanseiPalette.ambient)
             VStack(alignment: .leading) {
                 Text(text).font(.caption2).foregroundStyle(.secondary)
                 Text(String(format: "%.4f, %.4f", coord.coordinate.latitude, coord.coordinate.longitude))
@@ -237,7 +237,7 @@ struct TripDetailView: View {
             }
         }
         .padding()
-        .glassCard(corner: Kansei.Radius.medium)
+        .glassCard(corner: KanseiRadius.medium)
     }
 
     private func energyRow(label: String, value: String, color: Color) -> some View {
@@ -297,7 +297,7 @@ struct TripDetailView: View {
             .padding(.horizontal, 4)
         }
         .padding()
-        .glassCard(corner: Kansei.Radius.medium)
+        .glassCard(corner: KanseiRadius.medium)
     }
 
     // MARK: - 时间线
@@ -325,7 +325,7 @@ struct TripDetailView: View {
                 )
                 timelineItem(icon: "flag.fill", text: "行程结束", time: trip.endTime ?? Date(), color: .orange)
             }
-            .glassCard(corner: Kansei.Radius.small)
+            .glassCard(corner: KanseiRadius.small)
         }
         .padding()
     }
@@ -445,7 +445,7 @@ struct MapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = UIColor(Kansei.Color.ambient)
+                renderer.strokeColor = UIColor(KanseiPalette.ambient)
                 renderer.lineWidth = 3
                 renderer.lineDashPattern = [6, 4]
                 return renderer

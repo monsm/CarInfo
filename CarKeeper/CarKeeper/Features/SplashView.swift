@@ -15,47 +15,47 @@ struct SplashView: View {
     var body: some View {
         ZStack {
             // 全屏背景
-            Kansei.Color.background.ignoresSafeArea()
+            KanseiPalette.background.ignoresSafeArea()
 
             // 品牌光晕
             GeometryReader { geo in
                 Circle()
-                    .fill(Kansei.Color.ambient.opacity(0.3))
+                    .fill(KanseiPalette.ambient.opacity(0.3))
                     .frame(width: 300, height: 300)
                     .blur(radius: 60)
                     .position(x: geo.size.width / 2, y: geo.size.height / 2 - 40)
                     .opacity(brandGlow)
             }
 
-            VStack(spacing: Kansei.Spacing.xxl) {
+            VStack(spacing: KanseiSpacing.xxl) {
                 // 品牌标：呼吸光效
                 ZStack {
                     Circle()
-                        .fill(Kansei.Color.ambient)
+                        .fill(KanseiPalette.ambient)
                         .frame(width: 80, height: 80)
                         .blur(radius: 20)
                         .opacity(brandGlow * 0.5)
 
                     Image(systemName: "car.side.fill")
                         .font(.system(size: 36, weight: .medium))
-                        .foregroundColor(Kansei.Color.primary)
+                        .foregroundColor(KanseiPalette.primary)
                         .frame(width: 80, height: 80)
                         .background(
                             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(Kansei.Color.ambient)
+                                .fill(KanseiPalette.ambient)
                         )
                 }
                 .kanseiBreathe(opacity: 0.4, scale: 1.05)
 
-                VStack(spacing: Kansei.Spacing.sm) {
+                VStack(spacing: KanseiSpacing.sm) {
                     Text("长安车管家")
                         .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(Kansei.Color.primary)
+                        .foregroundColor(KanseiPalette.primary)
                         .tracking(2)
 
                     Text("CHANGAN CONNECT")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Kansei.Color.tertiary)
+                        .foregroundColor(KanseiPalette.tertiary)
                         .tracking(4)
                 }
 
@@ -63,15 +63,15 @@ struct SplashView: View {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 2)
-                            .fill(Kansei.Color.glassBorder)
+                            .fill(KanseiPalette.glassBorder)
                             .frame(height: 3)
                         RoundedRectangle(cornerRadius: 2)
-                            .fill(Kansei.Color.ambient)
+                            .fill(KanseiPalette.ambient)
                             .frame(width: geo.size.width * progress, height: 3)
                     }
                 }
                 .frame(width: 160, height: 3)
-                .padding(.top, Kansei.Spacing.md)
+                .padding(.top, KanseiSpacing.md)
             }
         }
         .onAppear {

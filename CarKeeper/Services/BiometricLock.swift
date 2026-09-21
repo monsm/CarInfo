@@ -18,10 +18,10 @@ struct BiometricLockOverlay: View {
             Color.black.opacity(0.6)
                 .ignoresSafeArea()
 
-            VStack(spacing: Kansei.Spacing.lg) {
+            VStack(spacing: KanseiSpacing.lg) {
                 Image(systemName: "faceid")
                     .font(.system(size: 60))
-                    .foregroundColor(Kansei.Color.ambient)
+                    .foregroundColor(KanseiPalette.ambient)
                     .symbolEffect(.bounce)
 
                 Text("需要身份验证")
@@ -41,11 +41,11 @@ struct BiometricLockOverlay: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Kansei.Color.ambient)
+                        .background(KanseiPalette.ambient)
                         .foregroundColor(.white)
-                        .cornerRadius(Kansei.Radius.medium)
+                        .cornerRadius(KanseiRadius.medium)
                 }
-                .padding(.horizontal, Kansei.Spacing.xl)
+                .padding(.horizontal, KanseiSpacing.xl)
             }
             .padding()
             .glassCard()

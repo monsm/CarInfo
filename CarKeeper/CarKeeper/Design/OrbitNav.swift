@@ -17,10 +17,10 @@ struct OrbitNav: View {
         HStack(spacing: 0) {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 Button {
-                    withAnimation(Kansei.Motion.tap) {
+                    withAnimation(KanseiMotion.tap) {
                         selected = index
                     }
-                    Kansei.Haptic.select()
+                    KanseiHaptic.select()
                 } label: {
                     OrbitNavItemView(
                         item: item,
@@ -31,13 +31,13 @@ struct OrbitNav: View {
 
                 if index < items.count - 1 {
                     Rectangle()
-                        .fill(Kansei.Color.glassBorder)
+                        .fill(KanseiPalette.glassBorder)
                         .frame(width: 0.5, height: 24)
                 }
             }
         }
-        .padding(.horizontal, Kansei.Spacing.sm)
-        .padding(.vertical, Kansei.Spacing.sm)
+        .padding(.horizontal, KanseiSpacing.sm)
+        .padding(.vertical, KanseiSpacing.sm)
         .background(
             Material.thickMaterial
                 .blendMode(.overlay)
@@ -55,18 +55,18 @@ struct OrbitNavItemView: View {
     let isSelected: Bool
 
     var body: some View {
-        VStack(spacing: Kansei.Spacing.xs) {
+        VStack(spacing: KanseiSpacing.xs) {
             ZStack {
                 Image(systemName: isSelected ? (item.activeIcon ?? item.icon) : item.icon)
                     .font(.system(size: 22, weight: isSelected ? .medium : .regular))
-                    .foregroundColor(isSelected ? Kansei.Color.ambient : Kansei.Color.tertiary)
+                    .foregroundColor(isSelected ? KanseiPalette.ambient : KanseiPalette.tertiary)
 
                 if let badge = item.badge {
                     Text(badge)
                         .font(KanseiTypo.micro)
                         .foregroundColor(.white)
                         .frame(width: 16, height: 16)
-                        .background(Kansei.Color.error)
+                        .background(KanseiPalette.error)
                         .clipShape(Circle())
                         .position(x: 18, y: -2)
                 }
@@ -74,11 +74,11 @@ struct OrbitNavItemView: View {
 
             Text(item.label)
                 .font(KanseiTypo.micro)
-                .foregroundColor(isSelected ? Kansei.Color.ambient : Kansei.Color.tertiary)
+                .foregroundColor(isSelected ? KanseiPalette.ambient : KanseiPalette.tertiary)
 
             if isSelected {
                 Capsule()
-                    .fill(Kansei.Color.ambient)
+                    .fill(KanseiPalette.ambient)
                     .frame(width: 4, height: 4)
             }
         }

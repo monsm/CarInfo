@@ -9,7 +9,7 @@ struct CarbonSavingsCard: View {
     let showDetails: Bool = false
 
     var body: some View {
-        CardBox(title: "碳减排", side: "\(stats.equivalentTrees) 棵树", cornerRadius: Kansei.Radius.medium) {
+        CardBox(title: "碳减排", side: "\(stats.equivalentTrees) 棵树", cornerRadius: KanseiRadius.medium) {
             VStack(spacing: 12) {
                 // 主统计
                 HStack {
@@ -50,7 +50,7 @@ struct CarbonSavingsCard: View {
                         CarbonSavingsTracker.shared.simulateDailySteps()
                     }
                     .font(Theme.caption)
-                    .foregroundStyle(Kansei.Color.ambient)
+                    .foregroundStyle(KanseiPalette.ambient)
                 }
             }
         }

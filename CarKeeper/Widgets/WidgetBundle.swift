@@ -194,7 +194,7 @@ struct ChargingProgressView: View {
         .containerBackground(for: .widget) {
             wtBackground(family)
         }
-        .widgetURL(WT.Link.battery)
+        .widgetURL(WT.DeepLink.battery)
     }
 
     @ViewBuilder
@@ -369,7 +369,7 @@ struct VehicleStatusView: View {
         .containerBackground(for: .widget) {
             wtBackground(family)
         }
-        .widgetURL(WT.Link.vehicle)
+        .widgetURL(WT.DeepLink.vehicle)
     }
 
     private var small: some View {
@@ -472,7 +472,7 @@ struct ChargingLiveActivityWidget: Widget {
                 startedAt: context.attributes.startedAt
             )
             .activityBackgroundTint(WT.Palette.canvas)
-            .widgetURL(WT.Link.battery)
+            .widgetURL(WT.DeepLink.battery)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -519,7 +519,7 @@ struct ChargingLiveActivityWidget: Widget {
                 Text("\(context.state.soc)")
                     .font(WT.Typo.data(13))
             }
-            .widgetURL(WT.Link.battery)
+            .widgetURL(WT.DeepLink.battery)
             .keylineTint(WT.Palette.charge)
         }
     }

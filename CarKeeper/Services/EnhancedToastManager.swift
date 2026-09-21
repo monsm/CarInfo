@@ -64,8 +64,8 @@ struct EnhancedToastView: View {
                 .font(.subheadline)
                 .lineLimit(2)
         }
-        .padding(.horizontal, Kansei.Spacing.lg)
-        .padding(.vertical, Kansei.Spacing.md)
+        .padding(.horizontal, KanseiSpacing.lg)
+        .padding(.vertical, KanseiSpacing.md)
         .background(Color(.systemBackground).opacity(0.95))
         .foregroundColor(.primary)
         .cornerRadius(Theme.Radius.lg)
@@ -104,16 +104,16 @@ struct EmptyStateView: View {
     }
 
     var body: some View {
-        VStack(spacing: Kansei.Spacing.lg) {
+        VStack(spacing: KanseiSpacing.lg) {
             // 动态图标（根据内容变化）
             // 旧版：渐变圆 + 持续重复的缩放动画（提示图标一直在跳）。
             // 新版：一个扁平色块承载图标，提示本身不需要动。
             Image(safeSymbol: icon, fallback: "checkmark.circle.fill")
                 .font(.system(size: 32, weight: .regular))
-                .foregroundStyle(Kansei.Color.ambient)
+                .foregroundStyle(KanseiPalette.ambient)
                 .frame(width: 72, height: 72)
                 .background(RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Kansei.Color.ambient))
+                    .fill(KanseiPalette.ambient))
 
             Text(title)
                 .font(.title3)
@@ -132,13 +132,13 @@ struct EmptyStateView: View {
                     Text(actionTitle)
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
-                        .padding(.horizontal, Kansei.Spacing.xl)
-                        .padding(.vertical, Kansei.Spacing.sm)
-                        .background(Kansei.Color.ambient)
-                        .cornerRadius(Kansei.Radius.medium)
+                        .padding(.horizontal, KanseiSpacing.xl)
+                        .padding(.vertical, KanseiSpacing.sm)
+                        .background(KanseiPalette.ambient)
+                        .cornerRadius(KanseiRadius.medium)
                 }
             }
         }
-        .padding(.vertical, Kansei.Spacing.xl)
+        .padding(.vertical, KanseiSpacing.xl)
     }
 }

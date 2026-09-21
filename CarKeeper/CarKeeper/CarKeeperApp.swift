@@ -406,7 +406,7 @@ struct MainTabView: View {
             mineTab
         }
         // 情感化配色：时间感知主色调
-        .tint(Kansei.Color.ambient)
+        .tint(KanseiPalette.ambient)
         // VoiceOver：切换 Tab 时朗读当前页面名称（仅首次切换到新 Tab）
         .onChange(of: nav.selectedTab) { _, newTab in
             if newTab != lastAnnouncedTab {
@@ -476,8 +476,8 @@ struct ToastView: View {
             Text(text)
         }
         .padding(.horizontal, 16).padding(.vertical, 8)
-        .background(Kansei.glassLight.opacity(0.9), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .foregroundColor(Kansei.primary)
+        .background(KanseiPalette.glassLight.opacity(0.9), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .foregroundColor(KanseiPalette.primary)
     }
 }
 

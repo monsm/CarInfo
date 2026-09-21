@@ -73,7 +73,7 @@ struct CheckInStreak: View {
     var body: some View {
         HStack {
             Image(systemName: "calendar.checkmark")
-                .foregroundColor(Kansei.Color.ambient)
+                .foregroundColor(KanseiPalette.ambient)
             Text("连续打卡 \(streakDays) 天")
                 .font(.subheadline)
             Spacer()
@@ -96,7 +96,7 @@ struct CarbonChallenge: View {
     var progress: Double { min(currentSavings / monthlyGoal, 1.0) }
 
     var body: some View {
-        VStack(spacing: Kansei.Spacing.sm) {
+        VStack(spacing: KanseiSpacing.sm) {
             Text("本月碳减排目标")
                 .font(.subheadline)
                 .fontWeight(.semibold)
@@ -165,8 +165,8 @@ struct FamilyLeaderboard: View {
                     .font(.headline)
                     .foregroundColor(idx == 0 ? .yellow : idx == 1 ? .gray : idx == 2 ? .orange : .secondary)
                     .frame(width: 30)
-                Circle().fill(Kansei.Color.ambient.opacity(0.2)).frame(width: 36, height: 36)
-                    .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(Kansei.Color.ambient))
+                Circle().fill(KanseiPalette.ambient.opacity(0.2)).frame(width: 36, height: 36)
+                    .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(KanseiPalette.ambient))
                     
                     
     

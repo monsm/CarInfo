@@ -33,7 +33,7 @@ struct ColorBlindModeView: View {
             .accessibilityLabel(Text("色彩辅助模式选择"))
         }
         .padding()
-        .glassCard(corner: Kansei.Radius.medium)
+        .glassCard(corner: KanseiRadius.medium)
     }
 }
 

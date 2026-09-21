@@ -54,12 +54,12 @@ struct PrivacyDashboardView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: Kansei.Spacing.lg) {
+                VStack(spacing: KanseiSpacing.lg) {
                     // 汇总卡片
                     VStack(spacing: Theme.Spacing.sm) {
                         Image(safeSymbol: "checkerboard.shield", fallback: "shield.fill")
                             .font(.system(size: 48))
-                            .foregroundColor(Kansei.Color.ambient)
+                            .foregroundColor(KanseiPalette.ambient)
                         Text("数据透明度")
                             .font(.title2)
                             .fontWeight(.bold)
@@ -68,7 +68,7 @@ struct PrivacyDashboardView: View {
                             .foregroundColor(.secondary)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, Kansei.Spacing.md)
+                    .padding(.vertical, KanseiSpacing.md)
                     .glassCard()
 
                     // 分类详情
@@ -105,11 +105,11 @@ struct PrivacyDashboardView: View {
                                 .cornerRadius(Theme.Radius.medium)
                         }
                     }
-                    .padding(.top, Kansei.Spacing.sm)
+                    .padding(.top, KanseiSpacing.sm)
                 }
                 .padding()
             }
-            .background(Kansei.Color.background)
+            .background(KanseiPalette.background)
             .navigationTitle("隐私与数据")
             .navigationBarTitleDisplayMode(.inline)
             .alert("确认清除", isPresented: $showClearConfirm) {
@@ -128,11 +128,11 @@ struct PrivacyCategorySection: View {
     let category: (title: String, items: [(name: String, size: String, type: String)])
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Kansei.Spacing.xs) {
+        VStack(alignment: .leading, spacing: KanseiSpacing.xs) {
             Text(category.title)
                 .font(.headline)
                 .padding(.horizontal)
-                .padding(.top, Kansei.Spacing.sm)
+                .padding(.top, KanseiSpacing.sm)
 
             ForEach(Array(category.items.enumerated()), id: \.offset) { idx, item in
                 HStack {

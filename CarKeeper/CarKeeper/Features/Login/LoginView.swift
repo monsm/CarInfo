@@ -32,10 +32,10 @@ struct LoginView: View {
         NavigationStack {
             DSCanvas {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: Kansei.Spacing.xxl) {
+                    VStack(alignment: .leading, spacing: KanseiSpacing.xxl) {
                         // 品牌区
                         brandHeader
-                            .padding(.top, Kansei.Spacing.xxxl)
+                            .padding(.top, KanseiSpacing.xxxl)
 
                         // 表单卡片
                         formCard
@@ -47,14 +47,14 @@ struct LoginView: View {
                             )
                         }
 
-                        VStack(spacing: Kansei.Spacing.md) {
+                        VStack(spacing: KanseiSpacing.md) {
                             loginButton
                             if biometricAvailable {
                                 biometricButton
                             }
                         }
                     }
-                    .padding(.bottom, Kansei.Spacing.xxxl)
+                    .padding(.bottom, KanseiSpacing.xxxl)
                 }
                 .scrollBounceBehavior(.basedOnSize)
                 .scrollDismissesKeyboard(.interactively)
@@ -82,53 +82,53 @@ struct LoginView: View {
 
     // MARK: - 品牌区
     private var brandHeader: some View {
-        VStack(alignment: .leading, spacing: Kansei.Spacing.lg) {
+        VStack(alignment: .leading, spacing: KanseiSpacing.lg) {
             HStack {
                 Image(systemName: "car.side.fill")
                     .font(.system(size: 40, weight: .medium))
-                    .foregroundColor(Kansei.Color.primary)
+                    .foregroundColor(KanseiPalette.primary)
                     .frame(width: 80, height: 80)
                     .background(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(Kansei.Color.ambient)
+                            .fill(KanseiPalette.ambient)
                     )
-                    .shadow(color: Kansei.Color.ambient.opacity(0.4), radius: 12, y: 4)
+                    .shadow(color: KanseiPalette.ambient.opacity(0.4), radius: 12, y: 4)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("长安车管家")
                         .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(Kansei.Color.primary)
+                        .foregroundColor(KanseiPalette.primary)
                     Text("CHANGAN CONNECT")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Kansei.Color.tertiary)
+                        .foregroundColor(KanseiPalette.tertiary)
                         .tracking(2)
                 }
-                .padding(.leading, Kansei.Spacing.md)
+                .padding(.leading, KanseiSpacing.md)
             }
 
             Text("登录以管理您的爱车")
                 .font(KanseiTypo.caption)
-                .foregroundColor(Kansei.Color.secondary)
+                .foregroundColor(KanseiPalette.secondary)
         }
     }
 
     // MARK: - 表单卡片
     private var formCard: some View {
         GlassCard {
-            VStack(spacing: Kansei.Spacing.lg) {
+            VStack(spacing: KanseiSpacing.lg) {
                 // 手机号输入
-                VStack(alignment: .leading, spacing: Kansei.Spacing.xs) {
+                VStack(alignment: .leading, spacing: KanseiSpacing.xs) {
                     Text("手机号")
                         .font(KanseiTypo.caption)
-                        .foregroundColor(Kansei.Color.secondary)
+                        .foregroundColor(KanseiPalette.secondary)
                     TextField("请输入手机号", text: $phone)
                         .keyboardType(.phonePad)
-                        .foregroundColor(Kansei.Color.primary)
+                        .foregroundColor(KanseiPalette.primary)
                         .font(KanseiTypo.subtitle)
                         .padding()
                         .background(
-                            RoundedRectangle(cornerRadius: Kansei.Radius.small, style: .continuous)
-                                .fill(Kansei.Color.glassLight)
+                            RoundedRectangle(cornerRadius: KanseiRadius.small, style: .continuous)
+                                .fill(KanseiPalette.glassLight)
                         )
                         .onChange(of: phone) { phone = String(phone.prefix(11)) }
                 }
@@ -137,18 +137,18 @@ struct LoginView: View {
                 DSDivider()
 
                 // 图形验证码
-                VStack(alignment: .leading, spacing: Kansei.Spacing.xs) {
+                VStack(alignment: .leading, spacing: KanseiSpacing.xs) {
                     Text("图形验证码")
                         .font(KanseiTypo.caption)
-                        .foregroundColor(Kansei.Color.secondary)
-                    HStack(spacing: Kansei.Spacing.sm) {
+                        .foregroundColor(KanseiPalette.secondary)
+                    HStack(spacing: KanseiSpacing.sm) {
                         TextField("输入验证码", text: $picCode)
-                            .foregroundColor(Kansei.Color.primary)
+                            .foregroundColor(KanseiPalette.primary)
                             .font(KanseiTypo.subtitle)
                             .padding()
                             .background(
-                                RoundedRectangle(cornerRadius: Kansei.Radius.small, style: .continuous)
-                                    .fill(Kansei.Color.glassLight)
+                                RoundedRectangle(cornerRadius: KanseiRadius.small, style: .continuous)
+                                    .fill(KanseiPalette.glassLight)
                             )
 
                         if let data = captchaData, let captcha = UIImage(data: data) {
@@ -159,7 +159,7 @@ struct LoginView: View {
                                 .onTapGesture { loadCaptcha() }
                         } else {
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(Kansei.Color.glassLight)
+                                .fill(KanseiPalette.glassLight)
                                 .frame(width: 80, height: 40)
                                 .onTapGesture { loadCaptcha() }
                         }
@@ -170,19 +170,19 @@ struct LoginView: View {
                 DSDivider()
 
                 // 短信验证码
-                VStack(alignment: .leading, spacing: Kansei.Spacing.xs) {
+                VStack(alignment: .leading, spacing: KanseiSpacing.xs) {
                     Text("短信验证码")
                         .font(KanseiTypo.caption)
-                        .foregroundColor(Kansei.Color.secondary)
-                    HStack(spacing: Kansei.Spacing.sm) {
+                        .foregroundColor(KanseiPalette.secondary)
+                    HStack(spacing: KanseiSpacing.sm) {
                         TextField("6位数字", text: $smsCode)
                             .keyboardType(.numberPad)
-                            .foregroundColor(Kansei.Color.primary)
+                            .foregroundColor(KanseiPalette.primary)
                             .font(KanseiTypo.hero)
                             .padding()
                             .background(
-                                RoundedRectangle(cornerRadius: Kansei.Radius.small, style: .continuous)
-                                    .fill(Kansei.Color.glassLight)
+                                RoundedRectangle(cornerRadius: KanseiRadius.small, style: .continuous)
+                                    .fill(KanseiPalette.glassLight)
                             )
                             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -191,20 +191,20 @@ struct LoginView: View {
                         } label: {
                             Text(smsBtnText)
                                 .font(KanseiTypo.caption)
-                                .foregroundColor(smsBtnDisabled ? Kansei.Color.tertiary : Kansei.Color.ambient)
-                                .padding(.horizontal, Kansei.Spacing.md)
-                                .padding(.vertical, Kansei.Spacing.sm)
+                                .foregroundColor(smsBtnDisabled ? KanseiPalette.tertiary : KanseiPalette.ambient)
+                                .padding(.horizontal, KanseiSpacing.md)
+                                .padding(.vertical, KanseiSpacing.sm)
                                 .background(
-                                    Kansei.Color.ambient.opacity(smsBtnDisabled ? 0.3 : 1)
+                                    KanseiPalette.ambient.opacity(smsBtnDisabled ? 0.3 : 1)
                                 )
-                                .cornerRadius(Kansei.Radius.small)
+                                .cornerRadius(KanseiRadius.small)
                         }
                         .disabled(smsBtnDisabled)
                     }
                 }
                 .focused($focused, equals: .sms)
             }
-            .padding(Kansei.Spacing.lg)
+            .padding(KanseiSpacing.lg)
         }
     }
 
@@ -222,10 +222,10 @@ struct LoginView: View {
                     .foregroundColor(.white)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, Kansei.Spacing.lg)
-            .background(Kansei.Color.ambient)
-            .cornerRadius(Kansei.Radius.medium)
-            .shadow(color: Kansei.Color.ambient.opacity(0.4), radius: 12, y: 4)
+            .padding(.vertical, KanseiSpacing.lg)
+            .background(KanseiPalette.ambient)
+            .cornerRadius(KanseiRadius.medium)
+            .shadow(color: KanseiPalette.ambient.opacity(0.4), radius: 12, y: 4)
         }
         .buttonStyle(.plain)
         .disabled(busy || !phoneValid)
@@ -240,12 +240,12 @@ struct LoginView: View {
                 Image(systemName: "faceid")
                 Text("Face ID 登录")
                     .font(KanseiTypo.subtitle)
-                    .foregroundColor(Kansei.Color.secondary)
+                    .foregroundColor(KanseiPalette.secondary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, Kansei.Spacing.md)
-            .background(Kansei.Color.glassHighlight)
-            .cornerRadius(Kansei.Radius.medium)
+            .padding(.vertical, KanseiSpacing.md)
+            .background(KanseiPalette.glassHighlight)
+            .cornerRadius(KanseiRadius.medium)
         }
         .buttonStyle(.plain)
     }

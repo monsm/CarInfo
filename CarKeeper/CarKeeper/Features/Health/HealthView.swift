@@ -22,7 +22,7 @@ struct HealthView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Kansei.Spacing.lg) {
+            VStack(alignment: .leading, spacing: KanseiSpacing.lg) {
                 if loading {
                     loadingState
                 } else if let model {
@@ -42,12 +42,12 @@ struct HealthView: View {
                                   actionTitle: "重新加载") { Task { await load() } }
                 }
             }
-            .padding(.top, Kansei.Spacing.sm)
-            .padding(.bottom, Kansei.Spacing.xxl)
+            .padding(.top, KanseiSpacing.sm)
+            .padding(.bottom, KanseiSpacing.xxl)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .navigationTitle("健康报告")
         .refreshable { await load() }
         .onAppear {
@@ -67,7 +67,7 @@ struct HealthView: View {
                 ProgressView().controlSize(.small)
                 Text("正在读取健康报告…")
                     .font(KanseiTypo.footnote)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
             }
             DSSkeleton(height: 96)
             DSSkeleton(height: 64)
@@ -92,7 +92,7 @@ struct HealthView: View {
                 if !m.time.isEmpty {
                     Text("最近检测 \(m.time)")
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                 }
             }
 
@@ -101,14 +101,14 @@ struct HealthView: View {
                         caption: verdict(m.scorePct),
                         size: 96,
                         tint: tint)
-                .padding(.top, Kansei.Spacing.lg)
+                .padding(.top, KanseiSpacing.lg)
 
             DSLightBar(progress: Double(max(0, min(100, m.scorePct))) / 100.0,
                        height: 6,
                        tint: LinearGradient(colors: [Color.white, tint.opacity(0.72), tint],
                                             startPoint: .leading, endPoint: .trailing))
-                .padding(.top, Kansei.Spacing.xl)
-                .padding(.bottom, Kansei.Spacing.xl)
+                .padding(.top, KanseiSpacing.xl)
+                .padding(.bottom, KanseiSpacing.xl)
 
             if !m.counts.isEmpty {
                 DSStatStrip(items: m.counts.map {
@@ -135,7 +135,7 @@ struct HealthView: View {
 
     private func systemRow(_ sys: HealthSystem, showsSeparator: Bool) -> some View {
         let isOpen = expandedSystems.contains(sys.name)
-        let tint = Kansei.statusColor(sys.statusCls)
+        let tint = KanseiPalette.statusColor(sys.statusCls)
         return VStack(alignment: .leading, spacing: 0) {
             Button { toggle(sys.name) } label: {
                 HStack(spacing: DS.Space.md) {
@@ -146,7 +146,7 @@ struct HealthView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(sys.name)
                             .font(DS.Typo.body)
-                            .foregroundStyle(Kansei.Color.primary)
+                            .foregroundStyle(KanseiPalette.primary)
                         Text(sys.statusText.isEmpty ? "—" : sys.statusText)
                             .font(DS.Typo.footnote)
                             .foregroundStyle(tint)
@@ -164,9 +164,9 @@ struct HealthView: View {
                         .foregroundStyle(tint)
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Kansei.Color.tertiary)
+                        .foregroundStyle(KanseiPalette.tertiary)
                         .rotationEffect(.degrees(isOpen ? 180 : 0))
-                        .animation(Kansei.Motion.tap, value: isOpen)
+                        .animation(KanseiMotion.tap, value: isOpen)
                 }
                 .frame(minHeight: DS.Space.row)
                 .contentShape(Rectangle())
@@ -190,7 +190,7 @@ struct HealthView: View {
                         }
                     }
                 }
-                .background(Kansei.Color.nightSurface.opacity(0.6))
+                .background(KanseiPalette.nightSurface.opacity(0.6))
             }
 
             if showsSeparator { DSSeparator(inset: 0) }
@@ -202,19 +202,19 @@ struct HealthView: View {
             HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
                 Text(item.name)
                     .font(DS.Typo.subheadline)
-                    .foregroundStyle(Kansei.Color.primary)
+                    .foregroundStyle(KanseiPalette.primary)
                     .lineLimit(2)
                 Spacer(minLength: DS.Space.sm)
                 Text(item.statusText)
                     .font(DS.Typo.subheadline)
-                    .foregroundStyle(Kansei.statusColor(item.statusCls))
+                    .foregroundStyle(KanseiPalette.statusColor(item.statusCls))
             }
             if let d = item.detect, !d.isEmpty { DSKeyValueRow(key: "检测值", value: d) }
             if let s = item.suggest, !s.isEmpty { DSKeyValueRow(key: "参考范围", value: s) }
             if let desc = item.desc, !desc.isEmpty {
                 Text(desc)
                     .font(KanseiTypo.footnote)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -257,21 +257,21 @@ struct HealthView: View {
                 HStack(spacing: DS.Space.md) {
                     Image(safeSymbol: "number.square.fill", fallback: "number")
                         .font(.system(size: DS.Size.icon))
-                        .foregroundStyle(Kansei.Color.ambient)
+                        .foregroundStyle(KanseiPalette.ambient)
                         .frame(width: DS.Size.iconColumn)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("检测 ID")
                             .font(DS.Typo.body)
-                            .foregroundStyle(Kansei.Color.primary)
+                            .foregroundStyle(KanseiPalette.primary)
                         Text(cid)
                             .font(.system(size: 15, design: .monospaced))
-                            .foregroundStyle(Kansei.Color.secondary)
+                            .foregroundStyle(KanseiPalette.secondary)
                             .lineLimit(2)
                     }
                     Spacer(minLength: DS.Space.sm)
                     Image(systemName: "doc.on.doc")
                         .font(.system(size: 15))
-                        .foregroundStyle(Kansei.Color.ambient)
+                        .foregroundStyle(KanseiPalette.ambient)
                 }
                 .frame(minHeight: DS.Space.row)
                 .contentShape(Rectangle())
@@ -285,10 +285,10 @@ struct HealthView: View {
 
     private func scoreColor(_ pct: Int) -> Color {
         switch pct {
-        case 0...39:  return Kansei.Color.error
-        case 40...69: return Kansei.Color.warning
-        case 70...89: return Kansei.Color.info
-        default:      return Kansei.Color.success
+        case 0...39:  return KanseiPalette.error
+        case 40...69: return KanseiPalette.warning
+        case 70...89: return KanseiPalette.info
+        default:      return KanseiPalette.success
         }
     }
 
@@ -346,7 +346,7 @@ struct HealthView: View {
     // MARK: - 交互
 
     private func toggle(_ name: String) {
-        withAnimation(Kansei.Motion.count) {
+        withAnimation(KanseiMotion.count) {
             if expandedSystems.contains(name) { expandedSystems.remove(name) }
             else { expandedSystems.insert(name) }
         }

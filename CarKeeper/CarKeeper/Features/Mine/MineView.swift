@@ -38,7 +38,7 @@ struct MineView: View {
     // MARK: 生命周期
     var body: some View {
         ScrollView {
-            VStack(spacing: Kansei.Spacing.lg) {
+            VStack(spacing: KanseiSpacing.lg) {
                 profileCard
                 if let car = store.car { carCard(car) }
                 tilesCard
@@ -47,7 +47,7 @@ struct MineView: View {
 
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .navigationTitle("我的")
             .accessibilityLabel(Text("我的"))
             .accessibilityHint(Text("账号设置、个人信息和应用程序管理"))
@@ -152,27 +152,27 @@ struct MineView: View {
                     // 头像：系统填充色的圆底 + 首字（iOS 设置顶部的身份区做法）
                     Text(um?.avatar ?? "主")
                         .font(DS.Typo.title2.weight(.semibold))
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                         .frame(width: 64, height: 64)
-                        .background(Circle().fill(Kansei.Color.glassLight))
+                        .background(Circle().fill(KanseiPalette.glassLight))
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(um?.name ?? "车主")
                             .font(DS.Typo.title2)
-                            .foregroundStyle(Kansei.Color.primary)
+                            .foregroundStyle(KanseiPalette.primary)
                         Text(um?.mobile ?? "--")
                             .font(DS.Typo.footnote)
-                            .foregroundStyle(Kansei.Color.secondary)
+                            .foregroundStyle(KanseiPalette.secondary)
                         if um?.authed == true {
                             Text("已实名认证")
                                 .font(DS.Typo.footnote)
-                                .foregroundStyle(Kansei.Color.success)
+                                .foregroundStyle(KanseiPalette.success)
                         }
                     }
                     Spacer(minLength: DS.Space.sm)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Kansei.Color.tertiary)
+                        .foregroundStyle(KanseiPalette.tertiary)
                 }
 
                 DSDivider()
@@ -195,7 +195,7 @@ struct MineView: View {
                         Text("上次登录 \(lt)")
                     }
                     .font(DS.Typo.caption)
-                    .foregroundStyle(Kansei.Color.tertiary)
+                    .foregroundStyle(KanseiPalette.tertiary)
                 }
             }
         }
@@ -206,15 +206,15 @@ struct MineView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(DS.Typo.caption2.weight(.medium))
-                .foregroundStyle(Kansei.Color.tertiary)
+                .foregroundStyle(KanseiPalette.tertiary)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
                     .font(DS.Typo.metric(20))
-                    .foregroundStyle(Kansei.Color.primary)
+                    .foregroundStyle(KanseiPalette.primary)
                 if let unit {
                     Text(unit)
                         .font(DS.Typo.caption)
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                 }
             }
         }
@@ -232,17 +232,17 @@ struct MineView: View {
             HStack(spacing: DS.Space.lg) {
                 Image(systemName: "car.fill")
                     .font(.system(size: DS.Size.iconLg, weight: .regular))
-                    .foregroundStyle(Kansei.Color.ambient)
+                    .foregroundStyle(KanseiPalette.ambient)
                     .frame(width: 48, height: 48)
                     .background(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .fill(Kansei.Color.ambient))
+                        .fill(KanseiPalette.ambient))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(sum?.name ?? "未绑定车辆")
                         .font(DS.Typo.headline)
-                        .foregroundStyle(Kansei.Color.primary)
+                        .foregroundStyle(KanseiPalette.primary)
                     Text(sum?.plate ?? "暂无车牌")
                         .font(DS.Typo.dataSmall)
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                 }
                 Spacer(minLength: DS.Space.sm)
                 if let d = sum?.insuranceDays {
@@ -251,7 +251,7 @@ struct MineView: View {
                 }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Kansei.Color.tertiary)
+                    .foregroundStyle(KanseiPalette.tertiary)
             }
             .padding(DS.Space.cardPadding)
             .dsSurface(padding: 0)
@@ -306,7 +306,7 @@ struct MineView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("驾驶行为评分").font(Theme.h4)
                             Text("急加速 \(score.aggressiveAccel) 次 · 急刹车 \(score.harshBrake) 次")
-                                .font(KanseiTypo.caption).foregroundStyle(Kansei.Color.secondary)
+                                .font(KanseiTypo.caption).foregroundStyle(KanseiPalette.secondary)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
@@ -367,7 +367,7 @@ struct MineView: View {
                     tile("lightbulb.fill", "车辆提示", tint: .yellow) { nav.pushNavigation(.tips) }
                 }
                     tile("trophy.fill", "驾驶评分",
-                          tint: Kansei.Color.ambient) { nav.pushNavigation(.score) }
+                          tint: KanseiPalette.ambient) { nav.pushNavigation(.score) }
             }
         }
     }
@@ -382,7 +382,7 @@ struct MineView: View {
                 if isChecking {
                     HStack(spacing: 10) {
                         ProgressView()
-                            .tint(Kansei.Color.ambient)
+                            .tint(KanseiPalette.ambient)
                         Text("正在检查最新版本…")
                             .font(Theme.caption)
                             .foregroundStyle(.secondary)
@@ -392,9 +392,9 @@ struct MineView: View {
                     // 下载中：进度条 + 百分比数字
                     VStack(spacing: 6) {
                         ProgressView(value: downloadPct)
-                            .tint(Kansei.Color.ambient)
+                            .tint(KanseiPalette.ambient)
                         Text("正在下载… \(downloadPctDisplay)%")
-                            .font(KanseiTypo.caption).foregroundStyle(Kansei.Color.secondary)
+                            .font(KanseiTypo.caption).foregroundStyle(KanseiPalette.secondary)
                     }
                 } else if let m = updateMsg {
                     // 错误或提示消息（图标由 updateMsgIsError 决定）
@@ -402,7 +402,7 @@ struct MineView: View {
                         Image(safeSymbol: updateMsgIsError ? "exclamationmark.triangle.fill" : "info.circle.fill",
                               fallback: "info.circle.fill")
                             .font(Theme.caption)
-                            .foregroundStyle(updateMsgIsError ? Kansei.Color.error : Kansei.Color.ambient)
+                            .foregroundStyle(updateMsgIsError ? KanseiPalette.error : KanseiPalette.ambient)
                         Text(m)
                             .font(Theme.caption)
                             .foregroundStyle(.secondary)
@@ -433,7 +433,7 @@ struct MineView: View {
                     .frame(height: 30)
                 Text(label)
                     .font(DS.Typo.subheadline.weight(.semibold))
-                    .foregroundStyle(Kansei.Color.primary)
+                    .foregroundStyle(KanseiPalette.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -441,9 +441,9 @@ struct MineView: View {
             .padding(DS.Space.md)
             .frame(minHeight: 84)
             .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                .fill(Kansei.Color.nightSurface))
+                .fill(KanseiPalette.nightSurface))
             .overlay(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                .strokeBorder(Kansei.Color.glassBorder, lineWidth: DS.Hair.line))
+                .strokeBorder(KanseiPalette.glassBorder, lineWidth: DS.Hair.line))
             .contentShape(Rectangle())
         }
         .buttonStyle(DSCardButtonStyle())
@@ -469,7 +469,7 @@ struct MineView: View {
             }
             .foregroundStyle(.white)
             .padding(.vertical, 10)
-            .background(Capsule().fill(Kansei.Color.ambient))
+            .background(Capsule().fill(KanseiPalette.ambient))
         }
         .buttonStyle(.plain)
         .disabled(updateBusy)
@@ -483,7 +483,7 @@ struct MineView: View {
             Label("分享安装包", systemImage: "square.and.arrow.up")
                 .font(Theme.font(.caption as Font).bold())
                 .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(Kansei.Color.fillSubtle, in: Capsule())
+                .background(KanseiPalette.fillSubtle, in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -497,7 +497,7 @@ struct MineView: View {
                 .font(Theme.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12).padding(.vertical, 10)
-                .background(Kansei.Color.fillSubtle, in: Capsule())
+                .background(KanseiPalette.fillSubtle, in: Capsule())
         }
         .buttonStyle(.plain)
     }

@@ -45,10 +45,10 @@ struct CommandHistoryView: View {
                 // 列表
                 commandList
             }
-            .padding(.horizontal, Kansei.Spacing.lg)
-            .padding(.vertical, Kansei.Spacing.md)
+            .padding(.horizontal, KanseiSpacing.lg)
+            .padding(.vertical, KanseiSpacing.md)
         }
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .navigationTitle("指令历史")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityLabel(Text("指令历史"))
@@ -62,7 +62,7 @@ struct CommandHistoryView: View {
             statBubble(label: "成功率", value: rateStr, tint: .green)
             statBubble(label: "进行中", value: "\(inProgressCount)", tint: .orange)
         }
-        .glassCard(corner: Kansei.Radius.medium)
+        .glassCard(corner: KanseiRadius.medium)
     }
 
     private func statBubble(label: String, value: String, tint: Color) -> some View {
@@ -87,8 +87,8 @@ struct CommandHistoryView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(filter == f ? Kansei.Color.ambient.opacity(0.2) : Color.clear)
-                            .foregroundStyle(filter == f ? Kansei.Color.ambient : Kansei.Color.secondary)
+                            .background(filter == f ? KanseiPalette.ambient.opacity(0.2) : Color.clear)
+                            .foregroundStyle(filter == f ? KanseiPalette.ambient : KanseiPalette.secondary)
                             .cornerRadius(20)
                     }
                 }
@@ -187,7 +187,7 @@ struct CommandHistoryView: View {
                     .font(.caption)
                 }
             }
-            .glassCard(corner: Kansei.Radius.small)
+            .glassCard(corner: KanseiRadius.small)
             .onTapGesture {
                 withAnimation(.spring(response: 0.35)) {
                     if isExpanded { expandedCmds.remove(cmd.id) }

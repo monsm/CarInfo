@@ -68,17 +68,17 @@ struct ServiceHistoryView: View {
                 // 时间线
                 timelineCard
             }
-            .padding(.horizontal, Kansei.Spacing.lg)
-            .padding(.vertical, Kansei.Spacing.md)
+            .padding(.horizontal, KanseiSpacing.lg)
+            .padding(.vertical, KanseiSpacing.md)
         }
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .navigationTitle("维保记录")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showAddService = true }) {
                     Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(Kansei.Color.ambient)
+                        .foregroundStyle(KanseiPalette.ambient)
                 }
             }
         }
@@ -95,7 +95,7 @@ struct ServiceHistoryView: View {
             statCell(label: "年均花费", value: "¥\(Int(avgAnnualCost))/年", tint: .green)
             statCell(label: "记录次数", value: "\(entries.count)", tint: .orange)
         }
-        .glassCard(corner: Kansei.Radius.medium)
+        .glassCard(corner: KanseiRadius.medium)
     }
 
     private func statCell(label: String, value: String, tint: Color) -> some View {
@@ -138,7 +138,7 @@ struct ServiceHistoryView: View {
             }
         }
         .padding()
-        .glassCard(corner: Kansei.Radius.medium)
+        .glassCard(corner: KanseiRadius.medium)
         .background(Color.orange.opacity(0.05))
     }
 
@@ -153,9 +153,9 @@ struct ServiceHistoryView: View {
         }
         return Image(safeSymbol: icon, fallback: "wrench.and.screwdriver.fill")
             .font(.caption)
-            .foregroundStyle(Kansei.Color.ambient)
+            .foregroundStyle(KanseiPalette.ambient)
             .frame(width: 28, height: 28)
-            .background(Kansei.Color.ambient.opacity(0.1))
+            .background(KanseiPalette.ambient.opacity(0.1))
             .cornerRadius(6)
     }
 
@@ -172,8 +172,8 @@ struct ServiceHistoryView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(selectedYear == y ? Kansei.Color.ambient.opacity(0.2) : Color.clear)
-                            .foregroundStyle(selectedYear == y ? Kansei.Color.ambient : Kansei.Color.secondary)
+                            .background(selectedYear == y ? KanseiPalette.ambient.opacity(0.2) : Color.clear)
+                            .foregroundStyle(selectedYear == y ? KanseiPalette.ambient : KanseiPalette.secondary)
                             .cornerRadius(16)
                     }
                 }
@@ -203,7 +203,7 @@ struct ServiceHistoryView: View {
                 }
             }
         }
-        .glassCard(corner: Kansei.Radius.medium)
+        .glassCard(corner: KanseiRadius.medium)
     }
 
     @ViewBuilder
@@ -221,7 +221,7 @@ struct ServiceHistoryView: View {
                 Spacer()
                 Text("¥\(Int(entry.cost))")
                     .font(Theme.font(.subheadline as Font).bold())
-                    .foregroundStyle(Kansei.Color.ambient)
+                    .foregroundStyle(KanseiPalette.ambient)
             }
             HStack {
                 Text(entry.date, style: .date)

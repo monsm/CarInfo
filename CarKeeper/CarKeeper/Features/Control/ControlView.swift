@@ -181,7 +181,7 @@ struct ControlView: View {
                windowRows: [(String, String, String)],
                extraRows: [(String, String, String)],
                lampRows: [(String, String)])) -> some View {
-        ExpandingCardBox(title: "车身状态", side: bd.summary, sideCls: bd.cls, cornerRadius: Kansei.Radius.medium) {
+        ExpandingCardBox(title: "车身状态", side: bd.summary, sideCls: bd.cls, cornerRadius: KanseiRadius.medium) {
             VStack(spacing: 8) {
                 if !bd.doorRows.isEmpty {
                     sectionLabel("车门")
@@ -221,9 +221,9 @@ struct ControlView: View {
                     let lit = bd.lampRows.filter { $0.1 == "亮" }
                     if !lit.isEmpty {
                         Text(lit.map { $0.0 }.joined(separator: " · "))
-                            .font(KanseiTypo.caption).foregroundStyle(Kansei.Color.warning)
+                            .font(KanseiTypo.caption).foregroundStyle(KanseiPalette.warning)
                     } else {
-                        Text("全部关闭").font(KanseiTypo.caption).foregroundStyle(Kansei.Color.secondary)
+                        Text("全部关闭").font(KanseiTypo.caption).foregroundStyle(KanseiPalette.secondary)
                     }
                 }
             }
@@ -257,7 +257,7 @@ struct ControlView: View {
             }
             // 数据回来后自动重播计数动画（pendingTemp 不变，onChange 会触发）
         }
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .navigationTitle("车控")
             .accessibilityLabel(Text("车控"))
             .accessibilityHint(Text("远程控制车辆：锁车、解锁、空调、座椅加热"))
@@ -363,11 +363,11 @@ struct ControlView: View {
                     .pickerStyle(.menu)
                     .labelsHidden()
                     .font(DS.Typo.subheadline.weight(.semibold))
-                    .tint(Kansei.Color.primary)
+                    .tint(KanseiPalette.primary)
                 } else {
                     Text(name)
                         .font(DS.Typo.subheadline.weight(.semibold))
-                        .foregroundStyle(Kansei.Color.primary)
+                        .foregroundStyle(KanseiPalette.primary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: DS.Space.sm)
@@ -386,7 +386,7 @@ struct ControlView: View {
 
             Text(statusLineText())
                 .font(DS.Typo.footnote)
-                .foregroundStyle(Kansei.Color.secondary)
+                .foregroundStyle(KanseiPalette.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
         }
     }
@@ -435,7 +435,7 @@ struct ControlView: View {
 
     // MARK: 快捷预设场景 (#18)
     private var presetScenesCard: some View {
-        CardBox(title: "快捷场景", cornerRadius: Kansei.Radius.medium) {
+        CardBox(title: "快捷场景", cornerRadius: KanseiRadius.medium) {
             VStack(spacing: 10) {
                 ForEach(Array(presetScenes.enumerated()), id: \.element.key) { idx, scene in
                     Button {
@@ -444,10 +444,10 @@ struct ControlView: View {
                         HStack(spacing: 12) {
                             Image(safeSymbol: scene.symbol, fallback: "car.fill")
                                 .font(Theme.bodyMd)
-                                .foregroundStyle(Kansei.Color.ambient)
+                                .foregroundStyle(KanseiPalette.ambient)
                                 .frame(width: 32, height: 32)
                                 .background(
-                                    Kansei.Color.fillSubtle,
+                                    KanseiPalette.fillSubtle,
                                     in: RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 )
                             VStack(alignment: .leading, spacing: 2) {
@@ -540,7 +540,7 @@ struct ControlView: View {
                             .foregroundStyle(.tertiary)
                         Text(showMoreCommands ? "收起" : "更多指令")
                             .font(Theme.caption)
-                            .foregroundStyle(Kansei.Color.ambient)
+                            .foregroundStyle(KanseiPalette.ambient)
                         Spacer()
                     }
                     .padding(.vertical, 10)
@@ -560,7 +560,7 @@ struct ControlView: View {
                     .font(Theme.bodyMd)
                     .foregroundStyle(Theme.brand)
                     .frame(width: 30, height: 30)
-                    .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(KanseiPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name).font(Theme.body)
                     if let note = item.note {
@@ -583,7 +583,7 @@ struct ControlView: View {
     // MARK: 记录
     private var historyCard: some View {
         ExpandingCardBox(title: "执行记录", side: "\(history.count) 条", sideCls: "na", cornerRadius:
- Kansei.Radius.medium) {
+ KanseiRadius.medium) {
             VStack(spacing: 0) {
                 ForEach(Array(history.enumerated()), id: \.element.id) { idx, item in
                     HStack(spacing: 12) {
@@ -742,7 +742,7 @@ struct ControlView: View {
                 KVRow(k: "任务 ID", v: r.taskId.isEmpty ? "--" : r.taskId)
                 Spacer()
             }
-            .padding(Kansei.Spacing.xl)
+            .padding(KanseiSpacing.xl)
         }
     }
 
@@ -771,11 +771,11 @@ struct CarTopView: View {
     var windowsOpen: Bool
 
     private func color(_ cls: String) -> Color {
-        cls == "bad" ? Kansei.Color.warning : Kansei.Color.success
+        cls == "bad" ? KanseiPalette.warning : KanseiPalette.success
     }
 
     private func doorColor(_ idx: Int) -> Color {
-        guard doorCls.indices.contains(idx) else { return Kansei.Color.success }
+        guard doorCls.indices.contains(idx) else { return KanseiPalette.success }
         return color(doorCls[idx])
     }
 
@@ -792,9 +792,9 @@ struct CarTopView: View {
                 Path(CGRect(origin: .zero, size: size)),
                 with: .radialGradient(
                     Gradient(colors: [
-                        Kansei.Color.primary.opacity(0.06),
-                        Kansei.Color.primary.opacity(0.015),
-                        Kansei.Color.primary.opacity(0.0)
+                        KanseiPalette.primary.opacity(0.06),
+                        KanseiPalette.primary.opacity(0.015),
+                        KanseiPalette.primary.opacity(0.0)
                     ]),
                     center: CGPoint(x: size.width / 2, y: size.height * 0.52),
                     startRadius: 0,
@@ -832,7 +832,7 @@ struct CarTopView: View {
             control1: CGPoint(x: 80, y: 34),
             control2: CGPoint(x: 114, y: 26))
             outline.closeSubpath()
-            ctx.stroke(xf(outline), with: .color(Kansei.Color.primary.opacity(0.85)),
+            ctx.stroke(xf(outline), with: .color(KanseiPalette.primary.opacity(0.85)),
                        style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
 
             // 风挡 / 天窗 / 后风挡
@@ -847,11 +847,11 @@ struct CarTopView: View {
             windshield.addLine(to: CGPoint(x: 245, y: 84))
             windshield.addLine(to: CGPoint(x: 75, y: 84))
             windshield.closeSubpath()
-            ctx.stroke(xf(windshield), with: .color(Kansei.Color.secondary),
+            ctx.stroke(xf(windshield), with: .color(KanseiPalette.secondary),
                        style: StrokeStyle(lineWidth: 1.3, lineJoin: .round))
 
             let roof = Path(roundedRect: CGRect(x: 92, y: 98, width: 136, height: 76), cornerRadius: 16)
-            ctx.stroke(xf(roof), with: .color(Kansei.Color.secondary), style: StrokeStyle(lineWidth: 1.3))
+            ctx.stroke(xf(roof), with: .color(KanseiPalette.secondary), style: StrokeStyle(lineWidth: 1.3))
 
             var rear = Path()
             rear.move(to: CGPoint(x: 75, y: 278))
@@ -864,7 +864,7 @@ struct CarTopView: View {
             control2: CGPoint(x: 220, y: 328))
             rear.addLine(to: CGPoint(x: 245, y: 278))
             rear.closeSubpath()
-            ctx.stroke(xf(rear), with: .color(Kansei.Color.secondary), style: StrokeStyle(lineWidth: 1.3))
+            ctx.stroke(xf(rear), with: .color(KanseiPalette.secondary), style: StrokeStyle(lineWidth: 1.3))
 
             // 后视镜
             var mirrorL = Path()
@@ -879,8 +879,8 @@ struct CarTopView: View {
             mirrorR.addLine(to: CGPoint(x: 277, y: 110))
             mirrorR.addLine(to: CGPoint(x: 263, y: 105))
             mirrorR.closeSubpath()
-            ctx.stroke(xf(mirrorL), with: .color(Kansei.Color.secondary), style: StrokeStyle(lineWidth: 1.3))
-            ctx.stroke(xf(mirrorR), with: .color(Kansei.Color.secondary), style: StrokeStyle(lineWidth: 1.3))
+            ctx.stroke(xf(mirrorL), with: .color(KanseiPalette.secondary), style: StrokeStyle(lineWidth: 1.3))
+            ctx.stroke(xf(mirrorR), with: .color(KanseiPalette.secondary), style: StrokeStyle(lineWidth: 1.3))
 
             // 四门状态线：绿 = 已关，橙 = 未关
             let doorSpans: [(CGFloat, CGFloat, CGFloat)] = [
@@ -903,7 +903,7 @@ struct CarTopView: View {
             var trunk = Path()
             trunk.move(to: CGPoint(x: 112, y: 336))
             trunk.addLine(to: CGPoint(x: 208, y: 336))
-            let trunkColor = trunkOpen ? Kansei.Color.warning : Kansei.Color.success
+            let trunkColor = trunkOpen ? KanseiPalette.warning : KanseiPalette.success
             if trunkOpen {
                 ctx.drawLayer { layer in
                     layer.addFilter(.blur(radius: 5))
@@ -922,9 +922,9 @@ struct CarTopView: View {
                 var wr = Path()
                 wr.move(to: CGPoint(x: 267, y: 96))
                 wr.addLine(to: CGPoint(x: 267, y: 250))
-                ctx.stroke(xf(wl), with: .color(Kansei.Color.warning.opacity(0.45)),
+                ctx.stroke(xf(wl), with: .color(KanseiPalette.warning.opacity(0.45)),
                            style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                ctx.stroke(xf(wr), with: .color(Kansei.Color.warning.opacity(0.45)),
+                ctx.stroke(xf(wr), with: .color(KanseiPalette.warning.opacity(0.45)),
                            style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
             }
         }
@@ -952,7 +952,7 @@ struct PINKeypadView: View {
                     Text(i < pin.count ? String(pin[pin.index(pin.startIndex, offsetBy: i)]) : "")
                         .font(Theme.d4)
                         .frame(width: 42, height: 54)
-                        .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 12, style:
+                        .background(KanseiPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 12, style:
  .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(i == pin.count ? Theme.brand : Color(.systemGray4),
@@ -971,7 +971,7 @@ struct PINKeypadView: View {
                         }
                         .font(Theme.d4)
                         .frame(maxWidth: .infinity, minHeight: 56)
-                        .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 14, style:
+                        .background(KanseiPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 14, style:
  .continuous))
                         .foregroundStyle(.primary)
                     }

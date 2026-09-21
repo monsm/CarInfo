@@ -74,7 +74,7 @@ final class APIClient: @unchecked Sendable {
         self.session = URLSession(configuration: cfg)
     }
 
-    struct Result {
+    struct Response {
         let status: Int
         let headers: [String: String]
         let body: Data
@@ -86,7 +86,7 @@ final class APIClient: @unchecked Sendable {
     /// 网络层瞬时故障（超时 / 断网 / 5xx）由 `Retrier.global` 按策略自动重发；
     /// 业务层错误（token 过期、4xx）抛出后不会重试，交由上层决定。
     func request(url: String, method: String = "POST", body: Any? = nil, token: String? = nil,
-                 raw: Data? = nil, retryable: Bool = true) async throws -> Result {
+                 raw: Data? = nil, retryable: Bool = true) async throws -> Response {
         guard let u = URL(string: url) else {
             throw APIError(message: "非法 URL：\(url)")
         }
@@ -113,7 +113,7 @@ final class APIClient: @unchecked Sendable {
 
         RawLogStore.shared.logRequest(method: method, url: url, body: req.httpBody)
 
-        let oneShot: () async throws -> Result = { [self] in
+        let oneShot: () async throws -> Response = { [self] in
             let (data, resp) = try await session.data(for: req)
             guard let http = resp as? HTTPURLResponse else {
                 throw APIError(message: "无效的 HTTP 响应")
@@ -138,7 +138,7 @@ final class APIClient: @unchecked Sendable {
                 e.statusCode = http.statusCode
                 throw e
             }
-            return Result(status: http.statusCode, headers: hdrs, body: data)
+            return Response(status: http.statusCode, headers: hdrs, body: data)
         }
 
         // 仅当调用方允许重试、且该请求是幂等的（GET / 幂等 POST）时走全局重试；
@@ -211,7 +211,7 @@ final class APIClient: @unchecked Sendable {
             "tel": phone, "picKey": phone
         ])
         // 发短信有副作用（真实下发短信），绝不自动重试。
-        let sendOnce: () async throws -> Result = { [self] in
+        let sendOnce: () async throws -> Response = { [self] in
             try await request(url: "\(APIConfig.authURL)/smsSend", method: "POST", body: params, retryable: false)
         }
         do {

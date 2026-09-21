@@ -36,12 +36,12 @@ struct BatteryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: Kansei.Spacing.lg) {
+            VStack(spacing: KanseiSpacing.lg) {
                 sections
             }
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .navigationTitle("充电")
         .navigationBarTitleDisplayMode(.large)
             .accessibilityLabel(Text("充电"))
@@ -107,12 +107,12 @@ struct BatteryView: View {
                 Text(e.chargeText)
                     .font(DS.Typo.footnote)
                     .foregroundStyle(e.chargeCls == "ok" || e.chargeCls == "charge"
-                                     ? Kansei.Color.info : Kansei.Color.secondary)
+                                     ? KanseiPalette.info : KanseiPalette.secondary)
                 Spacer(minLength: DS.Space.sm)
                 if !e.socWarn.isEmpty {
                     Text(e.socWarn)
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(Kansei.statusColor(e.socCls))
+                        .foregroundStyle(KanseiPalette.statusColor(e.socCls))
                 }
             }
 
@@ -129,16 +129,16 @@ struct BatteryView: View {
             HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
                 Text("续航 \(rangeText) km")
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
                 Spacer(minLength: DS.Space.sm)
                 if let ttf = e.timeToFull, ttf != "--" {
                     Text("预计充满 \(ttf)")
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                 } else if let tte = e.timeToEmpty, tte != "--" {
                     Text("可行驶 \(tte)")
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                 }
             }
             .padding(.top, DS.Space.md)
@@ -158,9 +158,9 @@ struct BatteryView: View {
     // MARK: SOC 语义色（不用渐变，颜色只表达健康度）
     private func socTint(_ pct: Int) -> Color {
         switch pct {
-        case ..<20: return Kansei.Color.error
-        case ..<40: return Kansei.Color.warning
-        default: return Kansei.Color.success
+        case ..<20: return KanseiPalette.error
+        case ..<40: return KanseiPalette.warning
+        default: return KanseiPalette.success
         }
     }
 
@@ -169,12 +169,12 @@ struct BatteryView: View {
         Group {
             if let batt = AN.summarize(cache, store.car).domains.first(where: { $0.key == "battery" }) {
                 ExpandingCardBox(title: "分析结论", side: batt.title,
-                                 sideCls: batt.cls, cornerRadius: Kansei.Radius.medium) {
+                                 sideCls: batt.cls, cornerRadius: KanseiRadius.medium) {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(Array(batt.reasons.enumerated()), id: \.offset) { _, r in
                             HStack(alignment: .top, spacing: 8) {
                                 StatusDot(cls: r.cls)
-                                Text(r.t).font(KanseiTypo.caption).foregroundStyle(Kansei.Color.secondary)
+                                Text(r.t).font(KanseiTypo.caption).foregroundStyle(KanseiPalette.secondary)
                             }
                         }
                     }
@@ -187,14 +187,14 @@ struct BatteryView: View {
     private func consistencyCard(_ b: BatteryModel) -> some View {
         let cellLabel = b.cellStats.map { cell in "\(cell.count) 节采样" } ?? "接口未上报"
         return ExpandingCardBox(title: "一致性", side: cellLabel, sideCls: "ok",
-                         cornerRadius: Kansei.Radius.medium) {
+                         cornerRadius: KanseiRadius.medium) {
             VStack(spacing: 12) {
                 if let cell = b.cellStats {
                     VStack(spacing: 6) {
                         sectionLabel("单体电压 (V)")
                         Chart(Array(cell.bars.enumerated()), id: \.offset) { (_ idx, v) in
                             BarMark(x: .value("序号", idx), y: .value("V", v))
-                                .foregroundStyle(Kansei.Color.success.opacity(0.7))
+                                .foregroundStyle(KanseiPalette.success.opacity(0.7))
                                 .cornerRadius(1.5)
                         }
                         .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
@@ -214,7 +214,7 @@ struct BatteryView: View {
                         sectionLabel("温度探针 (℃)")
                         Chart(Array(probe.bars.enumerated()), id: \.offset) { (_ idx, v) in
                             BarMark(x: .value("序号", idx), y: .value("℃", v))
-                                .foregroundStyle(Kansei.Color.ambient.opacity(0.55))
+                                .foregroundStyle(KanseiPalette.ambient.opacity(0.55))
                                 .cornerRadius(1.5)
                         }
                         .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
@@ -236,7 +236,7 @@ struct BatteryView: View {
     private func chargeCard(_ b: BatteryModel) -> some View {
         let chargeSide = b.charging.cls.isEmpty ? "na" : b.charging.cls
         ExpandingCardBox(title: "充电", side: b.charging.text, sideCls: chargeSide,
-                         cornerRadius: Kansei.Radius.medium) {
+                         cornerRadius: KanseiRadius.medium) {
             VStack(spacing: 0) {
                 let rows = chargeRows(b)
                 ForEach(Array(rows.enumerated()), id: \.offset) { (_ idx, r) in
@@ -284,12 +284,12 @@ struct BatteryView: View {
     private func motorCard(_ b: BatteryModel) -> some View {
         Group {
             if !b.motors.isEmpty {
-                ExpandingCardBox(title: "动力系统", side: "\(b.motors.count) 台电机", cornerRadius: Kansei.Radius.medium) {
+                ExpandingCardBox(title: "动力系统", side: "\(b.motors.count) 台电机", cornerRadius: KanseiRadius.medium) {
                     VStack(spacing: 12) {
                         ForEach(Array(b.motors.enumerated()), id: \.offset) { (_ idx, m) in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(m.num == "--" ? "驱动电机" : "驱动电机 #\(m.num)")
-                                    .font(KanseiTypo.caption.weight(.bold)).foregroundStyle(Kansei.Color.secondary)
+                                    .font(KanseiTypo.caption.weight(.bold)).foregroundStyle(KanseiPalette.secondary)
                                 let rows = motorRows(m)
                                 ForEach(Array(rows.enumerated()), id: \.offset) { (_ idx, r) in
                                     KVRow(k: r.k, v: r.v)
@@ -324,11 +324,11 @@ struct BatteryView: View {
                             if !f.codes.isEmpty {
                                 Text(f.codes)
                                     .font(Theme.mono)
-                                    .foregroundStyle(Kansei.Color.secondary).lineLimit(3)
+                                    .foregroundStyle(KanseiPalette.secondary).lineLimit(3)
                             }
                         }
                         .padding(10)
-                        .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 12, style:
+                        .background(KanseiPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 12, style:
  .continuous))
                     }
                 }
@@ -374,7 +374,7 @@ struct BatteryView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(KanseiPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private struct R { let k: String; let v: String; var cls: String = "" }
@@ -441,11 +441,11 @@ struct BatteryView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text("SOC 历史")
                         .font(DS.Typo.subheadline.weight(.semibold))
-                        .foregroundStyle(Kansei.Color.primary)
+                        .foregroundStyle(KanseiPalette.primary)
                     Spacer(minLength: DS.Space.sm)
                     Text("当前 \(e.socPct)%")
                         .font(DS.Typo.digits(13))
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                 }
                 if socPoints.count >= 2 {
                     DSTrendChart(points: socPoints,
@@ -469,18 +469,18 @@ struct BatteryView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text("充电功率")
                         .font(DS.Typo.subheadline.weight(.semibold))
-                        .foregroundStyle(Kansei.Color.primary)
+                        .foregroundStyle(KanseiPalette.primary)
                     Spacer(minLength: DS.Space.sm)
                     if let c = e.charging {
                         Text(c.power)
                             .font(DS.Typo.digits(13))
-                            .foregroundStyle(Kansei.Color.info)
+                            .foregroundStyle(KanseiPalette.info)
                     }
                 }
                 if powerPoints.count >= 2 {
                     DSTrendChart(points: powerPoints,
                                  unit: "kW",
-                                 tint: Kansei.Color.info,
+                                 tint: KanseiPalette.info,
                                  height: 132,
                                  valueText: { String(format: "%.0f", $0) })
                 } else {
@@ -568,7 +568,7 @@ struct DestinationCalculatorView: View {
                 .keyboardType(.decimalPad)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 12))
+                .background(KanseiPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1))
 
             if let reach = canReach {

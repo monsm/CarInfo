@@ -130,10 +130,10 @@ struct VehicleTipsView: View {
                     }
                 }
             }
-            .padding(.horizontal, Kansei.Spacing.lg)
-            .padding(.vertical, Kansei.Spacing.md)
+            .padding(.horizontal, KanseiSpacing.lg)
+            .padding(.vertical, KanseiSpacing.md)
         }
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .navigationTitle("车辆提示")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -141,7 +141,7 @@ struct VehicleTipsView: View {
                 Button(action: dismissAll) {
                     Text("全部已读")
                         .font(.caption)
-                        .foregroundStyle(Kansei.Color.ambient)
+                        .foregroundStyle(KanseiPalette.ambient)
                 }
             }
         }
@@ -158,8 +158,8 @@ struct VehicleTipsView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(selectedCategory == cat ? Kansei.Color.ambient.opacity(0.2) : Color.clear)
-                            .foregroundStyle(selectedCategory == cat ? Kansei.Color.ambient : Kansei.Color.secondary)
+                            .background(selectedCategory == cat ? KanseiPalette.ambient.opacity(0.2) : Color.clear)
+                            .foregroundStyle(selectedCategory == cat ? KanseiPalette.ambient : KanseiPalette.secondary)
                             .cornerRadius(16)
                     }
                 }
@@ -201,7 +201,7 @@ struct VehicleTipsView: View {
                     Button(action: { handleAction(tip) }) {
                         Text(action)
                             .font(.caption)
-                            .foregroundStyle(Kansei.Color.ambient)
+                            .foregroundStyle(KanseiPalette.ambient)
                     }
                 }
 
@@ -213,7 +213,7 @@ struct VehicleTipsView: View {
             }
         }
         .padding()
-        .glassCard(corner: Kansei.Radius.small)
+        .glassCard(corner: KanseiRadius.small)
         .onTapGesture {
             if tip.severity != .info { dismiss(tip) }
         }

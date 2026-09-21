@@ -18,7 +18,7 @@ struct CrashLogViewer: View {
             }
         }
         .listStyle(.plain)
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .navigationTitle("崩溃日志")
         .toolbar {
             Button("清除日志") { reporter.clearCrashHistory() }
@@ -32,7 +32,7 @@ struct PerformanceReport: View {
     @StateObject private var tracker = PerformanceTracker.shared
 
     var body: some View {
-        VStack(spacing: Kansei.Spacing.md) {
+        VStack(spacing: KanseiSpacing.md) {
             HStack {
                 Text("页面加载时间")
                 Spacer()

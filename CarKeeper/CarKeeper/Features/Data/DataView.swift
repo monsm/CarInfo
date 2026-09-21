@@ -68,7 +68,7 @@ struct DataView: View {
                     }
                     Text(footerText)
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(Kansei.Color.tertiary)
+                        .foregroundStyle(KanseiPalette.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, DS.Hair.inset)
                 }
@@ -78,7 +78,7 @@ struct DataView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .navigationTitle("全量数据")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { kindMenu }
@@ -126,7 +126,7 @@ struct DataView: View {
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 10, weight: .semibold))
             }
-            .foregroundStyle(Kansei.Color.ambient)
+            .foregroundStyle(KanseiPalette.ambient)
         }
         .accessibilityLabel(Text("数据分类：\(kind.title)"))
     }
@@ -139,7 +139,7 @@ struct DataView: View {
                 ProgressView().controlSize(.small)
                 Text("正在整理 \(kind.title)…")
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
             }
             DSSkeleton(height: 44)
             DSSkeleton(height: 132)
@@ -185,12 +185,12 @@ struct DataView: View {
             DSSectionHeader(title: b.h)
             Text(headline.isEmpty ? "—" : headline)
                 .font(DS.Typo.title2)
-                .foregroundStyle(Kansei.Color.primary)
+                .foregroundStyle(KanseiPalette.primary)
                 .fixedSize(horizontal: false, vertical: true)
             if !detail.isEmpty {
                 Text(detail)
                     .font(DS.Typo.subheadline)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, DS.Space.xs)
             }

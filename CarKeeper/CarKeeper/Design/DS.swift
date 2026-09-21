@@ -258,7 +258,7 @@ struct DSCanvas<Content: View>: View {
 
     var body: some View {
         ZStack {
-            Kansei.Color.background.ignoresSafeArea()
+            KanseiPalette.background.ignoresSafeArea()
             content()
         }
     }
@@ -295,7 +295,7 @@ struct DSCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(Kansei.Color.nightSurface)
+                    .fill(KanseiPalette.nightSurface)
             }
     }
 }
@@ -318,7 +318,7 @@ struct DSDivider: View {
     var inset: CGFloat = 0
     var body: some View {
         Rectangle()
-            .fill(Kansei.Color.glassBorder)
+            .fill(KanseiPalette.glassBorder)
             .frame(height: DS.Hair.line)
             .padding(.leading, inset)
     }
@@ -355,14 +355,14 @@ struct DSGroup<Content: View>: View {
             VStack(spacing: 0) { content() }
                 .background {
                     RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                        .fill(Kansei.Color.nightSurface)
+                        .fill(KanseiPalette.nightSurface)
                 }
                 // 裁剪掉圆角：行的按压底色是矩形，不裁会在分组四角露出方角
                 .clipShape(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous))
             if let footer {
                 Text(footer)
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6)
             }
@@ -400,12 +400,12 @@ struct DSKeyValueRow: View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Space.md) {
             Text(key)
                 .font(DS.Typo.subheadline)
-                .foregroundStyle(Kansei.Color.primary)
+                .foregroundStyle(KanseiPalette.primary)
                 .lineLimit(2)
             Spacer(minLength: DS.Space.sm)
             Text(value)
                 .font(mono ? DS.Typo.dataSmall : DS.Typo.subheadline)
-                .foregroundStyle(valueCls == "na" ? Kansei.Color.secondary : Kansei.statusColor(valueCls))
+                .foregroundStyle(valueCls == "na" ? KanseiPalette.secondary : KanseiPalette.statusColor(valueCls))
                 .multilineTextAlignment(.trailing)
                 .layoutPriority(1)
         }
@@ -429,18 +429,18 @@ struct DSSectionHeader: View {
             Text(title.uppercased())
                 .font(DS.Typo.footnote)
                 .tracking(0.2)
-                .foregroundStyle(Kansei.Color.secondary)
+                .foregroundStyle(KanseiPalette.secondary)
             Spacer(minLength: DS.Space.sm)
             if let trailing {
                 if let action {
                     Button(trailing, action: action)
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(Kansei.Color.ambient)
+                        .foregroundStyle(KanseiPalette.ambient)
                         .buttonStyle(.plain)
                 } else {
                     Text(trailing)
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(Kansei.Color.tertiary)
+                        .foregroundStyle(KanseiPalette.tertiary)
                 }
             }
         }
@@ -454,7 +454,7 @@ struct DSBigNumber: View {
     var unit: String? = nil
     var caption: String? = nil
     var size: CGFloat = 96
-    var tint: Color = Kansei.Color.primary
+    var tint: Color = KanseiPalette.primary
     var alignment: HorizontalAlignment = .leading
 
     var body: some View {
@@ -470,13 +470,13 @@ struct DSBigNumber: View {
                 if let unit {
                     Text(unit)
                         .font(DS.Typo.metric(size * 0.30))
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                 }
             }
             if let caption {
                 Text(caption)
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -489,7 +489,7 @@ struct DSMetric: View {
     var unit: String? = nil
     var caption: String? = nil
     var size: CGFloat = 72
-    var tint: Color = Kansei.Color.primary
+    var tint: Color = KanseiPalette.primary
     var alignment: HorizontalAlignment = .leading
 
     var body: some View {
@@ -565,7 +565,7 @@ struct DSStatStrip: View {
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
                 if idx > 0 {
                     Rectangle()
-                        .fill(Kansei.Color.glassBorder)
+                        .fill(KanseiPalette.glassBorder)
                         .frame(width: DS.Hair.line)
                         .frame(maxHeight: .infinity)
                 }
@@ -579,10 +579,10 @@ struct DSStatStrip: View {
                             .lineLimit(1)
                     }
                     .font(DS.Typo.caption)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
                     Text(item.value)
                         .font(DS.Typo.data)
-                        .foregroundStyle(item.cls == "na" ? Kansei.Color.primary : Kansei.statusColor(item.cls))
+                        .foregroundStyle(item.cls == "na" ? KanseiPalette.primary : KanseiPalette.statusColor(item.cls))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
@@ -602,7 +602,7 @@ struct DSChip: View {
     var cls: String = "na"
     var icon: String? = nil
 
-    private var color: Color { Kansei.statusColor(cls) }
+    private var color: Color { KanseiPalette.statusColor(cls) }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -617,7 +617,7 @@ struct DSChip: View {
             }
             Text(text)
                 .font(DS.Typo.footnote)
-                .foregroundStyle(cls == "na" ? Kansei.Color.secondary : color)
+                .foregroundStyle(cls == "na" ? KanseiPalette.secondary : color)
                 .lineLimit(1)
         }
         .accessibilityElement(children: .combine)
@@ -636,16 +636,16 @@ struct DSStatRow: View {
             if let icon {
                 Image(safeSymbol: icon, fallback: "circle")
                     .font(.system(size: DS.Size.iconSm))
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
                     .frame(width: 20)
             }
             Text(label)
                 .font(DS.Typo.body)
-                .foregroundStyle(Kansei.Color.primary)
+                .foregroundStyle(KanseiPalette.primary)
             Spacer(minLength: DS.Space.md)
             Text(value)
                 .font(DS.Typo.data)
-                .foregroundStyle(valueCls == "na" ? Kansei.Color.secondary : Kansei.statusColor(valueCls))
+                .foregroundStyle(valueCls == "na" ? KanseiPalette.secondary : KanseiPalette.statusColor(valueCls))
                 .multilineTextAlignment(.trailing)
         }
         .frame(minHeight: DS.Space.row)
@@ -666,14 +666,14 @@ struct DSStatTile: View {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
                     .font(DS.Typo.metric(28))
-                    .foregroundStyle(cls == "na" ? Kansei.Color.primary : Kansei.statusColor(cls))
+                    .foregroundStyle(cls == "na" ? KanseiPalette.primary : KanseiPalette.statusColor(cls))
                     .contentTransition(.numericText())
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 if let unit {
                     Text(unit)
                         .font(DS.Typo.caption)
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                 }
             }
             HStack(spacing: 4) {
@@ -685,7 +685,7 @@ struct DSStatTile: View {
                     .lineLimit(1)
             }
             .font(DS.Typo.caption)
-            .foregroundStyle(Kansei.Color.secondary)
+            .foregroundStyle(KanseiPalette.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -717,17 +717,17 @@ struct DSRow: View {
             if let icon {
                 Image(safeSymbol: icon, fallback: "circle")
                     .font(.system(size: DS.Size.icon))
-                    .foregroundStyle(Kansei.Color.ambient)
+                    .foregroundStyle(KanseiPalette.ambient)
                     .frame(width: DS.Size.iconColumn, alignment: .center)
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(DS.Typo.body)
-                    .foregroundStyle(Kansei.Color.primary)
+                    .foregroundStyle(KanseiPalette.primary)
                 if let subtitle {
                     Text(subtitle)
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                         .lineLimit(2)
                 }
             }
@@ -735,13 +735,13 @@ struct DSRow: View {
             if let value {
                 Text(value)
                     .font(DS.Typo.data)
-                    .foregroundStyle(valueCls == "na" ? Kansei.Color.secondary : Kansei.statusColor(valueCls))
+                    .foregroundStyle(valueCls == "na" ? KanseiPalette.secondary : KanseiPalette.statusColor(valueCls))
                     .multilineTextAlignment(.trailing)
             }
             if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Kansei.Color.tertiary)
+                    .foregroundStyle(KanseiPalette.tertiary)
             }
         }
         .frame(minHeight: DS.Space.row)
@@ -753,7 +753,7 @@ struct DSRow: View {
 struct DSRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(configuration.isPressed ? Kansei.Color.fillSubtle : Color.clear)
+            .background(configuration.isPressed ? KanseiPalette.fillSubtle : Color.clear)
             .animation(DS.Motion.press, value: configuration.isPressed)
     }
 }
@@ -770,7 +770,7 @@ struct DSTile: View {
     var action: () -> Void
 
     private var accent: Color {
-        isActive ? Kansei.statusColor(cls) : Kansei.Color.primary
+        isActive ? KanseiPalette.statusColor(cls) : KanseiPalette.primary
     }
 
     var body: some View {
@@ -793,7 +793,7 @@ struct DSTile: View {
                 if let subtitle {
                     Text(subtitle)
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                         .lineLimit(1)
                 }
             }
@@ -802,7 +802,7 @@ struct DSTile: View {
             .frame(minHeight: 84, alignment: .topLeading)
             .background {
                 RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                    .fill(Kansei.Color.nightSurface)
+                    .fill(KanseiPalette.nightSurface)
             }
         }
         .buttonStyle(DSCardButtonStyle())
@@ -813,7 +813,7 @@ struct DSTile: View {
 
 /// 主操作按钮（一屏最多一个）：实心胶囊
 struct DSPrimaryButtonStyle: ButtonStyle {
-    var tint: Color = Kansei.Color.ambient
+    var tint: Color = KanseiPalette.ambient
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -833,10 +833,10 @@ struct DSSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(DS.Typo.headline)
-            .foregroundStyle(Kansei.Color.primary)
+            .foregroundStyle(KanseiPalette.primary)
             .frame(maxWidth: .infinity)
             .frame(height: DS.Size.button)
-            .background(Capsule().fill(Kansei.Color.glassLight))
+            .background(Capsule().fill(KanseiPalette.glassLight))
             .opacity(configuration.isPressed ? 0.65 : 1)
             .animation(DS.Motion.press, value: configuration.isPressed)
     }
@@ -845,14 +845,14 @@ struct DSSecondaryButtonStyle: ButtonStyle {
 /// 图标按钮（导航栏、行尾）
 struct DSIconButtonStyle: ButtonStyle {
     var size: CGFloat = DS.Size.tap
-    var tint: Color = Kansei.Color.primary
+    var tint: Color = KanseiPalette.primary
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: DS.Size.iconLg))
             .foregroundStyle(tint)
             .frame(width: size, height: size)
-            .background(Circle().fill(configuration.isPressed ? Kansei.Color.glassLight : Color.clear))
+            .background(Circle().fill(configuration.isPressed ? KanseiPalette.glassLight : Color.clear))
             .contentShape(Circle())
             .animation(DS.Motion.press, value: configuration.isPressed)
     }
@@ -872,13 +872,13 @@ struct DSSegmented<T: Hashable>: View {
                 } label: {
                     Text(option.title)
                         .font(DS.Typo.subheadline.weight(selected ? .semibold : .regular))
-                        .foregroundStyle(Kansei.Color.primary)
+                        .foregroundStyle(KanseiPalette.primary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 32)
                         .background {
                             if selected {
                                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                    .fill(Kansei.Color.nightSurface)
+                                    .fill(KanseiPalette.nightSurface)
                                     .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
                             }
                         }
@@ -888,7 +888,7 @@ struct DSSegmented<T: Hashable>: View {
             }
         }
         .padding(2)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Kansei.Color.glassLight))
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(KanseiPalette.glassLight))
     }
 }
 
@@ -923,23 +923,23 @@ struct DSNotice: View {
         HStack(spacing: DS.Space.sm) {
             Image(safeSymbol: kind.icon, fallback: "info.circle.fill")
                 .font(.system(size: 15))
-                .foregroundStyle(Kansei.statusColor(kind.cls))
+                .foregroundStyle(KanseiPalette.statusColor(kind.cls))
             Text(text)
                 .font(DS.Typo.footnote)
-                .foregroundStyle(Kansei.Color.primary)
+                .foregroundStyle(KanseiPalette.primary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: DS.Space.sm)
             if let action {
                 Button(action.title, action: action.run)
                     .font(DS.Typo.footnote.weight(.semibold))
-                    .foregroundStyle(Kansei.Color.ambient)
+                    .foregroundStyle(KanseiPalette.ambient)
                     .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, DS.Space.md)
         .padding(.vertical, DS.Space.sm)
         .background(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-            .fill(Kansei.Color.nightSurface))
+            .fill(KanseiPalette.nightSurface))
         .accessibilityElement(children: .combine)
     }
 }
@@ -957,15 +957,15 @@ struct DSPlaceholder: View {
         VStack(spacing: DS.Space.md) {
             Image(safeSymbol: icon, fallback: "questionmark.circle")
                 .font(.system(size: 40, weight: .light))
-                .foregroundStyle(cls == "na" ? Kansei.Color.tertiary : Kansei.statusColor(cls))
+                .foregroundStyle(cls == "na" ? KanseiPalette.tertiary : KanseiPalette.statusColor(cls))
             Text(title)
                 .font(DS.Typo.headline)
-                .foregroundStyle(Kansei.Color.primary)
+                .foregroundStyle(KanseiPalette.primary)
                 .multilineTextAlignment(.center)
             if let message {
                 Text(message)
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -988,7 +988,7 @@ struct DSSkeleton: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-            .fill(Kansei.Color.fillSubtle)
+            .fill(KanseiPalette.fillSubtle)
             .frame(width: width, height: height)
             .accessibilityHidden(true)
     }

@@ -59,7 +59,7 @@ struct VehicleView: View {
                               actionTitle: "重新加载",
                               cls: "warn") { reloadVehicle() }
             }
-        }                .background(Kansei.Color.background)
+        }                .background(KanseiPalette.background)
                 .navigationTitle("车辆档案")
         .accessibilityLabel(Text("车辆档案"))
         .accessibilityHint(Text("车牌、VIN、车型配置与保险保养信息，点任意字段可复制"))
@@ -100,7 +100,7 @@ struct VehicleView: View {
                 ProgressView().controlSize(.small)
                 Text("正在加载车辆档案…")
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
             }
             DSSkeleton(height: 96)
             DSSkeleton(height: 132)
@@ -120,7 +120,7 @@ struct VehicleView: View {
             HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
                 Text(sum.plate.isEmpty ? "未绑定车牌" : sum.plate)
                     .font(.system(size: 34, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Kansei.Color.primary)
+                    .foregroundStyle(KanseiPalette.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 if isNev {
@@ -131,14 +131,14 @@ struct VehicleView: View {
 
             Text(sum.name.isEmpty ? "未绑定车辆" : sum.name)
                 .font(DS.Typo.title2)
-                .foregroundStyle(Kansei.Color.primary)
+                .foregroundStyle(KanseiPalette.primary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, DS.Space.sm)
 
             if !sum.model.isEmpty {
                 Text(sum.model)
                     .font(DS.Typo.subheadline)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
             }
@@ -189,19 +189,19 @@ struct VehicleView: View {
             HStack(spacing: DS.Space.sm) {
                 Image(safeSymbol: "barcode", fallback: "number")
                     .font(.system(size: 15))
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
                 Text("VIN")
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
                 Text(sum.vin.isEmpty ? "--" : sum.vin)
                     .font(.system(size: 15, design: .monospaced))
-                    .foregroundStyle(Kansei.Color.primary)
+                    .foregroundStyle(KanseiPalette.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Spacer(minLength: DS.Space.sm)
                 Image(systemName: "doc.on.doc")
                     .font(.system(size: 15))
-                    .foregroundStyle(Kansei.Color.ambient)
+                    .foregroundStyle(KanseiPalette.ambient)
             }
             .frame(minHeight: DS.Space.row)
             .contentShape(Rectangle())
@@ -262,10 +262,10 @@ struct VehicleView: View {
                                 Text("添加")
                                     .font(DS.Typo.caption)
                             }
-                            .foregroundStyle(Kansei.Color.secondary)
+                            .foregroundStyle(KanseiPalette.secondary)
                             .frame(width: 104, height: 78)
                             .background(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                                .fill(Kansei.Color.fillSubtle))
+                                .fill(KanseiPalette.fillSubtle))
                         }
                         .accessibilityLabel(Text("添加维保照片"))
                     }
@@ -399,12 +399,12 @@ struct PhotoPickerSheet: View {
                     }
                     Text("照片会以压缩后的形式保存在本机，用于维修与保养记录。")
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.top, DS.Space.sm)
             }
-            .background(Kansei.Color.background)
+            .background(KanseiPalette.background)
             .navigationTitle("添加照片")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

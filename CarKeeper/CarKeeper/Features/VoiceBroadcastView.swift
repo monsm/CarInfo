@@ -93,7 +93,7 @@ struct VoiceBroadcastCard: View {
 
     var body: some View {
         CardBox(title: "语音播报") {
-            VStack(spacing: Kansei.Spacing.sm) {
+            VStack(spacing: KanseiSpacing.sm) {
                 HStack {
                     VStack(alignment: .leading) {
                         Text("启用语音播报")
@@ -110,7 +110,7 @@ struct VoiceBroadcastCard: View {
                 if vm.isSpeaking {
                     HStack {
                         Image(systemName: "speaker.wave.3.fill")
-                            .foregroundColor(Kansei.Color.ambient)
+                            .foregroundColor(KanseiPalette.ambient)
                         Text(vm.currentMessage)
                             .font(.caption)
                             .foregroundColor(.secondary)

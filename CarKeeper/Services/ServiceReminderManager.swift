@@ -122,7 +122,7 @@ struct ServiceReminderRow: View {
         let kmUntil = reminder.nextMileageKm - currentMileage
         let isUrgent = daysUntil <= 7 || kmUntil <= 500
 
-        HStack(spacing: Kansei.Spacing.sm) {
+        HStack(spacing: KanseiSpacing.sm) {
             Image(safeSymbol: reminder.type.icon, fallback: "wrench.and.screwdriver.fill")
                 .font(.title2)
                 .frame(width: 40, height: 40)
@@ -145,7 +145,7 @@ struct ServiceReminderRow: View {
                 // 触发完成操作
             }
             .font(.caption)
-            .padding(.horizontal, Kansei.Spacing.md)
+            .padding(.horizontal, KanseiSpacing.md)
             .padding(.vertical, Theme.Spacing.xs)
             .background(isUrgent ? Color.orange : Color.blue.opacity(0.2))
             .foregroundColor(isUrgent ? .white : .blue)

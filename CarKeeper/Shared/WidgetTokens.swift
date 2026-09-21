@@ -146,7 +146,7 @@ enum WT {
     }
 
     /// 车况页与小组件共用的深链（App 已注册 carkeeper:// scheme）
-    enum Link {
+    enum DeepLink {
         /// 充电页（Tab 充电）：充电进度组件与实时活动的点击目标
         static let battery = URL(string: "carkeeper://battery")
         /// 车辆档案：状态组件的点击目标

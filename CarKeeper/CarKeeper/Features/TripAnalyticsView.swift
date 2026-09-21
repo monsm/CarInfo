@@ -85,7 +85,7 @@ struct TripAnalyticsView: View {
             .padding(.top, DS.Space.md)
             .padding(.bottom, DS.Space.huge)
         }
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .scrollBounceBehavior(.basedOnSize)
         .navigationTitle("行程")
         .navigationBarTitleDisplayMode(.large)
@@ -106,15 +106,15 @@ struct TripAnalyticsView: View {
     // MARK: - 唯一的大数字
 
     private var totalHeader: some View {
-        VStack(alignment: .leading, spacing: Kansei.Spacing.sm) {
+        VStack(alignment: .leading, spacing: KanseiSpacing.sm) {
             Text(period.rawValue + "合计")
                 .font(KanseiTypo.footnote)
-                .foregroundStyle(Kansei.Color.secondary)
+                .foregroundStyle(KanseiPalette.secondary)
             DSBigNumber(
                 value: String(format: "%.0f", tripStats.totalKm),
                 unit: "km",
                 size: 112,
-                tint: Kansei.Color.ambient
+                tint: KanseiPalette.ambient
             )
         }
     }
@@ -126,11 +126,11 @@ struct TripAnalyticsView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("近 7 日里程")
                     .font(KanseiTypo.footnote)
-                    .foregroundStyle(Kansei.Color.secondary)
-                Spacer(minLength: Kansei.Spacing.sm)
+                    .foregroundStyle(KanseiPalette.secondary)
+                Spacer(minLength: KanseiSpacing.sm)
                 Text(tripStats.avgKm > 0 ? String(format: "平均 %.0f km/次", tripStats.avgKm) : "--")
                     .font(KanseiTypo.caption)
-                    .foregroundStyle(Kansei.Color.tertiary)
+                    .foregroundStyle(KanseiPalette.tertiary)
             }
 
             Chart {
@@ -140,7 +140,7 @@ struct TripAnalyticsView: View {
                         x: .value("日期", item.0, unit: .day),
                         y: .value("里程", item.1)
                     )
-                    .foregroundStyle(isToday(item.0) ? Kansei.Color.ambient : Kansei.Color.glassBorder)
+                    .foregroundStyle(isToday(item.0) ? KanseiPalette.ambient : KanseiPalette.glassBorder)
                     .cornerRadius(6)
                 }
             }
@@ -148,7 +148,7 @@ struct TripAnalyticsView: View {
                 AxisMarks(values: .stride(by: .day)) { value in
                     AxisValueLabel(format: .dateTime.weekday(.narrow))
                         .font(KanseiTypo.caption2)
-                        .foregroundStyle(Kansei.Color.tertiary)
+                        .foregroundStyle(KanseiPalette.tertiary)
                 }
             }
             .chartYAxis(.hidden)
@@ -165,7 +165,7 @@ struct TripAnalyticsView: View {
     // MARK: - 汇总（iOS 行）
 
     private var behaviorSection: some View {
-        VStack(alignment: .leading, spacing: Kansei.Spacing.sm) {
+        VStack(alignment: .leading, spacing: KanseiSpacing.sm) {
             DSSectionHeader(title: "行程汇总")
             DSCard {
                 VStack(alignment: .leading, spacing: 0) {

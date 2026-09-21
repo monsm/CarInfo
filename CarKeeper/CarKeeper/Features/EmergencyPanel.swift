@@ -26,10 +26,10 @@ struct EmergencyPanel: View {
                 // 位置共享
                 locationShareCard
             }
-            .padding(.horizontal, Kansei.Spacing.lg)
-            .padding(.vertical, Kansei.Spacing.md)
+            .padding(.horizontal, KanseiSpacing.lg)
+            .padding(.vertical, KanseiSpacing.md)
         }
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .navigationTitle("紧急求助")
         .navigationBarTitleDisplayMode(.inline)
         .alert("确认拨打", isPresented: $showConfirm) {
@@ -86,7 +86,7 @@ struct EmergencyPanel: View {
                 actionButton(icon: "fan.fill", title: "开空调", color: .cyan) { Task { await turnOnAC() } }
             }
         }
-        .glassCard(corner: Kansei.Radius.medium)
+        .glassCard(corner: KanseiRadius.medium)
     }
 
     private func actionButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
@@ -113,7 +113,7 @@ struct EmergencyPanel: View {
             Text("紧急联系人").font(Theme.font(.subheadline as Font).bold())
             HStack {
                 Image(systemName: "person.fill")
-                    .foregroundStyle(Kansei.Color.ambient)
+                    .foregroundStyle(KanseiPalette.ambient)
                 TextField("输入紧急电话", text: $emergencyContact)
                     .keyboardType(.phonePad)
                 Button(action: saveContact) {
@@ -125,7 +125,7 @@ struct EmergencyPanel: View {
             .background(Color.primary.opacity(0.05))
             .cornerRadius(Theme.Radius.small)
         }
-        .glassCard(corner: Kansei.Radius.medium)
+        .glassCard(corner: KanseiRadius.medium)
     }
 
     // MARK: - 位置共享
@@ -147,7 +147,7 @@ struct EmergencyPanel: View {
             }
             .padding()
         }
-        .glassCard(corner: Kansei.Radius.medium)
+        .glassCard(corner: KanseiRadius.medium)
     }
 
     // MARK: - 紧急叠加层

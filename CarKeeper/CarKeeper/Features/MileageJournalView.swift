@@ -98,25 +98,25 @@ struct MileageJournalView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: Kansei.Spacing.md) {
+            VStack(spacing: KanseiSpacing.md) {
                 // 周期选择
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Kansei.Spacing.sm) {
+                    HStack(spacing: KanseiSpacing.sm) {
                         ForEach(months.indices, id: \.self) { i in
                             Text(months[i])
                                 .font(.subheadline)
                                 .foregroundColor(currentPeriod == i ? .white : .secondary)
-                                .padding(.horizontal, Kansei.Spacing.md)
-                                .padding(.vertical, Kansei.Spacing.xs)
-                                .background(currentPeriod == i ? Kansei.Color.ambient : Color.clear)
-                                .cornerRadius(Kansei.Radius.small)
+                                .padding(.horizontal, KanseiSpacing.md)
+                                .padding(.vertical, KanseiSpacing.xs)
+                                .background(currentPeriod == i ? KanseiPalette.ambient : Color.clear)
+                                .cornerRadius(KanseiRadius.small)
                                 .onTapGesture { currentPeriod = i }
                         }
                     }
                 }
 
                 // 统计卡片
-                HStack(spacing: Kansei.Spacing.sm) {
+                HStack(spacing: KanseiSpacing.sm) {
                     ForEach(Array(TripCostType.allCases.prefix(4)), id: \.self) { type in
                         CostSummaryTile(type: type, total: tracker.totalByType(type))
                     }
@@ -145,11 +145,11 @@ struct MileageJournalView: View {
                         .font(.body)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Kansei.Color.ambient)
+                        .background(KanseiPalette.ambient)
                         .foregroundColor(.white)
-                        .cornerRadius(Kansei.Radius.medium)
+                        .cornerRadius(KanseiRadius.medium)
                 }
-                .padding(.top, Kansei.Spacing.sm)
+                .padding(.top, KanseiSpacing.sm)
             }
             .sheet(isPresented: $showAddSheet) {
                 AddCostEntrySheet(selectedType: $selectedType, amountText: $amountText, noteText: $noteText)
@@ -175,7 +175,7 @@ struct CostSummaryTile: View {
         VStack(spacing: Theme.Spacing.xs) {
             Image(safeSymbol: type.icon, fallback: "doc.text.fill")
                 .font(.title2)
-                .foregroundColor(Kansei.Color.ambient)
+                .foregroundColor(KanseiPalette.ambient)
             Text("\(total, specifier: "%.1f")")
                 .font(.callout)
                 .fontWeight(.semibold)
@@ -184,7 +184,7 @@ struct CostSummaryTile: View {
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, Kansei.Spacing.sm)
+        .padding(.vertical, KanseiSpacing.sm)
         .glassCard()
     }
 }
@@ -258,11 +258,11 @@ struct AddCostEntrySheet: View {
 struct CostEntryRow: View {
     let entry: CostEntry
     var body: some View {
-        HStack(spacing: Kansei.Spacing.sm) {
+        HStack(spacing: KanseiSpacing.sm) {
             Image(safeSymbol: entry.type.icon, fallback: "doc.text.fill")
                 .font(.headline)
                 .frame(width: 36, height: 36)
-                .background(Kansei.Color.ambient.opacity(0.15))
+                .background(KanseiPalette.ambient.opacity(0.15))
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 2) {

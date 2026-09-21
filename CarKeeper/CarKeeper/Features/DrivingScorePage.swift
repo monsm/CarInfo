@@ -90,10 +90,10 @@ struct DrivingScorePage: View {
                 // 历史趋势
                 scoreTrend
             }
-            .padding(.horizontal, Kansei.Spacing.lg)
-            .padding(.vertical, Kansei.Spacing.md)
+            .padding(.horizontal, KanseiSpacing.lg)
+            .padding(.vertical, KanseiSpacing.md)
         }
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .navigationTitle("驾驶评分")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityLabel(Text("驾驶评分详情"))
@@ -116,7 +116,7 @@ struct DrivingScorePage: View {
                         .foregroundStyle(scoreColor)
                     Text("分")
                         .font(KanseiTypo.caption)
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                     Text("等级 \(scoreGrade)")
                         .font(KanseiTypo.subheadline)
                         .foregroundStyle(scoreColor)
@@ -132,7 +132,7 @@ struct DrivingScorePage: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .glassCard(corner: Kansei.Radius.large)
+        .glassCard(corner: KanseiRadius.large)
     }
 
     // MARK: - 雷达图
@@ -146,7 +146,7 @@ struct DrivingScorePage: View {
                 RadarSlice(value: comfortScore, label: "舒适", color: .orange)
             }
             .frame(height: 200)
-            .glassCard(corner: Kansei.Radius.medium)
+            .glassCard(corner: KanseiRadius.medium)
         }
     }
 
@@ -205,7 +205,7 @@ struct DrivingScorePage: View {
                 HStack {
                     Image(systemName: "chevron.right.circle.fill")
                         .font(.caption2)
-                        .foregroundStyle(Kansei.Color.ambient)
+                        .foregroundStyle(KanseiPalette.ambient)
                     Text(tip)
                         .font(.caption)
                         .foregroundStyle(.primary)
@@ -247,7 +247,7 @@ struct DrivingScorePage: View {
                 }
             }
             .frame(height: 120)
-            .glassCard(corner: Kansei.Radius.medium)
+            .glassCard(corner: KanseiRadius.medium)
         }
     }
 

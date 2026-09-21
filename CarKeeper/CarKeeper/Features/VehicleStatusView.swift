@@ -46,7 +46,7 @@ struct DTCSeverityBadge: View {
     let description: String
 
     var body: some View {
-        HStack(spacing: Kansei.Spacing.sm) {
+        HStack(spacing: KanseiSpacing.sm) {
             Image(safeSymbol: severity.icon, fallback: "exclamationmark.triangle.fill")
                 .foregroundColor(severity.color)
                 .font(.title3)
@@ -105,7 +105,7 @@ struct DriveModeDisplay: View {
     let onModeChange: (DriveMode) -> Void
 
     var body: some View {
-        HStack(spacing: Kansei.Spacing.md) {
+        HStack(spacing: KanseiSpacing.md) {
             ForEach(availableModes, id: \.self) { mode in
                 Button {
                     onModeChange(mode)
@@ -119,9 +119,9 @@ struct DriveModeDisplay: View {
                     .frame(width: 56, height: 56)
                     .background(mode == currentMode ? mode.color : Color.clear)
                     .foregroundColor(mode == currentMode ? .white : mode.color)
-                    .cornerRadius(Kansei.Radius.medium)
+                    .cornerRadius(KanseiRadius.medium)
                     .overlay(
-                        RoundedRectangle(cornerRadius: Kansei.Radius.medium)
+                        RoundedRectangle(cornerRadius: KanseiRadius.medium)
                             .stroke(mode == currentMode ? mode.color : Color.clear, lineWidth: 2)
                     )
                 }

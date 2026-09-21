@@ -64,8 +64,8 @@ struct OnboardingView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Kansei.Color.ambient, in: RoundedRectangle(cornerRadius: Kansei.Radius.medium))
-                    .shadow(color: Kansei.Color.ambient.opacity(0.3), radius: 8, y: 4)
+                    .background(KanseiPalette.ambient, in: RoundedRectangle(cornerRadius: KanseiRadius.medium))
+                    .shadow(color: KanseiPalette.ambient.opacity(0.3), radius: 8, y: 4)
 
                     Button("跳过引导") {
                         onboardingSeen = true
@@ -95,20 +95,20 @@ struct OnboardingView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
-                        .background(Kansei.Color.ambient, in: RoundedRectangle(cornerRadius: Kansei.Radius.medium))
+                        .background(KanseiPalette.ambient, in: RoundedRectangle(cornerRadius: KanseiRadius.medium))
                     }
                 }
             }
             .padding(.horizontal, DS.Space.xxxl)
             .padding(.vertical, DS.Space.xxl)
             .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                .fill(Kansei.Color.nightSurface))
+                .fill(KanseiPalette.nightSurface))
             .overlay(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                .strokeBorder(Kansei.Color.glassBorder, lineWidth: DS.Hair.line))
+                .strokeBorder(KanseiPalette.glassBorder, lineWidth: DS.Hair.line))
             .padding(.top, DS.Space.xl)
         }
         // 旧版：整屏三色渐变（主色 + 紫 + 蓝）。新版：单一画布色。
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
     }
 
     private func onboardingPage(_ page: OnboardingPage) -> some View {
@@ -117,11 +117,11 @@ struct OnboardingView: View {
             ZStack {
                 // 旧版：渐变色圆 + 超大图标。新版：扁平色块（与登录页品牌标同一套语言）。
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(Kansei.Color.ambient)
+                    .fill(KanseiPalette.ambient)
                     .frame(width: 96, height: 96)
                 Image(safeSymbol: page.icon, fallback: "car.fill")
                     .font(.system(size: 40, weight: .regular))
-                    .foregroundStyle(Kansei.Color.ambient)
+                    .foregroundStyle(KanseiPalette.ambient)
             }
 
             // 标题和描述
@@ -162,10 +162,10 @@ struct ExampleCard: View {
             Spacer()
             Text(value)
                 .font(KanseiTypo.body.monospaced())
-                .foregroundStyle(Kansei.Color.ambient)
+                .foregroundStyle(KanseiPalette.ambient)
         }
         .padding()
-        .background(Kansei.Color.fillSubtle, in: RoundedRectangle(cornerRadius: 12))
+        .background(KanseiPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 40)
     }
 }

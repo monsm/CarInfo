@@ -110,7 +110,7 @@ struct SiriShortcutsCard: View {
     let store = AppStore.shared
 
     var body: some View {
-        CardBox(title: "Siri 快捷指令", side: "语音控制", cornerRadius: Kansei.Radius.medium) {
+        CardBox(title: "Siri 快捷指令", side: "语音控制", cornerRadius: KanseiRadius.medium) {
             VStack(spacing: 12) {
                 ShortcutRow(icon: "lock.fill", title: "锁车", subtitle: "语音说「锁车」", usage:
  store.siriUsageCount["lock_true"] ?? 0)
@@ -138,12 +138,12 @@ struct ShortcutRow: View {
         HStack(spacing: 12) {
             Image(safeSymbol: icon, fallback: "car.fill")
                 .font(.title3)
-                .foregroundStyle(Kansei.Color.ambient)
+                .foregroundStyle(KanseiPalette.ambient)
                 .frame(width: 36, height: 36)
-                .background(Kansei.Color.fillSubtle, in: Circle())
+                .background(KanseiPalette.fillSubtle, in: Circle())
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(KanseiTypo.body).foregroundStyle(Kansei.Color.primary)
-                Text(subtitle).font(KanseiTypo.caption).foregroundStyle(Kansei.Color.secondary)
+                Text(title).font(KanseiTypo.body).foregroundStyle(KanseiPalette.primary)
+                Text(subtitle).font(KanseiTypo.caption).foregroundStyle(KanseiPalette.secondary)
             }
             Spacer()
             if usage > 0 {

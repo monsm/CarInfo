@@ -148,7 +148,7 @@ struct HomeView: View {
             .padding(.top, DS.Space.sm)
             .padding(.bottom, DS.Space.huge)
         }
-        .background(Kansei.Color.background)
+        .background(KanseiPalette.background)
         .scrollBounceBehavior(.basedOnSize)
         .refreshable {
             isRefreshing = true
@@ -219,7 +219,7 @@ struct HomeView: View {
             // 车辆标识
             HStack(spacing: DS.Space.sm) {
                 Circle()
-                    .fill(e.online.cls == "ok" ? Kansei.Color.success : Kansei.Color.tertiary)
+                    .fill(e.online.cls == "ok" ? KanseiPalette.success : KanseiPalette.tertiary)
                     .frame(width: 7, height: 7)
                 if sel.count > 1 {
                     Picker("选择车辆", selection: Binding(
@@ -233,17 +233,17 @@ struct HomeView: View {
                     .pickerStyle(.menu)
                     .labelsHidden()
                     .font(DS.Typo.subheadline.weight(.semibold))
-                    .tint(Kansei.Color.primary)
+                    .tint(KanseiPalette.primary)
                 } else {
                     Text(name)
                         .font(DS.Typo.subheadline.weight(.semibold))
-                        .foregroundStyle(Kansei.Color.primary)
+                        .foregroundStyle(KanseiPalette.primary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: DS.Space.sm)
                 Text(e.updated == "--" ? "暂无上报" : "\(e.updated)")
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(Kansei.Color.tertiary)
+                    .foregroundStyle(KanseiPalette.tertiary)
                     .lineLimit(1)
             }
 
@@ -257,20 +257,20 @@ struct HomeView: View {
                 HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
                     Text("剩余 \(e.range) km")
                         .font(DS.Typo.footnote)
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                     Spacer(minLength: DS.Space.sm)
                     if e.chargeCls == "ok" || e.chargeCls == "charge" {
                         Text(e.chargeText)
                             .font(DS.Typo.footnote.weight(.medium))
-                            .foregroundStyle(Kansei.Color.info)
+                            .foregroundStyle(KanseiPalette.info)
                     } else if !e.socWarn.isEmpty {
                         Text(e.socPct < 15 ? "电量偏低" : "建议补电")
                             .font(DS.Typo.footnote.weight(.medium))
-                            .foregroundStyle(e.socPct < 15 ? Kansei.Color.error : Kansei.Color.warning)
+                            .foregroundStyle(e.socPct < 15 ? KanseiPalette.error : KanseiPalette.warning)
                     } else if let tte = e.timeToEmpty, tte != "--" {
                         Text("可行驶 \(tte)")
                             .font(DS.Typo.footnote)
-                            .foregroundStyle(Kansei.Color.secondary)
+                            .foregroundStyle(KanseiPalette.secondary)
                     }
                 }
             }
@@ -294,7 +294,7 @@ struct HomeView: View {
                 }
                 Text("点车门可锁 / 解锁整车 —— 本车型协议未提供单门与后备箱的远程开合指令")
                     .font(DS.Typo.caption)
-                    .foregroundStyle(Kansei.Color.tertiary)
+                    .foregroundStyle(KanseiPalette.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, DS.Space.md)
             }
@@ -314,8 +314,8 @@ struct HomeView: View {
             Text(carLine?.text ?? "点车门可锁 / 解锁")
                 .font(DS.Typo.footnote)
                 .foregroundStyle(carLine == nil
-                                 ? Kansei.Color.tertiary
-                                 : Kansei.statusColor(carLine?.cls ?? "na"))
+                                 ? KanseiPalette.tertiary
+                                 : KanseiPalette.statusColor(carLine?.cls ?? "na"))
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -485,10 +485,10 @@ struct HomeView: View {
     }
 
     private func heroLightColor(_ e: EnergyModel) -> Color {
-        if e.chargeCls == "ok" || e.chargeCls == "charge" { return Kansei.Color.info }
-        if e.socPct < 15 { return Kansei.Color.error }
-        if e.socPct < 30 { return Kansei.Color.warning }
-        return Kansei.Color.ambient
+        if e.chargeCls == "ok" || e.chargeCls == "charge" { return KanseiPalette.info }
+        if e.socPct < 15 { return KanseiPalette.error }
+        if e.socPct < 30 { return KanseiPalette.warning }
+        return KanseiPalette.ambient
     }
 
     private func lightBarGradient(_ accent: Color) -> LinearGradient {
@@ -708,19 +708,19 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(item.label)
                 .font(DS.Typo.caption)
-                .foregroundStyle(Kansei.Color.secondary)
+                .foregroundStyle(KanseiPalette.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(item.kpa)
                     .font(DS.Typo.metric(28))
-                    .foregroundStyle(item.cls == "ok" ? Kansei.Color.primary : Kansei.statusColor(item.cls))
+                    .foregroundStyle(item.cls == "ok" ? KanseiPalette.primary : KanseiPalette.statusColor(item.cls))
                     .contentTransition(.numericText())
                 Text("kPa")
                     .font(DS.Typo.caption)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
             }
             Text("\(item.temp)℃")
                 .font(DS.Typo.dataSmall)
-                .foregroundStyle(Kansei.Color.secondary)
+                .foregroundStyle(KanseiPalette.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -777,7 +777,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
                 Text(loc.addr.isEmpty ? "暂无定位数据" : loc.addr)
                     .font(DS.Typo.headline)
-                    .foregroundStyle(loc.addr.isEmpty ? Kansei.Color.secondary : Kansei.Color.primary)
+                    .foregroundStyle(loc.addr.isEmpty ? KanseiPalette.secondary : KanseiPalette.primary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if showMap {
@@ -804,7 +804,7 @@ struct HomeView: View {
             }
             .padding(DS.Space.cardPadding)
             .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
-                .fill(Kansei.Color.nightSurface))
+                .fill(KanseiPalette.nightSurface))
 
             DSCard {
                 VStack(alignment: .leading, spacing: 0) {
@@ -847,7 +847,7 @@ struct HomeView: View {
         return HStack(spacing: DS.Space.sm) {
             Text("更新于 \(update)")
                 .font(DS.Typo.footnote)
-                .foregroundStyle(Kansei.Color.tertiary)
+                .foregroundStyle(KanseiPalette.tertiary)
             Spacer(minLength: DS.Space.sm)
             if isRefreshing {
                 ProgressView().controlSize(.small)
@@ -858,7 +858,7 @@ struct HomeView: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .buttonStyle(DSIconButtonStyle(size: 36, tint: Kansei.Color.ambient))
+                .buttonStyle(DSIconButtonStyle(size: 36, tint: KanseiPalette.ambient))
                 .accessibilityLabel(Text("刷新"))
             }
         }
@@ -1186,8 +1186,8 @@ struct CarStageView: View {
 
     private func lockColor(_ cls: String) -> Color {
         switch cls {
-        case "ok":  return Kansei.Color.success
-        case "bad": return Kansei.Color.warning
+        case "ok":  return KanseiPalette.success
+        case "bad": return KanseiPalette.warning
         default:    return Color.white.opacity(0.16)
         }
     }
@@ -1305,14 +1305,14 @@ struct LocationMapViewPlaceholder: View {
 
     var body: some View {
         ZStack {
-            Kansei.Color.glassLight
+            KanseiPalette.glassLight
             VStack(spacing: DS.Space.sm) {
                 Image(systemName: "map")
                     .font(.system(size: 26, weight: .light))
-                    .foregroundStyle(Kansei.Color.tertiary)
+                    .foregroundStyle(KanseiPalette.tertiary)
                 Text(addr.isEmpty ? "暂无定位" : addr)
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .padding(.horizontal, DS.Space.lg)

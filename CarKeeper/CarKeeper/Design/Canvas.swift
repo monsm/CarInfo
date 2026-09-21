@@ -27,7 +27,7 @@ struct DSStage<Content: View>: View {
     let padding: CGFloat
     let content: () -> Content
 
-    init(padding: CGFloat = Kansei.Spacing.page, @ViewBuilder content: @escaping () -> Content) {
+    init(padding: CGFloat = KanseiSpacing.page, @ViewBuilder content: @escaping () -> Content) {
         self.padding = padding
         self.content = content
     }
@@ -35,7 +35,7 @@ struct DSStage<Content: View>: View {
     var body: some View {
         content()
             .padding(.horizontal, padding)
-            .padding(.vertical, Kansei.Spacing.lg)
+            .padding(.vertical, KanseiSpacing.lg)
     }
 }
 
@@ -45,7 +45,7 @@ struct DSGroupedCard<Content: View>: View {
     let glow: Bool
     let content: () -> Content
 
-    init(radius: CGFloat = Kansei.Radius.medium, glow: Bool = true, @ViewBuilder content: @escaping () -> Content) {
+    init(radius: CGFloat = KanseiRadius.medium, glow: Bool = true, @ViewBuilder content: @escaping () -> Content) {
         self.radius = radius
         self.glow = glow
         self.content = content
@@ -53,18 +53,18 @@ struct DSGroupedCard<Content: View>: View {
 
     var body: some View {
         content()
-            .padding(Kansei.Spacing.md)
+            .padding(KanseiSpacing.md)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(Kansei.Color.nightSurface.opacity(0.6))
+                    .fill(KanseiPalette.nightSurface.opacity(0.6))
                     .overlay(
                         RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .stroke(Kansei.Color.glassBorder, lineWidth: 1)
+                            .stroke(KanseiPalette.glassBorder, lineWidth: 1)
                     )
                     .overlay {
                         if glow {
                             RoundedRectangle(cornerRadius: radius, style: .continuous)
-                                .fill(Kansei.Color.ambient.opacity(0.03))
+                                .fill(KanseiPalette.ambient.opacity(0.03))
                                 .blur(radius: 20)
                         }
                     }

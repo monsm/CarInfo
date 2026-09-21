@@ -32,7 +32,7 @@ struct GarageDoorStatus: View {
             } label: {
                 Image(systemName: garageOpen ? "lock.fill" : "lock.open.fill")
                     .font(.title3)
-                    .foregroundColor(Kansei.Color.ambient)
+                    .foregroundColor(KanseiPalette.ambient)
             }
         }
         .padding()
@@ -76,16 +76,16 @@ struct HomeSceneControl: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Kansei.Spacing.sm) {
+            HStack(spacing: KanseiSpacing.sm) {
                 ForEach(scenes, id: \.self) { scene in
                     Button(scene) {
                         // 触发HomeKit场景
                     }
-                    .padding(.horizontal, Kansei.Spacing.md)
-                    .padding(.vertical, Kansei.Spacing.sm)
-                    .background(Kansei.Color.ambient.opacity(0.2))
-                    .foregroundColor(Kansei.Color.ambient)
-                    .cornerRadius(Kansei.Radius.medium)
+                    .padding(.horizontal, KanseiSpacing.md)
+                    .padding(.vertical, KanseiSpacing.sm)
+                    .background(KanseiPalette.ambient.opacity(0.2))
+                    .foregroundColor(KanseiPalette.ambient)
+                    .cornerRadius(KanseiRadius.medium)
                 }
             }
         }
@@ -111,10 +111,10 @@ struct ReverseLinkageControl: View {
     @State private var autoACOnArrival = false
 
     var body: some View {
-        VStack(spacing: Kansei.Spacing.sm) {
+        VStack(spacing: KanseiSpacing.sm) {
             HStack {
                 Image(systemName: "car.fill")
-                    .foregroundColor(Kansei.Color.ambient)
+                    .foregroundColor(KanseiPalette.ambient)
                 Text("到家自动解锁")
                     .font(.subheadline)
                 Spacer()

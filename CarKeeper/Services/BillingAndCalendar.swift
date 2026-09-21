@@ -398,7 +398,7 @@ struct ChargeBillSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: Kansei.Spacing.lg) {
+            VStack(spacing: KanseiSpacing.lg) {
                 if chargeRecords.isEmpty {
                     EmptyStateView(
                         icon: "bolt.slash",
@@ -420,7 +420,7 @@ struct ChargeBillSheet: View {
                             Spacer()
                             Text("\(record.kWh) kWh")
                                 .font(.subheadline)
-                                .foregroundColor(Kansei.Color.ambient)
+                                .foregroundColor(KanseiPalette.ambient)
                         }
                     }
                 }
@@ -438,9 +438,9 @@ struct ChargeBillSheet: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Kansei.Color.ambient)
+                        .background(KanseiPalette.ambient)
                         .foregroundColor(.white)
-                        .cornerRadius(Kansei.Radius.medium)
+                        .cornerRadius(KanseiRadius.medium)
                 }
                 .padding(.horizontal)
 

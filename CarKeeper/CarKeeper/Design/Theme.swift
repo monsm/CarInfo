@@ -57,10 +57,10 @@ extension Color {
 enum Theme {
     // MARK: - 颜色别名（兼容旧代码 Theme.Colors.*）
     enum Colors {
-        static var accent: Color { Kansei.Color.ambient }
-        static var brand: Color { Kansei.Color.ambient }
-        static var brandLight: Color { Kansei.Color.ambient }
-        static var brandDark: Color { Kansei.Color.ambient }
+        static var accent: Color { KanseiPalette.ambient }
+        static var brand: Color { KanseiPalette.ambient }
+        static var brandLight: Color { KanseiPalette.ambient }
+        static var brandDark: Color { KanseiPalette.ambient }
         static var background: Color { ColorSystem.background }
         static var cardBg: Color { ColorSystem.cardBg }
         static var primary: Color { ColorSystem.primary }
@@ -68,32 +68,32 @@ enum Theme {
         static var tertiary: Color { ColorSystem.tertiary }
         static var border: Color { ColorSystem.border }
         static var fill: Color { ColorSystem.fill }
-        static var ok: Color { Kansei.Color.success }
-        static var warn: Color { Kansei.Color.warning }
-        static var bad: Color { Kansei.Color.error }
-        static var tint: Color { Kansei.Color.ambient }
-        static var charge: Color { Kansei.Color.info }
+        static var ok: Color { KanseiPalette.success }
+        static var warn: Color { KanseiPalette.warning }
+        static var bad: Color { KanseiPalette.error }
+        static var tint: Color { KanseiPalette.ambient }
+        static var charge: Color { KanseiPalette.info }
     }
 
     // MARK: - 品牌色（自适应浅色/深色模式）
 
-    /// 主色调：全 App 只有一个强调色（Kansei.Color.ambient）。
+    /// 主色调：全 App 只有一个强调色（KanseiPalette.ambient）。
     /// 各页面不设自己的色相，页面之间的差异由排版与内容表达。
-    static var brand: Color { Kansei.Color.ambient }
-    static var brandLight: Color { Kansei.Color.ambient }
-    static var brandDark: Color { Kansei.Color.ambient }
+    static var brand: Color { KanseiPalette.ambient }
+    static var brandLight: Color { KanseiPalette.ambient }
+    static var brandDark: Color { KanseiPalette.ambient }
 
     // MARK: - 语义色（全局唯一来源：DS.Palette）
-    static var ok: Color { Kansei.Color.success }
-    static var warn: Color { Kansei.Color.warning }
-    static var bad: Color { Kansei.Color.error }
-    static var charge: Color { Kansei.Color.info }
-    static var acc: Color { Kansei.Color.ambient }
-    static var na: Color { Kansei.Color.tertiary }
+    static var ok: Color { KanseiPalette.success }
+    static var warn: Color { KanseiPalette.warning }
+    static var bad: Color { KanseiPalette.error }
+    static var charge: Color { KanseiPalette.info }
+    static var acc: Color { KanseiPalette.ambient }
+    static var na: Color { KanseiPalette.tertiary }
 
     // MARK: - 状态 → 语义色
     static func statusColor(_ cls: String) -> Color {
-        Kansei.statusColor(cls)
+        KanseiPalette.statusColor(cls)
     }
 
     // =============================================================================
@@ -201,26 +201,26 @@ enum Theme {
     // =============================================================================
     enum ColorSystem {
         // ---- 表面色（Surface）：来源统一为 DS.Palette，保证与 DS 组件同色 ----
-        static let background: Color = Kansei.Color.background
-        static let cardBg: Color = Kansei.Color.nightSurface
-        static let surfaceRaised: Color = Kansei.Color.nightSurface
-        static let overlay: Color = Kansei.Color.nightSurface
-        static let glass: Color = Kansei.Color.nightSurface   // 旧版的半透明页面底已取消，避免“满屏玻璃”
+        static let background: Color = KanseiPalette.background
+        static let cardBg: Color = KanseiPalette.nightSurface
+        static let surfaceRaised: Color = KanseiPalette.nightSurface
+        static let overlay: Color = KanseiPalette.nightSurface
+        static let glass: Color = KanseiPalette.nightSurface   // 旧版的半透明页面底已取消，避免“满屏玻璃”
 
         // ---- 文字色（Text）----
-        static let primary: Color = Kansei.Color.primary
-        static let secondary: Color = Kansei.Color.secondary
-        static let tertiary: Color = Kansei.Color.tertiary
-        static let quaternary: Color = Kansei.Color.tertiary.opacity(0.6)
+        static let primary: Color = KanseiPalette.primary
+        static let secondary: Color = KanseiPalette.secondary
+        static let tertiary: Color = KanseiPalette.tertiary
+        static let quaternary: Color = KanseiPalette.tertiary.opacity(0.6)
 
         // ---- 边框色（Border）：发丝线 ----
-        static let border: Color = Kansei.Color.glassBorder
-        static let borderSubtle: Color = Kansei.Color.glassBorder.opacity(0.6)
+        static let border: Color = KanseiPalette.glassBorder
+        static let borderSubtle: Color = KanseiPalette.glassBorder.opacity(0.6)
 
         // ---- 填充色（Fill）----
-        static let fill: Color = Kansei.Color.nightSurface
-        static let fillSubtle: Color = Kansei.Color.glassLight
-        static let fillHighlighted: Color = Kansei.Color.nightSurface
+        static let fill: Color = KanseiPalette.nightSurface
+        static let fillSubtle: Color = KanseiPalette.glassLight
+        static let fillHighlighted: Color = KanseiPalette.nightSurface
 
         // ---- 阴影色（Tesla 式：极弱，只用于“浮层”）----
         static let shadowLight: Color = Color.black.opacity(0.05)
@@ -298,7 +298,7 @@ struct ShadowStyle {
 // MARK: - View Extensions：Apple Premium 组件
 extension View {
     // 页面底色 + 统一页面边距
-    // 刻意不接受任何颜色参数：页面底色只能是 Kansei.Color.background 这一层。
+    // 刻意不接受任何颜色参数：页面底色只能是 KanseiPalette.background 这一层。
     func pageBackground() -> some View {
         contentMargins(.horizontal, DS.Space.page, for: .scrollContent)
             .background(DS.Palette.canvasGradient.ignoresSafeArea())
@@ -335,7 +335,7 @@ struct GlassCardModifier: ViewModifier {
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     // 内容一律不透明（hero 也一样）：玻璃只允许出现在浮层。
-                    .fill(Kansei.Color.nightSurface)
+                    .fill(KanseiPalette.nightSurface)
             }
             // v4：内容层没有描边、没有阴影 —— 深度只由系统表面色表达。
             // （它们曾经是“卡片感”的来源，也是界面显廉价的主因。）
@@ -404,7 +404,7 @@ struct CardBox<Content: View>: View {
                 Text(title.uppercased())
                     .font(DS.Typo.sectionLabel)
                     .tracking(0.6)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
                 Spacer(minLength: DS.Space.sm)
                 if let side, !side.isEmpty {
                     DSChip(text: side, cls: sideCls.isEmpty ? "na" : sideCls)
@@ -468,14 +468,14 @@ struct ExpandingCardBox<Content: View>: View {
                     Text(title.uppercased())
                         .font(DS.Typo.sectionLabel)
                         .tracking(0.6)
-                        .foregroundStyle(Kansei.Color.secondary)
+                        .foregroundStyle(KanseiPalette.secondary)
                     Spacer(minLength: DS.Space.sm)
                     if let side, !side.isEmpty {
                         DSChip(text: side, cls: sideCls.isEmpty ? "na" : sideCls)
                     }
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Kansei.Color.tertiary)
+                        .foregroundStyle(KanseiPalette.tertiary)
                         .rotationEffect(isExpanded ? .degrees(180) : .degrees(0))
                         .animation(DS.Motion.press, value: isExpanded)
                 }
@@ -825,7 +825,7 @@ struct PageLoadingView: View {
                 ProgressView().controlSize(.small)
                 Text(message)
                     .font(DS.Typo.footnote)
-                    .foregroundStyle(Kansei.Color.secondary)
+                    .foregroundStyle(KanseiPalette.secondary)
             }
             DSSkeleton(height: 88, width: nil)
             DSSkeleton(height: 142, width: nil)
@@ -853,10 +853,10 @@ struct PageErrorView: View {
         VStack(spacing: DS.Space.md) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 30, weight: .light))
-                .foregroundStyle(Kansei.Color.warning)
+                .foregroundStyle(KanseiPalette.warning)
             Text(message)
                 .font(DS.Typo.subheadline)
-                .foregroundStyle(Kansei.Color.secondary)
+                .foregroundStyle(KanseiPalette.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Button("重新加载") { retryAction() }
