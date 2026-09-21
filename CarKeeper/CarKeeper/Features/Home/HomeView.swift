@@ -147,7 +147,6 @@ struct HomeView: View {
                 batterySection
                 tyreSection
                 cabinSection
-                carbonSection
                 locationSection
                 footer
             }
@@ -762,23 +761,6 @@ struct HomeView: View {
             DSRow(icon: "carseat.left.fill", title: "主驾座椅", value: c.seatD)
             DSSeparator()
             DSRow(icon: "carseat.right.fill", title: "副驾座椅", value: c.seatP)
-        }
-    }
-
-    // MARK: - 碳减排（有数据才出现）
-
-    @ViewBuilder
-    private var carbonSection: some View {
-        let stats = CarbonSavingsTracker.shared.getTodayStats()
-        if stats.todaySteps > 0 {
-            group("碳减排", trailing: "\(stats.equivalentTrees) 棵树") {
-                DSRow(icon: "figure.walk", title: "今日步行", value: "\(stats.todaySteps) 步")
-                DSSeparator()
-                DSRow(icon: "leaf.fill", title: "今日减碳", value: String(format: "%.2f kg", stats.todayCarbonKg))
-                DSSeparator()
-                DSRow(icon: "leaf.arrow.triangle.circlepath",
-                      title: "累计减碳", value: String(format: "%.2f kg", stats.totalCarbonKg))
-            }
         }
     }
 

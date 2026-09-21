@@ -32,6 +32,8 @@ struct ChargeSession: Identifiable {
     /// 会话起止时刻的 SOC（取同期的真实采样点）。没有采样点就是 nil —— 不猜。
     let socStart: Int?
     let socEnd: Int?
+    /// 这次会话的功率采样序列（回放曲线的数据源就是派生会话的同一份点，不会错位）
+    var powerCurve: [HistoryStore.Point] = []
 
     var durationMin: Int { max(0, Int(end.timeIntervalSince(start) / 60)) }
 }
@@ -69,6 +71,12 @@ final class ChargeLedger {
         Self.derive(power: HistoryStore.shared.power, soc: HistoryStore.shared.soc)
     }
 
+    /// 指定会话在**此刻**的功率序列。逐会话重算（数据量小：≤240 个点）。
+    /// 采样会持续到来，用 start 匹配 id，避免把旧会话的曲线当成别的会话的。
+    func powerHistory(for session: ChargeSession) -> [HistoryStore.Point] {
+        sessions.first(where: { $0.id == session.id })?.powerCurve ?? []
+    }
+
     /// 把功率采样切成会话并积分。写成 static 是为了能在没有单例的地方（测试 / 导出）直接用。
     static func derive(power: [HistoryStore.Point], soc: [HistoryStore.Point]) -> [ChargeSession] {
         guard power.count >= 2 else { return [] }
@@ -90,7 +98,8 @@ final class ChargeLedger {
                 end: b.t,
                 kWh: kwh,
                 socStart: socValue(at: a.t, in: soc),
-                socEnd: socValue(at: b.t, in: soc)
+                socEnd: socValue(at: b.t, in: soc),
+                powerCurve: group
             ))
         }
 
@@ -213,4 +222,162 @@ struct ChargeMoneyBlock: View {
     }
 
     private var rateNote: String { "按 \(ChargeLedger.rateText(ledger.rate)) 元/度" }
+}
+
+// =============================================================================
+//  充电回放：这次充电的功率曲线
+// =============================================================================
+//  曲线的每个点都是车端 1 分钟一个报上来的真实功率采样，不是模型拟合。
+//  样本少于 2 个就没有"形状"可言 —— 整个 sheet 不出现，只有一个如实说明。
+
+struct ChargeReplaySheet: View {
+    let session: ChargeSession
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var curve: [HistoryStore.Point] = []
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                    headline
+                    curveSection
+                    factsSection
+                    note
+                }
+                .padding(TokensSpacing.lg)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(TokensPalette.canvas)
+            .navigationTitle("充电回放")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .task { curve = ChargeLedger.shared.powerHistory(for: session) }
+    }
+
+    private var headline: some View {
+        HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.md) {
+            Text(ChargeLedger.kwhText(session.kWh))
+                .font(TokensTypo.digits(40))
+                .foregroundStyle(TokensPalette.primary)
+            Text("kWh")
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.tertiary)
+            Spacer(minLength: 0)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(session.durationMin) 分钟")
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
+                if let a = session.socStart, let b = session.socEnd {
+                    Text("\(a)% → \(b)%")
+                        .font(TokensTypo.digits(13))
+                        .foregroundStyle(TokensPalette.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var curveSection: some View {
+        if curve.count < 2 {
+            Text("这次充电的功率采样还不足两个点，画不出曲线 —— 按实情说明，不补假数据。")
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+                Text("功率（kW）· 1 分钟一个采样点")
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.tertiary)
+                ReplayChart(points: curve,
+                            accent: TokensPalette.accent,
+                            ink: TokensPalette.primary)
+                    .frame(height: 160)
+            }
+        }
+    }
+
+    private var factsSection: some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+            fact("开始", at: session.start)
+            fact("结束", at: session.end)
+            fact("折合电费", detail: "\(ChargeLedger.moneyText(session.kWh * ChargeLedger.shared.rate)) 元 · 按 \(ChargeLedger.rateText(ChargeLedger.shared.rate)) 元/度")
+        }
+    }
+
+    private func fact(_ title: String, at date: Date) -> some View {
+        fact(title, detail: Text(date.formatted(date: .abbreviated, time: .shortened)))
+    }
+
+    private func fact(_ title: String, detail: Text) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.tertiary)
+            Spacer(minLength: TokensSpacing.sm)
+            detail
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.primary)
+        }
+    }
+
+    private var note: some View {
+        Text("曲线的每个点都是车报上来的真实功率；积分方式和账本同源 —— 你看到的度数和曲线说的是同一件事。")
+            .font(TokensTypo.caption)
+            .foregroundStyle(TokensPalette.tertiary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// 功率曲线。Canvas 逐点连折线 + 渐变填充；坐标轴只用"顶点 = 峰值"一种标注。
+/// 颜色由调用方传入（读取令牌的职责留在视图层，画布只认颜色）。
+private struct ReplayChart: View {
+    let points: [HistoryStore.Point]
+    let accent: Color
+    let ink: Color
+
+    var body: some View {
+        Canvas { ctx, size in
+            let peak = max(points.map(\.v).max() ?? 1, 0.1)
+            var path = Path()
+            var fill = Path()
+            let stepX = size.width / CGFloat(max(1, points.count - 1))
+
+            for (i, p) in points.enumerated() {
+                let x = CGFloat(i) * stepX
+                let y = size.height - CGFloat(p.v / peak) * (size.height - 10) - 4
+                let pt = CGPoint(x: x, y: y)
+                if i == 0 {
+                    path.move(to: pt)
+                    fill.move(to: CGPoint(x: 0, y: size.height))
+                    fill.addLine(to: pt)
+                } else {
+                    path.addLine(to: pt)
+                    fill.addLine(to: pt)
+                }
+            }
+            fill.addLine(to: CGPoint(x: size.width, y: size.height))
+            fill.closeSubpath()
+
+            ctx.stroke(path, with: .color(accent), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+            ctx.fill(fill, with: .linearGradient(
+                Gradient(colors: [accent.opacity(0.28), accent.opacity(0.02)]),
+                startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: 0, y: size.height)))
+
+            // 峰值标注：只有真实的最大采样点才标，不铺网格线
+            if let peakPoint = points.max(by: { $0.v < $1.v }),
+               let idx = points.firstIndex(where: { $0.id == peakPoint.id }) {
+                let x = CGFloat(idx) * stepX
+                let y = size.height - CGFloat(peakPoint.v / peak) * (size.height - 10) - 4
+                ctx.draw(Text(String(format: "%.1f", peakPoint.v))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(ink), at: CGPoint(x: min(max(x, 24), size.width - 24), y: max(y - 12, 12)))
+            }
+        }
+    }
 }

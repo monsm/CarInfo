@@ -139,6 +139,17 @@ struct MapTyre: Identifiable {
     var id: String { label }
 }
 
+/// 热区：一段真实生活里的"常来之地"。完全由停车史聚类得出 ——
+/// 半径是几何的产物（组内最大间距加 60m 缓冲），次数是数据本身。
+/// 没有停车史就没有热区，一个都不编。
+struct MapHotspot: Identifiable {
+    let id: String
+    let center: CLLocationCoordinate2D
+    let radiusMeters: Double
+    let visits: Int
+    let lastVisit: Date
+}
+
 /// 附近充电站（MKLocalSearch 的真实结果）
 struct MapCharger: Identifiable {
     let id: String
@@ -195,12 +206,26 @@ struct MapSpineData {
     var reasons: [MapReason]
     /// 四轮胎压。空数组 = 这一刻没有真实读数（整行不出现）
     var tyres: [MapTyre]
+    /// 常停热区。空数组 = 停车史还不够聚出一个圈（一个都不编）
+    var hotspots: [MapHotspot]
 
     /// 有没有位置：没有位置时所有"地方类"内容都必须退场，不能画在(0,0)
     var hasLocation: Bool { carCoordinate != nil }
 
     /// 最近一次上报到现在（用于"数据有多新"）
     var updatedText: String { updated.isEmpty ? "--" : updated }
+
+    /// 剩余续航（米）。**车端报文里的 RemainedPowerMile 本身就是米**，不换算、不猜单位。
+    /// 车没报就是 nil —— 续航圈不画。
+    var rangeMeters: Double? {
+        let cache = AppStore.shared.caches
+        for key in ["charge", "control"] {   // 与 VM.energy 取 range 的顺序一致
+            if let n = ciNumber(ciVal(cache, key), ["RemainedPowerMile"]), n > 0 {
+                return n
+            }
+        }
+        return nil
+    }
 
     // -------------------------------------------------------------------------
     // MARK: 组装
@@ -274,6 +299,10 @@ struct MapSpineData {
         // 胎压：一次算好，既喂「为什么」也喂面板上那一行
         let tyreList = tyres(cache)
 
+        // ---- 常停热区：停车史聚出来的"生活圈"，没有史就一个不画 ----
+        let hotspots = clusterHotspots(from: store.parkingHistory,
+                                       excluding: store.parkingLocation)
+
         return MapSpineData(
             carCoordinate: car?.coordinate,
             headingDeg: Double(loc.degNum),
@@ -296,8 +325,10 @@ struct MapSpineData {
             trips: trips,
             holds: holds,
             issues: issues,
-            reasons: reasons(e: e, loc: loc, chips: chips, trips: trips, tyres: tyreList, store: store),
-            tyres: tyreList
+            reasons: reasons(e: e, loc: loc, chips: chips, trips: trips, tyres: tyreList,
+                             hotspots: hotspots, store: store),
+            tyres: tyreList,
+            hotspots: hotspots
         )
     }
 
@@ -313,6 +344,7 @@ struct MapSpineData {
         chips: [StatusChip],
         trips: [MapTripLine],
         tyres: [MapTyre],
+        hotspots: [MapHotspot],
         store: AppStore
     ) -> [MapReason] {
         var out: [MapReason] = []
@@ -405,7 +437,66 @@ struct MapSpineData {
             out.append(MapReason(id: "tyre", text: "四轮胎压 \(all) kPa", cls: "na"))
         }
 
+        // ⑨ 常来之地：≥3 次才值得说（“来过两次”不构成习惯）
+        if let top = hotspots.first(where: { $0.visits >= 3 }) {
+            out.append(MapReason(
+                id: "hot",
+                text: "这里你来过 \(top.visits) 次 —— 最近一次 \(agoText(top.lastVisit))，是从停车记录里聚出来的，不是猜的",
+                cls: "na"
+            ))
+        }
+
         return out
+    }
+
+    // -------------------------------------------------------------------------
+    // MARK: 常停热区聚类
+    // -------------------------------------------------------------------------
+    /// 逐点贪心：以每个停车点为核，把 80 米内的同伴收进同一组（间距是停车记录之间
+    /// 的真实距离，够近的记录本来就该是同一个目的地）。组内≥2 次才算热区；
+    /// 半径取组内各点到质心的最大距离再放宽 60 米 —— 是几何的产物，不是美术。
+    private static func clusterHotspots(
+        from records: [AppStore.ParkingRecord],
+        excluding latest: CLLocation?
+    ) -> [MapHotspot] {
+        var used = Array(repeating: false, count: records.count)
+        var out: [MapHotspot] = []
+
+        for i in records.indices where !used[i] {
+            used[i] = true
+            var group: [Int] = [i]
+            for j in records.indices where j != i && !used[j] {
+                // 与"最近一次"重合的点本来就没画钉，也不进热区
+                if let p = latest, p.distance(from: records[j].location) < 25 { continue }
+                if records[j].location.distance(from: records[i].location) <= 80 {
+                    used[j] = true
+                    group.append(j)
+                }
+            }
+            guard group.count >= 2 else { continue }
+
+            var lat = 0.0, lng = 0.0
+            for j in group {
+                lat += records[j].location.coordinate.latitude
+                lng += records[j].location.coordinate.longitude
+            }
+            let center = CLLocationCoordinate2D(latitude: lat / Double(group.count),
+                                                longitude: lng / Double(group.count))
+            var maxMeters = 0.0
+            for j in group {
+                maxMeters = max(maxMeters, records[j].location.distance(
+                    from: CLLocation(latitude: center.latitude, longitude: center.longitude)))
+            }
+            let newest = group.map { records[$0].time }.max() ?? records[i].time
+            out.append(MapHotspot(
+                id: "hot-\(Int(center.latitude * 10000))-\(Int(center.longitude * 10000))",
+                center: center,
+                radiusMeters: maxMeters + 60,
+                visits: group.count,
+                lastVisit: newest
+            ))
+        }
+        return out.sorted { $0.visits > $1.visits }
     }
 
     /// 胎压：复用 `VM.tyreStatus`（与 Analysis / 旧页面同一份读数，不另写一套解析）。

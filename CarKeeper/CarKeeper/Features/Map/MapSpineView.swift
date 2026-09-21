@@ -6,6 +6,7 @@
 //   • 地图是 MapKit 的 `Map`（真瓦片、真坐标、真手势），不是手绘 SVG
 //   • 车钉位置来自 location 接口（Lat/Lng），车头朝向来自 Heading —— 都不是猜的
 //   • 行程线来自 tripHistory 的起终点；**没有轨迹点就不画轨迹**（照实写"起终点连线"）
+//   • 充电曲线与常停热区也都是真数据：功率采样积分成会话，停车史聚成"生活圈"
 //   • 「为什么」每一行都由真实字段推出；推不出来就不显示
 //
 // 四个图层 = 四个真实问题（不是一个分类菜单）：
@@ -45,6 +46,8 @@ struct MapSpineView: View {
     @State private var chargerCenterKey = ""
     @State private var showIndex = false
     @State private var isRefreshing = false
+    @State private var showReplay = false
+    @State private var replaySession: ChargeSession?
 
     private var theme: ArtTheme { ArtTheme(rawValue: themeRaw) ?? .native }
     private var spec: MapStyleSpec { theme.mapSpec }
@@ -69,6 +72,9 @@ struct MapSpineView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarItems(d) }
         .sheet(isPresented: $showIndex) { indexSheet(d) }
+        .sheet(isPresented: $showReplay) {
+            if let s = replaySession { ChargeReplaySheet(session: s) }
+        }
         .task {
             await refresh()
             centerOnCar(force: true)
@@ -118,7 +124,9 @@ struct MapSpineView: View {
                 .frame(width: 44, height: 44)   // HIG 最小触控目标就落在钉中心
             }
         }
+        rangeCircle(d)
         tripLines(d)
+        hotspotCircles(d)
         holdPins(d)
         chargerPins
         issuePins(d)
@@ -132,6 +140,30 @@ struct MapSpineView: View {
                 MapPolyline(MKPolyline(coordinates: [t.from, t.to], count: 2))
                     .stroke(TokensPalette.accent.opacity(0.9),
                             style: StrokeStyle(lineWidth: 3, lineCap: .round))
+            }
+        }
+    }
+
+    /// 续航圈：半径就是车报的 RemainedPowerMile（米）。车没报就不画 —— 不猜。
+    @MapContentBuilder
+    private func rangeCircle(_ d: MapSpineData) -> some MapContent {
+        if layer == .now, let c = d.carCoordinate, let meters = d.rangeMeters, meters > 0 {
+            MapCircle(center: c, radius: meters)
+                .stroke(TokensPalette.accent,
+                        style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [4, 5]))
+                .foregroundStyle(TokensPalette.accent.opacity(0.05))
+        }
+    }
+
+    /// 常停热区：停车史聚出来的圈。描边示形状，填充透明度随次数加深。
+    @MapContentBuilder
+    private func hotspotCircles(_ d: MapSpineData) -> some MapContent {
+        if layer == .holds {
+            ForEach(d.hotspots) { h in
+                MapCircle(center: h.center, radius: h.radiusMeters)
+                    .stroke(TokensPalette.accent.opacity(0.55),
+                            style: StrokeStyle(lineWidth: 1, dash: [2, 4]))
+                    .foregroundStyle(TokensPalette.accent.opacity(h.visits >= 3 ? 0.14 : 0.07))
             }
         }
     }
@@ -494,6 +526,9 @@ struct MapSpineView: View {
             }
         }
 
+        // 充电回放：只有功率采样真的攒出了一条会话才出现；正在充的那次不回放（还没结果）
+        replayEntry()
+
         // 钱和电在同一层：这一充花了多少，是车端功率采样积分出来的真值
         ChargeMoneyBlock()
 
@@ -516,6 +551,9 @@ struct MapSpineView: View {
                 }
             }
             Text("来自按车的位置做的实时搜索（MKLocalSearch），不是写死的列表。")
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.tertiary)
+            Text("行程的“回放”做不了：TripRecord 只存起终点，没有逐点轨迹 —— 这是现状，不是缺陷。")
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.tertiary)
         }
@@ -740,6 +778,41 @@ struct MapSpineView: View {
         isRefreshing = true
         await store.fetchCore()
         isRefreshing = false
+    }
+
+    /// 回放入口。有已完成的会话才出现；点击打开采样曲线。
+    @ViewBuilder
+    private func replayEntry() -> some View {
+        if let latest = ChargeLedger.shared.sessions.first {
+            Button {
+                TokensHaptic.tap()
+                replaySession = latest
+                showReplay = true
+            } label: {
+                HStack(spacing: TokensSpacing.sm) {
+                    Image(systemName: "chart.xyaxis.line")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("看这次充电的功率曲线")
+                        .font(TokensTypo.footnote)
+                    Spacer(minLength: 0)
+                    Text(ChargeLedger.kwhText(latest.kWh) + " kWh")
+                        .font(TokensTypo.digits(13))
+                        .foregroundStyle(TokensPalette.secondary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(TokensPalette.tertiary)
+                }
+                .padding(.vertical, TokensSpacing.sm)
+                .padding(.horizontal, TokensSpacing.md)
+                .background {
+                    RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                        .fill(TokensPalette.raised)
+                }
+                .foregroundStyle(TokensPalette.primary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("查看最近一次充电的功率曲线"))
+        }
     }
 
     /// 按**车的位置**搜附近充电站（搜索中心不再是写死的北京坐标）

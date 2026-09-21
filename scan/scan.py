@@ -369,6 +369,13 @@ VERIFIED_SDK_ADDITIONS = {
     "squareRoot": "FloatingPoint.squareRoot()（Swift 标准库；评分页算电耗的离散程度用；已核 swift/floatingpoint/squareroot() 文档 JSON，externalID s:SF10squareRootxyF）",
     "Shape": "SwiftUI.Shape protocol（iOS 13+；本项目用它画车钉的三角形警告形状）",
     "UnevenRoundedRectangle": "SwiftUI.UnevenRoundedRectangle（iOS 16+；底部面板只要上面两角圆角）",
+    # 热区 / 回放 / 充电曲线（本轮）：全部写进代码前对着 Apple 文档 JSON 核过
+    "MapCircle": "MapKit.MapCircle struct（iOS 17+；init(center:radius:) 已核，stroke(_:style:)/foregroundStyle 见 Styling-the-circle）",
+    "Canvas": "SwiftUI.Canvas（iOS 15+；init(closure:(inout GraphicsContext, CGSize) -> Void)）",
+    "GraphicsContext": "SwiftUI.GraphicsContext（iOS 15+；stroke(_:with:style:)/fill(_:with:)/draw(_:at:) 已核）",
+    "Path": "SwiftUI.Path（iOS 13+；move/addLine/closeSubpath）",
+    "presentationDetents": "View.presentationDetents(_:)（iOS 16+；sheet 高度档）",
+    "formatted": "Date.formatted(date:time:)（iOS 15+；Foundation）",
 }
 
 
