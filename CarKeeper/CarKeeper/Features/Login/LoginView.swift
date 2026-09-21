@@ -179,7 +179,6 @@ struct LoginView: View {
                             .keyboardType(.numberPad)
                             .foregroundColor(Kansei.Color.primary)
                             .font(KanseiTypo.hero)
-                            .letterSpacing(8)
                             .padding()
                             .background(
                                 RoundedRectangle(cornerRadius: Kansei.Radius.small, style: .continuous)
