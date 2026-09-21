@@ -146,12 +146,12 @@ struct ServiceReminderRow: View {
             }
             .font(.caption)
             .padding(.horizontal, KanseiSpacing.md)
-            .padding(.vertical, Theme.Spacing.xs)
+            .padding(.vertical, Theme.SpacingTokens.xs)
             .background(isUrgent ? Color.orange : Color.blue.opacity(0.2))
             .foregroundColor(isUrgent ? .white : .blue)
-            .cornerRadius(Theme.Radius.sm)
+            .cornerRadius(Theme.RadiusTokens.sm)
         }
         .glassCard()
-        .padding(.vertical, Theme.Spacing.xs)
+        .padding(.vertical, Theme.SpacingTokens.xs)
     }
 }

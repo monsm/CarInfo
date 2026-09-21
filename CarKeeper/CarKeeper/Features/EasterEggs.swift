@@ -139,7 +139,7 @@ struct DrivingImprovementTips: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+        VStack(alignment: .leading, spacing: Theme.SpacingTokens.xs) {
             Text("驾驶改善建议")
                 .font(.subheadline).fontWeight(.semibold)
             ForEach(tips, id: \.self) { tip in

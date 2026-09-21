@@ -102,7 +102,7 @@ struct EmergencyPanel: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background(color.opacity(0.08))
-            .cornerRadius(Theme.Radius.small)
+            .cornerRadius(Theme.RadiusTokens.small)
         }
         .pressFeedback()
     }
@@ -123,7 +123,7 @@ struct EmergencyPanel: View {
             }
             .padding()
             .background(Color.primary.opacity(0.05))
-            .cornerRadius(Theme.Radius.small)
+            .cornerRadius(Theme.RadiusTokens.small)
         }
         .glassCard(corner: KanseiRadius.medium)
     }

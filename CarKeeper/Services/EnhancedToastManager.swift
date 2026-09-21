@@ -68,7 +68,7 @@ struct EnhancedToastView: View {
         .padding(.vertical, KanseiSpacing.md)
         .background(Color(.systemBackground).opacity(0.95))
         .foregroundColor(.primary)
-        .cornerRadius(Theme.Radius.lg)
+        .cornerRadius(Theme.RadiusTokens.lg)
         .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
         .scaleEffect(manager.dismissProgress)
         .opacity(manager.dismissProgress)

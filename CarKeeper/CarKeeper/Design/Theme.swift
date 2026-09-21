@@ -162,7 +162,9 @@ enum Theme {
     // 二、间距体系（Spacing Scale）
     // =============================================================================
     // 基准：4pt，所有间距为 4 的倍数
-    enum Spacing {
+    /// 间距令牌。`Tokens` 后缀是刻意保留的：通用词一旦成为嵌套类型名，就会在本作用域内
+    /// 遮蔽将来可能出现的同名 SDK 类型（`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
+    enum SpacingTokens {
         static let xs: CGFloat = 4
         static let sm: CGFloat = 8
         static let md: CGFloat = 12
@@ -180,19 +182,21 @@ enum Theme {
     // =============================================================================
     // 三、圆角体系（Corner Radius Scale）
     // =============================================================================
-    enum Radius {
+    /// 圆角令牌。`Tokens` 后缀是刻意保留的：通用词一旦成为嵌套类型名，就会在本作用域内
+    /// 遮蔽将来可能出现的同名 SDK 类型（`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
+    enum RadiusTokens {
         // 全部对齐 DS 的三档圆角（10 / 18 / 26）：卡片圆角在全 App 只有这三档，
         // 圆角档位一多，界面立刻显出「拼凑感」。
-        static let tiny: CGFloat = DS.Radius.small   // 图标按钮、tag
-        static let sm: CGFloat = DS.Radius.small     // tiny 别名
-        static let small: CGFloat = DS.Radius.small
-        static let medium: CGFloat = DS.Radius.card
-        static let large: CGFloat = DS.Radius.card
-        static let lg: CGFloat = DS.Radius.card
-        static let md: CGFloat = DS.Radius.card
-        static let card: CGFloat = DS.Radius.card
-        static let hero: CGFloat = DS.Radius.hero
-        static let ultra: CGFloat = DS.Radius.hero
+        static let tiny: CGFloat = DS.RadiusTokens.small   // 图标按钮、tag
+        static let sm: CGFloat = DS.RadiusTokens.small     // tiny 别名
+        static let small: CGFloat = DS.RadiusTokens.small
+        static let medium: CGFloat = DS.RadiusTokens.card
+        static let large: CGFloat = DS.RadiusTokens.card
+        static let lg: CGFloat = DS.RadiusTokens.card
+        static let md: CGFloat = DS.RadiusTokens.card
+        static let card: CGFloat = DS.RadiusTokens.card
+        static let hero: CGFloat = DS.RadiusTokens.hero
+        static let ultra: CGFloat = DS.RadiusTokens.hero
         static let full: CGFloat = 50   // 圆形元素
     }
 
@@ -231,7 +235,9 @@ enum Theme {
     // =============================================================================
     // 五、阴影体系（Shadow Scale）
     // =============================================================================
-    enum Shadow {
+    /// 阴影令牌。`Tokens` 后缀是刻意保留的：通用词一旦成为嵌套类型名，就会在本作用域内
+    /// 遮蔽将来可能出现的同名 SDK 类型（`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
+    enum ShadowTokens {
         // 新视觉里卡片靠发丝描边分层，阴影只给浮层用，且都压到极弱。
         static let none: ShadowStyle = .init(color: .clear, radius: 0, x: 0, y: 0)
         static let light = ShadowStyle(color: ColorSystem.shadowLight, radius: 4, x: 0, y: 1)
@@ -258,10 +264,10 @@ enum Theme {
         static let fast: Double = 0.2
         static let normal: Double = 0.3
         static let slow: Double = 0.5
-        // 动效曲线统一收敛到 DS.Motion：反馈快、状态变化稳、不过冲。
-        static let springFast: Animation = DS.Motion.press
-        static let springNormal: Animation = DS.Motion.value
-        static let springSlow: Animation = DS.Motion.screen
+        // 动效曲线统一收敛到 DS.MotionTokens：反馈快、状态变化稳、不过冲。
+        static let springFast: Animation = DS.MotionTokens.press
+        static let springNormal: Animation = DS.MotionTokens.value
+        static let springSlow: Animation = DS.MotionTokens.screen
     }
 }
 
@@ -306,12 +312,12 @@ extension View {
 
     // MARK: - 卡片修饰符
     /// 液态玻璃卡片背景 + 高光描边
-    func glassCard(corner: CGFloat = Theme.Radius.card) -> some View {
+    func glassCard(corner: CGFloat = Theme.RadiusTokens.card) -> some View {
         self.modifier(GlassCardModifier(cornerRadius: corner, isHero: false))
     }
 
     /// Hero 级玻璃卡片（更大圆角 + 更强阴影）
-    func glassHeroCard(corner: CGFloat = Theme.Radius.hero) -> some View {
+    func glassHeroCard(corner: CGFloat = Theme.RadiusTokens.hero) -> some View {
         self.modifier(GlassCardModifier(cornerRadius: corner, isHero: true))
     }
 
@@ -374,11 +380,11 @@ struct KVRow: View {
     var strong: Bool = false
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.md) {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.SpacingTokens.md) {
             Text(k)
                 .font(Theme.caption)
                 .foregroundStyle(.secondary)
-            Spacer(minLength: Theme.Spacing.lg)
+            Spacer(minLength: Theme.SpacingTokens.lg)
             Text(v)
                 .font(Theme.font(14, weight: strong ? .semibold : .medium,
                                  design: mono ? .monospaced : .rounded))
@@ -395,7 +401,7 @@ struct CardBox<Content: View>: View {
     let title: String
     var side: String? = nil
     var sideCls: String = ""
-    var cornerRadius: CGFloat = Theme.Radius.card
+    var cornerRadius: CGFloat = Theme.RadiusTokens.card
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -423,7 +429,7 @@ struct ExpandingCardBox<Content: View>: View {
     let title: String
     var side: String? = nil
     var sideCls: String = ""
-    var cornerRadius: CGFloat = Theme.Radius.card
+    var cornerRadius: CGFloat = Theme.RadiusTokens.card
     @ViewBuilder var content: () -> Content
 
     @State private var isExpanded = false
@@ -477,7 +483,7 @@ struct ExpandingCardBox<Content: View>: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(KanseiPalette.tertiary)
                         .rotationEffect(isExpanded ? .degrees(180) : .degrees(0))
-                        .animation(DS.Motion.press, value: isExpanded)
+                        .animation(DS.MotionTokens.press, value: isExpanded)
                 }
                 .padding(.horizontal, DS.Space.cardPadding)
                 .padding(.vertical, DS.Space.lg)
@@ -489,14 +495,14 @@ struct ExpandingCardBox<Content: View>: View {
             // ── 内容区（弹簧高度过渡）──
             if isExpanded {
                 content()
-                    .padding(.horizontal, Theme.Spacing.xl)
-                    .padding(.bottom, Theme.Spacing.lg)
+                    .padding(.horizontal, Theme.SpacingTokens.xl)
+                    .padding(.bottom, Theme.SpacingTokens.lg)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .overlay(alignment: .topLeading) {
                         Rectangle()
                             .fill(Color.secondary.opacity(0.12))
                             .frame(height: 1)
-                            .padding(.horizontal, -Theme.Spacing.xl)
+                            .padding(.horizontal, -Theme.SpacingTokens.xl)
                     }
             }
         }
@@ -674,7 +680,7 @@ enum DynamicTypeScale {
 extension View {
     /// 应用 Dynamic Type 感知的水平内边距（自适应页面左右留白）
     func adaptivePagePadding(_ size: ContentSizeCategory) -> some View {
-        self.padding(.horizontal, DynamicTypeScale.padding(Theme.Spacing.page, for: size))
+        self.padding(.horizontal, DynamicTypeScale.padding(Theme.SpacingTokens.page, for: size))
     }
 
     /// 应用 Dynamic Type 感知的 VStack/HStack 间距
@@ -714,8 +720,8 @@ struct DynamicTypeCompressModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .padding(.horizontal, compressRatio * Theme.Spacing.page)
-            .padding(.vertical, compressRatio * Theme.Spacing.md)
+            .padding(.horizontal, compressRatio * Theme.SpacingTokens.page)
+            .padding(.vertical, compressRatio * Theme.SpacingTokens.md)
     }
 }
 

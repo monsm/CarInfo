@@ -248,7 +248,7 @@ struct MessagesView: View {
     }
 
     private func toggle(_ item: MessageItem) {
-        withAnimation(DS.Motion.value) {
+        withAnimation(DS.MotionTokens.value) {
             if expanded.contains(item.id) {
                 expanded.remove(item.id)
             } else {

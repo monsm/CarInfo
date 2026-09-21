@@ -138,7 +138,9 @@ enum WT {
 
     // MARK: - 4. 圆角（只有三档 + 胶囊）
 
-    enum Radius {
+    /// 圆角令牌。`Tokens` 后缀是刻意保留的：通用词一旦成为嵌套类型名，就会在本作用域内
+    /// 遮蔽将来可能出现的同名 SDK 类型（`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
+    enum RadiusTokens {
         static let small: CGFloat = 8
         static let card: CGFloat = 12
         static let hero: CGFloat = 20

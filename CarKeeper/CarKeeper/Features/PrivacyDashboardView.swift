@@ -56,7 +56,7 @@ struct PrivacyDashboardView: View {
             ScrollView {
                 VStack(spacing: KanseiSpacing.lg) {
                     // 汇总卡片
-                    VStack(spacing: Theme.Spacing.sm) {
+                    VStack(spacing: Theme.SpacingTokens.sm) {
                         Image(safeSymbol: "checkerboard.shield", fallback: "shield.fill")
                             .font(.system(size: 48))
                             .foregroundColor(KanseiPalette.ambient)
@@ -77,7 +77,7 @@ struct PrivacyDashboardView: View {
                     }
 
                     // 一键清除按钮
-                    VStack(spacing: Theme.Spacing.sm) {
+                    VStack(spacing: Theme.SpacingTokens.sm) {
                         Button(role: .destructive) {
                             showClearConfirm = true
                         } label: {
@@ -87,7 +87,7 @@ struct PrivacyDashboardView: View {
                                 .padding()
                                 .background(Color.red.opacity(0.15))
                                 .foregroundColor(.red)
-                                .cornerRadius(Theme.Radius.medium)
+                                .cornerRadius(Theme.RadiusTokens.medium)
                         }
 
                         Button {
@@ -102,7 +102,7 @@ struct PrivacyDashboardView: View {
                                 .padding()
                                 .background(Color.orange.opacity(0.1))
                                 .foregroundColor(.orange)
-                                .cornerRadius(Theme.Radius.medium)
+                                .cornerRadius(Theme.RadiusTokens.medium)
                         }
                     }
                     .padding(.top, KanseiSpacing.sm)
@@ -147,7 +147,7 @@ struct PrivacyCategorySection: View {
                         .foregroundColor(Color(.tertiaryLabel))
                 }
                 .padding(.horizontal)
-                .padding(.vertical, Theme.Spacing.xs)
+                .padding(.vertical, Theme.SpacingTokens.xs)
                 if idx != category.items.count - 1 {
                     Divider().opacity(0.3)
                         .padding(.horizontal)
@@ -155,7 +155,7 @@ struct PrivacyCategorySection: View {
             }
         }
         .glassCard()
-        .padding(.vertical, Theme.Spacing.xs)
+        .padding(.vertical, Theme.SpacingTokens.xs)
     }
 }
 

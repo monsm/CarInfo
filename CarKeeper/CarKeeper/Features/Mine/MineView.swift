@@ -146,7 +146,7 @@ struct MineView: View {
     // MARK: 身份卡 — Apple Profile Card
     private var profileCard: some View {
         let um = VM.userModel(store.user)
-        return DSCard(padding: DS.Space.cardPadding, radius: DS.Radius.hero) {
+        return DSCard(padding: DS.Space.cardPadding, radius: DS.RadiusTokens.hero) {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
                 HStack(spacing: DS.Space.lg) {
                     // 头像：系统填充色的圆底 + 首字（iOS 设置顶部的身份区做法）
@@ -231,10 +231,10 @@ struct MineView: View {
         } label: {
             HStack(spacing: DS.Space.lg) {
                 Image(systemName: "car.fill")
-                    .font(.system(size: DS.Size.iconLg, weight: .regular))
+                    .font(.system(size: DS.SizeTokens.iconLg, weight: .regular))
                     .foregroundStyle(KanseiPalette.ambient)
                     .frame(width: 48, height: 48)
-                    .background(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                    .background(RoundedRectangle(cornerRadius: DS.RadiusTokens.small, style: .continuous)
                         .fill(KanseiPalette.ambient))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(sum?.name ?? "未绑定车辆")
@@ -430,7 +430,7 @@ struct MineView: View {
             // Tesla 式磁贴：图标左上 + 标签在左下，表面色不用玻璃、不用圆形底盘。
             VStack(alignment: .leading, spacing: DS.Space.sm) {
                 Image(safeSymbol: symbol, fallback: "car.fill")
-                    .font(.system(size: DS.Size.tileIcon, weight: .regular))
+                    .font(.system(size: DS.SizeTokens.tileIcon, weight: .regular))
                     .foregroundStyle(tint)
                     .frame(height: 30)
                 Text(label)
@@ -442,9 +442,9 @@ struct MineView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(DS.Space.md)
             .frame(minHeight: 84)
-            .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+            .background(RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
                 .fill(KanseiPalette.nightSurface))
-            .overlay(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+            .overlay(RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
                 .strokeBorder(KanseiPalette.glassBorder, lineWidth: DS.Hair.line))
             .contentShape(Rectangle())
         }

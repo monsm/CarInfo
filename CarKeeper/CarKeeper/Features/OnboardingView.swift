@@ -101,9 +101,9 @@ struct OnboardingView: View {
             }
             .padding(.horizontal, DS.Space.xxxl)
             .padding(.vertical, DS.Space.xxl)
-            .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+            .background(RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
                 .fill(KanseiPalette.nightSurface))
-            .overlay(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+            .overlay(RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
                 .strokeBorder(KanseiPalette.glassBorder, lineWidth: DS.Hair.line))
             .padding(.top, DS.Space.xl)
         }

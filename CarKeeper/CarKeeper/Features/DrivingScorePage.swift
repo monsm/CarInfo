@@ -158,7 +158,7 @@ struct DrivingScorePage: View {
             scoreRow(icon: "leaf.fill", label: "能耗效率", value: efficiencyScore, color: .cyan)
             scoreRow(icon: "comfort", label: "舒适体验", value: comfortScore, color: .orange)
         }
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Theme.RadiusTokens.medium)
     }
 
     private func scoreRow(icon: String, label: String, value: Int, color: Color) -> some View {
@@ -213,7 +213,7 @@ struct DrivingScorePage: View {
             }
         }
         .padding()
-        .glassCard(corner: Theme.Radius.medium)
+        .glassCard(corner: Theme.RadiusTokens.medium)
         .background(Color.yellow.opacity(0.05))
     }
 

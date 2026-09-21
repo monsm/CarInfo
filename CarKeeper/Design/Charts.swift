@@ -153,7 +153,9 @@ struct DSTyreTrendChart: View {
     /// Chart 的 `ForEach` 需要 Identifiable/键路径，而 Swift 的键路径不能指向元组元素。
     /// ⚠️ `id` 必须**逐点唯一**（ForEach 的硬要求），而 `series` 必须**逐轮位相同**
     /// —— 两者写反了，四条线会被并成一条，或者一条线被拆成一段段。
-    private struct Mark: Identifiable {
+    /// 名字避开裸 `Mark`：通用词做嵌套类型名会在本作用域内遮蔽将来可能出现的同名 SDK 类型
+    /// （`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
+    private struct CurveSegment: Identifiable {
         let id: String
         let series: String
         let t: Date
@@ -167,15 +169,15 @@ struct DSTyreTrendChart: View {
     /// 内层那个 LineMark 表达式让类型检查器直接超时：
     /// `error: the compiler is unable to type-check this expression in reasonable time`。
     /// 摊平后内层只剩纯粹的成员读取，编译器不必再做嵌套重载推断。
-    private var marks: [Mark] {
-        var out: [Mark] = []
+    private var marks: [CurveSegment] {
+        var out: [CurveSegment] = []
         out.reserveCapacity(points.count * Wheel.allCases.count)
         for p in points {
             let stamp = p.t.timeIntervalSince1970
             for wheel in Wheel.allCases {
                 guard let v = wheel.value(p) else { continue }
                 out.append(
-                    Mark(id: "\(wheel.rawValue)@\(stamp)",
+                    CurveSegment(id: "\(wheel.rawValue)@\(stamp)",
                          series: wheel.rawValue,
                          t: p.t,
                          v: v,

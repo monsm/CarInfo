@@ -511,7 +511,7 @@ struct ControlView: View {
             }
             Spacer()
         }
-        .dsSurface(padding: DS.Space.lg, radius: DS.Radius.card)
+        .dsSurface(padding: DS.Space.lg, radius: DS.RadiusTokens.card)
     }
 
     // MARK: 指令列表
@@ -983,7 +983,7 @@ struct PINKeypadView: View {
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 8)
         }
-        .padding(Theme.Spacing.xxl)
+        .padding(Theme.SpacingTokens.xxl)
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
     }
@@ -1050,7 +1050,7 @@ struct ACStepperView: View {
             Button("取消") { dismiss() }
                 .font(Theme.caption).foregroundStyle(.secondary)
         }
-        .padding(Theme.Spacing.xxl)
+        .padding(Theme.SpacingTokens.xxl)
         .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
         // 首次对齐目标温度

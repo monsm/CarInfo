@@ -172,7 +172,7 @@ struct CostSummaryTile: View {
     let type: TripCostType
     let total: Double
     var body: some View {
-        VStack(spacing: Theme.Spacing.xs) {
+        VStack(spacing: Theme.SpacingTokens.xs) {
             Image(safeSymbol: type.icon, fallback: "doc.text.fill")
                 .font(.title2)
                 .foregroundColor(KanseiPalette.ambient)
@@ -288,6 +288,6 @@ struct CostEntryRow: View {
                 }
             }
         }
-        .padding(.vertical, Theme.Spacing.xs)
+        .padding(.vertical, Theme.SpacingTokens.xs)
     }
 }

@@ -140,9 +140,9 @@ struct HealthView: View {
             Button { toggle(sys.name) } label: {
                 HStack(spacing: DS.Space.md) {
                     Image(safeSymbol: systemIcon(sys.name), fallback: "circle")
-                        .font(.system(size: DS.Size.icon))
+                        .font(.system(size: DS.SizeTokens.icon))
                         .foregroundStyle(tint)
-                        .frame(width: DS.Size.iconColumn)
+                        .frame(width: DS.SizeTokens.iconColumn)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(sys.name)
                             .font(DS.Typo.body)
@@ -256,9 +256,9 @@ struct HealthView: View {
             } label: {
                 HStack(spacing: DS.Space.md) {
                     Image(safeSymbol: "number.square.fill", fallback: "number")
-                        .font(.system(size: DS.Size.icon))
+                        .font(.system(size: DS.SizeTokens.icon))
                         .foregroundStyle(KanseiPalette.ambient)
-                        .frame(width: DS.Size.iconColumn)
+                        .frame(width: DS.SizeTokens.iconColumn)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("检测 ID")
                             .font(DS.Typo.body)

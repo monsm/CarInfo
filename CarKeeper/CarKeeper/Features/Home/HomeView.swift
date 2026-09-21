@@ -797,13 +797,13 @@ struct HomeView: View {
                             .buttonStyle(DSSecondaryButtonStyle())
                     }
                     Button(showMap ? "隐藏地图" : "显示地图") {
-                        withAnimation(DS.Motion.fade) { showMap.toggle() }
+                        withAnimation(DS.MotionTokens.fade) { showMap.toggle() }
                     }
                     .buttonStyle(DSSecondaryButtonStyle())
                 }
             }
             .padding(DS.Space.cardPadding)
-            .background(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+            .background(RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
                 .fill(KanseiPalette.nightSurface))
 
             DSCard {
@@ -878,7 +878,7 @@ struct HomeView: View {
             customMessage: fm.config.customMessage
         )
         fm.saveConfig(next)
-        withAnimation(DS.Motion.press) { focusEnabled = next.enabled }
+        withAnimation(DS.MotionTokens.press) { focusEnabled = next.enabled }
     }
 
     /// 导航交给系统地图（MKMapItem 驾车模式）。

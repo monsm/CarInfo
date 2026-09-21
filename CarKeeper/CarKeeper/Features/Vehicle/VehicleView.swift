@@ -242,7 +242,8 @@ struct VehicleView: View {
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                                     .frame(width: 104, height: 78)
-                                    .clipShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
+                                    .clipShape(RoundedRectangle(cornerRadius: DS.RadiusTokens.small,
+                                                                 style: .continuous))
                                     .contextMenu {
                                         Button(role: .destructive) {
                                             deletePhoto(at: idx)
@@ -264,7 +265,7 @@ struct VehicleView: View {
                             }
                             .foregroundStyle(KanseiPalette.secondary)
                             .frame(width: 104, height: 78)
-                            .background(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                            .background(RoundedRectangle(cornerRadius: DS.RadiusTokens.small, style: .continuous)
                                 .fill(KanseiPalette.fillSubtle))
                         }
                         .accessibilityLabel(Text("添加维保照片"))
@@ -277,7 +278,7 @@ struct VehicleView: View {
 
     private func deletePhoto(at idx: Int) {
         guard maintenancePhotos.indices.contains(idx) else { return }
-        withAnimation(DS.Motion.value) { _ = maintenancePhotos.remove(at: idx) }
+        withAnimation(DS.MotionTokens.value) { _ = maintenancePhotos.remove(at: idx) }
         saveMaintenancePhotos()
         ToastManager.shared.show("照片已删除", icon: "trash")
     }

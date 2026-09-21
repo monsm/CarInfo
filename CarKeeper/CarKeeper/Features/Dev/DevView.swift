@@ -176,9 +176,10 @@ struct DevView: View {
             ("页面边距", "\(Int(DS.Space.page)) pt"),
             ("分组内边距", "\(Int(DS.Space.cardPadding)) pt"),
             ("行高", "\(Int(DS.Space.row)) pt"),
-            ("圆角 · 小 / 分组 / 弹层", "\(Int(DS.Radius.small)) / \(Int(DS.Radius.card)) / \(Int(DS.Radius.hero)) pt"),
+            ("圆角 · 小 / 分组 / 弹层",
+             "\(Int(DS.RadiusTokens.small)) / \(Int(DS.RadiusTokens.card)) / \(Int(DS.RadiusTokens.hero)) pt"),
             ("发丝线", "\(DS.Hair.line) pt"),
-            ("主按钮高度", "\(Int(DS.Size.button)) pt")
+            ("主按钮高度", "\(Int(DS.SizeTokens.button)) pt")
         ]
     }
 

@@ -191,7 +191,9 @@ enum DS {
     // =========================================================================
     // MARK: 4. 圆角（只有三档 + 胶囊）
     // =========================================================================
-    enum Radius {
+    /// 圆角令牌。`Tokens` 后缀是刻意保留的：通用词一旦成为嵌套类型名，就会在本作用域内
+    /// 遮蔽将来可能出现的同名 SDK 类型（`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
+    enum RadiusTokens {
         static let small: CGFloat = 8     // 小控件、输入
         static let card: CGFloat = 12     // inset-grouped 表面
         static let hero: CGFloat = 20     // 弹层、大面板
@@ -209,7 +211,9 @@ enum DS {
     // =========================================================================
     // MARK: 5. 动效（只服务状态变化）
     // =========================================================================
-    enum Motion {
+    /// 动效令牌。`Tokens` 后缀是刻意保留的：通用词一旦成为嵌套类型名，就会在本作用域内
+    /// 遮蔽将来可能出现的同名 SDK 类型（`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
+    enum MotionTokens {
         static let press = Animation.spring(response: 0.30, dampingFraction: 0.86)
         static let value = Animation.spring(response: 0.36, dampingFraction: 0.88)
         static let screen = Animation.spring(response: 0.42, dampingFraction: 0.90)
@@ -221,7 +225,9 @@ enum DS {
     // =========================================================================
     // MARK: 6. 尺寸
     // =========================================================================
-    enum Size {
+    /// 尺寸令牌。`Tokens` 后缀是刻意保留的：通用词一旦成为嵌套类型名，就会在本作用域内
+    /// 遮蔽将来可能出现的同名 SDK 类型（`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
+    enum SizeTokens {
         static let tap: CGFloat = 44
         /// 主按钮（iOS 实心胶囊）
         static let button: CGFloat = 50
@@ -278,7 +284,7 @@ struct DSCard<Content: View>: View {
     var content: () -> Content
 
     init(padding: CGFloat = DS.Space.cardPadding,
-         radius: CGFloat = DS.Radius.card,
+         radius: CGFloat = DS.RadiusTokens.card,
          glass: Bool = false,
          hero: Bool = false,
          @ViewBuilder content: @escaping () -> Content) {
@@ -305,7 +311,7 @@ struct DSCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(configuration.isPressed ? 0.55 : 1)
-            .animation(DS.Motion.press, value: configuration.isPressed)
+            .animation(DS.MotionTokens.press, value: configuration.isPressed)
     }
 }
 
@@ -354,11 +360,11 @@ struct DSGroup<Content: View>: View {
             }
             VStack(spacing: 0) { content() }
                 .background {
-                    RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                    RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
                         .fill(KanseiPalette.nightSurface)
                 }
                 // 裁剪掉圆角：行的按压底色是矩形，不裁会在分组四角露出方角
-                .clipShape(RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous))
             if let footer {
                 Text(footer)
                     .font(DS.Typo.footnote)
@@ -531,10 +537,10 @@ struct DSLightBar: View {
         }
         .frame(height: height)
         .onAppear {
-            withAnimation(DS.Motion.draw) { revealed = clamped }
+            withAnimation(DS.MotionTokens.draw) { revealed = clamped }
         }
         .onChange(of: clamped) { _, newValue in
-            withAnimation(DS.Motion.value) { revealed = newValue }
+            withAnimation(DS.MotionTokens.value) { revealed = newValue }
         }
         .accessibilityElement()
         .accessibilityLabel(Text("电量比例"))
@@ -635,7 +641,7 @@ struct DSStatRow: View {
         HStack(spacing: DS.Space.sm) {
             if let icon {
                 Image(safeSymbol: icon, fallback: "circle")
-                    .font(.system(size: DS.Size.iconSm))
+                    .font(.system(size: DS.SizeTokens.iconSm))
                     .foregroundStyle(KanseiPalette.secondary)
                     .frame(width: 20)
             }
@@ -716,9 +722,9 @@ struct DSRow: View {
         HStack(spacing: DS.Space.md) {
             if let icon {
                 Image(safeSymbol: icon, fallback: "circle")
-                    .font(.system(size: DS.Size.icon))
+                    .font(.system(size: DS.SizeTokens.icon))
                     .foregroundStyle(KanseiPalette.ambient)
-                    .frame(width: DS.Size.iconColumn, alignment: .center)
+                    .frame(width: DS.SizeTokens.iconColumn, alignment: .center)
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
@@ -754,7 +760,7 @@ struct DSRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(configuration.isPressed ? KanseiPalette.fillSubtle : Color.clear)
-            .animation(DS.Motion.press, value: configuration.isPressed)
+            .animation(DS.MotionTokens.press, value: configuration.isPressed)
     }
 }
 
@@ -778,7 +784,7 @@ struct DSTile: View {
             VStack(alignment: .leading, spacing: DS.Space.sm) {
                 HStack(alignment: .center) {
                     Image(safeSymbol: icon, fallback: "circle")
-                        .font(.system(size: DS.Size.tileIcon, weight: .regular))
+                        .font(.system(size: DS.SizeTokens.tileIcon, weight: .regular))
                         .foregroundStyle(accent)
                     Spacer(minLength: 0)
                     if isLoading {
@@ -801,7 +807,7 @@ struct DSTile: View {
             .padding(DS.Space.lg)
             .frame(minHeight: 84, alignment: .topLeading)
             .background {
-                RoundedRectangle(cornerRadius: DS.Radius.card, style: .continuous)
+                RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
                     .fill(KanseiPalette.nightSurface)
             }
         }
@@ -820,11 +826,11 @@ struct DSPrimaryButtonStyle: ButtonStyle {
             .font(DS.Typo.headline)
             .foregroundStyle(DS.Palette.labelOnTint)
             .frame(maxWidth: .infinity)
-            .frame(height: DS.Size.button)
+            .frame(height: DS.SizeTokens.button)
             .background(Capsule().fill(tint))
             .opacity(configuration.isPressed ? 0.82 : 1)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .animation(DS.Motion.press, value: configuration.isPressed)
+            .animation(DS.MotionTokens.press, value: configuration.isPressed)
     }
 }
 
@@ -835,26 +841,26 @@ struct DSSecondaryButtonStyle: ButtonStyle {
             .font(DS.Typo.headline)
             .foregroundStyle(KanseiPalette.primary)
             .frame(maxWidth: .infinity)
-            .frame(height: DS.Size.button)
+            .frame(height: DS.SizeTokens.button)
             .background(Capsule().fill(KanseiPalette.glassLight))
             .opacity(configuration.isPressed ? 0.65 : 1)
-            .animation(DS.Motion.press, value: configuration.isPressed)
+            .animation(DS.MotionTokens.press, value: configuration.isPressed)
     }
 }
 
 /// 图标按钮（导航栏、行尾）
 struct DSIconButtonStyle: ButtonStyle {
-    var size: CGFloat = DS.Size.tap
+    var size: CGFloat = DS.SizeTokens.tap
     var tint: Color = KanseiPalette.primary
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: DS.Size.iconLg))
+            .font(.system(size: DS.SizeTokens.iconLg))
             .foregroundStyle(tint)
             .frame(width: size, height: size)
             .background(Circle().fill(configuration.isPressed ? KanseiPalette.glassLight : Color.clear))
             .contentShape(Circle())
-            .animation(DS.Motion.press, value: configuration.isPressed)
+            .animation(DS.MotionTokens.press, value: configuration.isPressed)
     }
 }
 
@@ -868,7 +874,7 @@ struct DSSegmented<T: Hashable>: View {
             ForEach(Array(options.enumerated()), id: \.offset) { _, option in
                 let selected = option.value == selection
                 Button {
-                    withAnimation(DS.Motion.value) { selection = option.value }
+                    withAnimation(DS.MotionTokens.value) { selection = option.value }
                 } label: {
                     Text(option.title)
                         .font(DS.Typo.subheadline.weight(selected ? .semibold : .regular))
@@ -938,7 +944,7 @@ struct DSNotice: View {
         }
         .padding(.horizontal, DS.Space.md)
         .padding(.vertical, DS.Space.sm)
-        .background(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+        .background(RoundedRectangle(cornerRadius: DS.RadiusTokens.small, style: .continuous)
             .fill(KanseiPalette.nightSurface))
         .accessibilityElement(children: .combine)
     }
@@ -987,7 +993,7 @@ struct DSSkeleton: View {
     var width: CGFloat? = nil
 
     var body: some View {
-        RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+        RoundedRectangle(cornerRadius: DS.RadiusTokens.small, style: .continuous)
             .fill(KanseiPalette.fillSubtle)
             .frame(width: width, height: height)
             .accessibilityHidden(true)
@@ -1006,7 +1012,7 @@ struct DSSkeleton: View {
 extension View {
     /// 分组表面外观
     func dsSurface(padding: CGFloat = DS.Space.cardPadding,
-                   radius: CGFloat = DS.Radius.card,
+                   radius: CGFloat = DS.RadiusTokens.card,
                    glass: Bool = false) -> some View {
         modifier(DSSurfaceModifier(padding: padding, radius: radius, glass: glass))
     }

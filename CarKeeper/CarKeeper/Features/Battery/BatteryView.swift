@@ -597,7 +597,7 @@ struct DestinationCalculatorView: View {
                 .font(Theme.body)
                 .foregroundStyle(.secondary)
         }
-        .padding(Theme.Spacing.xxl)
+        .padding(Theme.SpacingTokens.xxl)
         .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
     }
