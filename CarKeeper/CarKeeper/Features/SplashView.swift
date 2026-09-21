@@ -1,6 +1,7 @@
 // =============================================================================
-// SplashView.swift — 电影感启动
-// Tesla 式极简 + 时间感知品牌光 + 呼吸动画
+// SplashView.swift — 启动画面
+// v4：只有一次性的入场 —— 品牌光淡入、进度条绘制。
+// 没有呼吸、没有常驻发光：界面上会动的东西必须对应一个真实状态（这里是「正在启动」）。
 // =============================================================================
 import SwiftUI
 
@@ -45,7 +46,6 @@ struct SplashView: View {
                                 .fill(TokensPalette.ambient)
                         )
                 }
-                .kanseiBreathe(opacity: 0.4, scale: 1.05)
 
                 VStack(spacing: TokensSpacing.sm) {
                     Text("长安车管家")

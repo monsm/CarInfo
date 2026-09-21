@@ -255,7 +255,10 @@ struct DSBigNumber: View {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
                     .font(TokensTypo.display(size))
-                    .tracking(-size * 0.035)
+                    // 字距 = 按字号算的基准 + 主题的额外收紧。
+                    // 原生主题的额外量为 0，所以切换前是什么样现在还是什么样；
+                    // 「巨字」方向靠这一项把超大数字收成一整块（海报的做法）。
+                    .tracking(-size * 0.035 + TokensTypo.displayTracking)
                     .foregroundStyle(tint)
                     .contentTransition(.numericText())
                     .lineLimit(1)

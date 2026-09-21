@@ -85,9 +85,22 @@ extension Theme {
 extension View {
     // 页面底色 + 统一页面边距
     // 刻意不接受任何颜色参数：页面底色只能是 TokensPalette.background 这一层。
+    //
+    // v5：画布之上再叠一层**主题装饰**（CanvasDecorLayer）。
+    // 它永远在内容之下（写在 background 里，不是 overlay），所以不遮挡、不吃点击。
+    // 装饰不是“氛围背景”的回归：它只表达这套艺术方向的做法 ——
+    //   夜光 = 一束来自车所在地的光；纸上 = 纸面在光下的不均；巨字 = 发丝网格。
     func pageBackground() -> some View {
         contentMargins(.horizontal, TokensSpacing.page, for: .scrollContent)
-            .background(TokensPalette.canvasGradient.ignoresSafeArea())
+            .background {
+                ZStack {
+                    TokensPalette.canvasGradient
+                    CanvasDecorLayer()
+                        // 装饰层不吃点击：它只是画布，不是控件
+                        .allowsHitTesting(false)
+                }
+                .ignoresSafeArea()
+            }
     }
 
     // MARK: - 卡片修饰符
@@ -101,6 +114,73 @@ extension View {
         self.modifier(GlassCardModifier(cornerRadius: corner, isHero: true))
     }
 
+}
+
+// =============================================================================
+// CanvasDecorLayer —— 按当前主题给画布叠一层装饰
+// =============================================================================
+// 三种装饰各对应一种艺术方向的做法，不是随机氛围：
+//   lightPool    夜光：一束来自车所在地的光（暖色、位置固定、不是动画）
+//   paperGrain   纸上：纸面在光下的色温不均（印刷物不会完全均匀）
+//   hairlineGrid 巨字：发丝网格 —— 版面本身就是内容
+//
+// 它只出现在 pageBackground() 的 background 里（内容之下），并且关闭命中测试，
+// 所以不会遮挡、不会吃掉任何点击。
+struct CanvasDecorLayer: View {
+    private var decor: CanvasDecor { TokensPalette.decor }
+
+    var body: some View {
+        switch decor {
+        case .none:
+            Color.clear
+
+        case .lightPool:
+            GeometryReader { geo in
+                RadialGradient(
+                    colors: [TokensPalette.accent.opacity(0.16), TokensPalette.accent.opacity(0)],
+                    center: UnitPoint(x: 0.78, y: 0.12),
+                    startRadius: 0,
+                    endRadius: max(geo.size.width, geo.size.height) * 0.72
+                )
+            }
+
+        case .paperGrain:
+            ZStack {
+                RadialGradient(
+                    colors: [Color(red: 0.78, green: 0.68, blue: 0.50).opacity(0.10), .clear],
+                    center: UnitPoint(x: 0.18, y: 0.08),
+                    startRadius: 0,
+                    endRadius: 420
+                )
+                RadialGradient(
+                    colors: [Color(red: 0.55, green: 0.46, blue: 0.32).opacity(0.06), .clear],
+                    center: UnitPoint(x: 0.90, y: 0.85),
+                    startRadius: 0,
+                    endRadius: 520
+                )
+            }
+
+        case .hairlineGrid:
+            GeometryReader { geo in
+                Path { p in
+                    let step: CGFloat = 44
+                    var x: CGFloat = 0
+                    while x <= geo.size.width {
+                        p.move(to: CGPoint(x: x, y: 0))
+                        p.addLine(to: CGPoint(x: x, y: geo.size.height))
+                        x += step
+                    }
+                    var y: CGFloat = 0
+                    while y <= geo.size.height {
+                        p.move(to: CGPoint(x: 0, y: y))
+                        p.addLine(to: CGPoint(x: geo.size.width, y: y))
+                        y += step
+                    }
+                }
+                .stroke(TokensPalette.primary.opacity(CanvasDecor.hairlineGrid.strength), lineWidth: 0.5)
+            }
+        }
+    }
 }
 
 // =============================================================================

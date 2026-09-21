@@ -2,114 +2,113 @@
 // Tokens.swift — 设计令牌的唯一来源（Single Source of Truth）
 // =============================================================================
 //
-// 本文件合并了此前四套重叠的令牌层：
-//   1. `enum DS` 里的令牌子命名空间（Palette / Typo / Space / RadiusTokens / MotionTokens / Hair / SizeTokens）
-//   2. `Kansei.swift` 的 Kansei* 命名空间（Palette / Spacing / Radius / Motion / Haptic / Typo）
-//   3. `Theme` 里的令牌子命名空间（SpacingTokens / RadiusTokens / ShadowTokens / Spring / Duration）
-//   4. `Theme` 本身的别名（brand/ok/warn/bad/charge/acc/na、h1…h4、d0…d5、mono、Colors…）
+// v4 · iOS 原生语言（最终方向）
 //
-// 合并规则：
-//   • 命名空间一律挂在**顶层类型**上（TokensXxx），不嵌套 —— 嵌套类型名会遮蔽外层同名符号，
-//     历史上 `extension Kansei { enum Color { … } }` 就因此把 `SwiftUI.Color` 劫持掉了。
-//     `TokensPalette` 里刻意裸写 `Color`：谁要是再往里嵌套一个 `Color`，本文件立刻编译失败。
-//     `scan/shadowguard.py`（默认档 + --strict）会拦下这类形状。
-//   • 刻度采用 Kansei 刻度：间距 md 16 / lg 24、圆角 medium 16 / large 24、字体 title 24。
-//     原 DS 刻度（md 12 / lg 16）已按同名档位映射过来，因此间距整体变松是**有意的**。
-//   • 只保留仍被引用的 DS 成员；DS.Palette 里那一批无引用的旧成员（hairline/tint/label… 已由
-//     Kansei 色系与 `Theme.*` 别名取代）与 DS.Elev（全为 .clear 的占位）一并删除。
+// 三条取值原则（按优先级）：
+//   1. 能用系统语义值的，绝不自造：颜色、字号、分隔线、圆角都取 iOS 真值。
+//      `WT.Palette`（Shared/WidgetTokens.swift）是同一套值的世界面副本，
+//      小组件 / 实时活动与 App 由编译器保证不漂移 —— App 侧一律从这里转发。
+//   2. 强调色全局唯一（系统蓝）。旧的「时间感知琥珀金」已整体废弃：
+//      一个 App 同时挂两套强调色，等于没有强调色。
+//   3. 文字只有三档（label / 60% / 30%），且必须**跟随浅色/深色** ——
+//      旧值把 primary/secondary/tertiary 写成固定白色，浅色模式下不可读。
+//
+// 结构约定：命名空间一律挂在顶层类型上（TokensXxx），不嵌套 ——
+// 历史上把泛用名嵌进项目命名空间，结果把 SwiftUI 的 `Color` 劫持掉了；
+// `scan/shadowguard.py`（默认档 + --strict）会拦下这类形状。
+//
+// 已废弃并删除（含各自的调用点迁移）：
+//   TimeOfDay / ambient 时间感知色系、amber 家族、deepBlack / daySurface、
+//   呼吸动效（TokensMotion.breathe / kanseiBreathe）—— v4 规定：
+//   界面里所有会动、会发光的东西都必须对应一个真实状态。
+//
+// v5 · 可切换的艺术主题（ArtTheme.swift）：
+//   下面的颜色值不再直接写死，而是从**当前主题**读（ArtThemeStore.spec）。
+//   `.native` 主题的取值与 v4 逐值相同 —— 默认不切换时界面与之前完全一致。
+//   换主题 = 换值，不是换名字：全 App 的调用点（`TokensPalette.accent` 之类）一行不改。
+//   重绘由 CarKeeperApp 的 root 上的 `.id(主题)` 触发（静态计算值本身不产生依赖）。
 // =============================================================================
 import SwiftUI
 import UIKit
 
-// MARK: - 时间感知配色
-
-enum TimeOfDay {
-    case dawn, morning, noon, afternoon, dusk, night
-
-    static var current: TimeOfDay {
-        let hour = Calendar.current.component(.hour, from: Date())
-        switch hour {
-        case 5..<8: return .dawn
-        case 8..<12: return .morning
-        case 12..<15: return .noon
-        case 15..<18: return .afternoon
-        case 18..<21: return .dusk
-        default: return .night
-        }
-    }
-}
-
 // MARK: - 颜色令牌（单一来源）
-//
-// 两族并存是**有意的**，不是重复：
-//   • ok/warn/bad/charge/canvas/surface/hairline… —— 系统语义色（跟随浅色/深色，和小组件共用 WT.Palette）
-//   • success/warning/error/info/amber/primary… —— 固定 RGB 的情感色（深色表面、光带、状态强调）
-// 两者取值不同、用途不同；合并成一族会把「自适应浅色/深色」这一能力丢掉。
 enum TokensPalette {
-    // ---- 系统语义色（与小组件共用同一份真值，见 Shared/WidgetTokens.swift）----
-    /// 页面画布：systemGroupedBackground（亮 #F2F2F7 / 暗 #000）
-    static let canvas = WT.Palette.canvas
-    /// 一级分组表面：secondarySystemGroupedBackground（亮 #FFF / 暗 #1C1C1E）
-    static let surface = WT.Palette.surface
+    /// 当前主题的全部取值。**唯一读取点** —— 下面每个颜色都从这里转发。
+    /// （计算属性，无可变静态存储：不引入并发风险。）
+    static var spec: ArtThemeSpec { ArtThemeStore.spec }
+
+    // ---- 表面 ----
+    /// 页面画布（原生主题 = systemGroupedBackground，亮 #F2F2F7 / 暗 #000）
+    static var canvas: Color { spec.canvas }
+    /// 一级分组表面（原生主题 = secondarySystemGroupedBackground）
+    static var surface: Color { spec.surface }
+    /// 内凹 / 抬升表面
+    static var raised: Color { spec.raised }
+    /// 发丝分隔线
+    static var hairline: Color { spec.hairline }
     /// 光条 / 进度轨道
-    static let track = WT.Palette.track
-    static let labelOnTint = Color.white
-    /// 车灯光带渐变（白 → 浅蓝 → 系统蓝），只出现在「电量就是光」的地方
-    static let lightBar = WT.Palette.lightBar
-    /// 兼容旧调用：平坦画布渐变（v4 只有一个画布，没有气氛渐变）
-    static let canvasGradient = LinearGradient(
-        colors: [canvas, canvas], startPoint: .top, endPoint: .bottom
-    )
+    static var track: Color { spec.track }
+    /// 铺在强调色之上的文字色。**不是全局常量** —— 琥珀底配白字不可读（1.9:1）。
+    static var labelOnTint: Color { spec.onAccent }
+    /// 车灯光带渐变（原生主题 = 白 → 浅蓝 → 系统蓝）：只在「电量就是光」的地方出现
+    static var lightBar: LinearGradient {
+        LinearGradient(colors: spec.lightBar, startPoint: .leading, endPoint: .trailing)
+    }
+    /// 平坦画布渐变（滚动背景用）。v4 只有一个画布，没有氛围渐变。
+    static var canvasGradient: LinearGradient {
+        LinearGradient(colors: [canvas, canvas], startPoint: .top, endPoint: .bottom)
+    }
 
-    // ---- 情感色（固定 RGB）----
-    static let amber = Color(red: 1.0, green: 0.62, blue: 0.0)
-    static let amberDark = Color(red: 0.85, green: 0.45, blue: 0.0)
-    static let amberLight = Color(red: 1.0, green: 0.82, blue: 0.4)
-    static let deepBlack = Color.black
-    static let nightSurface = Color(red: 0.06, green: 0.06, blue: 0.08)
-    static let daySurface = Color(red: 0.97, green: 0.97, blue: 0.98)
-    static let success = Color(red: 0.15, green: 0.85, blue: 0.45)
-    static let warning = amber
-    static let error = Color(red: 1.0, green: 0.25, blue: 0.25)
-    static let info = Color(red: 0.2, green: 0.6, blue: 1.0)
-    static let glassLight = Color.white.opacity(0.08)
-    static let glassBorder = Color.white.opacity(0.12)
+    // ---- 文字三档 ----
+    static var primary: Color { spec.label }
+    static var secondary: Color { spec.labelSecondary }
+    static var tertiary: Color { spec.labelTertiary }
+
+    // ---- 强调色（每个主题只有一个）----
+    static var accent: Color { spec.accent }
+    /// 兼容旧调用名的别名。**不再是时间感知色** —— 金色方案已整体废弃。
+    static var ambient: Color { accent }
+
+    // ---- 语义状态色（界面上唯一的「彩色」来源）----
+    static var success: Color { spec.success }
+    static var warning: Color { spec.warning }
+    static var error: Color { spec.error }
+    /// 充电 / 电驱（EV 语义，不等于 success）
+    static var info: Color { spec.info }
+
+    // ---- 兼容名（历史调用点保留）----
+    /// 旧名：夜间表面。v4 只有「系统表面」一种，跟随主题。
+    static var nightSurface: Color { spec.surface }
+    /// 页面底色（旧名）
+    static var background: Color { canvas }
+    static let glassLight = Color(uiColor: .quaternarySystemFill)
+    static var glassBorder: Color { spec.hairline }
     static let glassHighlight = Color.white.opacity(0.15)
-    static let primary = Color.white
-    static let secondary = Color.white.opacity(0.7)
-    static let tertiary = Color.white.opacity(0.4)
-    static let fillSubtle = glassLight.opacity(0.5)
-
-    /// 时间感知主色调：清晨 / 正午 / 黄昏 / 夜里各有温度。
-    static var ambient: Color {
-        switch TimeOfDay.current {
-        case .dawn: return Color(red: 1.0, green: 0.55, blue: 0.2)
-        case .morning: return amber
-        case .noon: return Color(red: 0.9, green: 0.7, blue: 0.1)
-        case .afternoon: return amberDark
-        case .dusk: return Color(red: 0.8, green: 0.3, blue: 0.2)
-        case .night: return Color(red: 0.3, green: 0.5, blue: 0.8)
-        }
-    }
-
-    static var background: Color {
-        TimeOfDay.current == .night ? nightSurface : daySurface
-    }
+    static let fillSubtle = Color(uiColor: .quaternarySystemFill)
 
     /// 状态类名（ok / warn / charge…）→ 颜色。
+    /// 原生主题下与小组件的 `WT.Palette.status(_:)` 逐个等价（同一套判定），
+    /// 换成艺术主题时改走主题的语义色。
     static func statusColor(_ cls: String) -> Color {
         switch cls {
-        case "ok", "normal": return .green
+        case "ok", "normal": return success
         case "warn", "warning": return warning
         case "bad", "fault", "abnormal", "danger": return error
         case "charge", "charging": return info
-        case "acc", "accent": return ambient
+        case "acc", "accent": return accent
         default: return secondary
         }
     }
+
+    /// 这套主题允不允许"光"（发光 / 光晕）。纸上不允许 —— 纸张没有发光。
+    static var allowsGlow: Bool { spec.allowsGlow }
+    /// 标题是不是走宋体（印刷物的做法）
+    static var usesSerifTitles: Bool { spec.usesSerifTitles }
+    /// 画布装饰（光池 / 纸纹 / 发丝网格）
+    static var decor: CanvasDecor { spec.decor }
 }
 
-// MARK: - 间距（Kansei 刻度：4 的倍数，md 16 / lg 24）
+// MARK: - 间距（4 的倍数，页面边距 20）
 enum TokensSpacing {
     static let xxs = CGFloat(2)
     static let xs = CGFloat(4)
@@ -125,17 +124,19 @@ enum TokensSpacing {
     static let row = CGFloat(44)
 }
 
-// MARK: - 圆角（三档 + 胶囊）
+// MARK: - 圆角（与小组件 WT.RadiusTokens 同值）
 enum TokensRadius {
     static let small = CGFloat(8)
-    static let medium = CGFloat(16)
-    static let large = CGFloat(24)
+    /// inset-grouped 分组面
+    static let medium = CGFloat(12)
+    /// 大面（hero / sheet）
+    static let large = CGFloat(20)
     static let pill = CGFloat(999)
 }
 
 // MARK: - 字号
 //
-// 两族并存同样是**有意的**：
+// 两族并存是**有意的**：
 //   • 系统语义阶梯（largeTitle/title/body/footnote…）跟随 Dynamic Type，是正文骨架
 //   • 固定尺寸字体（hero/heading/subtitle/micro 与仪表数字 display/metric/data…）不随字号缩放，
 //     用于「数字不跳动、版式不位移」的场景
@@ -155,7 +156,7 @@ enum TokensTypo {
     /// 分组标题（iOS 的 section header：13pt、二级灰、大写由视图层加）
     static let sectionLabel = Font.footnote
 
-    // ---- 固定尺寸标题（不随 Dynamic Type；Kansei 刻度）----
+    // ---- 固定尺寸标题（不随 Dynamic Type）----
     static var hero: Font { Font.system(size: 48, weight: .light).monospacedDigit() }
     /// 24pt 半粗标题。旧名 `TokensTypo.heading` —— 让位给系统语义阶梯里的 `title`（28pt 且跟随字号）。
     static var heading: Font { Font.system(size: 24, weight: .semibold) }
@@ -163,10 +164,14 @@ enum TokensTypo {
     static var micro: Font { Font.system(size: 11, weight: .regular) }
 
     // ---- 仪表数字：等宽数字（换数不跳动）----
-    /// 超大数字（首屏 SOC / 关键指标）：字重 100 是「仪器感」的来源
+    /// 超大数字（首屏 SOC / 关键指标）：**字重差**是「仪器感」的来源 ——
+    /// 超细字重 + 负字距（字距在 DSBigNumber 里加），不靠颜色、不靠发光。
     static func display(_ size: CGFloat = 72) -> Font {
-        .system(size: size, weight: .ultraLight).monospacedDigit()
+        .system(size: size, weight: ArtThemeStore.spec.displayWeight).monospacedDigit()
     }
+    /// 超大数字的字距（不随 Dynamic Type 的那一档）。
+    /// 原生 −0.5（几乎看不出）、巨字 −1.8（字号越大越要收紧，否则数字会散开）。
+    static var displayTracking: CGFloat { ArtThemeStore.spec.displayTracking }
     /// 中等数字（页面头部大数值）
     static func metric(_ size: CGFloat = 34) -> Font {
         .system(size: size, weight: .light).monospacedDigit()
@@ -183,16 +188,15 @@ enum TokensTypo {
 }
 
 // MARK: - 动效（只服务状态变化）
+//
+// v4 规则：没有涟漪、没有光晕、没有扫光、没有呼吸、没有粒子。
+// 常驻运动只有一个 —— 充电时能量沿电缆流动（它本来就在流，见 DSLightBar 的 glow）。
+// 其余全是一次性：入场（reveal）、数值变化（value）、绘制（draw）。
 enum TokensMotion {
-    static var breathe: Animation {
-        Animation.easeInOut(duration: 5.0).repeatForever(autoreverses: true)
-    }
-    // ---- Kansei 刻度 ----
     static let tap = Animation.spring(response: 0.25, dampingFraction: 0.7)
     static let page = Animation.spring(response: 0.5, dampingFraction: 0.8)
     static let reveal = Animation.spring(response: 0.6, dampingFraction: 0.85)
     static let count = Animation.spring(response: 0.4, dampingFraction: 0.6)
-    // ---- DS 刻度（反馈快、状态变化稳、不过冲）----
     static let press = Animation.spring(response: 0.30, dampingFraction: 0.86)
     static let value = Animation.spring(response: 0.36, dampingFraction: 0.88)
     static let screen = Animation.spring(response: 0.42, dampingFraction: 0.90)
@@ -209,7 +213,7 @@ enum TokensHaptic {
     static func error() { UINotificationFeedbackGenerator().notificationOccurred(.error) }
     static func warning() { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
     static func heavy() { UIImpactFeedbackGenerator(style: .heavy).impactOccurred() }
-    /// 旧 `TokensHaptic.result(_:)`：一个布尔决定成功/失败反馈。
+    /// 一个布尔决定成功/失败反馈。
     /// 参数命名避开 `success`，否则会遮蔽同名的静态方法。
     static func result(_ ok: Bool) {
         if ok { success() } else { error() }
@@ -237,34 +241,4 @@ enum TokensSize {
     /// 行内图标列宽（iOS 设置行）
     static let iconColumn: CGFloat = 29
     static let barHeight: CGFloat = 56
-}
-
-// MARK: - 情感化 View 扩展
-extension View {
-    func kanseiBackground() -> some View {
-        self.background(TokensPalette.background)
-    }
-    func kanseiTint() -> some View {
-        self.foregroundColor(TokensPalette.primary)
-    }
-    /// 呼吸动效：用于载入、充电等待这类「正在进行」的状态。
-    func kanseiBreathe(opacity: Double = 1.0, scale: CGFloat = 1.1) -> some View {
-        self.modifier(KanseiBreatheModifier(opacity: opacity, scale: scale))
-    }
-}
-
-// MARK: - KanseiBreatheModifier
-struct KanseiBreatheModifier: ViewModifier {
-    var opacity: Double
-    var scale: CGFloat
-    @State private var animProgress: CGFloat = 0
-
-    func body(content: Content) -> some View {
-        content
-            .opacity(opacity * (0.5 + 0.5 * animProgress))
-            .scaleEffect(animProgress * (scale - 1) + 1)
-            .onAppear {
-                withAnimation(TokensMotion.breathe) { animProgress = 1.0 }
-            }
-    }
 }
