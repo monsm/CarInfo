@@ -376,6 +376,11 @@ VERIFIED_SDK_ADDITIONS = {
     "Path": "SwiftUI.Path（iOS 13+；move/addLine/closeSubpath）",
     "presentationDetents": "View.presentationDetents(_:)（iOS 16+；sheet 高度档）",
     "formatted": "Date.formatted(date:time:)（iOS 15+；Foundation）",
+    # 行程时间轴（TripsTimelineView）：四个均对着 Apple 文档 JSON 核过
+    "LazyVStack": "SwiftUI.LazyVStack struct（iOS 14+；externalID s:7SwiftUI10LazyVStackV）",
+    "constant": "Binding.constant(_:)（iOS 13+；静态方法，externalID s:7SwiftUI7BindingV8constantyACyxGxFZ）",
+    "isDateInYesterday": "Calendar.isDateInYesterday(_:)（iOS 8+；Foundation，externalID s:10Foundation8CalendarV17isDateInYesterdayySbAA0D0VF）",
+    "compactMap": "Sequence.compactMap(_:)（Swift 标准库；externalID s:ST13compactMapySay7ElementQd_Gqd_7ElementQRs_rlEF）",
 }
 
 

@@ -147,7 +147,7 @@ struct CarKeeperApp: App {
         }
         // #47 iPad 分屏：第二个窗口（原写成 `os(iOS) && os(macOS)` 恒为假，导致该场景从未注册）。
         // 能否真正被打开由「平台 + Info.plist 的 UIApplicationSceneManifest.UIApplicationSupportsMultipleScenes」
-        // 共同决定；入口在 HomeView 工具栏，用 supportsMultipleWindows 判定。
+        // 共同决定；入口在地图主屏的工具栏，用 supportsMultipleWindows 判定。
         //
         // ⚠️ 两个场景当前共用 NavState.shared（详见 DetailSplitView 的说明）：副窗口与主窗口是
         //    同一份导航状态 —— 同一个 Tab、同一条路径。即“能同时看两个窗口”，但还不是两块独立画布。
@@ -261,8 +261,6 @@ struct CarKeeperApp: App {
             _ = PerformanceTracker.shared
             // E38 专注模式监听
             _ = FocusModeManager.shared
-            // E9-E16 位置智能功能启动
-            LocationSmartFeatures.shared.startMonitoring()
             // E40 充电状态监控
             _ = ChargingStatusMonitor.shared
             // N10 车牌加密初始化
@@ -352,10 +350,12 @@ struct MainTabView: View {
         // 评分环）分别由电池页的趋势、地图主屏的「现在」层和评分页承接，
         // 而它那三个子分数是用总分做算术编出来的（score / 3、+10、+20）。
         case .dashboard: DrivingScorePage().environmentObject(nav)
-        case .trips: TripAnalyticsView().environmentObject(nav)
+        case .trips: TripsTimelineView().environmentObject(nav)
         case .commands: CommandHistoryView().environmentObject(nav)
         case .service: ServiceHistoryView().environmentObject(nav)
-        case .parking: ParkingMapView().environmentObject(nav)
+        // .parking 已并入行程时间轴（同一份停车史：时间轴列旅程，地图「停车」层
+        // 画常停圈，两处同源）。深链指向时间轴，不再指向已删除的页面。
+        case .parking: TripsTimelineView().environmentObject(nav)
         case .export: ExportDataView().environmentObject(nav)
         case .emergency: EmergencyPanel().environmentObject(nav)
         case .tips: VehicleTipsView().environmentObject(nav)
@@ -373,10 +373,11 @@ struct MainTabView: View {
 
     private var homeTab: some View {
         NavigationStack(path: $nav.path) {
-            // 落地：首页改成**以地图为主屏**（Features/Map/MapSpineView.swift）。
+            // 首页**以地图为主屏**（Features/Map/MapSpineView.swift）。
             // 车的一切都发生在某个地方，所以导航长在地方上；四个图层 = 四个真实问题，
-            // 全部功能与旧版首页在右上角的索引页里（去掉 Tab 栏的代价补在那里）。
-            // 想回到旧版本：把下一行换回 `HomeView()` 即可（那 1300 行一行没动）。
+            // 全部功能在右上角的索引页里（去掉 Tab 栏的代价补在那里）。
+            // 旧版列表首页已随重设计删除（它的 LocationMapView 还依赖已删的 MapView，
+            // 本身就是断链页面）—— 回退 = git revert，不再保留两套真相。
             MapSpineView()
                 .navigationDestination(for: Deeplink.self) { link in
                     deeplinkDestination(link)
@@ -424,7 +425,7 @@ struct MainTabView: View {
 
     private var tripsTab: some View {
             NavigationStack(path: $nav.tripsPath) {
-                TripAnalyticsView()
+                TripsTimelineView()
                     .navigationDestination(for: Deeplink.self) { link in
                         deeplinkDestination(link)
                     }
@@ -519,10 +520,9 @@ struct MainTabView: View {
 ///
 /// ⚠️ 它用的是共用的 `NavState.shared`，所以副窗口与主窗口是**同一份导航状态**：
 ///    `MainTabView` 内部是 `@StateObject private var nav = NavState.shared`（读单例、不读环境），
-///    两个场景因此绑定到同一个实例，Tab 选中与各 Tab 的路径完全同步；
-///    HomeView / TripAnalyticsView 里另有两处直接写 `NavState.shared.selectedTab`，同样绕过环境。
+///    两个场景因此绑定到同一个实例，Tab 选中与各 Tab 的路径完全同步。
 ///    要让两个窗口真正各走各的：NavState 去掉单例、由每个 Scene 各建一个实例并通过
-///    `.environmentObject` 注入，上述三处直接引用一并改成从环境读（否则只改一部分仍会串）。
+///    `.environmentObject` 注入（代码里已没有直接写 `NavState.shared.selectedTab` 的地方）。
 struct DetailSplitView: View {
     @StateObject private var nav = NavState.shared
     private let store = AppStore.shared

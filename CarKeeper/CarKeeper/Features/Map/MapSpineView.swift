@@ -498,7 +498,7 @@ struct MapSpineView: View {
                         .foregroundStyle(TokensPalette.tertiary)
                 }
             }
-            Button("停车位置详情") { nav.pushNavigation(.parking, targetTab: .home) }
+            Button("去行程时间轴看全部停车与旅程") { nav.pushNavigation(.parking, targetTab: .trips) }
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.accent)
                 .buttonStyle(.plain)
