@@ -224,7 +224,7 @@ struct RadiusArc: View {
                     let end = point(onCircle: center, radius: radius, angle: endAngle)
                     path.move(to: start)
                     path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle,
-lockwise: false)
+                               clockwise: false)
                 }
                 .fill(color)
             )
