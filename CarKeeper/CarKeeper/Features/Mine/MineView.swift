@@ -227,7 +227,7 @@ struct MineView: View {
         return Button {
             // 此前发 .navToVehicle 通知，根视图只写首页的 path —— 在「我的」Tab 点了毫无反应，
             // 要再点一次首页 Tab 才“突然出现”。改走统一导航：切到首页 Tab 并 push。
-            nav.pushNavigation(.vehicle, targetTab: 0)
+            nav.pushNavigation(.vehicle, targetTab: .home)
         } label: {
             HStack(spacing: DS.Space.lg) {
                 Image(systemName: "car.fill")
@@ -266,16 +266,18 @@ struct MineView: View {
         CardBox(title: "常用功能") {
             VStack(spacing: 12) {
                 HStack(spacing: 10) {
-                    tile("shield.lefthalf.filled", "健康报告", tint: .green) { nav.pushNavigation(.health, targetTab: 0) }
-                    tile("battery.100", "电池充电", tint: .green) { nav.pushNavigation(.battery, targetTab: 0) }
+                    tile("shield.lefthalf.filled", "健康报告", tint: .green) {
+                        nav.pushNavigation(.health, targetTab: .home)
+                    }
+                    tile("battery.100", "电池充电", tint: .green) { nav.pushNavigation(.battery, targetTab: .home) }
                 }
                 HStack(spacing: 10) {
-                    tile("chart.bar.xaxis", "全量数据", tint: .indigo) { nav.pushNavigation(.data, targetTab: 0) }
-                    tile("doc.text.fill", "车辆档案", tint: .orange) { nav.pushNavigation(.vehicle, targetTab: 0) }
+                    tile("chart.bar.xaxis", "全量数据", tint: .indigo) { nav.pushNavigation(.data, targetTab: .home) }
+                    tile("doc.text.fill", "车辆档案", tint: .orange) { nav.pushNavigation(.vehicle, targetTab: .home) }
                 }
                 HStack(spacing: 10) {
                     tile("bubble.left.fill", "消息中心", tint: .blue) { nav.pushNavigation(.messages) }
-                    tile("wrench.adjustable", "开发者工具", tint: .purple) { nav.pushNavigation(.dev, targetTab: 0) }
+                    tile("wrench.adjustable", "开发者工具", tint: .purple) { nav.pushNavigation(.dev, targetTab: .home) }
                 }
                 // #31 省电模式
                 PowerSavingToggle()
@@ -355,7 +357,7 @@ struct MineView: View {
                 tile("doc.plaintext.fill", "充电账单", tint: .cyan) { showChargeBill = true }
                 // E新增功能入口
                 HStack(spacing: 10) {
-                    tile("chart.bar.fill", "行程分析", tint: .blue) { nav.pushNavigation(.trips, targetTab: 3) }
+                    tile("chart.bar.fill", "行程分析", tint: .blue) { nav.pushNavigation(.trips, targetTab: .trips) }
                     tile("clock.fill", "指令历史", tint: .purple) { nav.pushNavigation(.commands) }
                 }
                 HStack(spacing: 10) {

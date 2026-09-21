@@ -209,7 +209,7 @@ struct TripAnalyticsView: View {
                                 value: String(format: "%.1f km", trip.distanceKm),
                                 showsChevron: true
                             ) {
-                                NavState.shared.selectedTab = 0
+                                NavState.shared.selectedTab = .home
                             }
                             if idx < trips.count - 1 { DSSeparator() }
                         }

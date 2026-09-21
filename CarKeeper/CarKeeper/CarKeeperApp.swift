@@ -18,6 +18,48 @@ extension Notification.Name {
     static let locationUpdated = Notification.Name("locationUpdated")
 }
 
+// MARK: - 主 Tab 的类型化标识
+
+/// 底部导航的五个 Tab。
+///
+/// 取代此前裸 `Int` 索引（0…4）：标题、图标、无障碍朗读名都挂在枚举上，
+/// 深链、角标、切 Tab 因此共用同一份定义 —— `selectedTab = 7` 这种越界值
+/// 在编译期就不存在，标签与选中值也不可能再对不上。
+enum MainTab: Int, Hashable, CaseIterable, Sendable {
+    // 声明顺序即底部导航从左到右的顺序
+    case home = 0
+    case control = 1
+    case charge = 2
+    case trips = 3
+    case mine = 4
+
+    /// 底部导航标题（同时是 VoiceOver 朗读名）
+    var title: String {
+        switch self {
+        case .home: return "车况"
+        case .control: return "车控"
+        case .charge: return "充电"
+        case .trips: return "行程"
+        case .mine: return "我的"
+        }
+    }
+
+    /// 底部导航图标（行程图标走 SafeSymbol 兜底：写错的 symbol 会渲染成空白，
+    /// 在 Tab 上就表现为「没有图标」）
+    var systemImage: String {
+        switch self {
+        case .home: return "car.fill"
+        case .control: return "slider.horizontal.3"
+        case .charge: return "bolt.fill"
+        case .trips: return SafeSymbol.name("point.topleft.down.to.point.bottomright.curvepath", fallback: "map.fill")
+        case .mine: return "person.fill"
+        }
+    }
+
+    /// VoiceOver 在导航栏内的朗读顺序（与底部从左到右一致）
+    var sortRank: Double { Double(rawValue) }
+}
+
 enum Deeplink: Hashable, CaseIterable {
     case vehicle, health, battery, data, dev, messages, control, dashboard
     case trips, commands, service, parking, export, emergency, tips, score
@@ -45,13 +87,16 @@ enum Deeplink: Hashable, CaseIterable {
     }
 
     /// 该页所属的 Tab（打开时先切到对应 Tab）
-    var hostTab: Int {
+    /// 穷举（无 default）：新增深链时编译器会强制在这里表态。
+    var hostTab: MainTab {
         switch self {
-        case .control: return 1
-        case .battery: return 2
-        case .trips: return 3
-        case .messages: return 4
-        default: return 0
+        case .control: return .control
+        case .battery: return .charge
+        case .trips: return .trips
+        case .messages: return .mine
+        case .vehicle, .health, .data, .dev, .dashboard, .commands,
+             .service, .parking, .export, .emergency, .tips, .score:
+            return .home
         }
     }
 
@@ -97,12 +142,13 @@ struct CarKeeperApp: App {
         guard let link = Deeplink(url: url) else { return }
         guard store.isLoggedIn else { return }   // 未登录时先让用户完成登录，登录后可从界面进入
         nav.selectedTab = link.hostTab
+        // 按目标 Tab 写入对应路径（枚举穷举，不存在写错的索引）
         switch link.hostTab {
-        case 1: nav.controlPath = [link]
-        case 2: nav.chargePath = [link]
-        case 3: nav.tripsPath = [link]   // hostTab 3 = 行程；此前误写进 minePath，深链打不开
-        case 4: nav.minePath = [link]
-        default: nav.path = [link]
+        case .control: nav.controlPath = [link]
+        case .charge: nav.chargePath = [link]
+        case .trips: nav.tripsPath = [link]   // 行程 Tab；此前误写进 minePath，深链打不开
+        case .mine: nav.minePath = [link]
+        case .home: nav.path = [link]
         }
     }
 
@@ -126,13 +172,13 @@ struct CarKeeperApp: App {
                     .onReceive(NotificationCenter.default.publisher(for: .navToVehicle)) { _ in nav.path = [.vehicle] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToHealth)) { _ in nav.path = [.health] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToBattery)) { _ in
-                        nav.selectedTab = 2
+                        nav.selectedTab = .charge
                         nav.chargePath = []
                     }
                     .onReceive(NotificationCenter.default.publisher(for: .navToData)) { _ in nav.path = [.data] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToDev)) { _ in nav.path = [.dev] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToMessages)) { _ in
-                        nav.selectedTab = 4
+                        nav.selectedTab = .mine
                         nav.minePath = [.messages]
                     }
                     .onReceive(ToastManager.shared.$currentItem) { item in
@@ -140,7 +186,7 @@ struct CarKeeperApp: App {
                     }
                     .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
                         nav.path = []
-                        nav.selectedTab = 0
+                        nav.selectedTab = .home
                     }
             } else {
                 LoginView()
@@ -202,17 +248,12 @@ struct CarKeeperApp: App {
 final class NavState: ObservableObject, @unchecked Sendable {
     static let shared = NavState()
     @Published var path: [Deeplink] = []
-    @Published var selectedTab: Int = 0
+    @Published var selectedTab: MainTab = .home
     @Published var currentToast: (text: String, icon: String)? = nil
     @Published var controlPath: [Deeplink] = []
     @Published var chargePath: [Deeplink] = []
     @Published var tripsPath: [Deeplink] = []
     @Published var minePath: [Deeplink] = []
-
-    /// 每个 Tab 的 VoiceOver 描述（用于动态朗读切换时的页面名称）
-    static let tabAccessibilityLabels: [Int: String] = [
-        0: "车况", 1: "车控", 2: "充电", 3: "行程", 4: "我的"
-    ]
 
     private init() {}
 
@@ -221,18 +262,17 @@ final class NavState: ObservableObject, @unchecked Sendable {
     /// 统一导航：从任意 Tab push 深潜页，自动切换到对应 Tab（若有）
     /// - Parameters:
     ///   - link: 目标深潜页
-    ///   - targetTab: 目标 Tab 索引（nil = 保持当前 Tab）
-    func pushNavigation(_ link: Deeplink, targetTab: Int? = nil) {
+    ///   - targetTab: 目标 Tab（nil = 保持当前 Tab）
+    func pushNavigation(_ link: Deeplink, targetTab: MainTab? = nil) {
         // 先切换到目标 Tab（如有）
         if let t = targetTab { selectedTab = t }
         // 根据当前 Tab 写入对应路径
         switch selectedTab {
-        case 0: path.append(link)
-        case 1: controlPath.append(link)
-        case 2: chargePath.append(link)
-        case 3: tripsPath.append(link)
-        case 4: minePath.append(link)
-        default: path.append(link)
+        case .home: path.append(link)
+        case .control: controlPath.append(link)
+        case .charge: chargePath.append(link)
+        case .trips: tripsPath.append(link)
+        case .mine: minePath.append(link)
         }
     }
 
@@ -244,23 +284,23 @@ final class NavState: ObservableObject, @unchecked Sendable {
     }
 
     /// 获取当前选中 Tab 的无障碍朗读文本
-    var selectedTabVoiceOverLabel: String {
-        Self.tabAccessibilityLabels[selectedTab] ?? "Tab \(selectedTab)"
-    }
+    var selectedTabVoiceOverLabel: String { selectedTab.title }
 }
 
 // MARK: - 主 Tab
 
 // 壳层约定：
-//   • Tab 内容直接作为画布，不套任何自定义容器（容器会让 TabView 读不到 .tabItem/.tag），
-//     否则底部导航会丢标题、点其他 Tab 又被弹回第一个。
+//   • 每个 Tab 用 iOS 18+ 的 `Tab(value:content:label:)` 声明：选中值是类型化的 MainTab，
+//     标签文案/图标/朗读名都取自 MainTab 本身 —— 标题、选中值、角标不再各写一份。
+//     旧写法（在子视图上挂 .tabItem/.tag）必须挂在最外层，一旦外面套了容器就会丢标题、
+//     选中态被弹回首页；新写法从结构上排除了这一类问题。
 //   • 每个 Tab 是标准 NavigationStack + navigationDestination
 //   • 返回手势、返回按钮、转场动画全部交给系统（系统同款动画做得更稳）
 //   • 导航栏用系统液态玻璃材质（浮在内容之上，是玻璃唯一该出现的地方）
 
 struct MainTabView: View {
     @StateObject private var nav = NavState.shared
-    @State private var lastAnnouncedTab: Int = 0
+    @State private var lastAnnouncedTab: MainTab = .home
     private let store = AppStore.shared
     @State private var lowBatteryBadge: Bool = false
     private let networkMonitorTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
@@ -286,6 +326,14 @@ struct MainTabView: View {
         case .tips: VehicleTipsView().environmentObject(nav)
         case .score: DrivingScorePage().environmentObject(nav)
         }
+    }
+
+    /// Tab 标签：文案/图标取自 MainTab（不再是手写字符串）。
+    /// sortRank 仅用于 VoiceOver 朗读顺序（与底部从左到右一致）；hint 只有行程 Tab 用。
+    private func tabLabel(_ tab: MainTab, hint: String? = nil) -> some View {
+        Label(tab.title, systemImage: tab.systemImage)
+            .accessibilitySortPriority(tab.sortRank)
+            .accessibilityHint(hint ?? "")
     }
 
     private var homeTab: some View {
@@ -315,18 +363,6 @@ struct MainTabView: View {
                     }
                 }
             }
-            .accessibilitySortPriority(0)
-            // ⚠️ .tabItem / .tag 必须留在子视图的最外层：TabView 靠 trait 读取它们，
-            // 而 trait 不会穿透 ZStack 这类容器 —— 之前外面被套了一层 ZStack，
-            // 于是标题丢失（底部导航没文字）、选中态被弹回第一个 Tab。
-            // 另外 .tabItem 的内容只认 Label / Text / Image，塞 ZStack 同样会丢标题。
-            .tabItem {
-                Label("车况", systemImage: "car.fill")
-                    .accessibilityLabel(Text("车况"))
-            }
-            // 低电量时在 Tab 上给出角标（只有真需要用户注意时才出现）
-            .badge(lowBatteryBadge ? "低" : nil)
-            .tag(0)
     }
 
     private var controlTab: some View {
@@ -336,14 +372,6 @@ struct MainTabView: View {
                         deeplinkDestination(link)
                     }
             }
-            .accessibilitySortPriority(1)
-            // ⚠️ 同 tab 0：.tabItem / .tag 必须最外层，否则标题与选中态都会失效
-            .tabItem {
-                Label("车控", systemImage: "slider.horizontal.3")
-                    .accessibilityLabel(Text("车控"))
-            }
-            .tag(1)
-
     }
 
     private var chargeTab: some View {
@@ -353,14 +381,6 @@ struct MainTabView: View {
                         deeplinkDestination(link)
                     }
             }
-            .accessibilitySortPriority(2)
-            // ⚠️ 同 tab 0：.tabItem / .tag 必须最外层，否则标题与选中态都会失效
-            .tabItem {
-                Label("充电", systemImage: "bolt.fill")
-                    .accessibilityLabel(Text("充电"))
-            }
-            .tag(2)
-
     }
 
     private var tripsTab: some View {
@@ -370,15 +390,6 @@ struct MainTabView: View {
                         deeplinkDestination(link)
                     }
             }
-            .accessibilitySortPriority(3)
-            .tabItem {
-                // 图标名走 SafeSymbol：写错的 symbol 会渲染成空白（Tab 上就是“没图标”）
-                Label("行程", systemImage: SafeSymbol.name("point.topleft.down.to.point.bottomright.curvepath", fallback: "map.fill"))
-                    .accessibilityLabel(Text("行程"))
-                    .accessibilityHint(Text("里程、能耗与每一次出行记录"))
-            }
-            .tag(3)
-
     }
 
     private var mineTab: some View {
@@ -388,22 +399,43 @@ struct MainTabView: View {
                         deeplinkDestination(link)
                     }
             }
-            .accessibilitySortPriority(4)
-            // ⚠️ 同 tab 0：.tabItem / .tag 必须最外层
-            .tabItem {
-                Label("我的", systemImage: "person.fill")
-                    .accessibilityLabel(Text("我的"))
-            }
-            .tag(4)
     }
 
     var body: some View {
+        // iOS 18+ Tab 语法：选中值换成类型化的 MainTab（替代 .tag(0…4)），
+        // 标签文案与图标同样取自 MainTab —— 手写字符串与裸索引一并消失。
         TabView(selection: $nav.selectedTab) {
-            homeTab
-            controlTab
-            chargeTab
-            tripsTab
-            mineTab
+            Tab(value: MainTab.home) {
+                homeTab
+            } label: {
+                tabLabel(.home)
+            }
+            // 低电量时在 Tab 上给出角标（只有真需要用户注意时才出现）
+            .badge(lowBatteryBadge ? Text("低") : nil)
+
+            Tab(value: MainTab.control) {
+                controlTab
+            } label: {
+                tabLabel(.control)
+            }
+
+            Tab(value: MainTab.charge) {
+                chargeTab
+            } label: {
+                tabLabel(.charge)
+            }
+
+            Tab(value: MainTab.trips) {
+                tripsTab
+            } label: {
+                tabLabel(.trips, hint: "里程、能耗与每一次出行记录")
+            }
+
+            Tab(value: MainTab.mine) {
+                mineTab
+            } label: {
+                tabLabel(.mine)
+            }
         }
         // 情感化配色：时间感知主色调
         .tint(KanseiPalette.ambient)
@@ -411,8 +443,7 @@ struct MainTabView: View {
         .onChange(of: nav.selectedTab) { _, newTab in
             if newTab != lastAnnouncedTab {
                 lastAnnouncedTab = newTab
-                let label = NavState.tabAccessibilityLabels[newTab] ?? "Tab \(newTab)"
-                UIAccessibility.post(notification: .announcement, argument: "已切换到\(label)页")
+                UIAccessibility.post(notification: .announcement, argument: "已切换到\(newTab.title)页")
             }
         }
         // #5 低电量角标检测：每次车控数据更新时检查

@@ -235,8 +235,11 @@ struct BatteryView: View {
     // MARK: 能耗历史折线图 (#13)
     private func chargeCard(_ b: BatteryModel) -> some View {
         let chargeSide = b.charging.cls.isEmpty ? "na" : b.charging.cls
-        ExpandingCardBox(title: "充电", side: b.charging.text, sideCls: chargeSide,
-                         cornerRadius: KanseiRadius.medium) {
+        // 显式 return：本函数不是 @ViewBuilder，多语句体必须 return，
+        // 否则是「opaque return type 无 return」错误（此前被开头一句多余的
+        // `return EmptyView()` 掩盖，那句同时让整张充电卡片渲染成空视图）。
+        return ExpandingCardBox(title: "充电", side: b.charging.text, sideCls: chargeSide,
+                                cornerRadius: KanseiRadius.medium) {
             VStack(spacing: 0) {
                 let rows = chargeRows(b)
                 ForEach(Array(rows.enumerated()), id: \.offset) { (_ idx, r) in

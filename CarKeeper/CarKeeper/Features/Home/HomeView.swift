@@ -567,7 +567,7 @@ struct HomeView: View {
     private func quick(_ raw: String) {
         DSHaptic.tap()
         store.pendingQuickCtrl = raw
-        NavState.shared.selectedTab = 1
+        NavState.shared.selectedTab = .control
     }
 
     // MARK: - 行驶
