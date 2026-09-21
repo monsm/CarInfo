@@ -119,6 +119,17 @@ struct MapIssue: Identifiable {
     let cls: String
 }
 
+/// 一个轮胎。**只有真的读到压力时才存在** —— 没有读数就不占位（不摆 `--`）。
+struct MapTyre: Identifiable {
+    /// 左前 / 右前 / 左后 / 右后（屏幕方位，与车头朝向无关）
+    let label: String
+    /// kPa 读数。来自 control 接口的 LfTyrePressure 等字段。
+    let kpa: String
+    /// 车端自己置的报警位（LfPressureWarning > 0），不是我们拿阈值猜的
+    let warn: Bool
+    var id: String { label }
+}
+
 /// 附近充电站（MKLocalSearch 的真实结果）
 struct MapCharger: Identifiable {
     let id: String
@@ -173,6 +184,8 @@ struct MapSpineData {
     var holds: [MapHoldPoint]
     var issues: [MapIssue]
     var reasons: [MapReason]
+    /// 四轮胎压。空数组 = 这一刻没有真实读数（整行不出现）
+    var tyres: [MapTyre]
 
     /// 有没有位置：没有位置时所有"地方类"内容都必须退场，不能画在(0,0)
     var hasLocation: Bool { carCoordinate != nil }
@@ -249,6 +262,9 @@ struct MapSpineData {
             }
         }
 
+        // 胎压：一次算好，既喂「为什么」也喂面板上那一行
+        let tyreList = tyres(cache)
+
         return MapSpineData(
             carCoordinate: car?.coordinate,
             headingDeg: Double(loc.degNum),
@@ -271,7 +287,8 @@ struct MapSpineData {
             trips: trips,
             holds: holds,
             issues: issues,
-            reasons: reasons(e: e, loc: loc, chips: chips, trips: trips, store: store)
+            reasons: reasons(e: e, loc: loc, chips: chips, trips: trips, tyres: tyreList, store: store),
+            tyres: tyreList
         )
     }
 
@@ -286,6 +303,7 @@ struct MapSpineData {
         loc: LocModel,
         chips: [StatusChip],
         trips: [MapTripLine],
+        tyres: [MapTyre],
         store: AppStore
     ) -> [MapReason] {
         var out: [MapReason] = []
@@ -364,7 +382,32 @@ struct MapSpineData {
             out.append(MapReason(id: "hold", text: "上次标记停车：\(agoText(t))", cls: "na"))
         }
 
+        // ⑧ 胎压：有真实读数才谈；报警的轮位单独列出来，没报警就只报四条读数
+        let warned = tyres.filter { $0.warn }
+        if !warned.isEmpty {
+            let names = warned.map { "\($0.label) \($0.kpa) kPa" }.joined(separator: "、")
+            out.append(MapReason(
+                id: "tyre",
+                text: "\(names) —— 这是车端自己置的报警位，不是我们拿阈值猜的",
+                cls: "bad"
+            ))
+        } else if !tyres.isEmpty {
+            let all = tyres.map { "\($0.label) \($0.kpa)" }.joined(separator: " / ")
+            out.append(MapReason(id: "tyre", text: "四轮胎压 \(all) kPa", cls: "na"))
+        }
+
         return out
+    }
+
+    /// 胎压：复用 `VM.tyreStatus`（与 Analysis / 旧页面同一份读数，不另写一套解析）。
+    /// 凡是没真读到的轮位直接不出现 —— 四个轮位全空时返回空数组。
+    private static func tyres(_ cache: [String: Any?]) -> [MapTyre] {
+        let model = VM.tyreStatus(cache)
+        return model.items.compactMap { item in
+            let kpa = item.kpa.trimmingCharacters(in: .whitespaces)
+            guard !kpa.isEmpty, kpa != "--" else { return nil }
+            return MapTyre(label: item.label, kpa: kpa, warn: item.warn)
+        }
     }
 
     // MARK: - 小工具

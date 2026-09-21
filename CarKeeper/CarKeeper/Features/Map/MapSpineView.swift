@@ -316,6 +316,8 @@ struct MapSpineView: View {
                    showsGlow: spec.allowsGlow,
                    tint: TokensPalette.lightBar)
 
+        tyreRow(d)
+
         if !d.reasons.isEmpty {
             DSSectionHeader(title: "为什么")
             VStack(alignment: .leading, spacing: TokensSpacing.sm) {
@@ -335,6 +337,34 @@ struct MapSpineView: View {
         }
 
         actionRow(d)
+    }
+
+    /// 四轮胎压：一条安静的事实行。**任何一轮没真读到，整行就不出现** —— 不摆占位符。
+    /// 报警位是车端自己置的（LfPressureWarning），颜色取自主题的 error，不是写死的红。
+    @ViewBuilder
+    private func tyreRow(_ d: MapSpineData) -> some View {
+        if !d.tyres.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.md) {
+                ForEach(d.tyres) { t in
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text(t.label)
+                            .font(TokensTypo.caption2)
+                            .foregroundStyle(TokensPalette.tertiary)
+                        Text(t.kpa)
+                            .font(TokensTypo.caption.monospacedDigit())
+                            .foregroundStyle(t.warn ? TokensPalette.error : TokensPalette.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(Text(t.warn
+                        ? "\(t.label)胎压 \(t.kpa) 千帕，报警"
+                        : "\(t.label)胎压 \(t.kpa) 千帕"))
+                }
+                Spacer(minLength: 0)
+                Text("kPa")
+                    .font(TokensTypo.caption2)
+                    .foregroundStyle(TokensPalette.tertiary)
+            }
+        }
     }
 
     /// 控制长在对象上：不新写一套车控，直接进已有的车控 / 电池页
