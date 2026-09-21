@@ -87,6 +87,8 @@ struct BatteryView: View {
         verdictCard(cache, b)
         consistencyCard(b)
         chargeCard(b)
+        // 钱：车端功率采样积分出来的电量 × 用户自己设的电价，见 Services/ChargeLedger.swift
+        ChargeMoneyBlock()
         // 趋势（SOC 历史 / 充电功率）—— 真实车端采样，见 Services/HistoryStore.swift
         trendSection
         subsystemCard(b)

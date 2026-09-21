@@ -489,6 +489,10 @@ struct MapSpineView: View {
                 }
             }
         }
+
+        // 钱和电在同一层：这一充花了多少，是车端功率采样积分出来的真值
+        ChargeMoneyBlock()
+
         if chargers.isEmpty {
             emptyNotice(MapSpineLayer.charge.emptyNote)
         } else {
