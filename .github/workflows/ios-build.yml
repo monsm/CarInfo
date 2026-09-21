@@ -12,8 +12,35 @@ env:
   XCODEGEN_VERSION: 2.43.0
 
 jobs:
+  # 先跑一遍本地静态检查器（Linux，秒级）。
+  # 存在的理由：一个编译错误要占用一整轮 macOS runner（约 3 分钟，而 macOS 额度是
+  # 按 10 倍计费的）。2026-09-21 那次失败就是 lexguard 能秒级拦下的那一类
+  # （字符串里嵌了 ASCII 双引号）。
+  # 它**不替代**编译：符号、结构、API 名字能查，类型检查查不了 —— 真正的编译仍是 xcodebuild。
+  static-gate:
+    name: Static gate (seconds, no Xcode)
+    runs-on: ubuntu-latest
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 静态检查器
+        run: |
+          echo "::group::check_style.js"
+          node CarKeeper/check_style.js
+          echo "::endgroup::"
+          for s in lexguard scan logic shadowguard scenes targets unreachable futureproof; do
+            echo "::group::$s.py"
+            python3 scan/$s.py
+            echo "::endgroup::"
+          done
+
   build-unsigned-ipa:
     name: Build unsigned IPA
+    needs: static-gate
     runs-on: macos-latest
     steps:
       - name: Checkout

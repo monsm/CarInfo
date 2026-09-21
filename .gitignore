@@ -12,8 +12,11 @@ clog_*.txt
 # Generated plans
 CarKeeper/CarKeeper/TODO_FULL_PLAN.md
 
-# 本地静态检查工具的生成物（scan/ 下的脚本本身可保留）
+# 本地静态检查工具（scan/）
+#  脚本本身全部进仓库。
+#  基线快照（82 个 .swift）**不进** —— 否则全仓搜索会多出一份旧代码的副本，人和工具都会被误导。
+#  但两个**缓存要进**：CI 上没有基线目录，只有靠缓存才能跑满符号检查（scan.py
+#  在两者都缺时会 exit 1，而不是打印一行提示就通过）。
 scan/baseline/
-scan/sdk_cache.json
 __pycache__/
 *.pyc

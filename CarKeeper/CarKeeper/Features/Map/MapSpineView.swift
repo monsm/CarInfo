@@ -565,7 +565,7 @@ struct MapSpineView: View {
                     .background(cardBackground)
 
                     Text("旧版首页（列表版）与三种艺术主题都住在开发者工具里。"
-                         + "这一页是"去掉 Tab 栏"之后它们的家：每一个深潜页都能在这里到达。")
+                         + "这一页是「去掉 Tab 栏」之后它们的家：每一个深潜页都能在这里到达。")
                         .font(TokensTypo.caption)
                         .foregroundStyle(TokensPalette.tertiary)
                         .fixedSize(horizontal: false, vertical: true)

@@ -13,6 +13,11 @@ import subprocess
 REPO = pathlib.Path(".")
 CK = REPO / "CarKeeper"
 BASELINE = REPO / "scan" / "baseline"
+# 基线的**紧凑缓存**。基线本身是 82 个 .swift 快照，不进仓库 —— 否则全仓搜索
+# 会多出一份旧代码的副本，人和工具都会被误导。所以把它**分析结果**物化成一个
+# 小 JSON 一起提交：干净机器（CI）上符号检查依然能跑满，而不是打印一行提示
+# 后静默 exit 0（「没检查」长得和「没问题」一模一样，是最危险的一种绿）。
+BASELINE_CACHE = REPO / "scan" / "baseline_cache.json"
 
 APP = ["CarKeeper", "Design", "Services", "Models", "HealthKit", "Shared"]
 WIDGET = ["Widgets", "Shared"]
@@ -280,6 +285,53 @@ def analyze(paths):
     return types, members, funcs, refs, calls, methods, memrefs, problems
 
 
+def save_baseline_cache(paths):
+    """把基线的分析结果物化成 JSON（排序，便于 diff 与复查）。
+
+    只存「本次扫描真正消费的」六项：main() 里的 sdk_types / sdk_calls /
+    sdk_methods 恰好只由它们推出来（见 main 里那三行的定义）。
+    """
+    import json
+
+    bt, bm, bf, bref, bcalls, bmethods, _m, _p = analyze(paths)
+    data = {
+        "_note": "由 scan/extract_baseline.sh 从冻结提交反推生成；手工修改无效（会被覆盖）",
+        "_files": len(paths),
+        "types": sorted(bt),
+        "members": {k: sorted(v) for k, v in sorted(bm.items())},
+        "funcs": sorted(bf),
+        "refs": sorted(bref),
+        "calls": dict(sorted(bcalls.items())),
+        "methods": dict(sorted(bmethods.items())),
+    }
+    BASELINE_CACHE.write_text(json.dumps(data, ensure_ascii=False, indent=0),
+                              encoding="utf-8")
+    return bt, bm, bf, bref, bcalls, bmethods
+
+
+def load_baseline_cache():
+    """读缓存；不存在或版本不符则返回 None（由调用方决定是报错还是退化）。"""
+    import json
+
+    if not BASELINE_CACHE.exists():
+        return None
+    try:
+        d = json.loads(BASELINE_CACHE.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    need = {"types", "members", "funcs", "refs", "calls", "methods"}
+    if not need <= set(d):
+        return None
+    return (
+        set(d["types"]),
+        {k: set(v) for k, v in d["members"].items()},
+        set(d["funcs"]),
+        set(d["refs"]),
+        dict(d["calls"]),
+        dict(d["methods"]),
+    )
+
+
 # 基线之后才引入、但已逐条对着 Apple 文档核实过确实存在的 SDK 名字。
 # 基线白名单是从「最后一次能编译的提交」反推的，所以新引入的 SDK 名字
 # （例如 iOS 18 的 Tab）必然不在里面 —— 在这里显式登记，登记前必须核实。
@@ -348,7 +400,14 @@ def report(label, paths, whitelist):
                 bad.append(f"{t}.{m}")
     print(f"\n-- {label} 项目类型的未知成员: {len(bad)}")
     print("   " + " ".join(bad[:60]))
-    return types
+    # 返回「高嫌疑」计数，供 main 决定退出码 —— 检查器必须能失败，否则它只是一段日志。
+    return {
+        "结构性问题": len(problems),
+        "未声明的类型": len(unk_types),
+        "未声明的构造/函数": len(unk_calls),
+        "未声明的方法": len(unk_methods),
+        "未知成员": len(bad),
+    }
 
 
 def main():
@@ -378,22 +437,40 @@ def main():
         for k, v in sorted(dups.items()):
             print(f"   {k}: {v}")
 
-    # 基线白名单
+    # 基线白名单：开发机上直接分析基线目录（并刷新缓存）；干净机器 / CI 用提交进仓库的缓存
     base_paths = sorted(BASELINE.rglob("*.swift"))
-    if not base_paths:
-        print("\n!! 基线缺失，先运行 extract_baseline.sh")
-        return
-    bt, bm, bf, bref, bcalls, bmethods, _, bprob = analyze(base_paths)
+    if base_paths:
+        bt, bm, bf, bref, bcalls, bmethods = save_baseline_cache(base_paths)
+        base_note = f"{len(base_paths)} 文件（现场分析，缓存已刷新）"
+    else:
+        cached = load_baseline_cache()
+        if cached is None:
+            print("\n❌ 基线缺失：scan/baseline/ 与 scan/baseline_cache.json 都不存在。")
+            print("   符号检查无法进行。而「无法检查」不等于「没问题」—— 所以这里按**失败**退出，")
+            print("   而不是打印一行提示就 return 0（那会把绿色悄悄变成一句空话）。")
+            print("   修法：git pull 取回缓存；或 scan/extract_baseline.sh <能编译的提交> 重新生成。")
+            return 1
+        bt, bm, bf, bref, bcalls, bmethods = cached
+        base_note = "缓存快照（由 extract_baseline.sh 从冻结提交生成）"
     sdk_types = bt | bref | set(bcalls) | set(VERIFIED_SDK_ADDITIONS)
     sdk_calls = bt | set(bcalls) | set(VERIFIED_SDK_ADDITIONS)
     sdk_methods = set(bmethods) | bf | set(VERIFIED_SDK_ADDITIONS)
     for v in bm.values():
         sdk_methods |= v
     print(f"显式核实的 SDK 名字: {len(VERIFIED_SDK_ADDITIONS)}")
-    print(f"\n基线: {len(base_paths)} 文件, 已知名字 类型{len(sdk_types)}/方法{len(sdk_methods)}")
+    print(f"\n基线: {base_note}, 已知名字 类型{len(sdk_types)}/方法{len(sdk_methods)}")
 
-    report("APP", app_paths, (sdk_types, sdk_calls, sdk_methods))
+    found = report("APP", app_paths, (sdk_types, sdk_calls, sdk_methods))
+    total = sum(found.values())
+    if total:
+        print("\n❌ 高嫌疑汇总: " + "  ".join(f"{k}={v}" for k, v in found.items() if v))
+        print("   白名单里没有它们 = 项目没声明、基线也没有 → 很可能是打错的名字（编译会挂）。")
+        return 1
+    print("\n✅ 未声明的类型 / 构造·函数 / 方法 / 未知成员 全部为 0")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    sys.exit(main())
