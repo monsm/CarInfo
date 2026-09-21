@@ -73,7 +73,7 @@ struct CheckInStreak: View {
     var body: some View {
         HStack {
             Image(systemName: "calendar.checkmark")
-                .foregroundColor(KanseiPalette.ambient)
+                .foregroundColor(TokensPalette.ambient)
             Text("连续打卡 \(streakDays) 天")
                 .font(.subheadline)
             Spacer()
@@ -96,7 +96,7 @@ struct CarbonChallenge: View {
     var progress: Double { min(currentSavings / monthlyGoal, 1.0) }
 
     var body: some View {
-        VStack(spacing: KanseiSpacing.sm) {
+        VStack(spacing: TokensSpacing.sm) {
             Text("本月碳减排目标")
                 .font(.subheadline)
                 .fontWeight(.semibold)
@@ -139,7 +139,7 @@ struct DrivingImprovementTips: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.SpacingTokens.xs) {
+        VStack(alignment: .leading, spacing: TokensSpacing.xs) {
             Text("驾驶改善建议")
                 .font(.subheadline).fontWeight(.semibold)
             ForEach(tips, id: \.self) { tip in
@@ -165,8 +165,8 @@ struct FamilyLeaderboard: View {
                     .font(.headline)
                     .foregroundColor(idx == 0 ? .yellow : idx == 1 ? .gray : idx == 2 ? .orange : .secondary)
                     .frame(width: 30)
-                Circle().fill(KanseiPalette.ambient.opacity(0.2)).frame(width: 36, height: 36)
-                    .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(KanseiPalette.ambient))
+                Circle().fill(TokensPalette.ambient.opacity(0.2)).frame(width: 36, height: 36)
+                    .overlay(Text(member.avatar).font(.title3).fontWeight(.bold).foregroundColor(TokensPalette.ambient))
                     
                     
     

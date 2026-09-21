@@ -18,8 +18,8 @@ struct DSArcProgress: View {
         progress: Double,
         size: CGFloat = 200,
         lineWidth: CGFloat = 8,
-        tint: Color = KanseiPalette.ambient,
-        trackColor: Color = KanseiPalette.glassBorder,
+        tint: Color = TokensPalette.ambient,
+        trackColor: Color = TokensPalette.glassBorder,
         showValue: Bool = true
     ) {
         self.progress = max(0, min(1, progress))
@@ -46,7 +46,7 @@ struct DSArcProgress: View {
 
             if showValue {
                 Circle()
-                    .fill(KanseiPalette.nightSurface.opacity(0.8))
+                    .fill(TokensPalette.nightSurface.opacity(0.8))
                     .frame(width: size * 0.7, height: size * 0.7)
             }
         }

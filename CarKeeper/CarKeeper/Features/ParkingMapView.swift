@@ -53,7 +53,7 @@ struct ParkingMapView: View {
                 }
             }
         }
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .navigationTitle("停车位置")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -95,7 +95,7 @@ struct ParkingMapView: View {
                     Image(systemName: "car.fill")
                         .font(.caption)
                         .padding(8)
-                        .background(KanseiPalette.ambient.opacity(0.15))
+                        .background(TokensPalette.ambient.opacity(0.15))
                         .cornerRadius(8)
                 }
             }
@@ -138,7 +138,7 @@ struct ParkingMapView: View {
                         Text("最近停车点").font(.headline)
                         ForEach(Array(store.parkingHistory.prefix(3).enumerated()), id: \.offset) { i, p in
                             HStack {
-                                Image(systemName: "mappin").foregroundStyle(KanseiPalette.ambient)
+                                Image(systemName: "mappin").foregroundStyle(TokensPalette.ambient)
                                 VStack(alignment: .leading) {
                                     // address 是非可选 String，?? 永远不会生效；空串时兜底显示
                                     Text(p.address.isEmpty ? "未知位置" : p.address).font(.subheadline)
@@ -153,7 +153,7 @@ struct ParkingMapView: View {
                         }
                     }
                     .padding()
-                    .glassCard(corner: KanseiRadius.medium)
+                    .glassCard(corner: TokensRadius.medium)
                 }
 
                 Button(action: navToParking) {
@@ -164,7 +164,7 @@ struct ParkingMapView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(KanseiPalette.ambient)
+                    .background(TokensPalette.ambient)
                     .foregroundStyle(.white)
                     .cornerRadius(12)
                 }

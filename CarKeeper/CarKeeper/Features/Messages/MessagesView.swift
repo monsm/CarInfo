@@ -51,7 +51,7 @@ struct MessagesView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: KanseiSpacing.lg) {
+            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
                 filterBar
 
                 if loading {
@@ -78,12 +78,12 @@ struct MessagesView: View {
                     }
                 }
             }
-            .padding(.top, KanseiSpacing.sm)
-            .padding(.bottom, KanseiSpacing.xxl)
+            .padding(.top, TokensSpacing.sm)
+            .padding(.bottom, TokensSpacing.xxl)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .navigationTitle("消息")
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: $searchText,
@@ -94,8 +94,8 @@ struct MessagesView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("全部已读") { markAllRead() }
-                    .font(KanseiTypo.subheadline.weight(.semibold))
-                    .foregroundStyle(KanseiPalette.ambient)
+                    .font(TokensTypo.subheadline.weight(.semibold))
+                    .foregroundStyle(TokensPalette.ambient)
                     .disabled(items.allSatisfy { $0.read })
                     .accessibilityLabel(Text("全部标为已读"))
             }
@@ -108,14 +108,14 @@ struct MessagesView: View {
     // MARK: - 筛选条（分段控件 + 标签胶囊）
 
     private var filterBar: some View {
-        VStack(alignment: .leading, spacing: KanseiSpacing.sm) {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             DSSegmented(options: [(value: false, title: "全部"), (value: true, title: "未读")],
                         selection: $showUnreadOnly)
-                .padding(.top, KanseiSpacing.xs)
+                .padding(.top, TokensSpacing.xs)
 
             if !allTags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: KanseiSpacing.sm) {
+                    HStack(spacing: TokensSpacing.sm) {
                         tagChip(nil)
                         ForEach(allTags, id: \.self) { tag in
                             tagChip(tag)
@@ -131,27 +131,27 @@ struct MessagesView: View {
         let selected = filterTag == tag
         let label = tag ?? "全部标签"
         return Button {
-            withAnimation(KanseiMotion.count) { filterTag = selected ? nil : tag }
-            DSHaptic.select()
+            withAnimation(TokensMotion.count) { filterTag = selected ? nil : tag }
+            TokensHaptic.select()
         } label: {
             Text(label)
-                .font(KanseiTypo.footnote.weight(selected ? .semibold : .regular))
-                .foregroundStyle(selected ? KanseiPalette.ambient : KanseiPalette.secondary)
-                .padding(.horizontal, KanseiSpacing.md)
+                .font(TokensTypo.footnote.weight(selected ? .semibold : .regular))
+                .foregroundStyle(selected ? TokensPalette.ambient : TokensPalette.secondary)
+                .padding(.horizontal, TokensSpacing.md)
                 .frame(height: 30)
-                .background(Capsule().fill(selected ? KanseiPalette.ambient.opacity(0.15) : KanseiPalette.glassLight))
+                .background(Capsule().fill(selected ? TokensPalette.ambient.opacity(0.15) : TokensPalette.glassLight))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
     private var loadingState: some View {
-        VStack(alignment: .leading, spacing: DS.Space.md) {
-            HStack(spacing: DS.Space.sm) {
+        VStack(alignment: .leading, spacing: TokensSpacing.md) {
+            HStack(spacing: TokensSpacing.sm) {
                 ProgressView().controlSize(.small)
                 Text("正在加载消息…")
-                    .font(KanseiTypo.footnote)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
             }
             DSSkeleton(height: 88)
             DSSkeleton(height: 88)
@@ -174,37 +174,37 @@ struct MessagesView: View {
         let isOpen = expanded.contains(item.id)
         return DSGroupRow(showsSeparator: showsSeparator) {
             Button { toggle(item) } label: {
-                HStack(alignment: .top, spacing: DS.Space.sm) {
+                HStack(alignment: .top, spacing: TokensSpacing.sm) {
                     Circle()
-                        .fill(item.read ? Color.clear : KanseiPalette.ambient)
+                        .fill(item.read ? Color.clear : TokensPalette.ambient)
                         .frame(width: 8, height: 8)
                         .padding(.top, 6)
                         .accessibilityHidden(true)
 
-                    VStack(alignment: .leading, spacing: DS.Space.xs) {
-                        HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
+                    VStack(alignment: .leading, spacing: TokensSpacing.xs) {
+                        HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                             Text(item.title)
                                 .font(.system(size: 17, weight: item.read ? .regular : .semibold))
-                                .foregroundStyle(KanseiPalette.primary)
+                                .foregroundStyle(TokensPalette.primary)
                                 .lineLimit(2)
                             if !item.tag.isEmpty {
                                 Text(item.tag)
-                            .font(KanseiTypo.caption2.weight(.semibold))
-                            .foregroundStyle(KanseiPalette.statusColor(item.tagCls))
+                            .font(TokensTypo.caption2.weight(.semibold))
+                            .foregroundStyle(TokensPalette.statusColor(item.tagCls))
                             }
-                            Spacer(minLength: DS.Space.sm)
+                            Spacer(minLength: TokensSpacing.sm)
                             Text(shortTime(item.time))
-                            .font(KanseiTypo.footnote)
-                            .foregroundStyle(KanseiPalette.secondary)
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.secondary)
                             Image(systemName: isOpen ? "chevron.up" : "chevron.down")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(KanseiPalette.tertiary)
+                                .foregroundStyle(TokensPalette.tertiary)
                         }
 
                         if !item.body.isEmpty {
                             Text(item.body)
-                                .font(KanseiTypo.subheadline)
-                                .foregroundStyle(KanseiPalette.secondary)
+                                .font(TokensTypo.subheadline)
+                                .foregroundStyle(TokensPalette.secondary)
                                 .lineLimit(isOpen ? nil : 2)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -216,11 +216,11 @@ struct MessagesView: View {
                                 if !item.time.isEmpty { detailRow("clock", "时间", item.time) }
                                 if !item.read { detailRow("envelope.open", "状态", "已标记为已读") }
                             }
-                            .padding(.top, DS.Space.xs)
+                            .padding(.top, TokensSpacing.xs)
                         }
                     }
                 }
-                .padding(.vertical, DS.Space.md)
+                .padding(.vertical, TokensSpacing.md)
                 .contentShape(Rectangle())
             }
             .buttonStyle(DSRowButtonStyle())
@@ -230,25 +230,25 @@ struct MessagesView: View {
     }
 
     private func detailRow(_ icon: String, _ label: String, _ value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
+        HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
             Image(safeSymbol: icon, fallback: "circle")
                 .font(.system(size: 12))
-                .foregroundStyle(KanseiPalette.tertiary)
+                .foregroundStyle(TokensPalette.tertiary)
                 .frame(width: 16, alignment: .center)
             Text(label)
-                .font(DS.Typo.caption)
-                .foregroundStyle(KanseiPalette.secondary)
-            Spacer(minLength: DS.Space.sm)
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.secondary)
+            Spacer(minLength: TokensSpacing.sm)
             Text(value)
-                .font(DS.Typo.caption)
-                .foregroundStyle(KanseiPalette.primary)
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.primary)
                 .multilineTextAlignment(.trailing)
         }
         .accessibilityElement(children: .combine)
     }
 
     private func toggle(_ item: MessageItem) {
-        withAnimation(DS.MotionTokens.value) {
+        withAnimation(TokensMotion.value) {
             if expanded.contains(item.id) {
                 expanded.remove(item.id)
             } else {
@@ -256,7 +256,7 @@ struct MessagesView: View {
                 markRead(item.id)
             }
         }
-        DSHaptic.select()
+        TokensHaptic.select()
     }
 
     /// "2026-09-19 22:31:05" → "22:31"（列表里只需要时刻，完整时间在展开明细里）
@@ -312,7 +312,7 @@ struct MessagesView: View {
         items.forEach { s.insert($0.id) }
         Self.localRead = s
         for i in items.indices { items[i].read = true }
-        DSHaptic.result(true)
+        TokensHaptic.result(true)
         ToastManager.shared.show("已全部标为已读", icon: "checkmark.circle.fill")
     }
 

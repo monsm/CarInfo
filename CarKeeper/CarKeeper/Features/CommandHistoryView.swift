@@ -45,10 +45,10 @@ struct CommandHistoryView: View {
                 // 列表
                 commandList
             }
-            .padding(.horizontal, KanseiSpacing.lg)
-            .padding(.vertical, KanseiSpacing.md)
+            .padding(.horizontal, TokensSpacing.lg)
+            .padding(.vertical, TokensSpacing.md)
         }
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .navigationTitle("指令历史")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityLabel(Text("指令历史"))
@@ -62,13 +62,13 @@ struct CommandHistoryView: View {
             statBubble(label: "成功率", value: rateStr, tint: .green)
             statBubble(label: "进行中", value: "\(inProgressCount)", tint: .orange)
         }
-        .glassCard(corner: KanseiRadius.medium)
+        .glassCard(corner: TokensRadius.medium)
     }
 
     private func statBubble(label: String, value: String, tint: Color) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(Theme.h2)
+                .font(TokensTypo.title)
                 .foregroundStyle(tint)
             Text(label)
                 .font(.caption2)
@@ -87,8 +87,8 @@ struct CommandHistoryView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(filter == f ? KanseiPalette.ambient.opacity(0.2) : Color.clear)
-                            .foregroundStyle(filter == f ? KanseiPalette.ambient : KanseiPalette.secondary)
+                            .background(filter == f ? TokensPalette.ambient.opacity(0.2) : Color.clear)
+                            .foregroundStyle(filter == f ? TokensPalette.ambient : TokensPalette.secondary)
                             .cornerRadius(20)
                     }
                 }
@@ -146,7 +146,7 @@ struct CommandHistoryView: View {
 
                     // 名称
                     Text(cmd.name)
-                        .font(Theme.subheadline)
+                        .font(TokensTypo.subheadline)
                         .foregroundStyle(.primary)
 
                     Spacer()
@@ -187,7 +187,7 @@ struct CommandHistoryView: View {
                     .font(.caption)
                 }
             }
-            .glassCard(corner: KanseiRadius.small)
+            .glassCard(corner: TokensRadius.small)
             .onTapGesture {
                 withAnimation(.spring(response: 0.35)) {
                     if isExpanded { expandedCmds.remove(cmd.id) }

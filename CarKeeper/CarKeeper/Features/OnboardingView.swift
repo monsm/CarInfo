@@ -53,31 +53,31 @@ struct OnboardingView: View {
             // 底部操作区
             VStack(spacing: 20) {
                 Text(isLastPage ? "准备好了吗？" : "")
-                    .font(Theme.h3)
+                    .font(TokensTypo.title3)
                     .foregroundStyle(.primary)
 
                 if isLastPage {
                     Button("开始使用") {
                         onboardingSeen = true
                     }
-                    .font(Theme.body.weight(.semibold))
+                    .font(TokensTypo.body.weight(.semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(KanseiPalette.ambient, in: RoundedRectangle(cornerRadius: KanseiRadius.medium))
-                    .shadow(color: KanseiPalette.ambient.opacity(0.3), radius: 8, y: 4)
+                    .background(TokensPalette.ambient, in: RoundedRectangle(cornerRadius: TokensRadius.medium))
+                    .shadow(color: TokensPalette.ambient.opacity(0.3), radius: 8, y: 4)
 
                     Button("跳过引导") {
                         onboardingSeen = true
                     }
-                    .font(Theme.caption)
+                    .font(TokensTypo.caption)
                     .foregroundStyle(.secondary)
                 } else {
                     HStack {
                         Button("跳过") {
                             onboardingSeen = true
                         }
-                        .font(Theme.caption)
+                        .font(TokensTypo.caption)
                         .foregroundStyle(.secondary)
 
                         Spacer()
@@ -91,24 +91,24 @@ struct OnboardingView: View {
                                 }
                             }
                         }
-                        .font(Theme.body.weight(.semibold))
+                        .font(TokensTypo.body.weight(.semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
-                        .background(KanseiPalette.ambient, in: RoundedRectangle(cornerRadius: KanseiRadius.medium))
+                        .background(TokensPalette.ambient, in: RoundedRectangle(cornerRadius: TokensRadius.medium))
                     }
                 }
             }
-            .padding(.horizontal, DS.Space.xxxl)
-            .padding(.vertical, DS.Space.xxl)
-            .background(RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
-                .fill(KanseiPalette.nightSurface))
-            .overlay(RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
-                .strokeBorder(KanseiPalette.glassBorder, lineWidth: DS.Hair.line))
-            .padding(.top, DS.Space.xl)
+            .padding(.horizontal, TokensSpacing.xxxl)
+            .padding(.vertical, TokensSpacing.xxl)
+            .background(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                .fill(TokensPalette.nightSurface))
+            .overlay(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                .strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.line))
+            .padding(.top, TokensSpacing.xl)
         }
         // 旧版：整屏三色渐变（主色 + 紫 + 蓝）。新版：单一画布色。
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
     }
 
     private func onboardingPage(_ page: OnboardingPage) -> some View {
@@ -117,21 +117,21 @@ struct OnboardingView: View {
             ZStack {
                 // 旧版：渐变色圆 + 超大图标。新版：扁平色块（与登录页品牌标同一套语言）。
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(KanseiPalette.ambient)
+                    .fill(TokensPalette.ambient)
                     .frame(width: 96, height: 96)
                 Image(safeSymbol: page.icon, fallback: "car.fill")
                     .font(.system(size: 40, weight: .regular))
-                    .foregroundStyle(KanseiPalette.ambient)
+                    .foregroundStyle(TokensPalette.ambient)
             }
 
             // 标题和描述
             VStack(spacing: 12) {
                 Text(page.title)
-                    .font(Theme.h2)
+                    .font(TokensTypo.title)
                     .foregroundStyle(.primary)
 
                 Text(page.description)
-                    .font(KanseiTypo.body)
+                    .font(TokensTypo.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
@@ -157,15 +157,15 @@ struct ExampleCard: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(Theme.caption)
+                .font(TokensTypo.caption)
                 .foregroundStyle(.secondary)
             Spacer()
             Text(value)
-                .font(KanseiTypo.body.monospaced())
-                .foregroundStyle(KanseiPalette.ambient)
+                .font(TokensTypo.body.monospaced())
+                .foregroundStyle(TokensPalette.ambient)
         }
         .padding()
-        .background(KanseiPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 12))
+        .background(TokensPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 40)
     }
 }

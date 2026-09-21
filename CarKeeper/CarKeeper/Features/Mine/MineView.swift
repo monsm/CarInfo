@@ -38,7 +38,7 @@ struct MineView: View {
     // MARK: 生命周期
     var body: some View {
         ScrollView {
-            VStack(spacing: KanseiSpacing.lg) {
+            VStack(spacing: TokensSpacing.lg) {
                 profileCard
                 if let car = store.car { carCard(car) }
                 tilesCard
@@ -47,7 +47,7 @@ struct MineView: View {
 
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .navigationTitle("我的")
             .accessibilityLabel(Text("我的"))
             .accessibilityHint(Text("账号设置、个人信息和应用程序管理"))
@@ -146,38 +146,38 @@ struct MineView: View {
     // MARK: 身份卡 — Apple Profile Card
     private var profileCard: some View {
         let um = VM.userModel(store.user)
-        return DSCard(padding: DS.Space.cardPadding, radius: DS.RadiusTokens.hero) {
-            VStack(alignment: .leading, spacing: DS.Space.lg) {
-                HStack(spacing: DS.Space.lg) {
+        return DSCard(padding: TokensSpacing.md, radius: TokensRadius.large) {
+            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                HStack(spacing: TokensSpacing.lg) {
                     // 头像：系统填充色的圆底 + 首字（iOS 设置顶部的身份区做法）
                     Text(um?.avatar ?? "主")
-                        .font(DS.Typo.title2.weight(.semibold))
-                        .foregroundStyle(KanseiPalette.secondary)
+                        .font(TokensTypo.title2.weight(.semibold))
+                        .foregroundStyle(TokensPalette.secondary)
                         .frame(width: 64, height: 64)
-                        .background(Circle().fill(KanseiPalette.glassLight))
+                        .background(Circle().fill(TokensPalette.glassLight))
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(um?.name ?? "车主")
-                            .font(DS.Typo.title2)
-                            .foregroundStyle(KanseiPalette.primary)
+                            .font(TokensTypo.title2)
+                            .foregroundStyle(TokensPalette.primary)
                         Text(um?.mobile ?? "--")
-                            .font(DS.Typo.footnote)
-                            .foregroundStyle(KanseiPalette.secondary)
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.secondary)
                         if um?.authed == true {
                             Text("已实名认证")
-                                .font(DS.Typo.footnote)
-                                .foregroundStyle(KanseiPalette.success)
+                                .font(TokensTypo.footnote)
+                                .foregroundStyle(TokensPalette.success)
                         }
                     }
-                    Spacer(minLength: DS.Space.sm)
+                    Spacer(minLength: TokensSpacing.sm)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(KanseiPalette.tertiary)
+                        .foregroundStyle(TokensPalette.tertiary)
                 }
 
                 DSDivider()
 
-                HStack(spacing: DS.Space.xl) {
+                HStack(spacing: TokensSpacing.xl) {
                     profileStat(label: "车辆", value: "\(store.cars.count)", unit: "辆")
                     if let gt = um?.gender, !gt.isEmpty {
                         profileStat(label: "性别", value: gt, unit: nil)
@@ -189,13 +189,13 @@ struct MineView: View {
                 }
 
                 if let lt = um?.lastLoginTime, !lt.isEmpty {
-                    HStack(spacing: DS.Space.xs) {
+                    HStack(spacing: TokensSpacing.xs) {
                         Image(systemName: "clock")
                             .font(.system(size: 11))
                         Text("上次登录 \(lt)")
                     }
-                    .font(DS.Typo.caption)
-                    .foregroundStyle(KanseiPalette.tertiary)
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.tertiary)
                 }
             }
         }
@@ -205,16 +205,16 @@ struct MineView: View {
     private func profileStat(label: String, value: String, unit: String?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(DS.Typo.caption2.weight(.medium))
-                .foregroundStyle(KanseiPalette.tertiary)
+                .font(TokensTypo.caption2.weight(.medium))
+                .foregroundStyle(TokensPalette.tertiary)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
-                    .font(DS.Typo.metric(20))
-                    .foregroundStyle(KanseiPalette.primary)
+                    .font(TokensTypo.metric(20))
+                    .foregroundStyle(TokensPalette.primary)
                 if let unit {
                     Text(unit)
-                        .font(DS.Typo.caption)
-                        .foregroundStyle(KanseiPalette.secondary)
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.secondary)
                 }
             }
         }
@@ -229,31 +229,31 @@ struct MineView: View {
             // 要再点一次首页 Tab 才“突然出现”。改走统一导航：切到首页 Tab 并 push。
             nav.pushNavigation(.vehicle, targetTab: .home)
         } label: {
-            HStack(spacing: DS.Space.lg) {
+            HStack(spacing: TokensSpacing.lg) {
                 Image(systemName: "car.fill")
-                    .font(.system(size: DS.SizeTokens.iconLg, weight: .regular))
-                    .foregroundStyle(KanseiPalette.ambient)
+                    .font(.system(size: TokensSize.iconLg, weight: .regular))
+                    .foregroundStyle(TokensPalette.ambient)
                     .frame(width: 48, height: 48)
-                    .background(RoundedRectangle(cornerRadius: DS.RadiusTokens.small, style: .continuous)
-                        .fill(KanseiPalette.ambient))
+                    .background(RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
+                        .fill(TokensPalette.ambient))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(sum?.name ?? "未绑定车辆")
-                        .font(DS.Typo.headline)
-                        .foregroundStyle(KanseiPalette.primary)
+                        .font(TokensTypo.headline)
+                        .foregroundStyle(TokensPalette.primary)
                     Text(sum?.plate ?? "暂无车牌")
-                        .font(DS.Typo.dataSmall)
-                        .foregroundStyle(KanseiPalette.secondary)
+                        .font(TokensTypo.dataSmall)
+                        .foregroundStyle(TokensPalette.secondary)
                 }
-                Spacer(minLength: DS.Space.sm)
+                Spacer(minLength: TokensSpacing.sm)
                 if let d = sum?.insuranceDays {
                     DSChip(text: d < 0 ? "保险到期" : "保险剩 \(d) 天",
                            cls: d < 0 ? "bad" : (d <= 30 ? "warn" : "ok"))
                 }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(KanseiPalette.tertiary)
+                    .foregroundStyle(TokensPalette.tertiary)
             }
-            .padding(DS.Space.cardPadding)
+            .padding(TokensSpacing.md)
             .dsSurface(padding: 0)
             .dynamicTypeCompress()
             .contentShape(Rectangle())
@@ -284,7 +284,7 @@ struct MineView: View {
                     .padding(.horizontal, 4)
                 // #NEW-115 夜间模式切换
                 HStack {
-                    Text("夜间模式").font(Theme.h4)
+                    Text("夜间模式").font(TokensTypo.headline)
                     Spacer()
                     Picker("主题", selection: Binding(
                         get: { nightModeManager.currentMode },
@@ -306,16 +306,16 @@ struct MineView: View {
                 if let score = calculateDriveBehaviorScore(store.caches) {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("驾驶行为评分").font(Theme.h4)
+                            Text("驾驶行为评分").font(TokensTypo.headline)
                             Text("急加速 \(score.aggressiveAccel) 次 · 急刹车 \(score.harshBrake) 次")
-                                .font(KanseiTypo.caption).foregroundStyle(KanseiPalette.secondary)
+                                .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
                             Text("\(score.score)")
-                                .font(Theme.d4).foregroundStyle(score.color)
+                                .font(TokensTypo.metric(26)).foregroundStyle(score.color)
                             Text(score.label)
-                                .font(KanseiTypo.caption).foregroundStyle(score.color)
+                                .font(TokensTypo.caption).foregroundStyle(score.color)
                         }
                     }
                     .padding(16)
@@ -369,7 +369,7 @@ struct MineView: View {
                     tile("lightbulb.fill", "车辆提示", tint: .yellow) { nav.pushNavigation(.tips) }
                 }
                     tile("trophy.fill", "驾驶评分",
-                          tint: KanseiPalette.ambient) { nav.pushNavigation(.score) }
+                          tint: TokensPalette.ambient) { nav.pushNavigation(.score) }
             }
         }
     }
@@ -379,14 +379,14 @@ struct MineView: View {
         CardBox(title: "检查更新", side: nil) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("下载最新 GitHub 构建的 ipa，分享后用自签工具安装")
-                    .font(Theme.caption).foregroundStyle(.secondary)
+                    .font(TokensTypo.caption).foregroundStyle(.secondary)
                 // OTA 检查中：骨架旋转指示器
                 if isChecking {
                     HStack(spacing: 10) {
                         ProgressView()
-                            .tint(KanseiPalette.ambient)
+                            .tint(TokensPalette.ambient)
                         Text("正在检查最新版本…")
-                            .font(Theme.caption)
+                            .font(TokensTypo.caption)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 8)
@@ -394,19 +394,19 @@ struct MineView: View {
                     // 下载中：进度条 + 百分比数字
                     VStack(spacing: 6) {
                         ProgressView(value: downloadPct)
-                            .tint(KanseiPalette.ambient)
+                            .tint(TokensPalette.ambient)
                         Text("正在下载… \(downloadPctDisplay)%")
-                            .font(KanseiTypo.caption).foregroundStyle(KanseiPalette.secondary)
+                            .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
                     }
                 } else if let m = updateMsg {
                     // 错误或提示消息（图标由 updateMsgIsError 决定）
                     HStack(spacing: 6) {
                         Image(safeSymbol: updateMsgIsError ? "exclamationmark.triangle.fill" : "info.circle.fill",
                               fallback: "info.circle.fill")
-                            .font(Theme.caption)
-                            .foregroundStyle(updateMsgIsError ? KanseiPalette.error : KanseiPalette.ambient)
+                            .font(TokensTypo.caption)
+                            .foregroundStyle(updateMsgIsError ? TokensPalette.error : TokensPalette.ambient)
                         Text(m)
-                            .font(Theme.caption)
+                            .font(TokensTypo.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
                     }
@@ -428,24 +428,24 @@ struct MineView: View {
                       _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             // Tesla 式磁贴：图标左上 + 标签在左下，表面色不用玻璃、不用圆形底盘。
-            VStack(alignment: .leading, spacing: DS.Space.sm) {
+            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
                 Image(safeSymbol: symbol, fallback: "car.fill")
-                    .font(.system(size: DS.SizeTokens.tileIcon, weight: .regular))
+                    .font(.system(size: TokensSize.tileIcon, weight: .regular))
                     .foregroundStyle(tint)
                     .frame(height: 30)
                 Text(label)
-                    .font(DS.Typo.subheadline.weight(.semibold))
-                    .foregroundStyle(KanseiPalette.primary)
+                    .font(TokensTypo.subheadline.weight(.semibold))
+                    .foregroundStyle(TokensPalette.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(DS.Space.md)
+            .padding(TokensSpacing.md)
             .frame(minHeight: 84)
-            .background(RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
-                .fill(KanseiPalette.nightSurface))
-            .overlay(RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
-                .strokeBorder(KanseiPalette.glassBorder, lineWidth: DS.Hair.line))
+            .background(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                .fill(TokensPalette.nightSurface))
+            .overlay(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                .strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.line))
             .contentShape(Rectangle())
         }
         .buttonStyle(DSCardButtonStyle())
@@ -471,7 +471,7 @@ struct MineView: View {
             }
             .foregroundStyle(.white)
             .padding(.vertical, 10)
-            .background(Capsule().fill(KanseiPalette.ambient))
+            .background(Capsule().fill(TokensPalette.ambient))
         }
         .buttonStyle(.plain)
         .disabled(updateBusy)
@@ -485,7 +485,7 @@ struct MineView: View {
             Label("分享安装包", systemImage: "square.and.arrow.up")
                 .font(Theme.font(.caption as Font).bold())
                 .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(KanseiPalette.fillSubtle, in: Capsule())
+                .background(TokensPalette.fillSubtle, in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -496,10 +496,10 @@ struct MineView: View {
             showToken = true
         } label: {
             Label("Token", systemImage: "key.fill")
-                .font(Theme.caption)
+                .font(TokensTypo.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12).padding(.vertical, 10)
-                .background(KanseiPalette.fillSubtle, in: Capsule())
+                .background(TokensPalette.fillSubtle, in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -524,7 +524,7 @@ struct MineView: View {
         UserDefaults.standard.set(next, forKey: key)
         ToastManager.shared.show(next ? "语音播报已开启" : "语音播报已关闭",
                                  icon: next ? "speaker.wave.3.fill" : "speaker.slash.fill")
-        DSHaptic.select()
+        TokensHaptic.select()
     }
 
     /// 专注模式开关：与首页 toggleFocusMode 同一套配置结构
@@ -541,7 +541,7 @@ struct MineView: View {
         fm.saveConfig(next)
         ToastManager.shared.show(next.enabled ? "专注模式已开启" : "专注模式已关闭",
                                  icon: next.enabled ? "moon.fill" : "moon.zzz.fill")
-        DSHaptic.select()
+        TokensHaptic.select()
     }
 
     private func checkUpdate() {

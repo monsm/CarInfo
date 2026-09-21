@@ -90,10 +90,10 @@ struct DrivingScorePage: View {
                 // 历史趋势
                 scoreTrend
             }
-            .padding(.horizontal, KanseiSpacing.lg)
-            .padding(.vertical, KanseiSpacing.md)
+            .padding(.horizontal, TokensSpacing.lg)
+            .padding(.vertical, TokensSpacing.md)
         }
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .navigationTitle("驾驶评分")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityLabel(Text("驾驶评分详情"))
@@ -115,10 +115,10 @@ struct DrivingScorePage: View {
                         .font(.system(size: 48, weight: .bold))
                         .foregroundStyle(scoreColor)
                     Text("分")
-                        .font(KanseiTypo.caption)
-                        .foregroundStyle(KanseiPalette.secondary)
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.secondary)
                     Text("等级 \(scoreGrade)")
-                        .font(KanseiTypo.subheadline)
+                        .font(TokensTypo.subheadline)
                         .foregroundStyle(scoreColor)
                 }
             }
@@ -132,13 +132,13 @@ struct DrivingScorePage: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .glassCard(corner: KanseiRadius.large)
+        .glassCard(corner: TokensRadius.large)
     }
 
     // MARK: - 雷达图
     private var radarChart: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("驾驶能力雷达").font(KanseiTypo.subheadline.weight(.bold))
+            Text("驾驶能力雷达").font(TokensTypo.subheadline.weight(.bold))
             Chart {
                 RadarSlice(value: smoothDrivingScore, label: "平稳", color: .green)
                 RadarSlice(value: safeSpeedScore, label: "守规", color: .blue)
@@ -146,7 +146,7 @@ struct DrivingScorePage: View {
                 RadarSlice(value: comfortScore, label: "舒适", color: .orange)
             }
             .frame(height: 200)
-            .glassCard(corner: KanseiRadius.medium)
+            .glassCard(corner: TokensRadius.medium)
         }
     }
 
@@ -158,7 +158,7 @@ struct DrivingScorePage: View {
             scoreRow(icon: "leaf.fill", label: "能耗效率", value: efficiencyScore, color: .cyan)
             scoreRow(icon: "comfort", label: "舒适体验", value: comfortScore, color: .orange)
         }
-        .glassCard(corner: Theme.RadiusTokens.medium)
+        .glassCard(corner: TokensRadius.medium)
     }
 
     private func scoreRow(icon: String, label: String, value: Int, color: Color) -> some View {
@@ -185,7 +185,7 @@ struct DrivingScorePage: View {
             .frame(maxWidth: 100)
 
             Text("\(value)")
-                .font(KanseiTypo.subheadline.weight(.bold))
+                .font(TokensTypo.subheadline.weight(.bold))
                 .foregroundStyle(color)
                 .frame(width: 30)
         }
@@ -205,7 +205,7 @@ struct DrivingScorePage: View {
                 HStack {
                     Image(systemName: "chevron.right.circle.fill")
                         .font(.caption2)
-                        .foregroundStyle(KanseiPalette.ambient)
+                        .foregroundStyle(TokensPalette.ambient)
                     Text(tip)
                         .font(.caption)
                         .foregroundStyle(.primary)
@@ -213,7 +213,7 @@ struct DrivingScorePage: View {
             }
         }
         .padding()
-        .glassCard(corner: Theme.RadiusTokens.medium)
+        .glassCard(corner: TokensRadius.medium)
         .background(Color.yellow.opacity(0.05))
     }
 
@@ -247,7 +247,7 @@ struct DrivingScorePage: View {
                 }
             }
             .frame(height: 120)
-            .glassCard(corner: KanseiRadius.medium)
+            .glassCard(corner: TokensRadius.medium)
         }
     }
 

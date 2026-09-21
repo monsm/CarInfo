@@ -177,7 +177,7 @@ struct TempKeyCard: View {
                         .font(.caption.weight(.semibold))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(KanseiPalette.ambient)
+                        .background(TokensPalette.ambient)
                         .foregroundColor(.white)
                         .cornerRadius(8)
                 }
@@ -198,9 +198,9 @@ struct FamilyMemberRow: View {
     var body: some View {
         HStack {
             Circle()
-                .fill(KanseiPalette.ambient.opacity(0.2))
+                .fill(TokensPalette.ambient.opacity(0.2))
                 .frame(width: 40, height: 40)
-                .overlay(Text(member.avatar).font(.title3).fontWeight(.bold)                .foregroundColor(KanseiPalette.ambient))
+                .overlay(Text(member.avatar).font(.title3).fontWeight(.bold)                .foregroundColor(TokensPalette.ambient))
 
             VStack(alignment: .leading) {
                 Text(member.name)

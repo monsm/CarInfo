@@ -69,23 +69,23 @@ struct TripAnalyticsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 periodPicker
-                    .padding(.bottom, DS.Space.xxl)
+                    .padding(.bottom, TokensSpacing.xxl)
 
                 totalHeader
 
                 trendSection
-                    .padding(.top, DS.Space.xxxl)
+                    .padding(.top, TokensSpacing.xxxl)
 
                 behaviorSection
-                    .padding(.top, DS.Space.xxxl)
+                    .padding(.top, TokensSpacing.xxxl)
 
                 routesSection
-                    .padding(.top, DS.Space.xxxl)
+                    .padding(.top, TokensSpacing.xxxl)
             }
-            .padding(.top, DS.Space.md)
-            .padding(.bottom, DS.Space.huge)
+            .padding(.top, TokensSpacing.md)
+            .padding(.bottom, TokensSpacing.huge)
         }
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .scrollBounceBehavior(.basedOnSize)
         .navigationTitle("行程")
         .navigationBarTitleDisplayMode(.large)
@@ -106,15 +106,15 @@ struct TripAnalyticsView: View {
     // MARK: - 唯一的大数字
 
     private var totalHeader: some View {
-        VStack(alignment: .leading, spacing: KanseiSpacing.sm) {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             Text(period.rawValue + "合计")
-                .font(KanseiTypo.footnote)
-                .foregroundStyle(KanseiPalette.secondary)
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.secondary)
             DSBigNumber(
                 value: String(format: "%.0f", tripStats.totalKm),
                 unit: "km",
                 size: 112,
-                tint: KanseiPalette.ambient
+                tint: TokensPalette.ambient
             )
         }
     }
@@ -125,12 +125,12 @@ struct TripAnalyticsView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 Text("近 7 日里程")
-                    .font(KanseiTypo.footnote)
-                    .foregroundStyle(KanseiPalette.secondary)
-                Spacer(minLength: KanseiSpacing.sm)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
+                Spacer(minLength: TokensSpacing.sm)
                 Text(tripStats.avgKm > 0 ? String(format: "平均 %.0f km/次", tripStats.avgKm) : "--")
-                    .font(KanseiTypo.caption)
-                    .foregroundStyle(KanseiPalette.tertiary)
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.tertiary)
             }
 
             Chart {
@@ -140,21 +140,21 @@ struct TripAnalyticsView: View {
                         x: .value("日期", item.0, unit: .day),
                         y: .value("里程", item.1)
                     )
-                    .foregroundStyle(isToday(item.0) ? KanseiPalette.ambient : KanseiPalette.glassBorder)
+                    .foregroundStyle(isToday(item.0) ? TokensPalette.ambient : TokensPalette.glassBorder)
                     .cornerRadius(6)
                 }
             }
             .chartXAxis {
                 AxisMarks(values: .stride(by: .day)) { value in
                     AxisValueLabel(format: .dateTime.weekday(.narrow))
-                        .font(KanseiTypo.caption2)
-                        .foregroundStyle(KanseiPalette.tertiary)
+                        .font(TokensTypo.caption2)
+                        .foregroundStyle(TokensPalette.tertiary)
                 }
             }
             .chartYAxis(.hidden)
             .chartLegend(.hidden)
             .frame(height: 148)
-            .padding(.top, DS.Space.xl)
+            .padding(.top, TokensSpacing.xl)
         }
     }
 
@@ -165,7 +165,7 @@ struct TripAnalyticsView: View {
     // MARK: - 汇总（iOS 行）
 
     private var behaviorSection: some View {
-        VStack(alignment: .leading, spacing: KanseiSpacing.sm) {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             DSSectionHeader(title: "行程汇总")
             DSCard {
                 VStack(alignment: .leading, spacing: 0) {
@@ -189,7 +189,7 @@ struct TripAnalyticsView: View {
     // MARK: - 最近行程
 
     private var routesSection: some View {
-        VStack(alignment: .leading, spacing: DS.Space.sm) {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             DSSectionHeader(title: "最近行程")
             DSCard {
                 VStack(alignment: .leading, spacing: 0) {

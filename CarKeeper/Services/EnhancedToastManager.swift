@@ -64,11 +64,11 @@ struct EnhancedToastView: View {
                 .font(.subheadline)
                 .lineLimit(2)
         }
-        .padding(.horizontal, KanseiSpacing.lg)
-        .padding(.vertical, KanseiSpacing.md)
+        .padding(.horizontal, TokensSpacing.lg)
+        .padding(.vertical, TokensSpacing.md)
         .background(Color(.systemBackground).opacity(0.95))
         .foregroundColor(.primary)
-        .cornerRadius(Theme.RadiusTokens.lg)
+        .cornerRadius(TokensRadius.medium)
         .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
         .scaleEffect(manager.dismissProgress)
         .opacity(manager.dismissProgress)
@@ -104,16 +104,16 @@ struct EmptyStateView: View {
     }
 
     var body: some View {
-        VStack(spacing: KanseiSpacing.lg) {
+        VStack(spacing: TokensSpacing.lg) {
             // 动态图标（根据内容变化）
             // 旧版：渐变圆 + 持续重复的缩放动画（提示图标一直在跳）。
             // 新版：一个扁平色块承载图标，提示本身不需要动。
             Image(safeSymbol: icon, fallback: "checkmark.circle.fill")
                 .font(.system(size: 32, weight: .regular))
-                .foregroundStyle(KanseiPalette.ambient)
+                .foregroundStyle(TokensPalette.ambient)
                 .frame(width: 72, height: 72)
                 .background(RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(KanseiPalette.ambient))
+                    .fill(TokensPalette.ambient))
 
             Text(title)
                 .font(.title3)
@@ -132,13 +132,13 @@ struct EmptyStateView: View {
                     Text(actionTitle)
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
-                        .padding(.horizontal, KanseiSpacing.xl)
-                        .padding(.vertical, KanseiSpacing.sm)
-                        .background(KanseiPalette.ambient)
-                        .cornerRadius(KanseiRadius.medium)
+                        .padding(.horizontal, TokensSpacing.xl)
+                        .padding(.vertical, TokensSpacing.sm)
+                        .background(TokensPalette.ambient)
+                        .cornerRadius(TokensRadius.medium)
                 }
             }
         }
-        .padding(.vertical, KanseiSpacing.xl)
+        .padding(.vertical, TokensSpacing.xl)
     }
 }

@@ -130,10 +130,10 @@ struct VehicleTipsView: View {
                     }
                 }
             }
-            .padding(.horizontal, KanseiSpacing.lg)
-            .padding(.vertical, KanseiSpacing.md)
+            .padding(.horizontal, TokensSpacing.lg)
+            .padding(.vertical, TokensSpacing.md)
         }
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .navigationTitle("车辆提示")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -141,7 +141,7 @@ struct VehicleTipsView: View {
                 Button(action: dismissAll) {
                     Text("全部已读")
                         .font(.caption)
-                        .foregroundStyle(KanseiPalette.ambient)
+                        .foregroundStyle(TokensPalette.ambient)
                 }
             }
         }
@@ -158,8 +158,8 @@ struct VehicleTipsView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(selectedCategory == cat ? KanseiPalette.ambient.opacity(0.2) : Color.clear)
-                            .foregroundStyle(selectedCategory == cat ? KanseiPalette.ambient : KanseiPalette.secondary)
+                            .background(selectedCategory == cat ? TokensPalette.ambient.opacity(0.2) : Color.clear)
+                            .foregroundStyle(selectedCategory == cat ? TokensPalette.ambient : TokensPalette.secondary)
                             .cornerRadius(16)
                     }
                 }
@@ -192,7 +192,7 @@ struct VehicleTipsView: View {
                     .cornerRadius(6)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(tip.title).font(Theme.subheadline).foregroundStyle(.primary)
+                    Text(tip.title).font(TokensTypo.subheadline).foregroundStyle(.primary)
                     Text(tip.body).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -201,7 +201,7 @@ struct VehicleTipsView: View {
                     Button(action: { handleAction(tip) }) {
                         Text(action)
                             .font(.caption)
-                            .foregroundStyle(KanseiPalette.ambient)
+                            .foregroundStyle(TokensPalette.ambient)
                     }
                 }
 
@@ -213,7 +213,7 @@ struct VehicleTipsView: View {
             }
         }
         .padding()
-        .glassCard(corner: KanseiRadius.small)
+        .glassCard(corner: TokensRadius.small)
         .onTapGesture {
             if tip.severity != .info { dismiss(tip) }
         }
@@ -225,7 +225,7 @@ struct VehicleTipsView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.green.opacity(0.5))
             Text("一切正常")
-                .font(Theme.subheadline)
+                .font(TokensTypo.subheadline)
                 .foregroundStyle(.secondary)
             Text("车辆状态良好，暂无新提示")
                 .font(.caption)

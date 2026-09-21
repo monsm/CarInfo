@@ -65,7 +65,7 @@ struct InsuranceCard: View {
         let isExpired = daysLeft < 0
         let isExpiring = daysLeft > 0 && daysLeft <= 30
 
-        VStack(alignment: .leading, spacing: KanseiSpacing.sm) {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             HStack {
                 VStack(alignment: .leading) {
                     Text(policy.name)
@@ -122,7 +122,7 @@ struct InsuranceCard: View {
         }
         .glassCard()
         .overlay(
-            RoundedRectangle(cornerRadius: KanseiRadius.medium)
+            RoundedRectangle(cornerRadius: TokensRadius.medium)
                 .stroke(isExpired ? Color.red : isExpiring ? Color.orange : Color.clear, lineWidth: 2)
         )
     }

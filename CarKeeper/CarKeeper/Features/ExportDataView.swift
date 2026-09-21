@@ -46,7 +46,7 @@ struct ExportDataView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(KanseiPalette.ambient)
+                        .background(TokensPalette.ambient)
                         .foregroundStyle(.white)
                         .cornerRadius(12)
                     }
@@ -67,7 +67,7 @@ struct ExportDataView: View {
             }
             .padding()
         }
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .navigationTitle("导出数据")
         .navigationBarTitleDisplayMode(.inline)
         .alert("导出成功", isPresented: $showSuccess) {
@@ -98,7 +98,7 @@ struct ExportDataView: View {
             .cornerRadius(8)
         }
         .padding()
-        .glassCard(corner: KanseiRadius.medium)
+        .glassCard(corner: TokensRadius.medium)
     }
 
     private var previewLines: [String] {

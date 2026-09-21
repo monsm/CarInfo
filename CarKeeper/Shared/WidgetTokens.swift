@@ -3,7 +3,7 @@
 // =============================================================================
 //  为什么单独一份：小组件与实时活动是**独立扩展**，不编译 App 的 Design/DS.swift。
 //  但「和 App 内是同一套排版与颜色」是硬要求，所以 v4 的令牌值只写在**这一处**，
-//  扩展直接用 WT.*，App 的 DS.Palette 也从这里取 ——
+//  扩展直接用 WT.*，App 的 TokensPalette 也从这里取 ——
 //  两边由编译器保证不会漂移（改一个数，App 与小组件同时改）。
 //
 //  取值全部来自 iOS 真值（系统色 + iOS 字号阶梯），不是"设计手感"：
@@ -59,7 +59,7 @@ enum WT {
             dark: (0.400, 0.839, 1.000)
         )
 
-        /// 状态字符串 → 颜色（与 App 的 DS.Palette.status 同一套判定）
+        /// 状态字符串 → 颜色（与 App 的 TokensPalette.statusColor 同一套判定）
         static func status(_ cls: String) -> Color {
             switch cls {
             case "ok", "normal": return ok
@@ -90,7 +90,7 @@ enum WT {
         }
     }
 
-    // MARK: - 2. 字体（Typo）— 与 DS.Typo 同名同值
+    // MARK: - 2. 字体（Typo）— 与 TokensTypo 同名同值
 
     enum Typo {
         /// 仪表数字：超细字重 + 等宽。字重差是"仪器感"的来源，不靠颜色。
@@ -120,7 +120,7 @@ enum WT {
         static let sectionLabel = Font.caption
     }
 
-    // MARK: - 3. 网格（与 DS.Space 同值）
+    // MARK: - 3. 网格（与 TokensSpacing 同值）
 
     enum Space {
         static let xxs: CGFloat = 2

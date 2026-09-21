@@ -98,25 +98,25 @@ struct MileageJournalView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: KanseiSpacing.md) {
+            VStack(spacing: TokensSpacing.md) {
                 // 周期选择
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: KanseiSpacing.sm) {
+                    HStack(spacing: TokensSpacing.sm) {
                         ForEach(months.indices, id: \.self) { i in
                             Text(months[i])
                                 .font(.subheadline)
                                 .foregroundColor(currentPeriod == i ? .white : .secondary)
-                                .padding(.horizontal, KanseiSpacing.md)
-                                .padding(.vertical, KanseiSpacing.xs)
-                                .background(currentPeriod == i ? KanseiPalette.ambient : Color.clear)
-                                .cornerRadius(KanseiRadius.small)
+                                .padding(.horizontal, TokensSpacing.md)
+                                .padding(.vertical, TokensSpacing.xs)
+                                .background(currentPeriod == i ? TokensPalette.ambient : Color.clear)
+                                .cornerRadius(TokensRadius.small)
                                 .onTapGesture { currentPeriod = i }
                         }
                     }
                 }
 
                 // 统计卡片
-                HStack(spacing: KanseiSpacing.sm) {
+                HStack(spacing: TokensSpacing.sm) {
                     ForEach(Array(TripCostType.allCases.prefix(4)), id: \.self) { type in
                         CostSummaryTile(type: type, total: tracker.totalByType(type))
                     }
@@ -145,11 +145,11 @@ struct MileageJournalView: View {
                         .font(.body)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(KanseiPalette.ambient)
+                        .background(TokensPalette.ambient)
                         .foregroundColor(.white)
-                        .cornerRadius(KanseiRadius.medium)
+                        .cornerRadius(TokensRadius.medium)
                 }
-                .padding(.top, KanseiSpacing.sm)
+                .padding(.top, TokensSpacing.sm)
             }
             .sheet(isPresented: $showAddSheet) {
                 AddCostEntrySheet(selectedType: $selectedType, amountText: $amountText, noteText: $noteText)
@@ -172,10 +172,10 @@ struct CostSummaryTile: View {
     let type: TripCostType
     let total: Double
     var body: some View {
-        VStack(spacing: Theme.SpacingTokens.xs) {
+        VStack(spacing: TokensSpacing.xs) {
             Image(safeSymbol: type.icon, fallback: "doc.text.fill")
                 .font(.title2)
-                .foregroundColor(KanseiPalette.ambient)
+                .foregroundColor(TokensPalette.ambient)
             Text("\(total, specifier: "%.1f")")
                 .font(.callout)
                 .fontWeight(.semibold)
@@ -184,7 +184,7 @@ struct CostSummaryTile: View {
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, KanseiSpacing.sm)
+        .padding(.vertical, TokensSpacing.sm)
         .glassCard()
     }
 }
@@ -258,11 +258,11 @@ struct AddCostEntrySheet: View {
 struct CostEntryRow: View {
     let entry: CostEntry
     var body: some View {
-        HStack(spacing: KanseiSpacing.sm) {
+        HStack(spacing: TokensSpacing.sm) {
             Image(safeSymbol: entry.type.icon, fallback: "doc.text.fill")
                 .font(.headline)
                 .frame(width: 36, height: 36)
-                .background(KanseiPalette.ambient.opacity(0.15))
+                .background(TokensPalette.ambient.opacity(0.15))
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 2) {
@@ -288,6 +288,6 @@ struct CostEntryRow: View {
                 }
             }
         }
-        .padding(.vertical, Theme.SpacingTokens.xs)
+        .padding(.vertical, TokensSpacing.xs)
     }
 }

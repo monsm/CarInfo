@@ -23,7 +23,7 @@ struct ColorBlindModeView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("色彩辅助模式").font(Theme.h4)
+            Text("色彩辅助模式").font(TokensTypo.headline)
             Picker("模式", selection: $mode) {
                 ForEach(Array(options.enumerated()), id: \.offset) { (_ idx, item) in
                     Text(item.0).tag(item.1)
@@ -33,7 +33,7 @@ struct ColorBlindModeView: View {
             .accessibilityLabel(Text("色彩辅助模式选择"))
         }
         .padding()
-        .glassCard(corner: KanseiRadius.medium)
+        .glassCard(corner: TokensRadius.medium)
     }
 }
 

@@ -27,7 +27,7 @@ struct DSStage<Content: View>: View {
     let padding: CGFloat
     let content: () -> Content
 
-    init(padding: CGFloat = KanseiSpacing.page, @ViewBuilder content: @escaping () -> Content) {
+    init(padding: CGFloat = TokensSpacing.page, @ViewBuilder content: @escaping () -> Content) {
         self.padding = padding
         self.content = content
     }
@@ -35,7 +35,7 @@ struct DSStage<Content: View>: View {
     var body: some View {
         content()
             .padding(.horizontal, padding)
-            .padding(.vertical, KanseiSpacing.lg)
+            .padding(.vertical, TokensSpacing.lg)
     }
 }
 
@@ -45,7 +45,7 @@ struct DSGroupedCard<Content: View>: View {
     let glow: Bool
     let content: () -> Content
 
-    init(radius: CGFloat = KanseiRadius.medium, glow: Bool = true, @ViewBuilder content: @escaping () -> Content) {
+    init(radius: CGFloat = TokensRadius.medium, glow: Bool = true, @ViewBuilder content: @escaping () -> Content) {
         self.radius = radius
         self.glow = glow
         self.content = content
@@ -53,18 +53,18 @@ struct DSGroupedCard<Content: View>: View {
 
     var body: some View {
         content()
-            .padding(KanseiSpacing.md)
+            .padding(TokensSpacing.md)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(KanseiPalette.nightSurface.opacity(0.6))
+                    .fill(TokensPalette.nightSurface.opacity(0.6))
                     .overlay(
                         RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .stroke(KanseiPalette.glassBorder, lineWidth: 1)
+                            .stroke(TokensPalette.glassBorder, lineWidth: 1)
                     )
                     .overlay {
                         if glow {
                             RoundedRectangle(cornerRadius: radius, style: .continuous)
-                                .fill(KanseiPalette.ambient.opacity(0.03))
+                                .fill(TokensPalette.ambient.opacity(0.03))
                                 .blur(radius: 20)
                         }
                     }

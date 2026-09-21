@@ -76,7 +76,7 @@ struct SOHDashboard: View {
     }
 
     var body: some View {
-        VStack(spacing: KanseiSpacing.sm) {
+        VStack(spacing: TokensSpacing.sm) {
             Text("电池健康度 SOH")
                 .font(.subheadline)
                 .fontWeight(.semibold)

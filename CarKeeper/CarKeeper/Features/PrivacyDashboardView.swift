@@ -54,12 +54,12 @@ struct PrivacyDashboardView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: KanseiSpacing.lg) {
+                VStack(spacing: TokensSpacing.lg) {
                     // 汇总卡片
-                    VStack(spacing: Theme.SpacingTokens.sm) {
+                    VStack(spacing: TokensSpacing.sm) {
                         Image(safeSymbol: "checkerboard.shield", fallback: "shield.fill")
                             .font(.system(size: 48))
-                            .foregroundColor(KanseiPalette.ambient)
+                            .foregroundColor(TokensPalette.ambient)
                         Text("数据透明度")
                             .font(.title2)
                             .fontWeight(.bold)
@@ -68,7 +68,7 @@ struct PrivacyDashboardView: View {
                             .foregroundColor(.secondary)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, KanseiSpacing.md)
+                    .padding(.vertical, TokensSpacing.md)
                     .glassCard()
 
                     // 分类详情
@@ -77,7 +77,7 @@ struct PrivacyDashboardView: View {
                     }
 
                     // 一键清除按钮
-                    VStack(spacing: Theme.SpacingTokens.sm) {
+                    VStack(spacing: TokensSpacing.sm) {
                         Button(role: .destructive) {
                             showClearConfirm = true
                         } label: {
@@ -87,7 +87,7 @@ struct PrivacyDashboardView: View {
                                 .padding()
                                 .background(Color.red.opacity(0.15))
                                 .foregroundColor(.red)
-                                .cornerRadius(Theme.RadiusTokens.medium)
+                                .cornerRadius(TokensRadius.medium)
                         }
 
                         Button {
@@ -102,14 +102,14 @@ struct PrivacyDashboardView: View {
                                 .padding()
                                 .background(Color.orange.opacity(0.1))
                                 .foregroundColor(.orange)
-                                .cornerRadius(Theme.RadiusTokens.medium)
+                                .cornerRadius(TokensRadius.medium)
                         }
                     }
-                    .padding(.top, KanseiSpacing.sm)
+                    .padding(.top, TokensSpacing.sm)
                 }
                 .padding()
             }
-            .background(KanseiPalette.background)
+            .background(TokensPalette.background)
             .navigationTitle("隐私与数据")
             .navigationBarTitleDisplayMode(.inline)
             .alert("确认清除", isPresented: $showClearConfirm) {
@@ -128,11 +128,11 @@ struct PrivacyCategorySection: View {
     let category: (title: String, items: [(name: String, size: String, type: String)])
 
     var body: some View {
-        VStack(alignment: .leading, spacing: KanseiSpacing.xs) {
+        VStack(alignment: .leading, spacing: TokensSpacing.xs) {
             Text(category.title)
                 .font(.headline)
                 .padding(.horizontal)
-                .padding(.top, KanseiSpacing.sm)
+                .padding(.top, TokensSpacing.sm)
 
             ForEach(Array(category.items.enumerated()), id: \.offset) { idx, item in
                 HStack {
@@ -147,7 +147,7 @@ struct PrivacyCategorySection: View {
                         .foregroundColor(Color(.tertiaryLabel))
                 }
                 .padding(.horizontal)
-                .padding(.vertical, Theme.SpacingTokens.xs)
+                .padding(.vertical, TokensSpacing.xs)
                 if idx != category.items.count - 1 {
                     Divider().opacity(0.3)
                         .padding(.horizontal)
@@ -155,7 +155,7 @@ struct PrivacyCategorySection: View {
             }
         }
         .glassCard()
-        .padding(.vertical, Theme.SpacingTokens.xs)
+        .padding(.vertical, TokensSpacing.xs)
     }
 }
 

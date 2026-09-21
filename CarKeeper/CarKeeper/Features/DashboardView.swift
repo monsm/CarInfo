@@ -18,10 +18,10 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: DS.Space.gap) {
+            VStack(spacing: TokensSpacing.lg) {
                 // 周期选择
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: KanseiSpacing.sm) {
+                    HStack(spacing: TokensSpacing.sm) {
                         ForEach(periods, id: \.self) { p in
                             periodChip(text: p, selected: period == p)
                         }
@@ -29,7 +29,7 @@ struct DashboardView: View {
                 }
 
                 // 核心指标
-                HStack(spacing: KanseiSpacing.sm) {
+                HStack(spacing: TokensSpacing.sm) {
                     DashTile(icon: "bolt.fill", label: "SOC",
                              value: energyModel.soc == "--" ? "--" : "\(energyModel.socPct)%", color: .green)
                     DashTile(icon: "gauge", label: "续航",
@@ -46,7 +46,7 @@ struct DashboardView: View {
                 if socPoints.count >= 2 {
                     DSTrendChart(points: socPoints,
                                  unit: "%",
-                                 tint: KanseiPalette.ambient,
+                                 tint: TokensPalette.ambient,
                                  yDomain: 0...100,
                                  valueText: { String(format: "%.0f", $0) })
                 } else {
@@ -60,7 +60,7 @@ struct DashboardView: View {
 
                 // 驾驶评分
                 let score = store.drivingScore
-                VStack(alignment: .leading, spacing: KanseiSpacing.sm) {
+                VStack(alignment: .leading, spacing: TokensSpacing.sm) {
                     Text("驾驶安全评分")
                         .font(.subheadline)
                         .fontWeight(.semibold)
@@ -93,9 +93,9 @@ struct DashboardView: View {
                     .glassCard()
                 }
             }
-            .padding(.vertical, DS.Space.sm)
+            .padding(.vertical, TokensSpacing.sm)
         }
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .navigationTitle("仪表盘")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -104,10 +104,10 @@ struct DashboardView: View {
         Text(text)
             .font(.subheadline)
             .foregroundColor(selected ? .white : .secondary)
-            .padding(.horizontal, KanseiSpacing.md)
-            .padding(.vertical, KanseiSpacing.xs)
-            .background(selected ? KanseiPalette.ambient : Color.clear)
-            .cornerRadius(KanseiRadius.small)
+            .padding(.horizontal, TokensSpacing.md)
+            .padding(.vertical, TokensSpacing.xs)
+            .background(selected ? TokensPalette.ambient : Color.clear)
+            .cornerRadius(TokensRadius.small)
     }
 }
 
@@ -118,7 +118,7 @@ struct DashTile: View {
     let color: Color
 
     var body: some View {
-        VStack(spacing: KanseiSpacing.xs) {
+        VStack(spacing: TokensSpacing.xs) {
             Image(safeSymbol: icon, fallback: "gauge")
                 .font(.title2)
                 .foregroundColor(color)
@@ -130,7 +130,7 @@ struct DashTile: View {
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, KanseiSpacing.sm)
+        .padding(.vertical, TokensSpacing.sm)
         .glassCard()
     }
 }

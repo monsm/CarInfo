@@ -32,7 +32,7 @@ struct DevView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: DS.Space.gap) {
+            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
                 swatchGroup(title: "画布与表面", footer: "内容层不透明：玻璃只允许出现在导航栏、Tab 栏与弹层。", items: surfaceTokens)
                 swatchGroup(title: "语义色", footer: "颜色只来自系统，且只表达状态；界面里没有装饰性彩色。", items: semanticTokens)
                 typographyGroup
@@ -42,17 +42,17 @@ struct DevView: View {
                 actionsGroup
                 kvGroup("关于", about)
             }
-            .padding(.top, DS.Space.sm)
-            .padding(.bottom, DS.Space.xxxl)
+            .padding(.top, TokensSpacing.sm)
+            .padding(.bottom, TokensSpacing.xxxl)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .navigationTitle("设计令牌")
         .confirmationDialog("清除全部车端缓存？", isPresented: $showClearConfirm, titleVisibility: .visible) {
             Button("清除缓存", role: .destructive) {
                 store.clearCache()
-                DSHaptic.result(true)
+                TokensHaptic.result(true)
                 ToastManager.shared.show("缓存已清除", icon: "trash")
             }
             Button("取消", role: .cancel) { }
@@ -65,24 +65,24 @@ struct DevView: View {
 
     private var surfaceTokens: [SWatch] {
         [
-            SWatch(name: "canvas", color: KanseiPalette.background, note: "页面画布 · systemGroupedBackground"),
-            SWatch(name: "surface", color: KanseiPalette.nightSurface, note: "分组表面 · secondarySystemGroupedBackground"),
-            SWatch(name: "surfaceRaised", color: KanseiPalette.nightSurface,
+            SWatch(name: "canvas", color: TokensPalette.background, note: "页面画布 · systemGroupedBackground"),
+            SWatch(name: "surface", color: TokensPalette.nightSurface, note: "分组表面 · secondarySystemGroupedBackground"),
+            SWatch(name: "surfaceRaised", color: TokensPalette.nightSurface,
                     note: "内凹表面 · tertiarySystemGroupedBackground"),
-            SWatch(name: "hairline", color: KanseiPalette.glassBorder, note: "发丝分隔线 · UIColor.separator"),
-            SWatch(name: "fill", color: KanseiPalette.glassLight, note: "通用填充 · tertiarySystemFill"),
-            SWatch(name: "tintSoft", color: KanseiPalette.ambient, note: "强调色淡底（选中胶囊）")
+            SWatch(name: "hairline", color: TokensPalette.glassBorder, note: "发丝分隔线 · UIColor.separator"),
+            SWatch(name: "fill", color: TokensPalette.glassLight, note: "通用填充 · tertiarySystemFill"),
+            SWatch(name: "tintSoft", color: TokensPalette.ambient, note: "强调色淡底（选中胶囊）")
         ]
     }
 
     private var semanticTokens: [SWatch] {
         [
-            SWatch(name: "tint", color: KanseiPalette.ambient, note: "唯一强调色 · 系统蓝 #007AFF / #0A84FF"),
-            SWatch(name: "ok", color: KanseiPalette.success, note: "正常 / 已就绪 · systemGreen"),
-            SWatch(name: "warn", color: KanseiPalette.warning, note: "预警 / 需关注 · systemOrange"),
-            SWatch(name: "bad", color: KanseiPalette.error, note: "故障 / 异常 · systemRed"),
-            SWatch(name: "charge", color: KanseiPalette.info, note: "充电 / 电驱状态"),
-            SWatch(name: "labelTertiary", color: KanseiPalette.tertiary, note: "文字第三级 · 30%")
+            SWatch(name: "tint", color: TokensPalette.ambient, note: "唯一强调色 · 系统蓝 #007AFF / #0A84FF"),
+            SWatch(name: "ok", color: TokensPalette.success, note: "正常 / 已就绪 · systemGreen"),
+            SWatch(name: "warn", color: TokensPalette.warning, note: "预警 / 需关注 · systemOrange"),
+            SWatch(name: "bad", color: TokensPalette.error, note: "故障 / 异常 · systemRed"),
+            SWatch(name: "charge", color: TokensPalette.info, note: "充电 / 电驱状态"),
+            SWatch(name: "labelTertiary", color: TokensPalette.tertiary, note: "文字第三级 · 30%")
         ]
     }
 
@@ -90,25 +90,25 @@ struct DevView: View {
         DSGroup(title: title, trailing: "\(items.count)", footer: footer) {
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
                 DSGroupRow(showsSeparator: idx < items.count - 1) {
-                    HStack(spacing: DS.Space.md) {
+                    HStack(spacing: TokensSpacing.md) {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .fill(item.color)
                             .frame(width: 28, height: 28)
                             .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(KanseiPalette.glassBorder, lineWidth: DS.Hair.line))
+                                .strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.line))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.name)
-                                .font(DS.Typo.body)
-                                .foregroundStyle(KanseiPalette.primary)
+                                .font(TokensTypo.body)
+                                .foregroundStyle(TokensPalette.primary)
                             Text(item.note)
-                                .font(DS.Typo.caption)
-                                .foregroundStyle(KanseiPalette.secondary)
+                                .font(TokensTypo.caption)
+                                .foregroundStyle(TokensPalette.secondary)
                                 .lineLimit(2)
                         }
-                        Spacer(minLength: DS.Space.sm)
+                        Spacer(minLength: TokensSpacing.sm)
                         Text(item.color.hexString())
                             .font(.system(size: 13, design: .monospaced))
-                            .foregroundStyle(KanseiPalette.secondary)
+                            .foregroundStyle(TokensPalette.secondary)
                     }
                     .padding(.vertical, 6)
                     .accessibilityElement(children: .combine)
@@ -121,18 +121,18 @@ struct DevView: View {
 
     private var typeTokens: [TypeToken] {
         [
-            TypeToken(name: "display", metrics: "96 / ultraLight · 等宽数字", font: DS.Typo.display(96), sample: "88"),
-            TypeToken(name: "metric", metrics: "34 / light · 等宽数字", font: DS.Typo.metric(34), sample: "420 km"),
-            TypeToken(name: "largeTitle", metrics: "34 / bold", font: DS.Typo.largeTitle, sample: "车况"),
-            TypeToken(name: "title2", metrics: "22 / semibold", font: DS.Typo.title2, sample: "驾驶舱"),
-            TypeToken(name: "title3", metrics: "20 / semibold", font: DS.Typo.title3, sample: "充电设置"),
-            TypeToken(name: "headline", metrics: "17 / semibold", font: DS.Typo.headline, sample: "主操作按钮"),
-            TypeToken(name: "body", metrics: "17 / regular · 字距 −0.41", font: DS.Typo.body, sample: "正文与列表行标题"),
-            TypeToken(name: "callout", metrics: "16", font: DS.Typo.callout, sample: "次级正文"),
-            TypeToken(name: "subheadline", metrics: "15", font: DS.Typo.subheadline, sample: "字段名与说明"),
-            TypeToken(name: "footnote", metrics: "13", font: DS.Typo.footnote, sample: "分组标题与脚注"),
-            TypeToken(name: "caption", metrics: "12", font: DS.Typo.caption, sample: "标签"),
-            TypeToken(name: "data", metrics: "17 · 等宽数字", font: DS.Typo.data, sample: "356 V / 12 A")
+            TypeToken(name: "display", metrics: "96 / ultraLight · 等宽数字", font: TokensTypo.display(96), sample: "88"),
+            TypeToken(name: "metric", metrics: "34 / light · 等宽数字", font: TokensTypo.metric(34), sample: "420 km"),
+            TypeToken(name: "largeTitle", metrics: "34 / bold", font: TokensTypo.largeTitle, sample: "车况"),
+            TypeToken(name: "title2", metrics: "22 / semibold", font: TokensTypo.title2, sample: "驾驶舱"),
+            TypeToken(name: "title3", metrics: "20 / semibold", font: TokensTypo.title3, sample: "充电设置"),
+            TypeToken(name: "headline", metrics: "17 / semibold", font: TokensTypo.headline, sample: "主操作按钮"),
+            TypeToken(name: "body", metrics: "17 / regular · 字距 −0.41", font: TokensTypo.body, sample: "正文与列表行标题"),
+            TypeToken(name: "callout", metrics: "16", font: TokensTypo.callout, sample: "次级正文"),
+            TypeToken(name: "subheadline", metrics: "15", font: TokensTypo.subheadline, sample: "字段名与说明"),
+            TypeToken(name: "footnote", metrics: "13", font: TokensTypo.footnote, sample: "分组标题与脚注"),
+            TypeToken(name: "caption", metrics: "12", font: TokensTypo.caption, sample: "标签"),
+            TypeToken(name: "data", metrics: "17 · 等宽数字", font: TokensTypo.data, sample: "356 V / 12 A")
         ]
     }
 
@@ -143,12 +143,12 @@ struct DevView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(token.sample)
                             .font(token.font)
-                            .foregroundStyle(KanseiPalette.primary)
+                            .foregroundStyle(TokensPalette.primary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
                         Text("\(token.name) · \(token.metrics)")
                             .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(KanseiPalette.secondary)
+                            .foregroundStyle(TokensPalette.secondary)
                     }
                     .padding(.vertical, 6)
                     .accessibilityElement(children: .combine)
@@ -173,13 +173,13 @@ struct DevView: View {
 
     private var geometry: [(String, String)] {
         [
-            ("页面边距", "\(Int(DS.Space.page)) pt"),
-            ("分组内边距", "\(Int(DS.Space.cardPadding)) pt"),
-            ("行高", "\(Int(DS.Space.row)) pt"),
+            ("页面边距", "\(Int(TokensSpacing.page)) pt"),
+            ("分组内边距", "\(Int(TokensSpacing.md)) pt"),
+            ("行高", "\(Int(TokensSpacing.row)) pt"),
             ("圆角 · 小 / 分组 / 弹层",
-             "\(Int(DS.RadiusTokens.small)) / \(Int(DS.RadiusTokens.card)) / \(Int(DS.RadiusTokens.hero)) pt"),
-            ("发丝线", "\(DS.Hair.line) pt"),
-            ("主按钮高度", "\(Int(DS.SizeTokens.button)) pt")
+             "\(Int(TokensRadius.small)) / \(Int(TokensRadius.medium)) / \(Int(TokensRadius.large)) pt"),
+            ("发丝线", "\(TokensHair.line) pt"),
+            ("主按钮高度", "\(Int(TokensSize.button)) pt")
         ]
     }
 
@@ -214,7 +214,7 @@ struct DevView: View {
             DSGroupRow {
                 DSRow(icon: "doc.on.doc", title: "复制诊断信息") {
                     UIPasteboard.general.string = diagnostics
-                    DSHaptic.result(true)
+                    TokensHaptic.result(true)
                     ToastManager.shared.show("诊断信息已复制", icon: "doc.on.doc.fill")
                 }
             }

@@ -9,16 +9,16 @@ struct CarbonSavingsCard: View {
     let showDetails: Bool = false
 
     var body: some View {
-        CardBox(title: "碳减排", side: "\(stats.equivalentTrees) 棵树", cornerRadius: KanseiRadius.medium) {
+        CardBox(title: "碳减排", side: "\(stats.equivalentTrees) 棵树", cornerRadius: TokensRadius.medium) {
             VStack(spacing: 12) {
                 // 主统计
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("今日步行")
-                            .font(Theme.caption)
+                            .font(TokensTypo.caption)
                             .foregroundStyle(.secondary)
                         Text("\(stats.todaySteps) 步")
-                            .font(Theme.d3)
+                            .font(TokensTypo.metric(34))
                             .foregroundStyle(.primary)
                     }
 
@@ -26,10 +26,10 @@ struct CarbonSavingsCard: View {
 
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("减碳量")
-                            .font(Theme.caption)
+                            .font(TokensTypo.caption)
                             .foregroundStyle(.secondary)
                         Text("\(String(format: "%.2f", stats.todayCarbonKg)) kg")
-                            .font(Theme.d3)
+                            .font(TokensTypo.metric(34))
                             .foregroundStyle(.green)
                     }
                 }
@@ -39,7 +39,7 @@ struct CarbonSavingsCard: View {
                     Image(safeSymbol: "leaf.fill", fallback: "leaf.fill")
                         .foregroundStyle(.green)
                     Text("相当于 \(stats.equivalentTrees) 棵树吸收的碳")
-                        .font(Theme.caption)
+                        .font(TokensTypo.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
@@ -49,8 +49,8 @@ struct CarbonSavingsCard: View {
                     Button("模拟今日步数") {
                         CarbonSavingsTracker.shared.simulateDailySteps()
                     }
-                    .font(Theme.caption)
-                    .foregroundStyle(KanseiPalette.ambient)
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.ambient)
                 }
             }
         }

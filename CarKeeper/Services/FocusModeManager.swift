@@ -71,12 +71,12 @@ struct FocusModeHomeView: View {
         if !focusManager.config.enabled {
             EmptyView()
         } else {
-            VStack(spacing: KanseiSpacing.lg) {
+            VStack(spacing: TokensSpacing.lg) {
                 // 自定义消息
                 if !focusManager.config.customMessage.isEmpty {
                     Text(focusManager.config.customMessage)
                         .font(.headline)
-                        .foregroundColor(KanseiPalette.ambient)
+                        .foregroundColor(TokensPalette.ambient)
                         .padding(.horizontal)
                         .glassCard()
                         .padding(.horizontal)
@@ -112,7 +112,7 @@ struct FocusModeHomeView: View {
                     .padding()
                     .background(Color.red.opacity(0.8))
                     .foregroundColor(.white)
-                    .cornerRadius(KanseiRadius.medium)
+                    .cornerRadius(TokensRadius.medium)
                 }
                 .padding(.horizontal)
             }
@@ -121,14 +121,14 @@ struct FocusModeHomeView: View {
     }
 
     private var essentialInfoView: some View {
-        VStack(spacing: KanseiSpacing.md) {
+        VStack(spacing: TokensSpacing.md) {
             // SOC 大圆环（必须）
             ZStack {
                 Circle()
                     .stroke(Color.secondary.opacity(0.2), lineWidth: 8)
                 Circle()
                     .trim(from: 0, to: min(1, max(0, Double(socPct) / 100)))
-                    .stroke(KanseiPalette.ambient, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .stroke(TokensPalette.ambient, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .animation(.easeInOut, value: socPct)
 

@@ -129,11 +129,11 @@ struct HomeView: View {
                             ? "离线模式：当前显示最后一次同步的数据"
                             : "网络不稳定，数据可能不是最新"
                     )
-                    .padding(.bottom, DS.Space.lg)
+                    .padding(.bottom, TokensSpacing.lg)
                 }
 
                 hero
-                    .padding(.bottom, DS.Space.xxl)
+                    .padding(.bottom, TokensSpacing.xxl)
 
                 quickActions
                 driveSection
@@ -145,10 +145,10 @@ struct HomeView: View {
                 locationSection
                 footer
             }
-            .padding(.top, DS.Space.sm)
-            .padding(.bottom, DS.Space.huge)
+            .padding(.top, TokensSpacing.sm)
+            .padding(.bottom, TokensSpacing.huge)
         }
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .scrollBounceBehavior(.basedOnSize)
         .refreshable {
             isRefreshing = true
@@ -211,15 +211,15 @@ struct HomeView: View {
                          busy: carBusy,
                          onZone: { onCarZone($0) })
                 .frame(height: 196)
-                .padding(.horizontal, -DS.Space.page)   // 让车超出画幅（产品照的构图）
-                .padding(.bottom, DS.Space.xs)
+                .padding(.horizontal, -TokensSpacing.page)   // 让车超出画幅（产品照的构图）
+                .padding(.bottom, TokensSpacing.xs)
 
             carFeedbackLine
 
             // 车辆标识
-            HStack(spacing: DS.Space.sm) {
+            HStack(spacing: TokensSpacing.sm) {
                 Circle()
-                    .fill(e.online.cls == "ok" ? KanseiPalette.success : KanseiPalette.tertiary)
+                    .fill(e.online.cls == "ok" ? TokensPalette.success : TokensPalette.tertiary)
                     .frame(width: 7, height: 7)
                 if sel.count > 1 {
                     Picker("选择车辆", selection: Binding(
@@ -232,49 +232,49 @@ struct HomeView: View {
                     }
                     .pickerStyle(.menu)
                     .labelsHidden()
-                    .font(DS.Typo.subheadline.weight(.semibold))
-                    .tint(KanseiPalette.primary)
+                    .font(TokensTypo.subheadline.weight(.semibold))
+                    .tint(TokensPalette.primary)
                 } else {
                     Text(name)
-                        .font(DS.Typo.subheadline.weight(.semibold))
-                        .foregroundStyle(KanseiPalette.primary)
+                        .font(TokensTypo.subheadline.weight(.semibold))
+                        .foregroundStyle(TokensPalette.primary)
                         .lineLimit(1)
                 }
-                Spacer(minLength: DS.Space.sm)
+                Spacer(minLength: TokensSpacing.sm)
                 Text(e.updated == "--" ? "暂无上报" : "\(e.updated)")
-                    .font(DS.Typo.footnote)
-                    .foregroundStyle(KanseiPalette.tertiary)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.tertiary)
                     .lineLimit(1)
             }
 
             // 唯一的大数字
             DSBigNumber(value: e.soc, unit: "%", size: 104)
-                .padding(.top, DS.Space.xl)
+                .padding(.top, TokensSpacing.xl)
 
             // 光条 —— 同一个数字的另一种写法
-            VStack(alignment: .leading, spacing: DS.Space.md) {
+            VStack(alignment: .leading, spacing: TokensSpacing.md) {
                 DSLightBar(progress: fraction, tint: lightBarGradient(lightColor))
-                HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
+                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                     Text("剩余 \(e.range) km")
-                        .font(DS.Typo.footnote)
-                        .foregroundStyle(KanseiPalette.secondary)
-                    Spacer(minLength: DS.Space.sm)
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.secondary)
+                    Spacer(minLength: TokensSpacing.sm)
                     if e.chargeCls == "ok" || e.chargeCls == "charge" {
                         Text(e.chargeText)
-                            .font(DS.Typo.footnote.weight(.medium))
-                            .foregroundStyle(KanseiPalette.info)
+                            .font(TokensTypo.footnote.weight(.medium))
+                            .foregroundStyle(TokensPalette.info)
                     } else if !e.socWarn.isEmpty {
                         Text(e.socPct < 15 ? "电量偏低" : "建议补电")
-                            .font(DS.Typo.footnote.weight(.medium))
-                            .foregroundStyle(e.socPct < 15 ? KanseiPalette.error : KanseiPalette.warning)
+                            .font(TokensTypo.footnote.weight(.medium))
+                            .foregroundStyle(e.socPct < 15 ? TokensPalette.error : TokensPalette.warning)
                     } else if let tte = e.timeToEmpty, tte != "--" {
                         Text("可行驶 \(tte)")
-                            .font(DS.Typo.footnote)
-                            .foregroundStyle(KanseiPalette.secondary)
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.secondary)
                     }
                 }
             }
-            .padding(.top, DS.Space.xl)
+            .padding(.top, TokensSpacing.xl)
 
             // 三条事实：只有发丝线，没有容器
             DSStatStrip(items: [
@@ -282,7 +282,7 @@ struct HomeView: View {
                 .init("电压 / 电流", e.voltAmp),
                 .init("电池健康", healthText(), cls: healthCls())
             ])
-            .padding(.top, DS.Space.xl)
+            .padding(.top, TokensSpacing.xl)
             .overlay(alignment: .top) { DSDivider() }
             .overlay(alignment: .bottom) { DSDivider() }
 
@@ -293,10 +293,10 @@ struct HomeView: View {
                     if idx < facts.count - 1 { DSSeparator(inset: 0) }
                 }
                 Text("点车门可锁 / 解锁整车 —— 本车型协议未提供单门与后备箱的远程开合指令")
-                    .font(DS.Typo.caption)
-                    .foregroundStyle(KanseiPalette.tertiary)
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, DS.Space.md)
+                    .padding(.top, TokensSpacing.md)
             }
             .overlay(alignment: .bottom) { DSDivider() }
         }
@@ -307,26 +307,26 @@ struct HomeView: View {
 
     /// 车上操作的一行反馈：正在执行 / 已完成 / 失败；空闲时是一句可操作提示
     private var carFeedbackLine: some View {
-        HStack(spacing: DS.Space.sm) {
+        HStack(spacing: TokensSpacing.sm) {
             if carBusy {
                 ProgressView().controlSize(.small)
             }
             Text(carLine?.text ?? "点车门可锁 / 解锁")
-                .font(DS.Typo.footnote)
+                .font(TokensTypo.footnote)
                 .foregroundStyle(carLine == nil
-                                 ? KanseiPalette.tertiary
-                                 : KanseiPalette.statusColor(carLine?.cls ?? "na"))
+                                 ? TokensPalette.tertiary
+                                 : TokensPalette.statusColor(carLine?.cls ?? "na"))
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, DS.Space.lg)
+        .padding(.bottom, TokensSpacing.lg)
         .accessibilityElement(children: .combine)
     }
 
     private func onCarZone(_ zone: CarZone) {
-        DSHaptic.tap()
+        TokensHaptic.tap()
         switch zone {
         case .leftFront, .leftRear:
             // 以被点的那扇门的锁状态取反；车端指令作用于整车（协议里唯一的车身指令）
@@ -377,12 +377,12 @@ struct HomeView: View {
                 await refreshControlCache()
                 pendingLock = nil
                 carLine = ("\(zone.label) · 已\(verb)", "ok")
-                DSHaptic.result(true)
+                TokensHaptic.result(true)
             } catch {
                 store.addCommandHistory(cmd: cmd, name: verb, success: false, duration: 0)
                 pendingLock = nil                   // 失败立刻回到车辆上报的真实值
                 carLine = ("\(zone.label) · 执行失败：\(error.localizedDescription)", "bad")
-                DSHaptic.result(false)
+                TokensHaptic.result(false)
             }
             carBusy = false
             scheduleCarLineClear()
@@ -485,10 +485,10 @@ struct HomeView: View {
     }
 
     private func heroLightColor(_ e: EnergyModel) -> Color {
-        if e.chargeCls == "ok" || e.chargeCls == "charge" { return KanseiPalette.info }
-        if e.socPct < 15 { return KanseiPalette.error }
-        if e.socPct < 30 { return KanseiPalette.warning }
-        return KanseiPalette.ambient
+        if e.chargeCls == "ok" || e.chargeCls == "charge" { return TokensPalette.info }
+        if e.socPct < 15 { return TokensPalette.error }
+        if e.socPct < 30 { return TokensPalette.warning }
+        return TokensPalette.ambient
     }
 
     private func lightBarGradient(_ accent: Color) -> LinearGradient {
@@ -521,13 +521,13 @@ struct HomeView: View {
         trailing: String? = nil,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: DS.Space.sm) {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             DSSectionHeader(title: title, trailing: trailing)
             DSCard {
                 VStack(alignment: .leading, spacing: 0) { content() }
             }
         }
-        .padding(.bottom, DS.Space.gap)
+        .padding(.bottom, TokensSpacing.lg)
     }
 
     // MARK: - ④ 快捷操作
@@ -565,7 +565,7 @@ struct HomeView: View {
     /// 快捷操作统一走「车控页执行」路径：写入 pendingQuickCtrl 后切到车控 Tab。
     /// 写的是协议里的真实指令名，由车控页原样执行（它同时兼容历史的 "air"/"lock" 简写）。
     private func quick(_ raw: String) {
-        DSHaptic.tap()
+        TokensHaptic.tap()
         store.pendingQuickCtrl = raw
         NavState.shared.selectedTab = .control
     }
@@ -665,13 +665,13 @@ struct HomeView: View {
         let tyre = VM.tyreStatus(cache)
 
         return group("胎压", trailing: tyre.alarmText) {
-            HStack(alignment: .top, spacing: DS.Space.md) {
+            HStack(alignment: .top, spacing: TokensSpacing.md) {
                 ForEach(tyre.items.prefix(2)) { item in
                     tyreItem(item)
                 }
             }
             DSSeparator(inset: 0)
-            HStack(alignment: .top, spacing: DS.Space.md) {
+            HStack(alignment: .top, spacing: TokensSpacing.md) {
                 ForEach(Array(tyre.items.dropFirst(2).prefix(2))) { item in
                     tyreItem(item)
                 }
@@ -690,8 +690,8 @@ struct HomeView: View {
         let points = HistoryStore.shared.tyreSeries(hours: 24 * 7)
         if points.count >= 2 {
             DSTyreTrendChart(points: points)
-                .padding(.top, DS.Space.md)
-                .padding(.bottom, DS.Space.xs)
+                .padding(.top, TokensSpacing.md)
+                .padding(.bottom, TokensSpacing.xs)
         } else {
             DSTrendEmpty(
                 icon: "gauge.with.dots.needle.50percent",
@@ -700,27 +700,27 @@ struct HomeView: View {
                          + "（任一胎变化 ≥ \(Int(HistoryStore.tyreJump)) kPa 也会立刻记）。"
                          + "已记录 \(points.count) 个点。"
             )
-            .padding(.top, DS.Space.sm)
+            .padding(.top, TokensSpacing.sm)
         }
     }
 
     private func tyreItem(_ item: TyreItem) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(item.label)
-                .font(DS.Typo.caption)
-                .foregroundStyle(KanseiPalette.secondary)
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.secondary)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(item.kpa)
-                    .font(DS.Typo.metric(28))
-                    .foregroundStyle(item.cls == "ok" ? KanseiPalette.primary : KanseiPalette.statusColor(item.cls))
+                    .font(TokensTypo.metric(28))
+                    .foregroundStyle(item.cls == "ok" ? TokensPalette.primary : TokensPalette.statusColor(item.cls))
                     .contentTransition(.numericText())
                 Text("kPa")
-                    .font(DS.Typo.caption)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.secondary)
             }
             Text("\(item.temp)℃")
-                .font(DS.Typo.dataSmall)
-                .foregroundStyle(KanseiPalette.secondary)
+                .font(TokensTypo.dataSmall)
+                .foregroundStyle(TokensPalette.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -771,13 +771,13 @@ struct HomeView: View {
         let loc = VM.locStatus(cache)
         let hasCoord = loc.lat != "--" && loc.lng != "--"
 
-        return VStack(alignment: .leading, spacing: DS.Space.sm) {
+        return VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             DSSectionHeader(title: "位置", trailing: loc.dir != "--" ? loc.dir : nil)
 
-            VStack(alignment: .leading, spacing: DS.Space.lg) {
+            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
                 Text(loc.addr.isEmpty ? "暂无定位数据" : loc.addr)
-                    .font(DS.Typo.headline)
-                    .foregroundStyle(loc.addr.isEmpty ? KanseiPalette.secondary : KanseiPalette.primary)
+                    .font(TokensTypo.headline)
+                    .foregroundStyle(loc.addr.isEmpty ? TokensPalette.secondary : TokensPalette.primary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if showMap {
@@ -791,20 +791,20 @@ struct HomeView: View {
                     .frame(height: 180)
                 }
 
-                HStack(spacing: DS.Space.md) {
+                HStack(spacing: TokensSpacing.md) {
                     if hasCoord {
                         Button("导航") { openNav(loc) }
                             .buttonStyle(DSSecondaryButtonStyle())
                     }
                     Button(showMap ? "隐藏地图" : "显示地图") {
-                        withAnimation(DS.MotionTokens.fade) { showMap.toggle() }
+                        withAnimation(TokensMotion.fade) { showMap.toggle() }
                     }
                     .buttonStyle(DSSecondaryButtonStyle())
                 }
             }
-            .padding(DS.Space.cardPadding)
-            .background(RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
-                .fill(KanseiPalette.nightSurface))
+            .padding(TokensSpacing.md)
+            .background(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                .fill(TokensPalette.nightSurface))
 
             DSCard {
                 VStack(alignment: .leading, spacing: 0) {
@@ -825,7 +825,7 @@ struct HomeView: View {
                 }
             }
 
-            HStack(spacing: DS.Space.md) {
+            HStack(spacing: TokensSpacing.md) {
                 Button {
                     saveParking(loc)
                 } label: {
@@ -837,32 +837,32 @@ struct HomeView: View {
                 .buttonStyle(DSSecondaryButtonStyle())
             }
         }
-        .padding(.bottom, DS.Space.gap)
+        .padding(.bottom, TokensSpacing.lg)
     }
 
     // MARK: - 数据来源
 
     private var footer: some View {
         let update = lastFetch.map { DateFormatter.relative($0) } ?? "--"
-        return HStack(spacing: DS.Space.sm) {
+        return HStack(spacing: TokensSpacing.sm) {
             Text("更新于 \(update)")
-                .font(DS.Typo.footnote)
-                .foregroundStyle(KanseiPalette.tertiary)
-            Spacer(minLength: DS.Space.sm)
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.tertiary)
+            Spacer(minLength: TokensSpacing.sm)
             if isRefreshing {
                 ProgressView().controlSize(.small)
             } else {
                 Button {
-                    DSHaptic.tap()
+                    TokensHaptic.tap()
                     Task { await fetchCore() }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .buttonStyle(DSIconButtonStyle(size: 36, tint: KanseiPalette.ambient))
+                .buttonStyle(DSIconButtonStyle(size: 36, tint: TokensPalette.ambient))
                 .accessibilityLabel(Text("刷新"))
             }
         }
-        .padding(.vertical, DS.Space.sm)
+        .padding(.vertical, TokensSpacing.sm)
     }
 
     // MARK: - 动作
@@ -878,7 +878,7 @@ struct HomeView: View {
             customMessage: fm.config.customMessage
         )
         fm.saveConfig(next)
-        withAnimation(DS.MotionTokens.press) { focusEnabled = next.enabled }
+        withAnimation(TokensMotion.press) { focusEnabled = next.enabled }
     }
 
     /// 导航交给系统地图（MKMapItem 驾车模式）。
@@ -1186,8 +1186,8 @@ struct CarStageView: View {
 
     private func lockColor(_ cls: String) -> Color {
         switch cls {
-        case "ok":  return KanseiPalette.success
-        case "bad": return KanseiPalette.warning
+        case "ok":  return TokensPalette.success
+        case "bad": return TokensPalette.warning
         default:    return Color.white.opacity(0.16)
         }
     }
@@ -1305,17 +1305,17 @@ struct LocationMapViewPlaceholder: View {
 
     var body: some View {
         ZStack {
-            KanseiPalette.glassLight
-            VStack(spacing: DS.Space.sm) {
+            TokensPalette.glassLight
+            VStack(spacing: TokensSpacing.sm) {
                 Image(systemName: "map")
                     .font(.system(size: 26, weight: .light))
-                    .foregroundStyle(KanseiPalette.tertiary)
+                    .foregroundStyle(TokensPalette.tertiary)
                 Text(addr.isEmpty ? "暂无定位" : addr)
-                    .font(DS.Typo.footnote)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
-                    .padding(.horizontal, DS.Space.lg)
+                    .padding(.horizontal, TokensSpacing.lg)
             }
         }
     }

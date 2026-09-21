@@ -59,7 +59,7 @@ struct VehicleView: View {
                               actionTitle: "重新加载",
                               cls: "warn") { reloadVehicle() }
             }
-        }                .background(KanseiPalette.background)
+        }                .background(TokensPalette.background)
                 .navigationTitle("车辆档案")
         .accessibilityLabel(Text("车辆档案"))
         .accessibilityHint(Text("车牌、VIN、车型配置与保险保养信息，点任意字段可复制"))
@@ -73,7 +73,7 @@ struct VehicleView: View {
                       let data = img.jpegData(compressionQuality: 0.6) else { return }
                 maintenancePhotos.append(data.base64EncodedString())
                 saveMaintenancePhotos()
-                DSHaptic.result(true)
+                TokensHaptic.result(true)
             }
         }
     }
@@ -82,31 +82,31 @@ struct VehicleView: View {
 
     private func content(_ sum: VehicleSummary) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: DS.Space.gap) {
+            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
                 identitySection(sum)
                 archiveGroups
                 photoSection
             }
-            .padding(.top, DS.Space.sm)
-            .padding(.bottom, DS.Space.xxxl)
+            .padding(.top, TokensSpacing.sm)
+            .padding(.bottom, TokensSpacing.xxxl)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
     }
 
     private var loadingState: some View {
-        VStack(alignment: .leading, spacing: DS.Space.md) {
-            HStack(spacing: DS.Space.sm) {
+        VStack(alignment: .leading, spacing: TokensSpacing.md) {
+            HStack(spacing: TokensSpacing.sm) {
                 ProgressView().controlSize(.small)
                 Text("正在加载车辆档案…")
-                    .font(DS.Typo.footnote)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
             }
             DSSkeleton(height: 96)
             DSSkeleton(height: 132)
         }
-        .padding(.horizontal, DS.Space.page)
-        .padding(.top, DS.Space.xl)
+        .padding(.horizontal, TokensSpacing.page)
+        .padding(.top, TokensSpacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
@@ -117,28 +117,28 @@ struct VehicleView: View {
         VStack(alignment: .leading, spacing: 0) {
             DSSectionHeader(title: "车辆")
 
-            HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
+            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                 Text(sum.plate.isEmpty ? "未绑定车牌" : sum.plate)
                     .font(.system(size: 34, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(KanseiPalette.primary)
+                    .foregroundStyle(TokensPalette.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 if isNev {
                     DSChip(text: "新能源", cls: "acc", icon: "bolt.fill")
                 }
-                Spacer(minLength: DS.Space.sm)
+                Spacer(minLength: TokensSpacing.sm)
             }
 
             Text(sum.name.isEmpty ? "未绑定车辆" : sum.name)
-                .font(DS.Typo.title2)
-                .foregroundStyle(KanseiPalette.primary)
+                .font(TokensTypo.title2)
+                .foregroundStyle(TokensPalette.primary)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, DS.Space.sm)
+                .padding(.top, TokensSpacing.sm)
 
             if !sum.model.isEmpty {
                 Text(sum.model)
-                    .font(DS.Typo.subheadline)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.subheadline)
+                    .foregroundStyle(TokensPalette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
             }
@@ -147,18 +147,18 @@ struct VehicleView: View {
             let items = statItems(sum)
             if items.count > 1 {
                 DSStatStrip(items: items)
-                    .padding(.top, DS.Space.xl)
+                    .padding(.top, TokensSpacing.xl)
                     .overlay(alignment: .top) { DSDivider() }
                     .overlay(alignment: .bottom) { DSDivider() }
             }
 
             // ③ VIN：整车唯一身份，点一下复制
             vinRow(sum)
-                .padding(.top, DS.Space.lg)
+                .padding(.top, TokensSpacing.lg)
 
             if let reminder = sum.serviceReminder {
                 DSNotice(kind: .warning, text: reminder)
-                    .padding(.top, DS.Space.md)
+                    .padding(.top, TokensSpacing.md)
             }
         }
         .accessibilityElement(children: .contain)
@@ -186,24 +186,24 @@ struct VehicleView: View {
         Button {
             copy(sum.vin, label: "VIN")
         } label: {
-            HStack(spacing: DS.Space.sm) {
+            HStack(spacing: TokensSpacing.sm) {
                 Image(safeSymbol: "barcode", fallback: "number")
                     .font(.system(size: 15))
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .foregroundStyle(TokensPalette.secondary)
                 Text("VIN")
-                    .font(DS.Typo.footnote)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
                 Text(sum.vin.isEmpty ? "--" : sum.vin)
                     .font(.system(size: 15, design: .monospaced))
-                    .foregroundStyle(KanseiPalette.primary)
+                    .foregroundStyle(TokensPalette.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                Spacer(minLength: DS.Space.sm)
+                Spacer(minLength: TokensSpacing.sm)
                 Image(systemName: "doc.on.doc")
                     .font(.system(size: 15))
-                    .foregroundStyle(KanseiPalette.ambient)
+                    .foregroundStyle(TokensPalette.ambient)
             }
-            .frame(minHeight: DS.Space.row)
+            .frame(minHeight: TokensSpacing.row)
             .contentShape(Rectangle())
         }
         .buttonStyle(DSRowButtonStyle())
@@ -235,14 +235,14 @@ struct VehicleView: View {
                 footer: "照片只保存在本机，不会上传服务器") {
             DSGroupRow(showsSeparator: false) {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: DS.Space.sm) {
+                    HStack(spacing: TokensSpacing.sm) {
                         ForEach(Array(maintenancePhotos.enumerated()), id: \.offset) { idx, b64 in
                             if let data = Data(base64Encoded: b64), let img = UIImage(data: data) {
                                 Image(uiImage: img)
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                                     .frame(width: 104, height: 78)
-                                    .clipShape(RoundedRectangle(cornerRadius: DS.RadiusTokens.small,
+                                    .clipShape(RoundedRectangle(cornerRadius: TokensRadius.small,
                                                                  style: .continuous))
                                     .contextMenu {
                                         Button(role: .destructive) {
@@ -257,20 +257,20 @@ struct VehicleView: View {
                         Button {
                             showPhotoPicker = true
                         } label: {
-                            VStack(spacing: DS.Space.xs) {
+                            VStack(spacing: TokensSpacing.xs) {
                                 Image(systemName: "plus")
                                     .font(.system(size: 20, weight: .light))
                                 Text("添加")
-                                    .font(DS.Typo.caption)
+                                    .font(TokensTypo.caption)
                             }
-                            .foregroundStyle(KanseiPalette.secondary)
+                            .foregroundStyle(TokensPalette.secondary)
                             .frame(width: 104, height: 78)
-                            .background(RoundedRectangle(cornerRadius: DS.RadiusTokens.small, style: .continuous)
-                                .fill(KanseiPalette.fillSubtle))
+                            .background(RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
+                                .fill(TokensPalette.fillSubtle))
                         }
                         .accessibilityLabel(Text("添加维保照片"))
                     }
-                    .padding(.vertical, DS.Space.md)
+                    .padding(.vertical, TokensSpacing.md)
                 }
             }
         }
@@ -278,7 +278,7 @@ struct VehicleView: View {
 
     private func deletePhoto(at idx: Int) {
         guard maintenancePhotos.indices.contains(idx) else { return }
-        withAnimation(DS.MotionTokens.value) { _ = maintenancePhotos.remove(at: idx) }
+        withAnimation(TokensMotion.value) { _ = maintenancePhotos.remove(at: idx) }
         saveMaintenancePhotos()
         ToastManager.shared.show("照片已删除", icon: "trash")
     }
@@ -298,7 +298,7 @@ struct VehicleView: View {
     private func copy(_ value: String, label: String) {
         guard !value.isEmpty, value != "--" else { return }
         UIPasteboard.general.string = value
-        DSHaptic.result(true)
+        TokensHaptic.result(true)
         ToastManager.shared.show("\(label) 已复制", icon: "doc.on.doc.fill")
     }
 
@@ -389,7 +389,7 @@ struct PhotoPickerSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: DS.Space.gap) {
+                VStack(alignment: .leading, spacing: TokensSpacing.lg) {
                     DSGroup(title: "来源") {
                         DSGroupRow {
                             DSRow(icon: "camera.fill", title: "拍照") { present(.camera, "拍照") }
@@ -399,13 +399,13 @@ struct PhotoPickerSheet: View {
                         }
                     }
                     Text("照片会以压缩后的形式保存在本机，用于维修与保养记录。")
-                        .font(DS.Typo.footnote)
-                        .foregroundStyle(KanseiPalette.secondary)
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.top, DS.Space.sm)
+                .padding(.top, TokensSpacing.sm)
             }
-            .background(KanseiPalette.background)
+            .background(TokensPalette.background)
             .navigationTitle("添加照片")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

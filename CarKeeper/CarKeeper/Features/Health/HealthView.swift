@@ -22,7 +22,7 @@ struct HealthView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: KanseiSpacing.lg) {
+            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
                 if loading {
                     loadingState
                 } else if let model {
@@ -42,12 +42,12 @@ struct HealthView: View {
                                   actionTitle: "重新加载") { Task { await load() } }
                 }
             }
-            .padding(.top, KanseiSpacing.sm)
-            .padding(.bottom, KanseiSpacing.xxl)
+            .padding(.top, TokensSpacing.sm)
+            .padding(.bottom, TokensSpacing.xxl)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .navigationTitle("健康报告")
         .refreshable { await load() }
         .onAppear {
@@ -62,12 +62,12 @@ struct HealthView: View {
     // MARK: - 加载态（安静的内容占位，不加边距 —— 画布已经统一给了 20pt）
 
     private var loadingState: some View {
-        VStack(alignment: .leading, spacing: DS.Space.md) {
-            HStack(spacing: DS.Space.sm) {
+        VStack(alignment: .leading, spacing: TokensSpacing.md) {
+            HStack(spacing: TokensSpacing.sm) {
                 ProgressView().controlSize(.small)
                 Text("正在读取健康报告…")
-                    .font(KanseiTypo.footnote)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
             }
             DSSkeleton(height: 96)
             DSSkeleton(height: 64)
@@ -84,15 +84,15 @@ struct HealthView: View {
         return VStack(alignment: .leading, spacing: 0) {
             DSSectionHeader(title: "健康评分")
 
-            HStack(spacing: DS.Space.sm) {
+            HStack(spacing: TokensSpacing.sm) {
                 if let vs = m.vehicleStatus, !vs.isEmpty {
                     DSChip(text: vehicleText(vs), cls: vehicleCls(vs), icon: vehicleIcon(vs))
                 }
-                Spacer(minLength: DS.Space.sm)
+                Spacer(minLength: TokensSpacing.sm)
                 if !m.time.isEmpty {
                     Text("最近检测 \(m.time)")
-                        .font(DS.Typo.footnote)
-                        .foregroundStyle(KanseiPalette.secondary)
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.secondary)
                 }
             }
 
@@ -101,14 +101,14 @@ struct HealthView: View {
                         caption: verdict(m.scorePct),
                         size: 96,
                         tint: tint)
-                .padding(.top, KanseiSpacing.lg)
+                .padding(.top, TokensSpacing.lg)
 
             DSLightBar(progress: Double(max(0, min(100, m.scorePct))) / 100.0,
                        height: 6,
                        tint: LinearGradient(colors: [Color.white, tint.opacity(0.72), tint],
                                             startPoint: .leading, endPoint: .trailing))
-                .padding(.top, KanseiSpacing.xl)
-                .padding(.bottom, KanseiSpacing.xl)
+                .padding(.top, TokensSpacing.xl)
+                .padding(.bottom, TokensSpacing.xl)
 
             if !m.counts.isEmpty {
                 DSStatStrip(items: m.counts.map {
@@ -135,20 +135,20 @@ struct HealthView: View {
 
     private func systemRow(_ sys: HealthSystem, showsSeparator: Bool) -> some View {
         let isOpen = expandedSystems.contains(sys.name)
-        let tint = KanseiPalette.statusColor(sys.statusCls)
+        let tint = TokensPalette.statusColor(sys.statusCls)
         return VStack(alignment: .leading, spacing: 0) {
             Button { toggle(sys.name) } label: {
-                HStack(spacing: DS.Space.md) {
+                HStack(spacing: TokensSpacing.md) {
                     Image(safeSymbol: systemIcon(sys.name), fallback: "circle")
-                        .font(.system(size: DS.SizeTokens.icon))
+                        .font(.system(size: TokensSize.icon))
                         .foregroundStyle(tint)
-                        .frame(width: DS.SizeTokens.iconColumn)
+                        .frame(width: TokensSize.iconColumn)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(sys.name)
-                            .font(DS.Typo.body)
-                            .foregroundStyle(KanseiPalette.primary)
+                            .font(TokensTypo.body)
+                            .foregroundStyle(TokensPalette.primary)
                         Text(sys.statusText.isEmpty ? "—" : sys.statusText)
-                            .font(DS.Typo.footnote)
+                            .font(TokensTypo.footnote)
                             .foregroundStyle(tint)
                         DSLightBar(progress: Double(max(0, min(100, sys.healthPct))) / 100.0,
                                    height: 3,
@@ -158,17 +158,17 @@ struct HealthView: View {
                             .frame(width: 88)
                             .padding(.top, 3)
                     }
-                    Spacer(minLength: DS.Space.sm)
+                    Spacer(minLength: TokensSpacing.sm)
                     Text("\(sys.healthPct)%")
-                        .font(DS.Typo.data)
+                        .font(TokensTypo.data)
                         .foregroundStyle(tint)
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(KanseiPalette.tertiary)
+                        .foregroundStyle(TokensPalette.tertiary)
                         .rotationEffect(.degrees(isOpen ? 180 : 0))
-                        .animation(KanseiMotion.tap, value: isOpen)
+                        .animation(TokensMotion.tap, value: isOpen)
                 }
-                .frame(minHeight: DS.Space.row)
+                .frame(minHeight: TokensSpacing.row)
                 .contentShape(Rectangle())
             }
             .buttonStyle(DSRowButtonStyle())
@@ -190,7 +190,7 @@ struct HealthView: View {
                         }
                     }
                 }
-                .background(KanseiPalette.nightSurface.opacity(0.6))
+                .background(TokensPalette.nightSurface.opacity(0.6))
             }
 
             if showsSeparator { DSSeparator(inset: 0) }
@@ -199,26 +199,26 @@ struct HealthView: View {
 
     private func childRow(_ item: HealthItem) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
+            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                 Text(item.name)
-                    .font(DS.Typo.subheadline)
-                    .foregroundStyle(KanseiPalette.primary)
+                    .font(TokensTypo.subheadline)
+                    .foregroundStyle(TokensPalette.primary)
                     .lineLimit(2)
-                Spacer(minLength: DS.Space.sm)
+                Spacer(minLength: TokensSpacing.sm)
                 Text(item.statusText)
-                    .font(DS.Typo.subheadline)
-                    .foregroundStyle(KanseiPalette.statusColor(item.statusCls))
+                    .font(TokensTypo.subheadline)
+                    .foregroundStyle(TokensPalette.statusColor(item.statusCls))
             }
             if let d = item.detect, !d.isEmpty { DSKeyValueRow(key: "检测值", value: d) }
             if let s = item.suggest, !s.isEmpty { DSKeyValueRow(key: "参考范围", value: s) }
             if let desc = item.desc, !desc.isEmpty {
                 Text(desc)
-                    .font(KanseiTypo.footnote)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.vertical, DS.Space.sm)
+        .padding(.vertical, TokensSpacing.sm)
         .accessibilityElement(children: .combine)
     }
 
@@ -251,29 +251,29 @@ struct HealthView: View {
         DSGroupRow {
             Button {
                 UIPasteboard.general.string = cid
-                DSHaptic.result(true)
+                TokensHaptic.result(true)
                 ToastManager.shared.show("检测 ID 已复制", icon: "doc.on.doc.fill")
             } label: {
-                HStack(spacing: DS.Space.md) {
+                HStack(spacing: TokensSpacing.md) {
                     Image(safeSymbol: "number.square.fill", fallback: "number")
-                        .font(.system(size: DS.SizeTokens.icon))
-                        .foregroundStyle(KanseiPalette.ambient)
-                        .frame(width: DS.SizeTokens.iconColumn)
+                        .font(.system(size: TokensSize.icon))
+                        .foregroundStyle(TokensPalette.ambient)
+                        .frame(width: TokensSize.iconColumn)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("检测 ID")
-                            .font(DS.Typo.body)
-                            .foregroundStyle(KanseiPalette.primary)
+                            .font(TokensTypo.body)
+                            .foregroundStyle(TokensPalette.primary)
                         Text(cid)
                             .font(.system(size: 15, design: .monospaced))
-                            .foregroundStyle(KanseiPalette.secondary)
+                            .foregroundStyle(TokensPalette.secondary)
                             .lineLimit(2)
                     }
-                    Spacer(minLength: DS.Space.sm)
+                    Spacer(minLength: TokensSpacing.sm)
                     Image(systemName: "doc.on.doc")
                         .font(.system(size: 15))
-                        .foregroundStyle(KanseiPalette.ambient)
+                        .foregroundStyle(TokensPalette.ambient)
                 }
-                .frame(minHeight: DS.Space.row)
+                .frame(minHeight: TokensSpacing.row)
                 .contentShape(Rectangle())
             }
             .buttonStyle(DSRowButtonStyle())
@@ -285,10 +285,10 @@ struct HealthView: View {
 
     private func scoreColor(_ pct: Int) -> Color {
         switch pct {
-        case 0...39:  return KanseiPalette.error
-        case 40...69: return KanseiPalette.warning
-        case 70...89: return KanseiPalette.info
-        default:      return KanseiPalette.success
+        case 0...39:  return TokensPalette.error
+        case 40...69: return TokensPalette.warning
+        case 70...89: return TokensPalette.info
+        default:      return TokensPalette.success
         }
     }
 
@@ -346,11 +346,11 @@ struct HealthView: View {
     // MARK: - 交互
 
     private func toggle(_ name: String) {
-        withAnimation(KanseiMotion.count) {
+        withAnimation(TokensMotion.count) {
             if expandedSystems.contains(name) { expandedSystems.remove(name) }
             else { expandedSystems.insert(name) }
         }
-        DSHaptic.select()
+        TokensHaptic.select()
     }
 
     // MARK: - 数据

@@ -32,222 +32,9 @@ extension UIColor {
     }
 }
 
+/// 设计系统组件（DSCard / DSRow / DSTile / DSSkeleton …）。
+/// 令牌（颜色 / 字体 / 间距 / 圆角 / 动效 / 触觉）已全部合并到 `Tokens.swift`。
 enum DS {
-
-    // =========================================================================
-    // MARK: 1. 色彩（Palette）— 全部使用 iOS 系统色真值
-    // =========================================================================
-    enum Palette {
-        /// 页面画布：systemGroupedBackground（亮 #F2F2F7 / 暗 #000）
-        /// ⚠️ 值与小组件/实时活动共用同一份（WT.Palette）——
-        /// 见 Shared/WidgetTokens.swift 顶部：改一个数，App 与小组件同时改，不可能漂移。
-        static let canvas = WT.Palette.canvas
-
-        /// 一级分组表面：secondarySystemGroupedBackground（亮 #FFF / 暗 #1C1C1E）
-        /// 这是 iOS inset-grouped 的卡片面，和画布永远成对出现。
-        static let surface = WT.Palette.surface
-        /// 二级表面：tertiarySystemGroupedBackground（暗 #2C2C2E）
-        static let surfaceRaised = Color(uiColor: UIColor.tertiarySystemGroupedBackground)
-        /// 下沉表面：输入框、分段控件底、进度槽
-        static let surfaceSunken = Color(uiColor: UIColor.tertiarySystemFill)
-
-        /// 发丝分隔线：UIColor.separator 的真值
-        /// 亮色 rgba(60,60,67,.29) / 暗色 rgba(84,84,88,.65)
-        static let hairline = WT.Palette.hairline
-        /// 不透明分隔线：UIColor.opaqueSeparator（亮 #C6C6C8 / 暗 #38383A）
-        static let hairlineStrong = Color(uiColor: UIColor.opaqueSeparator)
-        /// 光条 / 进度轨道（quarterLabel）
-        static let track = WT.Palette.track
-        /// 通用填充（图标底、层高块）
-        static let fill = Color(uiColor: UIColor.tertiarySystemFill)
-        static let fillSubtle = Color(uiColor: UIColor.quaternarySystemFill)
-
-        // ---- 文字：只有三档不透明度（label / 60% / 30%）----
-        static let label = WT.Palette.label
-        static let labelSecondary = WT.Palette.labelSecondary
-        static let labelTertiary = WT.Palette.labelTertiary
-        static let labelQuaternary = Color(uiColor: .quaternaryLabel)
-        static let labelOnTint = Color.white
-
-        // ---- 强调色（全局唯一）：iOS 系统蓝 ----
-        static let tint = WT.Palette.tint
-        static let tintSoft = Color(uiColor: UIColor.dsDynamic(
-            light: UIColor(red: 0.000, green: 0.478, blue: 1.000, alpha: 0.12),
-            dark: UIColor(red: 0.039, green: 0.518, blue: 1.000, alpha: 0.18)
-        ))
-
-        // ---- 语义状态色：唯一的"彩色"来源，全部系统色 ----
-        static let ok = WT.Palette.ok          // #34C759 / #30D158
-        static let warn = WT.Palette.warn      // #FF9500 / #FF9F0A
-        static let bad = WT.Palette.bad        // #FF3B30 / #FF453A
-        /// 充电 / 电驱状态（EV 语义，不等于 ok）
-        static let charge = WT.Palette.charge
-
-        // ---- 车灯光带用的渐变（白 → 浅蓝 → 系统蓝），只出现在"电量就是光"的地方 ----
-        static let lightBar = WT.Palette.lightBar
-
-        // ---- 兼容旧成员：现在是平坦画布（v4 只有一个画布，没有气氛渐变）----
-        static let canvasGradient = LinearGradient(
-            colors: [canvas, canvas], startPoint: .top, endPoint: .bottom
-        )
-        /// Hero 旧成员：不再是深色"驾驶舱"，回归分组表面（v4 没有 hero 卡片）
-        static let heroFill = LinearGradient(
-            colors: [surface, surface], startPoint: .topLeading, endPoint: .bottomTrailing
-        )
-        static let onHero = Color(uiColor: .label)
-        static let onHeroSecondary = Color(uiColor: .secondaryLabel)
-        static let onHeroTertiary = Color(uiColor: .tertiaryLabel)
-        static let onHeroLine = Color(uiColor: UIColor.separator)
-
-        /// 深色表面上的语义色版本（用在车灯/深色示意面上）
-        static func statusOnDark(_ cls: String) -> Color {
-            switch cls {
-            case "ok", "normal": return Color(red: 0.290, green: 0.851, blue: 0.392)
-            case "warn", "warning": return Color(red: 1.000, green: 0.722, blue: 0.192)
-            case "bad", "fault", "abnormal", "danger": return Color(red: 1.000, green: 0.380, blue: 0.341)
-            case "charge", "charging": return Color(red: 0.290, green: 0.898, blue: 0.831)
-            case "na": return Color.white.opacity(0.55)
-            default: return Color(red: 0.420, green: 0.651, blue: 1.000)
-            }
-        }
-
-        /// 状态字符串 → 颜色
-        static func status(_ cls: String) -> Color {
-            switch cls {
-            case "ok", "normal": return ok
-            case "warn", "warning": return warn
-            case "bad", "fault", "abnormal", "danger": return bad
-            case "charge", "charging": return charge
-            case "acc", "accent": return tint
-            default: return labelSecondary
-            }
-        }
-    }
-
-    // =========================================================================
-    // MARK: 2. 字体（Typo）— iOS 真实字号阶梯
-    // =========================================================================
-    enum Typo {
-        // ---- 仪表数字：超细字重 + 等宽数字（换数不跳动）----
-        /// 超大数字（首屏 SOC / 关键指标）：字重 100 是"仪器感"的来源
-        static func display(_ size: CGFloat = 72) -> Font {
-            .system(size: size, weight: .ultraLight).monospacedDigit()
-        }
-        /// 中等数字（页面头部大数值）
-        static func metric(_ size: CGFloat = 34) -> Font {
-            .system(size: size, weight: .light).monospacedDigit()
-        }
-        /// 行内数字（列表数值，iOS 正文尺寸）
-        static let data = Font.system(size: 17).monospacedDigit()
-        static let dataSmall = Font.system(size: 15).monospacedDigit()
-        /// 指定尺寸的等宽数字：图例、次要读数这类"比 dataSmall 还要小但必须等宽"的地方。
-        /// ⚠️ data / dataSmall 是**属性**（固定尺寸），digits 是**函数**（带尺寸参数）——
-        /// 写成 DS.Typo.data(13) 会编译报错（cannot call value of non-function type 'Font'）。
-        static func digits(_ size: CGFloat) -> Font {
-            .system(size: size).monospacedDigit()
-        }
-
-        // ---- 文本：系统语义样式 → 自动跟随 Dynamic Type ----
-        static let largeTitle = Font.largeTitle.weight(.bold)      // 34 / 700
-        static let title = Font.title.weight(.semibold)            // 28 / 600
-        static let title2 = Font.title2.weight(.semibold)          // 22 / 600
-        static let title3 = Font.title3.weight(.semibold)          // 20 / 600
-        static let headline = Font.headline                        // 17 / 600
-        static let body = Font.body                                // 17 / 400
-        static let callout = Font.callout                          // 16
-        static let subheadline = Font.subheadline                  // 15
-        static let footnote = Font.footnote                        // 13
-        static let caption = Font.caption                          // 12
-        static let caption2 = Font.caption2                        // 11
-
-        /// 分组标题（iOS 的 section header：13pt、二级灰、大写由视图层加）
-        static let sectionLabel = Font.footnote
-    }
-
-    // =========================================================================
-    // MARK: 3. 网格
-    // =========================================================================
-    enum Space {
-        static let xxs: CGFloat = 2
-        static let xs: CGFloat = 4
-        static let sm: CGFloat = 8
-        static let md: CGFloat = 12
-        static let lg: CGFloat = 16
-        static let xl: CGFloat = 20
-        static let xxl: CGFloat = 24
-        static let xxxl: CGFloat = 32
-        static let huge: CGFloat = 44
-
-        /// 页面左右边距（v4：20pt）
-        static let page: CGFloat = 20
-        /// 分组之间
-        static let gap: CGFloat = 26
-        /// 分组内部（inset-grouped 表面内边距）
-        static let cardPadding: CGFloat = 16
-        /// 行高（HIG 最小触控目标）
-        static let row: CGFloat = 44
-    }
-
-    // =========================================================================
-    // MARK: 4. 圆角（只有三档 + 胶囊）
-    // =========================================================================
-    /// 圆角令牌。`Tokens` 后缀是刻意保留的：通用词一旦成为嵌套类型名，就会在本作用域内
-    /// 遮蔽将来可能出现的同名 SDK 类型（`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
-    enum RadiusTokens {
-        static let small: CGFloat = 8     // 小控件、输入
-        static let card: CGFloat = 12     // inset-grouped 表面
-        static let hero: CGFloat = 20     // 弹层、大面板
-        static let capsule: CGFloat = 999
-    }
-
-    enum Hair {
-        /// 发丝线（iOS 分隔线厚度）
-        static let line: CGFloat = 0.5
-        static let border: CGFloat = 1
-        /// 分隔线内缩（与行内容左对齐）
-        static let inset: CGFloat = 16
-    }
-
-    // =========================================================================
-    // MARK: 5. 动效（只服务状态变化）
-    // =========================================================================
-    /// 动效令牌。`Tokens` 后缀是刻意保留的：通用词一旦成为嵌套类型名，就会在本作用域内
-    /// 遮蔽将来可能出现的同名 SDK 类型（`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
-    enum MotionTokens {
-        static let press = Animation.spring(response: 0.30, dampingFraction: 0.86)
-        static let value = Animation.spring(response: 0.36, dampingFraction: 0.88)
-        static let screen = Animation.spring(response: 0.42, dampingFraction: 0.90)
-        static let fade = Animation.easeOut(duration: 0.20)
-        /// 一次性绘制（光条从 0 长到位）
-        static let draw = Animation.easeOut(duration: 1.1)
-    }
-
-    // =========================================================================
-    // MARK: 6. 尺寸
-    // =========================================================================
-    /// 尺寸令牌。`Tokens` 后缀是刻意保留的：通用词一旦成为嵌套类型名，就会在本作用域内
-    /// 遮蔽将来可能出现的同名 SDK 类型（`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
-    enum SizeTokens {
-        static let tap: CGFloat = 44
-        /// 主按钮（iOS 实心胶囊）
-        static let button: CGFloat = 50
-        static let iconSm: CGFloat = 13
-        static let icon: CGFloat = 17
-        static let iconLg: CGFloat = 22
-        static let tileIcon: CGFloat = 22
-        /// 行内图标列宽（iOS 设置行）
-        static let iconColumn: CGFloat = 29
-        static let barHeight: CGFloat = 56
-    }
-
-    // =========================================================================
-    // MARK: 7. 阴影 —— v4 的内容层没有阴影（深度由系统表面色表达）
-    // =========================================================================
-    enum Elev {
-        static let card = Color.clear
-        static let cardFar = Color.clear
-        static let hero = Color.clear
-    }
 }
 
 // =============================================================================
@@ -264,7 +51,7 @@ struct DSCanvas<Content: View>: View {
 
     var body: some View {
         ZStack {
-            KanseiPalette.background.ignoresSafeArea()
+            TokensPalette.background.ignoresSafeArea()
             content()
         }
     }
@@ -283,8 +70,8 @@ struct DSCard<Content: View>: View {
     var hero: Bool
     var content: () -> Content
 
-    init(padding: CGFloat = DS.Space.cardPadding,
-         radius: CGFloat = DS.RadiusTokens.card,
+    init(padding: CGFloat = TokensSpacing.md,
+         radius: CGFloat = TokensRadius.medium,
          glass: Bool = false,
          hero: Bool = false,
          @ViewBuilder content: @escaping () -> Content) {
@@ -301,7 +88,7 @@ struct DSCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(KanseiPalette.nightSurface)
+                    .fill(TokensPalette.nightSurface)
             }
     }
 }
@@ -311,7 +98,7 @@ struct DSCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(configuration.isPressed ? 0.55 : 1)
-            .animation(DS.MotionTokens.press, value: configuration.isPressed)
+            .animation(TokensMotion.press, value: configuration.isPressed)
     }
 }
 
@@ -324,15 +111,15 @@ struct DSDivider: View {
     var inset: CGFloat = 0
     var body: some View {
         Rectangle()
-            .fill(KanseiPalette.glassBorder)
-            .frame(height: DS.Hair.line)
+            .fill(TokensPalette.glassBorder)
+            .frame(height: TokensHair.line)
             .padding(.leading, inset)
     }
 }
 
 /// 行内分隔线（内缩 16，与 DSRow 的内容左对齐）
 struct DSSeparator: View {
-    var inset: CGFloat = DS.Hair.inset
+    var inset: CGFloat = TokensHair.inset
     var body: some View {
         DSDivider(inset: inset)
     }
@@ -360,15 +147,15 @@ struct DSGroup<Content: View>: View {
             }
             VStack(spacing: 0) { content() }
                 .background {
-                    RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
-                        .fill(KanseiPalette.nightSurface)
+                    RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                        .fill(TokensPalette.nightSurface)
                 }
                 // 裁剪掉圆角：行的按压底色是矩形，不裁会在分组四角露出方角
-                .clipShape(RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous))
             if let footer {
                 Text(footer)
-                    .font(DS.Typo.footnote)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6)
             }
@@ -386,9 +173,9 @@ struct DSGroupRow<Content: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             content()
-                .padding(.horizontal, DS.Space.cardPadding)
+                .padding(.horizontal, TokensSpacing.md)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(minHeight: DS.Space.row)
+                .frame(minHeight: TokensSpacing.row)
             if showsSeparator { DSSeparator(inset: separatorInset) }
         }
     }
@@ -403,19 +190,19 @@ struct DSKeyValueRow: View {
     var mono: Bool = true
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: DS.Space.md) {
+        HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.md) {
             Text(key)
-                .font(DS.Typo.subheadline)
-                .foregroundStyle(KanseiPalette.primary)
+                .font(TokensTypo.subheadline)
+                .foregroundStyle(TokensPalette.primary)
                 .lineLimit(2)
-            Spacer(minLength: DS.Space.sm)
+            Spacer(minLength: TokensSpacing.sm)
             Text(value)
-                .font(mono ? DS.Typo.dataSmall : DS.Typo.subheadline)
-                .foregroundStyle(valueCls == "na" ? KanseiPalette.secondary : KanseiPalette.statusColor(valueCls))
+                .font(mono ? TokensTypo.dataSmall : TokensTypo.subheadline)
+                .foregroundStyle(valueCls == "na" ? TokensPalette.secondary : TokensPalette.statusColor(valueCls))
                 .multilineTextAlignment(.trailing)
                 .layoutPriority(1)
         }
-        .frame(minHeight: DS.Space.row)
+        .frame(minHeight: TokensSpacing.row)
         .accessibilityElement(children: .combine)
     }
 }
@@ -433,20 +220,20 @@ struct DSSectionHeader: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title.uppercased())
-                .font(DS.Typo.footnote)
+                .font(TokensTypo.footnote)
                 .tracking(0.2)
-                .foregroundStyle(KanseiPalette.secondary)
-            Spacer(minLength: DS.Space.sm)
+                .foregroundStyle(TokensPalette.secondary)
+            Spacer(minLength: TokensSpacing.sm)
             if let trailing {
                 if let action {
                     Button(trailing, action: action)
-                        .font(DS.Typo.footnote)
-                        .foregroundStyle(KanseiPalette.ambient)
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.ambient)
                         .buttonStyle(.plain)
                 } else {
                     Text(trailing)
-                        .font(DS.Typo.footnote)
-                        .foregroundStyle(KanseiPalette.tertiary)
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.tertiary)
                 }
             }
         }
@@ -460,14 +247,14 @@ struct DSBigNumber: View {
     var unit: String? = nil
     var caption: String? = nil
     var size: CGFloat = 96
-    var tint: Color = KanseiPalette.primary
+    var tint: Color = TokensPalette.primary
     var alignment: HorizontalAlignment = .leading
 
     var body: some View {
         VStack(alignment: alignment, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
-                    .font(DS.Typo.display(size))
+                    .font(TokensTypo.display(size))
                     .tracking(-size * 0.035)
                     .foregroundStyle(tint)
                     .contentTransition(.numericText())
@@ -475,14 +262,14 @@ struct DSBigNumber: View {
                     .minimumScaleFactor(0.6)
                 if let unit {
                     Text(unit)
-                        .font(DS.Typo.metric(size * 0.30))
-                        .foregroundStyle(KanseiPalette.secondary)
+                        .font(TokensTypo.metric(size * 0.30))
+                        .foregroundStyle(TokensPalette.secondary)
                 }
             }
             if let caption {
                 Text(caption)
-                    .font(DS.Typo.footnote)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -495,7 +282,7 @@ struct DSMetric: View {
     var unit: String? = nil
     var caption: String? = nil
     var size: CGFloat = 72
-    var tint: Color = KanseiPalette.primary
+    var tint: Color = TokensPalette.primary
     var alignment: HorizontalAlignment = .leading
 
     var body: some View {
@@ -519,17 +306,17 @@ struct DSLightBar: View {
             let w = geo.size.width * revealed
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(DS.Palette.track)
+                    .fill(TokensPalette.track)
                     .frame(height: height)
                 if showsGlow && w > 1 {
                     Capsule()
-                        .fill(tint ?? DS.Palette.lightBar)
+                        .fill(tint ?? TokensPalette.lightBar)
                         .frame(width: w, height: height)
                         .blur(radius: 9)
                         .opacity(0.75)
                 }
                 Capsule()
-                    .fill(tint ?? DS.Palette.lightBar)
+                    .fill(tint ?? TokensPalette.lightBar)
                     .frame(width: w, height: height)
             }
             .frame(height: height)
@@ -537,10 +324,10 @@ struct DSLightBar: View {
         }
         .frame(height: height)
         .onAppear {
-            withAnimation(DS.MotionTokens.draw) { revealed = clamped }
+            withAnimation(TokensMotion.draw) { revealed = clamped }
         }
         .onChange(of: clamped) { _, newValue in
-            withAnimation(DS.MotionTokens.value) { revealed = newValue }
+            withAnimation(TokensMotion.value) { revealed = newValue }
         }
         .accessibilityElement()
         .accessibilityLabel(Text("电量比例"))
@@ -571,8 +358,8 @@ struct DSStatStrip: View {
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
                 if idx > 0 {
                     Rectangle()
-                        .fill(KanseiPalette.glassBorder)
-                        .frame(width: DS.Hair.line)
+                        .fill(TokensPalette.glassBorder)
+                        .frame(width: TokensHair.line)
                         .frame(maxHeight: .infinity)
                 }
                 VStack(alignment: .leading, spacing: 5) {
@@ -584,11 +371,11 @@ struct DSStatStrip: View {
                         Text(item.label)
                             .lineLimit(1)
                     }
-                    .font(DS.Typo.caption)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.secondary)
                     Text(item.value)
-                        .font(DS.Typo.data)
-                        .foregroundStyle(item.cls == "na" ? KanseiPalette.primary : KanseiPalette.statusColor(item.cls))
+                        .font(TokensTypo.data)
+                        .foregroundStyle(item.cls == "na" ? TokensPalette.primary : TokensPalette.statusColor(item.cls))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
@@ -608,7 +395,7 @@ struct DSChip: View {
     var cls: String = "na"
     var icon: String? = nil
 
-    private var color: Color { KanseiPalette.statusColor(cls) }
+    private var color: Color { TokensPalette.statusColor(cls) }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -622,8 +409,8 @@ struct DSChip: View {
                     .frame(width: 6, height: 6)
             }
             Text(text)
-                .font(DS.Typo.footnote)
-                .foregroundStyle(cls == "na" ? KanseiPalette.secondary : color)
+                .font(TokensTypo.footnote)
+                .foregroundStyle(cls == "na" ? TokensPalette.secondary : color)
                 .lineLimit(1)
         }
         .accessibilityElement(children: .combine)
@@ -638,23 +425,23 @@ struct DSStatRow: View {
     var icon: String? = nil
 
     var body: some View {
-        HStack(spacing: DS.Space.sm) {
+        HStack(spacing: TokensSpacing.sm) {
             if let icon {
                 Image(safeSymbol: icon, fallback: "circle")
-                    .font(.system(size: DS.SizeTokens.iconSm))
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(.system(size: TokensSize.iconSm))
+                    .foregroundStyle(TokensPalette.secondary)
                     .frame(width: 20)
             }
             Text(label)
-                .font(DS.Typo.body)
-                .foregroundStyle(KanseiPalette.primary)
-            Spacer(minLength: DS.Space.md)
+                .font(TokensTypo.body)
+                .foregroundStyle(TokensPalette.primary)
+            Spacer(minLength: TokensSpacing.md)
             Text(value)
-                .font(DS.Typo.data)
-                .foregroundStyle(valueCls == "na" ? KanseiPalette.secondary : KanseiPalette.statusColor(valueCls))
+                .font(TokensTypo.data)
+                .foregroundStyle(valueCls == "na" ? TokensPalette.secondary : TokensPalette.statusColor(valueCls))
                 .multilineTextAlignment(.trailing)
         }
-        .frame(minHeight: DS.Space.row)
+        .frame(minHeight: TokensSpacing.row)
         .accessibilityElement(children: .combine)
     }
 }
@@ -671,15 +458,15 @@ struct DSStatTile: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
-                    .font(DS.Typo.metric(28))
-                    .foregroundStyle(cls == "na" ? KanseiPalette.primary : KanseiPalette.statusColor(cls))
+                    .font(TokensTypo.metric(28))
+                    .foregroundStyle(cls == "na" ? TokensPalette.primary : TokensPalette.statusColor(cls))
                     .contentTransition(.numericText())
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 if let unit {
                     Text(unit)
-                        .font(DS.Typo.caption)
-                        .foregroundStyle(KanseiPalette.secondary)
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.secondary)
                 }
             }
             HStack(spacing: 4) {
@@ -690,8 +477,8 @@ struct DSStatTile: View {
                 Text(label)
                     .lineLimit(1)
             }
-            .font(DS.Typo.caption)
-            .foregroundStyle(KanseiPalette.secondary)
+            .font(TokensTypo.caption)
+            .foregroundStyle(TokensPalette.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -719,38 +506,38 @@ struct DSRow: View {
     }
 
     private var rowContent: some View {
-        HStack(spacing: DS.Space.md) {
+        HStack(spacing: TokensSpacing.md) {
             if let icon {
                 Image(safeSymbol: icon, fallback: "circle")
-                    .font(.system(size: DS.SizeTokens.icon))
-                    .foregroundStyle(KanseiPalette.ambient)
-                    .frame(width: DS.SizeTokens.iconColumn, alignment: .center)
+                    .font(.system(size: TokensSize.icon))
+                    .foregroundStyle(TokensPalette.ambient)
+                    .frame(width: TokensSize.iconColumn, alignment: .center)
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(DS.Typo.body)
-                    .foregroundStyle(KanseiPalette.primary)
+                    .font(TokensTypo.body)
+                    .foregroundStyle(TokensPalette.primary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(DS.Typo.footnote)
-                        .foregroundStyle(KanseiPalette.secondary)
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.secondary)
                         .lineLimit(2)
                 }
             }
-            Spacer(minLength: DS.Space.sm)
+            Spacer(minLength: TokensSpacing.sm)
             if let value {
                 Text(value)
-                    .font(DS.Typo.data)
-                    .foregroundStyle(valueCls == "na" ? KanseiPalette.secondary : KanseiPalette.statusColor(valueCls))
+                    .font(TokensTypo.data)
+                    .foregroundStyle(valueCls == "na" ? TokensPalette.secondary : TokensPalette.statusColor(valueCls))
                     .multilineTextAlignment(.trailing)
             }
             if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(KanseiPalette.tertiary)
+                    .foregroundStyle(TokensPalette.tertiary)
             }
         }
-        .frame(minHeight: DS.Space.row)
+        .frame(minHeight: TokensSpacing.row)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
@@ -759,8 +546,8 @@ struct DSRow: View {
 struct DSRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(configuration.isPressed ? KanseiPalette.fillSubtle : Color.clear)
-            .animation(DS.MotionTokens.press, value: configuration.isPressed)
+            .background(configuration.isPressed ? TokensPalette.fillSubtle : Color.clear)
+            .animation(TokensMotion.press, value: configuration.isPressed)
     }
 }
 
@@ -776,15 +563,15 @@ struct DSTile: View {
     var action: () -> Void
 
     private var accent: Color {
-        isActive ? KanseiPalette.statusColor(cls) : KanseiPalette.primary
+        isActive ? TokensPalette.statusColor(cls) : TokensPalette.primary
     }
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: DS.Space.sm) {
+            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
                 HStack(alignment: .center) {
                     Image(safeSymbol: icon, fallback: "circle")
-                        .font(.system(size: DS.SizeTokens.tileIcon, weight: .regular))
+                        .font(.system(size: TokensSize.tileIcon, weight: .regular))
                         .foregroundStyle(accent)
                     Spacer(minLength: 0)
                     if isLoading {
@@ -792,23 +579,23 @@ struct DSTile: View {
                     }
                 }
                 Text(title)
-                    .font(DS.Typo.body)
+                    .font(TokensTypo.body)
                     .foregroundStyle(accent)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 if let subtitle {
                     Text(subtitle)
-                        .font(DS.Typo.footnote)
-                        .foregroundStyle(KanseiPalette.secondary)
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.secondary)
                         .lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(DS.Space.lg)
+            .padding(TokensSpacing.lg)
             .frame(minHeight: 84, alignment: .topLeading)
             .background {
-                RoundedRectangle(cornerRadius: DS.RadiusTokens.card, style: .continuous)
-                    .fill(KanseiPalette.nightSurface)
+                RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                    .fill(TokensPalette.nightSurface)
             }
         }
         .buttonStyle(DSCardButtonStyle())
@@ -819,18 +606,18 @@ struct DSTile: View {
 
 /// 主操作按钮（一屏最多一个）：实心胶囊
 struct DSPrimaryButtonStyle: ButtonStyle {
-    var tint: Color = KanseiPalette.ambient
+    var tint: Color = TokensPalette.ambient
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(DS.Typo.headline)
-            .foregroundStyle(DS.Palette.labelOnTint)
+            .font(TokensTypo.headline)
+            .foregroundStyle(TokensPalette.labelOnTint)
             .frame(maxWidth: .infinity)
-            .frame(height: DS.SizeTokens.button)
+            .frame(height: TokensSize.button)
             .background(Capsule().fill(tint))
             .opacity(configuration.isPressed ? 0.82 : 1)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .animation(DS.MotionTokens.press, value: configuration.isPressed)
+            .animation(TokensMotion.press, value: configuration.isPressed)
     }
 }
 
@@ -838,29 +625,29 @@ struct DSPrimaryButtonStyle: ButtonStyle {
 struct DSSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(DS.Typo.headline)
-            .foregroundStyle(KanseiPalette.primary)
+            .font(TokensTypo.headline)
+            .foregroundStyle(TokensPalette.primary)
             .frame(maxWidth: .infinity)
-            .frame(height: DS.SizeTokens.button)
-            .background(Capsule().fill(KanseiPalette.glassLight))
+            .frame(height: TokensSize.button)
+            .background(Capsule().fill(TokensPalette.glassLight))
             .opacity(configuration.isPressed ? 0.65 : 1)
-            .animation(DS.MotionTokens.press, value: configuration.isPressed)
+            .animation(TokensMotion.press, value: configuration.isPressed)
     }
 }
 
 /// 图标按钮（导航栏、行尾）
 struct DSIconButtonStyle: ButtonStyle {
-    var size: CGFloat = DS.SizeTokens.tap
-    var tint: Color = KanseiPalette.primary
+    var size: CGFloat = TokensSize.tap
+    var tint: Color = TokensPalette.primary
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: DS.SizeTokens.iconLg))
+            .font(.system(size: TokensSize.iconLg))
             .foregroundStyle(tint)
             .frame(width: size, height: size)
-            .background(Circle().fill(configuration.isPressed ? KanseiPalette.glassLight : Color.clear))
+            .background(Circle().fill(configuration.isPressed ? TokensPalette.glassLight : Color.clear))
             .contentShape(Circle())
-            .animation(DS.MotionTokens.press, value: configuration.isPressed)
+            .animation(TokensMotion.press, value: configuration.isPressed)
     }
 }
 
@@ -874,17 +661,17 @@ struct DSSegmented<T: Hashable>: View {
             ForEach(Array(options.enumerated()), id: \.offset) { _, option in
                 let selected = option.value == selection
                 Button {
-                    withAnimation(DS.MotionTokens.value) { selection = option.value }
+                    withAnimation(TokensMotion.value) { selection = option.value }
                 } label: {
                     Text(option.title)
-                        .font(DS.Typo.subheadline.weight(selected ? .semibold : .regular))
-                        .foregroundStyle(KanseiPalette.primary)
+                        .font(TokensTypo.subheadline.weight(selected ? .semibold : .regular))
+                        .foregroundStyle(TokensPalette.primary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 32)
                         .background {
                             if selected {
                                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                    .fill(KanseiPalette.nightSurface)
+                                    .fill(TokensPalette.nightSurface)
                                     .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
                             }
                         }
@@ -894,7 +681,7 @@ struct DSSegmented<T: Hashable>: View {
             }
         }
         .padding(2)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(KanseiPalette.glassLight))
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(TokensPalette.glassLight))
     }
 }
 
@@ -926,26 +713,26 @@ struct DSNotice: View {
     var action: (title: String, run: () -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: DS.Space.sm) {
+        HStack(spacing: TokensSpacing.sm) {
             Image(safeSymbol: kind.icon, fallback: "info.circle.fill")
                 .font(.system(size: 15))
-                .foregroundStyle(KanseiPalette.statusColor(kind.cls))
+                .foregroundStyle(TokensPalette.statusColor(kind.cls))
             Text(text)
-                .font(DS.Typo.footnote)
-                .foregroundStyle(KanseiPalette.primary)
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.primary)
                 .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: DS.Space.sm)
+            Spacer(minLength: TokensSpacing.sm)
             if let action {
                 Button(action.title, action: action.run)
-                    .font(DS.Typo.footnote.weight(.semibold))
-                    .foregroundStyle(KanseiPalette.ambient)
+                    .font(TokensTypo.footnote.weight(.semibold))
+                    .foregroundStyle(TokensPalette.ambient)
                     .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, DS.Space.md)
-        .padding(.vertical, DS.Space.sm)
-        .background(RoundedRectangle(cornerRadius: DS.RadiusTokens.small, style: .continuous)
-            .fill(KanseiPalette.nightSurface))
+        .padding(.horizontal, TokensSpacing.md)
+        .padding(.vertical, TokensSpacing.sm)
+        .background(RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
+            .fill(TokensPalette.nightSurface))
         .accessibilityElement(children: .combine)
     }
 }
@@ -960,18 +747,18 @@ struct DSPlaceholder: View {
     var action: (() -> Void)? = nil
 
     var body: some View {
-        VStack(spacing: DS.Space.md) {
+        VStack(spacing: TokensSpacing.md) {
             Image(safeSymbol: icon, fallback: "questionmark.circle")
                 .font(.system(size: 40, weight: .light))
-                .foregroundStyle(cls == "na" ? KanseiPalette.tertiary : KanseiPalette.statusColor(cls))
+                .foregroundStyle(cls == "na" ? TokensPalette.tertiary : TokensPalette.statusColor(cls))
             Text(title)
-                .font(DS.Typo.headline)
-                .foregroundStyle(KanseiPalette.primary)
+                .font(TokensTypo.headline)
+                .foregroundStyle(TokensPalette.primary)
                 .multilineTextAlignment(.center)
             if let message {
                 Text(message)
-                    .font(DS.Typo.footnote)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -981,8 +768,8 @@ struct DSPlaceholder: View {
                     .frame(maxWidth: 220)
             }
         }
-        .padding(.vertical, DS.Space.xxxl)
-        .padding(.horizontal, DS.Space.xl)
+        .padding(.vertical, TokensSpacing.xxxl)
+        .padding(.horizontal, TokensSpacing.xl)
         .frame(maxWidth: .infinity)
     }
 }
@@ -993,8 +780,8 @@ struct DSSkeleton: View {
     var width: CGFloat? = nil
 
     var body: some View {
-        RoundedRectangle(cornerRadius: DS.RadiusTokens.small, style: .continuous)
-            .fill(KanseiPalette.fillSubtle)
+        RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
+            .fill(TokensPalette.fillSubtle)
             .frame(width: width, height: height)
             .accessibilityHidden(true)
     }
@@ -1011,8 +798,8 @@ struct DSSkeleton: View {
 
 extension View {
     /// 分组表面外观
-    func dsSurface(padding: CGFloat = DS.Space.cardPadding,
-                   radius: CGFloat = DS.RadiusTokens.card,
+    func dsSurface(padding: CGFloat = TokensSpacing.md,
+                   radius: CGFloat = TokensRadius.medium,
                    glass: Bool = false) -> some View {
         modifier(DSSurfaceModifier(padding: padding, radius: radius, glass: glass))
     }
@@ -1029,15 +816,8 @@ struct DSSurfaceModifier: ViewModifier {
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .fill(glass ? AnyShapeStyle(.ultraThinMaterial)
-                                : AnyShapeStyle(DS.Palette.surface))
+                                : AnyShapeStyle(TokensPalette.surface))
             }
     }
-}
-
-enum DSHaptic {
-    static func tap() { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-    static func result(_ success: Bool) { 
-    UINotificationFeedbackGenerator().notificationOccurred(success ? .success : .error) }
-    static func select() { UISelectionFeedbackGenerator().selectionChanged() }
 }
 

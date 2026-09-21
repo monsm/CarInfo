@@ -17,10 +17,10 @@ struct OrbitNav: View {
         HStack(spacing: 0) {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 Button {
-                    withAnimation(KanseiMotion.tap) {
+                    withAnimation(TokensMotion.tap) {
                         selected = index
                     }
-                    KanseiHaptic.select()
+                    TokensHaptic.select()
                 } label: {
                     OrbitNavItemView(
                         item: item,
@@ -31,13 +31,13 @@ struct OrbitNav: View {
 
                 if index < items.count - 1 {
                     Rectangle()
-                        .fill(KanseiPalette.glassBorder)
+                        .fill(TokensPalette.glassBorder)
                         .frame(width: 0.5, height: 24)
                 }
             }
         }
-        .padding(.horizontal, KanseiSpacing.sm)
-        .padding(.vertical, KanseiSpacing.sm)
+        .padding(.horizontal, TokensSpacing.sm)
+        .padding(.vertical, TokensSpacing.sm)
         .background(
             Material.thickMaterial
                 .blendMode(.overlay)
@@ -55,30 +55,30 @@ struct OrbitNavItemView: View {
     let isSelected: Bool
 
     var body: some View {
-        VStack(spacing: KanseiSpacing.xs) {
+        VStack(spacing: TokensSpacing.xs) {
             ZStack {
                 Image(systemName: isSelected ? (item.activeIcon ?? item.icon) : item.icon)
                     .font(.system(size: 22, weight: isSelected ? .medium : .regular))
-                    .foregroundColor(isSelected ? KanseiPalette.ambient : KanseiPalette.tertiary)
+                    .foregroundColor(isSelected ? TokensPalette.ambient : TokensPalette.tertiary)
 
                 if let badge = item.badge {
                     Text(badge)
-                        .font(KanseiTypo.micro)
+                        .font(TokensTypo.micro)
                         .foregroundColor(.white)
                         .frame(width: 16, height: 16)
-                        .background(KanseiPalette.error)
+                        .background(TokensPalette.error)
                         .clipShape(Circle())
                         .position(x: 18, y: -2)
                 }
             }
 
             Text(item.label)
-                .font(KanseiTypo.micro)
-                .foregroundColor(isSelected ? KanseiPalette.ambient : KanseiPalette.tertiary)
+                .font(TokensTypo.micro)
+                .foregroundColor(isSelected ? TokensPalette.ambient : TokensPalette.tertiary)
 
             if isSelected {
                 Capsule()
-                    .fill(KanseiPalette.ambient)
+                    .fill(TokensPalette.ambient)
                     .frame(width: 4, height: 4)
             }
         }

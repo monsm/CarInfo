@@ -46,7 +46,7 @@ struct DataView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: DS.Space.gap) {
+            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
                 if loading {
                     loadingState
                 } else if blocks.isEmpty {
@@ -67,23 +67,23 @@ struct DataView: View {
                         blockView(b, isFirst: idx == 0)
                     }
                     Text(footerText)
-                        .font(DS.Typo.footnote)
-                        .foregroundStyle(KanseiPalette.tertiary)
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, DS.Hair.inset)
+                        .padding(.horizontal, TokensHair.inset)
                 }
             }
-            .padding(.top, DS.Space.sm)
-            .padding(.bottom, DS.Space.xxxl)
+            .padding(.top, TokensSpacing.sm)
+            .padding(.bottom, TokensSpacing.xxxl)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .navigationTitle("全量数据")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { kindMenu }
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: DS.Space.lg) {
+                HStack(spacing: TokensSpacing.lg) {
                     Button { copyAll() } label: { Image(systemName: "doc.on.doc") }
                         .accessibilityLabel(Text("复制全部数据"))
                     Button { reload() } label: { Image(systemName: "arrow.clockwise") }
@@ -122,11 +122,11 @@ struct DataView: View {
         } label: {
             HStack(spacing: 4) {
                 Text(kind.title)
-                    .font(DS.Typo.subheadline.weight(.semibold))
+                    .font(TokensTypo.subheadline.weight(.semibold))
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 10, weight: .semibold))
             }
-            .foregroundStyle(KanseiPalette.ambient)
+            .foregroundStyle(TokensPalette.ambient)
         }
         .accessibilityLabel(Text("数据分类：\(kind.title)"))
     }
@@ -134,12 +134,12 @@ struct DataView: View {
     // MARK: - 状态
 
     private var loadingState: some View {
-        VStack(alignment: .leading, spacing: DS.Space.md) {
-            HStack(spacing: DS.Space.sm) {
+        VStack(alignment: .leading, spacing: TokensSpacing.md) {
+            HStack(spacing: TokensSpacing.sm) {
                 ProgressView().controlSize(.small)
                 Text("正在整理 \(kind.title)…")
-                    .font(DS.Typo.footnote)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
             }
             DSSkeleton(height: 44)
             DSSkeleton(height: 132)
@@ -184,15 +184,15 @@ struct DataView: View {
         return VStack(alignment: .leading, spacing: 0) {
             DSSectionHeader(title: b.h)
             Text(headline.isEmpty ? "—" : headline)
-                .font(DS.Typo.title2)
-                .foregroundStyle(KanseiPalette.primary)
+                .font(TokensTypo.title2)
+                .foregroundStyle(TokensPalette.primary)
                 .fixedSize(horizontal: false, vertical: true)
             if !detail.isEmpty {
                 Text(detail)
-                    .font(DS.Typo.subheadline)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.subheadline)
+                    .foregroundStyle(TokensPalette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, DS.Space.xs)
+                    .padding(.top, TokensSpacing.xs)
             }
         }
         .accessibilityElement(children: .combine)
@@ -439,7 +439,7 @@ struct DataView: View {
 
     private func copyAll() {
         UIPasteboard.general.string = shareText
-        DSHaptic.result(true)
+        TokensHaptic.result(true)
         ToastManager.shared.show("数据已复制", icon: "doc.on.doc.fill")
     }
 

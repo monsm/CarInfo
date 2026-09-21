@@ -55,220 +55,9 @@ extension Color {
 }
 
 enum Theme {
-    // MARK: - 颜色别名（兼容旧代码 Theme.Colors.*）
-    enum Colors {
-        static var accent: Color { KanseiPalette.ambient }
-        static var brand: Color { KanseiPalette.ambient }
-        static var brandLight: Color { KanseiPalette.ambient }
-        static var brandDark: Color { KanseiPalette.ambient }
-        static var background: Color { ColorSystem.background }
-        static var cardBg: Color { ColorSystem.cardBg }
-        static var primary: Color { ColorSystem.primary }
-        static var secondary: Color { ColorSystem.secondary }
-        static var tertiary: Color { ColorSystem.tertiary }
-        static var border: Color { ColorSystem.border }
-        static var fill: Color { ColorSystem.fill }
-        static var ok: Color { KanseiPalette.success }
-        static var warn: Color { KanseiPalette.warning }
-        static var bad: Color { KanseiPalette.error }
-        static var tint: Color { KanseiPalette.ambient }
-        static var charge: Color { KanseiPalette.info }
-    }
-
-    // MARK: - 品牌色（自适应浅色/深色模式）
-
-    /// 主色调：全 App 只有一个强调色（KanseiPalette.ambient）。
-    /// 各页面不设自己的色相，页面之间的差异由排版与内容表达。
-    static var brand: Color { KanseiPalette.ambient }
-    static var brandLight: Color { KanseiPalette.ambient }
-    static var brandDark: Color { KanseiPalette.ambient }
-
-    // MARK: - 语义色（全局唯一来源：DS.Palette）
-    static var ok: Color { KanseiPalette.success }
-    static var warn: Color { KanseiPalette.warning }
-    static var bad: Color { KanseiPalette.error }
-    static var charge: Color { KanseiPalette.info }
-    static var acc: Color { KanseiPalette.ambient }
-    static var na: Color { KanseiPalette.tertiary }
-
-    // MARK: - 状态 → 语义色
-    static func statusColor(_ cls: String) -> Color {
-        KanseiPalette.statusColor(cls)
-    }
-
-    // =============================================================================
-    // 一、字号体系（Typography Scale）— 适配 Dynamic Type
-    // =============================================================================
-    // 基准字号：17pt（iOS 标准正文）
-    // 比例：1.25（Major Third）
-    //
-    // Dynamic Type 策略：
-    //   • Hero 数字（d1~d5）：Fixed，不受字号缩放影响（仪表盘视觉完整性）
-    //   • 标题/正文：使用系统语义字体（.title/.headline/.body/.caption 等）
-    //     自动跟随系统字号设置，确保 accessibility 合规
-    //   • 等宽数字（mono/monoLg）：Fixed monospaced，保持数据对齐
-    //   • 辅助文字（footnote/micro）：使用系统语义样式，允许缩放
-
-    // ---- Hero 数字（固定大小，不参与 Dynamic Type 缩放）----
-    // 仪表盘大数字：无论用户是否开启大字体，始终保持视觉冲击力
-    // 全部数字改成「等宽数字 + 圆润字形」：换数时不再抖动，读数像仪表盘。
-    static var d1: Font { DS.Typo.display(72) }
-    static var d2: Font { DS.Typo.display(52) }
-    static var d3: Font { DS.Typo.metric(34) }
-    /// Hero 数字（行程/统计大数值）
-    static var heroNum: Font { DS.Typo.metric(22) }
-
-    static var d4: Font { DS.Typo.metric(26) }
-    static var d5: Font { DS.Typo.metric(20) }
-
-    // ---- 语义标题（跟随 Dynamic Type）----
-    static var h1: Font { .largeTitle }                                       // 页面大标题
-    static var h2: Font { .title }                                             // 卡片主标题
-    static var h3: Font { .title3 }                                            // 子标题 / 分组名
-    static var h4: Font { .headline }                                          // 微标题
-
-    // ---- 正文（跟随 Dynamic Type）----
-    static var body: Font { .body }                                            // 正文（基准）
-    static var bodySm: Font { .subheadline }                                   // 小正文
-    static var bodyMd: Font { .body }                                          // 中等正文
-    static var bodyLg: Font { .callout }                                       // 大正文
-
-    // ---- 辅助文字（跟随 Dynamic Type）----
-    static var caption: Font { .caption }                                      // 说明文字
-    static var captionBold: Font { .caption.bold() }                           // 说明文字（强调）
-    static var footnote: Font { .footnote }                                    // 脚注 / 时间戳
-    static var micro: Font { .caption2 }                                       // 超微文字
-
-    // ---- 数字专用（等宽数字，固定大小保持对齐）----
-    static var mono: Font { DS.Typo.dataSmall }
-    static var monoLg: Font { DS.Typo.data }
-
-    // ---- 其他固定 Hero 尺寸（不受 Dynamic Type 影响）----
-    static var d0: Font { DS.Typo.display(42) }    // 超大数字（AC 温度）
-    static var d0b: Font { DS.Typo.metric(28) }    // 地图坐标大数字
-
-    // =============================================================================
-    // Font 扩展：语义样式便捷方法
-    // =============================================================================
-    enum FontSize {
-        static var headline: Font { .headline.weight(.semibold) }
-        static var body: Font { .body }
-        static var subheadline: Font { .subheadline }
-        static var caption: Font { .caption }
-        static var footnote: Font { .footnote }
-    }
-
-    // =============================================================================
-    // 二、间距体系（Spacing Scale）
-    // =============================================================================
-    // 基准：4pt，所有间距为 4 的倍数
-    /// 间距令牌。`Tokens` 后缀是刻意保留的：通用词一旦成为嵌套类型名，就会在本作用域内
-    /// 遮蔽将来可能出现的同名 SDK 类型（`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
-    enum SpacingTokens {
-        static let xs: CGFloat = 4
-        static let sm: CGFloat = 8
-        static let md: CGFloat = 12
-        static let lg: CGFloat = 16
-        static let xl: CGFloat = 20
-        static let xxl: CGFloat = 24
-        static let xxxl: CGFloat = 32
-        static let hero: CGFloat = 40
-        static let page: CGFloat = DS.Space.page        // 页面水平内边距
-        static let cardSpacing: CGFloat = DS.Space.gap  // 卡片垂直间距
-        static let cardPadding: CGFloat = DS.Space.cardPadding // 卡片内边距
-        static let gridGap: CGFloat = DS.Space.md       // 网格间距
-    }
-
-    // =============================================================================
-    // 三、圆角体系（Corner Radius Scale）
-    // =============================================================================
-    /// 圆角令牌。`Tokens` 后缀是刻意保留的：通用词一旦成为嵌套类型名，就会在本作用域内
-    /// 遮蔽将来可能出现的同名 SDK 类型（`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
-    enum RadiusTokens {
-        // 全部对齐 DS 的三档圆角（10 / 18 / 26）：卡片圆角在全 App 只有这三档，
-        // 圆角档位一多，界面立刻显出「拼凑感」。
-        static let tiny: CGFloat = DS.RadiusTokens.small   // 图标按钮、tag
-        static let sm: CGFloat = DS.RadiusTokens.small     // tiny 别名
-        static let small: CGFloat = DS.RadiusTokens.small
-        static let medium: CGFloat = DS.RadiusTokens.card
-        static let large: CGFloat = DS.RadiusTokens.card
-        static let lg: CGFloat = DS.RadiusTokens.card
-        static let md: CGFloat = DS.RadiusTokens.card
-        static let card: CGFloat = DS.RadiusTokens.card
-        static let hero: CGFloat = DS.RadiusTokens.hero
-        static let ultra: CGFloat = DS.RadiusTokens.hero
-        static let full: CGFloat = 50   // 圆形元素
-    }
-
-    // =============================================================================
-    // 四、色彩体系（Color System）
-    // =============================================================================
-    enum ColorSystem {
-        // ---- 表面色（Surface）：来源统一为 DS.Palette，保证与 DS 组件同色 ----
-        static let background: Color = KanseiPalette.background
-        static let cardBg: Color = KanseiPalette.nightSurface
-        static let surfaceRaised: Color = KanseiPalette.nightSurface
-        static let overlay: Color = KanseiPalette.nightSurface
-        static let glass: Color = KanseiPalette.nightSurface   // 旧版的半透明页面底已取消，避免“满屏玻璃”
-
-        // ---- 文字色（Text）----
-        static let primary: Color = KanseiPalette.primary
-        static let secondary: Color = KanseiPalette.secondary
-        static let tertiary: Color = KanseiPalette.tertiary
-        static let quaternary: Color = KanseiPalette.tertiary.opacity(0.6)
-
-        // ---- 边框色（Border）：发丝线 ----
-        static let border: Color = KanseiPalette.glassBorder
-        static let borderSubtle: Color = KanseiPalette.glassBorder.opacity(0.6)
-
-        // ---- 填充色（Fill）----
-        static let fill: Color = KanseiPalette.nightSurface
-        static let fillSubtle: Color = KanseiPalette.glassLight
-        static let fillHighlighted: Color = KanseiPalette.nightSurface
-
-        // ---- 阴影色（Tesla 式：极弱，只用于“浮层”）----
-        static let shadowLight: Color = Color.black.opacity(0.05)
-        static let shadowMedium: Color = Color.black.opacity(0.08)
-        static let shadowStrong: Color = Color.black.opacity(0.12)
-    }
-
-    // =============================================================================
-    // 五、阴影体系（Shadow Scale）
-    // =============================================================================
-    /// 阴影令牌。`Tokens` 后缀是刻意保留的：通用词一旦成为嵌套类型名，就会在本作用域内
-    /// 遮蔽将来可能出现的同名 SDK 类型（`Kansei.Color` 事故的同款；scan/shadowguard.py --strict 拦这种形状）。
-    enum ShadowTokens {
-        // 新视觉里卡片靠发丝描边分层，阴影只给浮层用，且都压到极弱。
-        static let none: ShadowStyle = .init(color: .clear, radius: 0, x: 0, y: 0)
-        static let light = ShadowStyle(color: ColorSystem.shadowLight, radius: 4, x: 0, y: 1)
-        static let medium = ShadowStyle(color: ColorSystem.shadowMedium, radius: 10, x: 0, y: 3)
-        static let strong = ShadowStyle(color: ColorSystem.shadowStrong, radius: 18, x: 0, y: 6)
-    }
-
-    enum Spring {
-        static let responseBase: Double = 0.45
-        static let dampingFraction: Double = 0.8
-        static let duration: Double = 0.5
-        static var standard: Animation { Animation.spring(response: responseBase, dampingFraction: dampingFraction,
- blendDuration: duration) }
-        static var quick: Animation { Animation.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.25) }
-        static var slow: Animation { Animation.spring(response: 0.6, dampingFraction: 0.9, blendDuration: 0.5) }
-        static var smooth: Animation { Animation.easeInOut(duration: 0.35) }
-    }
-
-    // =============================================================================
-    // 六、动画时长（Animation Duration）
-    // =============================================================================
-    enum Duration {
-        static let instant: Double = 0.1
-        static let fast: Double = 0.2
-        static let normal: Double = 0.3
-        static let slow: Double = 0.5
-        // 动效曲线统一收敛到 DS.MotionTokens：反馈快、状态变化稳、不过冲。
-        static let springFast: Animation = DS.MotionTokens.press
-        static let springNormal: Animation = DS.MotionTokens.value
-        static let springSlow: Animation = DS.MotionTokens.screen
-    }
+    // 令牌已全部合并到 `Tokens.swift`：
+    //   TokensPalette / TokensTypo / TokensSpacing / TokensRadius / TokensMotion / TokensHaptic
+    // 这里只保留非令牌工具函数，见下方 extension：font(_:weight:design:) / lineHeight(_:)。
 }
 
 extension Theme {
@@ -276,9 +65,8 @@ extension Theme {
     static func font(_ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default) -> Font {
         .system(size: size, weight: weight, design: design)
     }
-    /// Overload accepting an already-constructed font (e.g. Theme.caption, Theme.subheadline)
+    /// Overload accepting an already-constructed font (e.g. TokensTypo.caption, TokensTypo.subheadline)
     static func font(_ f: Font) -> Font { f }
-    static var subheadline: Font { .subheadline }
 
     static func lineHeight(_ size: CGFloat) -> CGFloat {
         switch size {
@@ -290,34 +78,26 @@ extension Theme {
     }
 }
 
-// MARK: - 阴影样式
-struct ShadowStyle {
-    var color: Color
-    var radius: CGFloat
-    var x: CGFloat
-    var y: CGFloat
-}
-
 // MARK: - 页面底色：单一画布
 // 规则：背景只有一层中性画布色。层级由「表面色 + 发丝线 + 排版」表达，
 // 页面之间的差异也来自内容与排版，不来自背景本身。
 // MARK: - View Extensions：Apple Premium 组件
 extension View {
     // 页面底色 + 统一页面边距
-    // 刻意不接受任何颜色参数：页面底色只能是 KanseiPalette.background 这一层。
+    // 刻意不接受任何颜色参数：页面底色只能是 TokensPalette.background 这一层。
     func pageBackground() -> some View {
-        contentMargins(.horizontal, DS.Space.page, for: .scrollContent)
-            .background(DS.Palette.canvasGradient.ignoresSafeArea())
+        contentMargins(.horizontal, TokensSpacing.page, for: .scrollContent)
+            .background(TokensPalette.canvasGradient.ignoresSafeArea())
     }
 
     // MARK: - 卡片修饰符
     /// 液态玻璃卡片背景 + 高光描边
-    func glassCard(corner: CGFloat = Theme.RadiusTokens.card) -> some View {
+    func glassCard(corner: CGFloat = TokensRadius.medium) -> some View {
         self.modifier(GlassCardModifier(cornerRadius: corner, isHero: false))
     }
 
     /// Hero 级玻璃卡片（更大圆角 + 更强阴影）
-    func glassHeroCard(corner: CGFloat = Theme.RadiusTokens.hero) -> some View {
+    func glassHeroCard(corner: CGFloat = TokensRadius.large) -> some View {
         self.modifier(GlassCardModifier(cornerRadius: corner, isHero: true))
     }
 
@@ -341,7 +121,7 @@ struct GlassCardModifier: ViewModifier {
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     // 内容一律不透明（hero 也一样）：玻璃只允许出现在浮层。
-                    .fill(KanseiPalette.nightSurface)
+                    .fill(TokensPalette.nightSurface)
             }
             // v4：内容层没有描边、没有阴影 —— 深度只由系统表面色表达。
             // （它们曾经是“卡片感”的来源，也是界面显廉价的主因。）
@@ -355,7 +135,7 @@ struct StatusDot: View {
     var size: CGFloat = 8
     var body: some View {
         Circle()
-            .fill(Theme.statusColor(cls))
+            .fill(TokensPalette.statusColor(cls))
             .frame(width: size, height: size)
             .opacity(cls == "na" ? 0.35 : 1)
     }
@@ -380,11 +160,11 @@ struct KVRow: View {
     var strong: Bool = false
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Theme.SpacingTokens.md) {
+        HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.md) {
             Text(k)
-                .font(Theme.caption)
+                .font(TokensTypo.caption)
                 .foregroundStyle(.secondary)
-            Spacer(minLength: Theme.SpacingTokens.lg)
+            Spacer(minLength: TokensSpacing.lg)
             Text(v)
                 .font(Theme.font(14, weight: strong ? .semibold : .medium,
                                  design: mono ? .monospaced : .rounded))
@@ -401,24 +181,24 @@ struct CardBox<Content: View>: View {
     let title: String
     var side: String? = nil
     var sideCls: String = ""
-    var cornerRadius: CGFloat = Theme.RadiusTokens.card
+    var cornerRadius: CGFloat = TokensRadius.medium
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DS.Space.lg) {
+        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title.uppercased())
-                    .font(DS.Typo.sectionLabel)
+                    .font(TokensTypo.sectionLabel)
                     .tracking(0.6)
-                    .foregroundStyle(KanseiPalette.secondary)
-                Spacer(minLength: DS.Space.sm)
+                    .foregroundStyle(TokensPalette.secondary)
+                Spacer(minLength: TokensSpacing.sm)
                 if let side, !side.isEmpty {
                     DSChip(text: side, cls: sideCls.isEmpty ? "na" : sideCls)
                 }
             }
             content()
         }
-        .padding(DS.Space.cardPadding)
+        .padding(TokensSpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard(corner: cornerRadius)
     }
@@ -429,7 +209,7 @@ struct ExpandingCardBox<Content: View>: View {
     let title: String
     var side: String? = nil
     var sideCls: String = ""
-    var cornerRadius: CGFloat = Theme.RadiusTokens.card
+    var cornerRadius: CGFloat = TokensRadius.medium
     @ViewBuilder var content: () -> Content
 
     @State private var isExpanded = false
@@ -470,23 +250,23 @@ struct ExpandingCardBox<Content: View>: View {
             } label: {
                 // 标题行 = DS 的分组标题（小号、灰、加粗、字距微开），
                 // 不再用大号标题 + 旋转箭头：折叠区的标题应当比内容轻，而不是更重。
-                HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
+                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                     Text(title.uppercased())
-                        .font(DS.Typo.sectionLabel)
+                        .font(TokensTypo.sectionLabel)
                         .tracking(0.6)
-                        .foregroundStyle(KanseiPalette.secondary)
-                    Spacer(minLength: DS.Space.sm)
+                        .foregroundStyle(TokensPalette.secondary)
+                    Spacer(minLength: TokensSpacing.sm)
                     if let side, !side.isEmpty {
                         DSChip(text: side, cls: sideCls.isEmpty ? "na" : sideCls)
                     }
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(KanseiPalette.tertiary)
+                        .foregroundStyle(TokensPalette.tertiary)
                         .rotationEffect(isExpanded ? .degrees(180) : .degrees(0))
-                        .animation(DS.MotionTokens.press, value: isExpanded)
+                        .animation(TokensMotion.press, value: isExpanded)
                 }
-                .padding(.horizontal, DS.Space.cardPadding)
-                .padding(.vertical, DS.Space.lg)
+                .padding(.horizontal, TokensSpacing.md)
+                .padding(.vertical, TokensSpacing.lg)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -495,14 +275,14 @@ struct ExpandingCardBox<Content: View>: View {
             // ── 内容区（弹簧高度过渡）──
             if isExpanded {
                 content()
-                    .padding(.horizontal, Theme.SpacingTokens.xl)
-                    .padding(.bottom, Theme.SpacingTokens.lg)
+                    .padding(.horizontal, TokensSpacing.xl)
+                    .padding(.bottom, TokensSpacing.lg)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .overlay(alignment: .topLeading) {
                         Rectangle()
                             .fill(Color.secondary.opacity(0.12))
                             .frame(height: 1)
-                            .padding(.horizontal, -Theme.SpacingTokens.xl)
+                            .padding(.horizontal, -TokensSpacing.xl)
                     }
             }
         }
@@ -680,7 +460,7 @@ enum DynamicTypeScale {
 extension View {
     /// 应用 Dynamic Type 感知的水平内边距（自适应页面左右留白）
     func adaptivePagePadding(_ size: ContentSizeCategory) -> some View {
-        self.padding(.horizontal, DynamicTypeScale.padding(Theme.SpacingTokens.page, for: size))
+        self.padding(.horizontal, DynamicTypeScale.padding(TokensSpacing.page, for: size))
     }
 
     /// 应用 Dynamic Type 感知的 VStack/HStack 间距
@@ -720,8 +500,8 @@ struct DynamicTypeCompressModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .padding(.horizontal, compressRatio * Theme.SpacingTokens.page)
-            .padding(.vertical, compressRatio * Theme.SpacingTokens.md)
+            .padding(.horizontal, compressRatio * TokensSpacing.page)
+            .padding(.vertical, compressRatio * TokensSpacing.md)
     }
 }
 
@@ -826,20 +606,20 @@ struct PageLoadingView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DS.Space.md) {
-            HStack(spacing: DS.Space.sm) {
+        VStack(alignment: .leading, spacing: TokensSpacing.md) {
+            HStack(spacing: TokensSpacing.sm) {
                 ProgressView().controlSize(.small)
                 Text(message)
-                    .font(DS.Typo.footnote)
-                    .foregroundStyle(KanseiPalette.secondary)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
             }
             DSSkeleton(height: 88, width: nil)
             DSSkeleton(height: 142, width: nil)
             DSSkeleton(height: 64, width: nil)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, DS.Space.page)
-        .padding(.vertical, DS.Space.lg)
+        .padding(.horizontal, TokensSpacing.page)
+        .padding(.vertical, TokensSpacing.lg)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(message))
     }
@@ -856,13 +636,13 @@ struct PageErrorView: View {
     }
 
     var body: some View {
-        VStack(spacing: DS.Space.md) {
+        VStack(spacing: TokensSpacing.md) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 30, weight: .light))
-                .foregroundStyle(KanseiPalette.warning)
+                .foregroundStyle(TokensPalette.warning)
             Text(message)
-                .font(DS.Typo.subheadline)
-                .foregroundStyle(KanseiPalette.secondary)
+                .font(TokensTypo.subheadline)
+                .foregroundStyle(TokensPalette.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Button("重新加载") { retryAction() }
@@ -870,8 +650,8 @@ struct PageErrorView: View {
                 .frame(maxWidth: 200)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, DS.Space.xl)
-        .padding(.horizontal, DS.Space.page)
+        .padding(.vertical, TokensSpacing.xl)
+        .padding(.horizontal, TokensSpacing.page)
     }
 }
 
@@ -926,19 +706,19 @@ struct ChargingStationFinder: View {
         } label: {
             HStack {
                 Image(safeSymbol: "ev.charger", fallback: "bolt.fill")
-                    .font(Theme.bodyMd)
+                    .font(TokensTypo.body)
                 Text("附近充电站")
-                    .font(Theme.body)
+                    .font(TokensTypo.body)
                 Spacer()
                 if isLoading {
                     ProgressView().controlSize(.small)
                 } else {
                     Image(systemName: "chevron.right")
-                        .font(Theme.caption)
+                        .font(TokensTypo.caption)
                         .foregroundStyle(.tertiary)
                 }
             }
-            .padding(.vertical, DS.Space.md)
+            .padding(.vertical, TokensSpacing.md)
             .glassCard()
         }
         .buttonStyle(.plain)
@@ -1093,20 +873,20 @@ struct ChargingStationMapView: View {
     var body: some View {
         VStack {
             Text("附近充电站 (\(stations.count) 个)")
-                .font(Theme.h3)
+                .font(TokensTypo.title3)
                 .padding()
             List(stations) { station in
                 HStack {
                     VStack(alignment: .leading) {
-                        Text(station.name).font(Theme.body)
-                        Text(station.address).font(Theme.caption).foregroundStyle(.secondary)
+                        Text(station.name).font(TokensTypo.body)
+                        Text(station.address).font(TokensTypo.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     VStack(alignment: .trailing) {
                         Text(station.distance)
-                            .font(Theme.caption.weight(.semibold))
-                            .foregroundStyle(Theme.Colors.accent)
-                        Text(station.type).font(Theme.micro).foregroundStyle(.secondary)
+                            .font(TokensTypo.caption.weight(.semibold))
+                            .foregroundStyle(TokensPalette.ambient)
+                        Text(station.type).font(TokensTypo.caption2).foregroundStyle(.secondary)
                     }
                 }
                 .padding(.vertical, 8)
@@ -1140,15 +920,15 @@ struct MonthlyReportGenerator: View {
         } label: {
             HStack {
                 Image(systemName: "doc.text.fill")
-                    .font(Theme.bodyMd)
+                    .font(TokensTypo.body)
                 Text("本月驾驶报告")
-                    .font(Theme.body)
+                    .font(TokensTypo.body)
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(Theme.caption)
+                    .font(TokensTypo.caption)
                     .foregroundStyle(.tertiary)
             }
-            .padding(.vertical, DS.Space.md)
+            .padding(.vertical, TokensSpacing.md)
             .glassCard()
         }
         .buttonStyle(.plain)
@@ -1181,7 +961,7 @@ struct MonthlyReportView: View {
         ScrollView {
             VStack(spacing: 20) {
                 Text("月度驾驶报告")
-                    .font(Theme.h2)
+                    .font(TokensTypo.title)
                 Divider()
                 
                 ReportSection(title: "行驶统计") {
@@ -1200,10 +980,10 @@ struct MonthlyReportView: View {
                     shareReport()
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Theme.Colors.accent)
+                .tint(TokensPalette.ambient)
                 
                 Button("关闭") { dismiss() }
-                    .font(Theme.body)
+                    .font(TokensTypo.body)
                     .foregroundStyle(.secondary)
             }
             .padding()
@@ -1258,7 +1038,7 @@ struct ReportSection<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(Theme.h4).foregroundStyle(.secondary)
+            Text(title).font(TokensTypo.headline).foregroundStyle(.secondary)
             content
         }
         .padding()
@@ -1272,9 +1052,9 @@ struct ReportRow: View {
     
     var body: some View {
         HStack {
-            Text(label).font(Theme.body).foregroundStyle(.secondary)
+            Text(label).font(TokensTypo.body).foregroundStyle(.secondary)
             Spacer()
-            Text(value).font(Theme.body.weight(.semibold))
+            Text(value).font(TokensTypo.body.weight(.semibold))
         }
     }
 }
@@ -1292,7 +1072,7 @@ struct PowerSavingToggle: View {
                 Image(systemName: enabled ? "battery.100" : "battery.25")
                     .foregroundStyle(enabled ? .green : .orange)
                 Text(enabled ? "省电模式已开启" : "省电模式")
-                    .font(Theme.body)
+                    .font(TokensTypo.body)
             }
         }
         .toggleStyle(SwitchToggleStyle(tint: enabled ? .green : .orange))

@@ -132,7 +132,7 @@ struct SearchResultRow: View {
             HStack(spacing: 12) {
                 Image(safeSymbol: result.icon, fallback: "magnifyingglass")
                     .font(.title2)
-                    .foregroundStyle(KanseiPalette.ambient)
+                    .foregroundStyle(TokensPalette.ambient)
                     .frame(width: 36)
 
                 VStack(alignment: .leading, spacing: 4) {

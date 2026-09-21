@@ -32,10 +32,10 @@ struct LoginView: View {
         NavigationStack {
             DSCanvas {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: KanseiSpacing.xxl) {
+                    VStack(alignment: .leading, spacing: TokensSpacing.xxl) {
                         // 品牌区
                         brandHeader
-                            .padding(.top, KanseiSpacing.xxxl)
+                            .padding(.top, TokensSpacing.xxxl)
 
                         // 表单卡片
                         formCard
@@ -47,14 +47,14 @@ struct LoginView: View {
                             )
                         }
 
-                        VStack(spacing: KanseiSpacing.md) {
+                        VStack(spacing: TokensSpacing.md) {
                             loginButton
                             if biometricAvailable {
                                 biometricButton
                             }
                         }
                     }
-                    .padding(.bottom, KanseiSpacing.xxxl)
+                    .padding(.bottom, TokensSpacing.xxxl)
                 }
                 .scrollBounceBehavior(.basedOnSize)
                 .scrollDismissesKeyboard(.interactively)
@@ -82,53 +82,53 @@ struct LoginView: View {
 
     // MARK: - 品牌区
     private var brandHeader: some View {
-        VStack(alignment: .leading, spacing: KanseiSpacing.lg) {
+        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
             HStack {
                 Image(systemName: "car.side.fill")
                     .font(.system(size: 40, weight: .medium))
-                    .foregroundColor(KanseiPalette.primary)
+                    .foregroundColor(TokensPalette.primary)
                     .frame(width: 80, height: 80)
                     .background(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(KanseiPalette.ambient)
+                            .fill(TokensPalette.ambient)
                     )
-                    .shadow(color: KanseiPalette.ambient.opacity(0.4), radius: 12, y: 4)
+                    .shadow(color: TokensPalette.ambient.opacity(0.4), radius: 12, y: 4)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("长安车管家")
                         .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(KanseiPalette.primary)
+                        .foregroundColor(TokensPalette.primary)
                     Text("CHANGAN CONNECT")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(KanseiPalette.tertiary)
+                        .foregroundColor(TokensPalette.tertiary)
                         .tracking(2)
                 }
-                .padding(.leading, KanseiSpacing.md)
+                .padding(.leading, TokensSpacing.md)
             }
 
             Text("登录以管理您的爱车")
-                .font(KanseiTypo.caption)
-                .foregroundColor(KanseiPalette.secondary)
+                .font(TokensTypo.caption)
+                .foregroundColor(TokensPalette.secondary)
         }
     }
 
     // MARK: - 表单卡片
     private var formCard: some View {
         GlassCard {
-            VStack(spacing: KanseiSpacing.lg) {
+            VStack(spacing: TokensSpacing.lg) {
                 // 手机号输入
-                VStack(alignment: .leading, spacing: KanseiSpacing.xs) {
+                VStack(alignment: .leading, spacing: TokensSpacing.xs) {
                     Text("手机号")
-                        .font(KanseiTypo.caption)
-                        .foregroundColor(KanseiPalette.secondary)
+                        .font(TokensTypo.caption)
+                        .foregroundColor(TokensPalette.secondary)
                     TextField("请输入手机号", text: $phone)
                         .keyboardType(.phonePad)
-                        .foregroundColor(KanseiPalette.primary)
-                        .font(KanseiTypo.subtitle)
+                        .foregroundColor(TokensPalette.primary)
+                        .font(TokensTypo.subtitle)
                         .padding()
                         .background(
-                            RoundedRectangle(cornerRadius: KanseiRadius.small, style: .continuous)
-                                .fill(KanseiPalette.glassLight)
+                            RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
+                                .fill(TokensPalette.glassLight)
                         )
                         .onChange(of: phone) { phone = String(phone.prefix(11)) }
                 }
@@ -137,18 +137,18 @@ struct LoginView: View {
                 DSDivider()
 
                 // 图形验证码
-                VStack(alignment: .leading, spacing: KanseiSpacing.xs) {
+                VStack(alignment: .leading, spacing: TokensSpacing.xs) {
                     Text("图形验证码")
-                        .font(KanseiTypo.caption)
-                        .foregroundColor(KanseiPalette.secondary)
-                    HStack(spacing: KanseiSpacing.sm) {
+                        .font(TokensTypo.caption)
+                        .foregroundColor(TokensPalette.secondary)
+                    HStack(spacing: TokensSpacing.sm) {
                         TextField("输入验证码", text: $picCode)
-                            .foregroundColor(KanseiPalette.primary)
-                            .font(KanseiTypo.subtitle)
+                            .foregroundColor(TokensPalette.primary)
+                            .font(TokensTypo.subtitle)
                             .padding()
                             .background(
-                                RoundedRectangle(cornerRadius: KanseiRadius.small, style: .continuous)
-                                    .fill(KanseiPalette.glassLight)
+                                RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
+                                    .fill(TokensPalette.glassLight)
                             )
 
                         if let data = captchaData, let captcha = UIImage(data: data) {
@@ -159,7 +159,7 @@ struct LoginView: View {
                                 .onTapGesture { loadCaptcha() }
                         } else {
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(KanseiPalette.glassLight)
+                                .fill(TokensPalette.glassLight)
                                 .frame(width: 80, height: 40)
                                 .onTapGesture { loadCaptcha() }
                         }
@@ -170,19 +170,19 @@ struct LoginView: View {
                 DSDivider()
 
                 // 短信验证码
-                VStack(alignment: .leading, spacing: KanseiSpacing.xs) {
+                VStack(alignment: .leading, spacing: TokensSpacing.xs) {
                     Text("短信验证码")
-                        .font(KanseiTypo.caption)
-                        .foregroundColor(KanseiPalette.secondary)
-                    HStack(spacing: KanseiSpacing.sm) {
+                        .font(TokensTypo.caption)
+                        .foregroundColor(TokensPalette.secondary)
+                    HStack(spacing: TokensSpacing.sm) {
                         TextField("6位数字", text: $smsCode)
                             .keyboardType(.numberPad)
-                            .foregroundColor(KanseiPalette.primary)
-                            .font(KanseiTypo.hero)
+                            .foregroundColor(TokensPalette.primary)
+                            .font(TokensTypo.hero)
                             .padding()
                             .background(
-                                RoundedRectangle(cornerRadius: KanseiRadius.small, style: .continuous)
-                                    .fill(KanseiPalette.glassLight)
+                                RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
+                                    .fill(TokensPalette.glassLight)
                             )
                             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -190,21 +190,21 @@ struct LoginView: View {
                             sendSMS()
                         } label: {
                             Text(smsBtnText)
-                                .font(KanseiTypo.caption)
-                                .foregroundColor(smsBtnDisabled ? KanseiPalette.tertiary : KanseiPalette.ambient)
-                                .padding(.horizontal, KanseiSpacing.md)
-                                .padding(.vertical, KanseiSpacing.sm)
+                                .font(TokensTypo.caption)
+                                .foregroundColor(smsBtnDisabled ? TokensPalette.tertiary : TokensPalette.ambient)
+                                .padding(.horizontal, TokensSpacing.md)
+                                .padding(.vertical, TokensSpacing.sm)
                                 .background(
-                                    KanseiPalette.ambient.opacity(smsBtnDisabled ? 0.3 : 1)
+                                    TokensPalette.ambient.opacity(smsBtnDisabled ? 0.3 : 1)
                                 )
-                                .cornerRadius(KanseiRadius.small)
+                                .cornerRadius(TokensRadius.small)
                         }
                         .disabled(smsBtnDisabled)
                     }
                 }
                 .focused($focused, equals: .sms)
             }
-            .padding(KanseiSpacing.lg)
+            .padding(TokensSpacing.lg)
         }
     }
 
@@ -218,14 +218,14 @@ struct LoginView: View {
                     ProgressView().tint(.white)
                 }
                 Text(busy ? "登录中…" : "登录")
-                    .font(KanseiTypo.title)
+                    .font(TokensTypo.heading)
                     .foregroundColor(.white)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, KanseiSpacing.lg)
-            .background(KanseiPalette.ambient)
-            .cornerRadius(KanseiRadius.medium)
-            .shadow(color: KanseiPalette.ambient.opacity(0.4), radius: 12, y: 4)
+            .padding(.vertical, TokensSpacing.lg)
+            .background(TokensPalette.ambient)
+            .cornerRadius(TokensRadius.medium)
+            .shadow(color: TokensPalette.ambient.opacity(0.4), radius: 12, y: 4)
         }
         .buttonStyle(.plain)
         .disabled(busy || !phoneValid)
@@ -239,13 +239,13 @@ struct LoginView: View {
             HStack {
                 Image(systemName: "faceid")
                 Text("Face ID 登录")
-                    .font(KanseiTypo.subtitle)
-                    .foregroundColor(KanseiPalette.secondary)
+                    .font(TokensTypo.subtitle)
+                    .foregroundColor(TokensPalette.secondary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, KanseiSpacing.md)
-            .background(KanseiPalette.glassHighlight)
-            .cornerRadius(KanseiRadius.medium)
+            .padding(.vertical, TokensSpacing.md)
+            .background(TokensPalette.glassHighlight)
+            .cornerRadius(TokensRadius.medium)
         }
         .buttonStyle(.plain)
     }

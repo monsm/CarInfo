@@ -32,7 +32,7 @@ struct GlassCard<Content: View>: View {
     let showBorder: Bool
     let content: () -> Content
 
-    init(cornerRadius: CGFloat = KanseiRadius.large,
+    init(cornerRadius: CGFloat = TokensRadius.large,
          showBorder: Bool = true,
          @ViewBuilder content: @escaping () -> Content) {
         self.cornerRadius = cornerRadius
@@ -42,7 +42,7 @@ struct GlassCard<Content: View>: View {
 
     var body: some View {
         content()
-            .padding(KanseiSpacing.md)
+            .padding(TokensSpacing.md)
             .background(
                 Material.ultraThinMaterial
             )
@@ -50,7 +50,7 @@ struct GlassCard<Content: View>: View {
             .cornerRadius(cornerRadius)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(KanseiPalette.glassBorder, lineWidth: 1)
+                    .stroke(TokensPalette.glassBorder, lineWidth: 1)
                     .opacity(showBorder ? 1 : 0)
             )
     }
@@ -71,13 +71,13 @@ struct GlassNavBar: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(KanseiTypo.title).fontWeight(.semibold)
-                .foregroundColor(KanseiPalette.primary)
+                .font(TokensTypo.heading).fontWeight(.semibold)
+                .foregroundColor(TokensPalette.primary)
 
             if let subtitle {
                 Text(subtitle)
-                    .font(KanseiTypo.caption)
-                    .foregroundColor(KanseiPalette.tertiary)
+                    .font(TokensTypo.caption)
+                    .foregroundColor(TokensPalette.tertiary)
             }
 
             Spacer()
@@ -86,15 +86,15 @@ struct GlassNavBar: View {
                 trailing()
             }
         }
-        .padding(.horizontal, KanseiSpacing.md)
-        .padding(.vertical, KanseiSpacing.sm)
+        .padding(.horizontal, TokensSpacing.md)
+        .padding(.vertical, TokensSpacing.sm)
         .background(
             Material.thickMaterial
                 .blendMode(.overlay)
         )
         .background(Color.black.opacity(0.2))
         .overlay(alignment: .bottom) {
-            DSDivider(inset: KanseiSpacing.md)
+            DSDivider(inset: TokensSpacing.md)
         }
     }
 }
@@ -109,8 +109,8 @@ struct GlassBottomBar<Content: View>: View {
 
     var body: some View {
         content()
-            .padding(.horizontal, KanseiSpacing.md)
-            .padding(.vertical, KanseiSpacing.sm)
+            .padding(.horizontal, TokensSpacing.md)
+            .padding(.vertical, TokensSpacing.sm)
             .background(
                 Material.thickMaterial
                     .blendMode(.overlay)
@@ -133,7 +133,7 @@ struct KanseiButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .fontWeight(.semibold)
-            .animation(KanseiMotion.tap, value: configuration.isPressed)
+            .animation(TokensMotion.tap, value: configuration.isPressed)
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .opacity(configuration.isPressed ? 0.8 : 1)
             .modifier(ButtonBackground(variant: variant))
@@ -147,28 +147,28 @@ struct ButtonBackground: ViewModifier {
         switch variant {
         case .primary:
             content
-                .foregroundColor(KanseiPalette.primary)
-                .padding(.vertical, KanseiSpacing.md)
-                .padding(.horizontal, KanseiSpacing.lg)
+                .foregroundColor(TokensPalette.primary)
+                .padding(.vertical, TokensSpacing.md)
+                .padding(.horizontal, TokensSpacing.lg)
                 .background(
-                    KanseiPalette.ambient
-                        .cornerRadius(KanseiRadius.medium)
-                        .shadow(color: KanseiPalette.ambient.opacity(0.4), radius: 12, y: 4)
+                    TokensPalette.ambient
+                        .cornerRadius(TokensRadius.medium)
+                        .shadow(color: TokensPalette.ambient.opacity(0.4), radius: 12, y: 4)
                 )
         case .secondary:
             content
-                .foregroundColor(KanseiPalette.primary)
-                .padding(.vertical, KanseiSpacing.md)
-                .padding(.horizontal, KanseiSpacing.lg)
+                .foregroundColor(TokensPalette.primary)
+                .padding(.vertical, TokensSpacing.md)
+                .padding(.horizontal, TokensSpacing.lg)
                 .background(
-                    KanseiPalette.glassHighlight
-                        .cornerRadius(KanseiRadius.medium)
+                    TokensPalette.glassHighlight
+                        .cornerRadius(TokensRadius.medium)
                 )
         case .ghost:
             content
-                .foregroundColor(KanseiPalette.secondary)
-                .padding(.vertical, KanseiSpacing.md)
-                .padding(.horizontal, KanseiSpacing.lg)
+                .foregroundColor(TokensPalette.secondary)
+                .padding(.vertical, TokensSpacing.md)
+                .padding(.horizontal, TokensSpacing.lg)
         }
     }
 }

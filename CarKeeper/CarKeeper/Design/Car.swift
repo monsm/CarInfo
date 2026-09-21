@@ -39,7 +39,7 @@ struct LivingCarView: View {
         }
         .frame(height: 200)
         .onAppear {
-            withAnimation(KanseiMotion.breathe) {
+            withAnimation(TokensMotion.breathe) {
                 breatheProgress = 1.0
             }
         }
@@ -74,8 +74,8 @@ struct LivingCarView: View {
             .fill(
                 LinearGradient(
                     colors: [
-                        KanseiPalette.primary.opacity(0.95),
-                        KanseiPalette.primary.opacity(0.7)
+                        TokensPalette.primary.opacity(0.95),
+                        TokensPalette.primary.opacity(0.7)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -90,16 +90,16 @@ struct LivingCarView: View {
                 path.addLine(to: CGPoint(x: 115, y: 100))
                 path.closeSubpath()
             }
-            .fill(KanseiPalette.nightSurface.opacity(0.8))
+            .fill(TokensPalette.nightSurface.opacity(0.8))
 
             // 车轮
             Circle()
-                .fill(KanseiPalette.nightSurface)
+                .fill(TokensPalette.nightSurface)
                 .frame(width: 40, height: 40)
                 .position(x: 90, y: 150)
 
             Circle()
-                .fill(KanseiPalette.nightSurface)
+                .fill(TokensPalette.nightSurface)
                 .frame(width: 40, height: 40)
                 .position(x: 200, y: 150)
 
@@ -108,8 +108,8 @@ struct LivingCarView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            KanseiPalette.ambient,
-                            KanseiPalette.ambient.opacity(0.3)
+                            TokensPalette.ambient,
+                            TokensPalette.ambient.opacity(0.3)
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -126,7 +126,7 @@ struct LivingCarView: View {
     private var chargingBurst: some View {
         ZStack {
             Circle()
-                .fill(KanseiPalette.info.opacity(0.3))
+                .fill(TokensPalette.info.opacity(0.3))
                 .frame(width: 60, height: 60)
                 .position(x: 250, y: 120)
                 .blur(radius: 20)
@@ -134,7 +134,7 @@ struct LivingCarView: View {
 
             Image(systemName: "bolt.fill")
                 .font(.system(size: 24))
-                .foregroundColor(KanseiPalette.info)
+                .foregroundColor(TokensPalette.info)
                 .position(x: 250, y: 120)
         }
     }
@@ -148,7 +148,7 @@ struct LivingCarView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(
                             selectedZone == zone
-                                ? KanseiPalette.ambient.opacity(0.3)
+                                ? TokensPalette.ambient.opacity(0.3)
                                 : Color.clear
                         )
                         .frame(width: geo.size.width * area.width)
@@ -159,7 +159,7 @@ struct LivingCarView: View {
                         )
                         .onTapGesture {
                             selectedZone = zone
-                            withAnimation(KanseiMotion.tap) {
+                            withAnimation(TokensMotion.tap) {
                                 onZone(zone)
                             }
                         }

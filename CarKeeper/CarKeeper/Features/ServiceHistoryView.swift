@@ -68,17 +68,17 @@ struct ServiceHistoryView: View {
                 // 时间线
                 timelineCard
             }
-            .padding(.horizontal, KanseiSpacing.lg)
-            .padding(.vertical, KanseiSpacing.md)
+            .padding(.horizontal, TokensSpacing.lg)
+            .padding(.vertical, TokensSpacing.md)
         }
-        .background(KanseiPalette.background)
+        .background(TokensPalette.background)
         .navigationTitle("维保记录")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showAddService = true }) {
                     Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(KanseiPalette.ambient)
+                        .foregroundStyle(TokensPalette.ambient)
                 }
             }
         }
@@ -95,12 +95,12 @@ struct ServiceHistoryView: View {
             statCell(label: "年均花费", value: "¥\(Int(avgAnnualCost))/年", tint: .green)
             statCell(label: "记录次数", value: "\(entries.count)", tint: .orange)
         }
-        .glassCard(corner: KanseiRadius.medium)
+        .glassCard(corner: TokensRadius.medium)
     }
 
     private func statCell(label: String, value: String, tint: Color) -> some View {
         VStack(spacing: 4) {
-            Text(value).font(Theme.h3).foregroundStyle(tint)
+            Text(value).font(TokensTypo.title3).foregroundStyle(tint)
             Text(label).font(.caption2).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -138,7 +138,7 @@ struct ServiceHistoryView: View {
             }
         }
         .padding()
-        .glassCard(corner: KanseiRadius.medium)
+        .glassCard(corner: TokensRadius.medium)
         .background(Color.orange.opacity(0.05))
     }
 
@@ -153,9 +153,9 @@ struct ServiceHistoryView: View {
         }
         return Image(safeSymbol: icon, fallback: "wrench.and.screwdriver.fill")
             .font(.caption)
-            .foregroundStyle(KanseiPalette.ambient)
+            .foregroundStyle(TokensPalette.ambient)
             .frame(width: 28, height: 28)
-            .background(KanseiPalette.ambient.opacity(0.1))
+            .background(TokensPalette.ambient.opacity(0.1))
             .cornerRadius(6)
     }
 
@@ -172,8 +172,8 @@ struct ServiceHistoryView: View {
                             .font(.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(selectedYear == y ? KanseiPalette.ambient.opacity(0.2) : Color.clear)
-                            .foregroundStyle(selectedYear == y ? KanseiPalette.ambient : KanseiPalette.secondary)
+                            .background(selectedYear == y ? TokensPalette.ambient.opacity(0.2) : Color.clear)
+                            .foregroundStyle(selectedYear == y ? TokensPalette.ambient : TokensPalette.secondary)
                             .cornerRadius(16)
                     }
                 }
@@ -203,7 +203,7 @@ struct ServiceHistoryView: View {
                 }
             }
         }
-        .glassCard(corner: KanseiRadius.medium)
+        .glassCard(corner: TokensRadius.medium)
     }
 
     @ViewBuilder
@@ -212,7 +212,7 @@ struct ServiceHistoryView: View {
             HStack {
                 typeIcon(entry.type)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(entry.type).font(Theme.subheadline).foregroundStyle(.primary)
+                    Text(entry.type).font(TokensTypo.subheadline).foregroundStyle(.primary)
                     Text(entry.description)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -221,7 +221,7 @@ struct ServiceHistoryView: View {
                 Spacer()
                 Text("¥\(Int(entry.cost))")
                     .font(Theme.font(.subheadline as Font).bold())
-                    .foregroundStyle(KanseiPalette.ambient)
+                    .foregroundStyle(TokensPalette.ambient)
             }
             HStack {
                 Text(entry.date, style: .date)
