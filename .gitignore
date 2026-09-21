@@ -15,3 +15,5 @@ CarKeeper/CarKeeper/TODO_FULL_PLAN.md
 # 本地静态检查工具的生成物（scan/ 下的脚本本身可保留）
 scan/baseline/
 scan/sdk_cache.json
+__pycache__/
+*.pyc
