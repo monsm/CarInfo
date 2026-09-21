@@ -35,11 +35,3 @@ class ShakeDetector: ObservableObject {
 
     var onShake: ((CMAcceleration) -> Void)?
 }
-
-
-
-extension View {
-    func carSwitchGesture(selectedCarIndex: Binding<Int>, carCount: Int, onSwitch: @escaping (Int) -> Void) -> some View {
-        modifier(CarSwitchGesture(selectedCarIndex: selectedCarIndex, carCount: carCount, onSwitch: onSwitch))
-    }
-}

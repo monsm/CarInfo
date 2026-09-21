@@ -306,7 +306,7 @@ struct ChargeReplaySheet: View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             fact("开始", at: session.start)
             fact("结束", at: session.end)
-            fact("折合电费", detail: "\(ChargeLedger.moneyText(session.kWh * ChargeLedger.shared.rate)) 元 · 按 \(ChargeLedger.rateText(ChargeLedger.shared.rate)) 元/度")
+            fact("折合电费", detail: Text("\(ChargeLedger.moneyText(session.kWh * ChargeLedger.shared.rate)) 元 · 按 \(ChargeLedger.rateText(ChargeLedger.shared.rate)) 元/度"))
         }
     }
 

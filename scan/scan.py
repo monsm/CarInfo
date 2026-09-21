@@ -427,6 +427,28 @@ def report(label, paths, whitelist):
     }
 
 
+# 「幽灵构造」：当前代码里调用了 `X(...)`，当前树没有声明 X，
+# 但冻结基线里**声明过** X —— 只可能是删除声明块时漏删的残留（CarSwitchGesture、
+# GlassCard 都是这一类：基线白名单反而掩护了它们，因为「未声明」检查永远放行）。
+# 已知歧义名：基线里是嵌套类型声明、当前代码用的是同名标准库类型（Result 等）。
+GHOST_CALL_IGNORE = {"Result"}
+
+
+def ghost_calls(label, paths, baseline_types, current_types, current_funcs):
+    _, _, _, _, calls, _, _, _ = analyze(paths)
+    ghosts = sorted(
+        c for c in calls
+        if c in baseline_types
+        and c not in current_types
+        and c not in current_funcs
+        and c not in GHOST_CALL_IGNORE
+    )
+    print(f"\n-- {label} 幽灵构造（基线声明过、当前已删、代码仍在调）: {len(ghosts)}")
+    if ghosts:
+        print("   " + " ".join(ghosts[:60]))
+    return len(ghosts)
+
+
 def main():
     app_paths = target_files(APP)
     widget_paths = target_files(WIDGET)
@@ -477,11 +499,21 @@ def main():
     print(f"显式核实的 SDK 名字: {len(VERIFIED_SDK_ADDITIONS)}")
     print(f"\n基线: {base_note}, 已知名字 类型{len(sdk_types)}/方法{len(sdk_methods)}")
 
+    # 幽灵构造需要「当前树的自有声明」—— analyze 只在 report 里跑过一次，
+    # 这里再取一次它的类型/函数集（解析很快，重复跑可接受）。
+    # 注意：基线信号只能用 **声明**（bt | bf）。第一版把 bcalls（基线代码里的调用）
+    # 也算进来，结果 Text/VStack 这些 SDK 调用全成了"基线声明过的名字"，一次 164 个假阳性。
+    app_types, _, app_funcs, _, _, _, _, _ = analyze(app_paths)
+    widget_types, _, widget_funcs, _, _, _, _, _ = analyze(widget_paths)
+    base_decls = bt | bf
     found = report("APP", app_paths, (sdk_types, sdk_calls, sdk_methods))
+    found["幽灵构造"] = ghost_calls("APP", app_paths, base_decls, app_types, app_funcs)
+    found["幽灵构造-widget"] = ghost_calls("WIDGET", widget_paths, base_decls, widget_types, widget_funcs)
     total = sum(found.values())
     if total:
         print("\n❌ 高嫌疑汇总: " + "  ".join(f"{k}={v}" for k, v in found.items() if v))
         print("   白名单里没有它们 = 项目没声明、基线也没有 → 很可能是打错的名字（编译会挂）。")
+        print("   幽灵构造 = 基线声明过、当前树已删、代码仍在调 → 删除声明块时漏删了引用（编译会挂）。")
         return 1
     print("\n✅ 未声明的类型 / 构造·函数 / 方法 / 未知成员 全部为 0")
     return 0

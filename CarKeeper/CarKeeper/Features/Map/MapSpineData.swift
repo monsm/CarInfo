@@ -216,7 +216,8 @@ struct MapSpineData {
     var updatedText: String { updated.isEmpty ? "--" : updated }
 
     /// 剩余续航（米）。**车端报文里的 RemainedPowerMile 本身就是米**，不换算、不猜单位。
-    /// 车没报就是 nil —— 续航圈不画。
+    /// 车没报就是 nil —— 续航圈不画。（AppStore 是 @MainActor，这里也必须标）
+    @MainActor
     var rangeMeters: Double? {
         let cache = AppStore.shared.caches
         for key in ["charge", "control"] {   // 与 VM.energy 取 range 的顺序一致
