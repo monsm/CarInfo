@@ -22,8 +22,11 @@
     <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>UILaunchScreen</key>
     <dict/>
-    <key>UIRequiresFullScreen</key>
-    <true/>
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <true/>
+    </dict>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
         <string>arm64</string>

@@ -62,6 +62,12 @@ struct HomeView: View {
 
     private let store = AppStore.shared
 
+    // #47 iPad 分屏：`supportsMultipleWindows` 是「能否开第二个窗口」的权威判据 ——
+    // 它同时反映平台与 Info.plist 的 UIApplicationSceneManifest 配置，比自己判断 idiom 准
+    // （iPhone 上即使声明了多场景也开不出第二个窗口）。
+    @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
+    @Environment(\.openWindow) private var openWindow
+
     @State private var startTimer: Task<Void, Never>? = nil
     @State private var lastFetch: Date?
     @State private var isRefreshing = false
@@ -169,6 +175,17 @@ struct HomeView: View {
                     Image(systemName: focusEnabled ? "moon.fill" : "moon.stars")
                 }
                 .accessibilityLabel(Text(focusEnabled ? "退出专注模式" : "启用专注模式"))
+
+                // #47 在新窗口打开：iPad 上再开一个窗口（分屏 / Slide Over）。
+                // 只在支持的平台上出现 —— 否则就是一个点了没反应的按钮。
+                // ⚠️ 两个窗口共用同一份导航状态，所以副窗口显示的是“当前 Tab”，不是独立画布
+                //    （详见 DetailSplitView 的说明）。
+                if supportsMultipleWindows {
+                    Button { openWindow(id: SceneID.detail) } label: {
+                        Image(systemName: "rectangle.on.rectangle")
+                    }
+                    .accessibilityLabel(Text("在新窗口打开"))
+                }
 
                 Button { shareStatus() } label: {
                     Image(systemName: "square.and.arrow.up")

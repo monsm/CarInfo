@@ -112,6 +112,17 @@ enum Deeplink: Hashable, CaseIterable {
 }
 
 @main
+// MARK: - 场景标识
+
+/// 窗口场景标识。
+///
+/// #47 分屏的「场景声明」与「打开入口」必须用同一个字符串：`openWindow(id:)` 传了
+/// 不存在的标识既不会报错、也不会打开任何东西（点了完全没反应），所以收成常量，
+/// 避免两处各写一份字面量后打错。
+enum SceneID {
+    static let detail = "detail"
+}
+
 struct CarKeeperApp: App {
     private let store = AppStore.shared
     @StateObject private var nav = NavState.shared
@@ -126,8 +137,13 @@ struct CarKeeperApp: App {
         WindowGroup {
             root
         }
-        // #47 iPad Split View 支持（原写成 `os(iOS) && os(macOS)` 恒为假，导致该场景从未注册）
-        WindowGroup(id: "detail") { DetailSplitView() }
+        // #47 iPad 分屏：第二个窗口（原写成 `os(iOS) && os(macOS)` 恒为假，导致该场景从未注册）。
+        // 能否真正被打开由「平台 + Info.plist 的 UIApplicationSceneManifest.UIApplicationSupportsMultipleScenes」
+        // 共同决定；入口在 HomeView 工具栏，用 supportsMultipleWindows 判定。
+        //
+        // ⚠️ 两个场景当前共用 NavState.shared（详见 DetailSplitView 的说明）：副窗口与主窗口是
+        //    同一份导航状态 —— 同一个 Tab、同一条路径。即“能同时看两个窗口”，但还不是两块独立画布。
+        WindowGroup(id: SceneID.detail) { DetailSplitView() }
     }
 
     // #NEW-112 启动画面控制
@@ -475,6 +491,15 @@ struct MainTabView: View {
 }
 
 // MARK: - #47 iPad Split View 支持
+
+/// 第二个窗口（`WindowGroup(id: SceneID.detail)`）的根视图，由 iPad 分屏入口打开。
+///
+/// ⚠️ 它用的是共用的 `NavState.shared`，所以副窗口与主窗口是**同一份导航状态**：
+///    `MainTabView` 内部是 `@StateObject private var nav = NavState.shared`（读单例、不读环境），
+///    两个场景因此绑定到同一个实例，Tab 选中与各 Tab 的路径完全同步；
+///    HomeView / TripAnalyticsView 里另有两处直接写 `NavState.shared.selectedTab`，同样绕过环境。
+///    要让两个窗口真正各走各的：NavState 去掉单例、由每个 Scene 各建一个实例并通过
+///    `.environmentObject` 注入，上述三处直接引用一并改成从环境读（否则只改一部分仍会串）。
 struct DetailSplitView: View {
     @StateObject private var nav = NavState.shared
     private let store = AppStore.shared

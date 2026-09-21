@@ -67,7 +67,15 @@ targets:
         - UIInterfaceOrientationPortrait
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
-        UIRequiresFullScreen: true
+        # ⚠️ UIRequiresFullScreen 曾在此声明为 true，已移除 —— 它于 iOS 26.0 被 Apple 弃用（迁移指引 TN3192），
+        # 而它的作用恰恰是「把 iPad app 放进兼容模式、退出多任务与动态缩放」，与 #47 的 iPad 分屏目标正相反。
+        # 若将来确需限制窗口尺寸，改用 UISceneSizeRestrictions，不要再把这个键加回来。
+        #
+        # #47 iPad 多窗口/分屏：UIApplicationSupportsMultipleScenes 必须嵌在 UIApplicationSceneManifest
+        # 字典里 —— 写成顶层键系统读不到，此时 openWindow(id:) 会以「app does not support multiple scenes」
+        # 静默失败，界面上的入口点了没有任何反应。
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
         # 实时活动总开关：缺这个键 Activity.request 不会生效，锁屏/灵动岛永远不会出现
         NSSupportsLiveActivities: true
         UIRequiredDeviceCapabilities:
