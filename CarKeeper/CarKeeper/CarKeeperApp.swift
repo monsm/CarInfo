@@ -111,7 +111,6 @@ enum Deeplink: Hashable, CaseIterable {
     }
 }
 
-@main
 // MARK: - 场景标识
 
 /// 窗口场景标识。
@@ -123,6 +122,10 @@ enum SceneID {
     static let detail = "detail"
 }
 
+// @main 必须紧贴 App 结构体：属性绑定到「下一个声明」，中间若插入任何类型（哪怕是
+// 一行常量枚举）就会静默接管入口 —— CI 曾因此报 SceneID 缺少 main()。注释不算声明，
+// 但为避免再踩，这里不再往 @main 与 struct 之间放任何东西。
+@main
 struct CarKeeperApp: App {
     private let store = AppStore.shared
     @StateObject private var nav = NavState.shared
