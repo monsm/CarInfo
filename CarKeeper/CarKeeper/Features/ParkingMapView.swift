@@ -185,7 +185,7 @@ struct ParkingMapView: View {
     }
 
     private func navToParking() {
-        guard let loc = store.parkingLocation else { return }
+        guard store.parkingLocation != nil else { return }
         showSearch = false
         openMaps()
     }

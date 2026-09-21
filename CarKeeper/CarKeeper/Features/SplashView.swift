@@ -18,12 +18,14 @@ struct SplashView: View {
             Kansei.Color.background.ignoresSafeArea()
 
             // 品牌光晕
-            Circle()
-                .fill(Kansei.Color.ambient.opacity(0.3))
-                .frame(width: 300, height: 300)
-                .blur(radius: 60)
-                .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height / 2 - 40)
-                .opacity(brandGlow)
+            GeometryReader { geo in
+                Circle()
+                    .fill(Kansei.Color.ambient.opacity(0.3))
+                    .frame(width: 300, height: 300)
+                    .blur(radius: 60)
+                    .position(x: geo.size.width / 2, y: geo.size.height / 2 - 40)
+                    .opacity(brandGlow)
+            }
 
             VStack(spacing: Kansei.Spacing.xxl) {
                 // 品牌标：呼吸光效

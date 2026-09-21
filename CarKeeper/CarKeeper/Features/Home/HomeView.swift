@@ -886,8 +886,7 @@ struct HomeView: View {
     /// 系统地图直达导航界面，无需任何授权弹窗。
     private func openNav(_ loc: LocModel) {
         guard let lat = Double(loc.lat), let lng = Double(loc.lng) else { return }
-        let coord = CLLocationCoordinate2D(latitude: lat, longitude: lng)
-        let item = MKMapItem(placemark: MKPlacemark(coordinate: coord))
+        let item = MKMapItem(location: CLLocation(latitude: lat, longitude: lng), address: nil)
         item.name = loc.addr.isEmpty ? "车辆位置" : loc.addr
         item.openInMaps(launchOptions: [
             MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving

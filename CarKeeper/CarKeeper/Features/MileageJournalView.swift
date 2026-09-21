@@ -40,7 +40,7 @@ enum TripCostType: String, CaseIterable, Identifiable, Codable {
 }
 
 struct CostEntry: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let date: Date
     let type: TripCostType
     let amount: Double

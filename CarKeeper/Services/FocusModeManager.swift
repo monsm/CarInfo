@@ -6,7 +6,7 @@ import SwiftUI
 
 /// 专注模式配置
 struct FocusModeConfig: Codable, Identifiable {
-    let id = UUID()
+    var id = UUID()
     var enabled: Bool
     var hideSensitiveData: Bool  // 隐藏车牌/ VIN/ 联系人
     var showEssentialOnly: Bool  // 只显示 SOC/锁车/空调

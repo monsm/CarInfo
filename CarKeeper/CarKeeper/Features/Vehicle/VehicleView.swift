@@ -277,7 +277,7 @@ struct VehicleView: View {
 
     private func deletePhoto(at idx: Int) {
         guard maintenancePhotos.indices.contains(idx) else { return }
-        withAnimation(DS.Motion.value) { maintenancePhotos.remove(at: idx) }
+        withAnimation(DS.Motion.value) { _ = maintenancePhotos.remove(at: idx) }
         saveMaintenancePhotos()
         ToastManager.shared.show("照片已删除", icon: "trash")
     }

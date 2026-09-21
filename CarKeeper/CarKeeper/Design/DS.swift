@@ -533,7 +533,7 @@ struct DSLightBar: View {
         .onAppear {
             withAnimation(DS.Motion.draw) { revealed = clamped }
         }
-        .onChange(of: clamped) { newValue in
+        .onChange(of: clamped) { _, newValue in
             withAnimation(DS.Motion.value) { revealed = newValue }
         }
         .accessibilityElement()

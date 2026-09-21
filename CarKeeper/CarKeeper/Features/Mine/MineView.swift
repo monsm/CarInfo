@@ -293,7 +293,7 @@ struct MineView: View {
                         Text("深色").tag(NightModeMode.dark)
                     }
                     .pickerStyle(SegmentedPickerStyle())
-                    .onChange(of: nightModeManager.currentMode) { mode in
+                    .onChange(of: nightModeManager.currentMode) { _, mode in
                         nightModeManager.setMode(mode)
                     }
                 }
@@ -413,7 +413,7 @@ struct MineView: View {
             }
         }
         // 下载进度数字滚动：从当前 display 值弹性过渡到目标百分比
-        .onChange(of: downloadPct) { pct in
+        .onChange(of: downloadPct) { _, pct in
             let target = max(0, min(100, Int(pct * 100)))
             withAnimation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0.5)) {
                 downloadPctDisplay = target

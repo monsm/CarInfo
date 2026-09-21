@@ -68,6 +68,6 @@ class MaintenanceReminderScheduler {
     /// 清除所有提醒
     func clearAllReminders() async {
         let center = UNUserNotificationCenter.current()
-        await center.removeAllPendingNotificationRequests()
+        center.removeAllPendingNotificationRequests()
     }
 }

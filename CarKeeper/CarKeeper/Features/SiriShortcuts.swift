@@ -21,7 +21,6 @@ struct SiriCarController {
             return nil
         }
 
-        let api = APIClient.shared
         let pin = store.readPin() ?? ""
 
         switch intent {
@@ -29,7 +28,7 @@ struct SiriCarController {
             await executeLock(pin: pin, carId: store.carId, locked: lock.locked == true)
         case let ac as CarSetAirConditioningIntent:
             await executeAc(pin: pin, carId: store.carId, on: ac.airConditioningOn == true)
-        case let find as CarFindIntent:
+        case is CarFindIntent:
             await executeFindCar(pin: pin, carId: store.carId)
         default:
             break

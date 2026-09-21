@@ -7,7 +7,7 @@ import SwiftUI
 import Charts
 
 struct ChargeCostRecord: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let date: Date
     let kWh: Double
     let cost: Double

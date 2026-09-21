@@ -57,22 +57,22 @@ final class AppStore: @unchecked Sendable {
     }
 
     // #16 维保里程记录（UserDefaults 持久化）
-    static let lastServiceMileageKey = "carkeeper_last_service_mileage"
+    nonisolated static let lastServiceMileageKey = "carkeeper_last_service_mileage"
 
     /// 上次选中的车辆 id（重启后恢复，否则每次都跳回第一辆）
-    static let selectedCarIdKey = "carkeeper_selected_car_id"
+    nonisolated static let selectedCarIdKey = "carkeeper_selected_car_id"
 
     /// App Group id：必须与 CarKeeper.entitlements / project.yml / Widgets / WatchApp 保持一致，
     /// 不一致时小组件、表盘、灵动岛读不到任何数据（永远是 0）。
-    static let appGroupId = "group.com.you.CarKeeper"
+    nonisolated static let appGroupId = "group.com.you.CarKeeper"
     var lastServiceMileage: Int {
         get { UserDefaults.standard.integer(forKey: Self.lastServiceMileageKey) }
         set { UserDefaults.standard.set(newValue, forKey: Self.lastServiceMileageKey) }
     }
-    static let defaultServiceInterval: Int = 10000  // 默认保养间隔 10000 km
+    nonisolated static let defaultServiceInterval: Int = 10000  // 默认保养间隔 10000 km
 
     // #40 维保价格估算
-    static let servicePriceEstimate: Int = 800  // 默认保养价格 800 元
+    nonisolated static let servicePriceEstimate: Int = 800  // 默认保养价格 800 元
     static let majorServicePriceEstimate: Int = 2500  // 大保养价格 2500 元
 
     // #13 能耗历史（每次刷新记录 SOC + range）
@@ -758,7 +758,7 @@ final class AppStore: @unchecked Sendable {
         // 无 iCloud 能力时绝不能 touch CloudSyncManager.shared：构造 CKContainer 会抛出
         // Swift 无法捕获的 ObjC 异常，直接崩进程（侧载/未签名包的典型启动闪退原因）。
         guard CloudSyncManager.isCloudKitEntitled else { return }
-        await CloudSyncManager.shared.syncIfNeeded()
+        _ = await CloudSyncManager.shared.syncIfNeeded()
     }
 
     // #车控命令发送

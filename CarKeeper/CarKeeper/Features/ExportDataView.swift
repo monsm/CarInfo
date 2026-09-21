@@ -220,10 +220,8 @@ struct ExportDataView: View {
     private func saveHTMLAsPDF(_ html: String, filename: String) -> URL? {
         let tempDir = FileManager.default.temporaryDirectory
         let htmlURL = tempDir.appendingPathComponent("export.html")
-        let pdfURL = tempDir.appendingPathComponent(filename)
         try? html.write(to: htmlURL, atomically: true, encoding: .utf8)
 
-        let htmlData = html.data(using: .utf8) ?? Data()
         // Simple approach: return the HTML file as-is for sharing
         return htmlURL
     }

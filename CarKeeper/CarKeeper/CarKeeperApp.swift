@@ -410,7 +410,7 @@ struct MainTabView: View {
         // 情感化配色：时间感知主色调
         .tint(Kansei.Color.ambient)
         // VoiceOver：切换 Tab 时朗读当前页面名称（仅首次切换到新 Tab）
-        .onChange(of: nav.selectedTab) { newTab in
+        .onChange(of: nav.selectedTab) { _, newTab in
             if newTab != lastAnnouncedTab {
                 lastAnnouncedTab = newTab
                 let label = NavState.tabAccessibilityLabels[newTab] ?? "Tab \(newTab)"

@@ -366,7 +366,6 @@ struct VehicleValuationView: View {
                         Text("折旧率")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        let years = Calendar.current.dateComponents([.year], from: purchaseDate, to: Date()).year ?? 0
                         let price = Double(initialPrice) ?? 200000
                         let rate = (1 - estimatedValue / price) * 100
                         Text(String(format: "%.1f%%", rate))
@@ -428,10 +427,10 @@ struct ChargeBillSheet: View {
 
                 Button {
                     // 生成 PDF
-                    if let url = ChargeBillGenerator.shared.generatePDF(
+                    if ChargeBillGenerator.shared.generatePDF(
                         records: chargeRecords,
                         vehiclePlate: store.car?["plate"] as? String ?? "车辆"
-                    ) {
+                    ) != nil {
                         showingPDF = true
                     }
                 } label: {

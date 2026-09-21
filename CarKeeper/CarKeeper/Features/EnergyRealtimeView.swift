@@ -221,7 +221,6 @@ struct RadiusArc: View {
                     let center = CGPoint(x: 50, y: 50)
                     let radius: CGFloat = 44
                     let start = point(onCircle: center, radius: radius, angle: startAngle)
-                    let end = point(onCircle: center, radius: radius, angle: endAngle)
                     path.move(to: start)
                     path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle,
                                clockwise: false)

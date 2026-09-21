@@ -115,11 +115,7 @@ struct InsuranceCard: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Spacer()
-                Text(policy.startDate.formatted(date: .numeric, time: .omitted))
-                    .font(.caption)
-                    + Text(" ~ ")
-                    .font(.caption)
-                    + Text(policy.endDate.formatted(date: .numeric, time: .omitted))
+                Text("\(policy.startDate.formatted(date: .numeric, time: .omitted)) ~ \(policy.endDate.formatted(date: .numeric, time: .omitted))")
                     .font(.caption)
                     .foregroundColor(isExpired ? .red : .primary)
             }

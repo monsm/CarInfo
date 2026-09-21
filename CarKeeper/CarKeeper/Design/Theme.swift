@@ -960,8 +960,8 @@ struct ChargingStationFinder: View {
             guard let response else { return }
             let origin = CLLocation(latitude: 39.9042, longitude: 116.4074)
             stations = response.mapItems.prefix(10).map { item in
-                let meters = item.placemark.location?.distance(from: origin) ?? 0
-                let coord = item.placemark.coordinate
+                let meters = item.location.distance(from: origin)
+                let coord = item.location.coordinate
                 return ChargingStation(
                     name: item.name ?? "充电站",
                     distance: "\(Int(meters / 1000)) km",
@@ -1292,7 +1292,7 @@ struct PowerSavingToggle: View {
             }
         }
         .toggleStyle(SwitchToggleStyle(tint: enabled ? .green : .orange))
-        .onChange(of: enabled) { newValue in
+        .onChange(of: enabled) { _, newValue in
             if newValue {
                 ToastManager.shared.show("省电模式已开启，动画和后台刷新已关闭", icon: "battery.25")
             } else {

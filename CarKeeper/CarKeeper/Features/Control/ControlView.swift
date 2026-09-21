@@ -333,7 +333,7 @@ struct ControlView: View {
             if showBiometricLock {
                 BiometricLockOverlay(isAuthenticated: $isAuthenticated)
                     .onAppear { isAuthenticated = false }
-                    .onChange(of: isAuthenticated) { auth in
+                    .onChange(of: isAuthenticated) { _, auth in
                         if auth {
                             showBiometricLock = false
                             showPin = true  // 验证通过后进入 PIN 输入
@@ -708,7 +708,7 @@ struct ControlView: View {
         history.insert(newRun, at: 0)
         if history.count > 10 { history.removeLast() }
         // #9 同步到 AppStore 全局历史记录
-        let duration = Double(newRun.finishTime.split(separator: ":").count > 1 ? 5 : 3) ?? 5
+        let duration = Double(newRun.finishTime.split(separator: ":").count > 1 ? 5 : 3)
         store.addCommandHistory(cmd: "", name: "", success: ok, duration: duration)
         Task { @MainActor in
             if let ctrl = try? await APIClient.shared.getControl(carId: store.carId) {
@@ -1060,7 +1060,7 @@ struct ACStepperView: View {
             }
         }
         // 每次加减按钮触发时同步滚动数字
-        .onChange(of: temp) { newTemp in
+        .onChange(of: temp) { _, newTemp in
             withAnimation(.spring(response: 0.5, dampingFraction: 0.65, blendDuration: 0.6)) {
                 tempDisplayCount = newTemp
             }

@@ -63,7 +63,7 @@ struct BatteryView: View {
         .sheet(isPresented: $showDestinationCalc) {
             DestinationCalculatorView(distance: $destinationDistance, canReach: $canReach)
         }
-        .onChange(of: store.carId) { newId in
+        .onChange(of: store.carId) { _, newId in
             guard !newId.isEmpty else { return }
             // 切车后重新拉一次数据
             Task { await load() }
@@ -234,7 +234,6 @@ struct BatteryView: View {
 
     // MARK: 能耗历史折线图 (#13)
     private func chargeCard(_ b: BatteryModel) -> some View {
-        return EmptyView()
         let chargeSide = b.charging.cls.isEmpty ? "na" : b.charging.cls
         ExpandingCardBox(title: "充电", side: b.charging.text, sideCls: chargeSide,
                          cornerRadius: Kansei.Radius.medium) {

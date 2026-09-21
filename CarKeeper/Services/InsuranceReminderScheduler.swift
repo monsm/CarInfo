@@ -31,7 +31,6 @@ class InsuranceReminderScheduler {
     func scheduleInsuranceReminder(insuranceEndDate: Date?) async {
         guard let endDate = insuranceEndDate else { return }
 
-        let center = UNUserNotificationCenter.current()
         let calendar = Calendar.current
         let now = Date()
 
@@ -87,6 +86,6 @@ class InsuranceReminderScheduler {
 
     /// 清除所有提醒
     func clearAllReminders() async {
-        await UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
 }
