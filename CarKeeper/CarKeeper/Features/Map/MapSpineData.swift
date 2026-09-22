@@ -54,14 +54,9 @@ enum MapSpineLayer: String, CaseIterable, Identifiable {
         }
     }
 
-    var icon: String {
-        switch self {
-        case .now: return "location.fill"
-        case .trips: return "point.topleft.down.to.point.bottomright.curvepath"
-        case .holds: return "parkingsign"
-        case .charge: return "bolt.fill"
-        }
-    }
+    // 这里曾经有一个 `icon`（每层一个 SF Symbol）。模式条改成相机语法之后
+    // 每一项**只有文字**（没有图标、没有底、没有描边），所以它没有调用点了。
+    // 留一个没人用的图标表，下一个人就会以为模式条是该带图标的。
 
     /// 这一层没有数据时**照实说**（空不是缺陷，是真实读数）
     var emptyNote: String {

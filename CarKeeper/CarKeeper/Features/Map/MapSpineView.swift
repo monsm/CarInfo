@@ -9,12 +9,23 @@
 //   • 充电曲线与常停热区也都是真数据：功率采样积分成会话，停车史聚成"生活圈"
 //   • 「为什么」每一行都由真实字段推出；推不出来就不显示
 //
-// 四个图层 = 四个真实问题（不是一个分类菜单）：
-//   现在 / 行程 / 停车 / 充电
+// =============================================================================
+// 主框架（2026-09-22 定，取代了 Tab 骨架与顶部图层胶囊条）
+// =============================================================================
+// 主框架是**两个原生 App 的融合**，不是自创的导航结构：
+//
+//   Apple Maps —— 一张满屏地图 + 一张贴底的纸（sheet）。地图是唯一的岗位，
+//                 页面全从它身上长出来，没有 Tab、没有平行的一等公民。
+//   相机 App   —— 换模式**不离开取景框**：模式条紧贴在内容的上沿，
+//                 每一档只有文字、选中只靠颜色，且条子自身可横向滚动。
+//                 （细节与「为什么没照搬左右滑换模式」见 modeStrip）
+//
+// 四个模式 = 四个真实问题（不是一个分类菜单）：现在 / 行程 / 停车 / 充电。
+// 换模式 = 同一张图换一个提问，图、车钉、手势全程不变。
 //
 // 三条架构规则（写错就出问题，不是风格问题）：
 //   ① 钉 = 屏幕空间（`Annotation`），面积/轨迹 = 地理空间（`MapPolyline`）。
-//   ② 内容层不透明：图层条与底部面板用 `TokensPalette.surface`，
+//   ② 内容层不透明：模式条与底部纸用 `TokensPalette.surface`，
 //      玻璃只允许出现在导航栏 / 弹层 / 底部操作条（这是 v4 就定下的规则；
 //      macOS 的那条「Tab 栏」实例随 5 Tab 骨架一起删了 —— 现在没有 Tab 栏）。
 //   ③ 地图样式来自 `ArtTheme.mapSpec` —— 换艺术主题 = 换真实 MapKit 配置，
@@ -293,34 +304,8 @@ struct MapSpineView: View {
     @ViewBuilder
     private func topBar(_ d: MapSpineData) -> some View {
         VStack(spacing: TokensSpacing.sm) {
-            HStack(spacing: TokensSpacing.xs) {
-                ForEach(MapSpineLayer.allCases) { l in
-                    Button {
-                        layerRaw = l.rawValue
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: l.icon)
-                                .font(TokensTypo.fixed(11, weight: .semibold))
-                            Text(l.title)
-                                .font(TokensTypo.caption)
-                        }
-                        .padding(.horizontal, TokensSpacing.sm + 2)
-                        .frame(height: 30)
-                        .background {
-                            Capsule().fill(l == layer ? TokensPalette.accent : TokensPalette.surface)
-                        }
-                        .foregroundStyle(l == layer ? TokensPalette.labelOnTint : TokensPalette.primary)
-                        .overlay {
-                            Capsule().strokeBorder(TokensPalette.hairline, lineWidth: l == layer ? 0 : 0.5)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text("看\(l.title)"))
-                    .accessibilityAddTraits(l == layer ? [.isSelected] : [])
-                }
-                Spacer(minLength: 0)
-            }
-
+            // 顶部的图层胶囊条已**整个移到底部纸的上沿**，并改成相机 App 的模式条语法（见 modeStrip）。
+            // 顶部现在只剩一件事：这台车此刻的数据是不是新的。
             HStack(spacing: TokensSpacing.sm) {
                 HStack(spacing: TokensSpacing.sm) {
                     statusDot(d.online)
@@ -408,6 +393,7 @@ struct MapSpineView: View {
     private func bottomPanel(_ d: MapSpineData) -> some View {
         VStack(alignment: .leading, spacing: TokensSpacing.md) {
             panelGrab
+            modeStrip
             panelTitle(d)
             if d.hasLocation == false {
                 // 没有位置时，**不摆一堆 -- 占位**，只说清为什么
@@ -433,6 +419,61 @@ struct MapSpineView: View {
                 .ignoresSafeArea(edges: .bottom)
         }
         .overlay(alignment: .top) {
+            Rectangle()
+                .fill(TokensPalette.hairline)
+                .frame(height: TokensHair.line)
+        }
+    }
+
+    // =========================================================================
+    // MARK: 模式条（相机 App 的语法，替代了顶部的胶囊条）
+    // =========================================================================
+    // 主框架 = **Apple Maps 的一张全屏地图 + 一张贴着底边的纸**，
+    // 而「换这张纸在回答哪个问题」用的是**相机 App 的模式条**：
+    //
+    //   ① 换模式**不离开这张图**：没有页面推入、没有 Tab、没有遮罩 —— 取景框不变，
+    //      变的只是它此刻在回答哪个问题（现在在哪 / 去过哪儿 / 停在哪 / 去哪充电）；
+    //   ② 每一项**只有文字**：没有图标、没有底、没有描边。选中只靠颜色与字重说话
+    //      （相机靠黄色，我们靠主题的 accent —— 全 App 唯一的强调色）；
+    //   ③ 它**横向可滚动**，所以再加第五、第六个模式不会撑坏版式。
+    //
+    // 有一件**刻意没有照搬**：相机 App 里左右滑取景框就换模式，可地图的横向拖拽是**平移**。
+    // 抢掉它会让「拖地图」变成「换模式」—— 那比少一个手势糟得多。所以第 ③ 条只落实到
+    // 「条子自己可滚」。
+    //
+    // 为什么它不在顶部（原来的胶囊条在顶部）：那既不像地图（Maps 把模式选择放在纸的上沿，
+    // 紧挨它控制的内容），也不像相机（相机的模式条在内容下沿），还和顶部的同步状态抢同一条视线。
+    private var modeStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: TokensSpacing.xl) {
+                ForEach(MapSpineLayer.allCases) { l in
+                    let selected = l == layer
+                    Button {
+                        guard !selected else { return }
+                        layerRaw = l.rawValue
+                    } label: {
+                        VStack(spacing: 3) {
+                            Text(l.title)
+                                .font(TokensTypo.subheadline.weight(selected ? .semibold : .regular))
+                                .foregroundStyle(selected ? TokensPalette.accent : TokensPalette.secondary)
+                            // 车机/户外都读得出来的「当前模式」：相机靠颜色，我们再给一个 3pt 的点。
+                            Circle()
+                                .fill(selected ? TokensPalette.accent : Color.clear)
+                                .frame(width: 3, height: 3)
+                        }
+                        .padding(.vertical, TokensSpacing.xs)
+                        .frame(minWidth: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("看\(l.title)"))
+                    .accessibilityAddTraits(selected ? [.isSelected] : [])
+                }
+            }
+            .padding(.horizontal, TokensSpacing.xxs)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(TokensPalette.hairline)
                 .frame(height: TokensHair.line)
@@ -807,16 +848,10 @@ struct MapSpineView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                    DSSectionHeader(title: "地图上的地方")
-                    VStack(spacing: 0) {
-                        ForEach(MapSpineLayer.allCases) { l in
-                            indexRow(l.title, "\(l.icon)", "看\(l.title)") {
-                                layerRaw = l.rawValue
-                                showIndex = false
-                            }
-                        }
-                    }
-                    .background(cardBackground)
+                    // 「地图上的地方」这一组（四个图层入口）已删：
+                    // 模式条就长在纸的上沿、永远可见，再在目录里摆同一份四个入口，
+                    // 就是「同一件事两个入口」——缝合怪的第一来源。
+                    // 索引页从此只做一件事：列**离开地图**的深潜页。
 
                     indexGroup("这辆车", [.vehicle, .battery, .health, .data, .control, .tips])
                     indexGroup("出行", [.trips, .emergency])
