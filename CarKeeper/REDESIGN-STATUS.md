@@ -433,3 +433,48 @@ CI 静态门禁清单因此从 13 项变成 14 项（新增 `access`）。
 
 批 1 必须紧跟：**没有 Tab 栏 = 锁车/开空调多一次点击**。高频操作应该在批 1
 以「地图上的常驻操作条」补回来 —— 答案在地图上，不是把 Tab 栏加回来。
+
+## 15. 旧骨架的残留审计（批 0 之后）
+
+问得很对：批 0 只拆了**电话 App** 的骨架。全库扫一遍同类残留，结果是——
+
+### 15.1 电话壳层：确认清零
+
+`MainTab` / `selectedTab` / 四个 per-tab path / `clearTabPaths()` / `Deeplink.hostTab` /
+Tab 角标 / 切 Tab 朗读：全库各只剩 **一行「已整体删除」的说明性注释**。
+剩下两处 `TabView` 是合法的：引导页翻页（`PageTabViewStyle`）、watchOS 自己的 TabView。
+
+### 15.2 残留一：CI 只编译了 7 个 target 里的 1 个
+
+`scheme CarKeeper` 的 build action 只列了 `CarKeeper`，于是
+**WidgetBundle / CarPlay / AppClip / WatchApp / WatchKitApp 从来没有被 CI 编译过一次**。
+里面有错也看不见 —— 这正是「构建过了」这句话之前一直不成立的原因。
+
+现在 build job 末尾多了一步 **编译体检**（`Compile other targets`，非阻断）：
+逐个 `xcodebuild -target ... -sdk ...`，每个 target 单独一份 derived data，
+日志按目标分组。它排在**打包与 Release 上传之后**，所以不可能影响 ipa 产物。
+
+同时留下一个坑位说明：**等它绿了就该把它改成阻断的**。
+顺带踩掉一个自己差点写下的 bug —— 不要写 `xcodebuild ... | tail -40` 然后看管道退出码
+（那取的是 `tail` 的状态，恒为 0，失败会被当成成功）。先落盘再判断。
+
+### 15.3 残留二：同一个文件存在两份副本（Watch）
+
+`WatchApp.swift` 与 `ComplicationController.swift` 在磁盘上有**两份、
+分别属于两个 target**（扩展与 WatchKitApp），内容靠人肉保持一致 ——
+改一份忘另一份，两个 target 各跑各的，而且**没有任何检查会出声**。
+
+现在 `paths.py` 多三条文件级规则（都要先把每个 target 的 sources 展开到文件）：
+
+| 规则 | 现存状态 | 反向自测 |
+|---|---|---|
+| 同一 target 内不得有同名 .swift（重复符号，编译必挂） | 0 处 | 造一个同名副本 → ❌ 退出码 1 |
+| 跨 target 同名但不同路径的两份副本必须一字不差 | 4 组，全部一致 | 给一份加一行 → ❌ 报「已漂移」 |
+| project.yml 的每个 target 都必须被 CI 覆盖（scheme + 体检清单） | 7/7 覆盖 | 从清单里抽掉 WatchKitApp → ❌ 退出码 1 |
+
+第三条是双向的：CI 里点名了 spec 中不存在的 target 也会报（名字写错的那一类）。
+
+**没有修的那部分**：Watch 的这份「复制粘贴式共享」本身是债 ——
+正经做法是让扩展有自己的入口文件、把共享的东西抽成 framework。
+但它需要真机/真 Xcode 验证（watchOS 的 app 与扩展谁是 `@main` 载体，
+在没有编译器与真机的环境里靠猜改，比留着这条守卫风险大）。先由守卫兜住漂移。

@@ -124,6 +124,51 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # 编译体检（非阻断）：把 `scheme CarKeeper` **看不见**的那些 target 也编一遍。
+      #
+      # 为什么需要它：scheme 的 build action 只列了 CarKeeper 一个 target，所以
+      # WidgetBundle / CarPlay / AppClip / WatchApp / WatchKitApp 这 5 个
+      # **从来没有被 CI 编译过一次** —— 里面有错也看不见，问题只会在别人真正
+      # 去构建它们的那天集中爆发。
+      #
+      # 为什么现在是非阻断：它们第一次被编译，大概率有错（先从没编过）；
+      # 先把错误照出来，比让整条流水线红掉更有用。等它绿了就该把它改成阻断的。
+      #
+      # 下面这份清单是**唯一**的 target 覆盖说明，`scan/paths.py` 会读它：
+      # 新增了 target 却忘了加进这里，会被静态门禁直接拦下（Linux 上，秒级）。
+      - name: Compile other targets (non-blocking health check)
+        continue-on-error: true
+        run: |
+          cd CarKeeper
+          fail=0
+          for pair in WidgetBundle:iphoneos CarPlay:iphoneos AppClip:iphoneos WatchApp:watchos WatchKitApp:watchos; do
+            t="${pair%%:*}"
+            sdk="${pair##*:}"
+            echo "::group::编译 $t ($sdk)"
+            # 注意：不要写成 `xcodebuild ... | tail` —— 管道的退出码取自 tail（恒为 0），
+            # 失败会被当成成功。先落盘再判断。
+            if xcodebuild build \
+                 -project CarKeeper.xcodeproj \
+                 -target "$t" \
+                 -configuration Release \
+                 -sdk "$sdk" \
+                 CODE_SIGNING_ALLOWED=NO \
+                 CODE_SIGNING_REQUIRED=NO \
+                 -derivedDataPath "./DerivedData-$t" \
+                 -quiet > "/tmp/$t.log" 2>&1; then
+              echo "✅ $t 编译通过"
+            else
+              echo "❌ $t 编译失败："
+              tail -60 "/tmp/$t.log"
+              fail=1
+            fi
+            echo "::endgroup::"
+          done
+          if [ "$fail" != 0 ]; then
+            echo "::warning title=target 编译体检未全绿::上面有 target 编译失败。它们目前不作为门禁（从未被编译过，先看清错误）；修完应改为阻断。"
+          fi
+          exit 0
+
       - name: Failure hint
         if: failure()
         run: |

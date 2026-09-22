@@ -30,6 +30,8 @@ import os
 import re
 import sys
 
+import yaml
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SPEC = os.path.join(ROOT, "CarKeeper", "project.yml")
 SPEC_DIR = os.path.join(ROOT, "CarKeeper")   # xcodegen 以 spec 所在目录为基准
@@ -92,6 +94,147 @@ def stray_swift(paths):
             continue
         stray.append(norm[len(root) + 1:] if norm.startswith(root) else norm)
     return sorted(stray)
+
+
+SPEC_SOURCES_ITEM = re.compile(r"^    - path:\s*(\S+)\s*$")
+
+
+def target_source_files(spec_text):
+    """把 spec 里每个 target 的 sources 展开成「真参与编译的 Swift 文件」列表
+
+    为什么要展开到文件级（而不是只看路径存不存在）：
+      · 同一个 basename 落在**同一个** target 里两次 = 重复符号，编译必挂；
+      · 同一个 basename 落在**两个** target 里、但来自两条不同的路径 = 两份副本，
+        改一份忘另一份就会漂移。`WatchApp/WatchApp.swift` 与
+        `WatchApp/WatchApp/Sources/WatchApp.swift` 就是这种「故意的两份」——
+        本检查器的职责不是拆掉它们，而是保证它们始终一致。
+
+    只认 `    - path: X` 这一种写法（spec 里就是这种），子键用缩进判定。
+    """
+    lines = spec_text.split('\n')
+    start = next((i for i, l in enumerate(lines) if l.rstrip() == 'targets:'), None)
+    if start is None:
+        return {}
+    end = len(lines)
+    for i in range(start + 1, len(lines)):
+        l = lines[i]
+        if l and not l.startswith(' ') and l.rstrip().endswith(':'):
+            end = i
+            break
+
+    targets, cur, in_sources = {}, None, False
+    for i in range(start + 1, end):
+        l = lines[i]
+        m = re.match(r'^  ([A-Za-z0-9_]+):\s*$', l)
+        if m:
+            cur, in_sources = m.group(1), False
+            targets.setdefault(cur, [])
+            continue
+        if cur is None:
+            continue
+        if re.match(r'^    sources:\s*(\[\s*\])?\s*$', l):
+            in_sources = True
+            continue
+        if not in_sources:
+            continue
+        # 回到 4 空格缩进的非列表键（如 settings: / dependencies:）就说明 sources 块结束
+        if re.match(r'^    [A-Za-z]', l) and not l.startswith('    - '):
+            in_sources = False
+            continue
+        mp = SPEC_SOURCES_ITEM.match(l)
+        if mp:
+            targets[cur].append([mp.group(1), []])
+            continue
+        if re.match(r'^      excludes:\s*$', l):
+            continue
+        me = re.match(r"^      - '?([^']+)'?\s*$", l)
+        if me and targets[cur]:
+            targets[cur][-1][1].append(me.group(1).strip())
+    return targets
+
+
+def _exclude_matcher(pat):
+    """把 XcodeGen 的 excludes 通配（`**/.*`）翻成正则"""
+    rx, i = '', 0
+    while i < len(pat):
+        if pat.startswith('**/', i):
+            rx += '(?:.*/)?'
+            i += 3
+        elif pat.startswith('**', i):
+            rx += '.*'
+            i += 2
+        elif pat[i] == '*':
+            rx += '[^/]*'
+            i += 1
+        elif pat[i] == '?':
+            rx += '[^/]'
+            i += 1
+        else:
+            rx += re.escape(pat[i])
+            i += 1
+    return re.compile('^' + rx + '$')
+
+
+def expand_sources(entries):
+    """sources 条目 → 归一化后的 Swift 文件绝对路径集合"""
+    out = set()
+    for rel, excludes in entries:
+        base = os.path.join(SPEC_DIR, rel.rstrip('/'))
+        excl = [_exclude_matcher(e) for e in excludes]
+        if os.path.isfile(base):
+            cands, relbase = [base], os.path.dirname(base)
+        else:
+            cands, relbase = glob.glob(os.path.join(base, '**', '*.swift'), recursive=True), base
+        for p in cands:
+            if not p.endswith('.swift'):
+                continue
+            relp = os.path.relpath(p, relbase).replace(os.sep, '/')
+            if any(e.match(relp) for e in excl):
+                continue
+            out.add(os.path.normpath(p).replace(os.sep, '/'))
+    return out
+
+
+def workflow_build_targets(workflow_dir):
+    """CI 里 `for pair in Target:sdk ...; do` 这种编译体检清单点名的 target
+
+    为什么必须读它：scheme 的 build action 只列了主 App，其余 target 是
+    靠这段循环编的。清单漏了谁，谁就永远不被编译 —— 这正是 2026-09-22 之前的
+    真实状态（WidgetBundle / WatchApp / WatchKitApp / CarPlay / AppClip 从未编译过）。
+    """
+    out = []
+    if not os.path.isdir(workflow_dir):
+        return out
+    for name in sorted(os.listdir(workflow_dir)):
+        if not name.endswith(('.yml', '.yaml')):
+            continue
+        with open(os.path.join(workflow_dir, name), encoding='utf-8') as f:
+            text = f.read()
+        for var, items in LOOP_HEAD.findall(text):
+            if var == 's':          # `for s in scan logic ...` 是检查器列表，不是 target
+                continue
+            for token in items.split():
+                token = token.strip().strip('"').strip("'")
+                if not token or token.startswith('#'):
+                    continue
+                t = token.split(':')[0]
+                if t not in out:
+                    out.append(t)
+    return out
+
+
+def scheme_targets(data):
+    """schemes: 里 build / test 两个阶段点名的 target"""
+    out = set()
+    for _name, body in (data.get('schemes') or {}).items():
+        for phase in ('build', 'test'):
+            blk = (body or {}).get(phase) or {}
+            v = blk.get('targets')
+            if isinstance(v, list):
+                out.update(x for x in v if isinstance(x, str))
+            elif isinstance(v, dict):
+                out.update(v.keys())
+    return out
 
 
 def workflow_checkers(workflow_dir):
@@ -206,6 +349,71 @@ def main(argv):
             for s in stray:
                 print("  ❌ " + s)
             problems.append(f"{len(stray)} 个 Swift 文件永远不会被编译（改了等于没改）")
+
+    # ---- 文件级规则：每个 target 实际编译哪些 .swift ------------------------
+    # 三条都属于「编译器会说、但要等一整轮 macOS runner」的那一类：
+    #   ① 同一 target 内同名 → 重复符号（编译必挂）
+    #   ② 跨 target 同名但来自不同路径 → 两份副本，内容必须一字不差（防漂移）
+    #   ③ project.yml 里的每个 target 都必须被 CI 覆盖（scheme 或体检清单）
+    if spec == SPEC:
+        with open(spec, encoding='utf-8') as f:
+            spec_text = f.read()
+        files = {t: expand_sources(e) for t, e in target_source_files(spec_text).items()}
+        if files:
+            print(f"\ntarget 文件清单（{len(files)} 个 target，"
+                  f"{sum(len(v) for v in files.values())} 个 .swift 参与编译）")
+            for t in sorted(files):
+                print(f"  · {t}: {len(files[t])} 个")
+
+            # ① 同一 target 内同名
+            for t, fs in files.items():
+                byname = {}
+                for f in fs:
+                    byname.setdefault(os.path.basename(f), []).append(f)
+                for n, ps in sorted(byname.items()):
+                    if len(ps) > 1:
+                        rel = [p[len(ROOT) + 1:] if p.startswith(ROOT) else p for p in sorted(ps)]
+                        print(f"  ❌ {t} 内同名：{n} ← " + " / ".join(rel))
+                        problems.append(f"target {t} 里有 {len(ps)} 个同名文件 {n}"
+                                        "（同一个 target 编两份 → 重复符号）")
+
+            # ② 跨 target 的两份副本必须一致
+            groups = {}
+            for t, fs in files.items():
+                for f in fs:
+                    groups.setdefault(os.path.basename(f), set()).add(f)
+            for n, ps in sorted(groups.items()):
+                if len(ps) < 2:
+                    continue
+                blobs = {}
+                for p in sorted(ps):
+                    with open(p, 'rb') as f:
+                        blobs[p] = f.read()
+                if len(set(blobs.values())) > 1:
+                    rel = [p[len(ROOT) + 1:] if p.startswith(ROOT) else p for p in sorted(ps)]
+                    print(f"  ❌ 两份副本已漂移：{n} ← " + " / ".join(rel))
+                    problems.append(f"{n} 有两份不同内容的副本（" + " / ".join(rel) +
+                                    "）—— 改了一份忘另一份，两个 target 会各跑各的")
+                else:
+                    rel = [p[len(ROOT) + 1:] if p.startswith(ROOT) else p for p in sorted(ps)]
+                    print(f"  ✅ 跨 target 同名副本一致：{n} ← " + " / ".join(rel))
+
+            # ③ 每个 target 都要被 CI 编到
+            with open(spec, encoding='utf-8') as f:
+                data = yaml.safe_load(f) or {}
+            all_targets = set(data.get('targets') or {})
+            covered = scheme_targets(data) | set(workflow_build_targets(WORKFLOW_DIR))
+            if all_targets:
+                print(f"\ntarget 的 CI 覆盖（scheme + 编译体检清单）")
+                for t in sorted(all_targets):
+                    ok = t in covered
+                    print(("  ✅ " if ok else "  ❌ ") + t)
+                    if not ok:
+                        problems.append(f"target {t} 没有任何 CI 步骤会编译它"
+                                        "（scheme 的 build action 里没有它，体检清单里也没有）")
+            for t in sorted(covered - all_targets):
+                print("  ❌ " + t + "（CI 点名了，但 project.yml 里没有这个 target）")
+                problems.append(f"CI 点名编译 {t}，但 project.yml 里没有这个 target（名字写错了？）")
 
     print()
     if problems:
