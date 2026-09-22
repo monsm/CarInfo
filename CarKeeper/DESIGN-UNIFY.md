@@ -327,3 +327,18 @@ ScrollView {
 >
 > 其中「大小写敏感的下标」这一类（以前是 77 处）已收敛成常驻门禁 **[`scan/keys.py`](../scan/keys.py)**：
 > 内置 441 个真实报文键，写错大小写直接红。一次性审计脚本已删除（它们只活了一轮）。
+
+---
+
+### 第四轮：全界面风格统一（2026-09-22 第四轮）
+
+| # | 做了什么 | 落在哪个面 |
+|---|---|---|
+| ✅17 | **字体字面量清零**：`BatteryView` / `DevView` / `EmergencyPanel` / `HealthDataView` / `MaintenanceMoneyView` / `MineView` / `MapQuickBar` / `CarKeeperApp` / `MileageJournalSection` / `EnhancedToastManager` / `FamilyAndKeySharing` 全部改用 `TokensTypo.fixed(N)` / `.caption` / `.title2` 等语义阶梯；AppClip 改用 `WT.Typo`（不破坏其命名空间隔离） | 全部深潜面 |
+| ✅18 | **图标一律 `safeSymbol`**：全库 `Image(systemName:)` 替换为 `Image(safeSymbol: N, fallback: N)`，防止主题切换时 icon 静默消失 | 全部深潜面 |
+| ✅19 | **颜色字面量清零**：`.fill(.secondary)` / `.foregroundStyle(.secondary)` / `.foregroundColor(.secondary)` 全部改走 `TokensPalette.secondary`（换主题时自动跟随） | `ControlView`（两处指示条）+ `FamilyAndKeySharing` + `EnhancedToastManager` |
+
+**门禁同步**：`scan/design.py` 已能拦截 `.font(.system(size: N)` 和 `.fill(.secondary)` 这类用法；`check_style.js` 与 `scan/keys.py` 不变。全库 `Image(systemName:)` 从原来散在 Design 组件里的合法用例（`DS.swift` 里 2 处设计层内部调用）+ 业务层的 40+ 处 → 业务层全部换成 `safeSymbol`；Design 层的 2 处保留（因为它们是设计系统的**实现细节**，不是界面调用）。
+
+> ⚠️ `ThemeGalleryView.swift` 仍豁免：它的职责是展示主题的真实取值，**必须用原始字号**。
+> ⚠️ Watch 仍豁免：watchOS 有自己的字号阶梯，不共享 `TokensTypo`。
