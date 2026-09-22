@@ -54,6 +54,7 @@ struct DevView: View {
                 kvGroup("几何", geometry, footer: "页面边距 20pt、分组圆角 12pt、发丝线 0.5pt 是全 App 的定值。")
                 kvGroup("动效", motion, footer: "只有两类：状态变化的弹簧，以及一次性绘制。")
                 kvGroup("运行状态", runtime)
+                capabilityGroups
                 actionsGroup
                 kvGroup("关于", about)
             }
@@ -252,8 +253,10 @@ struct DevView: View {
     private var runtime: [(String, String)] {
         let homeLoad = UserDefaults.standard.double(forKey: "carkeeper_home_load_time")
         let cachedCount = store.caches.compactMap { $0.value }.count
-        let mileage = UserDefaults.standard.integer(forKey: "carkeeper_current_mileage")
+        let mileage = UserDefaults.standard.integer(forKey: AppStore.currentMileageKey)
         let lastService = UserDefaults.standard.integer(forKey: AppStore.lastServiceMileageKey)
+        // 同一辆车、同一份报文算出来的保养计划（间隔与上次保养来自服务端字段）
+        let plan = store.maintenancePlan
         let crashes = crashReporter.readCrashHistory().count
 
         return [
@@ -277,6 +280,12 @@ struct DevView: View {
             ("摇一摇锁车", ShakeDetector.shared.isEnabled ? "已开启" : "关闭"),
             ("专注模式", focus.config.enabled ? "已开启" : "关闭"),
             ("车端里程", mileage > 0 ? "\(mileage) km" : "未取到"),
+            // 保养计划：这里要看得出「数字从哪来」—— 服务端字段（20000 / 20100）
+            // 与本机兜底（10000 / 用户手记）会给出完全不同的结论。
+            ("保养计划", plan.map { p in
+                let src = p.fromServer ? "车厂计划" : "本机记录"
+                return "\(p.last) + \(p.interval) = \(p.next) km（\(src)，当前 \(p.current)）"
+            } ?? "未登记"),
             ("上次保养里程", lastService > 0 ? "\(lastService) km" : "未设置")
         ]
     }
@@ -290,6 +299,45 @@ struct DevView: View {
     }
 
     private var networkText: String { store.networkStatus.rawValue }
+
+    // MARK: - 能力位图（car.funCode）
+
+    /// 服务端 `funCode` 说这辆车有什么功能：本次抓包 7 个分组、43 个开关。
+    ///
+    /// 这里**故意只显示原文**（键名 + 1/0）。43 个缩写里只有少数能自证
+    /// （`StateWindow` 车窗、`Statelock` 门锁）；其余（`zjcsStatusRC`/`openPJ`/
+    /// `openBY`/`isFence`/`#18`…）没有任何可核实的依据，参考实现也零引用。
+    /// 而且**两组同名开关互相矛盾**（本车 `remoteBaseControl.airBtn = 1` 而
+    /// `remoteBaseControl_XNY.airBtn = 0`），无从判断哪一组作准。
+    /// 猜一个中文写上去就是换一种方式说谎；按 0 隐藏控件又可能藏掉真能用的功能。
+    /// 所以位图留在这里当证据 —— 等某组位与真实车控的失败一一对应，
+    /// 再让 `VM.Capability.on` 去驱动界面。
+    private var capabilityGroups: some View {
+        let caps = VM.capabilities(store.car)
+        let groups = Dictionary(grouping: caps, by: { $0.group })
+        return VStack(alignment: .leading, spacing: TokensSpacing.md) {
+            if caps.isEmpty {
+                kvGroup("能力位图", [("funCode", "未取到")],
+                        footer: "getMyCars 里没有 FunCode，或它的 JSON 没解析出来。")
+            } else {
+                DSSectionHeader(title: "能力位图（funCode 原文）")
+                ForEach(groups.keys.sorted(), id: \.self) { g in
+                    let items = groups[g] ?? []
+                    let onCount = items.filter { $0.on }.count
+                    DSExpandGroup(title: g,
+                                  trailing: "\(onCount)/\(items.count)",
+                                  trailingCls: onCount == items.count ? "ok" : "na") {
+                        ForEach(Array(items.enumerated()), id: \.offset) { idx, c in
+                            DSGroupRow(showsSeparator: idx < items.count - 1) {
+                                DSKeyValueRow(key: c.key, value: c.on ? "1" : "0",
+                                              valueCls: c.on ? "ok" : "na")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     private var actionsGroup: some View {
         DSGroup(title: "操作", footer: "诊断信息包含版本、车辆 ID、缓存与网络状态，用于报障时贴给开发。") {

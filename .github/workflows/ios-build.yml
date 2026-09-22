@@ -39,7 +39,12 @@ jobs:
           # design.py：字号 / 颜色分量 / 色相字面量只允许出现在令牌定义文件里。
           # 这一条把「完全统一」变成可执行的约束 —— 否则下一轮又会有人写 .font(.system(size: 14))，
           # 而没有任何东西会出声（它编译得过、看起来也“能用”）。
-          for s in paths design access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol; do
+          # keys.py：报文键只准通过 ci* 家族读取。
+          # 2026-09-22 抓包证实服务端键一律首字母小写（remainPower / totalOdometer），
+          # 而我们 Swift 的 [String: Any] 下标是大小写敏感的 —— 写成 ["RemainPower"] 就是
+          # 永远 nil，而 nil 经过 num() 又常常变成 0，于是界面显示成一种「正常状态」
+          # （车锁车窗恒「已锁/已关」就是这么来的）。这类 bug 不报错、不崩溃，只能靠门禁。
+          for s in paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol; do
             echo "::group::$s.py"
             python3 scan/$s.py
             echo "::endgroup::"

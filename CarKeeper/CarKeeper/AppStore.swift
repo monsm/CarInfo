@@ -43,11 +43,29 @@ final class AppStore: @unchecked Sendable {
         let startedAt: Date
         let finishedAt: Date?
         let success: Bool
+        /// 车端是否给出了**可识别**的回执结果。
+        /// `false` = 指令发出去了、但结果未知（60 秒没等到终态，或服务端的状态值我们还不认识）——
+        /// 这种情况既不是成功也不是失败，界面要显示成「未确认」，不能沿用「失败」。
+        let confirmed: Bool
         let duration: TimeInterval  // 执行耗时（秒）
 
         // 颜色只能从令牌来：`.green` / `.red` 在四套艺术主题里都不会跟着变。
-        var statusColor: Color { success ? TokensPalette.success : TokensPalette.error }
-        var iconName: String { success ? "checkmark.circle.fill" : "xmark.circle.fill" }
+        var statusColor: Color {
+            if !confirmed { return TokensPalette.warning }
+            return success ? TokensPalette.success : TokensPalette.error
+        }
+        var iconName: String {
+            if !confirmed { return "questionmark.circle.fill" }
+            return success ? "checkmark.circle.fill" : "xmark.circle.fill"
+        }
+        var resultText: String {
+            if !confirmed { return "未确认" }
+            return success ? "成功" : "失败"
+        }
+        var statusCls: String {
+            if !confirmed { return "na" }
+            return success ? "ok" : "bad"
+        }
         // 一条车控指令通常是几秒到几十秒。原来这里一律按分钟显示，
         // 于是每一次都是「0min」—— 看起来像数据，其实是把秒数除没了。
         var durationText: String {
@@ -57,14 +75,23 @@ final class AppStore: @unchecked Sendable {
         }
     }
 
-    func addCommandHistory(cmd: String, name: String, success: Bool, duration: TimeInterval) {
-        commandHistory.insert(HistoryEntry(cmd: cmd, name: name, startedAt: Date().advanced(by: -duration), finishedAt: Date(), success: success, duration: duration), at: 0)
+    func addCommandHistory(cmd: String, name: String, success: Bool,
+                           duration: TimeInterval, confirmed: Bool = true) {
+        commandHistory.insert(HistoryEntry(cmd: cmd, name: name,
+                                          startedAt: Date().advanced(by: -duration),
+                                          finishedAt: Date(), success: success,
+                                          confirmed: confirmed, duration: duration), at: 0)
         // 只保留最近 50 条
         if commandHistory.count > 50 { commandHistory = Array(commandHistory.prefix(50)) }
     }
 
     // #16 维保里程记录（UserDefaults 持久化）
     nonisolated static let lastServiceMileageKey = "carkeeper_last_service_mileage"
+
+    /// 车端当前里程。唯一写入点是 `recordHistory()`（读 `control.totalOdometer`），
+    /// 读取点有 DevView 与保养提醒。写成常量是因为「同一个键名字符串散在三处」
+    /// 早晚会有一处拼错 —— 拼错不会报错，只会安静地读回 0。
+    nonisolated static let currentMileageKey = "carkeeper_current_mileage"
 
     /// 上次选中的车辆 id（重启后恢复，否则每次都跳回第一辆）
     nonisolated static let selectedCarIdKey = "carkeeper_selected_car_id"
@@ -113,10 +140,17 @@ final class AppStore: @unchecked Sendable {
         }
         let startSoc: Int
         let endSoc: Int
-        let avgEfficiency: Double?  // kWh/100km
+        /// kWh/100km。**需要电池容量**才算得出，而报文里的 `capacity` 是 `null` ——
+        /// 所以这个字段目前为 nil（以前硬编码 15 kWh 算出一个假数字）。
+        let avgEfficiency: Double?
+        /// 每 1% SOC 跑了多少 km —— **不需要容量**的口径，因此是目前唯一真算得出的能效指标。
+        let kmPerPercent: Double?
     }
     var tripHistory: [TripRecord] = []
-    private var currentTrip: (startTime: Date, startSoc: Int, startLocation: CLLocation?)? = nil
+    /// 正在进行的行程。`startMileage` 来自点火那一刻的 `control.totalOdometer`，
+    /// 它和熄火时的里程相减就是这一段真跑了多远（没有它就只能猜）。
+    private var currentTrip: (startTime: Date, startSoc: Int,
+                              startLocation: CLLocation?, startMileage: Int?)? = nil
 
     // #NEW-1 停车位置
     var parkingLocation: CLLocation? {
@@ -151,19 +185,46 @@ final class AppStore: @unchecked Sendable {
     var isOfflineMode: Bool = false
     var offlineMessage: String = ""
 
+    /// 跨面交接：出行面点「在图上看看」→ 地图把镜头移到这里（地图消费后清空）。
+    /// 用结构体而不是元组：`@Published` 给 SwiftUI 的 `onChange` 需要 `Equatable`。
+    struct MapFocus: Equatable, Identifiable {
+        let lat: Double
+        let lng: Double
+        let label: String
+        var id: String { "\(lat),\(lng)" }
+    }
+    @Published var mapFocus: MapFocus? = nil
+
     // #驾驶安全评分 — 只由**行程里真有的事实**推出来（0-100）。没有事实就是 nil。
     // 返回类型是 Int? 是刻意的：早先这里在"没有任何行程"时返回 75，
     // 于是"不知道"和"中等水平"在界面上长得一模一样。不知道就得是不知道。
     var drivingScore: Int? {
         let recent = Array(tripHistory.prefix(10))
         let efforts = recent.compactMap { $0.avgEfficiency }
-        // 一个能耗读数都没有 → 不给分。
-        // 分母也必须是**真有读数的条数**：原来除以 recent.count，
-        // 缺读数的行程会把平均值拉低成一个谁也不认识的数。
-        guard !efforts.isEmpty else { return nil }
-        let avg = efforts.reduce(0.0, +) / Double(efforts.count)
-        // 能耗越低评分越高：基准 15 kWh/100km，每高出 1 度扣 4 分（与评分页同一个口径）
-        let efficiencyScore = max(0, min(100, Int(100 - (avg - 15) * 4)))
+        let kmPerPct = recent.compactMap { $0.kmPerPercent }
+        // 能效分有两套口径，能用哪套取决于我们**真的知道**什么：
+        //   ① kWh/100km（优先）：只有知道电池容量时才算得出 —— 目前算不出。
+        //   ② 每 1% SOC 跑多少 km：不需要容量。但它只能**与自己比**：
+        //      基线取自己最近行程的中位数（车、人、路况、季节都不同，跨车主比没有意义）。
+        let efficiencyScore: Int?
+        if !efforts.isEmpty {
+            // 分母必须是**真有读数的条数**：原来除以 recent.count，
+            // 缺读数的行程会把平均值拉低成一个谁也不认识的数。
+            let avg = efforts.reduce(0.0, +) / Double(efforts.count)
+            efficiencyScore = max(0, min(100, Int(100 - (avg - 15) * 4)))
+        } else if kmPerPct.count >= 2, let latest = kmPerPct.first {
+            let sorted = kmPerPct.sorted()
+            let median = sorted[sorted.count / 2]
+            guard median > 0 else { return nil }
+            // 比自己的中位数跑得更远＝省；±30% 视为满分/零分。
+            let ratio = latest / median
+            efficiencyScore = max(0, min(100, Int((ratio - 0.7) / 0.6 * 100)))
+        } else {
+            // 还没有任何可比的东西 → **不给分**（"不知道"不能长得像"中等水平"）。
+            return nil
+        }
+        guard let efficiencyScore else { return nil }
+        guard !recent.isEmpty else { return nil }
         // 短途占比：短途多说明这段时期跑得都不远，不完全是"稳"，所以只占一半权重
         let shortTripRatio = Double(recent.filter { $0.distanceKm < 5 }.count) / Double(recent.count)
         let stabilityScore = Int(shortTripRatio * 50 + 50)
@@ -194,41 +255,157 @@ final class AppStore: @unchecked Sendable {
         if energyHistory.count > 20 { energyHistory = Array(energyHistory.suffix(20)) }
     }
 
-    // #NEW-1 记录停车位置
-    func saveParkingLocation(_ location: CLLocation?, at time: Date? = nil) {
-        parkingLocation = location
-        lastParkingTime = time ?? Date()
+    // MARK: - 停车点（唯一的写入点是事件流里的「熄火」）
+    struct ParkingPoint: Codable {
+        let lat: Double
+        let lng: Double
+        let time: Date
+        let address: String
+    }
+    nonisolated static let parkingPointsKey = "carkeeper_parking_points"
+
+    /// 停车点序列（持久化）。服务端**没有**「停车历史」接口，这些点只能从事件流里攒；
+    /// 而以前 `parkingHistory` 是个进程内数组、全库只有读没有写 —— 所以「常停热区」永远是空的。
+    var parkingPoints: [ParkingPoint] {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: Self.parkingPointsKey),
+                  let list = try? JSONDecoder().decode([ParkingPoint].self, from: data) else { return [] }
+            return list
+        }
+        set {
+            let capped = Array(newValue.suffix(200))
+            if let data = try? JSONEncoder().encode(capped) {
+                UserDefaults.standard.set(data, forKey: Self.parkingPointsKey)
+            }
+        }
     }
 
-    // #NEW-2 开始新行程
-    func startTrip(_ location: CLLocation? = nil, soc: Int? = nil) {
+    // #NEW-1 记录停车位置（`address` 来自事件的 `jumpParam.addrName`）
+    func saveParkingLocation(_ location: CLLocation?, at time: Date? = nil, address: String = "") {
+        parkingLocation = location
+        lastParkingTime = time ?? Date()
+        guard let c = location?.coordinate else { return }
+        // 同一个地方反复熄火只算一次：与上一个点相距 < 120 m 就当同一次停放
+        // （GPS 抖动几十米是常态，逐条追加会把热区淹掉）。
+        var points = parkingPoints
+        if let last = points.last {
+            let d = CLLocation(latitude: last.lat, longitude: last.lng)
+                .distance(from: CLLocation(latitude: c.latitude, longitude: c.longitude))
+            if d < 120 { return }
+        }
+        points.append(ParkingPoint(lat: c.latitude, lng: c.longitude,
+                                   time: time ?? Date(), address: address))
+        parkingPoints = points
+    }
+
+    // #NEW-2 开始新行程（唯一的调用方是 `ingestEvents` 里的点火事件）
+    /// 为什么带 `at:` / `mileage:`：事件自带**那一刻**的时刻与里程。
+    /// 我们是在事后（用户打开 App）才读到这些事件的，用「现在」当起点会把行程算歪。
+    func startTrip(_ location: CLLocation? = nil, soc: Int? = nil,
+                   at time: Date? = nil, mileage: Int? = nil) {
         let currentSoc = soc ?? (energyHistory.last?.soc ?? 0)
-        currentTrip = (Date(), currentSoc, location)
+        currentTrip = (startTime: time ?? Date(), startSoc: currentSoc,
+                       startLocation: location, startMileage: mileage)
     }
 
     // #NEW-2 结束行程
-    func endTrip(distanceKm: Double, endSoc: Int? = nil, endLocation: CLLocation? = nil) -> TripRecord? {
+    func endTrip(distanceKm: Double, endSoc: Int? = nil,
+                 endLocation: CLLocation? = nil, at time: Date? = nil) -> TripRecord? {
         guard let trip = currentTrip else { return nil }
         let endSoc = endSoc ?? (energyHistory.last?.soc ?? 0)
-        let avgEfficiency: Double?
-        if trip.startSoc > endSoc && distanceKm > 0 {
-            let energyUsed = Double(trip.startSoc - endSoc) / 100.0 * 15.0  // 假设电池容量15kWh
-            avgEfficiency = (distanceKm > 0) ? energyUsed / distanceKm * 100 : nil
-        } else { avgEfficiency = nil }
+        let socUsed = trip.startSoc - endSoc
+        // 每 1% SOC 多少 km：不需要电池容量。原来用硬编码的 15 kWh 算 kWh/100km，
+        // 算出来的是「假设」而不是读数，所以那个字段现在老实返回 nil。
+        let kmPerPercent: Double? = (socUsed > 0 && distanceKm > 0)
+            ? distanceKm / Double(socUsed) : nil
         let record = TripRecord(
             startTime: trip.startTime,
-            endTime: Date(),
+            endTime: time ?? Date(),
             startLocation: trip.startLocation,
             endLocation: endLocation,
             distanceKm: distanceKm,
             startSoc: trip.startSoc,
             endSoc: endSoc,
-            avgEfficiency: avgEfficiency
+            avgEfficiency: nil,
+            kmPerPercent: kmPerPercent
         )
         tripHistory.insert(record, at: 0)
         if tripHistory.count > 50 { tripHistory = Array(tripHistory.prefix(50)) }
         currentTrip = nil
         return record
+    }
+
+    // MARK: - 事件 → 行程（这是**唯一**的行程生成器）
+    //
+    // 消息事件流里已经有：点火/熄火、那一刻的坐标、地址、毫秒时刻。
+    // 把它们配成对就是一段行程的骨架；行程里程用点火与熄火两次的
+    // `control.totalOdometer` 相减。
+    //
+    // ⚠️ 没有轨迹点。`isPrivacyDrvingHistory: 1` 说明车端根本不上传行驶轨迹，
+    // 所以只能给「起点 + 终点 + 停留」，**绝不能画一条连线当成走过的路**。
+
+    /// 已处理事件（`stubId`）。服务端每次都把同一个 7 天窗口整段返回，
+    /// 同一条点火事件会被反复读到 —— 不去重就会每次刷新都多出几段重复行程。
+    /// `stubId`（`1:<uuid>:<时间戳>:<序号>`）正是服务端给的幂等键。
+    private var processedEventIds: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: "carkeeper_processed_event_ids") ?? []) }
+        set { UserDefaults.standard.set(Array(newValue.suffix(2000)),
+                                        forKey: "carkeeper_processed_event_ids") }
+    }
+
+    /// `jumpParam` 是一段**被包在字符串里的 JSON**，事件的机器可读字段在这里：
+    /// `gpsTime` / `lat` / `lng` / `addrName` / `eventActionTime` / `flameoutReason`。
+    /// 消息正文（`content`）是给人读的中文句子，不能当数据源用。
+    nonisolated static func jumpParams(_ m: [String: Any]) -> [String: Any] {
+        guard let raw = ciString(m, ["JumpParam", "jumpParam"]), !raw.isEmpty,
+              let obj = jsonToAny(raw) as? [String: Any] else { return [:] }
+        return (obj["uriParams"] as? [String: Any]) ?? obj
+    }
+
+    /// 把消息事件流喂给行程生成器（幂等：已处理过的 `stubId` 直接跳过）。
+    func ingestEvents(_ messages: [[String: Any]]) {
+        guard !carId.isEmpty else { return }
+        var seen = processedEventIds
+        let events = messages.compactMap { m -> (id: String, ignition: Bool, at: Date,
+                                                  loc: CLLocation?, addr: String)? in
+            guard let kind = ciString(m, ["InfoTypeId", "infoTypeId"])?.uppercased(),
+                  kind == "IGNITION" || kind == "FLAMEOUT" else { return nil }
+            let id = ciString(m, ["StubId", "stubId"]) ?? ciString(m, ["Id", "id"]) ?? ""
+            guard !id.isEmpty, !seen.contains(id) else { return nil }
+            let p = Self.jumpParams(m)
+            guard let at = VM.serverDate(p["gpsTime"])
+                    ?? VM.serverDate(ciPick(m, ["CreatedAt", "createdAt"])) else { return nil }
+            var loc: CLLocation?
+            if let lat = VM.vnum(p["lat"]), let lng = VM.vnum(p["lng"]) {
+                loc = CLLocation(latitude: lat, longitude: lng)
+            }
+            return (id, kind == "IGNITION", at, loc, (p["addrName"] as? String) ?? "")
+        }
+        // 报文里消息是**倒序**（最新在前）：顺序弄反就会把熄火当成点火。先按时刻升序。
+        let ordered = events.sorted { $0.at < $1.at }
+        guard !ordered.isEmpty else { return }
+
+        let soc = ciNumberInt(ciVal(caches, "charge"), ["RemainPower"])
+        let mileage = ciNumber(ciVal(caches, "control"), ["TotalOdometer"]).map { Int($0.rounded()) }
+        for e in ordered {
+            seen.insert(e.id)
+            if e.ignition {
+                startTrip(e.loc, soc: soc, at: e.at, mileage: mileage)
+            } else {
+                // 里程差只在「点火与熄火发生在同一次会话内」时才真实：
+                // 如果是几天前的历史事件，两端的 currentMileage 都是今天的值，
+                // 差值会是 0 —— 那就写 0，不编一个「估算里程」。
+                let km: Double
+                if let start = currentTrip?.startMileage, let end = mileage, end >= start {
+                    km = Double(end - start)
+                } else {
+                    km = 0
+                }
+                _ = endTrip(distanceKm: km, endSoc: soc, endLocation: e.loc, at: e.at)
+                saveParkingLocation(e.loc, at: e.at, address: e.addr)
+            }
+        }
+        processedEventIds = seen
     }
 
     // #NEW-4 打卡
@@ -538,6 +715,11 @@ final class AppStore: @unchecked Sendable {
             caches[k] = v
             cacheTimestamps[k] = now
         }
+        // 事件 → 行程：消息缓存是**唯一**的入口（网络与缓存共用同一条路径，
+        // 所以「上次打开时拿到的那些事件」也会被补上，不会只算新来的）。
+        if let msgs = patch["messages"] as? [[String: Any]] {
+            ingestEvents(msgs)
+        }
         // #13 记录能耗快照（ciNumberInt 同时兼容字符串与数字两种返回）
         if let charge = patch["charge"] as? [String: Any] {
             let soc = ciNumberInt(charge, ["RemainPower"])
@@ -570,9 +752,10 @@ final class AppStore: @unchecked Sendable {
         let e = VM.energy(caches, car)
         let control = ciVal(caches, "control")
 
-        // 充电功率：EnergyModel 里的 power 是给人看的字符串（"7 kW"），
-        // 曲线要的是数值，所以直接读报文 —— 键名与 VM.energy 里完全一致。
-        let pow = ciNumber(ciVal(caches, "charge"), ["ChargPower", "ChargingPower"])
+        // 充电功率：EnergyModel 里的 power 是给人看的字符串（"7 kW"），曲线要的是数值。
+        // 算法只有一份（VM.chargePowerKW）：报文里的 ChargPower / ChargingPower **并不存在**，
+        // 真实功率 = totalVoltage × totalCurrent。
+        let pow = VM.chargePowerKW(ciVal(caches, "charge"), control)
 
         // 顺带把功率补进 AppStore 的短历史：实时功耗页与小组件读的都是它，
         // 而它此前**没有任何地方写入过** —— 所以小组件上的功率永远显示 "--"。
@@ -597,19 +780,25 @@ final class AppStore: @unchecked Sendable {
         ChargingStatusMonitor.shared.observe(soc: e.socPct, charging: isCharging, powerKW: pow)
 
         // #NEW-118 维保提醒的真实里程。
-        // `MaintenanceReminderScheduler` 读的是 `carkeeper_current_mileage`，
-        // 而全库**只有读、没有写** —— 那个键恒为 0，所以提醒里永远是
-        // 「距下次保养 10000 km」，永远不会触发。这里补上唯一的写入点。
-        if let km = ciNumber(control, ["Mileage", "mileage", "TotalMileage"]), km > 0 {
+        // 里程键是 `totalOdometer`（本车 53766.4，Double）。此前这里读的是
+        // `Mileage` / `mileage` / `TotalMileage` —— 三个键**都不存在**，于是
+        // `carkeeper_current_mileage` 恒为 0，提醒里永远是「距下次保养 10000 km」，
+        // 永远不会触发；手表与小组件的「总里程」也恒为 0。
+        if let km = ciNumber(control, ["TotalOdometer"]), km > 0 {
             let intKm = Int(km.rounded())
-            let previous = UserDefaults.standard.integer(forKey: "carkeeper_current_mileage")
+            let previous = UserDefaults.standard.integer(forKey: Self.currentMileageKey)
             if previous != intKm {
-                UserDefaults.standard.set(intKm, forKey: "carkeeper_current_mileage")
-                let lastService = UserDefaults.standard.integer(forKey: Self.lastServiceMileageKey)
-                if lastService > 0 {
-                    Task { await MaintenanceReminderScheduler.shared
-                        .scheduleMaintenanceReminder(lastServiceMileage: lastService, currentMileage: intKm) }
-                }
+                UserDefaults.standard.set(intKm, forKey: Self.currentMileageKey)
+                // 小组件（widget_mileage）与表盘（watch_mileage）读的都是这个属性
+                if totalMileage != intKm { totalMileage = intKm }
+            }
+            // 保养计划：间隔与上次保养里程来自服务端（maintainSpaceMileage /
+            // lastMaintainMileage），不再是硬编码的 10000 km。
+            if let plan = maintenancePlan, previous != intKm {
+                Task { await MaintenanceReminderScheduler.shared.scheduleMaintenanceReminder(
+                    lastServiceMileage: plan.last,
+                    currentMileage: plan.current,
+                    interval: plan.interval) }
             }
         }
     }
@@ -668,8 +857,12 @@ final class AppStore: @unchecked Sendable {
             chargeCls: e.chargeCls,
             updatedAt: Date()
         )
-        // 内容真变了才刷小组件时间线、才动实时活动：
-        // 车况每 60 秒轮询一次，无条件刷新会把小组件的刷新预算烧光。
+        // 内容真变了才刷小组件时间线、才动实时活动。
+        //
+        // ⚠️ 这里原来写着「车况每 60 秒轮询一次」—— 那句注释把行为说得比现实更勤快：
+        // 全库**没有车辆轮询循环**（只有指令结果轮询 12×5 s、短信倒计时、后台刷新 15/30 min）。
+        // 车况刷新只发生在用户动作或回到前台时，所以这一层「内容没变就不推」比注释里
+        // 设想的情形更必要 —— 它现在是真的在防重复推送。
         if SharedStore.write(snapshot) {
             LiveActivityBridge.sync(snapshot)
         }
@@ -724,7 +917,8 @@ final class AppStore: @unchecked Sendable {
 
     func logout() {
         cancelPreload()
-        UserDefaults.standard.removeObject(forKey: tokenStorageKey)
+        // 令牌在 Keychain 里 —— 只删 UserDefaults 那个旧键等于没退出登录。
+        TokenStore.clear()
         UserDefaults.standard.removeObject(forKey: cacheStorageKey)
         UserDefaults.standard.removeObject(forKey: Self.selectedCarIdKey)
         deletePin()  // #8 退出时清除Keychain中的PIN
@@ -817,20 +1011,32 @@ final class AppStore: @unchecked Sendable {
         return CLLocation(latitude: lat, longitude: lng)
     }
 
-    // 停车历史
+    // 停车历史（视图模型用的形态；数据来自持久化的 `parkingPoints`）
     struct ParkingRecord: Identifiable {
         let id = UUID()
         let location: CLLocation
         let time: Date
         let address: String
     }
-    var parkingHistory: [ParkingRecord] = []
+    var parkingHistory: [ParkingRecord] {
+        parkingPoints.map {
+            ParkingRecord(location: CLLocation(latitude: $0.lat, longitude: $0.lng),
+                          time: $0.time, address: $0.address)
+        }
+    }
 
-    // 总里程
+    // 总里程（写入点是 recordHistory；读的人有 syncSharedDefaults → 小组件 / 表盘）
     var totalMileage: Int {
         get { UserDefaults.standard.integer(forKey: "carkeeper_total_mileage") }
         set { UserDefaults.standard.set(newValue, forKey: "carkeeper_total_mileage") }
     }
+
+    /// 车控报文缓存（`getControlStatus`）。**里程、电压电流、门窗、电芯数据都只在这里**，
+    /// `getMyCars` 里的同名 `totalOdometer` 恒为 null —— 这是最容易踩空的一处。
+    var controlCache: [String: Any]? { ciVal(caches, "control") }
+
+    /// 保养计划（服务端字段优先，本机记录兜底）。页面不要自己算里程 —— 见 VM.maintenancePlan。
+    var maintenancePlan: VM.MaintenancePlan? { VM.maintenancePlan(car, ciVal(caches, "control")) }
 
     // 维保时间戳
     var serviceTimestamp: TimeInterval {

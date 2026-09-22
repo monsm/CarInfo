@@ -173,8 +173,14 @@ struct TripsEventsView: View {
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.secondary)
             Spacer(minLength: 0)
+            // 能效只显示**算得出来**的那个：kWh/100km 需要电池容量（报文里 capacity 是 null），
+            // 所以实际先用「每 1% SOC 跑多少 km」——它不需要容量，是行程里真实读到的事实。
             if let eff = trip.avgEfficiency {
                 Text(String(format: "%.1f kWh/100km", eff))
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.tertiary)
+            } else if let kmPerPct = trip.kmPerPercent {
+                Text(String(format: "每 1%% 电量 %.1f km", kmPerPct))
                     .font(TokensTypo.caption)
                     .foregroundStyle(TokensPalette.tertiary)
             }

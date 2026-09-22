@@ -108,27 +108,40 @@ final class CommandCenter: ObservableObject {
                 guard let d = r.data else {
                     running?.progress = "查询异常，重试中…（\(i)/12"
                     if i >= 12 {
-                        finish(run, ok: false, text: "结果待确认", desc: "60秒未收到车辆终态")
+                        finish(run, ok: false, text: "结果待确认", desc: "60秒未收到车辆终态",
+                               neutral: true)
                         return
                     }
                     try? await Task.sleep(for: .seconds(5)); continue
                 }
                 let status = ciString(d, ["HandleStatus", "handleStatus", "Status", "status"]) ?? ""
-                let finals = ["Success", "Completed", "RunFailure", "Failed", "Timeout",
-                              "success", "completed", "runFailure", "failed", "timeout"]
-                if finals.contains(status) {
-                    let ok = ["Success", "Completed", "success", "completed"].contains(status)
-                    let desc = ciString(d, ["HandleStatusDesc", "handleStatusDesc", "Desc"]) ?? ""
-                    let handleCode = ciString(d, ["HandleCode", "handleCode"]) ?? ""
-                    let finishTime = ciString(d, ["CmdFinishTime", "cmdFinishTime"]) ?? ""
-                    finish(run, ok: ok, text: ok ? "执行成功" : "执行失败",
-                           desc: desc.isEmpty ? status : desc,
-                           handleCode: handleCode, finishTime: finishTime)
+                let desc = ciString(d, ["HandleStatusDesc", "handleStatusDesc", "Desc"]) ?? ""
+                let handleCode = ciString(d, ["HandleCode", "handleCode"]) ?? ""
+                let finishTime = ciString(d, ["CmdFinishTime", "cmdFinishTime"]) ?? ""
+
+                // 「车端已经回执了吗」的判据：`CmdFinishTime` 非空。
+                //
+                // 这里原来用的是我们自己编的 10 个字符串（Success/Completed/Failed/…）。
+                // 而参考实现（D:/xm/ChangAnCarInfo，C#）**根本不敢判** —— 它把 HandleStatus
+                // 原样显示，说明真实取值集合我们并不知道。用编出来的集合判终态，坏方向是：
+                // 真实值不在表里 → 每条指令都跑满 12 次、最后落到「结果待确认」，
+                // 看上去像网络问题，实际是判据错了。
+                //
+                // CmdFinishTime 是服务端自己盖的时间戳，它是**唯一**有源码依据的终态信号。
+                if !finishTime.isEmpty || !handleCode.isEmpty {
+                    let outcome = VM.controlOutcome(status: status, handleCode: handleCode)
+                    finish(run,
+                           ok: outcome == true,
+                           text: VM.controlOutcomeText(outcome),
+                           desc: desc.isEmpty ? (status.isEmpty ? "车端已回执" : status) : desc,
+                           handleCode: handleCode, finishTime: finishTime,
+                           neutral: outcome == nil)
                     return
                 }
                 running?.progress = "第 \(i) 次查询 · 车辆处理中"
                 if i >= 12 {
-                    finish(run, ok: false, text: "结果待确认", desc: "60秒未收到车辆终态")
+                    finish(run, ok: false, text: "结果待确认", desc: "60秒未收到车辆终态",
+                           neutral: true)
                     return
                 }
                 try? await Task.sleep(for: .seconds(5))
@@ -141,13 +154,14 @@ final class CommandCenter: ObservableObject {
     private func finish(
         _ run: ControlRun, ok: Bool, text: String,
         desc: String, handleCode: String = "",
-        finishTime: String = ""
+        finishTime: String = "", neutral: Bool = false
     ) {
         pollTask?.cancel()
         pollTask = nil
-        let cls = ok ? "ok" : "bad"
+        // neutral：车端确实回执了，但我们**不认识**它的状态值 —— 不猜成失败。
+        let cls = neutral ? "na" : (ok ? "ok" : "bad")
         var newRun = run
-        newRun.status = ok ? "ok" : "bad"
+        newRun.status = cls
         newRun.resultText = text
         newRun.resultCls = cls
         newRun.progress = desc
@@ -160,7 +174,8 @@ final class CommandCenter: ObservableObject {
         // 原先这里是写死的 5 秒，而 `HistoryEntry.durationText` 又按分钟显示，
         // 于是每一条记录都写着「0min」—— 一个看起来像数据、其实是常量的字段。
         store.addCommandHistory(cmd: run.cmd, name: run.name, success: ok,
-                                duration: Date().timeIntervalSince(runStartedAt))
+                                duration: Date().timeIntervalSince(runStartedAt),
+                                confirmed: !neutral)
 
         // 车况缓存重拉：刚下发的指令会改变门锁/空调状态，
         // 不重拉的话「车现在什么样」还停在指令之前的样子

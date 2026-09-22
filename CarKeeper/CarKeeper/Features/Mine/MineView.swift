@@ -210,7 +210,9 @@ struct MineView: View {
 
     // MARK: 车辆卡
     private func carCard(_ car: [String: Any]) -> some View {
-        let sum = VM.vehicleSummary(car)
+        // 里程只在车控报文里（getMyCars 的 totalOdometer 恒为 null），所以要把控制缓存传进去；
+        // 这里传的是 `store.car`，即当前选中的那辆车 —— 两者必须是同一辆。
+        let sum = VM.vehicleSummary(car, store.controlCache)
         return Button {
             // 此前发 .navToVehicle 通知，根视图只写首页的 path —— 在「我的」Tab 点了毫无反应，
             // 要再点一次首页 Tab 才“突然出现”。改走统一导航：切到首页 Tab 并 push。

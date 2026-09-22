@@ -17,7 +17,7 @@
 //   • 门/窗/后备箱/锁          ← VM.bodyStatus(store.caches)        ← control 接口
 //   • 行程的起终点与电量       ← store.tripHistory                  ← 本地记录的 TripRecord
 //   • 停车点                  ← store.parkingLocation / parkingHistory
-//   • 保养里程                ← store.totalMileage / lastServiceMileage
+//   • 保养里程                ← store.maintenancePlan（服务端 plan 优先，本机记录兜底）
 //
 // 已知缺口（**故意不做假**）：
 //   • 行程**没有 GPS 轨迹点**。TripRecord 只有 start/end 两个坐标，
@@ -89,7 +89,10 @@ struct MapTripLine: Identifiable {
     let distanceKm: Double
     let startSoc: Int
     let endSoc: Int
+    /// kWh/100km（需要电池容量，报文里 `capacity` 是 null → 目前恒为 nil）
     let efficiency: Double?
+    /// 每 1% SOC 多少 km（不需要容量，是目前唯一算得出的能效口径）
+    let kmPerPercent: Double?
 
     /// 这一段用了几个百分点
     var socUsed: Int { max(0, startSoc - endSoc) }
@@ -276,7 +279,8 @@ struct MapSpineData {
                 distanceKm: t.distanceKm,
                 startSoc: t.startSoc,
                 endSoc: t.endSoc,
-                efficiency: t.avgEfficiency
+                efficiency: t.avgEfficiency,
+                kmPerPercent: t.kmPerPercent
             )
         }
 
@@ -417,32 +421,67 @@ struct MapSpineData {
 
         // ⑤ 最近一段行程：花了几个百分点走了多远
         if let t = trips.first {
-            let eff = t.efficiency.map { String(format: "，%.1f kWh/100km", $0) } ?? ""
+            // 能效只用**算得出来**的那个口径：kWh/100km 需要电池容量（null），
+            // 所以实际显示的是「每 1% SOC 跑多少 km」。
+            let eff = t.efficiency.map { String(format: "，%.1f kWh/100km", $0) }
+                ?? t.kmPerPercent.map { String(format: "，每 1%% SOC 跑 %.1f km", $0) }
+                ?? ""
             let km = String(format: "%.1f", t.distanceKm)
             out.append(MapReason(
                 id: "trip",
                 text: "最近一段 \(t.timeText)：\(km) km，电量 \(t.startSoc)% → \(t.endSoc)%\(eff)",
-                cls: t.socUsed > 0 ? "na" : "warn"
+                cls: t.distanceKm > 0 ? "na" : "warn"
             ))
         }
 
-        // ⑥ 保养：距下一次还有多少公里（只有真的记过里程才算）
-        let total = store.totalMileage
-        let last = store.lastServiceMileage
-        if total > 0, last > 0 {
-            let remain = last + AppStore.defaultServiceInterval - total
+        // ⑥ 保养：距下一次还有多少公里。
+        // 唯一来源是 store.maintenancePlan —— 服务端已经给了这套计划
+        // （maintainSpaceMileage 20000 + lastMaintainMileage 20100），
+        // 不再用硬编码的 10000 km 与只在本机记过才存在的里程。
+        if let plan = store.maintenancePlan {
+            let src = plan.fromServer ? "" : "（本机记录）"
             out.append(MapReason(
                 id: "service",
-                text: remain > 0
-                    ? "距下次保养还有 \(remain) km（上次 \(last) km，间隔 \(AppStore.defaultServiceInterval) km）"
-                    : "已超过保养里程 \(abs(remain)) km",
-                cls: remain > 0 ? "na" : "warn"
+                text: plan.remaining > 0
+                    ? "距下次保养还有 \(plan.remaining) km（上次 \(plan.last) km，间隔 \(plan.interval) km）\(src)"
+                    : "已超过保养里程 \(abs(plan.remaining)) km\(src)",
+                cls: plan.remaining > 0 ? "na" : "warn"
             ))
         }
 
         // ⑦ 停放时长：只有真存过停车时间才说
         if let t = store.lastParkingTime {
             out.append(MapReason(id: "hold", text: "上次标记停车：\(agoText(t))", cls: "na"))
+        }
+
+        // ⑦.5 数据龄期：车端最后一次上报是什么时候。
+        // 这一条不是「锦上添花」：服务端只回放车端最后一次上报的快照，车端停报时
+        // 页面上每个数字都还是那一刻的，而它们看上去都像「现在」。
+        // 本次抓包就是活例：刷新发生在 09:56，而车端最后一次上报是 07:19:28。
+        if let age = VM.reportAge(ciVal(store.caches, "control")) {
+            out.append(MapReason(
+                id: "freshness",
+                text: age.stale
+                    ? "车端已 \(age.text)没上报：下面的数字是那一刻的，不是现在"
+                    : "车端 \(age.text)上报过一次，这些数字是新的",
+                cls: age.stale ? "warn" : "na"
+            ))
+        }
+
+        // ⑦.7 告警总灯：车端自己置的报警位 + 服务端给的最高等级。
+        // 只在**真的亮着**的时候才出现 —— 一条「无报警」每次刷新都重复一遍，
+        // 只会训练人忽略这一栏。
+        let alarms = VM.activeAlarms(store.caches)
+        let alarmLevel = VM.maxAlarmLevel(store.caches)
+        if !alarms.isEmpty || alarmLevel != nil {
+            var parts: [String] = []
+            if !alarms.isEmpty { parts.append("\(alarms.count) 个报警位亮着：" + alarms.joined(separator: "、")) }
+            if let lv = alarmLevel { parts.append("服务端最高等级 \(Int(lv))") }
+            out.append(MapReason(
+                id: "alarm",
+                text: parts.joined(separator: "；") + " —— 这是车端自己置的位，不是我们拿阈值猜的",
+                cls: alarms.isEmpty ? "warn" : "bad"
+            ))
         }
 
         // ⑧ 胎压：有真实读数才谈；报警的轮位单独列出来，没报警就只报四条读数

@@ -240,15 +240,90 @@ ScrollView {
 
 ---
 
-## 8. 下一批（未完成，写明数量，不装作完成）
+## 8. 数据层接线：本轮落地了什么（2026-09-22 第二轮）
 
-1. **行程 / 停车的数据缺口**：`tripHistory` / `parkingHistory` 全库**没有任何写入点**，
-   所以「行程」层与时间轴必然是空的 —— 先按第 3 节第 4 条接事件配对。
-2. **假数据**：`MonthlyReportGenerator` 现在是写死的 `1250 km / 14.5 / 8 次 / 65% / 85 分`
-   （代码注释写着"模拟生成"）→ 接 `tripHistory` + `ChargeLedger`。
-   AppClip 那一屏的「特斯拉 Model 3 / 85% / 420km」同理（它连车型都是编的）。
-3. **车控按 `funCode` 开合控件**（本车不支持车窗/定时充电，现在照样显示按钮）。
-4. **数据龄期降级**（`gpsTime` 判断"有没有新数据"，而不是看 HTTP 200）。
-5. **`0000-00-00` 哨兵日期拒绝**（`daysUntil` 现在会算出「已过期 73 万天」）。
-6. **里程键修复**：`AppStore` 写 `carkeeper_current_mileage` 时读的键名与真实报文
-   （`totalOdometer`）不匹配 → 维保提醒永远不会响。
+「功能一个不丢、全部融合」这一半做完了（§7）；**「界面在说谎」这一半本轮开始动手**，
+原则不变：不加新页面，全部落进现有的「地图 + 9 个深潜面」。
+
+| # | 做了什么 | 落在哪个面 | 依据 |
+|---|---|---|---|
+| ✅1 | **读层大小写清零**：77 处大小写敏感下标 → `ci*`/`ciPick`（含 4 处**变量键**：`sub[itemKey]`/`control?[codeKey]`/`presKey`/`tempKey`）；新增门禁 **`scan/keys.py`**（441 个真实报文键内置，直接下标写错大小写就红） | 全局 | §0.2、§6 |
+| ✅2 | **里程接对**：`carkeeper_current_mileage` 改读 `control.totalOdometer`（原来读 `Mileage/mileage/TotalMileage` 三个**不存在**的键）；同时写 `totalMileage` → 手表/小组件的里程从恒 0 变成真实 | 车 / 小组件 / 表盘 | §4.7 |
+| ✅3 | **保养计划唯一来源** `VM.maintenancePlan`：`maintainSpaceMileage`(20000) + `lastMaintainMileage`(20100) + `totalOdometer` → 下次 40100 km、已超 13666 km；地图/车 / 保养三处共用 | 地图 + 车 + 保养与钱 | §0.1 #3 |
+| ✅4 | **真实充电功率** `VM.chargePowerKW` = `totalVoltage × totalCurrent`（报文里根本没有 `ChargPower`），一处算法供能量卡/曲线/账本/小组件 | 地图 + 保养与钱 + 小组件 | §11.1 #1 |
+| ✅5 | **哨兵值守卫** `VM.antiSentinel`：`0000-00-00` / `0000-00-00\n\t\t00:00:00` 一律不当日期；保险到期显示**未登记**（不再打印零年零月） | 车 + 地图 | §0.1 #2、§5 |
+| ✅6 | **数据龄期一等公民** `VM.reportAge`：「在线 · 车端 2 小时前上报」+ 地图新增一条 freshness 理由（>30 min 转 warn） | 地图主屏 | §5.4 |
+| ✅7 | **车控终态改用有依据的判据**：`CmdFinishTime` 非空 = 已到终态；`HandleStatus` 不认识时新增**第三态「未确认」**（不再自编字符串表判成败，也不再把它记成失败） | 车控 + 指令历史 | §0.2 #9 |
+| ✅8 | **补上 `UpCarCondition`**（让车端立刻上报）—— 车端停报时刷页面没用，服务端只会回放同一份快照 | 车控「低频指令」 | §0.2 #8 |
+| ✅9 | **`chrgStatus:"3"` 不再写成「充电完成」**（车主确认车静止时就是 "3"）→ 「未在充电」；`chargeStart/Stoptime` 明确为**上一次**充电 | 地图 + 电池 | §0.1 #1 |
+| ✅10 | **日期解析补上带时分秒的格式**：`tserviceEndtime`（`2041-10-31 18:01:18`）以前**静默解析失败** → 车联网服务到期日从不显示 | 车 + 我的 | §4.9 |
+| ✅11 | **顺手修掉的三处「静默 nil」**：`VehicleView.lastServiceMiles` 用 `string(forKey:)` 读一个 Int 键（恒 nil → 那一节从未显示）；`API.parseMessages` 为补偿大小写缺陷而**双写** `realReceiverId`/`RealReceiverId`；`sub[itemKey]` 的 if/else 两个分支**完全相同** | 车 / 消息 | §6 |
+| ✅12 | 修正一句「比现实更勤快」的注释：`AppStore` 里写的「车况每 60 秒轮询一次」并不存在 | — | §8 #13 |
+
+### 第三轮：能力位图、告警总灯、88 节完整落图（2026-09-22 第三轮）
+
+| # | 做了什么 | 落在哪个面 | 依据 |
+|---|---|---|---|
+| ✅13 | **告警总灯**：报警位表收成唯一来源 `VM.alarmFlags` / `VM.activeAlarms`（16 个 `*Alarm`，**非 0 即亮**，0 与缺失都不算）；`VM.maxAlarmLevel` 只在 >0 时返回（不把「没上报」显示成「等级 0 = 一切正常」）；地图主屏新增一条 `alarm` 理由，**只在真的亮着时出现** —— 每次刷新都写一句「无报警」只会训练人忽略这一栏 | 地图主屏 + 电池 | §4.8 / §5.1 |
+| ✅14 | **电池页功率的重复算法删掉**：`Analysis.batteryModel` 仍在读**不存在**的 `ChargPower`/`ChargingPower`（上一轮只把 `VM.chargePowerKW` 接给了能量卡/账本/小组件），所以电池页的功率一直是 `--` | 电池 | §11.1 #1 |
+| ✅15 | **88 节完整落图**：`AN.barsOf` 的采样上限 64 → 128（本车 88 节，64 的步长是 2，**会丢掉一半电芯**，而那张图就是拿来看「哪一节低」的）；极值加上**节号**：「最低·第56节 3.800 V」（来自 `maxVoltageBatteryNum`/`minVoltageBatteryNum`） | 电池「一致性」 | §4.7 |
+| ✅16 | **能力位图进开发者工具**：`VM.capabilities` 解析 `funCode`（7 组 43 开关，两组键各自排序 → 两次运行行序一致、截图可比），每个分组一块折叠区，标题行给「on/total」，行内容只有**原文键名 + 1/0** | 开发者工具 | §4.2 |
+
+**为什么这一轮**没有**「按 `funCode` 隐藏控件」** —— 这是刻意的决定，不是漏做：
+
+1. 43 个缩写里只有少数能自证（`StateWindow`=车窗、`Statelock`=门锁、`airBtn`=空调按钮），
+   其余（`zjcsStatusRC`/`openPJ`/`openBY`/`isFence`/`#18`/`#26`…）零依据，参考实现也零引用。
+2. 更要紧的是**两组同名开关互相矛盾**：本车 `control/remoteBaseControl.airBtn = 1`，
+   而 `control/remoteBaseControl_XNY.airBtn = 0`（XNY = 新能源那组），无从判断哪一组作准。
+3. 按一个可能是错的值去隐藏控件，会**藏掉真能用的功能** —— 这比多显示一个按钮更糟
+   （用户会以为车没有这个能力），而多显示一个按钮最坏就是按下去失败。
+
+所以位图先当**证据**摆在开发者工具里；等某组位与真实车控失败一一对应，再让
+`VM.Capability.on` 去驱动界面。同理，`#PeriodicCharge:0`（`changeS203EV`）与
+`#bookChargeA301:1`（`home/newIndex`）也互相矛盾，因此电池页的「预约充电」只做**只读状态**，不给开关。
+
+### 还没做的（不装作完成）
+
+
+1. ✅ **行程 / 停车已接上**：`AppStore.ingestEvents` 把点火/熄火事件对喂给 `startTrip`/`endTrip`/
+   `saveParkingLocation`（幂等键 = 服务端 `stubId`，坐标与地址读 `jumpParam`）。
+   两条诚实的保留：① 报文里消息是**倒序**，代码先按时刻升序（否则熄火会被当成点火）；
+   ② 里程差只在「同一次会话内」才算 —— 历史事件的 `currentMileage` 两端都是今天的值，
+   那就写 0，**不编一个估算里程**。
+2. ✅ **两处假数据已删**：`MonthlyReportGenerator` 不再写死 `1250 km / 14.5 / 8 次 / 65% / 85 分`
+   （没记录就直说「本月还没有记录」，并告诉用户怎么产生记录）；
+   AppClip 不再编「特斯拉 Model 3 / 85% / 420km」，改为读共享快照，取不到就不显示。
+3. ✅ **`funCode` 已接（上一轮的表 #16），但刻意不开合控件**：位图已解析并显示在开发者工具；
+   不隐藏控件的理由（两组同名开关互相矛盾 + 藏掉真能用的功能更糟）写在上面那张表的下面。
+6. ✅ **已接**（对照用）：`stubId`（幂等键）、`jumpParam`（行程骨架）、`new`（红点判据）、
+   `maxAlarmLevel`（告警总灯，表 #13）、88 节单体电压（表 #15，整 88 节落图 + 极值带节号）。
+   仍未引用：`pin`（控车码）。
+8. ✅ **已修**：`maintainSpaceMileage`/`lastMaintainMileage`/`totalOdometer` 已接上（见上表 #2/#3）。
+   （旧条目保留在此仅作对照，勿再重复实现。）
+8b. ✅ **服务端已给、以前零引用的数据都已接上**：`funCode`（表 #16）、`maintainSpaceMileage`(20000)/
+   `lastMaintainMileage`(20100)（表 #3）、88 节单体电压 + 26 个温度探针（表 #15）、`insulateResistance`、
+   `insuranceCompany`/`insurancePhone`、`tserviceStatus`、消息 `stubId`（幂等键）、`jumpParam`（行程骨架）、
+   `maxAlarmLevel` + 16 个 `*Alarm`（表 #13）。**仍零引用**：`pin`（控车码）、`sidAndMid`、`recordTime`、
+   `carMode`/`dcStatus`、`flameoutReason`/`ignitionReason` —— 这几个**含义未核实，不编**。
+9. **未核实枚举禁止编中文**：`chrgStatus`/`carStatus`/`dcStatus`/`air.status` 等一律显示原文。
+10. ✅ **已修**：令牌已迁 **Keychain**（含旧 UserDefaults 值的自动迁移；退出登录时**两处都清**，
+    因为只删 UserDefaults 会让凭证留在设备上）；`RawLogStore.redact()` 补上 `vin`/`idcard`/姓名/`tuid`/
+    坐标/地址文本/K8s 容器名等 12 类。仍成立的一条事实：`refresh_token` 服务端**不轮换**
+    （请求与响应逐字符相同，见 API-FIELD-MAP §0）。
+
+11. ✅ **已修**（见上表 #7/#8）：`UpCarCondition` 已补进车控「低频指令」；指令终态改用 `CmdFinishTime` 非空，
+    并在 `HandleStatus` 不认识时给出第三态「未确认」。
+12. ✅ **门禁已加，但归一化刻意没做**：新增 `scan/keys.py`（禁大小写敏感的直接下标）；
+    而“在 `saveCache` 入口把键名一律小写”**没有采用** —— 理由：归一化只能救「已经写对的那个小写形式」，
+    对 `["RemainPower"]` 这种写法毫无帮助，却会让两类写法在不同路径下时灵时不灵（更难查）；
+    门禁把同一个错误变成「提交前就红」，作用面反而更大。
+13. ✅ **已修**：`AppStore` 里那句「车况每 60 秒轮询一次」已改成现实（没有轮询循环，
+    只有指令结果轮询 12×5 s、短信倒计时、后台刷新 15/30 min）。
+
+> 以上第 2–13 条的**逐字段证据**（含每个字段的样例值、我们代码的读法、交叉矛盾）见
+> **[`API-FIELD-MAP.md`](./API-FIELD-MAP.md)** —— 逐字段证据（每个字段的样例值、我们代码的读法、
+> 报文之间互相矛盾之处），由 `scan/_fields.py` / `_msgs.py` 从日志原文生成，可复跑复现；
+> 它的 §12 是「字段 → 代码接线表」。
+>
+> 其中「大小写敏感的下标」这一类（以前是 77 处）已收敛成常驻门禁 **[`scan/keys.py`](../scan/keys.py)**：
+> 内置 441 个真实报文键，写错大小写直接红。一次性审计脚本已删除（它们只活了一轮）。

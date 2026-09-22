@@ -28,6 +28,28 @@ final class RawLogStore: @unchecked Sendable {
         "phone", "mobile", "tel", "plate", "platenumber", "plateno"
     ]
 
+    /// 个人 / 车辆身份字段。这些以前**没有**打码，而日志页可以一键复制导出：
+    /// `vin`（车架号）、`idcard`（身份证）、`engineNo`、`userFullname` / `name` /
+    /// `nickName` / `senderName`（姓名）、`tuid` / `cycuid` / `sid`（账号与服务端内部 ID）。
+    private static let piiKeys = [
+        "vin", "idcard", "idcardno", "certifino", "engineno", "tuid",
+        "carnum", "carid", "userfullname", "username", "name", "nickname",
+        "lastname", "sidname", "sendername", "senderid", "trackuserid",
+        "sysuid", "cycuid", "cycid", "sid", "registrationid", "smskey",
+        "carauthcode", "bindtoken", "bind_token"
+    ]
+
+    /// 位置类字段：字符串值整体打码，数值坐标只留整数部分（约 100 km 量级）。
+    /// 理由：车的位置是这份日志里最敏感的东西之一，而排障根本不需要米级精度。
+    private static let locationKeys = [
+        "addrdesc", "addrname", "address", "community", "dist", "location"
+    ]
+    private static let coordinateKeys = ["lat", "lng"]
+
+    /// 内部实现细节：`containerName` 是 K8s 内网容器名（`carbond-tu-api-5cbf6f4f7-pp7qx`）——
+    /// 它藏着服务端的部署信息，不应该出现在一个可被用户导出的日志里。
+    private static let infraKeys = ["containername"]
+
     private init() {}
 
     // MARK: - 脱敏
@@ -48,6 +70,31 @@ final class RawLogStore: @unchecked Sendable {
             let pattern = "(?i)(\"" + NSRegularExpression.escapedPattern(for: key) + "\"\\s*:\\s*\")([^\"]*)"
             out = out.replacingOccurrences(of: pattern, with: "$1***", options: .regularExpression)
         }
+
+        // 2b) 个人 / 车辆身份（VIN / 身份证 / 姓名 / 内部 ID）
+        for key in Self.piiKeys {
+            let pattern = "(?i)(\"" + NSRegularExpression.escapedPattern(for: key) + "\"\\s*:\\s*\")([^\"]*)"
+            out = out.replacingOccurrences(of: pattern, with: "$1***", options: .regularExpression)
+        }
+
+        // 2c) 地址文本 / 内部容器名
+        for key in Self.locationKeys + Self.infraKeys {
+            let pattern = "(?i)(\"" + NSRegularExpression.escapedPattern(for: key) + "\"\\s*:\\s*\")([^\"]*)"
+            out = out.replacingOccurrences(of: pattern, with: "$1***", options: .regularExpression)
+        }
+
+        // 2d) 坐标：只留整数部分（约 100 km 级）—— 排障不需要米级精度
+        for key in Self.coordinateKeys {
+            let pattern = "(?i)(\"" + key + "\"\\s*:\\s*)(-?[0-9]+)(\\.[0-9]+)?"
+            out = out.replacingOccurrences(of: pattern, with: "$1$2", options: .regularExpression)
+        }
+
+        // 2e) 请求头里的 Bearer 凭证
+        out = out.replacingOccurrences(
+            of: "(?i)(authorization:\\s*bearer\\s+)(\\S+)",
+            with: "$1***",
+            options: .regularExpression
+        )
 
         // 3) 裸手机号（11 位、1 开头）
         out = out.replacingOccurrences(

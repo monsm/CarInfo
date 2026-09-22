@@ -115,6 +115,7 @@ struct MapSpineView: View {
             if new == .charge { Task { await searchChargersIfNeeded() } }
         }
         .onChange(of: d.carCoordinate?.latitude) { _, _ in centerOnCar(force: false) }
+        .onChange(of: store.mapFocus) { _, f in if let f { focusOn(f) } }
         .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
             centerOnCar(force: false)
         }
@@ -1072,6 +1073,23 @@ struct MapSpineView: View {
         case "charge": return TokensPalette.info
         default: return TokensPalette.tertiary
         }
+    }
+
+    /// 跨面交接的镜头：出行面点一条事件上的「在图上看看」→ 地图移到这里。
+    /// 消费后立刻清空 `mapFocus`，否则下一次回到地图会又跳一次。
+    @MainActor
+    private func focusOn(_ f: AppStore.MapFocus) {
+        withAnimation(TokensMotion.value) {
+            camera = .camera(MapCamera(centerCoordinate: CLLocationCoordinate2D(latitude: f.lat,
+                                                                              longitude: f.lng),
+                                       distance: spec.cameraDistance * 1.6,
+                                       heading: spec.cameraHeading,
+                                       pitch: 0))
+        }
+        didCenterOnce = true   // 别让随后的车位置刷新把镜头拉回车上
+        ToastManager.shared.show(f.label.isEmpty ? "已移到事件位置" : f.label,
+                                 icon: "mappin.and.ellipse")
+        store.mapFocus = nil
     }
 
     /// 把相机移到车上。heading 来自**当前艺术方向**（夜光转 7°，让路网斜走）。

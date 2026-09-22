@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 // MARK: - 配置
 //
@@ -22,15 +23,66 @@ let tokenStorageKey = "car_token_config"
 let cacheStorageKey = "car_data_cache"
 let rawLogStorageKey = "changan_raw_log"
 
+/// 令牌存储：**Keychain**，不再是 UserDefaults。
+///
+/// 为什么必须换：2026-09-22 的抓包逐字符比对证明，服务端的 `refresh_token` **不轮换**
+/// （请求里的与响应里回来的完全相同，`expires_in: 86400`）。一个泄露的 refresh_token
+/// 能长期换出新 access_token；而 UserDefaults 会进 iCloud / iTunes 备份，
+/// 备份文件与越狱设备都能直接读到它。
+///
+/// `kSecAttrAccessibleAfterFirstUnlock` 是刻意的：后台刷新（BGTask）要在锁屏后跑，
+/// 用 `WhenUnlocked` 会在锁屏后台读不到令牌 —— 表现出来就是「锁屏以后车况就不再刷新」，
+/// 一个很难查的“网络问题”。
 enum TokenStore {
+    private static let service = "com.you.CarKeeper.token"
+    private static let account = "car_token_config"
+
+    private static func baseQuery() -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: service,
+         kSecAttrAccount as String: account]
+    }
+
+    private static func readKeychain() -> Data? {
+        var q = baseQuery()
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: AnyObject?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess else { return nil }
+        return out as? Data
+    }
+
+    private static func writeKeychain(_ data: Data) {
+        var q = baseQuery()
+        SecItemDelete(q as CFDictionary)   // 先删再加：SecItemAdd 遇到已存在会返回 errSecDuplicateItem
+        q[kSecValueData as String] = data
+        q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        SecItemAdd(q as CFDictionary, nil)
+    }
+
+    /// 退出登录 / 清空数据时用。
+    /// ⚠️ 只删 UserDefaults 里的旧键是不够的：令牌已经搬到 Keychain，
+    /// 不删 Keychain 就等于「退出登录后凭证还在设备上」。
+    static func clear() {
+        SecItemDelete(baseQuery() as CFDictionary)
+        UserDefaults.standard.removeObject(forKey: tokenStorageKey)
+    }
+
     static func read() -> TokenConfig? {
-        guard let data = UserDefaults.standard.data(forKey: tokenStorageKey) else { return nil }
+        // 一次性迁移：旧版本把令牌放在 UserDefaults 里。
+        // 读到就搬进 Keychain 并**删掉明文**，然后照常返回 —— 用户无感，不用重新登录。
+        if let legacy = UserDefaults.standard.data(forKey: tokenStorageKey) {
+            writeKeychain(legacy)
+            UserDefaults.standard.removeObject(forKey: tokenStorageKey)
+            return try? JSONDecoder().decode(TokenConfig.self, from: legacy)
+        }
+        guard let data = readKeychain() else { return nil }
         return try? JSONDecoder().decode(TokenConfig.self, from: data)
     }
+
     static func write(_ cfg: TokenConfig) {
-        if let data = try? JSONEncoder().encode(cfg) {
-            UserDefaults.standard.set(data, forKey: tokenStorageKey)
-        }
+        guard let data = try? JSONEncoder().encode(cfg) else { return }
+        writeKeychain(data)
     }
     static func currentToken() -> String {
         TokenStore.read()?.accessToken ?? ""
@@ -408,10 +460,13 @@ final class APIClient: @unchecked Sendable {
         }
         return content.map { m in
             var copy = m
-            if let id = ciString(m, ["realReceiverId", "RealReceiverId"]) {
+            if let id = ciString(m, ["realReceiverId"]) {
                 if let p = plateOf[id] {
+                    // 只写报文真实键（首字母小写）。
+                    // 这里原先把 `realReceiverId` 与 `RealReceiverId` **同时**写一遍 ——
+                    // 那是在**补偿一个读层缺陷**（大小写敏感的下标）。读层修好后（一律走 ci*），
+                    // 双写只会凭空多出一个报文中不存在的键，让下一个读的人以为服务端真的发过它。
                     copy["realReceiverId"] = p
-                    copy["RealReceiverId"] = p
                 }
             }
             return copy

@@ -267,12 +267,45 @@ struct MonthlyReportGenerator: View {
     @State private var showReport = false
     @State private var reportData: ReportData?
     
+    /// 报表数据全部来自**本机真实记录**：行程历史（由点火/熄火事件自动生成）+ 充电账本 + 评分。
+    /// 每一项都可能算不出来 —— 那就显示「—」，不编。
     struct ReportData {
-        let totalMileage: Int
-        let avgConsumption: Double
+        /// 例：2026年9月
+        let monthLabel: String
+        let tripCount: Int
+        let totalMileage: Double
+        /// 每 1% SOC 的续航（km）。不需要电池容量，所以是目前唯一算得出的能效口径。
+        let kmPerPercent: Double?
         let chargeSessions: Int
-        let avgSoc: Int
-        let driveScore: Int
+        let chargeKWh: Double
+        /// 平均电量：来自本机的 SOC 采样（**不是你整月的平均** —— 采样只保留最近一小段）。
+        let avgSoc: Int?
+        let driveScore: Int?
+
+        /// 本月一条真记录都没有。这时不该画一张空表，而要直说为什么。
+        var hasAnyRecord: Bool { tripCount > 0 || chargeSessions > 0 }
+        var mileageText: String { tripCount > 0 ? String(format: "%.1f km", totalMileage) : "—" }
+        var tripText: String { tripCount > 0 ? "\(tripCount) 段" : "—" }
+        var efficiencyText: String {
+            kmPerPercent.map { String(format: "每 1%% 电量 %.1f km", $0) } ?? "—"
+        }
+        var chargeText: String {
+            chargeSessions > 0
+                ? "\(chargeSessions) 次 · \(String(format: "%.1f", chargeKWh)) kWh"
+                : "—"
+        }
+        var avgSocText: String { avgSoc.map { "\($0)%" } ?? "—" }
+        var scoreText: String { driveScore.map { "\($0) 分" } ?? "—" }
+        var scoreGrade: String {
+            guard let s = driveScore else { return "还没有足够的读数" }
+            switch s {
+            case 90...: return "S"
+            case 80..<90: return "优秀"
+            case 70..<80: return "良好"
+            case 60..<70: return "一般"
+            default: return "偏低"
+            }
+        }
     }
     
     var body: some View {
@@ -292,13 +325,33 @@ struct MonthlyReportGenerator: View {
     }
     
     private func generateReport() {
-        // 模拟生成报告数据
+        // 这里**曾经**是写死的 1250 km / 14.5 kWh / 8 次 / 65% / 85 分（注释写着「模拟生成」）。
+        // 一份编造的月报比没有月报坏得多 —— 用户会拿它判断自己的车。
+        let store = AppStore.shared
+        let cal = Calendar.current
+        let now = Date()
+        let trips = store.tripHistory.filter {
+            cal.isDate($0.startTime, equalTo: now, toGranularity: .month)
+        }
+        let sessions = ChargeLedger.shared.sessions.filter {
+            cal.isDate($0.start, equalTo: now, toGranularity: .month)
+        }
+        let distance = trips.reduce(0.0) { $0 + $1.distanceKm }
+        // 每 1% SOC 的续航：把本月所有行程的里程与百分点各自求和再相除
+        // （不能用「各段 km/% 的平均」——短途段的读数会被放大）。
+        let socUsed = trips.reduce(0) { $0 + max(0, $1.startSoc - $1.endSoc) }
+        let samples = HistoryStore.shared.soc.suffix(240).map { $0.v }
+        let mf = DateFormatter()
+        mf.dateFormat = "yyyy年M月"
         let data = ReportData(
-            totalMileage: 1250,
-            avgConsumption: 14.5,
-            chargeSessions: 8,
-            avgSoc: 65,
-            driveScore: 85
+            monthLabel: mf.string(from: now),
+            tripCount: trips.count,
+            totalMileage: distance,
+            kmPerPercent: socUsed > 0 ? distance / Double(socUsed) : nil,
+            chargeSessions: sessions.count,
+            chargeKWh: sessions.reduce(0.0) { $0 + $1.kWh },
+            avgSoc: samples.isEmpty ? nil : Int(samples.reduce(0, +) / Double(samples.count)),
+            driveScore: store.drivingScore
         )
         reportData = data
         showReport = true
@@ -318,17 +371,31 @@ struct MonthlyReportView: View {
                     .tracking(TokensTracking.title)
                     .foregroundStyle(TokensPalette.primary)
 
+                Text(data.monthLabel)
+                    .font(TokensTypo.subheadline)
+                    .foregroundStyle(TokensPalette.secondary)
+
+                if !data.hasAnyRecord {
+                    DSNotice(kind: .info,
+                             text: "本月还没有记录：行程由点火/熄火事件自动生成，充电统计来自本机的功率采样。"
+                                 + "跑一段路、充一次电，这里就有数了。")
+                }
+
                 DSGroup(title: "行驶统计") {
-                    DSGroupRow { DSKeyValueRow(key: "总里程", value: "\(data.totalMileage) km") }
-                    DSGroupRow { DSKeyValueRow(key: "平均能耗", value: "\(data.avgConsumption) kWh/100km") }
-                    DSGroupRow { DSKeyValueRow(key: "充电次数", value: "\(data.chargeSessions) 次") }
-                    DSGroupRow(showsSeparator: false) { DSKeyValueRow(key: "平均电量", value: "\(data.avgSoc)%") }
+                    DSGroupRow { DSKeyValueRow(key: "行程段数", value: data.tripText) }
+                    DSGroupRow { DSKeyValueRow(key: "总里程", value: data.mileageText) }
+                    // kWh/100km 需要电池容量（报文里 capacity 是 null），所以这里用口径说清楚的 km/1%
+                    DSGroupRow { DSKeyValueRow(key: "能效", value: data.efficiencyText) }
+                    DSGroupRow { DSKeyValueRow(key: "充电", value: data.chargeText) }
+                    DSGroupRow(showsSeparator: false) {
+                        DSKeyValueRow(key: "平均电量（近期采样）", value: data.avgSocText)
+                    }
                 }
 
                 DSGroup(title: "驾驶评分") {
-                    DSGroupRow { DSKeyValueRow(key: "综合评分", value: "\(data.driveScore) 分") }
+                    DSGroupRow { DSKeyValueRow(key: "综合评分", value: data.scoreText) }
                     DSGroupRow(showsSeparator: false) {
-                        DSKeyValueRow(key: "评价", value: data.driveScore >= 80 ? "优秀" : "良好")
+                        DSKeyValueRow(key: "评价", value: data.scoreGrade)
                     }
                 }
 
@@ -359,15 +426,16 @@ struct MonthlyReportView: View {
         return """
         <html><body style="font-family:system-ui;padding:20px;">
         <h1>月度驾驶报告</h1>
-        <h2>行驶统计</h2>
+        <h2>行驶统计（\(data.monthLabel)）</h2>
         <ul>
-        <li>总里程: \(data.totalMileage) km</li>
-        <li>平均能耗: \(data.avgConsumption) kWh/100km</li>
-        <li>充电次数: \(data.chargeSessions) 次</li>
-        <li>平均电量: \(data.avgSoc)%</li>
+        <li>行程段数: \(data.tripText)</li>
+        <li>总里程: \(data.mileageText)</li>
+        <li>能效: \(data.efficiencyText)</li>
+        <li>充电: \(data.chargeText)</li>
+        <li>平均电量（近期采样）: \(data.avgSocText)</li>
         </ul>
         <h2>驾驶评分</h2>
-        <p>综合评分: \(data.driveScore) 分 - \(data.driveScore >= 80 ? "优秀" : "良好")</p>
+        <p>综合评分: \(data.scoreText) - \(data.scoreGrade)</p>
         </body></html>
         """
     }

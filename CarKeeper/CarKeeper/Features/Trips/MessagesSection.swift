@@ -50,6 +50,9 @@ struct MessagesSection: View {
         var read: Bool
         var tag: String
         var tagCls: String
+        /// 事件坐标（来自 `jumpParam.uriParams`）—— 有点才能「在图上看看」。
+        /// **不存**路径：车端不上传轨迹（`isPrivacyDrvingHistory: 1`）。
+        var coordinate: (lat: Double, lng: Double)?
     }
 
     var body: some View {
@@ -234,6 +237,28 @@ struct MessagesSection: View {
                                 if !item.location.isEmpty { detailRow("mappin.and.ellipse", "位置", item.location) }
                                 if !item.time.isEmpty { detailRow("clock", "时间", item.time) }
                                 if !item.read { detailRow("envelope.open", "状态", "已标记为已读") }
+                                // 事件自带坐标时才给这个入口：点一下把地图镜头移过去。
+                                // 这里只给「地点」，不给「路径」—— 车端不上传轨迹。
+                                if let c = item.coordinate {
+                                    Button {
+                                        store.mapFocus = AppStore.MapFocus(lat: c.lat, lng: c.lng,
+                                                                           label: item.title)
+                                        // 读单例而不是环境对象：这一节不是页面，
+                                        // 不保证环境里有 NavState（`MapSpineView` 同此约定）。
+                                        NavState.shared.popToRoot()
+                                        TokensHaptic.select()
+                                    } label: {
+                                        HStack(spacing: TokensSpacing.sm) {
+                                            Image(safeSymbol: "map", fallback: "location")
+                                                .font(TokensTypo.fixed(12))
+                                            Text("在图上看看")
+                                                .font(TokensTypo.caption.weight(.semibold))
+                                        }
+                                        .foregroundStyle(TokensPalette.ambient)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.top, 2)
+                                }
                             }
                             .padding(.top, TokensSpacing.xs)
                         }
@@ -403,22 +428,33 @@ struct MessagesSection: View {
     private func apply(_ list: [[String: Any]]) {
         let readSet = Self.localRead
         items = list.enumerated().compactMap { idx, m in
-            let id = ciString(m, ["Id", "id"]) ?? "row-\(idx)"
+            // 幂等键用服务端的 `stubId`（`1:<uuid>:<时间戳>:<序号>`），它是为去重而生的；
+            // 退回 `id`，再退回行号。同一件事在两次拉取里必须是**同一个 id**，
+            // 否则「已读」状态与事件去重都会失效。
+            let id = ciString(m, ["StubId", "stubId"])
+                ?? ciString(m, ["Id", "id"]) ?? "row-\(idx)"
             let title = ciString(m, ["Title", "title"]) ?? "车辆通知"
             let body = Self.resolveBody(m)
             let rawLoc = ciString(m, ["Content", "content"]) ?? ""
             let location = (rawLoc != body && !rawLoc.isEmpty && rawLoc != "null" && rawLoc != "无") ? rawLoc : ""
             let cat = Self.classify(title: title, content: body.isEmpty ? rawLoc : body)
-            // 未读判定与小程序对齐（pages/messages/messages.js）：服务端 ReadStatus == 1 即已读。
-            // 此前多出的 `New` 字段反推分支是 App 自造的，服务端语义未知，已删除。
-            // 展开过的消息记入本地已读集合（无服务端标记接口）。
-            let serverRead = (ciNumber(m, ["ReadStatus", "readStatus"]) ?? 0) == 1
-            let read = serverRead || readSet.contains(id)
+            // 未读（红点）判据用 `new`：2026-09-22 那份报文里 5 条事件全是
+            // `readStatus: 0` 而 `new: false`，车主的手机上**没有**红点 ——
+            // 说明 `readStatus` 在这套服务里并没有被用起来，`new` 才是红点的真相。
+            // 两个字段都缺时才退回旧判据（ReadStatus == 1 即已读）。
+            // 展开过的消息记入本地已读集合（服务端没有 mark-read 接口）。
+            let isNew = ciBool(m, ["New", "new"])
+            let serverRead = isNew.map { !$0 }
+                ?? ((ciNumber(m, ["ReadStatus", "readStatus"]) ?? 0) == 1)
+            let p = AppStore.jumpParams(m)
+            var coord: (lat: Double, lng: Double)? = nil
+            if let lat = VM.vnum(p["lat"]), let lng = VM.vnum(p["lng"]) { coord = (lat, lng) }
             return MessageItem(
                 id: id, title: title, body: body, location: location,
                 time: ciString(m, ["CreatedAt", "createdAt"]) ?? "",
-                plate: ciString(m, ["realReceiverId", "RealReceiverId"]) ?? "",
-                read: read, tag: cat.tag, tagCls: cat.cls
+                plate: ciString(m, ["realReceiverId"]) ?? "",
+                read: serverRead || readSet.contains(id), tag: cat.tag, tagCls: cat.cls,
+                coordinate: coord
             )
         }
     }

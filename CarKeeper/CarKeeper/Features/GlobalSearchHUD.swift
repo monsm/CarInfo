@@ -135,7 +135,7 @@ struct GlobalSearchHUD: View {
         }
 
         // ② 车（车辆档案里的真实字段）
-        if let sum = VM.vehicleSummary(store.car) {
+        if let sum = VM.vehicleSummary(store.car, store.controlCache) {
             let fields: [(String, String)] = [
                 ("车牌", sum.plate),
                 ("VIN", sum.vin),

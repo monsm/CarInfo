@@ -12,10 +12,11 @@ import UIKit
 
 struct AppClipEntranceView: View {
     @State private var plateInput: String = ""
-    @State private var isLoading = false
     @State private var hasError = false
     @State private var showMainApp = false
-    @State private var carData: [String: Any]? = nil
+    /// 主 App 写进 App Group 的快照（App Clip 没有登录态，这是它**唯一**能拿到的真实数据）
+    @State private var snapshot: VehicleSnapshot?
+
 
     var body: some View {
         ZStack {
@@ -72,38 +73,31 @@ struct AppClipEntranceView: View {
                 .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(WT.Palette.labelSecondary.opacity(0.3), lineWidth: 1))
 
                 // 加载状态
-                if isLoading {
-                    ProgressView().progressViewStyle(CircularProgressViewStyle(tint: WT.Palette.onAccent))
-                    Text("正在查询车辆信息...")
-                        .font(WT.Typo.footnote)
-                        .foregroundStyle(WT.Palette.onAccent.opacity(0.6))
-                }
+                // 【已删】加载中的转圈。读 App Group 里的快照是**同步**的，
+                // 转圈只是一个表演用的延迟（原实现还配了 1.5 秒的 dispatchAfter）。
 
                 // 错误提示
                 if hasError {
-                    Text("未找到该车辆，请检查车牌号或下载完整 App")
+                    // 以前这里写「未找到该车辆，请检查车牌号」—— 但 App Clip 根本没查过任何东西：
+                    // 它没有登录态、也不带令牌，**无法联网核验车牌**。那句提示把「查不到」
+                    // 说成了用户的输入问题。现在说的是实话。
+                    Text("本机还没有主 App 共享的车况：请打开完整 App 并刷新一次车况（App Clip 没有登录态，只能读主 App 同步过来的数据）。")
                         .font(WT.Typo.footnote)
                         .foregroundStyle(WT.Palette.bad.opacity(0.8))
+                        .multilineTextAlignment(.leading)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
                 }
 
+                // 查到的车况（真数据：来自主 App 写进 App Group 的快照）
+                if let s = snapshot { snapshotCard(s) }
+
                 // 主要操作按钮
                 Button {
-                    isLoading = true
-                    hasError = false
-                    // 模拟查询（实际需调用 API）
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        isLoading = false
-                        if plateInput.count >= 7 {
-                            carData = ["name": "特斯拉 Model 3", "soc": 85, "range": 420, "temp": "21℃", "locked": true]
-                        } else {
-                            hasError = true
-                        }
-                    }
+                    query()
                 } label: {
-                    Text("查询车辆")
+                    Text("查看车辆状态")
                         .font(WT.Typo.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
@@ -124,11 +118,16 @@ struct AppClipEntranceView: View {
 
                 Spacer()
 
-                // 功能说明
+                // 功能说明。
+                // 写「实时」是不诚实的：Clip 自己发不了请求，显示的只能是主 App
+                // 最近一次同步的快照 —— 可能是几分钟前，也可能是几小时前。
                 VStack(spacing: 12) {
-                    FeatureItem(icon: "battery.100", label: "实时电量")
+                    Text("显示的是主 App 最近一次同步的车况")
+                        .font(WT.Typo.caption)
+                        .foregroundStyle(WT.Palette.onAccent.opacity(0.6))
+                    FeatureItem(icon: "battery.100", label: "电量与续航")
                     FeatureItem(icon: "thermometer", label: "车内温度")
-                    FeatureItem(icon: "lock.fill", label: "门锁状态")
+                    FeatureItem(icon: "lock.fill", label: "门锁与充电")
                 }
                 .padding(.top, 20)
             }
@@ -137,6 +136,70 @@ struct AppClipEntranceView: View {
         .sheet(isPresented: $showMainApp) {
             Text("跳转到主 App（需已安装）")
         }
+    }
+
+    // MARK: - 数据
+
+    /// 读主 App 写进 App Group 的快照。
+    /// App Clip **不发请求**：它没有登录态、也没有令牌，所以「查车牌」这件事**做不到**；
+    /// 能做的只有把主 App 最近一次同步的车况拿过来。拿不到就说拿不到。
+    private func query() {
+        // `hasData` 是快照自带的判据（`updatedAt == .distantPast` 表示从未同步过）：
+        // 没有它就会把一份“全 0 的默认快照”当成真实车况显示出来。
+        let s = SharedStore.read()
+        snapshot = (s?.hasData ?? false) ? s : nil
+        hasError = (snapshot == nil)
+    }
+
+    /// 车况卡：每一项都是快照里的真字段，没有的就不显示（不填默认值）。
+    private func snapshotCard(_ s: VehicleSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(Self.agoText(s.updatedAt))
+                    .font(WT.Typo.caption)
+                    .foregroundStyle(WT.Palette.labelSecondary)
+                Spacer(minLength: 8)
+                if !plateInput.isEmpty {
+                    // 车牌是你输入的：Clip 无从核验，所以就这么标着
+                    Text("车牌（你输入）\(plateInput)")
+                        .font(WT.Typo.caption)
+                        .foregroundStyle(WT.Palette.labelSecondary)
+                }
+            }
+            HStack(spacing: 18) {
+                clipStat("电量", "\(s.soc)%")
+                clipStat("续航", "\(s.rangeKm) km")
+                clipStat("车内", s.cabinTemp.isEmpty ? "—" : s.cabinTemp)
+            }
+            HStack(spacing: 18) {
+                clipStat("门锁", s.locked ? "已锁" : "未锁")
+                clipStat("充电", s.charging ? (s.chargePower.map { String(format: "%.1f kW", $0) } ?? "充电中") : "未充电")
+                clipStat("总里程", "\(s.mileageKm) km")
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func clipStat(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(WT.Typo.caption)
+                .foregroundStyle(WT.Palette.labelSecondary)
+            Text(value)
+                .font(WT.Typo.data(16))
+                .foregroundStyle(WT.Palette.onAccent)
+        }
+    }
+
+    /// 「主 App 同步于 x 前」。写清数据来源与龄期，比写「实时」诚实。
+    private static func agoText(_ date: Date) -> String {
+        let s = Date().timeIntervalSince(date)
+        if s < 60 { return "主 App 刚刚同步" }
+        if s < 3600 { return "主 App \(Int(s / 60)) 分钟前同步" }
+        if s < 86400 { return "主 App \(Int(s / 3600)) 小时前同步" }
+        return "主 App \(Int(s / 86400)) 天前同步"
     }
 }
 

@@ -24,12 +24,10 @@ struct VehicleView: View {
     private var isLoading: Bool { store.carId.isEmpty }
     private var isEmpty:   Bool { !store.carId.isEmpty && store.car == nil }
 
-    /// #40 上次保养里程（从 UserDefaults 读取）
-    private var lastServiceMiles: Int? {
-        guard let mileageStr = UserDefaults.standard.string(forKey: "carkeeper_last_service_mileage") else { return
- nil }
-        return Int(mileageStr)
-    }
+    // 【已删】private var lastServiceMiles: Int?
+    // 它是 `UserDefaults.string(forKey: "carkeeper_last_service_mileage")`，
+    // 而那个键是用 `set(Int, forKey:)` 写的 —— 类型不符，**永远返回 nil**，
+    // 所以「下次保养里程」那一节从来没被显示过。保养计划现在统一走 store.maintenancePlan。
 
     private var isNev: Bool {
         guard let v = ciString(store.car, ["IsNev"])?.lowercased() else { return false }
@@ -50,7 +48,7 @@ struct VehicleView: View {
                               title: "未绑定车辆",
                               message: "请先在「车与账号」里绑定车辆后重试",
                               actionTitle: "重新加载") { reloadVehicle() }
-            } else if let sum = VM.vehicleSummary(store.car) {
+            } else if let sum = VM.vehicleSummary(store.car, store.controlCache) {
                 content(sum)
             } else {
                 DSPlaceholder(icon: "exclamationmark.triangle",
@@ -321,7 +319,9 @@ struct VehicleView: View {
             return (v?.isEmpty ?? true) ? nil : v
         }
         func row(_ k: String, _ label: String, suffix: String = "") -> Row? {
-            guard let v = s2(k) else { return nil }
+            // 哨兵值（"0000-00-00" / "0000-00-00\n\t\t00:00:00"）是「没有登记」，不是数据。
+            // 不加这道守卫，档案表会写出「激活时间 0000-00-00」这种零年零月。
+            guard let v = VM.antiSentinel(s2(k)) else { return nil }
             return Row(k: label, v: v + suffix)
         }
         var out: [Grp] = []
@@ -336,21 +336,25 @@ struct VehicleView: View {
                      row("EngineNo", "发动机编号"), row("TenantId", "租户标识")].compactMap { $0 }
         if !basic.isEmpty { out.append(Grp(name: "车型配置", rows: basic)) }
 
-        let ins = [row("InsuranceEndDate", "保险到期"), row("InsuranceCompany", "保险公司"),
-                   row("InsurancePhone", "保险电话"), row("RegisterTime", "注册时间"),
-                   row("ProductTime", "生产时间")].compactMap { $0 }
-        if !ins.isEmpty { out.append(Grp(name: "注册与保险", rows: ins)) }
+        // 保险到期单独摆一行：哨兵值意味着「小程序里没登记过」，这本身就是一条信息，
+        // 不能用“整行消失”掩盖（而参考实现（C#）是干脆不显示）。
+        var ins: [Row] = [Row(k: "保险到期",
+                             v: VM.antiSentinel(s2("InsuranceEndDate")) ?? "未登记（小程序里没有填）")]
+        ins += [row("InsuranceCompany", "保险公司"), row("InsurancePhone", "保险电话"),
+                row("RegisterTime", "注册时间"), row("ProductTime", "生产时间")].compactMap { $0 }
+        out.append(Grp(name: "注册与保险", rows: ins))
 
         var svc = [row("MaintainSpaceMileage", "保养间隔", suffix: " km"),
                    row("LastMaintainMileage", "上次保养里程", suffix: " km"),
                    row("LastOnlineTime", "最后在线"), row("ActiveTime", "激活时间")].compactMap { $0 }
-        // #40 下次保养里程与预计费用（本地里程推算，不新增数据源）
-        if let miles = VM.vehicleSummary(store.car)?.mileage, let lastMiles = lastServiceMiles {
-            let interval = AppStore.defaultServiceInterval
-            let timesSince = max(0, (miles - lastMiles) / max(1, interval))
-            let nextMiles = lastMiles + (timesSince + 1) * interval
+        // #40 下次保养里程与预计费用。
+        // 数据源统一：`store.maintenancePlan`（间隔与上次保养来自服务端
+        // maintainSpaceMileage / lastMaintainMileage，缺字段才退回本机记录）。
+        if let plan = store.maintenancePlan {
+            let timesSince = max(0, (plan.current - plan.last) / max(1, plan.interval))
             let estPrice = timesSince >= 3 ? AppStore.majorServicePriceEstimate : AppStore.servicePriceEstimate
-            svc.append(Row(k: "下次保养里程", v: "\(nextMiles) km"))
+            let gap = plan.remaining >= 0 ? "再跑 \(plan.remaining) km" : "已超 \(abs(plan.remaining)) km"
+            svc.append(Row(k: "下次保养里程", v: "\(plan.next) km（\(gap)）"))
             svc.append(Row(k: "下次保养预计费用", v: "约 ¥\(estPrice)"))
         }
         if !svc.isEmpty { out.append(Grp(name: "服务与保养", rows: svc)) }

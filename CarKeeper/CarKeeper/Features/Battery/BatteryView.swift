@@ -106,6 +106,7 @@ struct BatteryView: View {
         socHero(e)
         verdictCard(cache, b)
         consistencyCard(b)
+        insulationCard(e)
         chargeCard(b)
         // 钱：车端功率采样积分出来的电量 × 用户自己设的电价，见 Services/ChargeLedger.swift
         ChargeMoneyBlock()
@@ -224,8 +225,10 @@ struct BatteryView: View {
                         .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
                         .frame(height: 96)
                         HStack(spacing: TokensSpacing.sm) {
-                            miniStat("最高", String(format: "%.3f", cell.max), "V")
-                            miniStat("最低", String(format: "%.3f", cell.min), "V")
+                            // 极值带节号：只有「最低 3.800 V」看不出是哪一节偏低，
+                            // 节号来自车端的 maxVoltageBatteryNum / minVoltageBatteryNum。
+                            miniStat(cellNumLabel("最高", b.cellMaxNum), String(format: "%.3f", cell.max), "V")
+                            miniStat(cellNumLabel("最低", b.cellMinNum), String(format: "%.3f", cell.min), "V")
                             if let dv = b.diffV {
                                 miniStat("压差", String(format: "%.3f", dv), "V",
                                          warn: dv >= 0.05)
@@ -256,6 +259,26 @@ struct BatteryView: View {
                     }
                     .padding(.vertical, TokensSpacing.sm)
                 }
+            }
+        }
+    }
+
+    /// 有节号就写成「最低·第56节」，没有就只写「最低」—— 不拿序号猜。
+    private func cellNumLabel(_ base: String, _ num: String?) -> String {
+        guard let num, !num.isEmpty, num != "0", num != "--" else { return base }
+        return "\(base)·第\(num)节"
+    }
+
+    // MARK: 高压安全（绝缘电阻）
+    /// `EnergyModel.insulate` 早就从报文里算好了（`insulateResistance`，本车 20000 Ω = 20 kΩ），
+    /// 但**没有任何视图读过它** —— 又一处「启动了却没人看」的读数。电车最该看的指标之一，
+    /// 而且它与告警是两层：越限时车端会把 `insulationAlarm` 置位，那条会出现在上面的「电池告警」里。
+    private func insulationCard(_ e: EnergyModel) -> some View {
+        DSGroup(title: "高压安全",
+                footer: "这是车端自己的读数（报文 insulateResistance），不是我们拿别的字段推的；越限时它会出现在「电池告警」里。") {
+            DSGroupRow(showsSeparator: false) {
+                DSKeyValueRow(key: "绝缘电阻", value: e.insulate,
+                              valueCls: e.insulate == "--" ? "na" : "ok")
             }
         }
     }

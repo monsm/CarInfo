@@ -400,6 +400,10 @@ struct BatteryModel {
     var hasCtrl: Bool
     var hasChg: Bool
     var cellStats: CellStats?
+    /// 最低 / 最高那一节的**节号**（`minVoltageBatteryNum` / `maxVoltageBatteryNum`）。
+    /// 只有极值不够用：88 节里知道「最低 3.800 V」不等于知道「哪一节低」。
+    var cellMinNum: String?
+    var cellMaxNum: String?
     var probeStats: CellStats?
     var diffV: Double?
     var diffT: Double?

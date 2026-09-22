@@ -28,7 +28,12 @@ struct ControlView: View {
     private let moreCommands: [(key: String, name: String, symbol: String, note: String?)] = [
         ("FlashLight", "闪灯", "lightbulb", nil),
         ("Whistle", "鸣笛", "speaker.wave.2", nil),
-        ("RemoteSearchCar", "远程寻车", "location", nil)
+        ("RemoteSearchCar", "远程寻车", "location", nil),
+        // UpCarCondition 来自参考实现（D:/xm/ChangAnCarInfo）的指令枚举，注释写着
+        // 「刷新车辆状态TBOX」。它不发任何物理动作，而是**让车端立刻上报一次** ——
+        // 车端停报时刷页面没有用：服务端只会回放同一份快照（本次抓包：07:19:28 之后
+        // 十几次轮询拿到的数值一字不差）。想让数字变新，只能先把车端叫醒。
+        ("UpCarCondition", "刷新车况", "arrow.clockwise", "让车端立刻上报一次状态")
     ]
     // #18 快捷预设场景
     /// 一个场景 = **一条真指令 + 它自己带的温度**。
@@ -574,8 +579,11 @@ struct ControlView: View {
 
     private var filteredRuns: [AppStore.HistoryEntry] {
         switch historyFilter {
-        case "ok": return allRuns.filter { $0.success }
-        case "fail": return allRuns.filter { !$0.success }
+        // 「成功」只算**已确认**的成功：一条「结果待确认」的指令不该出现在成功列表里，
+        // 也不该被算成失败 —— 那两件事都是我们不知道的事。
+        case "ok": return allRuns.filter { $0.success && $0.confirmed }
+        case "fail": return allRuns.filter { !$0.success && $0.confirmed }
+        case "unknown": return allRuns.filter { !$0.confirmed }
         default: return allRuns
         }
     }
@@ -584,9 +592,28 @@ struct ControlView: View {
     /// 刻意**没有**「进行中」：`addCommandHistory` 只在一次执行结束时被调用，
     /// 所以持久历史里不可能有未完成的条目 —— 做一个永远为 0 的筛选项就是界面在说谎。
     /// 真正在跑的那条在上面的 `runningCard` 里。
+    /// 筛选项。第四个「未确认」只在真的出现过这种记录时才出现 ——
+    /// 常态下不占位置，但一旦发生过（60 秒没等到车端终态），它必须能找到：
+    /// 否则那条记录既不在「成功」也不在「失败」里，用户看着「总指令 3、成功 2」
+    /// 却怎么都找不出第三条。
+    private var historyFilterOptions: [(value: String, title: String)] {
+        var o: [(value: String, title: String)] = [("all", "全部"), ("ok", "成功"), ("fail", "失败")]
+        if allRuns.contains(where: { !$0.confirmed }) { o.append(("unknown", "未确认")) }
+        return o
+    }
+
+    private var emptyFilterText: String {
+        switch historyFilter {
+        case "ok": return "没有成功的指令"
+        case "fail": return "没有失败的指令"
+        case "unknown": return "没有待确认的指令"
+        default: return "没有记录"
+        }
+    }
+
     private var successRateText: String {
         guard !allRuns.isEmpty else { return "—" }
-        let ok = allRuns.filter { $0.success }.count
+        let ok = allRuns.filter { $0.success && $0.confirmed }.count
         return String(format: "%.0f%%", Double(ok) / Double(allRuns.count) * 100)
     }
 
@@ -603,10 +630,7 @@ struct ControlView: View {
             } else {
                 // 筛选用系统的分段控件语法，不自造一排药丸
                 DSGroupRow {
-                    DSSegmented(options: [(value: "all", title: "全部"),
-                                          (value: "ok", title: "成功"),
-                                          (value: "fail", title: "失败")],
-                                selection: $historyFilter)
+                    DSSegmented(options: historyFilterOptions, selection: $historyFilter)
                 }
                 DSGroupRow(showsSeparator: false) {
                     HStack(spacing: 0) {
@@ -618,7 +642,7 @@ struct ControlView: View {
 
                 if filteredRuns.isEmpty {
                     DSGroupRow(showsSeparator: false) {
-                        Text(historyFilter == "ok" ? "没有成功的指令" : "没有失败的指令")
+                        Text(emptyFilterText)
                             .font(TokensTypo.footnote)
                             .foregroundStyle(TokensPalette.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -658,7 +682,7 @@ struct ControlView: View {
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: TokensSpacing.md) {
-                    StatusDot(cls: item.success ? "ok" : "bad")
+                    StatusDot(cls: item.statusCls)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.name)
                             .font(TokensTypo.footnote)
@@ -679,8 +703,8 @@ struct ControlView: View {
                         DSKeyValueRow(key: "结束",
                                       value: item.finishedAt?.formatted(date: .omitted, time: .standard) ?? "—")
                         DSKeyValueRow(key: "耗时", value: item.durationText)
-                        DSKeyValueRow(key: "结果", value: item.success ? "成功" : "失败",
-                                      valueCls: item.success ? "ok" : "bad")
+                        DSKeyValueRow(key: "结果", value: item.resultText,
+                                      valueCls: item.statusCls)
                     }
                     .padding(.top, TokensSpacing.sm)
                 }

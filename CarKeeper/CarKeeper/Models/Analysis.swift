@@ -17,7 +17,9 @@ enum AN {
         return (mn, mx, avg, arr.count)
     }
 
-    static func barsOf(_ arr: [Double], maxBars: Int = 64) -> [Double] {
+    /// 抽样上限 128：本车的电芯是 **88 节**，64 的采样步长是 2 —— 会丢掉一半电芯，
+    /// 而那张图本来就是拿来「看哪一节偏低」的。128 步长为 1，88 节完整落图。
+    static func barsOf(_ arr: [Double], maxBars: Int = 128) -> [Double] {
         let step = max(1, Int(ceil(Double(arr.count) / Double(maxBars))))
         var out: [Double] = []
         var i = 0
@@ -257,8 +259,8 @@ enum AN {
     // ---------- 服务 ----------
     private static func serviceDomain(_ cache: [String: Any?], _ carRaw: [String: Any]?) -> DomainVerdict {
         let car = carRaw
-        let insDays: Int? = car.flatMap { VM.daysUntil($0["InsuranceEndDate"]) }
-        let srvDays: Int? = car.flatMap { VM.daysUntil($0["TserviceEndtime"]) }
+        let insDays: Int? = car.flatMap { VM.daysUntil(ciPick($0, ["InsuranceEndDate"])) }
+        let srvDays: Int? = car.flatMap { VM.daysUntil(ciPick($0, ["TserviceEndtime"])) }
         var d = DomainVerdict(key: "service", label: "服务", url: "/pages/vehicle/vehicle",
                               cls: NA, short: "--", title: "暂无到期信息", reasons: [], metrics: [])
         if let insDays { d.metrics.append(Metric(k: "保险到期", v: insDays < 0 ? "已过 \(abs(insDays)) 天" : "剩 \(insDays) 天")) }
@@ -298,10 +300,10 @@ func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
         guard hasCtrl, let list = ciArray(control, [listKey]) else { return [] }
         var out: [Double] = []
         for sub in list {
-            let arr: [Any]
-            if let s = sub[itemKey] as? [Any] { arr = s }
-            else if let a = sub[itemKey] as? [Any] { arr = a }
-            else { arr = [] }
+            // 键是变量，所以必须走 ciPick —— 直接下标 `sub[itemKey]` 的大小写由调用方决定，
+            // 而报文的键一律小写，调用方一旦写成 "BatteryVoltage" 就永远读不到（静默空数组）。
+            // （原文这里是两个**完全相同**的分支 if/else，第二个永远不执行。）
+            let arr: [Any] = ciPick(sub, [itemKey]) as? [Any] ?? []
             for v in arr {
                 let d: Double?
                 if let s = v as? String { d = Double(s) }
@@ -337,21 +339,21 @@ func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
             : (ciArray(control, ["MotorData"])?.isEmpty == false ? ciArray(control, ["MotorData"]) : nil)) ?? []
         return list.map { m in
             MotorModel(
-                num: VM.n0(m["Num"]) ?? "--",
-                state: VM.s(m["State"]) ?? "--",
-                rpm: VM.n0(m["RevolutionSpeed"]) ?? "--",
-                torque: VM.n0(m["Torque"]) ?? "--",
-                temp: VM.n0(m["Temperature"]) ?? "--",
-                ctrlTemp: VM.n0(m["ControllerTemperature"]) ?? "--",
-                inputV: VM.n1(m["ControllerInputVoltage"]) ?? "--",
-                dcBus: VM.n0(m["ControllerDcBusCurrent"]) ?? "--"
+                num: VM.n0(ciPick(m, ["Num"])) ?? "--",
+                state: VM.s(ciPick(m, ["State"])) ?? "--",
+                rpm: VM.n0(ciPick(m, ["RevolutionSpeed"])) ?? "--",
+                torque: VM.n0(ciPick(m, ["Torque"])) ?? "--",
+                temp: VM.n0(ciPick(m, ["Temperature"])) ?? "--",
+                ctrlTemp: VM.n0(ciPick(m, ["ControllerTemperature"])) ?? "--",
+                inputV: VM.n1(ciPick(m, ["ControllerInputVoltage"])) ?? "--",
+                dcBus: VM.n0(ciPick(m, ["ControllerDcBusCurrent"])) ?? "--"
             )
         }
     }()
 
     func fault(_ name: String, _ countKey: String, _ codeKey: String) -> FaultItem {
         let n = ciNumber(control, [countKey]) ?? 0
-        let code = VM.s(control?[codeKey]) ?? ""
+        let code = VM.s(ciPick(control, [codeKey])) ?? ""
         return FaultItem(name: name, count: Int(max(0, n)), codes: code.isEmpty || code == "无" ? "" : code)
     }
     let faults: [FaultItem] = [
@@ -361,66 +363,60 @@ func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
         fault("其他", "OtherFaultCount", "OtherFaultCodes")
     ]
 
-    let alarmFlags: [(String, String)] = [
-        ("电池总报警", "BatteryAlarm"), ("一致性差异", "BatteryConsistencyDifferenceAlarm"),
-        ("绝缘报警", "InsulationAlarm"), ("高压互锁", "HighVoltageInterlockStateAlarm"),
-        ("单体过压", "SingleBatteryOverVoltageAlarm"), ("单体欠压", "SingleBatteryUnderVoltageAlarm"),
-        ("SOC 过低", "SocLowAlarm"), ("SOC 过高", "SocHighAlarm"), ("SOC 跳变", "SocJumpAlarm"),
-        ("温差过大", "TemperatureDifferenceAlarm"), ("电机过热", "DriveMotorTemperatureAlarm"),
-        ("控制器过热", "DriveMotorControllerTemperatureAlarm"), ("储能过压", "VehicleStorageDeviceOvervoltageAlarm"),
-        ("储能欠压", "VehicleStorageDeviceUndervoltageAlarm"), ("储能不匹配", "RechargeableStorageDeviceMismatchAlarm"),
-        ("过充保护", "VehiclePureDeviceTypeOvercharge")
-    ]
-    let alarms: [String] = alarmFlags.compactMap { (label, key) in
-        let x = ciNumber(control, [key])
-        return (x != nil && x != 0) ? label : nil
-    }
+    // 报警位表只有一份（VM.alarmFlags / VM.activeAlarms）：地图主屏的告警总灯
+    // 与这里的电池告警读的是同一张表、同一个判据（非 0 即亮）。
+    let alarms: [String] = VM.activeAlarms(cache)
 
-    let chgSt = VM.s(charge?["ChrgStatus"]) ?? ""
+    let chgSt = VM.s(ciPick(charge, ["ChrgStatus"])) ?? ""
+    // 「3」= 没在充电（车主已确认：车静止、未插枪时也是 "3"）；
+    // `chargeStarttime`/`Stoptime`/`chargDeltMins` 因此是**上一次**充电的记录（2024-05-20）。
     let chgText: String = switch chgSt {
     case "1": "充电中"
     case "2": "即将充满"
-    case "3": "充电完成"
+    case "3": "未在充电"
     default: "未充电"
     }
-    let chgCls = (["1", "2", "3"].contains(chgSt)) ? "ok" : ""
+    let chgCls = (["1", "2"].contains(chgSt)) ? "ok" : ""
 
     let charging = ChargeDetail(
         text: chgText, cls: chgCls,
-        soc: VM.n0(charge?["RemainPower"]) ?? "--",
-        range: VM.n0(charge?["RemainedPowerMile"]) ?? VM.n0(control?["RemainedPowerMile"]) ?? "--",
-        power: { let p = ciNumber(charge, ["ChargPower", "ChargingPower"]); return p == nil ? "--" : "\(Int(p!)) kW" }(),
-        durMin: VM.n0(charge?["ChargDeltMins"]) ?? "--",
-        start: VM.s(charge?["ChargeStarttime"]) ?? "--",
-        end: VM.s(charge?["ChargeStoptime"]) ?? "--",
+        soc: VM.n0(ciPick(charge, ["RemainPower"])) ?? "--",
+        range: VM.n0(ciPick(charge, ["RemainedPowerMile"])) ?? VM.n0(ciPick(control, ["RemainedPowerMile"])) ?? "--",
+        // 功率算法只有一份（VM.chargePowerKW = U×I，见那个函数的注释）：
+        // 这里以前读 `ChargPower`/`ChargingPower`，而报文里**根本没有这两个键**，
+        // 所以电池页的功率一直是 "--"。
+        power: { let p = VM.chargePowerKW(charge, control); return p == nil ? "--" : "\(Int(p!)) kW" }(),
+        durMin: VM.n0(ciPick(charge, ["ChargDeltMins"])) ?? "--",
+        start: VM.s(ciPick(charge, ["ChargeStarttime"])) ?? "--",
+        end: VM.s(ciPick(charge, ["ChargeStoptime"])) ?? "--",
         powerLine: ciNumber(charge, ["PowerLineStatus"]) == 0 ? "正常" : (hasChg ? "异常" : "--"),
         heating: ciNumber(charge, ["BatteryHeatingStatus"]) == 1 ? "开启" : (hasChg ? "关闭" : "--"),
         reservation: ciNumber(charge, ["ChargeReservationStatus"]) == 1 ? "已预约" : (hasChg ? "未预约" : "--"),
-        reserveTime: VM.s(charge?["ReservationUseVehicleTime"]) ?? "--"
+        reserveTime: VM.s(ciPick(charge, ["ReservationUseVehicleTime"])) ?? "--"
     )
 
     let subsystems: [SubSystem] = (ciArray(control, ["NevChargeSystemVoltageDtoList"]) ?? []).map { sub in
         SubSystem(
-            num: VM.n0(sub["ChildSystemNum"]) ?? "--",
-            count: VM.n0(sub["CurrentBatteryCount"]) ?? VM.n0(sub["BatteryCount"]) ?? "--",
-            volt: VM.n1(sub["ChargeSystemVoltage"]) ?? "--",
-            amp: VM.n0(sub["ChargeSystemCurrent"]) ?? "--",
-            vMin: { let arr = (sub["BatteryVoltage"] as? [Any])?.compactMap { (v) -> Double? in
+            num: VM.n0(ciPick(sub, ["ChildSystemNum"])) ?? "--",
+            count: VM.n0(ciPick(sub, ["CurrentBatteryCount"])) ?? VM.n0(ciPick(sub, ["BatteryCount"])) ?? "--",
+            volt: VM.n1(ciPick(sub, ["ChargeSystemVoltage"])) ?? "--",
+            amp: VM.n0(ciPick(sub, ["ChargeSystemCurrent"])) ?? "--",
+            vMin: { let arr = (ciPick(sub, ["BatteryVoltage"]) as? [Any])?.compactMap { (v) -> Double? in
                 if let s = v as? String { return Double(s) }; if let n = v as? NSNumber { return n.doubleValue }; return nil } ?? []
                 return arr.isEmpty ? "--" : String(format: "%.3f", arr.min()!) }(),
-            vMax: { let arr = (sub["BatteryVoltage"] as? [Any])?.compactMap { (v) -> Double? in
+            vMax: { let arr = (ciPick(sub, ["BatteryVoltage"]) as? [Any])?.compactMap { (v) -> Double? in
                 if let s = v as? String { return Double(s) }; if let n = v as? NSNumber { return n.doubleValue }; return nil } ?? []
                 return arr.isEmpty ? "--" : String(format: "%.3f", arr.max()!) }()
         )
     }
     let tempSubs: [TempSub] = (ciArray(control, ["NevChargeSystemTemperatureDtoList"]) ?? []).map { sub in
         TempSub(
-            num: VM.n0(sub["ChildSystemNum"]) ?? "--",
-            count: VM.n0(sub["ChargeTemperatureProbeNum"]) ?? "--",
-            tMin: { let arr = (sub["ProbeTemperatures"] as? [Any])?.compactMap { (v) -> Double? in
+            num: VM.n0(ciPick(sub, ["ChildSystemNum"])) ?? "--",
+            count: VM.n0(ciPick(sub, ["ChargeTemperatureProbeNum"])) ?? "--",
+            tMin: { let arr = (ciPick(sub, ["ProbeTemperatures"]) as? [Any])?.compactMap { (v) -> Double? in
                 if let s = v as? String { return Double(s) }; if let n = v as? NSNumber { return n.doubleValue }; return nil } ?? []
                 return arr.isEmpty ? "--" : String(format: "%.1f", arr.min()!) }(),
-            tMax: { let arr = (sub["ProbeTemperatures"] as? [Any])?.compactMap { (v) -> Double? in
+            tMax: { let arr = (ciPick(sub, ["ProbeTemperatures"]) as? [Any])?.compactMap { (v) -> Double? in
                 if let s = v as? String { return Double(s) }; if let n = v as? NSNumber { return n.doubleValue }; return nil } ?? []
                 return arr.isEmpty ? "--" : String(format: "%.1f", arr.max()!) }()
         )
@@ -428,7 +424,10 @@ func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
 
     return BatteryModel(
         hasCtrl: hasCtrl, hasChg: hasChg,
-        cellStats: cellStats, probeStats: probeStats,
+        cellStats: cellStats,
+        cellMinNum: VM.n0(ciPick(control, ["MinVoltageBatteryNum"])),
+        cellMaxNum: VM.n0(ciPick(control, ["MaxVoltageBatteryNum"])),
+        probeStats: probeStats,
         diffV: diffV, diffT: diffT,
         subsystems: subsystems, tempSubs: tempSubs,
         motors: motors, faults: faults,
