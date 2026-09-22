@@ -360,7 +360,7 @@ final class AppStore: @unchecked Sendable {
     /// 消息正文（`content`）是给人读的中文句子，不能当数据源用。
     nonisolated static func jumpParams(_ m: [String: Any]) -> [String: Any] {
         guard let raw = ciString(m, ["JumpParam", "jumpParam"]), !raw.isEmpty,
-              let obj = jsonToAny(raw) as? [String: Any] else { return [:] }
+              let obj = jsonToAny(raw) else { return [:] }
         return (obj["uriParams"] as? [String: Any]) ?? obj
     }
 

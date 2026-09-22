@@ -316,8 +316,10 @@ struct MineView: View {
     }
 
     /// 自定义行（开关 / 选择器 / 第三方视图）：只借用分组的内缩与分隔线
+    /// content 必须 @escaping：DSGroupRow 的 content 是存储属性闭包（会逃逸），
+    /// 包进它的非逃逸参数会在编译期直接报错（CI 上踩过）。
     private func customRow<V: View>(last: Bool = false,
-                                    @ViewBuilder _ content: () -> V) -> some View {
+                                    @ViewBuilder _ content: @escaping () -> V) -> some View {
         DSGroupRow(showsSeparator: !last) { content() }
     }
 
