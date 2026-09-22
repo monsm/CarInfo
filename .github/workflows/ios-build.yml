@@ -100,6 +100,18 @@ jobs:
           rm -rf Payload
           mkdir Payload
           cp -R "$APP_PATH" Payload/
+          # 嵌入 CarPlay extension（.appex 放到 PlugIns/ 下）：
+          # xcodebuild -target CarPlay 编译后产物在 DerivedData/Build/Products/
+          # 如果找不到 .appex（首次编译失败），跳过不报错，主 App 仍可安装。
+          APP_EX_PATH=$(find ~/Library/Developer/Xcode/DerivedData             -name "CarPlay.appex" -type d 2>/dev/null | head -n1)
+          if [ -n "$APP_EX_PATH" ]; then
+            echo "Embedding CarPlay extension: $APP_EX_PATH"
+            PLUGINS_DIR="$APP_PATH/PlugIns"
+            mkdir -p "$PLUGINS_DIR"
+            cp -R "$APP_EX_PATH" "$PLUGINS_DIR/"
+          else
+            echo "⚠️ CarPlay.appex not found — extension will be absent from IPA"
+          fi
           # 打成 ipa
           zip -qr "CarKeeper-unsigned.ipa" Payload
           # 同时把 ipa 复制成 zip 附件（便于 Actions 直接下载）
