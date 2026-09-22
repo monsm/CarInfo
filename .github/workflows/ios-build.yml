@@ -36,7 +36,7 @@ jobs:
           # 2026-09-22 那次 CI 就是在 xcodegen generate 阶段以
           # 「missing source directory .../HealthKit」直接失败的（删目录时漏删声明，
           # 而本地开发机上那个空壳目录还在，怎么试都试不出来）。
-          for s in paths lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol; do
+          for s in paths access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol; do
             echo "::group::$s.py"
             python3 scan/$s.py
             echo "::endgroup::"

@@ -112,7 +112,7 @@ struct MileageJournalView: View {
                     ForEach(Array(TripCostType.allCases.prefix(4)), id: \.self) { type in
                         DSGroupRow {
                             DSKeyValueRow(key: type.displayName,
-                                          value: "¥\(tracker.totalByType(type), specifier: "%.1f")")
+                                          value: String(format: "¥%.1f", tracker.totalByType(type)))
                         }
                     }
                 }

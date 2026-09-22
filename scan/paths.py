@@ -25,6 +25,7 @@ paths.py —— project.yml 与 CI 工作流里声明的路径必须真的存在
   它**只看存在性**，不判断路径该不该在那儿 —— 删目录时漏删声明，正是它要抓的。
 """
 
+import glob
 import os
 import re
 import sys
@@ -54,6 +55,43 @@ def declared_paths(spec_path):
             seen.add(p)
             out.append(p)
     return out
+
+
+def covered_sources(paths):
+    """把声明的 source 路径展开成「真的会参与编译的 Swift 文件」集合
+
+    存在的意义（2026-09-22 差点出的事）：
+    仓库里有两条 Services/ 与两条 Models/ —— `CarKeeper/Services/`（在 spec 里声明了）
+    与 `CarKeeper/CarKeeper/Services/`（在 `- path: CarKeeper/` 里）。
+    两边都在编译，没问题；但如果哪天改的那份不在任何声明之下，
+    它就成了「磁盘上有、编译器永远不看」的文件 —— 改了等于没改，而且毫无报错。
+    """
+    covered = set()
+    for rel in paths:
+        base = os.path.join(SPEC_DIR, rel.rstrip('/'))
+        if os.path.isfile(base):
+            norm = os.path.normpath(base).replace(os.sep, '/')
+            if norm.endswith('.swift'):
+                covered.add(norm)
+            continue
+        for p in glob.glob(os.path.join(base, '**', '*.swift'), recursive=True):
+            covered.add(os.path.normpath(p).replace(os.sep, '/'))
+    return covered
+
+
+def stray_swift(paths):
+    """磁盘上的 Swift 文件里，不参与任何 target 编译的那些"""
+    covered = covered_sources(paths)
+    root = ROOT.replace(os.sep, '/')
+    stray = []
+    for p in glob.glob(os.path.join(ROOT, 'CarKeeper', '**', '*.swift'), recursive=True):
+        norm = os.path.normpath(p).replace(os.sep, '/')
+        if '/scan/' in norm:
+            continue            # 检查器的基线副本（不是源码）
+        if norm in covered:
+            continue
+        stray.append(norm[len(root) + 1:] if norm.startswith(root) else norm)
+    return sorted(stray)
 
 
 def workflow_checkers(workflow_dir):
@@ -160,6 +198,14 @@ def main(argv):
                 if not ok:
                     problems.append(f"CI 用 -scheme {s}，但 spec 既没有这个 scheme"
                                     "（schemes: 存在时 XcodeGen 不再为其它 target 自动生成方案）")
+
+    if spec == SPEC:
+        stray = stray_swift(paths)
+        if stray:
+            print(f"\n⚠️ 磁盘上 {len(stray)} 个 Swift 文件不在任何已声明的 source 之下")
+            for s in stray:
+                print("  ❌ " + s)
+            problems.append(f"{len(stray)} 个 Swift 文件永远不会被编译（改了等于没改）")
 
     print()
     if problems:

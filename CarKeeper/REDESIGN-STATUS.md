@@ -336,3 +336,34 @@ xcodebuild: error: The project named "CarKeeper" does not contain a scheme named
 值得记下来的是：这个检查器的**第一版有洞** —— 它把「是 target 名」也算通过，而
 `CarKeeper` 正好也是 target 名，于是反向自测（临时抽掉那条 scheme）当场没报。改成
 「`schemes:` 存在时只认显式声明」之后，同样的探针立刻 ❌ + 退出码 1。
+
+### 11.2 第一次真正跑到编译器：三个 Swift 错误
+
+CI 终于走完 `xcodegen` + scheme，进入了 Swift 编译。三个错误，全部是这一轮新写的代码：
+
+| 文件 | 错误 | 成因 |
+|---|---|---|
+| `MileageJournalView.swift:115` | `incorrect argument label (have '_:specifier:', expected '_:default:')` | `"¥\(x, specifier: "%.1f")"` 是 **`Text` 的 `LocalizedStringKey` 插值**语法，`DSKeyValueRow.value` 收的是普通 `String` —— 普通字符串插值没有 `specifier:`。改成 `String(format:)`。同文件第 262 行那处**是合法的**（它在 `Text(...)` 里），保留 |
+| `SiriShortcuts.swift:65` | `value of optional type 'Int?' must be unwrapped` | `air(on:)` 写成 `temperature: on ? temperature : nil`，而 `sendControlCommand(temperature: Int = 17)` 收非可选。改成开机才带温度的分支 |
+| `TripsTimelineView.swift:23` | `'clusterHotspots' is inaccessible due to 'private'` | 行程时间轴复用了地图的聚类函数，而它是 `private static` |
+
+## 12. 新增：`scan/access.py`（跨文件访问 private）
+
+第三个错误是**纯静态就能查出来**的一类：限定引用（`类型名.成员名`）指向了另一个文件里的
+`private` / `fileprivate` 成员。这台机器没有编译器，这类错误只能靠人眼，而人眼漏了。
+
+第一次尝试是全查「跨文件引用了任何 private 成员名」——**2916 条命中，全是
+`font` / `now` / `content` / `filter` 这种同名噪音**。噪音检查器等于没有检查器，
+所以最终只查**限定引用**：这正是编译器报的那一类，且几乎没有误报。
+
+反向自测的写法也学了一课：探针**必须自带声明**，不能指向仓库里现有的某个 private 成员 ——
+第一版探针指向 `MapSpineData.clusterHotspots`，而这个函数在同一个提交里被改成 internal，
+于是探针「没问题可报」，自测误判成检查器坏了。现在探针自己声明一个
+`AccessProbeHolder.secret()` 再从另一个文件引用它，通过后随即删除。
+
+同一次里 `scan/paths.py` 还加了第四条规则：**磁盘上不得有「不在任何已声明 source 之下」
+的 Swift 文件**。仓库里 `CarKeeper/Services/` 与 `CarKeeper/CarKeeper/Services/` 两个目录
+（前者在 spec 里声明，后者被 `- path: CarKeeper/` 覆盖）都在编译 —— 但如果哪天改的那份
+两份都不是，它就变成「改了等于没改、而且毫无报错」的文件。现存 0 个。
+
+CI 静态门禁清单因此从 13 项变成 14 项（新增 `access`）。

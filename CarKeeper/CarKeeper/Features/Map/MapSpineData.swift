@@ -482,7 +482,7 @@ struct MapSpineData {
     /// 逐点贪心：以每个停车点为核，把 80 米内的同伴收进同一组（间距是停车记录之间
     /// 的真实距离，够近的记录本来就该是同一个目的地）。组内≥2 次才算热区；
     /// 半径取组内各点到质心的最大距离再放宽 60 米 —— 是几何的产物，不是美术。
-    private static func clusterHotspots(
+    static func clusterHotspots(
         from records: [AppStore.ParkingRecord],
         excluding latest: CLLocation?
     ) -> [MapHotspot] {

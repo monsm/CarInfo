@@ -37,10 +37,14 @@ struct SiriCarController {
     }
 
     func air(on: Bool, temperature: Int = 22) async -> Outcome {
-        await send(cmd: on ? "OpenAir" : "CloseAir",
-                   name: on ? "开空调" : "关空调",
-                   usageKey: on ? "ac_on" : "ac_off",
-                   temperature: on ? temperature : nil)
+        // 温度只对 OpenAir 有意义（API 只在 cmd == "OpenAir" 时拼进 URL），
+        // 所以关机指令根本不带这个参数，而不是传一个用不上的值。
+        if on {
+            return await send(cmd: "OpenAir", name: "开空调",
+                              usageKey: "ac_on", temperature: temperature)
+        } else {
+            return await send(cmd: "CloseAir", name: "关空调", usageKey: "ac_off")
+        }
     }
 
     func findCar() async -> Outcome {
