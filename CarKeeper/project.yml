@@ -219,6 +219,8 @@ targets:
         GENERATE_INFOPLIST_FILE: 'YES'
         ENABLE_PREVIEWS: 'NO'
         CODE_SIGNING_ALLOWED: 'NO'
+        # 车机扩展必须能读 App Group 里的 VehicleSnapshot，否则读到的是空数据
+        CODE_SIGN_ENTITLEMENTS: CarPlay/CarPlay.entitlements
     dependencies:
     - target: CarKeeper
   AppClip:
