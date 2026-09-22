@@ -245,7 +245,7 @@ struct Pill: View {
 /// 网络状态条：一整行、发丝线分隔、左对齐 —— 像车内状态灯，而不是飘在顶部的彩色胶囊。
 /// 全局 Toast 提示（由 NavState.currentItem 驱动，挂载在根视图上）
 // ShareableStatusInfo / generateShareableStatus 已删：那是一段没有任何调用点的“分享文案生成”，
-// 而且它是第二套分享路径（导出页的 `ExportDataView` 才是真的导出）。
+// 而且它是第二套分享路径（真的导出在保养与钱里的 `ExportDataSection`）。
 //
 // ImagePicker / pickImageFromPhotoLibrary / ImagePickerCoordinator 已删：
 // 用 `UIImagePickerController` 自己 present 是 UIKit 时代的写法（还得靠一个全局强引用来防止

@@ -1,11 +1,15 @@
 // =============================================================================
-// ExportDataView - 数据导出（CSV/PDF 行程/充电记录）
+// 导出 — CSV/PDF（行程 / 充电 / 指令历史）
+//
+// 原为独立页面（深链 `carkeeper://export`）。批 5 并进 **保养与钱**：
+// 「带走你自己的记录」跟钱与保养是同一件事的一部分。
+// 它现在只提供内容（`ExportDataSection`），页面外壳归 `MaintenanceMoneyView`。
 // =============================================================================
 
 import SwiftUI
 import UIKit
 
-struct ExportDataView: View {
+struct ExportDataSection: View {
     private let store = AppStore.shared
     @State private var exportType: ExportType = .trips
     @State private var isExporting = false
@@ -20,16 +24,13 @@ struct ExportDataView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "导出数据", subtitle: "带走你自己的记录")
+        Group {
+            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSSectionHeader(title: "导出")
 
                 // 选择导出类型（四个互斥选项 → 系统的分段语法）
-                VStack(alignment: .leading, spacing: TokensSpacing.xs) {
-                    DSSectionHeader(title: "导出类型")
-                    DSSegmented(options: ExportType.allCases.map { (value: $0, title: $0.rawValue) },
-                                selection: $exportType)
-                }
+                DSSegmented(options: ExportType.allCases.map { (value: $0, title: $0.rawValue) },
+                            selection: $exportType)
 
                 // 导出内容预览
                 previewCard
@@ -53,10 +54,7 @@ struct ExportDataView: View {
                     .buttonStyle(DSSecondaryButtonStyle())
                 }
             }
-            .padding(.horizontal, TokensSpacing.page)
-            .padding(.vertical, TokensSpacing.lg)
         }
-        .dsPageTitle("导出数据", inline: true)
         .alert("导出成功", isPresented: $showSuccess) {
             Button("分享", action: shareExportedFile)
             Button("关闭", role: .cancel) {}
@@ -225,10 +223,8 @@ struct ExportDataView: View {
     }
 }
 
-struct ExportDataView_Previews: PreviewProvider {
+struct ExportDataSection_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationStack {
-            ExportDataView()
-        }
+        ScrollView { ExportDataSection() }
     }
 }

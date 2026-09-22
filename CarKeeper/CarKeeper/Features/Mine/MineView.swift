@@ -24,9 +24,6 @@ struct MineView: View {
     @State private var showPrivacyDashboard = false
     @State private var showTempKeys = false
     @State private var showFamily = false
-    @State private var showInspection = false
-    @State private var showValuation = false
-    @State private var showChargeBill = false
     /// 退出登录二次确认（按钮在 tilesCard 的「应用」组里）
     @State private var logoutConfirm = false
     /// 行内开关的**本地镜像**。
@@ -122,30 +119,6 @@ struct MineView: View {
             NavigationStack {
                 FamilyManagementView()
                     .navigationTitle("家庭管理")
-                    .dsSheetCanvas()
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-        }
-        .sheet(isPresented: $showInspection) {
-            NavigationStack {
-                InspectionCalendarView()
-                    .navigationTitle("年检日历")
-                    .dsSheetCanvas()
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-        }
-        .sheet(isPresented: $showValuation) {
-            NavigationStack {
-                VehicleValuationView()
-                    .navigationTitle("车辆估值")
-                    .dsSheetCanvas()
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-        }
-        .sheet(isPresented: $showChargeBill) {
-            NavigationStack {
-                ChargeBillSheet()
-                    .navigationTitle("充电账单")
                     .dsSheetCanvas()
                     .navigationBarTitleDisplayMode(.inline)
             }
@@ -283,13 +256,6 @@ struct MineView: View {
     // 批 4 把那两组去掉：**功能目录只在地图上有一份**，这一页只留设置。
     private var settingsGroups: some View {
         VStack(spacing: TokensSpacing.xl) {
-            DSGroup(title: "钱与证件",
-                    footer: "数字来自本机记录（年检 / 保险的字段由你自己填）；里程记账在「车辆档案」里。") {
-                actionRow("doc.plaintext.fill", "充电账单") { showChargeBill = true }
-                actionRow("dollarsign.circle.fill", "车辆估值") { showValuation = true }
-                actionRow("calendar.fill", "年检与保险", last: true) { showInspection = true }
-            }
-
             DSGroup(title: "报告与共享") {
                 actionRow("key.fill", "共享钥匙") { showTempKeys = true }
                 actionRow("person.2.fill", "家庭管理") { showFamily = true }
@@ -315,7 +281,6 @@ struct MineView: View {
                         nav.showSearch = true
                     }
                 }
-                linkRow("bubble.left.fill", "消息中心", .messages)
                 actionRow("eye.fill", "隐私与数据") { showPrivacyDashboard = true }
                 actionRow("tray.fill", "OTA 日志") { showOTAChangelog = true }
                 // 此前是空操作（VoiceBroadcastManager 自动启动，点这里什么都不发生）。

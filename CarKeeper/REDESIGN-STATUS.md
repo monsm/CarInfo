@@ -741,3 +741,27 @@ secondarySystemGroupedBackground
 语音播报、开发者工具、退出登录）。副标题与无障碍提示改成实情。
 
 15 个检查器 + `check_style` 全绿。
+
+---
+
+## 批 5：「保养与钱」一屏 —— 吸收维保 + 年检保险 + 充电账单 + 估值 + 导出
+
+`ServiceHistoryView` → **`MaintenanceMoneyView`**（`Features/Maintenance/`），
+页面标题从「维保记录」改成「保养与钱」，并把四个原本各占一个弹层/深链的东西并成一屏：
+
+| 原 | 现 | 备注 |
+|---|---|---|
+| `InspectionCalendarView`（弹层） | `InspectionSection` | 仍在 `Services/BillingAndCalendar.swift`，只提供内容 |
+| `VehicleValuationView`（弹层） | `VehicleValuationSection` | 同上 |
+| `ChargeBillSheet`（弹层） | `ChargeBillSection` | 同上 |
+| `ExportDataView`（深链 `.export`） | `ExportDataSection` | 文件搬到 `Features/Maintenance/` |
+| `Deeplink.export` | 已删 | 索引页 / 搜索两处入口一并去掉 |
+| 「车与账号」的「钱与证件」三行 + 三个 sheet + 三个 `@State` | 已删 | 它们现在是保养与钱里的三节 |
+
+页面顺序按「先到期、再花钱、后带走」：即将到期（保养里程 / 年检保险日期两套口径）→
+保养记录（统计/年份/时间线）→ 充电账单 → 车辆估值 → 导出。
+
+顺带删掉「车与账号」里最后一条功能入口（消息中心）—— 功能目录只在地图上有一份。
+`Theme.swift` 里那句「导出页的 `ExportDataView` 才是真的导出」也改成现在的实话。
+
+15 个检查器 + `check_style` 全绿；七个改动文件括号余额逐文件配平。

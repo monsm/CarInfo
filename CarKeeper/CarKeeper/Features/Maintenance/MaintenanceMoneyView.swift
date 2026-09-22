@@ -1,10 +1,14 @@
 // =============================================================================
-// ServiceHistoryView —— 维保历史记录（里程提醒 + 维保时间线 + 费用统计）
+// 保养与钱 —— 保养记录 + 年检保险 + 充电账单 + 估值 + 导出
+//
+// 原为「维保记录」页（`ServiceHistoryView`）。批 5 把它扩成一屏：
+// 保养（时间线 / 费用统计）、证件（年检 + 保险）、钱（充电账单 / 估值）、
+// 以及把自己记录带走的导出 —— 它们此前散在「车与账号」的四个弹层与一个深链里。
 // =============================================================================
 
 import SwiftUI
 
-struct ServiceHistoryView: View {
+struct MaintenanceMoneyView: View {
     private let store = AppStore.shared
     @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
     @State private var showAddService = false
@@ -54,26 +58,31 @@ struct ServiceHistoryView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "维保记录", subtitle: "每一次保养、每一笔花费都在这里")
+                DSPageTitle(title: "保养与钱", subtitle: "保养、年检保险、充电账单、估值与导出")
 
-                // 统计
-                statsCard
-
-                // 即将到期提醒
+                // ① 即将到期（保养按里程、年检/保险按日期 —— 两套口径各自一组）
                 if !upcomingServices.isEmpty {
                     upcomingCard
                 }
+                InspectionSection()
 
-                // 年份筛选
+                // ② 保养：统计 → 年份 → 时间线
+                DSSectionHeader(title: "保养记录")
+                statsCard
                 yearFilter
-
-                // 时间线
                 timelineCard
+
+                // ③ 钱：账与估值（充电账单 / 车辆估值）
+                ChargeBillSection()
+                VehicleValuationSection()
+
+                // ④ 带走你自己的记录
+                ExportDataSection()
             }
             .padding(.horizontal, TokensSpacing.page)
             .padding(.vertical, TokensSpacing.lg)
         }
-        .dsPageTitle("维保记录", inline: true)
+        .dsPageTitle("保养与钱", inline: true)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showAddService = true }) {
@@ -86,7 +95,7 @@ struct ServiceHistoryView: View {
             AddServiceView(onSave: addEntry)
                 .dsSheetCanvas()
         }
-        .accessibilityLabel(Text("维保历史记录"))
+        .accessibilityLabel(Text("保养与钱"))
     }
 
     // MARK: - 统计卡
@@ -259,7 +268,7 @@ struct ServiceHistoryView: View {
 
 // MARK: - Add Service Sheet
 struct AddServiceView: View {
-    let onSave: (ServiceHistoryView.ServiceEntry) -> Void
+    let onSave: (MaintenanceMoneyView.ServiceEntry) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var type = "保养"
     @State private var mileage = ""
@@ -302,7 +311,7 @@ struct AddServiceView: View {
     }
 
     private func save() {
-        let entry = ServiceHistoryView.ServiceEntry(
+        let entry = MaintenanceMoneyView.ServiceEntry(
             date: Date(),
             mileage: Int(mileage) ?? 0,
             type: type,
@@ -315,10 +324,10 @@ struct AddServiceView: View {
 }
 
 // MARK: - Preview
-struct ServiceHistoryView_Previews: PreviewProvider {
+struct MaintenanceMoneyView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            ServiceHistoryView()
+            MaintenanceMoneyView()
         }
     }
 }

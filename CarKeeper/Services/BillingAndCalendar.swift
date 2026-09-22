@@ -181,7 +181,11 @@ class InspectionCalendar: ObservableObject {
 /// 年检与保险是同一件事的两面：「哪个证件什么时候到期」。
 /// 这一页只存**用户自己填的日期**（本机 UserDefaults，没有云端副本），
 /// 并把这些日期交给提醒调度器 —— 提醒这件事以前从来没被调用过（见文件尾注释）。
-struct InspectionCalendarView: View {
+/// 年检 + 保险。
+///
+/// 原为独立 sheet（`InspectionCalendarView`，从「车与账号」的「年检与保险」行弹出）。
+/// 批 5 并进**保养与钱**：证件到期就是钱与手续的一部分，不再单占一个弹层。
+struct InspectionSection: View {
     /// `InspectionCalendar` 是 `ObservableObject`（`@Published` 存的是 inspections）。
     /// 用 `@State` 装一个 class 不会触发重绘 —— 存进去后「添加年检」要等退出重进才看得见。
     @StateObject private var calendar = InspectionCalendar.shared
@@ -197,8 +201,10 @@ struct InspectionCalendarView: View {
     private static let insuranceTypes = ["交强险", "商业险", "座位险"]
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+        Group {
+            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSSectionHeader(title: "年检与保险")
+
                 // ① 最近要到的（年检 + 保险合在一个时间轴上）
                 DSGroup(title: "最近到期",
                         footer: "到期前 30 天与 7 天会各提醒一次（需允许通知）。") {
@@ -318,8 +324,6 @@ struct InspectionCalendarView: View {
                     }
                 }
             }
-            .padding(.horizontal, TokensSpacing.page)
-            .padding(.vertical, TokensSpacing.sm)
         }
         .task { await syncReminders() }
     }
@@ -384,7 +388,10 @@ struct InspectionCalendarView: View {
 }
 
 // MARK: - UI: 车辆估值视图
-struct VehicleValuationView: View {
+/// 车辆估值。
+///
+/// 同样从「车与账号」的弹层并进**保养与钱**（`VehicleValuationSection`）。
+struct VehicleValuationSection: View {
     @State private var initialPrice: String = ""
     @State private var purchaseDate = Date()
     @State private var currentMileage: String = ""
@@ -397,8 +404,10 @@ struct VehicleValuationView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+        Group {
+            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSSectionHeader(title: "车辆估值")
+
                 // 先把「这是什么」说在前面：它是**按一条固定规则算出来的估算**，
                 // 不是二手车市场价。把规则印在结果的上面，而不是藏在页脚。
                 DSNotice(kind: .info,
@@ -452,8 +461,6 @@ struct VehicleValuationView: View {
                     }
                 }
             }
-            .padding(.horizontal, TokensSpacing.page)
-            .padding(.vertical, TokensSpacing.sm)
         }
     }
 
@@ -464,7 +471,10 @@ struct VehicleValuationView: View {
 }
 
 // MARK: - UI: 充电账单 Sheet
-struct ChargeBillSheet: View {
+/// 充电账单。
+///
+/// 同样从「车与账号」的弹层并进**保养与钱**（`ChargeBillSection`）。
+struct ChargeBillSection: View {
     private let store = AppStore.shared
     @State private var savedFile: URL? = nil
 
@@ -486,8 +496,10 @@ struct ChargeBillSheet: View {
     private var totalCost: Double { records.map(\.cost).reduce(0, +) }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+        Group {
+            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSSectionHeader(title: "充电账单")
+
                 if records.isEmpty {
                     DSPlaceholder(icon: "bolt.slash",
                                   title: "还没有充电记录",
@@ -534,9 +546,6 @@ struct ChargeBillSheet: View {
                     }
                 }
             }
-            .padding(.horizontal, TokensSpacing.page)
-            .padding(.top, TokensSpacing.sm)
-            .padding(.bottom, TokensSpacing.xxl)
         }
     }
 }

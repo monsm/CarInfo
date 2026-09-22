@@ -40,7 +40,8 @@ enum Deeplink: Hashable, CaseIterable {
     // 同一件事不再有两个界面（详情见 ControlView 的 historyCard 注释）。
     // `.tips`（车辆提示页）已删：提示是从这辆车的读数推出来的，已并入车辆档案
     // （`VehicleTipsSection`），不再单占一个深链。
-    case trips, service, parking, export, emergency, score
+    // `.export`（导出数据页）已并入保养与钱（`ExportDataSection`）。
+    case trips, service, parking, emergency, score
     /// 「车与账号」（原「我的」Tab 的根页）。设置类内容的去处 —— 它不是功能目录，
     /// 功能目录归地图右上角的索引页；这个深链保证它不再依附于 Tab 才能到达。
     case mine
@@ -59,7 +60,6 @@ enum Deeplink: Hashable, CaseIterable {
         case .trips: return "trips"
         case .service: return "service"
         case .parking: return "parking"
-        case .export: return "export"
         case .emergency: return "emergency"
         case .score: return "score"
         case .mine: return "mine"
@@ -292,11 +292,12 @@ struct MapShellView: View {
         // 而它那三个子分数是用总分做算术编出来的（score / 3、+10、+20）。
         case .dashboard: DrivingScorePage().environmentObject(nav)
         case .trips: TripsTimelineView().environmentObject(nav)
-        case .service: ServiceHistoryView().environmentObject(nav)
+        case .service: MaintenanceMoneyView().environmentObject(nav)
         // .parking 已并入行程时间轴（同一份停车史：时间轴列旅程，地图「停车」层
         // 画常停圈，两处同源）。深链指向时间轴，不再指向已删除的页面。
         case .parking: TripsTimelineView().environmentObject(nav)
-        case .export: ExportDataView().environmentObject(nav)
+        // .export（导出数据页）已并入保养与钱（ExportDataSection）——
+        // 导出的就是那几类记录，它和钱/保养在同一屏里更短一步。
         case .emergency: EmergencyPanel().environmentObject(nav)
         // .tips（车辆提示页）已并入车辆档案 —— 见 `Deeplink` 枚举上的注释。
         case .score: DrivingScorePage().environmentObject(nav)

@@ -856,7 +856,8 @@ struct MapSpineView: View {
                     // 「用车提示」不再单列：它已并入车辆档案（`VehicleTipsSection`）。
                     indexGroup("这辆车", [.vehicle, .battery, .health, .data, .control])
                     indexGroup("出行", [.trips, .emergency])
-                    indexGroup("保养与钱", [.service, .export, .score])
+                    // 「导出数据」不再单列：它并进了保养与钱（`ExportDataSection`）。
+                    indexGroup("保养与钱", [.service, .score])
                     indexGroup("系统", [.messages, .dev, .mine])
 
                     Text("三种艺术主题（夜光 / 纸上 / 巨字）住在开发者工具里，按一下换一套。"
@@ -1036,9 +1037,8 @@ struct MapSpineView: View {
         case .control: return "车控"
         case .dashboard: return "仪表"
         case .trips: return "行程分析"
-        case .service: return "保养记录"
+        case .service: return "保养与钱"
         case .parking: return "停车位置"
-        case .export: return "导出数据"
         case .emergency: return "应急面板"
         case .score: return "驾驶评分"
         }
