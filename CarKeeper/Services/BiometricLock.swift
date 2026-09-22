@@ -18,37 +18,33 @@ struct BiometricLockOverlay: View {
             Color.black.opacity(0.6)
                 .ignoresSafeArea()
 
-            VStack(spacing: TokensSpacing.lg) {
-                Image(systemName: "faceid")
-                    .font(.system(size: 60))
-                    .foregroundColor(TokensPalette.ambient)
-                    .symbolEffect(.bounce)
+            // 卡片与按钮全部回到 DS：这是全 App 唯一的验证浮层，它不该是第四套外观。
+            DSCard(padding: TokensSpacing.lg, radius: TokensRadius.large) {
+                VStack(spacing: TokensSpacing.lg) {
+                    Image(systemName: "faceid")
+                        .font(.system(size: 60))
+                        .foregroundColor(TokensPalette.ambient)
+                        .symbolEffect(.bounce)
 
-                Text("需要身份验证")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    Text("需要身份验证")
+                        .font(TokensTypo.title2)
+                        .foregroundStyle(TokensPalette.primary)
 
-                Text(errorMessage ?? "请使用 Face ID 或 Touch ID 验证身份")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                    Text(errorMessage ?? "请使用 Face ID 或 Touch ID 验证身份")
+                        .font(TokensTypo.body)
+                        .foregroundStyle(TokensPalette.secondary)
+                        .multilineTextAlignment(.center)
 
-                Button {
-                    authenticate()
-                } label: {
-                    Label("解锁", systemImage: "faceid")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(TokensPalette.ambient)
-                        .foregroundColor(TokensPalette.labelOnTint)
-                        .cornerRadius(TokensRadius.medium)
+                    Button {
+                        authenticate()
+                    } label: {
+                        Label("解锁", systemImage: "faceid")
+                    }
+                    .buttonStyle(DSPrimaryButtonStyle())
                 }
-                .padding(.horizontal, TokensSpacing.xl)
+                .frame(maxWidth: 320)
             }
-            .padding()
-            .glassCard()
+            .frame(maxWidth: 320)
         }
         .ignoresSafeArea()
     }

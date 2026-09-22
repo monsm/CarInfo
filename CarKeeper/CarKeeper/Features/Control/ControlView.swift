@@ -556,7 +556,7 @@ struct ControlView: View {
                 } label: {
                     HStack {
                         Image(systemName: showMoreCommands ? "chevron.up" : "chevron.down")
-                            .font(Theme.font(.footnote as Font).bold())
+                            .font(TokensTypo.footnote.weight(.bold))
                             .foregroundStyle(TokensPalette.tertiary)
                         Text(showMoreCommands ? "收起" : "更多指令")
                             .font(TokensTypo.caption)
@@ -589,7 +589,7 @@ struct ControlView: View {
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(Theme.font(.footnote as Font).bold())
+                    .font(TokensTypo.footnote.weight(.bold))
                     .foregroundStyle(TokensPalette.tertiary)
             }
             .padding(.vertical, 10)

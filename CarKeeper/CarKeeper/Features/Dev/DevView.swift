@@ -46,6 +46,7 @@ struct DevView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "设计令牌", subtitle: "颜色、字体、间距、圆角、动效的唯一来源")
                 themeEntry
                 swatchGroup(title: "画布与表面", footer: "内容层不透明：玻璃只允许出现在导航栏、Tab 栏与弹层。", items: surfaceTokens)
                 swatchGroup(title: "语义色", footer: "颜色只来自系统，且只表达状态；界面里没有装饰性彩色。", items: semanticTokens)
@@ -60,8 +61,9 @@ struct DevView: View {
             .padding(.bottom, TokensSpacing.xxxl)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .pageBackground()
         .scrollBounceBehavior(.basedOnSize)
-        .navigationTitle("设计令牌")
+        .dsPageTitle("设计令牌")
         .confirmationDialog("清除全部车端缓存？", isPresented: $showClearConfirm, titleVisibility: .visible) {
             Button("清除缓存", role: .destructive) {
                 store.clearCache()

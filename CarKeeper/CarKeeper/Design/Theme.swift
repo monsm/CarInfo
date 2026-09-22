@@ -956,23 +956,14 @@ struct MonthlyReportGenerator: View {
     }
     
     var body: some View {
-        Button {
+        // 它就是「一行」：内缩、最小行高、箭头全部交给 DSRow。
+        // 旧写法自己 padding + 自己一层卡片底，于是它在「我的」的分组里长得像另一个 App。
+        DSRow(icon: "doc.text.fill",
+              title: "本月驾驶报告",
+              subtitle: "本月里程 / 能耗 / 充电次数",
+              showsChevron: true) {
             generateReport()
-        } label: {
-            HStack {
-                Image(systemName: "doc.text.fill")
-                    .font(TokensTypo.body)
-                Text("本月驾驶报告")
-                    .font(TokensTypo.body)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(TokensTypo.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.vertical, TokensSpacing.md)
-            .glassCard()
         }
-        .buttonStyle(.plain)
         .sheet(isPresented: $showReport) {
             if let data = reportData {
                 MonthlyReportView(data: data).dsSheetCanvas()
@@ -1000,34 +991,35 @@ struct MonthlyReportView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                // 不用 DSPageTitle：这个浮层没有导航栏，原生主题下 DSPageTitle 什么都不画。
                 Text("月度驾驶报告")
-                    .font(TokensTypo.title)
-                Divider()
-                
-                ReportSection(title: "行驶统计") {
-                    ReportRow(label: "总里程", value: "\(data.totalMileage) km")
-                    ReportRow(label: "平均能耗", value: "\(data.avgConsumption) kWh/100km")
-                    ReportRow(label: "充电次数", value: "\(data.chargeSessions) 次")
-                    ReportRow(label: "平均电量", value: "\(data.avgSoc)%")
+                    .font(TokensSerif.page(30))
+                    .tracking(TokensTracking.title)
+                    .foregroundStyle(TokensPalette.primary)
+
+                DSGroup(title: "行驶统计") {
+                    DSGroupRow { DSKeyValueRow(key: "总里程", value: "\(data.totalMileage) km") }
+                    DSGroupRow { DSKeyValueRow(key: "平均能耗", value: "\(data.avgConsumption) kWh/100km") }
+                    DSGroupRow { DSKeyValueRow(key: "充电次数", value: "\(data.chargeSessions) 次") }
+                    DSGroupRow(showsSeparator: false) { DSKeyValueRow(key: "平均电量", value: "\(data.avgSoc)%") }
                 }
-                
-                ReportSection(title: "驾驶评分") {
-                    ReportRow(label: "综合评分", value: "\(data.driveScore) 分")
-                    ReportRow(label: "评价", value: data.driveScore >= 80 ? "优秀" : "良好")
+
+                DSGroup(title: "驾驶评分") {
+                    DSGroupRow { DSKeyValueRow(key: "综合评分", value: "\(data.driveScore) 分") }
+                    DSGroupRow(showsSeparator: false) {
+                        DSKeyValueRow(key: "评价", value: data.driveScore >= 80 ? "优秀" : "良好")
+                    }
                 }
-                
-                Button("分享报告") {
-                    shareReport()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(TokensPalette.ambient)
-                
+
+                Button("分享报告") { shareReport() }
+                    .buttonStyle(DSPrimaryButtonStyle())
+
                 Button("关闭") { dismiss() }
-                    .font(TokensTypo.body)
-                    .foregroundStyle(.secondary)
+                    .buttonStyle(DSSecondaryButtonStyle())
             }
-            .padding()
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.vertical, TokensSpacing.lg)
         }
         .presentationDetents([.large])
     }
@@ -1068,37 +1060,6 @@ struct MonthlyReportView: View {
     }
 }
 
-struct ReportSection<Content: View>: View {
-    let title: String
-    let content: Content
-
-    init(title: String, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(TokensTypo.headline).foregroundStyle(.secondary)
-            content
-        }
-        .padding()
-        .glassCard()
-    }
-}
-
-struct ReportRow: View {
-    let label: String
-    let value: String
-    
-    var body: some View {
-        HStack {
-            Text(label).font(TokensTypo.body).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).font(TokensTypo.body.weight(.semibold))
-        }
-    }
-}
 
 // =============================================================================
 // PowerSavingToggle —— #31 省电模式开关
@@ -1108,15 +1069,24 @@ struct PowerSavingToggle: View {
     @AppStorage("carkeeper_power_saving") private var enabled = false
 
     var body: some View {
+        // 颜色只从令牌来：`.green` / `.orange` 是硬编码的第三个调色盘，
+        // 换成艺术主题时它不会跟着变。
         Toggle(isOn: $enabled) {
-            HStack {
+            HStack(spacing: TokensSpacing.sm) {
                 Image(systemName: enabled ? "battery.100" : "battery.25")
-                    .foregroundStyle(enabled ? .green : .orange)
-                Text(enabled ? "省电模式已开启" : "省电模式")
-                    .font(TokensTypo.body)
+                    .foregroundStyle(enabled ? TokensPalette.success : TokensPalette.warning)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("省电模式")
+                        .font(TokensTypo.body)
+                        .foregroundStyle(TokensPalette.primary)
+                    Text(enabled ? "已关闭动画与后台刷新" : "开启后关闭动画与后台刷新")
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.secondary)
+                }
             }
         }
-        .toggleStyle(SwitchToggleStyle(tint: enabled ? .green : .orange))
+        .toggleStyle(SwitchToggleStyle(tint: TokensPalette.accent))
+        .frame(minHeight: TokensSpacing.row)
         .onChange(of: enabled) { _, newValue in
             if newValue {
                 ToastManager.shared.show("省电模式已开启，动画和后台刷新已关闭", icon: "battery.25")

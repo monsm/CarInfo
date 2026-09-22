@@ -47,6 +47,7 @@ struct DataView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "全量数据", subtitle: "车端返回的字段，原样列出")
                 if loading {
                     loadingState
                 } else if blocks.isEmpty {
@@ -79,7 +80,7 @@ struct DataView: View {
         }
         .pageBackground()
         .scrollBounceBehavior(.basedOnSize)
-        .navigationTitle("全量数据")
+        .dsPageTitle("全量数据")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { kindMenu }
             ToolbarItem(placement: .topBarTrailing) {

@@ -104,6 +104,7 @@ struct DrivingScorePage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "驾驶评分", subtitle: "每一次出行的能耗与平稳度")
                 hero
 
                 if overallScore == nil {
@@ -118,8 +119,7 @@ struct DrivingScorePage: View {
             .padding(.horizontal, TokensSpacing.page)
             .padding(.vertical, TokensSpacing.md)
         }
-        .navigationTitle("驾驶评分")
-        .navigationBarTitleDisplayMode(.inline)
+        .dsPageTitle("驾驶评分", inline: true)
         .accessibilityLabel(Text("驾驶评分详情"))
     }
 

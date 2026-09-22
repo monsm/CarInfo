@@ -834,6 +834,96 @@ struct DSSkeleton: View {
 // MARK: - Haptic feedback (backward compatibility alias)
 // MARK: - 分组表面（inset-grouped 表面外观）
 
+// =============================================================================
+// MARK: - 可折叠分组（DS 语言里的唯一一种「折叠」）
+// =============================================================================
+
+/// 可折叠分组：标题行在画布上，行在分组表面上，**收起时标题行与 footer 仍然可见**。
+///
+/// 它取代旧的 `ExpandingCardBox`（那是第二套容器：标题行行内 padding 与自己的一层玻璃）。
+/// 折叠本身是有用的功能（电池页的子系统 / 车控页的完整指令表默认收起），
+/// 但它必须与 `DSGroup` **长得一样** —— 折叠只改变「展开还是收起」，不改变版式语言。
+///
+/// 收起状态下的 footer 是刻意的：像「这块只列 10 条」这种规则如果只在展开后可见，
+/// 用户就永远不会去展开它。
+struct DSExpandGroup<Content: View>: View {
+    var title: String
+    var trailing: String? = nil
+    var trailingCls: String = "na"
+    var footer: String? = nil
+    var initiallyExpanded: Bool = false
+    @ViewBuilder var content: () -> Content
+
+    @State private var expanded: Bool
+
+    init(title: String,
+         trailing: String? = nil,
+         trailingCls: String = "na",
+         footer: String? = nil,
+         initiallyExpanded: Bool = false,
+         @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.trailing = trailing
+        self.trailingCls = trailingCls
+        self.footer = footer
+        self.initiallyExpanded = initiallyExpanded
+        self.content = content
+        _expanded = State(initialValue: initiallyExpanded)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                TokensHaptic.select()
+                withAnimation(TokensMotion.value) { expanded.toggle() }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+                    Text(title.uppercased())
+                        .font(TokensSerif.section(13))
+                        .tracking(TokensTracking.label)
+                        .foregroundStyle(TokensPalette.secondary)
+                    Spacer(minLength: TokensSpacing.sm)
+                    if let trailing, !trailing.isEmpty {
+                        DSChip(text: trailing, cls: trailingCls)
+                    }
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(TokensPalette.tertiary)
+                        .rotationEffect(.degrees(expanded ? 180 : 0))
+                }
+                .padding(.bottom, 6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(title))
+            .accessibilityValue(Text(expanded ? "已展开" : "已收起"))
+
+            if expanded {
+                VStack(spacing: 0) { content() }
+                    .background {
+                        RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                            .fill(TokensPalette.nightSurface)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous))
+                    .overlay {
+                        if TokensPalette.decor != .none {
+                            RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                                .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line)
+                        }
+                    }
+            }
+
+            if let footer {
+                Text(footer)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
+            }
+        }
+    }
+}
+
 extension View {
     /// 分组表面外观
     func dsSurface(padding: CGFloat = TokensSpacing.md,

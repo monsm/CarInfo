@@ -23,6 +23,7 @@ struct HealthView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "健康报告", subtitle: "车端自检的结论与依据")
                 if loading {
                     loadingState
                 } else if let model {
@@ -48,7 +49,7 @@ struct HealthView: View {
         }
         .pageBackground()
         .scrollBounceBehavior(.basedOnSize)
-        .navigationTitle("健康报告")
+        .dsPageTitle("健康报告")
         .refreshable { await load() }
         .onAppear {
             if expandedSystems.isEmpty, let m = model {

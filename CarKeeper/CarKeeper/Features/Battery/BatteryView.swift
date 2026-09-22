@@ -322,9 +322,9 @@ struct BatteryView: View {
                     ForEach(b.faults.filter { $0.count > 0 }) { f in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(f.name).font(Theme.font(.caption as Font).bold())
+                                Text(f.name).font(TokensTypo.caption.weight(.bold))
                                 Spacer()
-                                Text("\(f.count) 条").font(Theme.font(.caption as Font).bold())
+                                Text("\(f.count) 条").font(TokensTypo.caption.weight(.bold))
                                     .foregroundStyle(TokensPalette.error)
                             }
                             if !f.codes.isEmpty {
@@ -353,7 +353,7 @@ struct BatteryView: View {
                                 StatusDot(cls: "bad")
                                 Text(a).font(TokensTypo.caption)
                                 Spacer()
-                                Text("触发").font(Theme.font(.footnote as Font).bold())
+                                Text("触发").font(TokensTypo.footnote.weight(.bold))
                                     .foregroundStyle(TokensPalette.error)
                             }
                             .padding(.vertical, 6)
@@ -374,7 +374,7 @@ struct BatteryView: View {
     private func miniStat(_ k: String, _ v: String, _ unit: String, warn: Bool = false) -> some View {
         HStack(spacing: 4) {
             Text(k).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
-            Text(v).font(Theme.font(.caption as Font).bold()).monospacedDigit()
+            Text(v).font(TokensTypo.caption.weight(.bold)).monospacedDigit()
                 .foregroundStyle(warn ? TokensPalette.error : .primary)
             Text(unit).font(TokensTypo.caption2).foregroundStyle(TokensPalette.secondary)
         }
@@ -581,10 +581,10 @@ struct DestinationCalculatorView: View {
                 HStack {
                     Image(systemName: reach ? "checkmark.circle.fill" : "xmark.circle.fill")
                         .font(.title2)
-                        .foregroundStyle(reach ? .green : .red)
+                        .foregroundStyle(reach ? TokensPalette.success : TokensPalette.error)
                     Text(reach ? "电量足够到达" : "电量不足，建议充电")
                         .font(TokensTypo.body.weight(.semibold))
-                        .foregroundStyle(reach ? .green : .red)
+                        .foregroundStyle(reach ? TokensPalette.success : TokensPalette.error)
                 }
                 .padding()
                 .background(reach ? .green.opacity(0.1) : .red.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))

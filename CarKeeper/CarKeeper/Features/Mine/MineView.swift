@@ -30,6 +30,13 @@ struct MineView: View {
     @State private var showChargeBill = false
     /// 退出登录二次确认（按钮在 tilesCard 的「应用」组里）
     @State private var logoutConfirm = false
+    /// 行内开关的**本地镜像**。
+    /// ShakeDetector / VoiceBroadcast / FocusModeManager 三个单例都不是 ObservableObject，
+    /// 直接把开关绑到它们的属性上会出现「拨了不动」（值变了但没人通知视图）。
+    /// 这一页不是常驻屏，所以镜像一份状态：先改本地（立刻重绘），再写回单例。
+    @State private var shakeOn = ShakeDetector.shared.isEnabled
+    @State private var voiceOn = UserDefaults.standard.bool(forKey: "carkeeper_voice_enabled")
+    @State private var focusOn = FocusModeManager.shared.config.enabled
     // 行程分析 / 指令历史 / 维保记录 / 停车位置 / 紧急求助 / 车辆提示 / 驾驶评分
     // 走 nav.pushNavigation（这些页已在壳层 navigationDestination 注册），
     // 不再保留一堆从未绑定 sheet 的 @State（此前 7 个磁贴设了状态却没人监听 = 死按钮）。
@@ -41,18 +48,18 @@ struct MineView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "我的")
+                DSPageTitle(title: "车与账号", subtitle: "车辆、账号、数据与工具")
                 profileCard
                 if let car = store.car { carCard(car) }
-                tilesCard
+                settingsGroups
                 updateCard
             }
 
         }
         .pageBackground()
         .scrollBounceBehavior(.basedOnSize)
-        .dsPageTitle("我的")
-            .accessibilityLabel(Text("我的"))
+        .dsPageTitle("车与账号")
+            .accessibilityLabel(Text("车与账号"))
             .accessibilityHint(Text("账号设置、个人信息和应用程序管理"))
         .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
             // 其他 Tab 退出登录时，重置 OTA 状态，避免残留下载进度
@@ -278,165 +285,147 @@ struct MineView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: 常用磁贴
-    private var tilesCard: some View {
-        VStack(spacing: TokensSpacing.lg) {
-            CardBox(title: "车辆", footer: "车况主屏是地图；这几个是它的深潜页。") {
-                VStack(spacing: 12) {
-                    HStack(spacing: 10) {
-                        tile("shield.lefthalf.filled", "健康报告", tint: TokensPalette.success) {
-                            nav.pushNavigation(.health)
-                        }
-                        tile("battery.100", "电池充电", tint: TokensPalette.success) {
-                            nav.pushNavigation(.battery)
-                        }
-                    }
-                    HStack(spacing: 10) {
-                        tile("doc.text.fill", "车辆档案", tint: TokensPalette.warning) {
-                            nav.pushNavigation(.vehicle)
-                        }
-                        tile("chart.bar.xaxis", "全量数据", tint: TokensPalette.accent) {
-                            nav.pushNavigation(.data)
-                        }
-                    }
-                    HStack(spacing: 10) {
-                        tile("gauge.with.dots.needle.50percent", "驾驶总览", tint: TokensPalette.info) {
-                            nav.pushNavigation(.dashboard)
-                        }
-                        tile("trophy.fill", "驾驶评分", tint: TokensPalette.ambient) {
-                            nav.pushNavigation(.score)
-                        }
-                    }
+    // MARK: 设置分组（inset-grouped 行）
+    //
+    // 旧写法是 6 个 `CardBox`，每个里面再摆 2 列「Tesla 式磁贴」（一共 28 个）——
+    // 那是**第三套容器 + 第三套行**：全 App 只有这一页这么排，从别的页面走进来像换了一个 App。
+    // 现在它和 iOS 设置一样：分组标题在画布上、行在分组表面上、行与行之间是发丝线。
+    private var settingsGroups: some View {
+        VStack(spacing: TokensSpacing.xl) {
+            DSGroup(title: "车辆", footer: "车况主屏是地图；下面是它的深潜页。") {
+                linkRow("shield.lefthalf.filled", "健康报告", .health)
+                linkRow("battery.100", "电池与充电", .battery)
+                linkRow("doc.text.fill", "车辆档案", .vehicle)
+                linkRow("chart.bar.xaxis", "全量数据", .data)
+                // 「驾驶总览」原本与「驾驶评分」指向**同一个页面**（`.dashboard` 只是别名），
+                // 同一页摆两个入口正是缝合的来源，所以只留一个。
+                linkRow("trophy.fill", "驾驶评分", .score, last: true)
+            }
+
+            DSGroup(title: "用车") {
+                linkRow("chart.bar.fill", "行程分析", .trips)
+                linkRow("clock.fill", "指令历史", .commands)
+                linkRow("wrench.and.screwdriver.fill", "维保记录", .service)
+                linkRow("mappin.circle.fill", "停车位置", .parking)
+                linkRow("lightbulb.fill", "车辆提示", .tips)
+                linkRow("exclamationmark.octagon.fill", "紧急求助", .emergency)
+                // #44 充电站：地图主屏的「充电」层就是这件事 —— 它按**车的位置**实时搜，
+                // 这里不再自己搜一份（原来那份搜的是写死的北京坐标 39.9042, 116.4074）。
+                actionRow("bolt.fill", "附近充电站", last: true) {
+                    MapSpineLayer.charge.makeCurrent()
+                    nav.popToRoot()
                 }
             }
 
-            CardBox(title: "用车") {
-                VStack(spacing: 12) {
-                    HStack(spacing: 10) {
-                        tile("chart.bar.fill", "行程分析", tint: TokensPalette.info) {
-                            nav.pushNavigation(.trips)
-                        }
-                        tile("clock.fill", "指令历史", tint: TokensPalette.accent) {
-                            nav.pushNavigation(.commands)
-                        }
-                    }
-                    HStack(spacing: 10) {
-                        tile("wrench.and.screwdriver.fill", "维保记录", tint: TokensPalette.warning) {
-                            nav.pushNavigation(.service)
-                        }
-                        tile("mappin.circle.fill", "停车位置", tint: TokensPalette.success) {
-                            nav.pushNavigation(.parking)
-                        }
-                    }
-                    HStack(spacing: 10) {
-                        tile("lightbulb.fill", "车辆提示", tint: TokensPalette.warning) {
-                            nav.pushNavigation(.tips)
-                        }
-                        tile("exclamationmark.octagon.fill", "紧急求助", tint: TokensPalette.error) {
-                            nav.pushNavigation(.emergency)
-                        }
-                    }
-                    // #44 充电站：地图主屏的「充电」层就是这件事 —— 它按**车的位置**实时搜，
-                    // 这里不再自己搜一份（原来那份搜的是写死的北京坐标 39.9042, 116.4074）。
-                    tile("bolt.fill", "附近充电站", tint: TokensPalette.ambient) {
-                        MapSpineLayer.charge.makeCurrent()
-                        nav.popToRoot()
-                        // 地图就是首页：popToRoot() 之后已经落在地图上，没有 Tab 可切
-                    }
-                }
-            }
-
-            CardBox(title: "钱与证件",
+            DSGroup(title: "钱与证件",
                     footer: "数字来自本机记录（里程记账 / 年检 / 保险的字段由你自己填）。") {
-                VStack(spacing: 12) {
-                    HStack(spacing: 10) {
-                        tile("banknote.fill", "里程记账", tint: TokensPalette.success) { showMileageJournal = true }
-                        tile("doc.plaintext.fill", "充电账单", tint: TokensPalette.accent) { showChargeBill = true }
-                    }
-                    HStack(spacing: 10) {
-                        tile("dollarsign.circle.fill", "车辆估值", tint: TokensPalette.success) { showValuation = true }
-                        tile("calendar.fill", "年检与保险", tint: TokensPalette.accent) { showInspection = true }
-                    }
-                }
+                actionRow("banknote.fill", "里程记账") { showMileageJournal = true }
+                actionRow("doc.plaintext.fill", "充电账单") { showChargeBill = true }
+                actionRow("dollarsign.circle.fill", "车辆估值") { showValuation = true }
+                actionRow("calendar.fill", "年检与保险", last: true) { showInspection = true }
             }
 
-            CardBox(title: "报告与共享") {
-                VStack(spacing: 12) {
-                    HStack(spacing: 10) {
-                        tile("key.fill", "共享钥匙", tint: TokensPalette.accent) { showTempKeys = true }
-                        tile("person.2.fill", "家庭管理", tint: TokensPalette.warning) { showFamily = true }
-                    }
-                    // #39 月度驾驶报告入口
-                    MonthlyReportGenerator()
-                }
+            DSGroup(title: "报告与共享") {
+                actionRow("key.fill", "共享钥匙") { showTempKeys = true }
+                actionRow("person.2.fill", "家庭管理") { showFamily = true }
+                // #39 月度驾驶报告入口：它自己就是一行（内缩与分隔线由 DSGroupRow 给）
+                customRow(last: true) { MonthlyReportGenerator() }
             }
 
-            CardBox(title: "设备与模式",
+            DSGroup(title: "设备与模式",
                     footer: "摇一摇锁车默认关闭 —— 它会真的发一条锁车指令。") {
-                VStack(spacing: 12) {
-                    shakeToggle
-                    // #31 省电模式
-                    PowerSavingToggle()
-                        .padding(.horizontal, 4)
-                    nightModeRow
-                    tile("moon.fill", "专注模式", tint: TokensPalette.accent) { toggleFocus() }
+                customRow { shakeToggle }
+                // #31 省电模式
+                customRow { PowerSavingToggle() }
+                customRow { nightModeRow }
+                customRow(last: true) {
+                    DSRow(icon: "moon.fill", title: "专注模式",
+                          value: focusOn ? "已开启" : "已关闭") { toggleFocus() }
                 }
             }
 
-            CardBox(title: "应用") {
-                VStack(spacing: 12) {
-                    HStack(spacing: 10) {
-                        tile("magnifyingglass", "全局搜索", tint: TokensPalette.info) { nav.showSearch = true }
-                        tile("bubble.left.fill", "消息中心", tint: TokensPalette.info) { nav.pushNavigation(.messages) }
+            DSGroup(title: "应用") {
+                customRow {
+                    DSRow(icon: "magnifyingglass", title: "全局搜索", showsChevron: true) {
+                        nav.showSearch = true
                     }
-                    HStack(spacing: 10) {
-                        tile("eye.fill", "隐私与数据", tint: TokensPalette.accent) { showPrivacyDashboard = true }
-                        tile("tray.fill", "OTA日志", tint: TokensPalette.info) { showOTAChangelog = true }
-                    }
-                    HStack(spacing: 10) {
-                        // 此前是空操作（VoiceBroadcastManager 自动启动，点这里什么都不发生）。
-                        // 现在是真能用的开关：翻转 VoiceBroadcastManager 读取的 UserDefaults 键。
-                        tile("speaker.wave.3.fill", "语音播报", tint: TokensPalette.accent) { toggleVoice() }
-                        tile("wrench.adjustable", "开发者工具", tint: TokensPalette.accent) {
-                            nav.pushNavigation(.dev)
-                        }
-                    }
-                    logoutRow
                 }
+                linkRow("bubble.left.fill", "消息中心", .messages)
+                actionRow("eye.fill", "隐私与数据") { showPrivacyDashboard = true }
+                actionRow("tray.fill", "OTA 日志") { showOTAChangelog = true }
+                // 此前是空操作（VoiceBroadcastManager 自动启动，点这里什么都不发生）。
+                // 现在是真能用的开关：翻转 VoiceBroadcastManager 读取的 UserDefaults 键。
+                customRow {
+                    DSRow(icon: "speaker.wave.3.fill", title: "语音播报",
+                          value: voiceOn ? "已开启" : "已关闭") { toggleVoice() }
+                }
+                linkRow("wrench.adjustable", "开发者工具", .dev)
+                customRow(last: true) { logoutRow }
             }
         }
     }
 
-    // MARK: 设备与模式 / 退出登录（都在 tilesCard 里用）
+    // MARK: 行的三种写法（与全 App 其余 20 屏同一套 DS 原语）
+
+    /// 跳页行：图标 + 标题 + 箭头
+    private func linkRow(_ icon: String, _ title: String, _ link: Deeplink,
+                         last: Bool = false) -> some View {
+        DSGroupRow(showsSeparator: !last) {
+            DSRow(icon: icon, title: title, showsChevron: true) { nav.pushNavigation(link) }
+        }
+    }
+
+    /// 动作行（开浮层 / 切图层 / 触发一件事）：图标 + 标题 + 箭头
+    private func actionRow(_ icon: String, _ title: String, last: Bool = false,
+                           _ action: @escaping () -> Void) -> some View {
+        DSGroupRow(showsSeparator: !last) {
+            DSRow(icon: icon, title: title, showsChevron: true, action: action)
+        }
+    }
+
+    /// 自定义行（开关 / 选择器 / 第三方视图）：只借用分组的内缩与分隔线
+    private func customRow<V: View>(last: Bool = false,
+                                    @ViewBuilder _ content: () -> V) -> some View {
+        DSGroupRow(showsSeparator: !last) { content() }
+    }
+
+    // MARK: 行内的小组件 / 退出登录（都在 settingsGroups 里用）
 
     /// 摇一摇锁车开关。
     /// 此前这个功能只有一个从未被写入过的 UserDefaults 键（`carkeeper_shake_to_lock`，
     /// bool 默认 false）—— 也就是说它永远是关的，而且没有任何地方能把它打开。
+    /// 现在开关真的写到 ShakeDetector，并且**本地镜像**状态（它不是 ObservableObject，
+    /// 直接绑定会出现「拨了不动」）。
     private var shakeToggle: some View {
-        HStack(spacing: TokensSpacing.sm) {
-            Image(systemName: "hand.raised.fill")
-                .font(.system(size: 15))
-                .foregroundStyle(TokensPalette.secondary)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("摇一摇锁车").font(TokensTypo.headline).foregroundStyle(TokensPalette.primary)
-                Text("摇一下手机，发一条锁车指令（需 PIN）")
-                    .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
+        Toggle(isOn: Binding(
+            get: { shakeOn },
+            set: { newValue in
+                shakeOn = newValue
+                ShakeDetector.shared.isEnabled = newValue
+                TokensHaptic.select()
             }
-            Spacer(minLength: TokensSpacing.sm)
-            Toggle("", isOn: Binding(
-                get: { ShakeDetector.shared.isEnabled },
-                set: { ShakeDetector.shared.isEnabled = $0 }
-            ))
-            .labelsHidden()
+        )) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("摇一摇锁车")
+                    .font(TokensTypo.body)
+                    .foregroundStyle(TokensPalette.primary)
+                Text("摇一下手机，发一条锁车指令（需 PIN）")
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
+            }
         }
+        .frame(minHeight: TokensSpacing.row)
     }
 
-    /// #NEW-115 夜间模式切换
+    /// #NEW-115 夜间模式切换：iOS 设置里的「值选择器」行
+    /// （原来是行内分段控件 + 自己的 padding + 第二套卡片底：一整块彩色块嵌在白色分组里）
     private var nightModeRow: some View {
         HStack {
-            Text("夜间模式").font(TokensTypo.headline)
-            Spacer()
-            Picker("主题", selection: Binding(
+            Text("夜间模式")
+                .font(TokensTypo.body)
+                .foregroundStyle(TokensPalette.primary)
+            Spacer(minLength: TokensSpacing.sm)
+            Picker("夜间模式", selection: Binding(
                 get: { nightModeManager.currentMode },
                 set: { nightModeManager.setMode($0) }
             )) {
@@ -444,10 +433,10 @@ struct MineView: View {
                 Text("浅色").tag(NightModeMode.light)
                 Text("深色").tag(NightModeMode.dark)
             }
-            .pickerStyle(SegmentedPickerStyle())
+            .pickerStyle(.menu)
+            .labelsHidden()
         }
-        .padding(16)
-        .glassCard()
+        .frame(minHeight: TokensSpacing.row)
     }
 
     /// 退出登录。`logout()` 一直存在，但**没有任何按钮调它** —— 它是一段到不了的代码。
@@ -470,42 +459,47 @@ struct MineView: View {
 
     // MARK: 检查更新
     private var updateCard: some View {
-        CardBox(title: "检查更新", side: nil) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("下载最新 GitHub 构建的 ipa，分享后用自签工具安装")
-                    .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
-                // OTA 检查中：骨架旋转指示器
-                if isChecking {
-                    HStack(spacing: 10) {
-                        ProgressView()
-                            .tint(TokensPalette.ambient)
-                        Text("正在检查最新版本…")
-                            .font(TokensTypo.caption)
-                            .foregroundStyle(TokensPalette.secondary)
+        // 整块是一行：上面的说明、进度与三个按钮都属于「检查更新」这一件事。
+        DSGroup(title: "检查更新") {
+            customRow(last: true) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("下载最新 GitHub 构建的 ipa，分享后用自签工具安装")
+                        .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
+                    // OTA 检查中：骨架旋转指示器
+                    if isChecking {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                                .tint(TokensPalette.ambient)
+                            Text("正在检查最新版本…")
+                                .font(TokensTypo.caption)
+                                .foregroundStyle(TokensPalette.secondary)
+                        }
+                        .padding(.vertical, 8)
+                    } else if showDownload {
+                        // 下载中：进度条 + 百分比数字
+                        VStack(spacing: 6) {
+                            ProgressView(value: downloadPct)
+                                .tint(TokensPalette.ambient)
+                            Text("正在下载… \(downloadPctDisplay)%")
+                                .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
+                        }
+                    } else if let m = updateMsg {
+                        // 错误或提示消息（图标由 updateMsgIsError 决定）
+                        HStack(spacing: 6) {
+                            Image(safeSymbol: updateMsgIsError ? "exclamationmark.triangle.fill" : "info.circle.fill",
+                                  fallback: "info.circle.fill")
+                                .font(TokensTypo.caption)
+                                .foregroundStyle(updateMsgIsError ? TokensPalette.error : TokensPalette.ambient)
+                            Text(m)
+                                .font(TokensTypo.caption)
+                                .foregroundStyle(TokensPalette.secondary)
+                            Spacer()
+                        }
                     }
-                    .padding(.vertical, 8)
-                } else if showDownload {
-                    // 下载中：进度条 + 百分比数字
-                    VStack(spacing: 6) {
-                        ProgressView(value: downloadPct)
-                            .tint(TokensPalette.ambient)
-                        Text("正在下载… \(downloadPctDisplay)%")
-                            .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
-                    }
-                } else if let m = updateMsg {
-                    // 错误或提示消息（图标由 updateMsgIsError 决定）
-                    HStack(spacing: 6) {
-                        Image(safeSymbol: updateMsgIsError ? "exclamationmark.triangle.fill" : "info.circle.fill",
-                              fallback: "info.circle.fill")
-                            .font(TokensTypo.caption)
-                            .foregroundStyle(updateMsgIsError ? TokensPalette.error : TokensPalette.ambient)
-                        Text(m)
-                            .font(TokensTypo.caption)
-                            .foregroundStyle(TokensPalette.secondary)
-                        Spacer()
-                    }
+                    HStack(spacing: 12) { updateButtons() }
                 }
-                HStack(spacing: 12) { updateButtons() }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, TokensSpacing.sm)
             }
         }
         // 下载进度数字滚动：从当前 display 值弹性过渡到目标百分比
@@ -515,34 +509,6 @@ struct MineView: View {
                 downloadPctDisplay = target
             }
         }
-    }
-
-    // 常用入口大尺寸磁贴
-    private func tile(_ symbol: String, _ label: String, tint: Color,
-                      _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            // Tesla 式磁贴：图标左上 + 标签在左下，表面色不用玻璃、不用圆形底盘。
-            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-                Image(safeSymbol: symbol, fallback: "car.fill")
-                    .font(.system(size: TokensSize.tileIcon, weight: .regular))
-                    .foregroundStyle(tint)
-                    .frame(height: 30)
-                Text(label)
-                    .font(TokensTypo.subheadline.weight(.semibold))
-                    .foregroundStyle(TokensPalette.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(TokensSpacing.md)
-            .frame(minHeight: 84)
-            .background(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                .fill(TokensPalette.nightSurface))
-            .overlay(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                .strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.line))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(DSCardButtonStyle())
     }
 
     @ViewBuilder
@@ -561,7 +527,7 @@ struct MineView: View {
             HStack(spacing: 6) {
                 if updateBusy { ProgressView().controlSize(.mini).tint(TokensPalette.labelOnTint) }
                 Text(updateBusy ? "检查中…" : "检查更新")
-                    .font(Theme.font(.caption as Font).bold())
+                    .font(TokensTypo.caption.weight(.bold))
             }
             .foregroundStyle(TokensPalette.labelOnTint)
             .padding(.vertical, 10)
@@ -577,7 +543,7 @@ struct MineView: View {
             shareSheetFlag = true
         } label: {
             Label("分享安装包", systemImage: "square.and.arrow.up")
-                .font(Theme.font(.caption as Font).bold())
+                .font(TokensTypo.caption.weight(.bold))
                 .padding(.horizontal, 14).padding(.vertical, 10)
                 .background(TokensPalette.fillSubtle, in: Capsule())
         }
@@ -616,6 +582,7 @@ struct MineView: View {
         let key = "carkeeper_voice_enabled"
         let next = !UserDefaults.standard.bool(forKey: key)
         UserDefaults.standard.set(next, forKey: key)
+        voiceOn = next
         ToastManager.shared.show(next ? "语音播报已开启" : "语音播报已关闭",
                                  icon: next ? "speaker.wave.3.fill" : "speaker.slash.fill")
         TokensHaptic.select()
@@ -633,6 +600,7 @@ struct MineView: View {
             customMessage: fm.config.customMessage
         )
         fm.saveConfig(next)
+        focusOn = next.enabled
         ToastManager.shared.show(next.enabled ? "专注模式已开启" : "专注模式已关闭",
                                  icon: next.enabled ? "moon.fill" : "moon.zzz.fill")
         TokensHaptic.select()

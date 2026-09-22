@@ -33,7 +33,7 @@ struct ThemeGalleryView: View {
             .scrollBounceBehavior(.basedOnSize)
         }
         .pageBackground()
-        .navigationTitle("艺术主题")
+        .dsPageTitle("艺术主题")
     }
 
     // MARK: - 常驻切换器
@@ -68,6 +68,7 @@ struct ThemeGalleryView: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+            DSPageTitle(title: "艺术主题", subtitle: "换一套值，不换版式")
             intro
 
             DSSectionHeader(title: "四个方向")

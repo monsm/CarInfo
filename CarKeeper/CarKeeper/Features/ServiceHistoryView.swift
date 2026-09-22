@@ -196,23 +196,20 @@ struct ServiceHistoryView: View {
             .filter { Calendar.current.component(.year, from: $0.date) == selectedYear }
             .sorted { $0.date > $1.date }
 
-        return VStack(spacing: 0) {
+        // 空态走 DSPlaceholder（全 App 的空态只有这一个形状），容器走 DSCard。
+        return DSCard(padding: 0, radius: TokensRadius.medium) {
             if filtered.isEmpty {
-                VStack(spacing: 12) {
-                    Image(safeSymbol: "calendar.badge.minus", fallback: "calendar")
-                        .font(.system(size: 36))
-                        .foregroundStyle(.secondary.opacity(0.3))
-                    Text("暂无记录").font(.subheadline).foregroundStyle(.tertiary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 32)
+                DSPlaceholder(icon: "calendar.badge.minus",
+                              title: "还没有维保记录",
+                              message: "记录一次保养之后，这里会排成一条时间线。")
             } else {
-                ForEach(Array(filtered.enumerated()), id: \.element.id) { idx, entry in
-                    timelineRow(entry, idx: idx, total: filtered.count)
+                VStack(spacing: 0) {
+                    ForEach(Array(filtered.enumerated()), id: \.element.id) { idx, entry in
+                        timelineRow(entry, idx: idx, total: filtered.count)
+                    }
                 }
             }
         }
-        .glassCard(corner: TokensRadius.medium)
     }
 
     @ViewBuilder
@@ -229,7 +226,7 @@ struct ServiceHistoryView: View {
                 }
                 Spacer()
                 Text("¥\(Int(entry.cost))")
-                    .font(Theme.font(.subheadline as Font).bold())
+                    .font(TokensTypo.subheadline.weight(.bold))
                     .foregroundStyle(TokensPalette.ambient)
             }
             HStack {

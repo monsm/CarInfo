@@ -69,25 +69,26 @@ struct ExportDataView: View {
     }
 
     private var previewCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("导出预览")
-                .font(TokensTypo.caption)
-                .foregroundStyle(TokensPalette.secondary)
+        // 容器统一走 DSCard（与其余 20 屏同一张卡片）；底色走令牌，不用 Color.primary 自调透明度。
+        DSCard {
+            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+                Text("导出预览")
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.secondary)
 
-            let lines = previewLines
-            ScrollView {
-                Text(lines.joined(separator: "\n"))
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(8)
+                let lines = previewLines
+                ScrollView {
+                    Text(lines.joined(separator: "\n"))
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(TokensPalette.secondary)
+                        .lineLimit(8)
+                }
+                .frame(height: 100)
+                .padding(TokensSpacing.sm)
+                .background(TokensPalette.fillSubtle)
+                .clipShape(RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous))
             }
-            .frame(height: 100)
-            .padding(8)
-            .background(Color.primary.opacity(0.05))
-            .cornerRadius(8)
         }
-        .padding()
-        .glassCard(corner: TokensRadius.medium)
     }
 
     private var previewLines: [String] {

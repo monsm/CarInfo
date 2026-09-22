@@ -583,3 +583,39 @@ CI 里那个 `unit-tests`（`Unit tests (pure logic, non-blocking)`）整体删�
 第二条同样重要：**证明这条规则不是永久瞎的**，测试真的回来时它认得。
 
 `project.yml` 里那句「单元测试 job 用它」也一并改成实话 —— 注释说谎比代码说谎更贵。
+
+---
+
+## 2026-09-22 · 统一契约（DESIGN-UNIFY.md）
+
+「各种风格混用」不是感觉，是对着数字能证的：仓库里同时活着**四代容器、三套行、三种标题机制、
+两个页面边距机制**。这一轮先立契约（`DESIGN-UNIFY.md`），再按它清场。
+
+这一轮落地的：
+
+| 位置 | 改了什么 |
+|---|---|
+| `DS.swift` | 新增 `DSExpandGroup`（折叠分组回到 DS 语言；旧 `ExpandingCardBox` 的替代品） |
+| `MineView` | 6 个 `CardBox` → `DSGroup`；28 个 Tesla 磁贴 → `DSRow` 设置行；`glassCard` 行 → `DSGroupRow`；`tile()` 辅助函数删除 |
+| `Theme.swift` | `MonthlyReportGenerator` 从「自建卡片 + 自建行」→ `DSRow`；`ReportSection`/`ReportRow`（第五种行）删除，月报改用 `DSGroup` + `DSKeyValueRow` + `DSPrimaryButtonStyle`；`PowerSavingToggle` 的 `.green`/`.orange` → 令牌 |
+| 标题 | 7 个裸 `.navigationTitle` 的页面（全量数据 / 设计令牌 / 驾驶评分 / 健康报告 / 艺术主题 / 行程 / 车辆档案）改成 `DSPageTitle` + `dsPageTitle()` **成套**；`DevView` 连横向页面边距都没有，补了 `pageBackground()` |
+| 卡片 | `ExportDataView` / `ServiceHistoryView` / `BiometricLock` / `FamilyAndKeySharing` 的 `.glassCard()` → `DSCard`；维保记录的空态改走 `DSPlaceholder` |
+| 令牌 | `Theme.font(...)` 调用点清零（8 处）；`.green`/`.orange`/`.red` 直用清零（`AppStore.statusColor`、省电开关、电池达成率） |
+
+还没做（写明数量，不装作完成）：
+
+| 位置 | 数量 |
+|---|---|
+| 电池页旧世代 | 16 处（`ExpandingCardBox` 3 / `CardBox` 4 / `KVRow` 5 / `ListDivider` 3） |
+| 车控页旧世代 | 12 处（`ExpandingCardBox` 2 / `CardBox` 3 / `KVRow` 4 / `ListDivider` 3） |
+| 应用内硬编码字号 | 68 处 |
+| 假数据 | `MonthlyReportGenerator` 的 1250 km / 14.5 / 8 次 / 65% / 85 分 |
+
+顺带一个「命名对齐」：`MineView` 的标题从「我的」改成**「车与账号」**（索引页里它就叫这个名字），
+`VehicleView` 的空态文案「请先在「我的」页面绑定车辆」也改成「车与账号」——
+同一个页面两个名字，是导航里最容易迷路的地方。
+
+`DSExpandGroup` 目前**没有调用点**：它是下一批（电池 / 车控）要用的容器，先放在 DS 里，
+免得那一批再发明第五个。这一点写进了契约文档，不让它变成悄悄躺着的死代码。
+
+14 个检查器 + `check_style` 全绿，14 个改动文件括号余额逐文件配平。

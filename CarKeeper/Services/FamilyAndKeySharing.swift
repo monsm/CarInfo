@@ -155,40 +155,42 @@ struct TempKeyCard: View {
     let onUse: () -> Void
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(key.recipientName)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                Text("有效期: \(key.expiresAt, format: .dateTime.month().day().year())")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                if key.remainingUses > 0 {
-                    Text("剩余 \(key.remainingUses) 次")
-                        .font(.caption2)
-                        .foregroundColor(TokensPalette.success)
+        // 卡片走 DSCard，字体与颜色全部走令牌（原来是 .subheadline / .caption2 / .secondary
+        // 这一套原生的写法 —— 换主题时它不跟）。
+        DSCard {
+            HStack {
+                VStack(alignment: .leading, spacing: TokensSpacing.xs) {
+                    Text(key.recipientName)
+                        .font(TokensTypo.subheadline.weight(.semibold))
+                        .foregroundStyle(TokensPalette.primary)
+                    Text("有效期: \(key.expiresAt, format: .dateTime.month().day().year())")
+                        .font(TokensTypo.caption2)
+                        .foregroundStyle(TokensPalette.secondary)
+                    if key.remainingUses > 0 {
+                        Text("剩余 \(key.remainingUses) 次")
+                            .font(TokensTypo.caption2)
+                            .foregroundStyle(TokensPalette.success)
+                    }
                 }
-            }
-            Spacer()
+                Spacer(minLength: TokensSpacing.sm)
 
-            if key.isActive && !key.isExpired && key.remainingUses > 0 {
-                Button(action: onUse) {
-                    Text("使用")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(TokensPalette.ambient)
-                        .foregroundColor(TokensPalette.labelOnTint)
-                        .cornerRadius(8)
+                if key.isActive && !key.isExpired && key.remainingUses > 0 {
+                    Button(action: onUse) {
+                        Text("使用")
+                            .font(TokensTypo.caption.weight(.semibold))
+                            .padding(.horizontal, TokensSpacing.md)
+                            .padding(.vertical, TokensSpacing.sm)
+                            .background(Capsule().fill(TokensPalette.ambient))
+                            .foregroundStyle(TokensPalette.labelOnTint)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Text(key.isExpired ? "已过期" : key.remainingUses <= 0 ? "已用完" : "已撤销")
+                        .font(TokensTypo.caption2)
+                        .foregroundStyle(TokensPalette.secondary)
                 }
-            } else {
-                Text(key.isExpired ? "已过期" : key.remainingUses <= 0 ? "已用完" : "已撤销")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
             }
         }
-        .padding()
-        .glassCard()
     }
 }
 

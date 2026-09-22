@@ -48,7 +48,7 @@ struct VehicleView: View {
             } else if isEmpty {
                 DSPlaceholder(icon: "car",
                               title: "未绑定车辆",
-                              message: "请先在「我的」页面绑定车辆后重试",
+                              message: "请先在「车与账号」里绑定车辆后重试",
                               actionTitle: "重新加载") { reloadVehicle() }
             } else if let sum = VM.vehicleSummary(store.car) {
                 content(sum)
@@ -60,7 +60,7 @@ struct VehicleView: View {
                               cls: "warn") { reloadVehicle() }
             }
         }
-                .navigationTitle("车辆档案")
+                .dsPageTitle("车辆档案")
         .accessibilityLabel(Text("车辆档案"))
         .accessibilityHint(Text("车牌、VIN、车型配置与保险保养信息，点任意字段可复制"))
         .refreshable {
@@ -84,6 +84,7 @@ struct VehicleView: View {
     private func content(_ sum: VehicleSummary) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "车辆档案", subtitle: "车牌、VIN、车型配置与保险保养")
                 identitySection(sum)
                 archiveGroups
                 photoSection

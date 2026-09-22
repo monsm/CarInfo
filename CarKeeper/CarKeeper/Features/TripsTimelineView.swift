@@ -24,13 +24,16 @@ struct TripsTimelineView: View {
                                                     excluding: store.parkingLocation)
         Group {
             if trips.isEmpty {
-                emptyState
+                VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                    DSPageTitle(title: "行程", subtitle: "每一次出行都会落在时间轴上")
+                    emptyState
+                }
+                .padding(.horizontal, TokensSpacing.page)
             } else {
                 timeline(trips, hotspots: hotspots)
             }
         }
-        .navigationTitle("行程")
-        .navigationBarTitleDisplayMode(.large)
+        .dsPageTitle("行程")
         .accessibilityLabel(Text("行程时间轴"))
     }
 
@@ -56,6 +59,8 @@ struct TripsTimelineView: View {
     private func timeline(_ trips: [AppStore.TripRecord], hotspots: [MapHotspot]) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
+                DSPageTitle(title: "行程", subtitle: "每一次出行都会落在时间轴上")
+                    .padding(.bottom, TokensSpacing.lg)
                 summaryHeader(trips)
                 ForEach(Array(trips.enumerated()), id: \.element.id) { idx, trip in
                     timelineRow(trip, isLast: idx == trips.count - 1)
