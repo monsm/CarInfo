@@ -56,16 +56,6 @@ targets:
         # 用车数据写进 Apple 健康的那套代码（HealthKit 目录）已随死代码清理删除，
         # 全仓再没有任何 HKHealthStore / HealthKit API 调用 —— 留着这两条会让
         # 审核与用户以为 App 在读健康数据。缺声明不会闪退（只有真的调用才会）。
-        # iCloud/CloudKit 总开关：未签名构建与侧载重签的包都没有 iCloud entitlement，
-        # 构造 CKContainer 会抛出 Swift 无法捕获的 ObjC 异常并直接杀进程（表现为启动闪退）。
-        # 只有用带 iCloud 容器的证书签名时才把它改成 true。
-        CKCloudKitEnabled: false
-        # 后台刷新（BGTaskScheduler）：标识符必须在这里声明，否则 register/submit 会抛 ObjC 异常直接杀进程
-        UIBackgroundModes:
-        - fetch
-        BGTaskSchedulerPermittedIdentifiers:
-        - com.carkeeper.refresh
-        - com.carkeeper.longtask
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
         UISupportedInterfaceOrientations:

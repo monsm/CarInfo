@@ -2,20 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- App Group：小组件、Watch、灵动岛共用车况快照，必须保留 -->
     <key>com.apple.security.application-groups</key>
     <array>
         <string>group.com.you.CarKeeper</string>
     </array>
-    <key>com.apple.developer.associated-domains</key>
-    <array>
-        <string>applinks:carkeeper.app</string>
-        <string>appclips:carkeeper.app</string>
-    </array>
-    <!-- 注：原来这里还有 com.apple.developer.location-services、
-         healthkit.allowAllHealthTypes、homekit、carplay-mfi 四个键，
-         它们都不是真实的 entitlement 键名 —— 签名时会因为这些未知键报错，已删除。
-         定位只需 Info.plist 里的 usage description，不需要 entitlement。 -->
-    <key>com.apple.developer.healthkit</key>
-    <true/>
 </dict>
 </plist>

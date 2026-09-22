@@ -97,9 +97,8 @@ struct CarKeeperApp: App {
     @StateObject private var nav = NavState.shared
 
     init() {
-        // #NEW-109 后台刷新注册：必须在 App 启动完成前完成。
-        // 内部会先校验 Info.plist 是否声明了对应标识符，未声明则安静跳过（避免直接崩进程）。
-        BackgroundTaskManager.shared.registerTasks()
+        // 后台刷新（BGTask）已删：免费开发者账号没有 BGTaskScheduler 权限，
+        // 调用 register 会抛 ObjC 异常直接杀进程。若将来升级付费账号再恢复。
     }
 
     var body: some Scene {
@@ -199,8 +198,6 @@ struct CarKeeperApp: App {
             if let c = store.currentLocation?.coordinate {
                 Task { await WeatherService.shared.refreshIfNeeded(coordinate: c) }
             }
-            // #NEW-111 CloudKit 同步
-            Task { await store.triggerCloudSync() }
             // #N38 崩溃上报初始化
             CrashReporter.shared.setup()
             // #N39 内存监控启动

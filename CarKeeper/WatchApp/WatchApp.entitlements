@@ -6,13 +6,5 @@
     <array>
         <string>group.com.you.CarKeeper</string>
     </array>
-    <key>com.apple.developer.associated-domains</key>
-    <array>
-        <string>applinks:carkeeper.app</string>
-    </array>
-    <key>com.apple.developer.healthkit</key>
-    <true/>
-    <key>com.apple.developer.location-services</key>
-    <true/>
 </dict>
 </plist>

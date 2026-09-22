@@ -1008,13 +1008,9 @@ final class AppStore: @unchecked Sendable {
         Task { await fetchVehicleData() }
     }
 
-    // #NEW-111 CloudKit 同步触发（后台）
-    func triggerCloudSync() async {
-        // 无 iCloud 能力时绝不能 touch CloudSyncManager.shared：构造 CKContainer 会抛出
-        // Swift 无法捕获的 ObjC 异常，直接崩进程（侧载/未签名包的典型启动闪退原因）。
-        guard CloudSyncManager.isCloudKitEntitled else { return }
-        _ = await CloudSyncManager.shared.syncIfNeeded()
-    }
+    // CloudSyncManager 已删：免费开发者账号没有 iCloud entitlement，
+    // 调用 CKContainer 会直接抛 ObjC 异常杀进程。若将来升级付费账号再恢复。
+
 
     // #车控命令发送
     func sendControlCommand(_ cmd: String) async -> Bool {
