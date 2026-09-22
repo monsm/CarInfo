@@ -89,6 +89,21 @@ def workflow_checkers(workflow_dir):
     return out
 
 
+def workflow_schemes(workflow_dir):
+    """工作流里 `-scheme X` 用到的 scheme 名"""
+    out = []
+    if not os.path.isdir(workflow_dir):
+        return out
+    for name in sorted(os.listdir(workflow_dir)):
+        if not name.endswith((".yml", ".yaml")):
+            continue
+        with open(os.path.join(workflow_dir, name), encoding="utf-8") as f:
+            for s in re.findall(r"-scheme\s+([A-Za-z0-9_.-]+)", f.read()):
+                if s not in out:
+                    out.append(s)
+    return out
+
+
 def main(argv):
     spec = argv[1] if len(argv) > 1 else SPEC
     if not os.path.isfile(spec):
@@ -116,6 +131,35 @@ def main(argv):
             print(("  ✅ " if ok else "  ❌ ") + c)
             if not ok:
                 problems.append(f"CI 工作流调用了不存在的脚本：{c}")
+
+    # 工作流里 `-scheme X` 用到的名字必须在 spec 里有交代，而且规则比想象的严：
+    #
+    #   • `schemes:` **缺席**时：XcodeGen 会为每个 target 自动生成方案，
+    #     所以 `-scheme <target 名>` 是可用的。
+    #   • `schemes:` **一旦存在**：只生成其中列出的那些，其它 target 不再自动生成。
+    #
+    # 这条教训是 2026-09-22 真实踩到的：那时 `schemes:` 里只有 CarKeeperTests，
+    # 而 CI 用 `-scheme CarKeeper` —— 干净检出里根本没有这个方案
+    # （「does not contain a scheme named CarKeeper」），本地 Xcode 却会自动补一个，
+    # 所以怎么试都试不出来。**只看「是不是 target 名」是不够的**，
+    # 这正是本检查器第一版犯过的错（反向自测当场抳住了）。
+    if spec == SPEC:
+        import yaml  # 工作流与 spec 都是 YAML；runner 上装了 pyyaml
+        with open(spec, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        declared = set(data.get("schemes") or {})
+        targets = set(data.get("targets") or {})
+        allowed = declared if declared else (targets | {data.get("name", "")})
+        schemes = workflow_schemes(WORKFLOW_DIR)
+        if schemes:
+            mode = "只认显式声明的 schemes" if declared else "schemes 缺席 → 每个 target 都有自动方案"
+            print(f"\n工作流用到的 scheme {len(schemes)} 个（{mode}）")
+            for s in schemes:
+                ok = s in allowed
+                print(("  ✅ " if ok else "  ❌ ") + s)
+                if not ok:
+                    problems.append(f"CI 用 -scheme {s}，但 spec 既没有这个 scheme"
+                                    "（schemes: 存在时 XcodeGen 不再为其它 target 自动生成方案）")
 
     print()
     if problems:

@@ -268,10 +268,40 @@ targets:
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/CarKeeper.app/CarKeeper
         BUNDLE_LOADER: $(TEST_HOST)
 
-# 单独一条测试用的 scheme：**不动** CI 一直在用的 CarKeeper scheme
-# （那个 scheme 是 XcodeGen 按 target 自动生成的，改它的风险比收益大）。
-# 这条 scheme 只做两件事：构建 App、跑 CarKeeperTests。
+# ─────────────────────────────────────────────────────────────────────────────
+# Schemes
+# ─────────────────────────────────────────────────────────────────────────────
+# ⚠️ 这两条都必须**显式声明**。
+#
+# 教训（2026-09-22 的 CI）：以前只写了下面那条 CarKeeperTests，注释里还想当然地写着
+# 「CarKeeper scheme 是 XcodeGen 按 target 自动生成的」—— 实际上**一旦
+# 显式给出 `schemes:`，就不会再为其它 target 自动生成方案了**。
+# 于是干净检出里根本没有 CarKeeper scheme，xcodebuild 直接报：
+#     The project named "CarKeeper" does not contain a scheme named "CarKeeper"
+# 本地又会掩盖它：Xcode 打开工程时会自动补一个 scheme 出来。
+#
+# 现在由 `scan/paths.py` 守住：「工作流里 `-scheme X` 用到的每个名字，
+# 必须在 schemes 里声明过、或是一个 target 名」。
 schemes:
+  # CI 构建 App 用的就是它（.github/workflows/ios-build.yml 的 -scheme CarKeeper）
+  CarKeeper:
+    build:
+      targets:
+        CarKeeper: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+      - CarKeeperTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
+  # 单元测试 job 用它（-scheme CarKeeperTests）
   CarKeeperTests:
     build:
       targets:

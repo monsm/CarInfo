@@ -315,3 +315,24 @@ Spec validation error: Target "CarKeeper" has a missing source directory
 
 一个仍然存在的工程事实：**这台开发机没有 Swift 编译器**，所以 Swift 层面的错误只能在
 CI 上看到。这一轮至少把「根本走不到编译」的那一层堵住了。
+
+### 11.1 紧接其后的一次：CI 找不到 `CarKeeper` scheme
+
+`xcodegen generate` 过了之后的第二个失败点仍然不在 Swift：
+
+```
+xcodebuild: error: The project named "CarKeeper" does not contain a scheme named "CarKeeper"
+```
+
+成因是 `bae6080`（加测试 target 那一批）往 `project.yml` 末尾加了顶层 `schemes:`，
+里面**只**声明了 `CarKeeperTests`，注释却写着「CarKeeper scheme 是 XcodeGen 按 target
+自动生成的」—— 事实相反：**一旦显式给出 `schemes:`，就不再有其它 target 的自动方案**。
+本地 Xcode 打开工程会自动补一个 scheme，所以本地怎么试都正常。
+
+现在两条 scheme 都显式声明（`CarKeeper` 走 build/test/archive，`CarKeeperTests` 给测试 job），
+并且 `scan/paths.py` 增加了第三条规则：**工作流里 `-scheme X` 用到的每个名字，
+必须在 `schemes:` 里声明过**（`schemes:` 缺席时才退回「每个 target 都有自动方案」）。
+
+值得记下来的是：这个检查器的**第一版有洞** —— 它把「是 target 名」也算通过，而
+`CarKeeper` 正好也是 target 名，于是反向自测（临时抽掉那条 scheme）当场没报。改成
+「`schemes:` 存在时只认显式声明」之后，同样的探针立刻 ❌ + 退出码 1。
