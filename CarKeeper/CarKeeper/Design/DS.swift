@@ -997,6 +997,34 @@ struct DSSection<Content: View>: View {
     }
 }
 
+struct DSSurfaceModifier: ViewModifier {
+    var padding: CGFloat
+    var radius: CGFloat
+    var glass: Bool
+
+    init(padding: CGFloat, radius: CGFloat, glass: Bool) {
+        self.padding = padding
+        self.radius = radius
+        self.glass = glass
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(glass ? TokensPalette.glassLight : TokensPalette.nightSurface)
+            }
+            .overlay {
+                if TokensPalette.decor != .none {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line)
+                }
+            }
+    }
+}
+
 extension View {
     /// 分组表面外观
     func dsSurface(padding: CGFloat = TokensSpacing.md,
