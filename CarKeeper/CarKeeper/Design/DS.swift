@@ -90,6 +90,14 @@ struct DSCard<Content: View>: View {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .fill(TokensPalette.nightSurface)
             }
+            // 艺术方向下给卡片一条发丝描边：纸与墨的语言里，「一块面」是靠线画出来的。
+            // 原生主题不加（原生 = 现状）。这一处一改，全 App 的卡片同时变。
+            .overlay {
+                if TokensPalette.decor != .none {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line)
+                }
+            }
     }
 }
 
@@ -152,6 +160,13 @@ struct DSGroup<Content: View>: View {
                 }
                 // 裁剪掉圆角：行的按压底色是矩形，不裁会在分组四角露出方角
                 .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous))
+                // 艺术方向下分组也要有线（与 DSCard 同一规则，原生不加）
+                .overlay {
+                    if TokensPalette.decor != .none {
+                        RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                            .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line)
+                    }
+                }
             if let footer {
                 Text(footer)
                     .font(TokensTypo.footnote)
@@ -218,10 +233,13 @@ struct DSSectionHeader: View {
     var action: (() -> Void)? = nil
 
     var body: some View {
+        // 分组标题是全 App 最密集的一行字（~28 屏都在用它）：
+        // 它一换成衬线 + 疏排，整套界面的语气就从「App」变成「印刷物」。
+        // 原生主题下 `TokensSerif.section` 返回系统字，所以原生 = 现状。
         HStack(alignment: .firstTextBaseline) {
             Text(title.uppercased())
-                .font(TokensTypo.footnote)
-                .tracking(0.2)
+                .font(TokensSerif.section(13))
+                .tracking(TokensTracking.label)
                 .foregroundStyle(TokensPalette.secondary)
             Spacer(minLength: TokensSpacing.sm)
             if let trailing {
@@ -276,6 +294,45 @@ struct DSBigNumber: View {
             }
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// 页面大标题（艺术方向下用）：导航栏的字体改不了（系统字体），
+/// 所以「标题的字体」只能画在内容里 —— 这既是代价也是印刷物的做法：
+/// 标题属于版面，不属于系统栏。
+struct DSPageTitle: View {
+    var title: String
+    var subtitle: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(TokensSerif.page(30))
+                .tracking(TokensTracking.title)
+                .foregroundStyle(TokensPalette.primary)
+            if let subtitle {
+                Text(subtitle)
+                    .font(TokensTypo.caption)
+                    .tracking(TokensTracking.label)
+                    .foregroundStyle(TokensPalette.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+extension View {
+    /// 页面标题的两种活法：
+    ///   原生      = iOS 大标题留在导航栏（逐像素等于切换前的现状）
+    ///   艺术方向  = 导航栏清空，大标题搬进版面（衬线 + 疏排）
+    /// 它必须与 `DSPageTitle` **成套**出现：只清导航栏不补内容，那一屏就没标题了。
+    func dsPageTitle(_ title: String) -> some View {
+        if TokensPalette.decor == .none {
+            return AnyView(navigationTitle(title).navigationBarTitleDisplayMode(.large))
+        }
+        return AnyView(navigationTitle("").navigationBarTitleDisplayMode(.inline))
     }
 }
 

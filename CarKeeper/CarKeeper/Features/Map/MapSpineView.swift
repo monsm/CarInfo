@@ -50,6 +50,14 @@ struct MapSpineView: View {
     @State private var replaySession: ChargeSession?
     /// 「此刻的光」表 —— 这一屏的光是怎么算出来的（药丸点开）
     @State private var showSky = false
+    /// 时刻滑块：`skyLive` = 看此刻；一旦拖过滑块就变成「看那一刻的光」
+    @State private var skyLive = true
+    @State private var skyHour: Double = 12
+
+    /// 算光用的时刻（实时就是现在）
+    private var skyDate: Date {
+        SkyLight.date(hour: skyLive ? nil : Int(skyHour.rounded()), from: Date())
+    }
 
     private var theme: ArtTheme { ArtTheme(rawValue: themeRaw) ?? .native }
     private var spec: MapStyleSpec { theme.mapSpec }
@@ -112,8 +120,8 @@ struct MapSpineView: View {
         // 光层：光池的位置由**太阳方位角**决定，暗角与颗粒由环境光决定。
         // 它是「车所在的那一刻」直接画在图上 —— 不吃点击，原生主题下一个像素都不加。
         .overlay {
-            if let sky = d.sky {
-                MapSkyOverlay(light: sky)
+            if let sky = d.sky(at: skyDate) {
+                SkyOverlay(light: sky)
             }
         }
         .overlay(alignment: .topLeading) { mapPlaceLabel(d) }
@@ -149,7 +157,7 @@ struct MapSpineView: View {
                     style: spec.pinStyle,
                     allowsGlow: spec.allowsGlow,
                     isActive: false,
-                    lamp: d.sky?.lamp ?? 0
+                    lamp: d.sky(at: skyDate)?.lamp ?? 0
                 )
                 .frame(width: 44, height: 44)   // HIG 最小触控目标就落在钉中心
             }
@@ -295,7 +303,7 @@ struct MapSpineView: View {
                     Text("没有位置")
                         .font(TokensTypo.caption)
                         .foregroundStyle(TokensPalette.warning)
-                } else if let sky = d.sky {
+                } else if let sky = d.sky(at: skyDate) {
                     Button {
                         TokensHaptic.tap()
                         showSky = true
@@ -332,6 +340,12 @@ struct MapSpineView: View {
             Text(String(format: "%.0f°", sky.altitude))
                 .font(TokensTypo.digits(11))
                 .foregroundStyle(TokensPalette.tertiary)
+            // 回放时必须看得见自己不在实时上 —— 不然这就是一屏假象
+            if !skyLive {
+                Text("回放")
+                    .font(TokensTypo.caption2)
+                    .foregroundStyle(TokensPalette.warning)
+            }
         }
         .foregroundStyle(TokensPalette.secondary)
         .padding(.horizontal, TokensSpacing.sm + 2)
@@ -787,12 +801,44 @@ struct MapSpineView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                    if let sky = d.sky {
+                    if let sky = d.sky(at: skyDate) {
                         DSSectionHeader(title: "此刻的光")
                         VStack(alignment: .leading, spacing: 0) {
                             SkyFactTable(facts: sky.facts)
                         }
                         .padding(.horizontal, TokensSpacing.md)
+                        .background(cardBackground)
+
+                        // 时刻滑块 —— 样品里最标志性的那件东西：
+                        // 把「此刻」变成「可以拖的时刻」，一拖就能看完一天的光（深夜→日出→正午→黄昏）。
+                        // 它同时是这一整套光的**证明**：不是配的色，拖一下就自己看见。
+                        DSSectionHeader(title: "看哪一刻的光")
+                        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+                            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+                                Text(skyLive ? "此刻（实时）"
+                                             : String(format: "%02d:00", Int(skyHour.rounded())))
+                                    .font(TokensTypo.digits(20))
+                                    .foregroundStyle(TokensPalette.primary)
+                                Spacer(minLength: 0)
+                                if !skyLive {
+                                    Button("回到此刻") {
+                                        TokensHaptic.tap()
+                                        skyLive = true
+                                    }
+                                    .font(TokensTypo.footnote)
+                                    .foregroundStyle(TokensPalette.accent)
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            Slider(value: $skyHour, in: 0...23)
+                                .tint(TokensPalette.accent)
+                                .onChange(of: skyHour) { _, _ in skyLive = false }
+                            Text("按你所在时区的钟点；光由**车的经纬度**与这个时刻算出，所以拖到哪一格，光就真的算到哪一格。")
+                                .font(TokensTypo.caption)
+                                .foregroundStyle(TokensPalette.tertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(TokensSpacing.md)
                         .background(cardBackground)
 
                         Text("太阳的高度角与方位角，由车所在的经纬度与此刻算出（NOAA 简化算法，纯数学，不联网），可以复算。"

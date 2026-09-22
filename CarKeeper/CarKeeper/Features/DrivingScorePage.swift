@@ -118,7 +118,6 @@ struct DrivingScorePage: View {
             .padding(.horizontal, TokensSpacing.page)
             .padding(.vertical, TokensSpacing.md)
         }
-        .background(TokensPalette.canvas)
         .navigationTitle("驾驶评分")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityLabel(Text("驾驶评分详情"))

@@ -78,7 +78,6 @@ struct DataView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(TokensPalette.background)
         .navigationTitle("全量数据")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { kindMenu }

@@ -29,7 +29,6 @@ struct TripsTimelineView: View {
                 timeline(trips, hotspots: hotspots)
             }
         }
-        .background(TokensPalette.background)
         .navigationTitle("行程")
         .navigationBarTitleDisplayMode(.large)
         .accessibilityLabel(Text("行程时间轴"))

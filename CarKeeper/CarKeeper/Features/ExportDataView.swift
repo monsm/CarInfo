@@ -67,7 +67,6 @@ struct ExportDataView: View {
             }
             .padding()
         }
-        .background(TokensPalette.background)
         .navigationTitle("导出数据")
         .navigationBarTitleDisplayMode(.inline)
         .alert("导出成功", isPresented: $showSuccess) {

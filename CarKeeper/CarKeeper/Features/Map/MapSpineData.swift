@@ -230,9 +230,12 @@ struct MapSpineData {
 
     /// 此刻的光：由**车所在的经纬度 + 真实时刻**算出（太阳位置是纯数学，不联网）。
     /// 没有车的位置就没有光 —— 不拿设备自己的位置冒充车的位置。
-    var sky: SkyLight? {
+    var sky: SkyLight? { sky(at: Date()) }
+
+    /// 指定时刻的光（「拖着看一整天的光」用；不带参数就是此刻）。
+    func sky(at date: Date) -> SkyLight? {
         guard let c = carCoordinate else { return nil }
-        return SkyLight.now(at: Date(), coordinate: c)
+        return SkyLight.now(at: date, coordinate: c)
     }
 
     /// 地图上那句大字地名：**就是车端上报的那句地址**，长了就照实截断（带省略号）。

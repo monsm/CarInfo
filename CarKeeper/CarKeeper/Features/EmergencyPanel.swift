@@ -29,7 +29,6 @@ struct EmergencyPanel: View {
             .padding(.horizontal, TokensSpacing.lg)
             .padding(.vertical, TokensSpacing.md)
         }
-        .background(TokensPalette.background)
         .navigationTitle("紧急求助")
         .navigationBarTitleDisplayMode(.inline)
         .alert("确认拨打", isPresented: $showConfirm) {

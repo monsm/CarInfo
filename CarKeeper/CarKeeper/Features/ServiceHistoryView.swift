@@ -71,7 +71,6 @@ struct ServiceHistoryView: View {
             .padding(.horizontal, TokensSpacing.lg)
             .padding(.vertical, TokensSpacing.md)
         }
-        .background(TokensPalette.background)
         .navigationTitle("维保记录")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

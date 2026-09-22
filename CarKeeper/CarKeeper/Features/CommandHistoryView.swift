@@ -48,7 +48,6 @@ struct CommandHistoryView: View {
             .padding(.horizontal, TokensSpacing.lg)
             .padding(.vertical, TokensSpacing.md)
         }
-        .background(TokensPalette.background)
         .navigationTitle("指令历史")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityLabel(Text("指令历史"))

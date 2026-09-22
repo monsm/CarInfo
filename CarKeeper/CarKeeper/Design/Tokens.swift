@@ -279,6 +279,22 @@ enum TokensSerif {
         if let name = cjkSerifName { return .custom(name, size: size) }
         return .system(size: size, weight: weight, design: .serif)
     }
+
+    // ---- 跟随主题的两档（全 App 用它们，而不是直接调上面的）----
+    // 规则：**三个艺术方向走衬线，原生不换** —— 原生必须逐像素等于切换前的现状。
+    // （不把衬线写进数字：宋体的数字没有等宽特性，换数值时会跳动；
+    //   样品里也是这么分的 —— 衬线只给地名与大标题，数字仍然是 Inter/系统字。）
+    private static var followsArt: Bool { TokensPalette.decor != .none }
+
+    /// 页面 / 弹层的大标题
+    static func page(_ size: CGFloat) -> Font {
+        followsArt ? title(size) : .system(size: size, weight: .semibold)
+    }
+
+    /// 分组标题（全 App 的 section header 走它）
+    static func section(_ size: CGFloat) -> Font {
+        followsArt ? label(size) : .system(size: size)
+    }
 }
 
 // MARK: - 字距

@@ -60,7 +60,6 @@ struct VehicleView: View {
                               cls: "warn") { reloadVehicle() }
             }
         }
-                .background(TokensPalette.background)
                 .navigationTitle("车辆档案")
         .accessibilityLabel(Text("车辆档案"))
         .accessibilityHint(Text("车牌、VIN、车型配置与保险保养信息，点任意字段可复制"))

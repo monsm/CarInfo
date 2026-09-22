@@ -1,5 +1,5 @@
 // =============================================================================
-// MapSkyOverlay.swift — 地图上面那层"光"
+// SkyOverlay.swift — 地图上面那层"光"
 // =============================================================================
 //
 // 样品版好看的地方，一半在**地图被光笼罩**：光池有方向、画面有暗角、表面有颗粒。
@@ -19,7 +19,7 @@
 // =============================================================================
 import SwiftUI
 
-struct MapSkyOverlay: View {
+struct SkyOverlay: View {
     let light: SkyLight
 
     private var decor: CanvasDecor { TokensPalette.decor }
@@ -165,7 +165,7 @@ struct MapSkyOverlay: View {
     // MARK: 颗粒
     // -------------------------------------------------------------------------
     private var grain: some View {
-        MapGrainLayer(strength: light.grain * grainScale)
+        GrainLayer(strength: light.grain * grainScale)
             .allowsHitTesting(false)
     }
 
@@ -244,15 +244,18 @@ struct SkyFactTable: View {
 }
 
 // =============================================================================
-// MapGrainLayer —— 胶片颗粒
+// GrainLayer —— 胶片颗粒
 // =============================================================================
+//
+// ⚠️ 用量提醒：把它放在根画布（AppCanvas）上，它只在根重绘时才画一次；
+//    不要放进逐帧变化的动画里。
 //
 // 为什么不用系统随机数：`Double.random` 每次重绘都是新的噪声，画面会**闪** ——
 // 那是"噪点动画"，不是颗粒。这里用固定种子的线性同余发生器：
 // 同一块屏幕每次画的点完全一样，所以它安静。
 //
 // 为什么粒度按面积算：屏幕越大颗粒越多，密度才一致。
-struct MapGrainLayer: View {
+struct GrainLayer: View {
     var strength: Double
 
     var body: some View {

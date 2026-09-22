@@ -52,6 +52,7 @@ struct MessagesView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "消息")
                 filterBar
 
                 if loading {
@@ -83,9 +84,7 @@ struct MessagesView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(TokensPalette.background)
-        .navigationTitle("消息")
-        .navigationBarTitleDisplayMode(.large)
+        .dsPageTitle("消息")
         .searchable(text: $searchText,
                     placement: .navigationBarDrawer(displayMode: .always),
                     prompt: "搜索标题或内容")

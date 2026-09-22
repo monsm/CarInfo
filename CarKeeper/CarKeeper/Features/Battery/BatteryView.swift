@@ -37,13 +37,12 @@ struct BatteryView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "充电")
                 sections
             }
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(TokensPalette.background)
-        .navigationTitle("充电")
-        .navigationBarTitleDisplayMode(.large)
+        .dsPageTitle("充电")
             .accessibilityLabel(Text("充电"))
             .accessibilityHint(Text("电池状态、充电历史与诊断报告"))
         .onAppear { loadIfNeeded(); startSocAnimation() }

@@ -48,7 +48,6 @@ struct DevView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(TokensPalette.background)
         .navigationTitle("设计令牌")
         .confirmationDialog("清除全部车端缓存？", isPresented: $showClearConfirm, titleVisibility: .visible) {
             Button("清除缓存", role: .destructive) {

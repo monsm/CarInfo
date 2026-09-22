@@ -108,7 +108,6 @@ struct OnboardingView: View {
             .padding(.top, TokensSpacing.xl)
         }
         // 旧版：整屏三色渐变（主色 + 紫 + 蓝）。新版：单一画布色。
-        .background(TokensPalette.background)
     }
 
     private func onboardingPage(_ page: OnboardingPage) -> some View {

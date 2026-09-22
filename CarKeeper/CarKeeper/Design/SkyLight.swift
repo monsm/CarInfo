@@ -208,6 +208,18 @@ struct SkyLight {
         ]
     }
 
+    /// 把「看几点」换成一个今天的具体时刻。`hour == nil` 就是此刻（实时）。
+    /// 时区用设备本地 —— 滑块是「假设性时刻」的工具，界面上照实写它是按你所在时区。
+    static func date(hour: Int?, from now: Date) -> Date {
+        guard let hour else { return now }
+        let cal = Calendar.current
+        var comps = cal.dateComponents([.year, .month, .day], from: now)
+        comps.hour = hour
+        comps.minute = 0
+        comps.second = 0
+        return cal.date(from: comps) ?? now
+    }
+
     /// 由车的位置与此刻算光。**没有位置就没有光**（不拿设备位置冒充车的位置）。
     static func now(at date: Date, coordinate: CLLocationCoordinate2D) -> SkyLight {
         let fix = SolarMath.fix(at: date, coordinate: coordinate)

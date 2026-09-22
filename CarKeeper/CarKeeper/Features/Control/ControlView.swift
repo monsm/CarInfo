@@ -236,6 +236,7 @@ struct ControlView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "车控")
                 controlHeader
                 primarySceneButton
                 if let run = running { runningCard(run) }
@@ -257,8 +258,7 @@ struct ControlView: View {
             }
             // 数据回来后自动重播计数动画（pendingTemp 不变，onChange 会触发）
         }
-        .background(TokensPalette.background)
-        .navigationTitle("车控")
+        .dsPageTitle("车控")
             .accessibilityLabel(Text("车控"))
             .accessibilityHint(Text("远程控制车辆：锁车、解锁、空调、座椅加热"))
         // #35 语音播报入口

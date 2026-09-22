@@ -224,6 +224,9 @@ struct CarKeeperApp: App {
                 LoginView()
             }
         }
+        // 画布与光在**根部只画一次**（Design/Theme.swift 的 AppCanvas）：
+        // 全 App 每一屏共用同一束由车所在地算出的光。逐屏去加，一定会有屏幕漏掉。
+        .background { AppCanvas() }
         .onAppear {
             // 启动时若已登录，拉取一次数据
             if store.isLoggedIn && store.cars.isEmpty {
@@ -528,12 +531,16 @@ struct DetailSplitView: View {
     private let store = AppStore.shared
 
     var body: some View {
-        if store.isLoggedIn {
-            MainTabView()
-                .environmentObject(nav)
-        } else {
-            LoginView()
+        Group {
+            if store.isLoggedIn {
+                MainTabView()
+                    .environmentObject(nav)
+            } else {
+                LoginView()
+            }
         }
+        // 副窗口也共用同一束光（两个窗口的光方向不一样，比没有光更糟）
+        .background { AppCanvas() }
     }
 }
 

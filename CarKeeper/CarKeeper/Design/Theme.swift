@@ -91,16 +91,10 @@ extension View {
     // 装饰不是“氛围背景”的回归：它只表达这套艺术方向的做法 ——
     //   夜光 = 一束来自车所在地的光；纸上 = 纸面在光下的不均；巨字 = 发丝网格。
     func pageBackground() -> some View {
+        // 画布与光**不在这一层**：它们在 App 根部（`CarKeeperApp` 里的 `AppCanvas`）。
+        // 原因很实际：逐屏去加背景，就一定会有屏幕漏掉 —— 改之前 28 屏里只有 2 屏有画布，
+        // 这正是「换了主题却看不出变化」的根源。光只在根上画一次，方向就永远不会自相矛盾。
         contentMargins(.horizontal, TokensSpacing.page, for: .scrollContent)
-            .background {
-                ZStack {
-                    TokensPalette.canvasGradient
-                    CanvasDecorLayer()
-                        // 装饰层不吃点击：它只是画布，不是控件
-                        .allowsHitTesting(false)
-                }
-                .ignoresSafeArea()
-            }
     }
 
     // MARK: - 卡片修饰符
@@ -114,6 +108,37 @@ extension View {
         self.modifier(GlassCardModifier(cornerRadius: corner, isHero: true))
     }
 
+}
+
+// =============================================================================
+// AppCanvas —— 全 App 的画布：整棵界面背后的一层光
+// =============================================================================
+// 光池的位置与强度来自 `SkyLight`（车所在经纬度 + 此刻算出的**真实太阳位置**），
+// 纸面颗粒、暗角、发丝网格同理 —— 这不是「氛围背景」的回归，每一层都对应一个物理量。
+//
+// 为什么画在根部而不是每屏自己画：
+//   ① 逐屏去加，一定会有屏幕漏掉（改之前 28 屏里只有 2 屏有画布）；
+//   ② 同一束光必须只有一份 —— 两个屏幕上的光方向不一样，比没有光更糟。
+// @MainActor：AppStore 是 @MainActor（View 的 body 本来就在主线程上）。
+struct AppCanvas: View {
+    @MainActor private var sky: SkyLight? {
+        guard let c = AppStore.shared.currentLocation?.coordinate else { return nil }
+        return SkyLight.now(at: Date(), coordinate: c)
+    }
+
+    var body: some View {
+        ZStack {
+            TokensPalette.canvasGradient
+            if let light = sky {
+                // 与地图主屏用的是同一套光层：换个屏幕，光不会换个方向
+                SkyOverlay(light: light)
+            } else {
+                CanvasDecorLayer()
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
 }
 
 // =============================================================================
@@ -135,14 +160,10 @@ struct CanvasDecorLayer: View {
             Color.clear
 
         case .lightPool:
-            GeometryReader { geo in
-                RadialGradient(
-                    colors: [TokensPalette.accent.opacity(0.16), TokensPalette.accent.opacity(0)],
-                    center: UnitPoint(x: 0.78, y: 0.12),
-                    startRadius: 0,
-                    endRadius: max(geo.size.width, geo.size.height) * 0.72
-                )
-            }
+            // 光池曾经在这里画一块固定在右上角的暖光 —— 那是错的：光的**方向**是物理量，
+            // 不该由版式决定。现在光池由 `SkyOverlay` 按真实太阳方位角画（见 AppCanvas）。
+            // 这一档只兜底「还没有车的位置」：那就没有光，不编一个方向。
+            Color.clear
 
         case .paperGrain:
             ZStack {

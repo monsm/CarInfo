@@ -133,7 +133,6 @@ struct VehicleTipsView: View {
             .padding(.horizontal, TokensSpacing.lg)
             .padding(.vertical, TokensSpacing.md)
         }
-        .background(TokensPalette.background)
         .navigationTitle("车辆提示")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

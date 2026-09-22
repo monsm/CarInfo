@@ -39,6 +39,7 @@ struct MineView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "我的")
                 profileCard
                 if let car = store.car { carCard(car) }
                 tilesCard
@@ -47,8 +48,7 @@ struct MineView: View {
 
         }
         .scrollBounceBehavior(.basedOnSize)
-        .background(TokensPalette.background)
-        .navigationTitle("我的")
+        .dsPageTitle("我的")
             .accessibilityLabel(Text("我的"))
             .accessibilityHint(Text("账号设置、个人信息和应用程序管理"))
         .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
