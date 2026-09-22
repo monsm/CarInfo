@@ -121,12 +121,6 @@ class VehicleValuation {
         return initialPrice * depreciation * (1 - mileageDep)
     }
 
-    /// 车辆信息卡片
-    func valuationCard(initialPrice: Double, years: Int, mileageKm: Double) -> (currentValue: Double, depreciationRate: Double) {
-        let value = estimateValue(initialPrice: initialPrice, years: years, mileageKm: mileageKm)
-        let depRate = (1 - value / initialPrice) * 100
-        return (value, depRate)
-    }
 }
 
 // MARK: - N34 年检日历
@@ -151,23 +145,11 @@ class InspectionCalendar: ObservableObject {
     func addInspection(_ inspection: Inspection) {
         var list = inspections
         list.append(inspection)
-        if let data = try? JSONEncoder().encode(list) {
-            UserDefaults.standard.set(data, forKey: "carkeeper_inspections")
-        }
-    }
-
-    /// 获取即将到期的年检（60天内）
-    var upcomingInspections: [Inspection] {
-        let now = Date()
-        let sixtyDays = Calendar.current.date(byAdding: .day, value: 60, to: now)!
-        return inspections
-            .filter { $0.date >= now && $0.date <= sixtyDays }
-            .sorted { $0.date < $1.date }
-    }
-
-    /// 已过期
-    var expiredInspections: [Inspection] {
-        inspections.filter { $0.date < Date() }
+        // ⚠️ 必须写回 `inspections`：旧版只存了 UserDefaults、没有更新 `@Published` 数组，
+        // 于是「保存年检」在本次运行里看上去没任何反应（重启才看得到）——
+        // 数据其实存进去了，但界面读的是内存里那份没变的。
+        inspections = list
+        save(list)
     }
 
     /// 距离下次年检天数
@@ -175,93 +157,25 @@ class InspectionCalendar: ObservableObject {
         Calendar.current.dateComponents([.day], from: Date(), to: inspection.date).day ?? 0
     }
 
-    private func saveInspections(_ list: [Inspection]) {
+    private func save(_ list: [Inspection]) {
         if let data = try? JSONEncoder().encode(list) {
             UserDefaults.standard.set(data, forKey: "carkeeper_inspections")
         }
     }
-    func updateInspection(_ inspection: Inspection) {
-        var list = inspections
-        if let idx = list.firstIndex(where: { $0.id == inspection.id }) {
-            list[idx] = inspection
-        }
-        inspections = list
-        saveInspections(list)
-    }
 }
+
+// 已删（全仓零引用的死 API）：
+//   · `upcomingInspections` / `expiredInspections` —— 新页面把年检与保险合在一条
+//     时间轴上算，不再需要这两个只算年检的过滤属性
+//   · `updateInspection` —— 它唯一的调用方是已删的 `InspectionEditForm`
+//   · `VehicleValuation.valuationCard` —— 估值页自己用 `estimateValue` 与购车价算折旧率
 
 // MARK: - UI 组件
-struct InspectionRow: View {
-    let inspection: Inspection
-    let currentMileage: Double
-
-    var body: some View {
-        let days = InspectionCalendar.shared.daysUntilInspection(for: inspection)
-        let isExpired = days < 0
-        let isUrgent = days > 0 && days <= 30
-
-        HStack {
-            Image(systemName: isExpired ? "exclamationmark.triangle.fill" : "calendar.fill")
-                .foregroundColor(isExpired ? .red : isUrgent ? .orange : .blue)
-                .font(.title2)
-                .frame(width: 36, height: 36)
-                .background(isExpired ? TokensPalette.error.opacity(0.1) : isUrgent ? TokensPalette.warning.opacity(0.1) : TokensPalette.info.opacity(0.1))
-                .clipShape(Circle())
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(inspection.vehicleName)
-                    .font(.subheadline).fontWeight(.medium)
-                Text(inspection.date.formatted(date: .numeric, time: .omitted))
-                    .font(.caption).foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing) {
-                Text(isExpired ? "已过期" : "\(days)天后到期")
-                    .font(.caption).fontWeight(.semibold)
-                    .foregroundColor(isExpired ? .red : isUrgent ? .orange : .green)
-            }
-        }
-        .padding(.vertical, 8)
-        .glassCard()
-    }
-}
-
-
-struct InspectionEditForm: View {
-    let inspection: Inspection
-    @State private var name: String
-    @State private var date: Date
-    @Environment(\.dismiss) private var dismiss
-
-    init(inspection: Inspection) {
-        self.inspection = inspection
-        _name = State(initialValue: inspection.vehicleName)
-        _date = State(initialValue: inspection.date)
-    }
-
-    var body: some View {
-        Form {
-            Section("车辆信息") {
-                TextField("车辆名称", text: $name)
-                DatePicker("年检日期", selection: $date, displayedComponents: .date)
-            }
-        }
-        .navigationTitle("编辑年检")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("保存") {
-                    var updated = inspection
-                    updated = Inspection(id: inspection.id, vehicleName: name, date: date, notes: inspection.notes)
-                    InspectionCalendar.shared.updateInspection(updated)
-                    dismiss()
-                }
-            }
-        }
-    }
-}
+//
+// 这里原本还有 `InspectionRow` 与 `InspectionEditForm` 两个视图。
+// `InspectionCalendarView` 改成 inset-grouped 分组之后，**两者都没有任何引用**了 ——
+// 它们只是留在文件里，编译进来但不属于任何一处界面（而且是旧版玻璃卡的写法）。
+// 已删；年检行现在由 `DSRow` 渲染，编辑入口就是页面底部那个「保存年检」。
 
 // MARK: - UI: 证件与到期日（年检 + 保险）
 /// 年检与保险是同一件事的两面：「哪个证件什么时候到期」。
