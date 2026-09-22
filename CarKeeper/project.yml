@@ -301,7 +301,12 @@ schemes:
     archive:
       config: Release
 
-  # 单元测试 job 用它（-scheme CarKeeperTests）
+  # 纯函数测试（光的太阳位置、充电站聚合）的 scheme。
+  # CI **不再跑它**（2026-09-22 按用户要求删掉了单元测试 job：它要占一整个 macOS
+  # runner，而 macOS 额度按 10 倍计费，且它是 continue-on-error、红不红都不影响构建）。
+  # 保留这个 scheme 是为了开发机上还能 `Product > Test`。
+  # 因此 `scan/paths.py` 的「每个 target 都必须被 CI 编到」那条规则里，
+  # CarKeeperTests 被显式豁免并写了理由 —— 它确实不再参与 CI 编译。
   CarKeeperTests:
     build:
       targets:

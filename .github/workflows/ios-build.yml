@@ -177,51 +177,13 @@ jobs:
           echo "  2. Swift 编译错误（查看 build 日志）"
           echo "  3. 资源缺失"
 
-  # 纯函数测试（光的太阳位置、充电站聚合）—— **非阻断**。
+  # 单元测试 job 已删除（2026-09-22，按用户要求）。
   #
-  # 为什么单独一个 job：这些函数错了不会崩、也不会有编译错误，只会安静地给出
-  # 错的光和错的圈；而开发机上没有 Swift 工具链，只有 macOS runner 能跑它们。
+  # 它原本是「纯函数测试（光的太阳位置、充电站聚合）」的唯一边一执行处，非阻断。
+  # 删掉的理由是成本：每次 push 都要占一整个 macOS runner（额度按 10 倍计费），
+  # 而它是 continue-on-error —— 红不红都不影响构建。
   #
-  # 为什么 continue-on-error：模拟器镜像与 Xcode 版本会随 runner 漂移，
-  # 「找不到 iPhone 17」这类失败与代码无关，不该把它算成构建失败。
-  # 日志里会写清用的是哪个模拟器 —— 真正的测试失败一眼能看出来。
-  unit-tests:
-    name: Unit tests (pure logic, non-blocking)
-    needs: static-gate
-    runs-on: macos-latest
-    continue-on-error: true
-    env:
-      PYTHONUTF8: "1"
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install XcodeGen
-        run: |
-          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
-          xcodegen --version
-
-      - name: Generate Xcode project
-        run: cd CarKeeper && xcodegen generate
-
-      - name: Pick an available iOS simulator
-        id: sim
-        run: |
-          UDID=$(xcrun simctl list devices available -j | python3 -c "
-          import json, sys
-          d = json.load(sys.stdin)['devices']
-          print([v['udid'] for k, v in d.items() if 'iOS' in k for v in v if v['isAvailable']][0])
-          ")
-          echo "使用模拟器：$UDID"
-          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
-
-      - name: Run unit tests
-        run: |
-          cd CarKeeper
-          xcodebuild test \
-            -project CarKeeper.xcodeproj \
-            -scheme CarKeeperTests \
-            -destination "id=${{ steps.sim.outputs.udid }}" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            -quiet
+  # 失去的东西要说清楚：`Tests/PureLogicTests.swift` 从此**不再被任何 CI 编译过**。
+  # target 与 scheme 都还在，开发机上的 Xcode 可以直接跑（Product > Test）。
+  # 为此 `scan/paths.py` 的「每个 target 都必须被 CI 编到」那条规则里，
+  # `CarKeeperTests` 被**显式豁免并写了理由** —— 不能靠沉默蒙过去。

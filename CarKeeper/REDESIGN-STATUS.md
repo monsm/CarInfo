@@ -547,3 +547,39 @@ externalID `doc://com.apple.SwiftUI/documentation/SwiftUI/View/truncationMode(_:
 
 **执行中的指令在离开车控页时会被放弃**（`abandon()`）：这是原先的行为，我保持了它，
 而不是顺手改成「后台跑完再提示」——那会改变电量与语义，属于另一个决定。
+
+## 17. 删掉单元测试 job（2026-09-22，按用户要求）
+
+### 17.1 删了什么、失去了什么
+
+CI 里那个 `unit-tests`（`Unit tests (pure logic, non-blocking)`）整体删掉了。
+它原本是纯函数测试（光的太阳位置、充电站聚合）的**唯一**执行处，而且**非阻断**——
+红不红都不影响构建产物。每次 push 却要为此多占一整个 macOS runner，
+而 macOS 额度是按 **10 倍**计费的：花 10 倍成本跑一个不影响成败的东西。
+
+失去的东西要说清楚：**`Tests/PureLogicTests.swift` 从此不再被任何 CI 编译过。**
+这是真实的代价，不是零成本删除。target 与 scheme 都保留，开发机上
+`Product > Test` 随时能跑（这正是那些测试最初该被跑的地方）。
+
+### 17.2 不能让规则靠沉默蒙过去
+
+删掉之后，`paths.py` 那条「project.yml 里的每个 target 都必须被 CI 编到」
+会出现一个**看似通过、其实是假的**结果：`CarKeeper` scheme 的 test action 里
+依旧写着 `CarKeeperTests`，于是它会被算作「已覆盖」，而它实际上一行都没被编过。
+
+两处收紧：
+
+| 改动 | 原来 | 现在 |
+|---|---|---|
+| 只看「被工作流真正引用的 scheme」 | 看 spec 里声明的所有 scheme | 工作流没跑过的 scheme 不算数 |
+| test action 只在真的跑测试时才算覆盖 | 声明了就算 | 必须有 `xcodebuild test` 才认 |
+
+再加上**显式豁免**：`CI_UNCOVERED_TARGETS` 里写明 `CarKeeperTests` 与**理由**，
+输出成 ⚠️ 而不是 ✅。反过来，豁免名单里出现 spec 中不存在的 target 也会被报出来
+（陈旧豁免该删了）。默认值仍然是「每个 target 都要被编到」。
+
+反向自测两条：把豁免拿掉 → ❌ 退出码 1（并顺手报出陈旧豁免条目）；
+给工作流加回一条 `xcodebuild test -scheme CarKeeperTests` → 自动变回 ✅。
+第二条同样重要：**证明这条规则不是永久瞎的**，测试真的回来时它认得。
+
+`project.yml` 里那句「单元测试 job 用它」也一并改成实话 —— 注释说谎比代码说谎更贵。

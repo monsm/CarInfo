@@ -37,6 +37,16 @@ SPEC = os.path.join(ROOT, "CarKeeper", "project.yml")
 SPEC_DIR = os.path.join(ROOT, "CarKeeper")   # xcodegen 以 spec 所在目录为基准
 WORKFLOW_DIR = os.path.join(ROOT, ".github", "workflows")
 
+# 明确「不参与 CI 编译」的 target。
+#
+# 默认值是「每个 target 都要被编到」—— 因为「写了但没人编」就是「改了等于没改，
+# 而且没有报错」。豁免只能显式给，而且必须写出理由：靠沉默蒙过去是不行的。
+CI_UNCOVERED_TARGETS = {
+    "CarKeeperTests": "纯函数测试 target。它在 CI 上要占一整个 macOS runner"
+                      "（额度按 10 倍计费），2026-09-22 按用户要求停跑。"
+                      "target 与 scheme 都保留，开发机上用 Xcode 直接跑（Product > Test）。",
+}
+
 # `- path: X` / `  path: X` —— 只此两种写法，且必须独占一行
 PATH_LINE = re.compile(r"^\s*(?:-\s+)?path:\s*(\S+)\s*$", re.M)
 # 工作流里点名的检查器
@@ -223,11 +233,39 @@ def workflow_build_targets(workflow_dir):
     return out
 
 
-def scheme_targets(data):
-    """schemes: 里 build / test 两个阶段点名的 target"""
+def workflow_test_schemes(workflow_dir):
+    """工作流里跑过 `xcodebuild test` 的 scheme —— 只有它们才会真的去编 test target
+
+    为什么不能只看「scheme 的 test action 里列了谁」：那样的声明不等于真被执行。
+    2026-09-22 删掉单元测试 job 之后，`CarKeeper` scheme 的 test action 里依旧
+    写着 `CarKeeperTests`，但 CI 已经不再跑 `xcodebuild test` 了 ——
+    若只看声明，这个 target 会显成「已覆盖」，而它实际上一行都没被编过。
+    """
+    out = set()
+    if not os.path.isdir(workflow_dir):
+        return out
+    for name in sorted(os.listdir(workflow_dir)):
+        if not name.endswith(('.yml', '.yaml')):
+            continue
+        with open(os.path.join(workflow_dir, name), encoding='utf-8') as f:
+            text = f.read()
+        if not re.search(r'xcodebuild\s+test', text):
+            continue
+        out.update(re.findall(r'-scheme\s+([A-Za-z0-9_.-]+)', text))
+    return out
+
+
+def scheme_targets(data, only=None, phases=('build', 'test')):
+    """schemes: 里 build / test 两个阶段点名的 target
+
+    `only` 用来限定「只看被工作流引用的那些 scheme」：一个从没被 CI 跑过的 scheme
+    （即使是 spec 里声明的）并不能让它的 target 真的被编到。
+    """
     out = set()
     for _name, body in (data.get('schemes') or {}).items():
-        for phase in ('build', 'test'):
+        if only is not None and _name not in only:
+            continue
+        for phase in phases:
             blk = (body or {}).get(phase) or {}
             v = blk.get('targets')
             if isinstance(v, list):
@@ -402,15 +440,38 @@ def main(argv):
             with open(spec, encoding='utf-8') as f:
                 data = yaml.safe_load(f) or {}
             all_targets = set(data.get('targets') or {})
-            covered = scheme_targets(data) | set(workflow_build_targets(WORKFLOW_DIR))
+            declared_schemes = set(data.get('schemes') or {})
+            used_schemes = set(workflow_schemes(WORKFLOW_DIR))
+            if declared_schemes:
+                # 只算**被工作流真的用到**的 scheme：spec 里声明了但 CI 从不跑它的，
+                # 它的 target 实际上从未被编译过（2026-09-22 删掉单元测试 job 之后，
+                # `CarKeeperTests` 正好就是这种情形）。
+                # 只算 build action 的 target：test action 里写着谁，不等于谁会真的被编
+                covered = (scheme_targets(data, only=used_schemes, phases=('build',))
+                           | scheme_targets(data, only=workflow_test_schemes(WORKFLOW_DIR), phases=('test',))
+                           | set(workflow_build_targets(WORKFLOW_DIR)))
+                mode = (f"只看工作流引用的 scheme：{sorted(used_schemes) or '无'}"
+                        f"；跑过 test 的 scheme：{sorted(workflow_test_schemes(WORKFLOW_DIR)) or '无'}")
+            else:
+                # schemes: 缺席时 XcodeGen 为每个 target 自动生成方案，视为都覆盖
+                covered = set(all_targets) | set(workflow_build_targets(WORKFLOW_DIR))
+                mode = "spec 没有 schemes: → 每个 target 都有自动方案"
             if all_targets:
-                print(f"\ntarget 的 CI 覆盖（scheme + 编译体检清单）")
+                print(f"\ntarget 的 CI 覆盖（{mode}）")
                 for t in sorted(all_targets):
                     ok = t in covered
-                    print(("  ✅ " if ok else "  ❌ ") + t)
-                    if not ok:
+                    if ok:
+                        print("  ✅ " + t)
+                    elif t in CI_UNCOVERED_TARGETS:
+                        print(f"  ⚠️  {t}（已显式豁免）—— {CI_UNCOVERED_TARGETS[t]}")
+                    else:
+                        print("  ❌ " + t)
                         problems.append(f"target {t} 没有任何 CI 步骤会编译它"
-                                        "（scheme 的 build action 里没有它，体检清单里也没有）")
+                                        "（scheme 的 build action 里没有它，体检清单里也没有）。"
+                                        "若是有意不跑，请写进 paths.py 的 CI_UNCOVERED_TARGETS 并说明理由。")
+                for t in sorted(set(CI_UNCOVERED_TARGETS) - all_targets):
+                    print(f"  ⚠️  豁免名单里的 {t} 在 spec 里已不存在 —— 这条豁免该删了")
+
             for t in sorted(covered - all_targets):
                 print("  ❌ " + t + "（CI 点名了，但 project.yml 里没有这个 target）")
                 problems.append(f"CI 点名编译 {t}，但 project.yml 里没有这个 target（名字写错了？）")
