@@ -56,7 +56,11 @@ struct SiriCarController {
     /// 使用次数的 key 必须与 `SiriShortcutsCard` 里那张表一致：旧代码记的是
     /// `lock_on` / `lock_off`，而卡片读的是 `lock_true` / `lock_false` ——
     /// 所以卡片永远显示「还没有用过语音指令」，哪怕你用了一百次。
-    private func send(cmd: String, name: String, usageKey: String, temperature: Int? = nil) async -> Outcome {
+    ///
+    /// `temperature` 是非可选，默认值与 `APIClient.sendControlCommand` 一致（17）：
+    /// 那个参数**只对 `OpenAir` 生效**（API 只在 `cmd == "OpenAir"` 时把它拼进 URL），
+    /// 所以锁车/寻车这类指令根本用不到它，写 `Int?` 只会引入一个永远为 nil 的分支。
+    private func send(cmd: String, name: String, usageKey: String, temperature: Int = 17) async -> Outcome {
         let store = AppStore.shared
         guard store.isLoggedIn, !store.carId.isEmpty else { return .notLoggedIn }
         guard let pin = store.readPin(), !pin.isEmpty else { return .noPin }
