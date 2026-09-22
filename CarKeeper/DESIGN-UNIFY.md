@@ -351,3 +351,12 @@ ScrollView {
 | ✅21 | **电池页「框框背景」**：BatteryView 的 8 个卡片（`verdictCard`/`consistencyCard`/`chargeCard`/`motorCard`/`faultCard`/`alarmCard` 等）各自用 `DSExpandGroup`/`DSGroup`，每个都有独立的 `nightSurface` 背景矩形，叠在一起出现多框视觉效果。修复：新增 `DSSection`（与 `DSExpandGroup` 相同的标题行 + 折叠交互，但无背景）；`BatteryView.sections` 改为 `socHero` + `detailsGroup()` 两栏，`detailsGroup` 用 `dsSurface()` 包一层统一背景 | 电池页 |
 
 **门禁同步**：无新增门禁，复用 `scan/keys.py` / `scan/design.py`。
+
+### 第六轮：CI 修复 + CarPlay 实时地图（2026-09-22 第六轮）
+
+| # | 做了什么 | 落在哪个面 |
+|---|---|---|
+| ✅22 | **CI 修复**：① `DSSection` 补上 `footer: String?` 参数（`insulationCard` 调用时缺此参数）；② `ControlView.tempButton` 里 `\(sym).circle.fill` 是字符串插值语法误出现在字符串外（之前 sed 批量替换残留），还原为 `sym + ".circle.fill"` | DS.swift / ControlView.swift |
+| ✅23 | **CarPlay 全量实现**：重写 `CPParentViewController.swift`，接入 App Group 快照做实时地图 + 车况页。新增 `VehicleSnapshot.lat/lng` 字段，主 App `syncSharedDefaults()` 写入位置。详见下文教程 | CarPlay/ CPParentViewController.swift / WidgetTokens.swift / AppStore.swift |
+
+**门禁同步**：无新增门禁。
