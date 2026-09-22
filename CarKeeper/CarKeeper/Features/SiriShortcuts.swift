@@ -23,7 +23,7 @@ struct SiriCarController {
     static let shared = SiriCarController()
 
     /// 一次车控语音指令的结果，供 intent 拼对话文案
-    enum Outcome {
+    enum Outcome: Sendable {
         case notLoggedIn
         case noPin
         case sent
@@ -74,8 +74,12 @@ struct SiriCarController {
         }
     }
 
-    /// 把 Outcome 变成 Siri 说的话 / 卡片上的说明（只有这一份文案）
-    static func dialog(_ outcome: Outcome, action: String) -> String {
+    /// 把 Outcome 变成 Siri 说的话 / 卡片上的说明（只有这一份文案）。
+    ///
+    /// `nonisolated`：`perform()` 是**非隔离**的 async 方法，而 `SiriCarController`
+    /// 整体是 `@MainActor` —— 不标 nonisolated 的话，这里就得写成 `await`，
+    /// 而它只是个纯函数（输入 → 字符串），没有任何状态可碰。
+    nonisolated static func dialog(_ outcome: Outcome, action: String) -> String {
         switch outcome {
         case .sent: return "已\(action)"
         case .notLoggedIn: return "请先在长安车管家里登录并绑定车辆。"

@@ -21,7 +21,11 @@ targets:
     - path: Services
     - path: Models
     - path: CarKeeper/Models
-    - path: HealthKit
+    # ⚠️ 这里曾声明 `- path: HealthKit`。那个目录的唯一文件 HealthKitManager.swift
+    # 在「删死代码」那一批里被删掉了，而 git 不跟踪空目录 —— 于是它在干净检出里
+    # 不存在，XcodeGen 直接以「missing source directory」失败：整轮 CI 连编译都没开始。
+    # 本地开发机上目录还在（被删文件留下的空壳），所以本地 `xcodegen generate` 不会报。
+    # 该目录里的类型已全仓零引用，不再重新创建。现在由 `scan/paths.py` 守住这类声明。
     # 与小组件/实时活动共享的设计令牌与数据契约（同一批文件也被 WidgetBundle 编译）
     - path: Shared
     resources:
@@ -48,8 +52,10 @@ targets:
         NSPhotoLibraryUsageDescription: 用于选择车辆照片
         NSPhotoLibraryAddUsageDescription: 用于保存车辆照片到相册
         NSFaceIDUsageDescription: 用于验证身份后访问敏感信息
-        NSHealthShareUsageDescription: 用于读取健康数据换算碳减排
-        NSHealthUpdateUsageDescription: 用于把碳减排数据写入健康 App
+        # ⚠️ 原本还有 NSHealthShare/UpdateUsageDescription 两条。
+        # 用车数据写进 Apple 健康的那套代码（HealthKit 目录）已随死代码清理删除，
+        # 全仓再没有任何 HKHealthStore / HealthKit API 调用 —— 留着这两条会让
+        # 审核与用户以为 App 在读健康数据。缺声明不会闪退（只有真的调用才会）。
         # iCloud/CloudKit 总开关：未签名构建与侧载重签的包都没有 iCloud entitlement，
         # 构造 CKContainer 会抛出 Swift 无法捕获的 ObjC 异常并直接杀进程（表现为启动闪退）。
         # 只有用带 iCloud 容器的证书签名时才把它改成 true。

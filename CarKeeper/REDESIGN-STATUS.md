@@ -286,3 +286,32 @@ AppIcon 每次 CI 都报「3 unassigned children」：实测 `Contents.json` 与
   `targets` / `unreachable` / `orphans` 全 0；`check_style` 0 问题。
 - 24 个改动文件的括号净余额与 HEAD 逐文件零差异。
 - **这台机器仍然没有 Swift 编译器**：本批只经过静态验证，push 后由 CI 给结论。
+
+## 11. CI 在 `xcodegen generate` 就挂了：一个空目录（2026-09-22）
+
+第一次拿到真 CI 日志，失败点**不在 Swift**：
+
+```
+Spec validation error: Target "CarKeeper" has a missing source directory
+  ".../CarKeeper/HealthKit"
+```
+
+`project.yml` 里声明了 `- path: HealthKit`，而那个目录的唯一文件
+（`HealthKitManager.swift`）在「删死代码」那一批里被删了。**git 不跟踪空目录** ——
+本地开发机上目录还在（被删文件留下的空壳），所以本地 `xcodegen generate` 一切正常；
+只有干净检出会失败。代价是整轮 macOS runner，而且日志会误导人去看 Swift 错误。
+
+修掉的三处连带：
+
+- `project.yml`：删掉 `- path: HealthKit`；顺带删掉 `NSHealthShare/UpdateUsageDescription`
+  —— 全仓已无任何 HealthKit API 调用，留着这两条会让人以为 App 在读健康数据。
+- `.swiftlint.yml`：删掉过时的 `CarKeeper/HealthKit` 排除项。
+- 新增 **`scan/paths.py`**：验证 `project.yml` 里声明的每个 source / resource / info 路径
+  真的存在，**并且**验证 CI 工作流点名的检查器脚本都存在（含
+  `for s in a b c; do python3 scan/$s.py` 这种循环写法 —— 漏掉它，检查器改名而忘了改列表
+  就查不出来）。做了正反自测：干净树 0 报错；注入一条不存在的路径立刻以 ❌ + 退出码 1 拦住。
+- 静态门禁的检查器清单补上此前没有在 CI 里跑的四个：`paths`（新）、`orphans`、`deep`、`eol`。
+  其中 `orphans` 正是「写了页面但没有任何入口」的守卫 —— 这类问题以前只能靠人发现。
+
+一个仍然存在的工程事实：**这台开发机没有 Swift 编译器**，所以 Swift 层面的错误只能在
+CI 上看到。这一轮至少把「根本走不到编译」的那一层堵住了。

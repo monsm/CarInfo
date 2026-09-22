@@ -32,7 +32,11 @@ jobs:
           echo "::group::check_style.js"
           node CarKeeper/check_style.js
           echo "::endgroup::"
-          for s in lexguard scan logic shadowguard scenes targets unreachable futureproof; do
+          # paths.py 必须在最前：它验证 project.yml 声明的路径真的存在。
+          # 2026-09-22 那次 CI 就是在 xcodegen generate 阶段以
+          # 「missing source directory .../HealthKit」直接失败的（删目录时漏删声明，
+          # 而本地开发机上那个空壳目录还在，怎么试都试不出来）。
+          for s in paths lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol; do
             echo "::group::$s.py"
             python3 scan/$s.py
             echo "::endgroup::"
