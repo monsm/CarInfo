@@ -419,6 +419,7 @@ VERIFIED_SDK_ADDITIONS = {
     "fullScreenCover": "View.fullScreenCover(isPresented:onDismiss:content:)（iOS 14+；decl: nonisolated func fullScreenCover<Content>(isPresented: Binding<Bool>, onDismiss: (() -> Void)? = nil, @ContentBuilder content: @escaping () -> Content) -> some View；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/fullScreenCover(isPresented:onDismiss:content:)）——搜索 HUD 要盖住全屏，半屏 sheet 会把压暗背景拆成两段",
     "Sendable": "Swift.Sendable 协议（Swift 标准库；decl: protocol Sendable : SendableMetatype；externalID doc://com.apple.Swift/documentation/Swift/Sendable）——Siri 指令的结果枚举要能跨隔离传递",
     "submitLabel": "View.submitLabel(_:)（iOS 15+；decl: nonisolated func submitLabel(_ submitLabel: SubmitLabel) -> some View；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/submitLabel(_:)）——搜索框回车键改成「搜索」",
+    "truncationMode": "View.truncationMode(_:)（iOS 13+；decl: nonisolated func truncationMode(_ mode: Text.TruncationMode) -> some View；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/truncationMode(_:)）——地图操作条在跑指令时，把「第 3 次查询 · 车辆处理中」从中间截断（尾巴比中间重要：进度数字在头部）。注：它是 View 的方法，不是 Text 的",
 }
 
 

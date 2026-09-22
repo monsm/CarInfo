@@ -77,6 +77,10 @@ struct MapSpineView: View {
             VStack(spacing: 0) {
                 topBar(d)
                 Spacer(minLength: 0)
+                // 常驻操作条：高频动作不离开这张图就能发出去。
+                // 它与底部面板是**两件事**：面板是「车现在什么样」，条子是「现在能做什么」——
+                // 面板只服务「现在」这一层，而锁车在「行程/停车/充电」层里同样会发生。
+                MapQuickBar()
                 bottomPanel(d)
             }
         }
@@ -566,7 +570,10 @@ struct MapSpineView: View {
             action("车控", "slider.horizontal.3", hot: true) {
                 nav.pushNavigation(.control)
             }
-            action("找车", "location.circle") { centerOnCar(force: true) }
+            // 叫「回到车」而不是「找车」：它做的是把镜头移回车所在位置。
+            // 「找车」是另一件事（下发 RemoteSearchCar 让车鸣笛闪灯），
+            // 那一个在地图下方的常驻操作条里。两个都叫「找车」= 用户分不清点哪个。
+            action("回到车", "location.circle") { centerOnCar(force: true) }
             action("充电", "bolt.fill") { nav.pushNavigation(.battery) }
             action("异常", "exclamationmark.triangle") { nav.pushNavigation(.messages) }
         }

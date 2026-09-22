@@ -3,24 +3,17 @@ import AVFoundation
 
 // 车控 —— iOS 27 Liquid Glass：
 // 渐变主控双盘 + 玻璃指令列表 + 执行进度卡 + PIN 数字键盘 / 温度弹层。
-// 指令与轮询逻辑不变。
+//
+// 指令的下发与轮询**不在这个文件里**，已整体搬到 `CommandCenter`（同目录）：
+// 地图上的常驻操作条也要发同一条指令，两边各写一遍迟早会给出不同结果。
+// 这一屏只负责「在哪里发起」与「怎么显示状态」。
 
 struct ControlView: View {
     private let store = AppStore.shared
 
-    static let quickAllowlist: Set<String> = [
-        "LockDoor", "UnLockDoor", "OpenAir", "CloseAir",
-        "FlashLight", "Whistle", "RemoteSearchCar"
-    ]
-
-    /// 把首页传来的键解析成可执行指令；不认识的一律不执行（宁可不做，也不做错）
-    static func resolveQuick(_ raw: String) -> String? {
-        switch raw {
-        case "air":  return "OpenAir"
-        case "lock": return "LockDoor"
-        default:     return quickAllowlist.contains(raw) ? raw : nil
-        }
-    }
+    // 这里原有 `quickAllowlist` + `resolveQuick`（把首页穿透过来的 "air" / "lock"
+    // 简写解析成真指令）。批 1 之后地图上的操作条**直接发真实指令名**、并在原地执行,
+    // 不再需要「穿过一层简写再解析」这条路 —— 也就少了一个「简写表与指令表不一致」的坑。
 
     private let hero: [(key: String, name: String, symbol: String)] = [
         ("LockDoor", "锁车", "lock.fill"),
@@ -66,44 +59,30 @@ struct ControlView: View {
                     note: "发一条「锁车」")
     ]
 
-    @State private var busy = false
-    @State private var running: RunState? = nil
-    @State private var history: [RunState] = []
+    // 执行状态（busy / running / history / lastResult / showResult）全部搬到了
+    // `CommandCenter` —— 地图上的常驻操作条与这一屏共用同一条执行路径。
+    // 下面这些是**只读转发**：一千多行视图代码只读它们，所以一行都不用改；
+    // 写入都发生在中心里（也是唯一能写的地方）。
+    @ObservedObject private var commands = CommandCenter.shared
+    private var busy: Bool { commands.busy }
+    private var running: ControlRun? { commands.running }
+    private var history: [ControlRun] { commands.history }
+    private var lastResult: ControlRun? { commands.lastResult }
+    private var showResult: Bool { commands.showResult }
+
     @State private var showPin = false
     @State private var showBiometricLock = false  // #N13 生物识别二次验证
     @State private var isAuthenticated = false
     @State private var showTemp = false
-    @State private var showResult = false
     @State private var showMoreCommands = false
     @State private var pendingCmd = ""
     @State private var pendingTemp = 25
     @State private var pinDigits = ""
-    @State private var pollTask: Task<Void, Never>? = nil
-    @State private var lastResult: RunState? = nil
-    // lastResult 由 resultSheet 直接使用，保留
     @State private var tempDisplayCount: Int = 0   // HeroDisc 温度数字滚动计数（0→pendingTemp）
     @State private var isRefreshing = false         // 下拉刷新进行中
-    @EnvironmentObject var nav: NavState            // C3: 用于 pushNavigation
-
-    struct RunState: Identifiable {
-        let id: Int
-        var cmd: String
-        var name: String
-        var startedAt: String
-        var taskId: String
-        var status: String
-        var progress: String
-        var resultText: String
-        var resultCls: String
-        var handleCode: String = ""
-        var finishTime: String = ""
-    }
-
-    private static let seq: () -> Int = {
-        var n = 0
-        let lock = NSLock()
-        return { lock.lock(); n += 1; lock.unlock(); return n }
-    }()
+    // 原先这里还有个 `@EnvironmentObject var nav` —— 全文件一次都没用过
+    // （本页从不 push 别的页面），已删。留着的代价是：一旦这一屏改用 sheet 呈现，
+    // 环境里缺这个对象会直接崩。`RunState` 与 id 序列也一并搬到了 CommandCenter。
 
     private var bodyDetail: (
         summary: String, cls: String,
@@ -323,7 +302,11 @@ struct ControlView: View {
                             store.savePin(pin)
                             EnhancedToastManager.shared.show("PIN码已安全保存", icon: "key.fill")
                         }
-                        execute(pin)
+                        // 与地图上的常驻操作条走**同一条**执行路径
+                        commands.send(cmd: pendingCmd,
+                                      temperature: pendingCmd == "OpenAir" ? pendingTemp : 17,
+                                      pin: pin,
+                                      displayName: nameOf(pendingCmd))
                     }
                 }
                 .dsSheetCanvas()
@@ -342,32 +325,22 @@ struct ControlView: View {
         // MARK: 车身明细（车门/窗/灯状态）
 
         .onAppear {
-            if running != nil && pollTask == nil {
-                running = nil
-                busy = false
-            }
+            // 上一次执行若是在别的屏发起、又没人等它，这里的陈旧状态要清掉
+            commands.clearIfIdle()
             // 首次进入时若缓存为空，主动拉一次数据
             if store.caches["control"] == nil {
                 Task { await refreshControlCache() }
             }
-            if let q = store.pendingQuickCtrl {
-                store.pendingQuickCtrl = nil
-                // 首页传过来的是协议里的真实指令名，原样执行；同时兼容历史的 "air"/"lock" 简写。
-                // （旧代码把除这两个简写外的一切都当成 UnLockDoor —— 于是首页的「锁车」
-                //   会反向把车解锁。这是真 bug，不能靠“反正只有两个键”蒙过去。）
-                let cmd = Self.resolveQuick(q)
-                if let cmd {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                        onCmd(cmd)
-                    }
-                }
-            }
         }
         .onDisappear {
-            pollTask?.cancel()
-            showResult = false
+            // 离开发起它的那一屏：停止轮询并**把状态收干净**（只 cancel 不清理，
+            // 状态条会永远停在「正在执行」，而且下一次指令会被静默挡回去）
+            commands.abandon()
         }
-        .sheet(isPresented: $showResult) { resultSheet.dsSheetCanvas() }
+        .sheet(isPresented: Binding(get: { commands.showResult },
+                                    set: { commands.showResult = $0 })) {
+            resultSheet.dsSheetCanvas()
+        }
         // #N13 生物识别验证覆盖层
         .overlay {
             if showBiometricLock {
@@ -544,7 +517,7 @@ struct ControlView: View {
     }
 
     // MARK: 指令执行中
-    private func runningCard(_ run: RunState) -> some View {
+    private func runningCard(_ run: ControlRun) -> some View {
         HStack(spacing: 12) {
             ProgressView()
                 .controlSize(.regular)
@@ -671,103 +644,14 @@ struct ControlView: View {
         }
     }
 
-    private func execute(_ pin: String) {
-        let cmd = pendingCmd
-        guard !cmd.isEmpty else { return }
-        let temperature = cmd == "OpenAir" ? pendingTemp : 17
-        busy = true
-        let startedAt = VM.nowText()
-        let run = RunState(id: Self.seq(), cmd: cmd, name: nameOf(cmd), startedAt: startedAt,
-                           taskId: "", status: "run", progress: "", resultText: "", resultCls: "")
-        running = run
-
-        Task { @MainActor in
-            do {
-                let data = try await APIClient.shared.sendControlCommand(
-                    cmd: cmd, carId: store.carId,
-                    pin: pin, temperature: temperature)
-                let taskId = data.flatMap { ciString($0, ["TaskId", "taskId"]) } ?? ""
-                if !taskId.isEmpty {
-                    running?.taskId = taskId
-                    startPolling(taskId: taskId, run: run)
-                } else {
-                    finish(run, ok: true, text: "执行成功", desc: "服务端已受理")
-                }
-            } catch {
-                finish(run, ok: false, text: "执行失败", desc: error.localizedDescription)
-            }
-        }
-    }
-
-    private func startPolling(taskId: String, run: RunState) {
-        pollTask?.cancel()
-        pollTask = Task { @MainActor in
-            var i = 0
-            while !Task.isCancelled {
-                i += 1
-                let r = await APIClient.shared.getControlInfo(carId: store.carId, taskId: taskId)
-                guard let d = r.data else {
-                    running?.progress = "查询异常，重试中…（\(i)/12"
-                    if i >= 12 {
-                        finish(run, ok: false, text: "结果待确认", desc: "60秒未收到车辆终态")
-                        return
-                    }
-                    try? await Task.sleep(for: .seconds(5)); continue
-                }
-                let status = ciString(d, ["HandleStatus", "handleStatus", "Status", "status"]) ?? ""
-                let finals = ["Success", "Completed", "RunFailure", "Failed", "Timeout",
-                              "success", "completed", "runFailure", "failed", "timeout"]
-                if finals.contains(status) {
-                    let ok = ["Success", "Completed", "success", "completed"].contains(status)
-                    let desc = ciString(d, ["HandleStatusDesc", "handleStatusDesc", "Desc"]) ?? ""
-                    let handleCode = ciString(d, ["HandleCode", "handleCode"]) ?? ""
-                    let finishTime = ciString(d, ["CmdFinishTime", "cmdFinishTime"]) ?? ""
-                    finish(run, ok: ok, text: ok ? "执行成功" : "执行失败", desc: desc.isEmpty ? status : desc,
-                           handleCode: handleCode, finishTime: finishTime)
-                    return
-                }
-                running?.progress = "第 \(i) 次查询 · 车辆处理中"
-                if i >= 12 {
-                    finish(run, ok: false, text: "结果待确认", desc: "60秒未收到车辆终态")
-                    return
-                }
-                try? await Task.sleep(for: .seconds(5))
-            }
-        }
-    }
-
-    private func finish(
-        _ run: RunState, ok: Bool, text: String,
-        desc: String, handleCode: String = "",
-        finishTime: String = ""
-    ) {
-        pollTask?.cancel()
-        let cls = ok ? "ok" : "bad"
-        var newRun = run
-        newRun.status = ok ? "ok" : "bad"
-        newRun.resultText = text
-        newRun.resultCls = cls
-        newRun.progress = desc
-        newRun.handleCode = handleCode
-        newRun.finishTime = finishTime.isEmpty ? VM.nowText() : finishTime
-        lastResult = newRun
-        running = nil
-        busy = false
-        history.insert(newRun, at: 0)
-        if history.count > 10 { history.removeLast() }
-        // #9 同步到 AppStore 全局历史记录
-        let duration = Double(newRun.finishTime.split(separator: ":").count > 1 ? 5 : 3)
-        store.addCommandHistory(cmd: "", name: "", success: ok, duration: duration)
-        Task { @MainActor in
-            if let ctrl = try? await APIClient.shared.getControl(carId: store.carId) {
-                store.saveCache(["control": ctrl])
-            }
-        }
-        // 弹结果详情
-        showResult = true
-        // #14 指令成功时 Toast 提示
-        if ok { EnhancedToastManager.shared.show("", icon: "checkmark.circle.fill") }
-    }
+    // `execute` / `startPolling` / `finish` 三个函数整体搬到了 `CommandCenter`
+    // （地图上的常驻操作条要发同一条指令，两边各写一遍迟早会给出不同结果）。
+    //
+    // 搬过去时顺手修了两处：
+    //   · `store.addCommandHistory(cmd: "", name: "")` 原先写的是空串 —— 指令历史里
+    //     每一条都没有名字，看不出这条到底做了什么。现在传真实指令名。
+    //   · 成功时的 toast 是 `show("")`（只有图标、没有字）。在地图上发指令不会跳页，
+    //     用户需要一个「刚才那条怎么了」的落点，所以改成带指令名的文案。
 
     // MARK: 执行结果详情 Sheet
     @ViewBuilder

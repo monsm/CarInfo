@@ -410,8 +410,9 @@ final class AppStore: @unchecked Sendable {
         return isCacheExpired(key)
     }
 
-    // 首页快控穿透（对应 globalData.pendingQuickCtrl）
-    var pendingQuickCtrl: String? = nil
+    // 这里原有 `pendingQuickCtrl`（首页把指令「穿透」给车控页，由车控页执行）。
+    // 已删：**全库没有任何地方写入过它** —— 读它的只有车控页的 onAppear，
+    // 而首页从来没设过。批 1 之后地图上的操作条直接执行指令，这条路已无必要。
 
     private init() {
         if let cfg = TokenStore.read(), !cfg.accessToken.isEmpty {
@@ -734,7 +735,6 @@ final class AppStore: @unchecked Sendable {
         energyHistory = []
         chargingPowerHistory = []
         commandHistory = []
-        pendingQuickCtrl = nil
         // 实时活动与小组件快照同样绑定账号：退出时一起清掉，
         // 否则锁屏 / 桌面上会继续显示上一个账号的车牌与电量。
         LiveActivityBridge.endAll()
