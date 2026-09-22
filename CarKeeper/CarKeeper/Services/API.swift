@@ -419,7 +419,12 @@ final class APIClient: @unchecked Sendable {
         // 在 getMessages（主线程入口）先取 cars 快照，再传给 parseMessages。
         let cars = await MainActor.run { AppStore.shared.cars }
         return try await withRefresh { [self] in
-            let res = try await request(url: messagesURL(), method: "POST", body: [:])
+            // ⚠️ 必须同时传 token 参数：messagesURL() 里内嵌的 URL 参数只是 URL 级的认证，
+            // request() 还需要 token 来设置 Authorization: Bearer 头。
+            // 缺了这行，服务端返回 200 但 data.content 为空（不报 token expired），
+            // 导致消息永远解析成空数组且 withRefresh 不会触发重试——这就是消息一直空的根因。
+            let res = try await request(url: messagesURL(), method: "POST", body: [:],
+                                        token: TokenStore.currentToken())
             return Self.parseMessages(res.text, cars: cars)
         }
     }
