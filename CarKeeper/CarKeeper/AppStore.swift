@@ -186,14 +186,16 @@ final class AppStore: @unchecked Sendable {
     var offlineMessage: String = ""
 
     /// 跨面交接：出行面点「在图上看看」→ 地图把镜头移到这里（地图消费后清空）。
-    /// 用结构体而不是元组：`@Published` 给 SwiftUI 的 `onChange` 需要 `Equatable`。
+    /// 用结构体而不是元组：`.onChange(of:)` 需要 `Equatable`。
+    /// 注意：本类是 `@Observable` —— 这里**不能**再加 `@Published`，
+    /// 两个宏都会合成 `_mapFocus`，重声明直接编译失败（CI 上踩过一次）。
     struct MapFocus: Equatable, Identifiable {
         let lat: Double
         let lng: Double
         let label: String
         var id: String { "\(lat),\(lng)" }
     }
-    @Published var mapFocus: MapFocus? = nil
+    var mapFocus: MapFocus? = nil
 
     // #驾驶安全评分 — 只由**行程里真有的事实**推出来（0-100）。没有事实就是 nil。
     // 返回类型是 Int? 是刻意的：早先这里在"没有任何行程"时返回 75，
