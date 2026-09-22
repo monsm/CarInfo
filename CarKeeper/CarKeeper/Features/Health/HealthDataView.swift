@@ -149,7 +149,7 @@ struct HealthDataView: View {
             Button { toggle(sys.name) } label: {
                 HStack(spacing: TokensSpacing.md) {
                     Image(safeSymbol: systemIcon(sys.name), fallback: "circle")
-                        .font(.system(size: TokensSize.icon))
+                        .font(TokensTypo.fixed(TokensSize.icon))
                         .foregroundStyle(tint)
                         .frame(width: TokensSize.iconColumn)
                     VStack(alignment: .leading, spacing: 3) {
@@ -171,7 +171,7 @@ struct HealthDataView: View {
                     Text("\(sys.healthPct)%")
                         .font(TokensTypo.data)
                         .foregroundStyle(tint)
-                    Image(systemName: "chevron.down")
+                    Image(safeSymbol: "chevron.down", fallback: "chevron.down")
                         .font(TokensTypo.caption.weight(.semibold))
                         .foregroundStyle(TokensPalette.tertiary)
                         .rotationEffect(.degrees(isOpen ? 180 : 0))
@@ -265,7 +265,7 @@ struct HealthDataView: View {
             } label: {
                 HStack(spacing: TokensSpacing.md) {
                     Image(safeSymbol: "number.square.fill", fallback: "number")
-                        .font(.system(size: TokensSize.icon))
+                        .font(TokensTypo.fixed(TokensSize.icon))
                         .foregroundStyle(TokensPalette.ambient)
                         .frame(width: TokensSize.iconColumn)
                     VStack(alignment: .leading, spacing: 2) {

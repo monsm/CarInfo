@@ -407,7 +407,7 @@ struct DetailSplitView: View {
 struct NetworkStatusIndicator: View {
     let status: AppStore.NetworkStatus
     var body: some View {
-        Text("网络: " + status.rawValue).font(.caption).foregroundColor(.secondary)
+        Text("网络: " + status.rawValue).font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
     }
 }
 
@@ -417,7 +417,7 @@ struct ToastView: View {
     let icon: String?
     var body: some View {
         HStack(spacing: 8) {
-            if let icon = icon { Image(systemName: icon) }
+            if let icon = icon { Image(safeSymbol: icon, fallback: icon) }
             Text(text)
         }
         .padding(.horizontal, 16).padding(.vertical, 8)

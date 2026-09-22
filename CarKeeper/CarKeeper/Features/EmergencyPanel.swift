@@ -62,7 +62,7 @@ struct EmergencyPanel: View {
                     .animation(.easeInOut(duration: 0.2), value: activeEmergency)
 
                 VStack(spacing: 4) {
-                    Image(systemName: "exclamationmark.octagon.fill")
+                    Image(safeSymbol: "exclamationmark.octagon.fill", fallback: "exclamationmark.octagon.fill")
                         .font(TokensTypo.fixed(28))
                         .foregroundStyle(TokensPalette.error)
                     Text("SOS")
@@ -109,13 +109,13 @@ struct EmergencyPanel: View {
         DSGroup(title: "紧急联系人", footer: "SOS 会拨打这个号码。") {
             DSGroupRow {
                 HStack(spacing: TokensSpacing.md) {
-                    Image(systemName: "person.fill")
+                    Image(safeSymbol: "person.fill", fallback: "person.fill")
                         .foregroundStyle(TokensPalette.ambient)
                     TextField("输入紧急电话", text: $emergencyContact)
                         .keyboardType(.phonePad)
                         .font(TokensTypo.data)
                     Button(action: saveContact) {
-                        Image(systemName: "checkmark.circle.fill")
+                        Image(safeSymbol: "checkmark.circle.fill", fallback: "checkmark.circle.fill")
                             .foregroundStyle(TokensPalette.success)
                     }
                     .accessibilityLabel(Text("保存联系人"))
@@ -151,8 +151,8 @@ struct EmergencyPanel: View {
                     .foregroundStyle(TokensPalette.labelOnTint)
 
                 Text("正在联系 \(emergencyContact)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(TokensTypo.subheadline)
+                    .foregroundStyle(TokensPalette.secondary)
 
                 Button(action: cancelEmergency) {
                     Text("取消")

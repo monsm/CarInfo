@@ -202,18 +202,18 @@ struct FamilyMemberRow: View {
             Circle()
                 .fill(TokensPalette.ambient.opacity(0.2))
                 .frame(width: 40, height: 40)
-                .overlay(Text(member.avatar).font(.title3).fontWeight(.bold)
+                .overlay(Text(member.avatar).font(TokensTypo.title3).fontWeight(.bold)
                 .foregroundColor(TokensPalette.ambient))
 
             VStack(alignment: .leading) {
                 Text(member.name)
-                    .font(.subheadline).fontWeight(.semibold)
+                    .font(TokensTypo.subheadline).fontWeight(.semibold)
                 Text(member.roles.joined(separator: " · "))
-                    .font(.caption2).foregroundColor(.secondary)
+                    .font(TokensTypo.caption2).foregroundStyle(TokensPalette.secondary)
             }
             Spacer()
             Text(member.sharedCars.count > 0 ? "\(member.sharedCars.count) 辆车" : "")
-                .font(.caption).foregroundColor(.secondary)
+                .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
         }
         .padding(.vertical, 8)
     }
@@ -232,7 +232,7 @@ struct TempKeyListView: View {
             Section("当前有效钥匙") {
                 if manager.keys.isEmpty {
                     Text("暂无共享钥匙")
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(TokensPalette.secondary)
                 } else {
                     ForEach(manager.keys) { key in
                         TempKeyCard(key: key) {
@@ -285,7 +285,7 @@ struct FamilyManagementView: View {
                 }
                 if manager.members.isEmpty {
                     Text("暂无成员")
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(TokensPalette.secondary)
                 }
             }
 

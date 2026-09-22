@@ -86,7 +86,7 @@ struct MaintenanceMoneyView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showAddService = true }) {
-                    Image(systemName: "plus.circle.fill")
+                    Image(safeSymbol: "plus.circle.fill", fallback: "plus.circle.fill")
                         .foregroundStyle(TokensPalette.ambient)
                 }
             }
@@ -170,7 +170,7 @@ struct MaintenanceMoneyView: View {
         default: icon = "circle"
         }
         return Image(safeSymbol: icon, fallback: "wrench.and.screwdriver.fill")
-            .font(.caption)
+            .font(TokensTypo.caption)
             .foregroundStyle(TokensPalette.ambient)
             .frame(width: 28, height: 28)
             .background(TokensPalette.ambient.opacity(0.1))
@@ -187,7 +187,7 @@ struct MaintenanceMoneyView: View {
                 ForEach(years, id: \.self) { y in
                     Button(action: { selectedYear = y }) {
                         Text("\(y)年")
-                            .font(.caption)
+                            .font(TokensTypo.caption)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .background(selectedYear == y ? TokensPalette.ambient.opacity(0.2) : Color.clear)
@@ -227,10 +227,10 @@ struct MaintenanceMoneyView: View {
             HStack {
                 typeIcon(entry.type)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(entry.type).font(TokensTypo.subheadline).foregroundStyle(.primary)
+                    Text(entry.type).font(TokensTypo.subheadline).foregroundStyle(TokensPalette.primary)
                     Text(entry.description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.secondary)
                         .lineLimit(1)
                 }
                 Spacer()
@@ -240,10 +240,10 @@ struct MaintenanceMoneyView: View {
             }
             HStack {
                 Text(entry.date, style: .date)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .font(TokensTypo.caption2)
+                    .foregroundStyle(TokensPalette.tertiary)
                 if let next = entry.nextMileage {
-                    Text("· 下次 \(next)km").font(.caption2).foregroundStyle(.tertiary)
+                    Text("· 下次 \(next)km").font(TokensTypo.caption2).foregroundStyle(TokensPalette.tertiary)
                 }
             }
         }

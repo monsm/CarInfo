@@ -286,7 +286,7 @@ struct CostEntryRow: View {
     var body: some View {
         HStack(spacing: TokensSpacing.sm) {
             Image(safeSymbol: entry.type.icon, fallback: "doc.text.fill")
-                .font(.headline)
+                .font(TokensTypo.headline)
                 .frame(width: 36, height: 36)
                 .background(TokensPalette.ambient.opacity(0.15))
                 .clipShape(Circle())

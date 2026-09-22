@@ -81,13 +81,13 @@ struct EmptyStateView: View {
                     .fill(TokensPalette.ambient))
 
             Text(title)
-                .font(.title3)
+                .font(TokensTypo.title3)
                 .fontWeight(.semibold)
 
             if !message.isEmpty {
                 Text(message)
-                    .font(.body)
-                    .foregroundColor(.secondary)
+                    .font(TokensTypo.body)
+                    .foregroundStyle(TokensPalette.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
@@ -95,8 +95,8 @@ struct EmptyStateView: View {
             if let actionTitle = actionTitle, let action = action {
                 Button(action: action) {
                     Text(actionTitle)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(TokensPalette.labelOnTint)
+                        .font(TokensTypo.subheadline.weight(.semibold))
+                        .foregroundStyle(TokensPalette.labelOnTint)
                         .padding(.horizontal, TokensSpacing.xl)
                         .padding(.vertical, TokensSpacing.sm)
                         .background(TokensPalette.ambient)

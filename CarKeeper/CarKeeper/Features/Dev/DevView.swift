@@ -102,8 +102,8 @@ struct DevView: View {
                             .multilineTextAlignment(.leading)
                     }
                     Spacer(minLength: TokensSpacing.sm)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: TokensSize.iconSm, weight: .semibold))
+                    Image(safeSymbol: "chevron.right", fallback: "chevron.right")
+                        .font(TokensTypo.fixed(TokensSize.iconSm, weight: .semibold))
                         .foregroundStyle(TokensPalette.tertiary)
                 }
                 .padding(TokensSpacing.md)

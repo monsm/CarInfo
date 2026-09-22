@@ -55,7 +55,7 @@ struct BatteryView: View {
                 Button {
                     showDestinationCalc = true
                 } label: {
-                    Image(systemName: "map.pin")
+                    Image(safeSymbol: "map.pin", fallback: "map.pin")
                 }
                 .accessibilityLabel(Text("目的地续航计算"))
             }
@@ -635,8 +635,9 @@ struct DestinationCalculatorView: View {
 
             if let reach = canReach {
                 HStack {
-                    Image(systemName: reach ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .font(.title2)
+                    Image(safeSymbol: reach ? "checkmark.circle.fill" : "xmark.circle.fill",
+                            fallback: reach ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .font(TokensTypo.title2)
                         .foregroundStyle(reach ? TokensPalette.success : TokensPalette.error)
                     Text(reach ? "电量足够到达" : "电量不足，建议充电")
                         .font(TokensTypo.body.weight(.semibold))

@@ -968,7 +968,7 @@ struct PINKeypadView: View {
 
     var body: some View {
         VStack(spacing: 22) {
-            Capsule().fill(.secondary.opacity(0.4)).frame(width: 40, height: 5)
+            Capsule().fill(TokensPalette.secondary.opacity(0.4)).frame(width: 40, height: 5)
             VStack(spacing: 4) {
                 Text("输入控车码").font(TokensTypo.title)
                 Text("6 位数字 · 输满后自动执行").font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
@@ -1043,7 +1043,7 @@ struct ACStepperView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            Capsule().fill(.secondary.opacity(0.4)).frame(width: 40, height: 5)
+            Capsule().fill(TokensPalette.secondary.opacity(0.4)).frame(width: 40, height: 5)
             VStack(spacing: 4) {
                 Text("空调温度").font(TokensTypo.title)
                 Text("设置范围 17 – 33 ℃").font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)

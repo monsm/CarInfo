@@ -54,7 +54,7 @@ struct AppClipEntranceView: View {
 
                 // 车牌输入框
                 HStack(spacing: 12) {
-                    Image(systemName: "creditcard.fill").font(.title3).foregroundStyle(WT.Palette.tint)
+                    Image(systemName: "creditcard.fill").font(WT.Typo.title3).foregroundStyle(WT.Palette.tint)
                     TextField("请输入车牌号", text: $plateInput)
                         .font(WT.Typo.data(18).weight(.medium))
                         .textInputAutocapitalization(.characters)
@@ -211,7 +211,7 @@ struct FeatureItem: View {
         HStack(spacing: 10) {
             // 注：AppClip target 不包含 Design/Theme.swift，用不了 SafeSymbol 兜底，
             // 所以这里只能用确实存在的 symbol 名（battery.100 / thermometer / lock.fill）
-            Image(systemName: icon).font(.title3).foregroundStyle(WT.Palette.onAccent.opacity(0.8))
+            Image(systemName: icon).font(WT.Typo.title3).foregroundStyle(WT.Palette.onAccent.opacity(0.8))
             Text(label)
                 .font(WT.Typo.subheadline)
                 .foregroundStyle(WT.Palette.onAccent.opacity(0.8))

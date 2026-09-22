@@ -158,7 +158,7 @@ struct MineView: View {
                         }
                     }
                     Spacer(minLength: TokensSpacing.sm)
-                    Image(systemName: "chevron.right")
+                    Image(safeSymbol: "chevron.right", fallback: "chevron.right")
                         .font(TokensTypo.fixed(13, weight: .semibold))
                         .foregroundStyle(TokensPalette.tertiary)
                 }
@@ -178,7 +178,7 @@ struct MineView: View {
 
                 if let lt = um?.lastLoginTime, !lt.isEmpty {
                     HStack(spacing: TokensSpacing.xs) {
-                        Image(systemName: "clock")
+                        Image(safeSymbol: "clock", fallback: "clock")
                             .font(TokensTypo.fixed(11))
                         Text("上次登录 \(lt)")
                     }
@@ -219,8 +219,8 @@ struct MineView: View {
             nav.pushNavigation(.vehicle)
         } label: {
             HStack(spacing: TokensSpacing.lg) {
-                Image(systemName: "car.fill")
-                    .font(.system(size: TokensSize.iconLg, weight: .regular))
+                Image(safeSymbol: "car.fill", fallback: "car.fill")
+                    .font(TokensTypo.fixed(TokensSize.iconLg))
                     .foregroundStyle(TokensPalette.ambient)
                     .frame(width: 48, height: 48)
                     .background(RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
