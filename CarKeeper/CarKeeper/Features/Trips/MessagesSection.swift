@@ -94,6 +94,14 @@ struct MessagesSection: View {
             }
         }
         .onAppear { loadIfNeeded() }
+        // bootstrap（冷启动预加载）是异步的：如果用户先进入出行页，
+        // carId 还是空 → loadIfNeeded 直接 return，之后 bootstrap 完成时
+        // 视图不会重新 onAppear，消息就永远空着。跟 BatteryView 一样监听 carId。
+        .onChange(of: store.carId) { _, newId in
+            guard !newId.isEmpty else { return }
+            // carId 变了（切车 / 首次绑定）→ 重新加载
+            loadIfNeeded()
+        }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
     }
 
@@ -401,7 +409,11 @@ struct MessagesSection: View {
         if let cached = store.caches["messages"] as? [[String: Any]], !cached.isEmpty {
             apply(cached)
         }
-        if store.needsRefresh("messages") || items.isEmpty {
+        // 缓存缺失（首次访问 / 刚切车）或 TTL 到期 → 强制拉取。
+        // 注意：我们**不缓存空数组**（见 load() 里的条件保存）——
+        // 空数组意味着「服务端这次没返回」而不是「确实没有消息」，
+        // 留着它会让下一次访问永远命中空缓存而不再重试。
+        if store.needsRefresh("messages") {
             loadTask = Task { await load() }
         } else {
             loading = false
@@ -415,7 +427,12 @@ struct MessagesSection: View {
         do {
             let list = try await APIClient.shared.getMessages()
             apply(list)
-            store.saveCache(["messages": list])
+            // 只缓存非空列表：空列表可能是网络抖动或权限问题，缓存它会
+            // 让后续所有访问都命中空缓存而永远不再重试。
+            // 非空列表才是「有真实消息」的确认信号。
+            if !list.isEmpty {
+                store.saveCache(["messages": list])
+            }
         } catch {
             // 失败时保留已渲染的缓存内容（与小程序一致），并明确告知，而不是悄悄清空
             NSLog("loadMessages: \(error.localizedDescription)")
