@@ -246,38 +246,33 @@ struct ControlView: View {
         DSSectionHeader(title: t)
     }
     var body: some View {
-        ScrollView {
+        DSPaperPage {
             // 这一屏的版面就是它的信息架构：**车现在什么样 → 现在该做什么 → 还能做什么
             // → 做过什么**。旧版是一条平铺的卡片堆，从上到下没有顺序可言 ——
             // 状态、动作、记录混在同一层里，读的人得自己找。
-            LazyVStack(alignment: .leading, spacing: TokensSpacing.xl) {
-                DSPageTitle(title: "车控",
-                            subtitle: "指令先验身份，发出后等车辆回执 —— 回执到了才算完成")
+            DSPageTitle(title: "车控",
+                        subtitle: "指令先验身份，发出后等车辆回执 —— 回执到了才算完成")
 
-                // ① 车现在是什么样：姿态图 + 一句话状态 + 逐字段明细（同一块，不拆开）
-                VStack(alignment: .leading, spacing: TokensSpacing.md) {
-                    controlHeader
-                    if let bd = bodyDetail { bodyDetailCard(bd) }
-                }
-
-                // ② 现在该做的一件事：一屏唯一的实心胶囊（状态有问题时它就是「锁车关窗」）
-                VStack(alignment: .leading, spacing: TokensSpacing.md) {
-                    DSSectionHeader(title: "现在该做的")
-                    primarySceneButton
-                    if let run = running { runningCard(run) }
-                }
-
-                // ③ 还能做什么 → ④ 一键场景 → ⑤ 做过什么（按用到它们的频率从高到低）
-                commandCard
-                presetScenesCard
-                historyCard
-                SiriShortcutsCard()
+            // ① 车现在是什么样：姿态图 + 一句话状态 + 逐字段明细（同一块，不拆开）
+            VStack(alignment: .leading, spacing: TokensSpacing.md) {
+                controlHeader
+                if let bd = bodyDetail { bodyDetailCard(bd) }
             }
-            .padding(.top, TokensSpacing.sm)
-            .padding(.bottom, TokensSpacing.huge)
+
+            // ② 现在该做的一件事：一屏唯一的实心胶囊（状态有问题时它就是「锁车关窗」）
+            VStack(alignment: .leading, spacing: TokensSpacing.md) {
+                DSSectionHeader(title: "现在该做的")
+                primarySceneButton
+                if let run = running { runningCard(run) }
+            }
+
+            // ③ 还能做什么 → ④ 一键场景 → ⑤ 做过什么（按用到它们的频率从高到低）
+            commandCard
+            presetScenesCard
+            historyCard
+            SiriShortcutsCard()
         }
         .pageBackground()
-        .scrollBounceBehavior(.basedOnSize)
         .refreshable {
             tempDisplayCount = 0
             // 数字归零

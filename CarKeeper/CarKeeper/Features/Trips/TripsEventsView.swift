@@ -34,37 +34,30 @@ struct TripsEventsView: View {
         // 出行只有一张画布：行程在上、常停之地在中间、车的事件在下。
         // （原本「空态」与「有数据」是两条互斥的整页分支，各自带一套
         //  `ScrollView` + 页面标题 —— 同一页两套外壳，正是缝合的来源。）
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                DSPageTitle(title: "出行", subtitle: "每一次出行、常停的地方，以及车发来的事件")
-                    .padding(.bottom, TokensSpacing.lg)
+        DSPaperPage {
+            DSPageTitle(title: "出行", subtitle: "每一次出行、常停的地方，以及车发来的事件")
 
-                if trips.isEmpty {
-                    emptyState
-                } else {
-                    summaryHeader(trips)
-                    ForEach(Array(trips.enumerated()), id: \.element.id) { idx, trip in
-                        timelineRow(trip, isLast: idx == trips.count - 1)
-                    }
-                    if !hotspots.isEmpty {
-                        hotspotsBand(hotspots)
-                    }
+            if trips.isEmpty {
+                emptyState
+            } else {
+                summaryHeader(trips)
+                ForEach(Array(trips.enumerated()), id: \.element.id) { idx, trip in
+                    timelineRow(trip, isLast: idx == trips.count - 1)
                 }
-
-                // 分数：完全由上面那些行程的电耗算出来（原「驾驶评分」页）
-                ScoreSection()
-                    .padding(.top, TokensSpacing.xl)
-
-                // 车的事件：点火/熄火/控制记录（原「消息」页）
-                MessagesSection()
-                    .padding(.top, TokensSpacing.xl)
+                if !hotspots.isEmpty {
+                    hotspotsBand(hotspots)
+                }
             }
-            .padding(.horizontal, TokensSpacing.lg)
-            .padding(.top, TokensSpacing.md)
-            .padding(.bottom, TokensSpacing.huge)
+
+            // 分数：完全由上面那些行程的电耗算出来（原「驾驶评分」页）
+            ScoreSection()
+                .padding(.top, TokensSpacing.xl)
+
+            // 车的事件：点火/熄火/控制记录（原「消息」页）
+            MessagesSection()
+                .padding(.top, TokensSpacing.xl)
         }
         .pageBackground()
-        .scrollBounceBehavior(.basedOnSize)
         .dsPageTitle("出行")
         .accessibilityLabel(Text("出行"))
     }

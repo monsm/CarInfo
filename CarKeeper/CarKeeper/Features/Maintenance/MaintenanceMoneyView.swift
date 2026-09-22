@@ -56,32 +56,29 @@ struct MaintenanceMoneyView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "保养与钱", subtitle: "保养、年检保险、充电账单、估值与导出")
+        DSPaperPage {
+            DSPageTitle(title: "保养与钱", subtitle: "保养、年检保险、充电账单、估值与导出")
 
-                // ① 即将到期（保养按里程、年检/保险按日期 —— 两套口径各自一组）
-                if !upcomingServices.isEmpty {
-                    upcomingCard
-                }
-                InspectionSection()
-
-                // ② 保养：统计 → 年份 → 时间线
-                DSSectionHeader(title: "保养记录")
-                statsCard
-                yearFilter
-                timelineCard
-
-                // ③ 钱：账与估值（充电账单 / 车辆估值）
-                ChargeBillSection()
-                VehicleValuationSection()
-
-                // ④ 带走你自己的记录
-                ExportDataSection()
+            // ① 即将到期（保养按里程、年检/保险按日期 —— 两套口径各自一组）
+            if !upcomingServices.isEmpty {
+                upcomingCard
             }
-            .padding(.horizontal, TokensSpacing.page)
-            .padding(.vertical, TokensSpacing.lg)
+            InspectionSection()
+
+            // ② 保养：统计 → 年份 → 时间线
+            DSSectionHeader(title: "保养记录")
+            statsCard
+            yearFilter
+            timelineCard
+
+            // ③ 钱：账与估值（充电账单 / 车辆估值）
+            ChargeBillSection()
+            VehicleValuationSection()
+
+            // ④ 带走你自己的记录
+            ExportDataSection()
         }
+        .pageBackground()
         .dsPageTitle("保养与钱", inline: true)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {

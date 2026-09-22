@@ -35,14 +35,11 @@ struct BatteryView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "充电")
-                sections
-            }
+        DSPaperPage {
+            DSPageTitle(title: "充电")
+            sections
         }
         .pageBackground()
-        .scrollBounceBehavior(.basedOnSize)
         .dsPageTitle("充电")
             .accessibilityLabel(Text("充电"))
             .accessibilityHint(Text("电池状态、充电历史与诊断报告"))

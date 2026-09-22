@@ -1004,21 +1004,55 @@ extension View {
                    glass: Bool = false) -> some View {
         modifier(DSSurfaceModifier(padding: padding, radius: radius, glass: glass))
     }
+
+    /// 全页「纸」外壳：深潜页的统一容器，与地图主屏的 bottomPanel 视觉同源。
+    ///
+    /// 用法：把整页内容（ScrollView / VStack）包进 `DSPaperPage`，
+    /// 顶部圆角 + 纸面填充 + hairline 顶边，和地图底部那张纸长得一样。
+    /// 这是「地图是家、深潜页是从纸上抽出来展开的那张纸」的语言落地。
+    func dsPaperPage() -> some View {
+        modifier(DSPaperPageModifier())
+    }
 }
 
-struct DSSurfaceModifier: ViewModifier {
-    var padding: CGFloat
-    var radius: CGFloat
-    var glass: Bool
-
+struct DSPaperPageModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .padding(padding)
+            .padding(.horizontal, TokensSpacing.md)
+            .padding(.top, TokensSpacing.md)
+            .padding(.bottom, TokensSpacing.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(glass ? AnyShapeStyle(.ultraThinMaterial)
-                                : AnyShapeStyle(TokensPalette.surface))
+                UnevenRoundedRectangle(
+                    topLeadingRadius: TokensRadius.large,
+                    topTrailingRadius: TokensRadius.large,
+                    style: .continuous
+                )
+                .fill(TokensPalette.surface)
+                .ignoresSafeArea(edges: .top)
             }
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(TokensPalette.hairline)
+                    .frame(height: TokensHair.line)
+            }
+    }
+}
+
+/// 全页「纸」外壳的显式容器版本（比 modifier 更直观，也方便加标题）。
+struct DSPaperPage<Content: View>: View {
+    var content: () -> Content
+
+    init(@ViewBuilder content: @escaping () -> Content) {
+        self.content = content
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) { content() }
+                .dsPaperPage()
+        }
+        .scrollBounceBehavior(.basedOnSize)
     }
 }
 

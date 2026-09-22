@@ -25,35 +25,29 @@ struct HealthDataView: View {
     @State private var loadTask: Task<Void, Never>? = nil
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "体检与数据", subtitle: "车端自检的结论，以及它依据的原始字段")
-                if loading {
-                    loadingState
-                } else if let model {
-                    scoreSection(model)
-                    systemsSection(model)
-                    infoSection(model)
-                } else if let err = errText {
-                    DSPlaceholder(icon: "exclamationmark.triangle",
-                                  title: "读取失败",
-                                  message: err,
-                                  actionTitle: "重新加载",
-                                  cls: "warn") { Task { await load() } }
-                } else {
-                    DSPlaceholder(icon: "checkmark.shield",
-                                  title: "暂无检测报告",
-                                  message: "车辆完成一次全车检测后，这里会显示评分与逐系统明细",
-                                  actionTitle: "重新加载") { Task { await load() } }
-                }
-
-                // 依据：同一次 carcheck 的原文（原「全量数据」页）。
-                // 它在 if/else **之外** —— 体检报告读不到时，原始字段往往正是排错要看的东西。
-                RawDataSection(kind: .check)
+        DSPaperPage {
+            DSPageTitle(title: "体检与数据", subtitle: "车端自检的结论，以及它依据的原始字段")
+            if loading {
+                loadingState
+            } else if let model {
+                scoreSection(model)
+                systemsSection(model)
+                infoSection(model)
+            } else if let err = errText {
+                DSPlaceholder(icon: "exclamationmark.triangle",
+                              title: "读取失败",
+                              message: err,
+                              actionTitle: "重新加载",
+                              cls: "warn") { Task { await load() } }
+            } else {
+                DSPlaceholder(icon: "checkmark.shield",
+                              title: "暂无检测报告",
+                              message: "车辆完成一次全车检测后，这里会显示评分与逐系统明细",
+                              actionTitle: "重新加载") { Task { await load() } }
             }
-            .padding(.top, TokensSpacing.sm)
-            .padding(.bottom, TokensSpacing.xxl)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // 依据：同一次 carcheck 的原文（原「全量数据」页）。
+            // 它在 if/else **之外** —— 体检报告读不到时，原始字段往往正是排错要看的东西。
+            RawDataSection(kind: .check)
         }
         .pageBackground()
         .scrollBounceBehavior(.basedOnSize)

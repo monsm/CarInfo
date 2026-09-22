@@ -42,18 +42,14 @@ struct MineView: View {
 
     // MARK: 生命周期
     var body: some View {
-        ScrollView {
-            VStack(spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "车与账号", subtitle: "账号、车辆切换、数据与隐私、关于")
-                profileCard
-                if let car = store.car { carCard(car) }
-                settingsGroups
-                updateCard
-            }
-
+        DSPaperPage {
+            DSPageTitle(title: "车与账号", subtitle: "账号、车辆切换、数据与隐私、关于")
+            profileCard
+            if let car = store.car { carCard(car) }
+            settingsGroups
+            updateCard
         }
         .pageBackground()
-        .scrollBounceBehavior(.basedOnSize)
         .dsPageTitle("车与账号")
             .accessibilityLabel(Text("车与账号"))
             .accessibilityHint(Text("账号设置、车辆切换、数据与隐私、关于"))
