@@ -222,12 +222,12 @@ struct GlobalSearchHUD: View {
         ("电池充电", "SOC、充电曲线、充电账单", "battery.100", .battery),
         ("出行", "行程、常停的地方与车的事件", "chart.bar.fill", .trips),
         ("保养与钱", "保养、年检保险、充电账单、估值与导出", "wrench.and.screwdriver.fill", .service),
-        ("停车位置", "最近一次停放的位置", "mappin.circle.fill", .parking),
         ("车与账号", "车辆、账号、隐私与关于", "person.fill", .mine),
         ("紧急求助", "拖车、保险、救援电话", "exclamationmark.octagon.fill", .emergency),
         ("远程控车", "锁车、空调、寻车", "dot.radiowaves.left.and.right", .control),
-        ("驾驶总览", "一屏看完今天", "gauge.with.dots.needle.50percent", .dashboard),
         ("开发者工具", "设计令牌、运行状态、诊断", "wrench.adjustable", .dev)
+        // 别名（`.dashboard` / `.score` / `.parking`）**不进这一列**：
+        // 它们指向的页面在上面已经各有一条；同一页摆两个入口，就是缝合的来源。
     ]
 }
 
