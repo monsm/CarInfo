@@ -652,7 +652,21 @@ final class AppStore: @unchecked Sendable {
                 }
             }
         } catch {
-            NSLog("bootstrap: \(error.localizedDescription)")
+            // token 过期 / 刷新失败：静默吞掉会让用户看到空白地图且永远没有消息。
+            // 识别这类错误，主动清掉登录态，让用户回到登录页重新走一遍完整流程。
+            // 其他错误（弱网、断网）保留现有登录态，下次启动再重试。
+            let apiErr = error as? APIError
+            if apiErr?.expired == true || error.localizedDescription.contains("token expired") {
+                NSLog("bootstrap: token expired — forcing logout")
+                logout()
+                // logout() 已经清空 isLoggedIn，UI 会自动切到登录页；
+                // 这里再发一条 Toast 明确告知原因，避免用户以为 App 坏了。
+                Task { @MainActor in
+                    ToastManager.shared.show("登录已过期，请重新登录", icon: "exclamationmark.triangle.fill")
+                }
+            } else {
+                NSLog("bootstrap: \(error.localizedDescription)")
+            }
         }
     }
 

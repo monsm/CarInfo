@@ -178,9 +178,21 @@ struct CarKeeperApp: App {
         // 全 App 每一屏共用同一束由车所在地算出的光。逐屏去加，一定会有屏幕漏掉。
         .background { AppCanvas() }
         .onAppear {
-            // 启动时若已登录，拉取一次数据
+            // 启动时若已登录但数据未加载，异步拉取一次数据。
+            // ⚠️ 不阻塞 UI：用户可以先看到地图壳，数据在后头悄悄补上。
             if store.isLoggedIn && store.cars.isEmpty {
                 Task { await store.bootstrap() }
+                // bootstrap 是异步的：如果它因 token 过期失败了（已处理 logout），
+                // 或者因为网络慢还没完成，用户可能先进入了出行页看到空白消息。
+                // 这里再加一层兜底：bootstrap 完成后如果 cars 仍然为空，提示用户。
+                Task {
+                    await store.bootstrap()
+                    if store.isLoggedIn && store.cars.isEmpty {
+                        Task { @MainActor in
+                            ToastManager.shared.show("数据加载失败，请检查网络后重试", icon: "wifi.exclamationmark")
+                        }
+                    }
+                }
             }
             // 天气实况（光需要云量）：有车的位置就取一次。
             // 取不到就退回「晴空模型」，界面上照实写明 —— 不拿默认值冒充实况。
