@@ -111,6 +111,34 @@ extension View {
 }
 
 // =============================================================================
+// SheetCanvas —— 浮层背后的同一束光
+// =============================================================================
+// 浮层（sheet / fullScreenCover）会盖住整屏：根部的 AppCanvas 在它**后面**，
+// 于是弹层一开，光就被挡在外面 —— 光只铺到一半，比没有光更糟。
+//
+// 这一支用 `presentationBackground` 把同一束光补到浮层背后：
+//   • 不用 `.background`：那是给内容铺底，浮层自己的面还压在上面；
+//     `presentationBackground` 才是「这个呈现层的背景」这件事本身。
+//   • 原生主题**什么都不做**（原生 = 现状）：浮层继续用系统自带的面，逐像素不变。
+//   • 光不吃点击（AppCanvas 里已经 allowsHitTesting(false)），它只是光。
+extension View {
+    func dsSheetCanvas() -> some View {
+        modifier(SheetCanvasModifier())
+    }
+}
+
+struct SheetCanvasModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if TokensPalette.decor == .none {
+            content
+        } else {
+            content.presentationBackground { AppCanvas() }
+        }
+    }
+}
+
+// =============================================================================
 // AppCanvas —— 全 App 的画布：整棵界面背后的一层光
 // =============================================================================
 // 光池的位置与强度来自 `SkyLight`（车所在经纬度 + 此刻算出的**真实太阳位置**），
@@ -893,7 +921,7 @@ struct MonthlyReportGenerator: View {
         .buttonStyle(.plain)
         .sheet(isPresented: $showReport) {
             if let data = reportData {
-                MonthlyReportView(data: data)
+                MonthlyReportView(data: data).dsSheetCanvas()
             }
         }
     }

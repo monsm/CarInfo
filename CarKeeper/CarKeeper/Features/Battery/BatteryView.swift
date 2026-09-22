@@ -61,6 +61,7 @@ struct BatteryView: View {
         }
         .sheet(isPresented: $showDestinationCalc) {
             DestinationCalculatorView(distance: $destinationDistance, canReach: $canReach)
+                .dsSheetCanvas()
         }
         .onChange(of: store.carId) { _, newId in
             guard !newId.isEmpty else { return }

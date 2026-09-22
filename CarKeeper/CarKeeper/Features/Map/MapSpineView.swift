@@ -81,11 +81,11 @@ struct MapSpineView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarItems(d) }
-        .sheet(isPresented: $showIndex) { indexSheet(d) }
+        .sheet(isPresented: $showIndex) { indexSheet(d).dsSheetCanvas() }
         .sheet(isPresented: $showReplay) {
-            if let s = replaySession { ChargeReplaySheet(session: s) }
+            if let s = replaySession { ChargeReplaySheet(session: s).dsSheetCanvas() }
         }
-        .sheet(isPresented: $showSky) { skySheet(d) }
+        .sheet(isPresented: $showSky) { skySheet(d).dsSheetCanvas() }
         .task {
             await refresh()
             centerOnCar(force: true)

@@ -83,6 +83,7 @@ struct ServiceHistoryView: View {
         }
         .sheet(isPresented: $showAddService) {
             AddServiceView(onSave: addEntry)
+                .dsSheetCanvas()
         }
         .accessibilityLabel(Text("维保历史记录"))
     }

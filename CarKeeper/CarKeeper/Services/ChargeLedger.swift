@@ -248,7 +248,7 @@ struct ChargeReplaySheet: View {
                 .padding(TokensSpacing.lg)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .background(TokensPalette.canvas)
+            // v5：不自己铺底 —— 浮层的光由调用点的 .dsSheetCanvas() 补在背后。
             .navigationTitle("充电回放")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -288,6 +288,7 @@ struct ControlView: View {
                         execute(pin)
                     }
                 }
+                .dsSheetCanvas()
         }
         .sheet(isPresented: $showTemp) {
             ACStepperView(initialTemp: $pendingTemp)
@@ -298,6 +299,7 @@ struct ControlView: View {
                         showPin = true
                     }
                 }
+                .dsSheetCanvas()
         }
         // MARK: 车身明细（车门/窗/灯状态）
 
@@ -327,7 +329,7 @@ struct ControlView: View {
             pollTask?.cancel()
             showResult = false
         }
-        .sheet(isPresented: $showResult) { resultSheet }
+        .sheet(isPresented: $showResult) { resultSheet.dsSheetCanvas() }
         // #N13 生物识别验证覆盖层
         .overlay {
             if showBiometricLock {

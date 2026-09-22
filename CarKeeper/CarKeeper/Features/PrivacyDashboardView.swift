@@ -109,7 +109,7 @@ struct PrivacyDashboardView: View {
                 }
                 .padding()
             }
-            .background(TokensPalette.background)
+            // v5：不自己铺底 —— 画布与光在 App 根部只画一次（原生主题下逐像素相同）。
             .navigationTitle("隐私与数据")
             .navigationBarTitleDisplayMode(.inline)
             .alert("确认清除", isPresented: $showClearConfirm) {

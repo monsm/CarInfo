@@ -156,6 +156,7 @@ struct MileageJournalView: View {
             .sheet(isPresented: $showAddSheet) {
                 AddCostEntrySheet(selectedType: $selectedType, amountText: $amountText, noteText: $noteText)
                     .onAppear { amountText = "" ; noteText = "" }
+                    .dsSheetCanvas()
             }
             .navigationTitle("里程记账")
             .toolbar {

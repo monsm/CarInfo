@@ -75,6 +75,7 @@ struct VehicleView: View {
                 saveMaintenancePhotos()
                 TokensHaptic.result(true)
             }
+            .dsSheetCanvas()
         }
     }
 
@@ -405,7 +406,8 @@ struct PhotoPickerSheet: View {
                 }
                 .padding(.top, TokensSpacing.sm)
             }
-            .background(TokensPalette.background)
+            // v5：不自己铺底 —— 画布与光在 App 根部只画一次，这里再铺一层
+            //       就是一块盖住光的墙（原生主题下与原来逐像素相同：根画布就是同一个颜色）。
             .navigationTitle("添加照片")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

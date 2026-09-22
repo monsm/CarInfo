@@ -22,7 +22,19 @@ import SwiftUI
 struct SkyOverlay: View {
     let light: SkyLight
 
-    private var decor: CanvasDecor { TokensPalette.decor }
+    /// 画一套**不属于当前主题**的光（主题画廊要用它按每套主题的真取值渲染）。
+    /// 为 nil 时读当前主题 —— App 里走的都是这条。
+    ///
+    /// 为什么值得开这一个口子：画廊原先手搓了一份「小号版」装饰，两份实现已经开始
+    /// 分叉（网格透明度一边是写死的 0.07、一边读 `CanvasDecor.strength`）。
+    /// 样张与真机不一致，这张表就不再是「用眼睛挑」的依据 —— 所以只留一份实现。
+    var spec: ArtThemeSpec? = nil
+
+    private var decor: CanvasDecor { spec?.decor ?? TokensPalette.decor }
+    private var lightSource: Color { spec?.lightSource ?? TokensPalette.lightSource }
+    private var accentColor: Color { spec?.accent ?? TokensPalette.accent }
+    private var labelColor: Color { spec?.label ?? TokensPalette.primary }
+    private var canvasColor: Color { spec?.canvas ?? TokensPalette.canvas }
 
     @ViewBuilder
     var body: some View {
@@ -81,8 +93,8 @@ struct SkyOverlay: View {
         Circle()
             .fill(
                 RadialGradient(
-                    colors: [TokensPalette.lightSource.opacity(strength),
-                             TokensPalette.lightSource.opacity(0)],
+                    colors: [lightSource.opacity(strength),
+                             lightSource.opacity(0)],
                     center: .center,
                     startRadius: 0,
                     endRadius: radius
@@ -115,7 +127,7 @@ struct SkyOverlay: View {
 
                 // 顶部压暗：让顶栏的药丸在图上读得清（样品版也这么做）
                 LinearGradient(
-                    colors: [TokensPalette.canvas.opacity(0.46), TokensPalette.canvas.opacity(0)],
+                    colors: [canvasColor.opacity(0.46), canvasColor.opacity(0)],
                     startPoint: .top,
                     endPoint: .center
                 )
@@ -127,9 +139,9 @@ struct SkyOverlay: View {
     /// 雾的颜色：夜光是暖的（跟着光走），纸上是墨（像纸被压深了一点）。
     private var hazeColor: Color {
         switch decor {
-        case .lightPool: return TokensPalette.accent
-        case .paperGrain: return TokensPalette.primary
-        default: return TokensPalette.canvas
+        case .lightPool: return accentColor
+        case .paperGrain: return labelColor
+        default: return canvasColor
         }
     }
 
@@ -165,7 +177,7 @@ struct SkyOverlay: View {
     // MARK: 颗粒
     // -------------------------------------------------------------------------
     private var grain: some View {
-        GrainLayer(strength: light.grain * grainScale)
+        GrainLayer(strength: light.grain * grainScale, tint: labelColor)
             .allowsHitTesting(false)
     }
 
@@ -197,7 +209,9 @@ struct SkyOverlay: View {
                     y += step
                 }
             }
-            .stroke(TokensPalette.primary.opacity(0.07), lineWidth: 0.5)
+            // 透明度读 `CanvasDecor.strength` —— 从前这里写死 0.07，
+            // 而画廊那份写的是 0.08，同一个装饰两个值。现在只有一处取值。
+            .stroke(labelColor.opacity(decor.strength), lineWidth: 0.5)
         }
         .allowsHitTesting(false)
     }
@@ -257,6 +271,8 @@ struct SkyFactTable: View {
 // 为什么粒度按面积算：屏幕越大颗粒越多，密度才一致。
 struct GrainLayer: View {
     var strength: Double
+    /// 颗粒的颜色。默认读当前主题；主题画廊会传它自己那套的 label。
+    var tint: Color = TokensPalette.primary
 
     var body: some View {
         Canvas { ctx, size in
@@ -279,7 +295,7 @@ struct GrainLayer: View {
                 dot.addLine(to: CGPoint(x: x + side, y: y + side))
                 dot.addLine(to: CGPoint(x: x, y: y + side))
                 dot.closeSubpath()
-                ctx.fill(dot, with: .color(TokensPalette.primary.opacity(0.15 + next() * 0.5)))
+                ctx.fill(dot, with: .color(tint.opacity(0.15 + next() * 0.5)))
             }
         }
         .opacity(strength)

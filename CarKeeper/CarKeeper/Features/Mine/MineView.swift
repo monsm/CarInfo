@@ -89,6 +89,7 @@ struct MineView: View {
             NavigationStack {
                 MileageJournalView()
                     .navigationTitle("里程记账")
+                    .dsSheetCanvas()
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
@@ -96,6 +97,7 @@ struct MineView: View {
             NavigationStack {
                 OTAChangelogView()
                     .navigationTitle("OTA 版本日志")
+                    .dsSheetCanvas()
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
@@ -103,6 +105,7 @@ struct MineView: View {
             NavigationStack {
                 PrivacyDashboardView()
                     .navigationTitle("隐私与数据")
+                    .dsSheetCanvas()
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
@@ -110,6 +113,7 @@ struct MineView: View {
             NavigationStack {
                 TempKeyListView()
                     .navigationTitle("共享钥匙")
+                    .dsSheetCanvas()
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
@@ -117,6 +121,7 @@ struct MineView: View {
             NavigationStack {
                 FamilyManagementView()
                     .navigationTitle("家庭管理")
+                    .dsSheetCanvas()
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
@@ -124,6 +129,7 @@ struct MineView: View {
             NavigationStack {
                 InspectionCalendarView()
                     .navigationTitle("年检日历")
+                    .dsSheetCanvas()
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
@@ -131,6 +137,7 @@ struct MineView: View {
             NavigationStack {
                 VehicleValuationView()
                     .navigationTitle("车辆估值")
+                    .dsSheetCanvas()
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
@@ -138,6 +145,7 @@ struct MineView: View {
             NavigationStack {
                 ChargeBillSheet()
                     .navigationTitle("充电账单")
+                    .dsSheetCanvas()
                     .navigationBarTitleDisplayMode(.inline)
             }
         }

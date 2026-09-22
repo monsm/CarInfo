@@ -292,45 +292,19 @@ private struct ThemeTile: View {
         }
     }
 
-    /// 该主题的画布装饰（与 App 里 CanvasDecorLayer 同一套规则的小号版）
+    /// 该主题的画布装饰 —— **就是 App 用的那一份实现**（`SkyOverlay`），
+    /// 只是把 spec 传成这套主题自己的取值。
+    ///
+    /// 这里曾经手搓过一份「小号版」：两个实现已经开始分叉（发丝网格一边写死 0.07、
+    /// 一边读 `CanvasDecor.strength`），而且那份里还有一个写死的纸色
+    /// `Color(red: 0.78, …)` —— 样张与真机不一致，这张「用眼睛挑」的表就失效了。
+    /// 现在样张不可能和真机不一致：它们是同一个 View。
+    ///
+    /// 没有车的位置就没有光 —— 不编一个方向（与 AppCanvas 同一条规则）。
     @ViewBuilder
     private var decorOverlay: some View {
-        switch s.decor {
-        case .none:
-            EmptyView()
-        case .lightPool:
-            RadialGradient(
-                colors: [s.accent.opacity(0.18), s.accent.opacity(0)],
-                center: UnitPoint(x: 0.80, y: 0.10),
-                startRadius: 0,
-                endRadius: 240
-            )
-        case .paperGrain:
-            RadialGradient(
-                colors: [Color(red: 0.78, green: 0.68, blue: 0.50).opacity(0.12), .clear],
-                center: UnitPoint(x: 0.20, y: 0.10),
-                startRadius: 0,
-                endRadius: 200
-            )
-        case .hairlineGrid:
-            GeometryReader { geo in
-                Path { p in
-                    let step: CGFloat = 22
-                    var x: CGFloat = 0
-                    while x <= geo.size.width {
-                        p.move(to: CGPoint(x: x, y: 0))
-                        p.addLine(to: CGPoint(x: x, y: geo.size.height))
-                        x += step
-                    }
-                    var y: CGFloat = 0
-                    while y <= geo.size.height {
-                        p.move(to: CGPoint(x: 0, y: y))
-                        p.addLine(to: CGPoint(x: geo.size.width, y: y))
-                        y += step
-                    }
-                }
-                .stroke(s.label.opacity(CanvasDecor.hairlineGrid.strength), lineWidth: 0.5)
-            }
+        if s.decor != .none, let c = AppStore.shared.currentLocation?.coordinate {
+            SkyOverlay(light: SkyLight.now(at: Date(), coordinate: c), spec: s)
         }
     }
 
