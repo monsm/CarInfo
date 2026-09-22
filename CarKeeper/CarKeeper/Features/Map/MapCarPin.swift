@@ -4,15 +4,18 @@
 //
 // 这一屏只有一件实体：车。所以车钉不是图标，是**做出来的一件东西**：
 //   • 外面的**弧就是电量**（不是装饰性圆环）—— 弧的长度 = SOC，起点在正上方
+//   • 弧外面那一圈**刻度**是仪表盘的语言（转轴上的尺），不是花纹
 //   • 里面那个小字是同一个数字（换数值时字宽不跳，monospacedDigit）
 //   • 顶部那个缺口是**车头朝向**（来自 location 接口的 Heading，不是猜的）
+//   • 脚下那圈**接地阴影**是"它站在这块地上"的唯一提示（平面化的钉像是贴上去的）
+//   • 车灯是**算出来的**：亮度 = SkyLight.lamp（1 − 晴空辐照度/220，日照下几乎不亮）
 //
 // 三种艺术方向在这里的差别不是配色，是**画法**：
-//   ring  夜光 —— 弧形 + 外发光 + 接地阴影（光只出现在车上）
-//   ink   纸上 —— 墨线圈 + 实心墨点 + 无发光（纸不会发光）
+//   ring  夜光 —— 刻度盘 + 弧形 + 外发光 + 接地阴影（光只出现在车上）
+//   ink   纸上 —— 墨线圈 + 虚线刻度 + 无发光（纸不会发光）
 //   rule  巨字 —— 两层发丝细环 + 十字准线，没有实心填充（版面即内容）
 //
-// 尺寸约定：钉本体 64pt，命中区由 MapSpineView 给（HIG 要 44pt）。
+// 尺寸约定：钉本体 76pt（外圈光晕可溢出），命中区由 MapSpineView 给（HIG 要 44pt）。
 // =============================================================================
 import SwiftUI
 
@@ -25,6 +28,8 @@ struct MapCarPin: View {
     var allowsGlow: Bool
     /// 选中态（点了钉 → 车控环展开）
     var isActive: Bool
+    /// 车灯亮度 0…1，来自 SkyLight（真实太阳位置算出来的），默认不亮
+    var lamp: Double = 0
 
     private var progress: Double { max(0, min(1, Double(socPct) / 100)) }
 
@@ -37,6 +42,8 @@ struct MapCarPin: View {
 
     var body: some View {
         ZStack {
+            lampBloom
+
             if allowsGlow {
                 Circle()
                     .fill(ringColor.opacity(0.22))
@@ -58,30 +65,59 @@ struct MapCarPin: View {
         .accessibilityValue(Text("电量 \(socPct)%，车头朝 \(Int(heading.rounded())) 度"))
     }
 
-    // MARK: 夜光 —— 弧形 + 发光 + 接地阴影
+    // MARK: 车灯 —— 唯一一处"由光算出来"的发光
+    /// 它亮不亮不取决于是不是夜里，而取决于**太阳给不给光**。
+    /// 所以正午的钉是干净的，黄昏的钉脚下开始有暖光。
+    @ViewBuilder
+    private var lampBloom: some View {
+        if allowsGlow, lamp > 0.05 {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [TokensPalette.lightSource.opacity(0.34 * lamp),
+                                 TokensPalette.lightSource.opacity(0)],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 78
+                    )
+                )
+                .frame(width: 156, height: 156)
+        }
+    }
+
+    // MARK: 夜光 —— 刻度盘 + 弧形 + 发光 + 接地阴影
     private var ringStyle: some View {
         ZStack {
+            groundShadow(opacity: 0.34)
+
+            // 刻度盘：仪表盘的语言。一圈短尺，不是花纹 ——
+            // 它让"弧"读起来像指针在表盘上走，而不是一条装饰圆弧。
+            Circle()
+                .stroke(TokensPalette.track,
+                        style: StrokeStyle(lineWidth: 9, dash: [0.9, 14.3]))
+                .frame(width: 58, height: 58)
+
             Circle()
                 .fill(TokensPalette.surface)
-                .frame(width: 52, height: 52)
+                .frame(width: 48, height: 48)
                 .shadow(color: .black.opacity(0.45), radius: 14, y: 6)
 
             Circle()
                 .strokeBorder(TokensPalette.hairline, lineWidth: 0.5)
-                .frame(width: 52, height: 52)
+                .frame(width: 48, height: 48)
 
             // 未充电部分的轨道
             Circle()
-                .stroke(TokensPalette.track, style: StrokeStyle(lineWidth: 4.5, lineCap: .round))
-                .frame(width: 60, height: 60)
+                .stroke(TokensPalette.track, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                .frame(width: 58, height: 58)
 
             // 电量弧（从正上方开始，顺时针）
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(ringColor,
-                        style: StrokeStyle(lineWidth: 4.5, lineCap: .round))
+                        style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .frame(width: 60, height: 60)
+                .frame(width: 58, height: 58)
                 .shadow(color: allowsGlow ? ringColor.opacity(0.7) : .clear, radius: 6)
 
             socText(color: TokensPalette.primary)
@@ -148,6 +184,17 @@ struct MapCarPin: View {
         }
     }
 
+    // MARK: 接地阴影
+    /// 一枚扁的椭圆、模糊、偏下 —— 它只做一件事：让钉**站在**地上。
+    /// 平面化的钉会像贴纸浮在地图上，这一笔是廉价与不廉价的差别之一。
+    private func groundShadow(opacity: Double) -> some View {
+        Ellipse()
+            .fill(Color.black.opacity(opacity))
+            .frame(width: 36, height: 8)
+            .blur(radius: 5)
+            .offset(y: 25)
+    }
+
     // MARK: 车头朝向
     /// 一个小缺口环，绕中心转 —— 它表达的是**从接口读到的 Heading**，不是装饰动画。
     private var headingMark: some View {
@@ -163,7 +210,7 @@ struct MapCarPin: View {
     private func socText(color: Color) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
             Text("\(socPct)")
-                .font(.system(size: 17, weight: .semibold).monospacedDigit())
+                .font(.system(size: 16, weight: .semibold).monospacedDigit())
                 .foregroundStyle(color)
             Text("%")
                 .font(.system(size: 9, weight: .medium).monospacedDigit())
@@ -193,15 +240,28 @@ struct MapSpotPin: View {
     var kind: Kind
     var style: MapPinStyle
     var allowsGlow: Bool
+    /// 钉旁边的文字注记。异常才需要（"后备箱未关"这类必须一眼看见）——
+    /// 它带文字阴影，因为地图底色不可控，注记必须在任何底上读得清。
+    var label: String? = nil
 
     var body: some View {
-        switch kind {
-        case .hold(let isLatest):
-            holdPin(isLatest: isLatest)
-        case .charger(let distanceText):
-            chargerPin(distanceText: distanceText)
-        case .issue:
-            issuePin
+        VStack(spacing: 4) {
+            switch kind {
+            case .hold(let isLatest):
+                holdPin(isLatest: isLatest)
+            case .charger(let distanceText):
+                chargerPin(distanceText: distanceText)
+            case .issue:
+                issuePin
+            }
+            if let label, !label.isEmpty {
+                Text(label)
+                    .font(TokensTypo.digits(11))
+                    .tracking(TokensTracking.label)
+                    .foregroundStyle(TokensPalette.error)
+                    .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
+                    .fixedSize()
+            }
         }
     }
 
@@ -280,5 +340,68 @@ struct Triangle: Shape {
         p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
         p.closeSubpath()
         return p
+    }
+}
+
+// =============================================================================
+// CarGlyphShape —— 一台用线画出来的车
+// =============================================================================
+//
+// 样品版里的车是**描边**画出来的（不是 SF Symbol）：一条腰线、一条底盘线、两个轮。
+// 差别在于：符号是"图标语言"，描边是"制图语言"—— 后者放在地图与版面上都不违和。
+// 坐标取自样品版（150×150 画布里的 44×23 那一段），这里按 rect 归一化。
+// 只画车身与底盘 —— 两个轮由 `CarGlyph` 用两个圆补上（同一个图形，两种画法拆开）。
+struct CarGlyphShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        // 原始坐标空间：x 53…97、y 69…92
+        func px(_ x: Double) -> CGFloat { rect.minX + CGFloat((x - 53) / 44) * rect.width }
+        func py(_ y: Double) -> CGFloat { rect.minY + CGFloat((y - 69) / 23) * rect.height }
+
+        var p = Path()
+        // 车顶与腰线
+        p.move(to: CGPoint(x: px(56), y: py(86)))
+        p.addLine(to: CGPoint(x: px(60.5), y: py(73)))
+        p.addQuadCurve(to: CGPoint(x: px(66.4), y: py(69)),
+                       control: CGPoint(x: px(61.8), y: py(69)))
+        p.addLine(to: CGPoint(x: px(83.6), y: py(69)))
+        p.addQuadCurve(to: CGPoint(x: px(89.5), y: py(73)),
+                       control: CGPoint(x: px(88.2), y: py(69)))
+        p.addLine(to: CGPoint(x: px(94), y: py(86)))
+        // 底盘线
+        p.move(to: CGPoint(x: px(53), y: py(86)))
+        p.addLine(to: CGPoint(x: px(97), y: py(86)))
+        return p
+    }
+}
+
+/// 完整的"一台车"：车身（描边路径）+ 两个轮（描边圆）。
+/// 为什么拆开：椭圆子路径要带一个 CGAffineTransform 重载，而"两个圆"用视图表达更直白、
+/// 也不用为一个装饰图形承担一个未核实签名的风险。
+struct CarGlyph: View {
+    var width: CGFloat = 30
+    var height: CGFloat = 16
+    var color: Color = TokensPalette.secondary
+
+    /// 轮径 = 车宽的 10.8/44（样品版的原始坐标）
+    private var wheel: CGFloat { width * 10.8 / 44 }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            CarGlyphShape()
+                .stroke(color, lineWidth: 1.4)
+            wheelView(centerX: 66)
+            wheelView(centerX: 84)
+        }
+        .frame(width: width, height: height)
+        .accessibilityHidden(true)
+    }
+
+    /// 轮心按样品版的坐标系定位（x 66 / 84、y 87）
+    private func wheelView(centerX: Double) -> some View {
+        Circle()
+            .stroke(color, lineWidth: 1.4)
+            .frame(width: wheel, height: wheel)
+            .offset(x: width * CGFloat((centerX - 53) / 44) - wheel / 2,
+                    y: height * CGFloat((87 - 69) / 23) - wheel / 2)
     }
 }

@@ -252,3 +252,44 @@ enum TokensSize {
     static let iconColumn: CGFloat = 29
     static let barHeight: CGFloat = 56
 }
+
+// MARK: - 衬线（只有标题与地名走它）
+//
+// 为什么需要衬线：样品版里最像"印刷物"的两处 —— 地图上的大字地名、底部面板的大标题 ——
+// 用的是宋体 + 疏排字距。系统默认的黑体（PingFang）怎么调都调不出这个感觉：
+// 黑体的字面是均匀的，宋体的横细竖粗本身就是明暗，那是**版面的光**。
+//
+// 一条不假设的原则：中文字体名在不同系统上不一定都在。
+// 所以先问系统有没有（`UIFont(name:size:)` 返回 nil 就是没有），没有就退回
+// 系统的衬线设计（`.serif`，拉丁语系一定有，中文会落到系统能给的衬线面）。
+enum TokensSerif {
+    /// 中文衬线在 iOS 上叫「Songti SC」
+    private static var cjkSerifName: String? {
+        UIFont(name: "Songti SC", size: 12) != nil ? "Songti SC" : nil
+    }
+
+    /// 标题衬线（面板大标题、纸张上的标题）
+    static func title(_ size: CGFloat) -> Font { font(size, .regular) }
+    /// 地名 / 大标注：字距由调用方给 —— 它才是主角
+    static func place(_ size: CGFloat) -> Font { font(size, .light) }
+    /// 小标注（图上标签、比例尺）
+    static func label(_ size: CGFloat) -> Font { font(size, .regular) }
+
+    private static func font(_ size: CGFloat, _ weight: Font.Weight) -> Font {
+        if let name = cjkSerifName { return .custom(name, size: size) }
+        return .system(size: size, weight: weight, design: .serif)
+    }
+}
+
+// MARK: - 字距
+//
+// 疏排是这套视觉的主要手段之一：中文小字一旦排得开，就从"说明文字"变成"地图注记"。
+// 数值不随 Dynamic Type 变 —— 它是版面的度量，不是字号的一部分。
+enum TokensTracking {
+    /// 图上地名（字距就是它的排版）
+    static let place: CGFloat = 6
+    /// 小标注（药丸、图上标签）：约 0.06em
+    static let label: CGFloat = 0.6
+    /// 面板大标题：略收紧
+    static let title: CGFloat = -0.2
+}

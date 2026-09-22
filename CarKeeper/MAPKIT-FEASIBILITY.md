@@ -183,8 +183,9 @@ extension ArtTheme { var mapSpec: MapStyleSpec { … } }
 | `CarKeeper/Features/Map/MapSpineData.swift` | 把 AppStore 的真实字段翻译成地图画得出来的东西（每个字段注明来自哪个接口；没有数据就是 nil，不用默认值填空） |
 | `CarKeeper/Features/Map/MapCarPin.swift` | 车钉（外面那圈弧就是电量、缺口就是真实 Heading）+ 停车/充电/异常三类小钉 |
 | `CarKeeper/Features/Map/MapSpineView.swift` | 地图主屏：四个图层（现在/行程/停车/充电）+ 底部「为什么」面板 + 全部功能索引页 |
-| `CarKeeper/CarKeeperApp.swift` | 首页 tab 指向 `MapSpineView`（想回到列表版：那一行换回 `HomeView()`） |
-| `Features/Dev/DevView.swift` | 多了一个「旧版首页（对照）」入口 —— 任何新方向都该有一个可信的对照 |
+| `CarKeeper/CarKeeperApp.swift` | 首页 tab 指向 `MapSpineView`。列表版首页（`HomeView`）已在「行程 tab 重建」那一批**删除** —— 想回退用 Git |
+| `CarKeeper/Design/SkyLight.swift` | 光引擎：太阳高度角/方位角（NOAA 简化算法）→ 光名、光的方向、车灯亮度、暗角、颗粒。**纯数学，不联网** |
+| `CarKeeper/Features/Map/MapSkyOverlay.swift` | 叠在瓦片上的光层（光池/雾霭/暗角/颗粒/发丝网格）+ 「光」表。按主题档位开关，原生主题一个像素都不加 |
 
 **落地时守住的四条规则**（都在代码注释里写明了理由）：
 1. **钉 = 屏幕空间**（`Annotation`），轨迹/面积 = 地理空间（`MapPolyline`）。

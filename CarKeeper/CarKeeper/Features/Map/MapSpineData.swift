@@ -228,6 +228,21 @@ struct MapSpineData {
         return nil
     }
 
+    /// 此刻的光：由**车所在的经纬度 + 真实时刻**算出（太阳位置是纯数学，不联网）。
+    /// 没有车的位置就没有光 —— 不拿设备自己的位置冒充车的位置。
+    var sky: SkyLight? {
+        guard let c = carCoordinate else { return nil }
+        return SkyLight.now(at: Date(), coordinate: c)
+    }
+
+    /// 地图上那句大字地名：**就是车端上报的那句地址**，长了就照实截断（带省略号）。
+    /// 不做地址解析、不猜行政区 —— 猜错的地名比没有地名更糟。
+    var placeLabel: String {
+        let t = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return "" }
+        return t.count > 7 ? String(t.prefix(7)) + "…" : t
+    }
+
     // -------------------------------------------------------------------------
     // MARK: 组装
     // -------------------------------------------------------------------------

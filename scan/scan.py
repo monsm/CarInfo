@@ -355,6 +355,11 @@ VERIFIED_SDK_ADDITIONS = {
     "allowsHitTesting": "View.allowsHitTesting(Bool)（iOS 13+；swiftui/view/allowshittesting(_:)）",
     "ColorScheme": "SwiftUI.ColorScheme（iOS 13+；主题自带明暗用它表达 light/dark）",
     "RadialGradient": "SwiftUI.RadialGradient(colors:center:startRadius:endRadius:)（iOS 13+；已核文档 JSON）",
+    # 光层与衬线排版（Design/SkyLight.swift、Features/Map/MapSkyOverlay.swift、MapCarPin.swift、
+    # Design/Tokens.swift 的 TokensSerif）。登记前逐个核过 Apple 文档 JSON：
+    "Ellipse": "SwiftUI.Ellipse（iOS 13+；externalID s:7SwiftUI7EllipseV）——车钉脚下的接地阴影",
+    "UIFont": "UIKit.UIFont（iOS 2+；externalID c:objc(cs)UIFont）——用 UIFont(name:size:) 探测中文衬线是否存在",
+    "custom": "Font.custom(_ name: String, size: CGFloat)（iOS 13+；externalID s:7SwiftUI4FontV6custom_4sizeACSS_14CoreFoundation7CGFloatVtFZ）",
     # 地图主屏（Features/Map/*）用到的 MapKit SwiftUI 名字。
     # 每一个都在写进代码前对着 Apple 文档 JSON 核过类型、可用版本与初始化器签名
     # （核实记录见 CarKeeper/MAPKIT-FEASIBILITY.md 第 7 节）。

@@ -48,6 +48,8 @@ struct MapSpineView: View {
     @State private var isRefreshing = false
     @State private var showReplay = false
     @State private var replaySession: ChargeSession?
+    /// 「此刻的光」表 —— 这一屏的光是怎么算出来的（药丸点开）
+    @State private var showSky = false
 
     private var theme: ArtTheme { ArtTheme(rawValue: themeRaw) ?? .native }
     private var spec: MapStyleSpec { theme.mapSpec }
@@ -75,6 +77,7 @@ struct MapSpineView: View {
         .sheet(isPresented: $showReplay) {
             if let s = replaySession { ChargeReplaySheet(session: s) }
         }
+        .sheet(isPresented: $showSky) { skySheet(d) }
         .task {
             await refresh()
             centerOnCar(force: true)
@@ -106,8 +109,34 @@ struct MapSpineView: View {
                 .opacity(spec.scrimOpacity)
                 .allowsHitTesting(false)
         }
+        // 光层：光池的位置由**太阳方位角**决定，暗角与颗粒由环境光决定。
+        // 它是「车所在的那一刻」直接画在图上 —— 不吃点击，原生主题下一个像素都不加。
+        .overlay {
+            if let sky = d.sky {
+                MapSkyOverlay(light: sky)
+            }
+        }
+        .overlay(alignment: .topLeading) { mapPlaceLabel(d) }
         .ignoresSafeArea(edges: .top)
         .accessibilityLabel(Text("地图，车在这张图上"))
+    }
+
+    /// 图上的大字地名。**斜排的角度来自当前艺术方向**（夜光的相机本来就转了 7°）——
+    /// 所以它和路网是同一个角度，不是装饰性倾斜。衬线 + 疏排是「印刷物」的做法。
+    @ViewBuilder
+    private func mapPlaceLabel(_ d: MapSpineData) -> some View {
+        if !d.placeLabel.isEmpty {
+            Text(d.placeLabel)
+                .font(TokensSerif.place(29))
+                .tracking(TokensTracking.place)
+                .lineLimit(1)
+                .foregroundStyle(TokensPalette.primary.opacity(0.9))
+                .shadow(color: TokensPalette.canvas.opacity(0.55), radius: 6)
+                .rotationEffect(.degrees(-spec.cameraHeading))
+                .padding(.leading, TokensSpacing.page)
+                .padding(.top, 108)
+                .allowsHitTesting(false)
+        }
     }
 
     @MapContentBuilder
@@ -119,7 +148,8 @@ struct MapSpineView: View {
                     heading: d.headingDeg,
                     style: spec.pinStyle,
                     allowsGlow: spec.allowsGlow,
-                    isActive: false
+                    isActive: false,
+                    lamp: d.sky?.lamp ?? 0
                 )
                 .frame(width: 44, height: 44)   // HIG 最小触控目标就落在钉中心
             }
@@ -199,7 +229,9 @@ struct MapSpineView: View {
         if layer == .now {
             ForEach(d.issues) { i in
                 Annotation("异常", coordinate: i.coordinate) {
-                    MapSpotPin(kind: .issue, style: spec.pinStyle, allowsGlow: spec.allowsGlow)
+                    // 异常必须在图上自己说出来 —— 要点一下才知道是哪一条，不算「看见」
+                    MapSpotPin(kind: .issue, style: spec.pinStyle,
+                               allowsGlow: spec.allowsGlow, label: i.title)
                 }
             }
         }
@@ -241,27 +273,40 @@ struct MapSpineView: View {
             }
 
             HStack(spacing: TokensSpacing.sm) {
-                statusDot(d.online)
-                Text(d.online.text)
-                    .font(TokensTypo.caption)
-                    .foregroundStyle(TokensPalette.secondary)
-                Text("·")
-                    .font(TokensTypo.caption)
-                    .foregroundStyle(TokensPalette.tertiary)
-                Text("上报 \(d.updatedText)")
-                    .font(TokensTypo.caption)
-                    .foregroundStyle(TokensPalette.tertiary)
+                HStack(spacing: TokensSpacing.sm) {
+                    statusDot(d.online)
+                    Text(d.online.text)
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.secondary)
+                    Text("·")
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.tertiary)
+                    Text("上报 \(d.updatedText)")
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.tertiary)
+                }
+                .padding(.horizontal, TokensSpacing.sm + 2)
+                .padding(.vertical, 6)
+                .background { Capsule().fill(TokensPalette.surface.opacity(0.94)) }
+
                 Spacer(minLength: 0)
+
                 if d.hasLocation == false {
                     Text("没有位置")
                         .font(TokensTypo.caption)
                         .foregroundStyle(TokensPalette.warning)
+                } else if let sky = d.sky {
+                    Button {
+                        TokensHaptic.tap()
+                        showSky = true
+                    } label: {
+                        lightPill(sky)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("此刻的光：\(sky.phase.title)，"
+                                             + "太阳高度 \(Int(sky.altitude.rounded())) 度。"
+                                             + "点开看它是怎么算出来的"))
                 }
-            }
-            .padding(.horizontal, TokensSpacing.sm)
-            .padding(.vertical, 5)
-            .background {
-                Capsule().fill(TokensPalette.surface.opacity(0.94))
             }
         }
         .padding(.horizontal, TokensSpacing.page)
@@ -274,6 +319,26 @@ struct MapSpineView: View {
             .frame(width: 6, height: 6)
     }
 
+    /// 光名药丸：这一刻的光叫什么、太阳多高、**从哪个方向来**。
+    /// 那个箭头的角度就是真实方位角（正北为 0，顺时针）—— 不是装饰罗盘。
+    private func lightPill(_ sky: SkyLight) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "arrow.up")
+                .font(.system(size: 10, weight: .semibold))
+                .rotationEffect(.degrees(sky.azimuth))
+            Text(sky.phase.title)
+                .font(TokensSerif.label(11))
+                .tracking(TokensTracking.label)
+            Text(String(format: "%.0f°", sky.altitude))
+                .font(TokensTypo.digits(11))
+                .foregroundStyle(TokensPalette.tertiary)
+        }
+        .foregroundStyle(TokensPalette.secondary)
+        .padding(.horizontal, TokensSpacing.sm + 2)
+        .padding(.vertical, 6)
+        .background { Capsule().fill(TokensPalette.surface.opacity(0.94)) }
+    }
+
     // =========================================================================
     // MARK: 底部面板
     // =========================================================================
@@ -281,6 +346,8 @@ struct MapSpineView: View {
     @ViewBuilder
     private func bottomPanel(_ d: MapSpineData) -> some View {
         VStack(alignment: .leading, spacing: TokensSpacing.md) {
+            panelGrab
+            panelTitle(d)
             if d.hasLocation == false {
                 // 没有位置时，**不摆一堆 -- 占位**，只说清为什么
                 emptyNotice("还没收到车的位置上报。连上车之后这张图才会有东西可看。")
@@ -311,21 +378,53 @@ struct MapSpineView: View {
         }
     }
 
+    /// 抓手：面板是「一张可以拉起来的纸」，这一点必须看得见（样品版就是靠它读的）。
+    private var panelGrab: some View {
+        Capsule()
+            .fill(TokensPalette.hairline)
+            .frame(width: 40, height: 4)
+            .frame(maxWidth: .infinity)
+            .accessibilityHidden(true)
+    }
+
+    /// 面板标题：衬线大字 + 一台**描边画出来的**小车（不是 SF Symbol）。
+    /// 负字距是大字才需要的 -
+    /// 字号一大，字距不收紧就散。
+    private func panelTitle(_ d: MapSpineData) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+            Text(d.carName.isEmpty ? "车" : d.carName)
+                .font(TokensSerif.title(26))
+                .tracking(TokensTracking.title)
+                .foregroundStyle(TokensPalette.primary)
+                .lineLimit(1)
+            CarGlyph(width: 30, height: 16, color: TokensPalette.secondary)
+                .offset(y: -3)
+            Spacer(minLength: 0)
+            Text(d.address)
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.tertiary)
+                .lineLimit(1)
+                .layoutPriority(-1)
+        }
+    }
+
     // ---- 现在 ----
     @ViewBuilder
     private func nowContent(_ d: MapSpineData) -> some View {
+        // 车名与地址已经搬到了面板标题行（衬线大字），这里只留三句读数
         HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-            Text(d.carName)
-                .font(TokensTypo.headline)
-                .foregroundStyle(TokensPalette.primary)
-            Text(d.address)
-                .font(TokensTypo.caption)
-                .foregroundStyle(TokensPalette.secondary)
-                .lineLimit(1)
-            Spacer(minLength: 0)
             Text("车头朝\(d.headingText)")
-                .font(TokensTypo.caption)
+                .font(TokensTypo.digits(12))
                 .foregroundStyle(TokensPalette.tertiary)
+            if !d.gpsText.isEmpty {
+                Text("·")
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.tertiary)
+                Text("GPS \(d.gpsText)")
+                    .font(TokensTypo.digits(12))
+                    .foregroundStyle(TokensPalette.tertiary)
+            }
+            Spacer(minLength: 0)
         }
 
         HStack(alignment: .bottom, spacing: TokensSpacing.lg) {
@@ -406,31 +505,38 @@ struct MapSpineView: View {
     /// 控制长在对象上：不新写一套车控，直接进已有的车控 / 电池页
     private func actionRow(_ d: MapSpineData) -> some View {
         HStack(spacing: TokensSpacing.sm) {
-            action("车控", "slider.horizontal.3") { nav.pushNavigation(.control, targetTab: .control) }
+            // 主操作只有一个，其余三个是并列的 —— 四个都一样重要 = 没有重要的
+            action("车控", "slider.horizontal.3", hot: true) {
+                nav.pushNavigation(.control, targetTab: .control)
+            }
             action("找车", "location.circle") { centerOnCar(force: true) }
             action("充电", "bolt.fill") { nav.pushNavigation(.battery, targetTab: .charge) }
             action("异常", "exclamationmark.triangle") { nav.pushNavigation(.messages, targetTab: .mine) }
         }
     }
 
-    private func action(_ title: String, _ icon: String, _ run: @escaping () -> Void) -> some View {
+    /// 四宫格动作块：图标在上、疏排小字在下（样品版的 q4 结构）。
+    /// `hot` 只给**一个**动作 —— 强调一旦泛滥就等于没有强调。
+    private func action(_ title: String, _ icon: String, hot: Bool = false,
+                        _ run: @escaping () -> Void) -> some View {
         Button {
             TokensHaptic.tap()
             run()
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 17, weight: .medium))
                 Text(title)
                     .font(TokensTypo.caption)
+                    .tracking(TokensTracking.label)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: TokensSpacing.row)
+            .frame(height: 58)
             .background {
-                RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                    .fill(TokensPalette.raised)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(hot ? TokensPalette.accent : TokensPalette.raised)
             }
-            .foregroundStyle(TokensPalette.primary)
+            .foregroundStyle(hot ? TokensPalette.labelOnTint : TokensPalette.primary)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(title))
@@ -647,15 +753,15 @@ struct MapSpineView: View {
 
                     DSSectionHeader(title: "对照与外观")
                     VStack(spacing: 0) {
-                        indexRow("开发者工具 · 旧版首页与艺术主题", "chevron.right", "") {
+                        indexRow("开发者工具 · 艺术主题与检查器", "chevron.right", "") {
                             showIndex = false
                             nav.pushNavigation(.dev)
                         }
                     }
                     .background(cardBackground)
 
-                    Text("旧版首页（列表版）与三种艺术主题都住在开发者工具里。"
-                         + "这一页是「去掉 Tab 栏」之后它们的家：每一个深潜页都能在这里到达。")
+                    Text("三种艺术主题（夜光 / 纸上 / 巨字）住在开发者工具里，按一下换一套。"
+                         + "这一页是「去掉 Tab 栏」之后它们的家：每一个深潜页都能从这里到达。")
                         .font(TokensTypo.caption)
                         .foregroundStyle(TokensPalette.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -669,6 +775,46 @@ struct MapSpineView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("完成") { showIndex = false }
+                }
+            }
+        }
+    }
+
+    /// 「此刻的光」：样品版里那张表的真机版。
+    /// 它不是「关于」页 —— 它让这一屏的光**可以被争论**：每一行都是一个可复算的事实，
+    /// 而把天文事实翻译成界面数值的那几条规则，都写在值的旁边。
+    private func skySheet(_ d: MapSpineData) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                    if let sky = d.sky {
+                        DSSectionHeader(title: "此刻的光")
+                        VStack(alignment: .leading, spacing: 0) {
+                            SkyFactTable(facts: sky.facts)
+                        }
+                        .padding(.horizontal, TokensSpacing.md)
+                        .background(cardBackground)
+
+                        Text("太阳的高度角与方位角，由车所在的经纬度与此刻算出（NOAA 简化算法，纯数学，不联网），可以复算。"
+                             + "「晴空辐照度」是晴空模型 1050×sin(高度角) —— App 里没有天气数据源，"
+                             + "所以它不是实测值，云量不会体现在这一栏里。")
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        emptyNotice("不知道车在哪儿，就没有这一刻的光 —— 光是从车的位置算出来的。")
+                    }
+                }
+                .padding(.top, TokensSpacing.sm)
+                .padding(.bottom, TokensSpacing.xxl)
+            }
+            .pageBackground()
+            .navigationTitle("光")
+            .navigationBarTitleDisplayMode(.inline)
+            .presentationDetents([.medium, .large])
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("完成") { showSky = false }
                 }
             }
         }
