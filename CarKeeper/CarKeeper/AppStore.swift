@@ -849,6 +849,12 @@ final class AppStore: @unchecked Sendable {
         // 结构化快照：小组件与充电实时活动读的就是这一个键。
         // 字段只有一份定义（Shared/WidgetTokens.swift 的 VehicleSnapshot），
         // 不再靠"键名字符串两边都对得上"来维系 —— 写错键名不会报错，只会安静地显示 0。
+        // 位置：从 location 缓存取 Lat/Lng（与小程序 home.js 一致，键是大小写混合）。
+        // 取不到时保持 nil，CarPlay 会降级到静态位置显示而不是假装知道车在哪。
+        let loc = caches["location"] as? [String: Any]
+        let snapLat = ciNumber(loc, ["Lat"])
+        let snapLng = ciNumber(loc, ["Lng"])
+
         let snapshot = VehicleSnapshot(
             soc: soc,
             rangeKm: rangeKm,
@@ -862,7 +868,9 @@ final class AppStore: @unchecked Sendable {
             offline: isOfflineMode,
             mileageKm: totalMileage,
             chargeCls: e.chargeCls,
-            updatedAt: Date()
+            updatedAt: Date(),
+            lat: snapLat,
+            lng: snapLng
         )
         // 内容真变了才刷小组件时间线、才动实时活动。
         //

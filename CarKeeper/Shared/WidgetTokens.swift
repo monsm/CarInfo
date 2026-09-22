@@ -186,6 +186,9 @@ struct VehicleSnapshot: Codable, Equatable {
     /// 语义色分类：ok / charge / warn / bad / na（与 App 的 e.chargeCls 同一套）
     var chargeCls: String = "na"
     var updatedAt: Date = .distantPast
+    // CarPlay 专用：车辆位置（单位：度，GCJ-02 坐标系，与车端报文一致）
+    var lat: Double? = nil
+    var lng: Double? = nil
 
     var fraction: Double { max(0, min(1, Double(soc) / 100)) }
     var lowBattery: Bool { soc < 20 }
@@ -217,13 +220,15 @@ struct VehicleSnapshot: Codable, Equatable {
             && offline == other.offline
             && mileageKm == other.mileageKm
             && chargeCls == other.chargeCls
+            && lat == other.lat
+            && lng == other.lng
     }
 
     /// 占位数据（组件库预览、以及还没同步过数据时的兜底）
     static let placeholder = VehicleSnapshot(
         soc: 68, rangeKm: 320, cabinTemp: "22℃", locked: true, charging: true,
         chargePower: 12.4, timeToFull: "1 小时 10 分", offline: false,
-        mileageKm: 24860, chargeCls: "charge", updatedAt: Date()
+        mileageKm: 24860, chargeCls: "charge", updatedAt: Date(), lat: 30.52, lng: 114.23
     )
 }
 
