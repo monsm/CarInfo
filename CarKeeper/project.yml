@@ -243,3 +243,33 @@ targets:
         APP_CLIP: true
     dependencies:
     - target: CarKeeper
+
+  # 纯函数测试（光的太阳位置、充电站聚合）。
+  # 为什么值得存在：这些函数错了不会崩、也不会有编译错误，只会安静地给出错的光和错的圈。
+  # 这台开发机没有 Swift 工具链，所以它们只在 CI 上跑
+  # （.github/workflows/ios-build.yml 的 unit-tests job，非阻断）。
+  CarKeeperTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+    - path: Tests/
+    dependencies:
+    - target: CarKeeper
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: 'YES'
+        # 单元测试要跑在宿主 App 里：`@testable import CarKeeper` 需要它
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/CarKeeper.app/CarKeeper
+        BUNDLE_LOADER: $(TEST_HOST)
+
+# 单独一条测试用的 scheme：**不动** CI 一直在用的 CarKeeper scheme
+# （那个 scheme 是 XcodeGen 按 target 自动生成的，改它的风险比收益大）。
+# 这条 scheme 只做两件事：构建 App、跑 CarKeeperTests。
+schemes:
+  CarKeeperTests:
+    build:
+      targets:
+        CarKeeper: all
+    test:
+      targets:
+      - CarKeeperTests
