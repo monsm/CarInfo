@@ -932,6 +932,60 @@ struct DSExpandGroup<Content: View>: View {
     }
 }
 
+/// 与 DSExpandGroup 相同的标题行 + 折叠交互，但**不画背景表面**。
+/// 用在「外层已有统一表面」的场景里，避免多层嵌套背景产生「框框套框框」的视觉垃圾。
+struct DSSection<Content: View>: View {
+    var title: String
+    var trailing: String? = nil
+    var trailingCls: String = "na"
+    @ViewBuilder var content: () -> Content
+
+    @State private var expanded: Bool = false
+
+    init(title: String,
+         trailing: String? = nil,
+         trailingCls: String = "na",
+         @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.trailing = trailing
+        self.trailingCls = trailingCls
+        self.content = content
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                TokensHaptic.select()
+                withAnimation(TokensMotion.value) { expanded.toggle() }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+                    Text(title.uppercased())
+                        .font(TokensSerif.section(13))
+                        .tracking(TokensTracking.label)
+                        .foregroundStyle(TokensPalette.secondary)
+                    Spacer(minLength: TokensSpacing.sm)
+                    if let trailing, !trailing.isEmpty {
+                        DSChip(text: trailing, cls: trailingCls)
+                    }
+                    Image(systemName: "chevron.down")
+                        .font(TokensTypo.fixed(11, weight: .semibold))
+                        .foregroundStyle(TokensPalette.tertiary)
+                        .rotationEffect(.degrees(expanded ? 180 : 0))
+                }
+                .padding(.bottom, 6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(title))
+            .accessibilityValue(Text(expanded ? "已展开" : "已收起"))
+
+            if expanded {
+                VStack(spacing: 0) { content() }
+            }
+        }
+    }
+}
+
 extension View {
     /// 分组表面外观
     func dsSurface(padding: CGFloat = TokensSpacing.md,

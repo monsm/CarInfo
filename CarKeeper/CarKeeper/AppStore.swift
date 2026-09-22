@@ -591,8 +591,13 @@ final class AppStore: @unchecked Sendable {
     /// 判断指定 key 是否需要重新拉取（缓存缺失 或 已过期）
     func needsRefresh(_ key: String) -> Bool {
         guard let v = caches[key] else { return true }
-        // 只判断类型是否正确（原来写成 guard let d = ... 但 d 从未被使用）
-        guard v is [String: Any] else { return true }
+        // 只判断类型是否正确：caches 同时存 dict（control/location/charge 等）
+        // 和 array（messages 是 [[String: Any]]）。
+        // 原来只检查 [String: Any]，导致 messages 永远类型不匹配 →
+        // needsRefresh 永远返回 true → 每次打开都重新请求，且如果上一次请求
+        // 返回了 []，那 [] 就被写进缓存，之后 3 分钟内再打进来永远是空。
+        // 改成「dict 或 array 都算合法类型」即可。
+        guard v is [String: Any] || v is [[String: Any]] else { return true }
         return isCacheExpired(key)
     }
 

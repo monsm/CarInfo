@@ -98,24 +98,37 @@ struct BatteryView: View {
     }
 
     // MARK: 卡片列表（独立 ViewBuilder，避免整个 body 类型检查超时）
+    //
+    // 「框框背景」修复：之前各卡片各自用 DSExpandGroup / DSGroup，每个都有独立的
+    // nightSurface 背景矩形，叠在一起就像「背后有几个框框」。现在用一个统一的外层
+    // dsSurface 包裹全部内容（除 socHero 外的所有），内部卡片改用 DSSection（无背景、
+    // 仅标题行 + 折叠交互）—— 单层表面，不再有嵌套框框。
     @ViewBuilder
     private var sections: some View {
         let cache = store.caches
         let b = batteryModel(cache)
         let e = VM.energy(cache, store.car)
         socHero(e)
-        verdictCard(cache, b)
-        consistencyCard(b)
-        insulationCard(e)
-        chargeCard(b)
-        // 钱：车端功率采样积分出来的电量 × 用户自己设的电价，见 Services/ChargeLedger.swift
-        ChargeMoneyBlock()
-        // 趋势（SOC 历史 / 充电功率）—— 真实车端采样，见 Services/HistoryStore.swift
-        trendSection
-        subsystemCard(b)
-        motorCard(b)
-        faultCard(b)
-        alarmCard(b)
+        detailsGroup(cache, b, e)
+    }
+
+    // MARK: 统一详情容器（框框背景修复）
+    private func detailsGroup(_ cache: [String: Any?], _ b: BatteryModel, _ e: EnergyModel) -> some View {
+        VStack(spacing: 0) {
+            verdictCard(cache, b)
+            consistencyCard(b)
+            insulationCard(e)
+            chargeCard(b)
+            // 钱：车端功率采样积分出来的电量 × 用户自己设的电价，见 Services/ChargeLedger.swift
+            ChargeMoneyBlock()
+            // 趋势（SOC 历史 / 充电功率）—— 真实车端采样，见 Services/HistoryStore.swift
+            trendSection
+            subsystemCard(b)
+            motorCard(b)
+            faultCard(b)
+            alarmCard(b)
+        }
+        .dsSurface()
     }
 
     // MARK: 电池头部（v4：一个巨大数字 + 一条光条 + 三条事实，不装容器）
@@ -191,8 +204,8 @@ struct BatteryView: View {
     private func verdictCard(_ cache: [String: Any?], _ b: BatteryModel) -> some View {
         Group {
             if let batt = AN.summarize(cache, store.car).domains.first(where: { $0.key == "battery" }) {
-                // 折叠分组回到 DS 语言：标题行在画布上，行在表面上（与其余 25 屏一致）
-                DSExpandGroup(title: "分析结论", trailing: batt.title, trailingCls: batt.cls) {
+                // 折叠分组：外层 dsSurface 已提供唯一背景，这里改用 DSSection（无背景、仅标题行）
+                DSSection(title: "分析结论", trailing: batt.title, trailingCls: batt.cls) {
                     ForEach(Array(batt.reasons.enumerated()), id: \.offset) { idx, r in
                         DSGroupRow(showsSeparator: idx < batt.reasons.count - 1) {
                             HStack(alignment: .top, spacing: TokensSpacing.sm) {
@@ -212,7 +225,7 @@ struct BatteryView: View {
     // MARK: 一致性
     private func consistencyCard(_ b: BatteryModel) -> some View {
         let cellLabel = b.cellStats.map { cell in "\(cell.count) 节采样" } ?? "接口未上报"
-        return DSExpandGroup(title: "一致性", trailing: cellLabel, trailingCls: "ok") {
+        return DSSection(title: "一致性", trailing: cellLabel, trailingCls: "ok") {
             if let cell = b.cellStats {
                 DSGroupRow(showsSeparator: b.probeStats != nil) {
                     VStack(spacing: TokensSpacing.sm) {
@@ -274,7 +287,7 @@ struct BatteryView: View {
     /// 但**没有任何视图读过它** —— 又一处「启动了却没人看」的读数。电车最该看的指标之一，
     /// 而且它与告警是两层：越限时车端会把 `insulationAlarm` 置位，那条会出现在上面的「电池告警」里。
     private func insulationCard(_ e: EnergyModel) -> some View {
-        DSGroup(title: "高压安全",
+        DSSection(title: "高压安全",
                 footer: "这是车端自己的读数（报文 insulateResistance），不是我们拿别的字段推的；越限时它会出现在「电池告警」里。") {
             DSGroupRow(showsSeparator: false) {
                 DSKeyValueRow(key: "绝缘电阻", value: e.insulate,
@@ -289,7 +302,7 @@ struct BatteryView: View {
         // 显式 return：本函数不是 @ViewBuilder，多语句体必须 return，
         // 否则是「opaque return type 无 return」错误（此前被开头一句多余的
         // `return EmptyView()` 掩盖，那句同时让整张充电卡片渲染成空视图）。
-        return DSExpandGroup(title: "充电", trailing: b.charging.text, trailingCls: chargeSide) {
+        return DSSection(title: "充电", trailing: b.charging.text, trailingCls: chargeSide) {
             let rows = chargeRows(b)
             ForEach(Array(rows.enumerated()), id: \.offset) { idx, r in
                 DSGroupRow(showsSeparator: idx < rows.count - 1) {
@@ -308,7 +321,7 @@ struct BatteryView: View {
                 // 子标题变成分组标题（全 App 的分组标题只有一种写法）。
                 VStack(spacing: TokensSpacing.xl) {
                     if !b.subsystems.isEmpty {
-                        DSGroup(title: "电压采样") {
+                        DSSection(title: "电压采样") {
                             ForEach(Array(b.subsystems.enumerated()), id: \.element.num) { idx, s in
                                 DSGroupRow(showsSeparator: idx < b.subsystems.count - 1) {
                                     DSKeyValueRow(key: s.num == "--" ? "子系统" : "子系统 \(s.num)",
@@ -324,7 +337,7 @@ struct BatteryView: View {
                         }
                     }
                     if !b.tempSubs.isEmpty {
-                        DSGroup(title: "温度采样") {
+                        DSSection(title: "温度采样") {
                             ForEach(Array(b.tempSubs.enumerated()), id: \.element.num) { idx, s in
                                 DSGroupRow(showsSeparator: idx < b.tempSubs.count - 1) {
                                     DSKeyValueRow(key: s.num == "--" ? "子系统" : "子系统 \(s.num)",
@@ -346,7 +359,7 @@ struct BatteryView: View {
     private func motorCard(_ b: BatteryModel) -> some View {
         Group {
             if !b.motors.isEmpty {
-                DSExpandGroup(title: "动力系统", trailing: "\(b.motors.count) 台电机") {
+                DSSection(title: "动力系统", trailing: "\(b.motors.count) 台电机") {
                     ForEach(Array(b.motors.enumerated()), id: \.offset) { mIdx, m in
                         let rows = motorRows(m)
                         DSGroupRow(showsSeparator: mIdx < b.motors.count - 1) {
@@ -369,7 +382,7 @@ struct BatteryView: View {
 
     // MARK: 故障码
     private func faultCard(_ b: BatteryModel) -> some View {
-        DSGroup(title: "故障码",
+        DSSection(title: "故障码",
                 trailing: b.faultTotal > 0 ? "共 \(b.faultTotal) 条" : "无故障",
                 trailingCls: b.faultTotal > 0 ? "bad" : "ok") {
             let active = b.faults.filter { $0.count > 0 }
@@ -396,7 +409,7 @@ struct BatteryView: View {
     private func alarmCard(_ b: BatteryModel) -> some View {
         Group {
             if !b.alarms.isEmpty {
-                DSGroup(title: "电池告警", trailing: "共 \(b.alarms.count) 项", trailingCls: "bad") {
+                DSSection(title: "电池告警", trailing: "共 \(b.alarms.count) 项", trailingCls: "bad") {
                     ForEach(Array(b.alarms.enumerated()), id: \.offset) { idx, a in
                         DSGroupRow(showsSeparator: idx < b.alarms.count - 1) {
                             HStack(spacing: TokensSpacing.sm) {
