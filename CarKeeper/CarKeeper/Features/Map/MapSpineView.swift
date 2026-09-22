@@ -111,6 +111,12 @@ struct MapSpineView: View {
             mapContent(d)
         }
         .mapStyle(spec.style)
+        // 比例尺：地图上唯一能让「这一段有多长」变得可核对的东西。
+        // 它是系统控件（MapKit 的 MapScaleView），不占位、不在原生主题下改变现有观感。
+        .mapControls {
+            MapScaleView()
+                .mapControlVisibility(.visible)
+        }
         .overlay {
             // 系统瓦片的颜色改不了，只能盖一层。原生主题的不透明度是 0（不盖）。
             spec.scrim
@@ -219,14 +225,33 @@ struct MapSpineView: View {
         }
     }
 
+    /// 显示用的聚合结果（地图与面板共用同一份）
+    private var chargerClusters: [MapChargerCluster] {
+        MapSpineData.clusterChargers(chargers)
+    }
+
     @MapContentBuilder
     private var chargerPins: some MapContent {
         if layer == .charge {
-            ForEach(chargers) { c in
-                Annotation("充电站", coordinate: c.coordinate) {
-                    MapSpotPin(kind: .charger(distanceText: c.distanceText),
-                               style: spec.pinStyle,
-                               allowsGlow: spec.allowsGlow)
+            // 一个位置只放一个标记：孤立的是钉子，挨在一起的是一个带**真实站数**的圈。
+            // 点圈 = 放大到那一组 —— 聚合不能变成「点不开的东西」。
+            ForEach(chargerClusters) { cluster in
+                Annotation("充电站", coordinate: cluster.coordinate) {
+                    if cluster.count == 1 {
+                        MapSpotPin(kind: .charger(distanceText: cluster.nearest.distanceText),
+                                   style: spec.pinStyle,
+                                   allowsGlow: spec.allowsGlow)
+                    } else {
+                        Button {
+                            withAnimation(TokensMotion.value) {
+                                camera = .camera(MapCamera(centerCoordinate: cluster.coordinate,
+                                                           distance: 1200))
+                            }
+                        } label: {
+                            MapClusterPin(count: cluster.count)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
         }
@@ -1034,7 +1059,9 @@ struct MapSpineView: View {
                 )
             }
             let sorted = found.sorted { $0.distanceMeters < $1.distanceMeters }
-            Task { @MainActor in chargers = Array(sorted.prefix(12)) }
+            // 不再只取最近 12 个：那是权宜之计（画不全、也说不清为什么是 12）。
+            // 取回全部（上限 60 = 一次搜索的实际返回量），由聚合决定画成一个圈还是几个圈。
+            Task { @MainActor in chargers = Array(sorted.prefix(60)) }
         }
     }
 }

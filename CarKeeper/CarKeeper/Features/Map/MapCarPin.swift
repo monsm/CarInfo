@@ -230,6 +230,24 @@ struct MapCarPin: View {
 //
 // 全部是屏幕空间（放在 `Annotation` 里）—— **不随地图缩放变形**。
 // 这是最容易被写错的一条：面积类的东西（热区）才该放进地图坐标空间。
+/// 聚合后的标记：一个圆 + 组内**真实的站数**。
+///
+/// 它不是一个站，所以不能画得和一个站一样 —— 形状是这里唯一能传达「这不是一个点」的东西
+/// （数字会变、位置会变，但「圈 vs 钉」一眼就能分开）。
+struct MapClusterPin: View {
+    let count: Int
+
+    var body: some View {
+        Text("\(count)")
+            .font(TokensTypo.dataSmall)
+            .foregroundStyle(TokensPalette.labelOnTint)
+            .frame(width: 30, height: 30)
+            .background(Circle().fill(TokensPalette.ambient))
+            .overlay(Circle().strokeBorder(TokensPalette.canvas, lineWidth: 1.5))
+            .accessibilityLabel(Text("\(count) 个充电站"))
+    }
+}
+
 struct MapSpotPin: View {
     enum Kind {
         case hold(isLatest: Bool)

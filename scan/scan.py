@@ -386,6 +386,13 @@ VERIFIED_SDK_ADDITIONS = {
     "constant": "Binding.constant(_:)（iOS 13+；静态方法，externalID s:7SwiftUI7BindingV8constantyACyxGxFZ）",
     "isDateInYesterday": "Calendar.isDateInYesterday(_:)（iOS 8+；Foundation，externalID s:10Foundation8CalendarV17isDateInYesterdayySbAA0D0VF）",
     "compactMap": "Sequence.compactMap(_:)（Swift 标准库；externalID s:ST13compactMapySay7ElementQd_Gqd_7ElementQRs_rlEF）",
+    # 浮层画布 / 标注聚合 / 比例尺 / 长按菜单（本轮）：
+    # 每个都写进代码前对着 Apple 文档 JSON 核过签名
+    "presentationBackground": "View.presentationBackground(alignment:content:)（iOS 16.4+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/presentationBackground(alignment:content:)：浮层自己的背景，不是内容底）",
+    "MapScaleView": "MapKit.MapScaleView（iOS 17+；init(alignment:scope:)/init(anchorEdge:scope:) 已核，externalID doc://com.apple.mapkit/documentation/MapKit/MapScaleView）",
+    "mapControls": "View.mapControls(_:)（iOS 17+；decl: func mapControls(@ViewBuilder _ content: () -> some View)，externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/mapControls(_:)：把系统地图控件放进地图）",
+    "mapControlVisibility": "View.mapControlVisibility(_:)（iOS 17+；decl: func mapControlVisibility(_ visibility: Visibility)，externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/mapControlVisibility(_:)）",
+    "contextMenu": "View.contextMenu(menuItems:)（iOS 13+；decl: nonisolated func contextMenu<MenuItems>(@ContentBuilder menuItems: () -> MenuItems)，externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/contextMenu(menuItems:)：长按菜单——明细行的删除挂在它上面）",
 }
 
 

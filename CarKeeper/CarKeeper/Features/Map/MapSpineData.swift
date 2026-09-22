@@ -539,3 +539,50 @@ struct MapSpineData {
         return "\(Int(s / 86400)) 天前"
     }
 }
+
+// =============================================================================
+// MARK: - 充电站聚合（地图上的标注聚合）
+// =============================================================================
+//
+// 为什么必须做：搜索半径 8km 内搜出来的站可能有几十个，**全画出来就是一片钉子**。
+// 改之前是 `prefix(12)` 的权宜 —— 既画不全，也说不清为什么是 12 个。
+//
+// 判据是地理的，不是美术的：两站地面距离 ≤ 400m 归为一组（贪心，先近后远），
+// 组的坐标取组内成员的重心（成员越多自然越落在中间），计数是这一组**真实的站数**。
+// 组内离车最近的那一个单独留着 —— 点开时必须说得出名字。
+struct MapChargerCluster: Identifiable {
+    let id: String
+    let coordinate: CLLocationCoordinate2D
+    let count: Int
+    let nearest: MapCharger
+}
+
+extension MapSpineData {
+    /// 400m 内两两合并。距离用 `CLLocation.distance(from:)`（与停车热区同一套算法）。
+    static func clusterChargers(_ chargers: [MapCharger],
+                                radiusMeters: Double = 400) -> [MapChargerCluster] {
+        var out: [MapChargerCluster] = []
+        for c in chargers.sorted(by: { $0.distanceMeters < $1.distanceMeters }) {
+            let here = CLLocation(latitude: c.coordinate.latitude, longitude: c.coordinate.longitude)
+            if let i = out.firstIndex(where: {
+                CLLocation(latitude: $0.coordinate.latitude,
+                           longitude: $0.coordinate.longitude).distance(from: here) <= radiusMeters
+            }) {
+                let old = out[i]
+                let n = Double(old.count)
+                out[i] = MapChargerCluster(
+                    id: old.id,
+                    coordinate: CLLocationCoordinate2D(
+                        latitude: (old.coordinate.latitude * n + c.coordinate.latitude) / (n + 1),
+                        longitude: (old.coordinate.longitude * n + c.coordinate.longitude) / (n + 1)
+                    ),
+                    count: old.count + 1,
+                    nearest: old.nearest
+                )
+            } else {
+                out.append(MapChargerCluster(id: c.id, coordinate: c.coordinate, count: 1, nearest: c))
+            }
+        }
+        return out
+    }
+}
