@@ -300,7 +300,7 @@ struct MapSpineView: View {
                     } label: {
                         HStack(spacing: 5) {
                             Image(systemName: l.icon)
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(TokensTypo.fixed(11, weight: .semibold))
                             Text(l.title)
                                 .font(TokensTypo.caption)
                         }
@@ -373,7 +373,7 @@ struct MapSpineView: View {
     private func lightPill(_ sky: SkyLight) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "arrow.up")
-                .font(.system(size: 10, weight: .semibold))
+                .font(TokensTypo.fixed(10, weight: .semibold))
                 .rotationEffect(.degrees(sky.azimuth))
             Text(sky.phase.title)
                 .font(TokensSerif.label(11))
@@ -589,7 +589,7 @@ struct MapSpineView: View {
         } label: {
             VStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 17, weight: .medium))
+                    .font(TokensTypo.fixed(17, weight: .medium))
                 Text(title)
                     .font(TokensTypo.caption)
                     .tracking(TokensTracking.label)
@@ -950,7 +950,7 @@ struct MapSpineView: View {
                     .foregroundStyle(TokensPalette.primary)
                 Spacer(minLength: TokensSpacing.sm)
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(TokensTypo.fixed(12, weight: .semibold))
                     .foregroundStyle(TokensPalette.tertiary)
             }
             .padding(.vertical, TokensSpacing.md)
@@ -1017,7 +1017,7 @@ struct MapSpineView: View {
     private func emptyNotice(_ text: String) -> some View {
         HStack(alignment: .top, spacing: TokensSpacing.sm) {
             Image(systemName: "info.circle")
-                .font(.system(size: 13))
+                .font(TokensTypo.fixed(13))
                 .foregroundStyle(TokensPalette.tertiary)
             Text(text)
                 .font(TokensTypo.footnote)
@@ -1070,7 +1070,7 @@ struct MapSpineView: View {
             } label: {
                 HStack(spacing: TokensSpacing.sm) {
                     Image(systemName: "chart.xyaxis.line")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(TokensTypo.fixed(13, weight: .medium))
                     Text("看这次充电的功率曲线")
                         .font(TokensTypo.footnote)
                     Spacer(minLength: 0)
@@ -1078,7 +1078,7 @@ struct MapSpineView: View {
                         .font(TokensTypo.digits(13))
                         .foregroundStyle(TokensPalette.secondary)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(TokensTypo.fixed(11, weight: .semibold))
                         .foregroundStyle(TokensPalette.tertiary)
                 }
                 .padding(.vertical, TokensSpacing.sm)

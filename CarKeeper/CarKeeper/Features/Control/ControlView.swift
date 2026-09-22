@@ -182,50 +182,49 @@ struct ControlView: View {
                windowRows: [(String, String, String)],
                extraRows: [(String, String, String)],
                lampRows: [(String, String)])) -> some View {
-        ExpandingCardBox(title: "车身状态", side: bd.summary, sideCls: bd.cls, cornerRadius: TokensRadius.medium) {
-            VStack(spacing: 8) {
-                if !bd.doorRows.isEmpty {
-                    sectionLabel("车门")
-                    ForEach(Array(bd.doorRows.enumerated()), id: \.offset) { _, r in
-                        HStack {
-                            Text(r.0).font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
-                            Spacer()
-                            Text(r.1).font(TokensTypo.caption)
-                                .foregroundStyle(r.2 == "bad" ? TokensPalette.error : .primary)
-                        }
+        // 折叠分组 + 键值行：与电池页、全量数据页同一套装法。
+        // 「未关」真的是状态，所以值走 valueCls（状态色），不再自己写一个三元表达式的颜色。
+        DSExpandGroup(title: "车身状态", trailing: bd.summary, trailingCls: bd.cls) {
+            if !bd.doorRows.isEmpty {
+                DSGroupRow(showsSeparator: true) { sectionLabel("车门") }
+                ForEach(Array(bd.doorRows.enumerated()), id: \.offset) { idx, r in
+                    DSGroupRow(showsSeparator: idx < bd.doorRows.count - 1) {
+                        DSKeyValueRow(key: r.0, value: r.1, valueCls: r.2)
                     }
                 }
-                if !bd.windowRows.isEmpty {
-                    sectionLabel("车窗")
-                    ForEach(Array(bd.windowRows.enumerated()), id: \.offset) { _, r in
-                        HStack {
-                            Text(r.0).font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
-                            Spacer()
-                            Text(r.1).font(TokensTypo.caption)
-                                .foregroundStyle(r.2 == "bad" ? TokensPalette.error : .primary)
-                        }
+            }
+            if !bd.windowRows.isEmpty {
+                DSGroupRow(showsSeparator: true) { sectionLabel("车窗") }
+                ForEach(Array(bd.windowRows.enumerated()), id: \.offset) { idx, r in
+                    DSGroupRow(showsSeparator: idx < bd.windowRows.count - 1) {
+                        DSKeyValueRow(key: r.0, value: r.1, valueCls: r.2)
                     }
                 }
-                if !bd.extraRows.isEmpty {
-                    sectionLabel("舱盖/天窗")
-                    ForEach(Array(bd.extraRows.enumerated()), id: \.offset) { _, r in
-                        HStack {
-                            Text(r.0).font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
-                            Spacer()
-                            Text(r.1).font(TokensTypo.caption)
-                                .foregroundStyle(r.2 == "bad" ? TokensPalette.error : .primary)
-                        }
+            }
+            if !bd.extraRows.isEmpty {
+                DSGroupRow(showsSeparator: true) { sectionLabel("舱盖/天窗") }
+                ForEach(Array(bd.extraRows.enumerated()), id: \.offset) { idx, r in
+                    DSGroupRow(showsSeparator: idx < bd.extraRows.count - 1) {
+                        DSKeyValueRow(key: r.0, value: r.1, valueCls: r.2)
                     }
                 }
-                if !bd.lampRows.isEmpty {
-                    sectionLabel("灯光")
-                    let lit = bd.lampRows.filter { $0.1 == "亮" }
-                    if !lit.isEmpty {
-                        Text(lit.map { $0.0 }.joined(separator: " · "))
-                            .font(TokensTypo.caption).foregroundStyle(TokensPalette.warning)
-                    } else {
-                        Text("全部关闭").font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
+            }
+            if !bd.lampRows.isEmpty {
+                DSGroupRow(showsSeparator: false) {
+                    VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+                        sectionLabel("灯光")
+                        let lit = bd.lampRows.filter { $0.1 == "亮" }
+                        if !lit.isEmpty {
+                            Text(lit.map { $0.0 }.joined(separator: " · "))
+                                .font(TokensTypo.footnote)
+                                .foregroundStyle(TokensPalette.warning)
+                        } else {
+                            Text("全部关闭")
+                                .font(TokensTypo.footnote)
+                                .foregroundStyle(TokensPalette.secondary)
+                        }
                     }
+                    .padding(.vertical, TokensSpacing.sm)
                 }
             }
         }
@@ -448,45 +447,22 @@ struct ControlView: View {
 
     // MARK: 快捷预设场景 (#18)
     private var presetScenesCard: some View {
-        CardBox(title: "一键场景", cornerRadius: TokensRadius.medium,
+        // 一行一个场景：DSRow 把「图标列 + 标题 + 副标题 + 箭头」全部包好，
+        // 旧写法是自己搭一遍 HStack，于是它与车控页其它行差一个内缩。
+        DSGroup(title: "一键场景",
+                trailing: busy || running != nil ? "执行中" : nil,
+                trailingCls: "acc",
                 footer: "每个场景只发一条指令；温度是场景自己带的值，不走上次的设置。与其他指令一样，先验证身份再发。") {
-            VStack(spacing: 10) {
-                ForEach(Array(presetScenes.enumerated()), id: \.element.key) { idx, scene in
-                    Button {
+            ForEach(Array(presetScenes.enumerated()), id: \.element.key) { idx, scene in
+                DSGroupRow(showsSeparator: idx < presetScenes.count - 1) {
+                    DSRow(icon: scene.symbol, title: scene.name, subtitle: scene.note,
+                          value: busy || running != nil ? "执行中" : nil,
+                          showsChevron: !(busy || running != nil)) {
                         onPresetScene(scene)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(safeSymbol: scene.symbol, fallback: "car.fill")
-                                .font(TokensTypo.body)
-                                .foregroundStyle(TokensPalette.ambient)
-                                .frame(width: 32, height: 32)
-                                .background(
-                                    TokensPalette.fillSubtle,
-                                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                )
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(scene.name).font(TokensTypo.body)
-                                Text(scene.note).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
-                            }
-                            Spacer()
-                            if busy || running != nil {
-                                Image(systemName: "clock.fill")
-                                    .font(TokensTypo.caption)
-                                    .foregroundStyle(TokensPalette.secondary)
-                            } else {
-                                Image(systemName: "chevron.right")
-                                    .font(TokensTypo.caption)
-                                    .foregroundStyle(TokensPalette.tertiary)
-                            }
-                        }
-                        .padding(.vertical, 10)
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
-                    .disabled(busy || running != nil)
-                    .opacity(busy || running != nil ? 0.5 : 1)
-                    if idx < presetScenes.count - 1 { ListDivider() }
                 }
+                .disabled(busy || running != nil)
+                .opacity(busy || running != nil ? 0.5 : 1)
             }
         }
     }
@@ -534,36 +510,39 @@ struct ControlView: View {
 
     // MARK: 指令列表
     private var commandCard: some View {
-        CardBox(title: "还能做什么",
-                side: busy || running != nil ? "执行中" : nil, sideCls: "acc",
+        DSGroup(title: "还能做什么",
+                trailing: busy || running != nil ? "执行中" : nil,
+                trailingCls: "acc",
                 footer: "指令发出去后等车辆回执：12 次查询（约 60 秒）仍没有终态时会标成「结果待确认」，不算成功。") {
-            VStack(spacing: 0) {
-                // 高频指令（默认展示）
-                ForEach(Array(mainCommands.enumerated()), id: \.offset) { idx, item in
+            // 高频指令（默认展示）
+            ForEach(Array(mainCommands.enumerated()), id: \.offset) { idx, item in
+                DSGroupRow(showsSeparator: idx < mainCommands.count - 1 || showMoreCommands) {
                     cmdRow(item)
-                    if idx < mainCommands.count - 1 || showMoreCommands { ListDivider() }
                 }
-                // 低频指令（可折叠）
-                if showMoreCommands {
-                    ForEach(Array(moreCommands.enumerated()), id: \.offset) { idx, item in
+            }
+            // 低频指令（可折叠）
+            if showMoreCommands {
+                ForEach(Array(moreCommands.enumerated()), id: \.offset) { idx, item in
+                    DSGroupRow(showsSeparator: idx < moreCommands.count - 1) {
                         cmdRow(item)
-                        if idx < moreCommands.count - 1 { ListDivider() }
                     }
                 }
-                // 展开/收起按钮
+            }
+            // 展开/收起：它也是分组里的一行（内缩与分隔线由 DSGroupRow 给）
+            DSGroupRow(showsSeparator: false) {
                 Button {
                     withAnimation(TokensMotion.press) { showMoreCommands.toggle() }
                 } label: {
-                    HStack {
+                    HStack(spacing: TokensSpacing.sm) {
                         Image(systemName: showMoreCommands ? "chevron.up" : "chevron.down")
                             .font(TokensTypo.footnote.weight(.bold))
                             .foregroundStyle(TokensPalette.tertiary)
                         Text(showMoreCommands ? "收起" : "更多指令")
-                            .font(TokensTypo.caption)
+                            .font(TokensTypo.footnote)
                             .foregroundStyle(TokensPalette.ambient)
-                        Spacer()
+                        Spacer(minLength: 0)
                     }
-                    .padding(.vertical, 10)
+                    .frame(minHeight: TokensSpacing.row)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -572,55 +551,34 @@ struct ControlView: View {
     }
 
     private func cmdRow(_ item: (key: String, name: String, symbol: String, note: String?)) -> some View {
-        Button {
+        DSRow(icon: item.symbol, title: item.name, subtitle: item.note, showsChevron: true) {
             onCmd(item.key)
-        } label: {
-            HStack(spacing: 12) {
-                Image(safeSymbol: item.symbol, fallback: "bolt.fill")
-                    .font(TokensTypo.body)
-                    .foregroundStyle(TokensPalette.ambient)
-                    .frame(width: 30, height: 30)
-                    .background(TokensPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name).font(TokensTypo.body)
-                    if let note = item.note {
-                        Text(note).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
-                    }
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(TokensTypo.footnote.weight(.bold))
-                    .foregroundStyle(TokensPalette.tertiary)
-            }
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
         .disabled(busy || running != nil)
         .opacity(busy || running != nil ? 0.45 : 1)
     }
 
     // MARK: 记录
     private var historyCard: some View {
-        ExpandingCardBox(title: "做过什么", side: "\(history.count) 条", sideCls: "na",
-                         cornerRadius: TokensRadius.medium,
-                         footer: "这里只留最近 10 条（本机、本次运行）；全部记录在「指令历史」页里。") {
-            VStack(spacing: 0) {
-                ForEach(Array(history.enumerated()), id: \.element.id) { idx, item in
-                    HStack(spacing: 12) {
+        DSExpandGroup(title: "做过什么", trailing: "\(history.count) 条",
+                      footer: "这里只留最近 10 条（本机、本次运行）；全部记录在「指令历史」页里。") {
+            ForEach(Array(history.enumerated()), id: \.element.id) { idx, item in
+                DSGroupRow(showsSeparator: idx < history.count - 1) {
+                    HStack(spacing: TokensSpacing.md) {
                         StatusDot(cls: item.resultCls)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(item.name).font(TokensTypo.caption)
-                            Text(item.resultText).font(TokensTypo.caption)
+                            Text(item.name)
+                                .font(TokensTypo.footnote)
+                                .foregroundStyle(TokensPalette.primary)
+                            Text(item.resultText)
+                                .font(TokensTypo.footnote)
                                 .foregroundStyle(TokensPalette.statusColor(item.resultCls))
                         }
-                        Spacer()
+                        Spacer(minLength: TokensSpacing.sm)
                         Text(item.startedAt.suffix(5))
-                            .font(TokensTypo.data)
+                            .font(TokensTypo.dataSmall)
                             .foregroundStyle(TokensPalette.secondary)
                     }
-                    .padding(.vertical, 8)
-                    if idx < history.count - 1 { ListDivider() }
                 }
             }
         }
@@ -666,12 +624,18 @@ struct ControlView: View {
                 if !r.progress.isEmpty {
                     Text(r.progress).font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
                 }
-                if !r.handleCode.isEmpty {
-                    KVRow(k: "错误码", v: r.handleCode)
+                DSGroup(title: "执行详情") {
+                    if !r.handleCode.isEmpty {
+                        DSGroupRow {
+                            DSKeyValueRow(key: "错误码", value: r.handleCode, valueCls: "bad")
+                        }
+                    }
+                    DSGroupRow { DSKeyValueRow(key: "发起时间", value: r.startedAt) }
+                    DSGroupRow { DSKeyValueRow(key: "完成时间", value: r.finishTime) }
+                    DSGroupRow(showsSeparator: false) {
+                        DSKeyValueRow(key: "任务 ID", value: r.taskId.isEmpty ? "--" : r.taskId)
+                    }
                 }
-                KVRow(k: "发起时间", v: r.startedAt)
-                KVRow(k: "完成时间", v: r.finishTime)
-                KVRow(k: "任务 ID", v: r.taskId.isEmpty ? "--" : r.taskId)
                 Spacer()
             }
             .padding(TokensSpacing.xl)

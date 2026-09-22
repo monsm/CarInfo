@@ -275,7 +275,7 @@ struct DSTrendEmpty: View {
     var body: some View {
         HStack(alignment: .top, spacing: TokensSpacing.md) {
             Image(safeSymbol: icon, fallback: "chart.xyaxis.line")
-                .font(.system(size: 20, weight: .light))
+                .font(TokensTypo.fixed(20, weight: .light))
                 .foregroundStyle(TokensPalette.tertiary)
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: TokensSpacing.xxs) {

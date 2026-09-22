@@ -201,6 +201,11 @@ targets:
     - path: CarPlay/
       excludes:
       - '**/.*'
+    # 设计令牌（WT）与 App / 小组件**同一份源文件**：车机屏幕上的字号与颜色
+    # 也从这里出，否则它就是第四个自带一套数值的地方（这正是「缝合感」的来源）。
+    # 只加这一个文件，不加整个 Shared/ —— ChargingActivityAttributes 需要 ActivityKit，
+    # 车机与 AppClip 都不该把它编进来。
+    - path: Shared/WidgetTokens.swift
     info:
       path: CarPlay/Info.plist
       properties:
@@ -223,6 +228,8 @@ targets:
     - path: AppClip/
       excludes:
       - '**/.*'
+    # 同上：AppClip 的第一屏就是「同一个 App 的第一屏」，令牌必须同源。
+    - path: Shared/WidgetTokens.swift
     resources:
     - path: AppClip/AppClipIcon.imagestack
       group: AppClipIcon

@@ -50,6 +50,10 @@ enum TokensPalette {
     static var track: Color { spec.track }
     /// 铺在强调色之上的文字色。**不是全局常量** —— 琥珀底配白字不可读（1.9:1）。
     static var labelOnTint: Color { spec.onAccent }
+    /// 遮罩：弹层 / HUD 背后的一层、以及光照不到的暗角（SkyOverlay）。
+    /// 为什么它必须是令牌：纯黑在暖色纸面上会发蓝 —— 纸主题的遮罩是**墨**，不是黑。
+    /// 调用点只给不透明度（`.opacity(0.45)`），色相由主题决定。
+    static var scrim: Color { spec.scrim }
     /// 光从哪来（原生/夜光 = 暖白，纸上 = 朱红，巨字 = 近白）。
     /// 用在「电量就是光」的光条起点、以及光池/光晕——**不要再用写死的 Color.white**：
     /// 纸上主题里它是朱红，白色会在纸面上戳出一个洞。
@@ -189,6 +193,13 @@ enum TokensTypo {
     /// 行内数字（列表数值，iOS 正文尺寸）
     static let data = Font.system(size: 17).monospacedDigit()
     static let dataSmall = Font.system(size: 15).monospacedDigit()
+    /// 定尺文字（**不随 Dynamic Type**）。
+    /// 用在哪：画布本身是几何图形的地方 —— 地图图钉、药丸、环内的读数。
+    /// 那些地方把字号放大就会撑破图形，所以尺寸必须固定；但固定尺寸也**只能从这一个
+    /// 地方来**（`grep "fixed(" 就能看到全 App 到底用了几个尺寸），不写在调用点。
+    static func fixed(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .system(size: size, weight: weight)
+    }
     /// 指定尺寸的等宽数字：图例、次要读数这类「比 dataSmall 还要小但必须等宽」的地方。
     /// ⚠️ data / dataSmall 是**属性**（固定尺寸），digits 是**函数**（带尺寸参数）——
     /// 写成 TokensTypo.data(13) 会编译报错（cannot call value of non-function type 'Font'）。

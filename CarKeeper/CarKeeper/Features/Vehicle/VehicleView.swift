@@ -121,7 +121,8 @@ struct VehicleView: View {
 
             HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                 Text(sum.plate.isEmpty ? "未绑定车牌" : sum.plate)
-                    .font(.system(size: 34, weight: .semibold, design: .monospaced))
+                    // 车牌是**全屏最大的字**，也是这一页的标题：走 metric（等宽数字家族的定尺字）
+                    .font(TokensTypo.metric(34).weight(.semibold))
                     .foregroundStyle(TokensPalette.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -190,19 +191,19 @@ struct VehicleView: View {
         } label: {
             HStack(spacing: TokensSpacing.sm) {
                 Image(safeSymbol: "barcode", fallback: "number")
-                    .font(.system(size: 15))
+                    .font(TokensTypo.fixed(15))
                     .foregroundStyle(TokensPalette.secondary)
                 Text("VIN")
                     .font(TokensTypo.footnote)
                     .foregroundStyle(TokensPalette.secondary)
                 Text(sum.vin.isEmpty ? "--" : sum.vin)
-                    .font(.system(size: 15, design: .monospaced))
+                    .font(TokensTypo.dataSmall)
                     .foregroundStyle(TokensPalette.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Spacer(minLength: TokensSpacing.sm)
                 Image(systemName: "doc.on.doc")
-                    .font(.system(size: 15))
+                    .font(TokensTypo.fixed(15))
                     .foregroundStyle(TokensPalette.ambient)
             }
             .frame(minHeight: TokensSpacing.row)
@@ -261,7 +262,7 @@ struct VehicleView: View {
                         } label: {
                             VStack(spacing: TokensSpacing.xs) {
                                 Image(systemName: "plus")
-                                    .font(.system(size: 20, weight: .light))
+                                    .font(TokensTypo.fixed(20, weight: .light))
                                 Text("添加")
                                     .font(TokensTypo.caption)
                             }

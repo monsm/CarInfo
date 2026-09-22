@@ -136,7 +136,9 @@ struct DrivingScorePage: View {
                     }
                 } else {
                     Text("—")
-                        .font(.system(size: 64, weight: .light).monospacedDigit())
+                        // display() 会带上主题的字重（原生 = 超细）—— 换主题时这几个巨字
+                        // 本来就该跟着变：巨字方向的仪器感就来自这里。
+                        .font(TokensTypo.display(64))
                         .foregroundStyle(TokensPalette.tertiary)
                 }
                 Spacer(minLength: 0)

@@ -74,7 +74,7 @@ struct EmptyStateView: View {
             // 旧版：渐变圆 + 持续重复的缩放动画（提示图标一直在跳）。
             // 新版：一个扁平色块承载图标，提示本身不需要动。
             Image(safeSymbol: icon, fallback: "checkmark.circle.fill")
-                .font(.system(size: 32, weight: .regular))
+                .font(TokensTypo.fixed(32))
                 .foregroundStyle(TokensPalette.ambient)
                 .frame(width: 72, height: 72)
                 .background(RoundedRectangle(cornerRadius: 20, style: .continuous)

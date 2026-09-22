@@ -153,7 +153,8 @@ struct SkyOverlay: View {
         GeometryReader { geo in
             let maxDim = max(geo.size.width, geo.size.height)
             RadialGradient(
-                colors: [Color.black.opacity(0), Color.black.opacity(light.vignette * vignetteScale)],
+                // 暗角 = 光照不到的那一块。它和遮罩同源：纸主题里是墨，不是黑。
+                colors: [TokensPalette.scrim.opacity(0), TokensPalette.scrim.opacity(light.vignette * vignetteScale)],
                 center: UnitPoint(x: 0.5 + light.dirX / (geo.size.width * 2),
                                   y: 0.42 + light.dirY / (geo.size.height * 2)),
                 startRadius: maxDim * 0.34,

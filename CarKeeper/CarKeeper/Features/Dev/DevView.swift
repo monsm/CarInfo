@@ -162,7 +162,7 @@ struct DevView: View {
                         }
                         Spacer(minLength: TokensSpacing.sm)
                         Text(item.color.hexString())
-                            .font(.system(size: 13, design: .monospaced))
+                            .font(TokensTypo.digits(13))
                             .foregroundStyle(TokensPalette.secondary)
                     }
                     .padding(.vertical, 6)
@@ -202,7 +202,7 @@ struct DevView: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
                         Text("\(token.name) · \(token.metrics)")
-                            .font(.system(size: 12, design: .monospaced))
+                            .font(TokensTypo.digits(12))
                             .foregroundStyle(TokensPalette.secondary)
                     }
                     .padding(.vertical, 6)

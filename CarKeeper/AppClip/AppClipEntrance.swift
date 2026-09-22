@@ -21,7 +21,10 @@ struct AppClipEntranceView: View {
         ZStack {
             // 背景渐变
             LinearGradient(
-                colors: [.blue.opacity(0.3), .purple.opacity(0.2)],
+                // 品牌色对：系统蓝 → 电驱青。
+                // 原来是「系统蓝 + 系统紫」—— 那两个色在 App 里哪儿都不出现，
+                // 是这个文件自带的一套（同一件事的第二、第三个名字）。
+                colors: [WT.Palette.tint.opacity(0.3), WT.Palette.charge.opacity(0.2)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -33,21 +36,26 @@ struct AppClipEntranceView: View {
                     Circle()
                         .fill(Material.thin)
                         .frame(width: 80, height: 80)
-                        .overlay(Circle().strokeBorder(Color.white.opacity(0.2), lineWidth: 1))
+                        .overlay(Circle().strokeBorder(WT.Palette.onAccent.opacity(0.2), lineWidth: 1))
                     Image(systemName: "car.fill")
-                        .font(.system(size: 36))
-                        .foregroundStyle(.white)
+                        .font(WT.Typo.fixed(36))
+                        .foregroundStyle(WT.Palette.onAccent)
                 }
 
-                Text("CarKeeper").font(.system(size: 24, weight: .bold)).foregroundStyle(.white)
-                Text("扫码车牌，快速查看车辆状态").font(.system(size: 14)).foregroundStyle(.white.opacity(0.7))
+                Text("CarKeeper")
+                    .font(WT.Typo.fixed(24, weight: .bold))
+                    .foregroundStyle(WT.Palette.onAccent)
+                Text("扫码车牌，快速查看车辆状态")
+                    .font(WT.Typo.subheadline)
+                    // 渐变底是彩色面：文字用「彩色面上的文字色」，它在两种外观下都是白
+                    .foregroundStyle(WT.Palette.onAccent.opacity(0.7))
                     .multilineTextAlignment(.center)
 
                 // 车牌输入框
                 HStack(spacing: 12) {
-                    Image(systemName: "creditcard.fill").font(.title3).foregroundStyle(Color.accentColor)
+                    Image(systemName: "creditcard.fill").font(.title3).foregroundStyle(WT.Palette.tint)
                     TextField("请输入车牌号", text: $plateInput)
-                        .font(.system(size: 18, weight: .medium, design: .monospaced))
+                        .font(WT.Typo.data(18).weight(.medium))
                         .textInputAutocapitalization(.characters)
                         .keyboardType(.asciiCapable)
                         .autocorrectionDisabled()
@@ -55,24 +63,27 @@ struct AppClipEntranceView: View {
                         Button(action: { plateInput = "" }, label: {
                             Image(systemName: "xmark.circle.fill")
                         })
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(WT.Palette.labelSecondary)
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(WT.Palette.labelSecondary.opacity(0.3), lineWidth: 1))
 
                 // 加载状态
                 if isLoading {
-                    ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    Text("正在查询车辆信息...").font(.system(size: 13)).foregroundStyle(.white.opacity(0.6))
+                    ProgressView().progressViewStyle(CircularProgressViewStyle(tint: WT.Palette.onAccent))
+                    Text("正在查询车辆信息...")
+                        .font(WT.Typo.footnote)
+                        .foregroundStyle(WT.Palette.onAccent.opacity(0.6))
                 }
 
                 // 错误提示
                 if hasError {
                     Text("未找到该车辆，请检查车牌号或下载完整 App")
-                        .font(.system(size: 13)).foregroundStyle(.red.opacity(0.8))
+                        .font(WT.Typo.footnote)
+                        .foregroundStyle(WT.Palette.bad.opacity(0.8))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -93,11 +104,13 @@ struct AppClipEntranceView: View {
                     }
                 } label: {
                     Text("查询车辆")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(WT.Typo.headline)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
-                        .foregroundStyle(Color.accentColor)
+                        // 渐变上的实心卡：`onAccent` 在两种外观下都是白 ——
+                        // 因为它站的底是彩色的（与 App 内文字用色同一套语义）
+                        .background(WT.Palette.onAccent, in: RoundedRectangle(cornerRadius: 14))
+                        .foregroundStyle(WT.Palette.tint)
                 }
 
                 // 已有账号？打开完整 App
@@ -105,8 +118,8 @@ struct AppClipEntranceView: View {
                     showMainApp = true
                 } label: {
                     Text("打开完整 App")
-                        .font(.system(size: 15))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .font(WT.Typo.subheadline)
+                        .foregroundStyle(WT.Palette.onAccent.opacity(0.6))
                 }
 
                 Spacer()
@@ -135,8 +148,10 @@ struct FeatureItem: View {
         HStack(spacing: 10) {
             // 注：AppClip target 不包含 Design/Theme.swift，用不了 SafeSymbol 兜底，
             // 所以这里只能用确实存在的 symbol 名（battery.100 / thermometer / lock.fill）
-            Image(systemName: icon).font(.title3).foregroundStyle(.white.opacity(0.8))
-            Text(label).font(.system(size: 14)).foregroundStyle(.white.opacity(0.8))
+            Image(systemName: icon).font(.title3).foregroundStyle(WT.Palette.onAccent.opacity(0.8))
+            Text(label)
+                .font(WT.Typo.subheadline)
+                .foregroundStyle(WT.Palette.onAccent.opacity(0.8))
         }
     }
 }

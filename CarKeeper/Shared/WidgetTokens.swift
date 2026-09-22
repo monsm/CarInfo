@@ -58,6 +58,10 @@ enum WT {
             light: (0.000, 0.780, 0.745),
             dark: (0.400, 0.839, 1.000)
         )
+        /// 铺在**彩色面之上**的文字色（AppClip 的渐变卡、CarPlay 的深底）。
+        /// 它在两种外观下都是白 —— 因为它站的那块底是彩色的，不是画布。
+        /// （App 内对应的是 `TokensPalette.labelOnTint`，两者同名同义。）
+        static let onAccent = Color.white
 
         /// 状态字符串 → 颜色（与 App 的 TokensPalette.statusColor 同一套判定）
         static func status(_ cls: String) -> Color {
@@ -101,9 +105,14 @@ enum WT {
         static func metric(_ size: CGFloat) -> Font {
             .system(size: size, weight: .light).monospacedDigit()
         }
-        /// 行内数字（等宽，换数不跳动）
+        /// 指定尺寸的等宽数字：图例、次要读数这类「比 data(15) 还小但必须等宽」的地方
         static func data(_ size: CGFloat = 15) -> Font {
             .system(size: size).monospacedDigit()
+        }
+        /// 定尺文字（**不随 Dynamic Type**）：画布是固定几何（小组件、车机、AppClip 圆形 Logo）时用。
+        /// 与 App 侧的 `TokensTypo.fixed` 同名同义 —— 两边都只能从令牌文件里出尺寸。
+        static func fixed(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+            .system(size: size, weight: weight)
         }
 
         // 文本：系统语义样式 → 自动跟随 Dynamic Type

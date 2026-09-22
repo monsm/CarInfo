@@ -100,7 +100,7 @@ struct MapCarPin: View {
             Circle()
                 .fill(TokensPalette.surface)
                 .frame(width: 48, height: 48)
-                .shadow(color: .black.opacity(0.45), radius: 14, y: 6)
+                .shadow(color: TokensPalette.scrim.opacity(0.45), radius: 14, y: 6)
 
             Circle()
                 .strokeBorder(TokensPalette.hairline, lineWidth: 0.5)
@@ -189,7 +189,8 @@ struct MapCarPin: View {
     /// 平面化的钉会像贴纸浮在地图上，这一笔是廉价与不廉价的差别之一。
     private func groundShadow(opacity: Double) -> some View {
         Ellipse()
-            .fill(Color.black.opacity(opacity))
+            // 车钉的落地阴影 = 光照不到的那一块，所以它和暗角同源（主题的遮罩色）
+            .fill(TokensPalette.scrim.opacity(opacity))
             .frame(width: 36, height: 8)
             .blur(radius: 5)
             .offset(y: 25)
@@ -210,10 +211,10 @@ struct MapCarPin: View {
     private func socText(color: Color) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
             Text("\(socPct)")
-                .font(.system(size: 16, weight: .semibold).monospacedDigit())
+                .font(TokensTypo.digits(16).weight(.semibold))
                 .foregroundStyle(color)
             Text("%")
-                .font(.system(size: 9, weight: .medium).monospacedDigit())
+                .font(TokensTypo.digits(9).weight(.medium))
                 .foregroundStyle(color.opacity(0.6))
         }
     }
@@ -277,7 +278,7 @@ struct MapSpotPin: View {
                     .font(TokensTypo.digits(11))
                     .tracking(TokensTracking.label)
                     .foregroundStyle(TokensPalette.error)
-                    .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
+                    .shadow(color: TokensPalette.scrim.opacity(0.55), radius: 3, y: 1)
                     .fixedSize()
             }
         }
@@ -296,7 +297,7 @@ struct MapSpotPin: View {
                         .strokeBorder(ink.opacity(isLatest ? 0.85 : 0.45),
                                       lineWidth: isLatest ? 1.6 : 1)
                 }
-                .shadow(color: allowsGlow ? .black.opacity(0.35) : .clear, radius: 8, y: 4)
+                .shadow(color: allowsGlow ? TokensPalette.scrim.opacity(0.35) : .clear, radius: 8, y: 4)
             if isLatest {
                 RoundedRectangle(cornerRadius: 1.5, style: .continuous)
                     .fill(ink)
@@ -315,12 +316,12 @@ struct MapSpotPin: View {
                     .frame(width: 22, height: 22)
                     .overlay { Circle().strokeBorder(inkSoft.opacity(0.6), lineWidth: 1) }
                 Image(systemName: "bolt.fill")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(TokensTypo.fixed(10, weight: .semibold))
                     .foregroundStyle(TokensPalette.info)
             }
             // 价签式标注：**写在钉上的距离**，不随地图缩放变大
             Text(distanceText)
-                .font(.system(size: 10, weight: .medium).monospacedDigit())
+                .font(TokensTypo.digits(10).weight(.medium))
                 .foregroundStyle(ink)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 1.5)
@@ -339,7 +340,7 @@ struct MapSpotPin: View {
                 .fill(TokensPalette.error)
                 .frame(width: 20, height: 18)
             Text("!")
-                .font(.system(size: 11, weight: .bold))
+                .font(TokensTypo.fixed(11, weight: .bold))
                 .foregroundStyle(TokensPalette.labelOnTint)
                 .offset(y: 1)
         }

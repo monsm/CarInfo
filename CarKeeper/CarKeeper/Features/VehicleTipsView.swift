@@ -264,9 +264,11 @@ enum TipSeverity {
 
     var color: Color {
         switch self {
-        case .critical: return .red
-        case .warning: return .orange
-        case .info: return .blue
+        // 三个系统色名 → 三个语义令牌：换主题（纸/夜光）时它们必须跟着变，
+        // 而 `.red` 在任何主题下都只是红色。
+        case .critical: return TokensPalette.error
+        case .warning: return TokensPalette.warning
+        case .info: return TokensPalette.info
         }
     }
 

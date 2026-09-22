@@ -36,7 +36,10 @@ jobs:
           # 2026-09-22 那次 CI 就是在 xcodegen generate 阶段以
           # 「missing source directory .../HealthKit」直接失败的（删目录时漏删声明，
           # 而本地开发机上那个空壳目录还在，怎么试都试不出来）。
-          for s in paths access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol; do
+          # design.py：字号 / 颜色分量 / 色相字面量只允许出现在令牌定义文件里。
+          # 这一条把「完全统一」变成可执行的约束 —— 否则下一轮又会有人写 .font(.system(size: 14))，
+          # 而没有任何东西会出声（它编译得过、看起来也“能用”）。
+          for s in paths design access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol; do
             echo "::group::$s.py"
             python3 scan/$s.py
             echo "::endgroup::"

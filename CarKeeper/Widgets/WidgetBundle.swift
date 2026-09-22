@@ -219,7 +219,7 @@ struct ChargingProgressView: View {
                 Spacer(minLength: 0)
                 if s.charging {
                     Image(systemName: "bolt.fill")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(WT.Typo.fixed(11, weight: .semibold))
                         .foregroundStyle(WT.Palette.charge)
                 }
             }
@@ -297,7 +297,7 @@ struct ChargingProgressView: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: WT.Space.xs) {
                 Image(systemName: "bolt.fill")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(WT.Typo.fixed(11, weight: .semibold))
                 Text(s.charging ? "充电中 \(s.soc)%" : "电量 \(s.soc)%")
                     .font(WT.Typo.headline)
                 Spacer(minLength: 0)
@@ -381,7 +381,7 @@ struct VehicleStatusView: View {
                 WTLabel(text: s.offline ? "离线" : "在线")
                 Spacer(minLength: 0)
                 Image(systemName: s.locked ? "lock.fill" : "lock.open.fill")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(WT.Typo.fixed(11, weight: .semibold))
                     .foregroundStyle(s.locked ? WT.Palette.labelSecondary : WT.Palette.warn)
             }
             Spacer(minLength: WT.Space.sm)
@@ -478,7 +478,7 @@ struct ChargingLiveActivityWidget: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(alignment: .firstTextBaseline, spacing: WT.Space.xs) {
                         Image(systemName: "bolt.fill")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(WT.Typo.fixed(13, weight: .semibold))
                             .foregroundStyle(WT.Palette.charge)
                         Text("\(context.state.soc)")
                             .font(WT.Typo.metric(24))
@@ -509,7 +509,7 @@ struct ChargingLiveActivityWidget: Widget {
                 }
             } compactLeading: {
                 Image(systemName: "bolt.fill")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(WT.Typo.fixed(12, weight: .semibold))
                     .foregroundStyle(WT.Palette.charge)
             } compactTrailing: {
                 Text("\(context.state.soc)%")
@@ -535,7 +535,7 @@ struct ChargingLockScreenView: View {
         VStack(alignment: .leading, spacing: WT.Space.md) {
             HStack(spacing: WT.Space.sm) {
                 Image(systemName: state.charging ? "bolt.fill" : "checkmark.circle.fill")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(WT.Typo.fixed(13, weight: .semibold))
                     .foregroundStyle(state.charging ? WT.Palette.charge : WT.Palette.ok)
                 Text(plate)
                     .font(WT.Typo.subheadline.weight(.semibold))

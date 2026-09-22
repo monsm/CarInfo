@@ -92,7 +92,7 @@ struct OnboardingView: View {
                     .fill(TokensPalette.ambient)
                     .frame(width: 96, height: 96)
                 Image(safeSymbol: page.icon, fallback: "car.fill")
-                    .font(.system(size: 40, weight: .regular))
+                    .font(TokensTypo.fixed(40))
                     .foregroundStyle(TokensPalette.ambient)
             }
 

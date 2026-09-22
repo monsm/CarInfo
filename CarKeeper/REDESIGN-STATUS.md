@@ -619,3 +619,81 @@ CI 里那个 `unit-tests`（`Unit tests (pure logic, non-blocking)`）整体删�
 免得那一批再发明第五个。这一点写进了契约文档，不让它变成悄悄躺着的死代码。
 
 14 个检查器 + `check_style` 全绿，14 个改动文件括号余额逐文件配平。
+
+---
+
+## 第三批：字体与颜色的**字面量清零**（并加了一道会出声的门）
+
+前两批把「同一件事的多个名字」合并了（四代容器 → DS；两套行 → DSRow；三种标题机制 → 成套）。
+这一批处理的是更隐蔽的一层：**同一件事的多个数值**。它不表现为"多了一个类型"，
+而表现为"同一页里 13/14/15pt 混着写"——看起来就是没对齐。
+
+### 迁移前 vs 迁移后（数出来的，不是感觉）
+
+| 项 | 迁移前 | 迁移后 |
+|---|---|---|
+| `.font(.system(size: N))` 字面量 | 112 处 / 26 个文件 | **0 处**（定义处之外；3 处显式豁免） |
+| 颜色分量字面量（手写 RGB） | 4 处（含纸纹的暖棕、遮罩的纯黑、阴影） | **0 处**（全部进 ArtTheme 的取值表） |
+| 色相直用（`.white` / `.red` / `.black` / `.green` …） | 25 个文件里有 | **0 处** |
+| 跨 target 各自一套数值 | CarPlay 6 / AppClip 19 / 小组件 6（各自写死） | CarPlay / AppClip / 小组件**共用 `Shared/WidgetTokens.swift`** |
+| `Theme.swift` | 1128 行（第二代设计系统：`CardBox` / `FluidHeroFont` / Dynamic Type 工具…） | **415 行**：只剩画布与光、两个小零件、两个被「车与账号」直接用的视图 |
+| `Color(hex:)` / `Theme.font` / `Theme.lineHeight` | 三个"第二个入口" | **已删**（字体只从 `TokensTypo` 出，颜色只从 `TokensPalette` 出） |
+
+### 新增 `scan/design.py`（把「完全统一」变成可执行的约束）
+
+三条规则，只拦**结构**（这正是静态脚本能可靠做到的那一类）：
+
+1. 字号字面量 → 只允许在 `Tokens.swift` / `WidgetTokens.swift`
+2. 颜色分量字面量 → 只允许在 `ArtTheme.swift`（主题取值表）/ `WidgetTokens.swift`
+3. 色相字面量（含 `colors: [.red, .orange]` 这种裸色名）→ 一律不允许
+
+豁免必须**写明理由**，输出成 ⚠️ 而不是 ✅（沿用 `paths.py` 的约定）。目前 3 条豁免：
+主题样张页（它的职责就是把真实取值显示给人看）、Watch 的两个副本（理由见下）。
+
+> 反向自测做了：注入一处 `.font(.system(size: 14))` → ❌ + 退出码 1；
+> 同一处写进 `EXEMPT` → ⚠️ 并打印理由；把豁免删掉 → 又变 ❌。
+
+### 为迁移补的三个口子（都是「同一件事被做了很多次」的典型）
+
+| 新令牌 | 它替掉的东西 | 为什么必须是令牌 |
+|---|---|---|
+| `TokensPalette.scrim` | `.black` 遮罩、暗角、车钉落地阴影（7 处） | 纯黑在暖色纸面上会发蓝 —— 纸主题的遮罩是**墨** |
+| `TokensPalette.labelOnTint` | 紧急面板 / AppClip 上的 `.white` 文字 | 琥珀底配白字只有 1.9:1；"彩色面上的文字色"必须是主题的一部分 |
+| `TokensTypo.fixed(N, weight:)` | 图钉 / 药丸 / 图标字形 / 环内读数（~45 处） | 那些画布是几何图形，字号**不能**跟随 Dynamic Type（放大会撑破它）；但尺寸仍只能从令牌文件出 |
+
+`WT.Palette.onAccent` 与 `WT.Typo.fixed` 是它们在**世界面**的同名同义对应物 ——
+两边的命名刻意一致，这样"车机上看到的"与"手机里看到的"是同一条规则。
+
+### Watch 为什么没并进来（先去核实，再豁免）
+
+共享 `WidgetTokens.swift` 的前提是它能在那个平台编译。查了 Apple 文档 JSON：
+
+```
+secondarySystemGroupedBackground
+  platforms = iOS 13.0 / iPadOS 13.0 / Mac Catalyst 13.1 / visionOS 1.0
+  —— 没有 watchOS
+```
+
+`WT.Palette` 的取值面是系统语义色，所以**手表不能共享这份文件**（不是不想共享）。
+手表那 19 处字面量按它的 155pt 画布另定，豁免理由写成了**平台事实**并记进 `scan/design.py`。
+
+### 顺带发现的三个「说错了话」的地方
+
+1. `ArtTheme.swift` 头部写着「App 里仍有约 130 处写死的颜色，不跟随主题，属于下一轮的事」——
+   本轮就是那一轮，已改成实情（并把仍未做的一条如实留着：换主题会重置子树 `@State`）。
+2. `Theme.swift` 里两处 `\.white` 注释与「页面的加载态用 `DSSkeleton`」混在一起，
+   孤儿 `///` 注释挂在已删的类型上 —— 已清。
+3. `TokensSize.icon*` 与 `.font(.system(size: TokensSize.icon))` 是这个仓库里的**中间形态**
+   （尺寸是令牌，但字体构造仍在调用点）。定尺零件现在统一走 `TokensTypo.fixed`。
+
+### 仍未做（不装作完成）
+
+- `MonthlyReportGenerator` 的月报仍是写死的 `1250 km / 14.5 / 8 次 / 65% / 85 分`。
+- AppClip 那一屏的「特斯拉 Model 3 / 85% / 420km」是编的（连车型都对不上）。
+- `tripHistory` / `parkingHistory` 仍**没有任何写入点** → 行程与停车两个层必然是空的。
+- 车控页还没按 `funCode` 开合控件（本车 `#StateWindow:0`、`#PeriodicCharge:0` 照样显示按钮）。
+- `daysUntil` 还没拒绝 `0000-00-00`；`AppStore` 写里程用的键名（`Mileage`）与真实报文
+  （`totalOdometer`）不匹配 → 维保提醒永远不会响。
+
+15 个检查器（新增 `design`）+ `check_style` 全绿；31 个改动文件括号余额逐文件配平
+（用 `design.py` 的同一套字符串/注释剥离实现来数，不另写一套）。

@@ -125,7 +125,7 @@ struct DataView: View {
                 Text(kind.title)
                     .font(TokensTypo.subheadline.weight(.semibold))
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(TokensTypo.caption2.weight(.semibold))
             }
             .foregroundStyle(TokensPalette.ambient)
         }

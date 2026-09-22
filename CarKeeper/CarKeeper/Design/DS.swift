@@ -144,6 +144,9 @@ struct DSSeparator: View {
 struct DSGroup<Content: View>: View {
     var title: String? = nil
     var trailing: String? = nil
+    /// 不为 "na" 时，右侧那个值渲染成 `DSChip`（带语义色）而不是灰字。
+    /// 「共 3 项故障」这类话是**状态**，不是计数：状态必须带颜色，计数只是灰字。
+    var trailingCls: String = "na"
     var footer: String? = nil
     var onTrailingTap: (() -> Void)? = nil
     @ViewBuilder var content: () -> Content
@@ -151,7 +154,8 @@ struct DSGroup<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let title {
-                DSSectionHeader(title: title, trailing: trailing, action: onTrailingTap)
+                DSSectionHeader(title: title, trailing: trailing,
+                                trailingCls: trailingCls, action: onTrailingTap)
             }
             VStack(spacing: 0) { content() }
                 .background {
@@ -230,6 +234,8 @@ struct DSKeyValueRow: View {
 struct DSSectionHeader: View {
     var title: String
     var trailing: String? = nil
+    /// 不为 "na" 时用 `DSChip`（一个语义圆点 + 颜色）代替灰字。
+    var trailingCls: String = "na"
     var action: (() -> Void)? = nil
 
     var body: some View {
@@ -248,6 +254,8 @@ struct DSSectionHeader: View {
                         .font(TokensTypo.footnote)
                         .foregroundStyle(TokensPalette.ambient)
                         .buttonStyle(.plain)
+                } else if trailingCls != "na" {
+                    DSChip(text: trailing, cls: trailingCls)
                 } else {
                     Text(trailing)
                         .font(TokensTypo.footnote)
@@ -442,7 +450,7 @@ struct DSStatStrip: View {
                     HStack(spacing: 4) {
                         if let icon = item.icon {
                             Image(safeSymbol: icon, fallback: "circle")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(TokensTypo.fixed(10, weight: .semibold))
                         }
                         Text(item.label)
                             .lineLimit(1)
@@ -477,7 +485,7 @@ struct DSChip: View {
         HStack(spacing: 6) {
             if let icon {
                 Image(safeSymbol: icon, fallback: "circle.fill")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(TokensTypo.fixed(10, weight: .semibold))
                     .foregroundStyle(color)
             } else {
                 Circle()
@@ -571,7 +579,7 @@ struct DSRow: View {
             }
             if showsChevron {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(TokensTypo.fixed(13, weight: .semibold))
                     .foregroundStyle(TokensPalette.tertiary)
             }
         }
@@ -710,7 +718,7 @@ struct DSSegmented<T: Hashable>: View {
                             if selected {
                                 RoundedRectangle(cornerRadius: 7, style: .continuous)
                                     .fill(TokensPalette.nightSurface)
-                                    .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
+                                    .shadow(color: TokensPalette.scrim.opacity(0.12), radius: 3, y: 1)
                             }
                         }
                 }
@@ -753,7 +761,7 @@ struct DSNotice: View {
     var body: some View {
         HStack(spacing: TokensSpacing.sm) {
             Image(safeSymbol: kind.icon, fallback: "info.circle.fill")
-                .font(.system(size: 15))
+                .font(TokensTypo.fixed(15))
                 .foregroundStyle(TokensPalette.statusColor(kind.cls))
             Text(text)
                 .font(TokensTypo.footnote)
@@ -787,7 +795,7 @@ struct DSPlaceholder: View {
     var body: some View {
         VStack(spacing: TokensSpacing.md) {
             Image(safeSymbol: icon, fallback: "questionmark.circle")
-                .font(.system(size: 40, weight: .light))
+                .font(TokensTypo.fixed(40, weight: .light))
                 .foregroundStyle(cls == "na" ? TokensPalette.tertiary : TokensPalette.statusColor(cls))
             Text(title)
                 .font(TokensTypo.headline)
@@ -887,7 +895,7 @@ struct DSExpandGroup<Content: View>: View {
                         DSChip(text: trailing, cls: trailingCls)
                     }
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(TokensTypo.fixed(11, weight: .semibold))
                         .foregroundStyle(TokensPalette.tertiary)
                         .rotationEffect(.degrees(expanded ? 180 : 0))
                 }

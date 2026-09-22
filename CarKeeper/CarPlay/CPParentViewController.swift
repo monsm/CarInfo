@@ -124,12 +124,16 @@ struct CarPlayStatusCardView: View {
         VStack(spacing: 16) {
             // SOC 圆环
             ZStack {
-                Circle().stroke(Color.gray.opacity(0.3), lineWidth: 12)
+                Circle().stroke(WT.Palette.track, lineWidth: 12)
                 Circle()
                     .trim(from: 0, to: CGFloat(soc) / 100)
                     .stroke(
+                        // 低电量用语义色的那一对（不到 20% 就是「需要处理」），
+                        // 正常时是「电驱」的那一对。与 App 内同一套判定。
                         LinearGradient(
-                            colors: soc < 20 ? [.red, .orange] : [.green, .teal],
+                            colors: soc < 20
+                                ? [WT.Palette.bad, WT.Palette.warn]
+                                : [WT.Palette.ok, WT.Palette.charge],
                             startPoint: .topLeading, endPoint: .bottomTrailing
                         ),
                         lineWidth: 12
@@ -137,9 +141,11 @@ struct CarPlayStatusCardView: View {
                     .rotationEffect(.degrees(-90))
                 VStack(spacing: 2) {
                     Text("\(soc)%")
-                        .font(.system(size: 48, weight: .bold, design: .monospaced))
-                        .foregroundStyle(soc < 20 ? Color.red : Color.primary)
-                    Text("SOC").font(.system(size: 14)).foregroundStyle(.secondary)
+                        .font(WT.Typo.display(48).weight(.bold))
+                        .foregroundStyle(soc < 20 ? WT.Palette.bad : WT.Palette.label)
+                    Text("SOC")
+                        .font(WT.Typo.data(14))
+                        .foregroundStyle(WT.Palette.labelSecondary)
                 }
             }
             .frame(width: 140, height: 140)
@@ -168,8 +174,10 @@ struct StatusItem: View {
     var body: some View {
         VStack(spacing: 4) {
             Label(value + (unit.isEmpty ? "" : unit), systemImage: icon)
-                .font(.system(size: 16, weight: .semibold))
-            Text(label).font(.system(size: 11)).foregroundStyle(.secondary)
+                .font(WT.Typo.fixed(16, weight: .semibold))
+            Text(label)
+                .font(WT.Typo.fixed(11))
+                .foregroundStyle(WT.Palette.labelSecondary)
         }
     }
 }

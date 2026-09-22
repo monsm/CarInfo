@@ -184,7 +184,8 @@ struct MessagesView: View {
                     VStack(alignment: .leading, spacing: TokensSpacing.xs) {
                         HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                             Text(item.title)
-                                .font(.system(size: 17, weight: item.read ? .regular : .semibold))
+                                // 未读靠**字重**而不是颜色（颜色已经全给了语义状态）
+                                .font(TokensTypo.body.weight(item.read ? .regular : .semibold))
                                 .foregroundStyle(TokensPalette.primary)
                                 .lineLimit(2)
                             if !item.tag.isEmpty {
@@ -197,7 +198,7 @@ struct MessagesView: View {
                             .font(TokensTypo.footnote)
                             .foregroundStyle(TokensPalette.secondary)
                             Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(TokensTypo.fixed(11, weight: .semibold))
                                 .foregroundStyle(TokensPalette.tertiary)
                         }
 
@@ -232,7 +233,7 @@ struct MessagesView: View {
     private func detailRow(_ icon: String, _ label: String, _ value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
             Image(safeSymbol: icon, fallback: "circle")
-                .font(.system(size: 12))
+                .font(TokensTypo.fixed(12))
                 .foregroundStyle(TokensPalette.tertiary)
                 .frame(width: 16, alignment: .center)
             Text(label)

@@ -69,11 +69,30 @@ struct BatteryView: View {
             // 切车后重新拉一次数据
             Task { await load() }
         }
+        // 加载态用骨架、失败态用 DSPlaceholder —— 与全量数据 / 健康报告 / 车辆档案同一套。
         .overlay(alignment: .center) {
             if !loaded && errText.isEmpty {
-                PageLoadingView("正在同步电池数据…")
+                VStack(alignment: .leading, spacing: TokensSpacing.md) {
+                    HStack(spacing: TokensSpacing.sm) {
+                        ProgressView().controlSize(.small)
+                        Text("正在同步电池数据…")
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.secondary)
+                    }
+                    DSSkeleton(height: 88, width: nil)
+                    DSSkeleton(height: 142, width: nil)
+                    DSSkeleton(height: 64, width: nil)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, TokensSpacing.page)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(Text("正在同步电池数据"))
             } else if !errText.isEmpty {
-                PageErrorView(errText) { Task { await load() } }
+                DSPlaceholder(icon: "exclamationmark.triangle",
+                              title: "电池数据读取失败",
+                              message: errText,
+                              actionTitle: "重新加载",
+                              cls: "warn") { Task { await load() } }
             }
         }
     }
@@ -171,13 +190,16 @@ struct BatteryView: View {
     private func verdictCard(_ cache: [String: Any?], _ b: BatteryModel) -> some View {
         Group {
             if let batt = AN.summarize(cache, store.car).domains.first(where: { $0.key == "battery" }) {
-                ExpandingCardBox(title: "分析结论", side: batt.title,
-                                 sideCls: batt.cls, cornerRadius: TokensRadius.medium) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(Array(batt.reasons.enumerated()), id: \.offset) { _, r in
-                            HStack(alignment: .top, spacing: 8) {
+                // 折叠分组回到 DS 语言：标题行在画布上，行在表面上（与其余 25 屏一致）
+                DSExpandGroup(title: "分析结论", trailing: batt.title, trailingCls: batt.cls) {
+                    ForEach(Array(batt.reasons.enumerated()), id: \.offset) { idx, r in
+                        DSGroupRow(showsSeparator: idx < batt.reasons.count - 1) {
+                            HStack(alignment: .top, spacing: TokensSpacing.sm) {
                                 StatusDot(cls: r.cls)
-                                Text(r.t).font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
+                                Text(r.t)
+                                    .font(TokensTypo.footnote)
+                                    .foregroundStyle(TokensPalette.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                     }
@@ -189,11 +211,10 @@ struct BatteryView: View {
     // MARK: 一致性
     private func consistencyCard(_ b: BatteryModel) -> some View {
         let cellLabel = b.cellStats.map { cell in "\(cell.count) 节采样" } ?? "接口未上报"
-        return ExpandingCardBox(title: "一致性", side: cellLabel, sideCls: "ok",
-                         cornerRadius: TokensRadius.medium) {
-            VStack(spacing: 12) {
-                if let cell = b.cellStats {
-                    VStack(spacing: 6) {
+        return DSExpandGroup(title: "一致性", trailing: cellLabel, trailingCls: "ok") {
+            if let cell = b.cellStats {
+                DSGroupRow(showsSeparator: b.probeStats != nil) {
+                    VStack(spacing: TokensSpacing.sm) {
                         sectionLabel("单体电压 (V)")
                         Chart(Array(cell.bars.enumerated()), id: \.offset) { (_ idx, v) in
                             BarMark(x: .value("序号", idx), y: .value("V", v))
@@ -202,7 +223,7 @@ struct BatteryView: View {
                         }
                         .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
                         .frame(height: 96)
-                        HStack(spacing: 8) {
+                        HStack(spacing: TokensSpacing.sm) {
                             miniStat("最高", String(format: "%.3f", cell.max), "V")
                             miniStat("最低", String(format: "%.3f", cell.min), "V")
                             if let dv = b.diffV {
@@ -211,9 +232,12 @@ struct BatteryView: View {
                             }
                         }
                     }
+                    .padding(.vertical, TokensSpacing.sm)
                 }
-                if let probe = b.probeStats {
-                    VStack(spacing: 6) {
+            }
+            if let probe = b.probeStats {
+                DSGroupRow(showsSeparator: false) {
+                    VStack(spacing: TokensSpacing.sm) {
                         sectionLabel("温度探针 (℃)")
                         Chart(Array(probe.bars.enumerated()), id: \.offset) { (_ idx, v) in
                             BarMark(x: .value("序号", idx), y: .value("℃", v))
@@ -222,7 +246,7 @@ struct BatteryView: View {
                         }
                         .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
                         .frame(height: 80)
-                        HStack(spacing: 8) {
+                        HStack(spacing: TokensSpacing.sm) {
                             miniStat("最高", String(format: "%.1f", probe.max), "℃")
                             miniStat("最低", String(format: "%.1f", probe.min), "℃")
                             if let dt = b.diffT {
@@ -230,6 +254,7 @@ struct BatteryView: View {
                             }
                         }
                     }
+                    .padding(.vertical, TokensSpacing.sm)
                 }
             }
         }
@@ -241,14 +266,12 @@ struct BatteryView: View {
         // 显式 return：本函数不是 @ViewBuilder，多语句体必须 return，
         // 否则是「opaque return type 无 return」错误（此前被开头一句多余的
         // `return EmptyView()` 掩盖，那句同时让整张充电卡片渲染成空视图）。
-        return ExpandingCardBox(title: "充电", side: b.charging.text, sideCls: chargeSide,
-                                cornerRadius: TokensRadius.medium) {
-            VStack(spacing: 0) {
-                let rows = chargeRows(b)
-                ForEach(Array(rows.enumerated()), id: \.offset) { (_ idx, r) in
-                    KVRow(k: r.k, v: r.v)
-                        .padding(.vertical, 8)
-                    if idx < rows.count - 1 { ListDivider() }
+        return DSExpandGroup(title: "充电", trailing: b.charging.text, trailingCls: chargeSide) {
+            let rows = chargeRows(b)
+            ForEach(Array(rows.enumerated()), id: \.offset) { idx, r in
+                DSGroupRow(showsSeparator: idx < rows.count - 1) {
+                    DSKeyValueRow(key: r.k, value: r.v,
+                                  valueCls: r.cls.isEmpty ? "na" : r.cls)
                 }
             }
         }
@@ -258,26 +281,36 @@ struct BatteryView: View {
     private func subsystemCard(_ b: BatteryModel) -> some View {
         Group {
             if !b.subsystems.isEmpty || !b.tempSubs.isEmpty {
-                CardBox(title: "子系统") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        if !b.subsystems.isEmpty {
-                            sectionLabel("电压采样")
-                            ForEach(b.subsystems, id: \.num) { s in
-                                KVRow(k: s.num == "--" ? "子系统" : "子系统 \(s.num)",
-                                      v: [s.count != "--" ? "\(s.count) 串" : "",
-                                          s.volt != "--" ? "\(s.volt) V" : "",
-                                          s.amp != "--" ? "\(s.amp) A" : "",
-                                          s.vMin != "--" && s.vMax != "--" ? "\(s.vMin)~\(s.vMax) V" : ""
-                                      ].filter { !$0.isEmpty }.joined(separator: " · "))
+                // 原来是一个 CardBox 里塞两组「小标题 + 键值行」；现在拆成两个真分组，
+                // 子标题变成分组标题（全 App 的分组标题只有一种写法）。
+                VStack(spacing: TokensSpacing.xl) {
+                    if !b.subsystems.isEmpty {
+                        DSGroup(title: "电压采样") {
+                            ForEach(Array(b.subsystems.enumerated()), id: \.element.num) { idx, s in
+                                DSGroupRow(showsSeparator: idx < b.subsystems.count - 1) {
+                                    DSKeyValueRow(key: s.num == "--" ? "子系统" : "子系统 \(s.num)",
+                                                  value: joinedParts([
+                                                      s.count != "--" ? "\(s.count) 串" : "",
+                                                      s.volt != "--" ? "\(s.volt) V" : "",
+                                                      s.amp != "--" ? "\(s.amp) A" : "",
+                                                      s.vMin != "--" && s.vMax != "--"
+                                                          ? "\(s.vMin)~\(s.vMax) V" : ""
+                                                  ]))
+                                }
                             }
                         }
-                        if !b.tempSubs.isEmpty {
-                            sectionLabel("温度采样")
-                            ForEach(b.tempSubs, id: \.num) { s in
-                                KVRow(k: s.num == "--" ? "子系统" : "子系统 \(s.num)",
-                                      v: [s.count != "--" ? "\(s.count) 探针" : "",
-                                          s.tMin != "--" && s.tMax != "--" ? "\(s.tMin)~\(s.tMax) ℃" : ""
-                                      ].filter { !$0.isEmpty }.joined(separator: " · "))
+                    }
+                    if !b.tempSubs.isEmpty {
+                        DSGroup(title: "温度采样") {
+                            ForEach(Array(b.tempSubs.enumerated()), id: \.element.num) { idx, s in
+                                DSGroupRow(showsSeparator: idx < b.tempSubs.count - 1) {
+                                    DSKeyValueRow(key: s.num == "--" ? "子系统" : "子系统 \(s.num)",
+                                                  value: joinedParts([
+                                                      s.count != "--" ? "\(s.count) 探针" : "",
+                                                      s.tMin != "--" && s.tMax != "--"
+                                                          ? "\(s.tMin)~\(s.tMax) ℃" : ""
+                                                  ]))
+                                }
                             }
                         }
                     }
@@ -290,18 +323,20 @@ struct BatteryView: View {
     private func motorCard(_ b: BatteryModel) -> some View {
         Group {
             if !b.motors.isEmpty {
-                ExpandingCardBox(title: "动力系统", side: "\(b.motors.count) 台电机", cornerRadius: TokensRadius.medium) {
-                    VStack(spacing: 12) {
-                        ForEach(Array(b.motors.enumerated()), id: \.offset) { (_ idx, m) in
-                            VStack(alignment: .leading, spacing: 6) {
+                DSExpandGroup(title: "动力系统", trailing: "\(b.motors.count) 台电机") {
+                    ForEach(Array(b.motors.enumerated()), id: \.offset) { mIdx, m in
+                        let rows = motorRows(m)
+                        DSGroupRow(showsSeparator: mIdx < b.motors.count - 1) {
+                            VStack(alignment: .leading, spacing: TokensSpacing.xs) {
                                 Text(m.num == "--" ? "驱动电机" : "驱动电机 #\(m.num)")
-                                    .font(TokensTypo.caption.weight(.bold)).foregroundStyle(TokensPalette.secondary)
-                                let rows = motorRows(m)
-                                ForEach(Array(rows.enumerated()), id: \.offset) { (_ idx, r) in
-                                    KVRow(k: r.k, v: r.v)
-                                    if idx < rows.count - 1 { ListDivider().opacity(0.4) }
+                                    .font(TokensTypo.footnote.weight(.bold))
+                                    .foregroundStyle(TokensPalette.secondary)
+                                ForEach(Array(rows.enumerated()), id: \.offset) { _, r in
+                                    DSKeyValueRow(key: r.k, value: r.v,
+                                                  valueCls: r.cls.isEmpty ? "na" : r.cls)
                                 }
                             }
+                            .padding(.vertical, TokensSpacing.sm)
                         }
                     }
                 }
@@ -311,31 +346,23 @@ struct BatteryView: View {
 
     // MARK: 故障码
     private func faultCard(_ b: BatteryModel) -> some View {
-        CardBox(title: "故障码",
-                side: b.faultTotal > 0 ? "共 \(b.faultTotal) 条" : "无故障",
-                sideCls: b.faultTotal > 0 ? "bad" : "ok") {
-            if b.faults.filter({ $0.count > 0 }).isEmpty {
-                Text("驱动电机 / 储能 / 发动机均无故障")
-                    .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
+        DSGroup(title: "故障码",
+                trailing: b.faultTotal > 0 ? "共 \(b.faultTotal) 条" : "无故障",
+                trailingCls: b.faultTotal > 0 ? "bad" : "ok") {
+            let active = b.faults.filter { $0.count > 0 }
+            if active.isEmpty {
+                DSGroupRow(showsSeparator: false) {
+                    Text("驱动电机 / 储能 / 发动机均无故障")
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.secondary)
+                }
             } else {
-                VStack(spacing: 10) {
-                    ForEach(b.faults.filter { $0.count > 0 }) { f in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(f.name).font(TokensTypo.caption.weight(.bold))
-                                Spacer()
-                                Text("\(f.count) 条").font(TokensTypo.caption.weight(.bold))
-                                    .foregroundStyle(TokensPalette.error)
-                            }
-                            if !f.codes.isEmpty {
-                                Text(f.codes)
-                                    .font(TokensTypo.dataSmall)
-                                    .foregroundStyle(TokensPalette.secondary).lineLimit(3)
-                            }
-                        }
-                        .padding(10)
-                        .background(TokensPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 12, style:
- .continuous))
+                ForEach(Array(active.enumerated()), id: \.element.id) { idx, f in
+                    DSGroupRow(showsSeparator: idx < active.count - 1) {
+                        DSKeyValueRow(key: f.name,
+                                      value: f.codes.isEmpty ? "\(f.count) 条"
+                                                             : "\(f.count) 条 · \(f.codes)",
+                                      valueCls: "bad")
                     }
                 }
             }
@@ -346,18 +373,19 @@ struct BatteryView: View {
     private func alarmCard(_ b: BatteryModel) -> some View {
         Group {
             if !b.alarms.isEmpty {
-                CardBox(title: "电池告警", side: "共 \(b.alarms.count) 项", sideCls: "bad") {
-                    VStack(spacing: 0) {
-                        ForEach(Array(b.alarms.enumerated()), id: \.offset) { (_ idx, a) in
-                            HStack {
+                DSGroup(title: "电池告警", trailing: "共 \(b.alarms.count) 项", trailingCls: "bad") {
+                    ForEach(Array(b.alarms.enumerated()), id: \.offset) { idx, a in
+                        DSGroupRow(showsSeparator: idx < b.alarms.count - 1) {
+                            HStack(spacing: TokensSpacing.sm) {
                                 StatusDot(cls: "bad")
-                                Text(a).font(TokensTypo.caption)
-                                Spacer()
-                                Text("触发").font(TokensTypo.footnote.weight(.bold))
+                                Text(a)
+                                    .font(TokensTypo.footnote)
+                                    .foregroundStyle(TokensPalette.primary)
+                                Spacer(minLength: TokensSpacing.sm)
+                                Text("触发")
+                                    .font(TokensTypo.footnote.weight(.bold))
                                     .foregroundStyle(TokensPalette.error)
                             }
-                            .padding(.vertical, 6)
-                            if idx < b.alarms.count - 1 { ListDivider() }
                         }
                     }
                 }
@@ -371,11 +399,16 @@ struct BatteryView: View {
         DSSectionHeader(title: t)
     }
 
+    /// 把「串数 · 电压 · 电流 · 区间」里真正有值的部分接成一句（空项丢掉，不留下多余的分隔点）。
+    private func joinedParts(_ parts: [String]) -> String {
+        parts.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
     private func miniStat(_ k: String, _ v: String, _ unit: String, warn: Bool = false) -> some View {
         HStack(spacing: 4) {
             Text(k).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
             Text(v).font(TokensTypo.caption.weight(.bold)).monospacedDigit()
-                .foregroundStyle(warn ? TokensPalette.error : .primary)
+                .foregroundStyle(warn ? TokensPalette.error : TokensPalette.primary)
             Text(unit).font(TokensTypo.caption2).foregroundStyle(TokensPalette.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -587,7 +620,8 @@ struct DestinationCalculatorView: View {
                         .foregroundStyle(reach ? TokensPalette.success : TokensPalette.error)
                 }
                 .padding()
-                .background(reach ? .green.opacity(0.1) : .red.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                .background(reach ? TokensPalette.success.opacity(0.1) : TokensPalette.error.opacity(0.1),
+                            in: RoundedRectangle(cornerRadius: 12))
             }
 
             Button("计算") {

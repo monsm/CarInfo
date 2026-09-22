@@ -375,7 +375,7 @@ private struct ReplayChart: View {
                 let x = CGFloat(idx) * stepX
                 let y = size.height - CGFloat(peakPoint.v / peak) * (size.height - 10) - 4
                 ctx.draw(Text(String(format: "%.1f", peakPoint.v))
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(TokensTypo.fixed(10, weight: .semibold))
                     .foregroundColor(ink), at: CGPoint(x: min(max(x, 24), size.width - 24), y: max(y - 12, 12)))
             }
         }

@@ -39,8 +39,8 @@ struct GlobalSearchHUD: View {
 
     var body: some View {
         ZStack {
-            // 背景遮罩（浮层自己的一层，合法）
-            Color.black.opacity(0.45)
+            // 背景遮罩（浮层自己的一层，合法）。色相来自主题：纸主题的遮罩是墨，不是黑。
+            TokensPalette.scrim.opacity(0.45)
                 .ignoresSafeArea()
                 .onTapGesture { isPresented = false }
 

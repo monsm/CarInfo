@@ -195,7 +195,7 @@ struct MineView: View {
                     }
                     Spacer(minLength: TokensSpacing.sm)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(TokensTypo.fixed(13, weight: .semibold))
                         .foregroundStyle(TokensPalette.tertiary)
                 }
 
@@ -215,7 +215,7 @@ struct MineView: View {
                 if let lt = um?.lastLoginTime, !lt.isEmpty {
                     HStack(spacing: TokensSpacing.xs) {
                         Image(systemName: "clock")
-                            .font(.system(size: 11))
+                            .font(TokensTypo.fixed(11))
                         Text("上次登录 \(lt)")
                     }
                     .font(TokensTypo.caption)
@@ -223,7 +223,6 @@ struct MineView: View {
                 }
             }
         }
-        .dynamicTypeCompress()
     }
 
     private func profileStat(label: String, value: String, unit: String?) -> some View {
@@ -274,12 +273,11 @@ struct MineView: View {
                            cls: d < 0 ? "bad" : (d <= 30 ? "warn" : "ok"))
                 }
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(TokensTypo.fixed(13, weight: .semibold))
                     .foregroundStyle(TokensPalette.tertiary)
             }
             .padding(TokensSpacing.md)
             .dsSurface(padding: 0)
-            .dynamicTypeCompress()
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -446,7 +444,7 @@ struct MineView: View {
         } label: {
             HStack(spacing: TokensSpacing.sm) {
                 Image(systemName: "rectangle.portrait.and.arrow.right")
-                    .font(.system(size: 15))
+                    .font(TokensTypo.fixed(15))
                 Text("退出登录").font(TokensTypo.headline)
                 Spacer()
             }

@@ -13,14 +13,15 @@
 | 维度 | 立契约前 | 立契约后（本轮） |
 |---|---|---|
 | 容器 | `CardBox` / `ExpandingCardBox` / `glassCard`（第二代）+ `DSCard` / `DSGroup`（第四代） | 只留 `DSCard` / `DSGroup` / `DSExpandGroup` |
-| 分组容器调用点 | 旧世代 40 处（Battery 16 / Control 12 / Mine 8 / 散落 4） | Mine 的 8 处已迁；**Battery 16 + Control 12 待迁** |
+| 分组容器调用点 | 旧世代 40 处（Battery 16 / Control 12 / Mine 8 / 散落 4） | **全部迁完（40/40）**；`DSExpandGroup` 现有 6 个真实调用点（电池 4 / 车控 2） |
 | 行 | `KVRow`（第二代）/ `DSKeyValueRow`（第四代）/ 手写 `HStack` / `ReportRow`（第五种，只在月报里） | 只留 `DSRow` / `DSKeyValueRow` / `DSStatRow` |
 | 分隔线 | `ListDivider`（`Divider().opacity(0.5)`）与 `DSDivider`/`DSSeparator` 并存 | 只留 `DSSeparator`（跟着 `DSGroupRow` 走） |
 | 页面标题 | `DSPageTitle` + `dsPageTitle()`（成套，12 页）／裸 `.navigationTitle`（7 页）／什么都没有 | **30 页全部成套**：内容里 `DSPageTitle`，导航栏交给 `dsPageTitle()` |
 | 页面边距 | `pageBackground()`（contentMargins 20）与手写 `.padding(.horizontal, …)`（20 或 24）并存 | 两种都指向 20pt；**DevView 原本一点横向边距都没有，已补 `pageBackground()`** |
-| 字体 | 令牌 358 处 + `Theme.font(...)` 中转 + 应用内硬编码 `.font(.system(size:` 68 处 | `Theme.font` 调用点清零；硬编码字号仍是下一批 |
+| 字体 | 令牌 358 处 + `Theme.font(...)` 中转 + 应用内硬编码 `.font(.system(size:` 68 处 | `Theme.font` 清零；**字号字面量全库清零**（定义处之外 0 处，仅 3 处显式豁免）；`Theme.font` / `Theme.lineHeight` / `Color(hex:)` 已从代码里删掉 |
 | 空态 | `DSPlaceholder`（12 处）／`PageLoadingView`+`PageErrorView`（各 1 处）／手写灰图标 | 空态一律 `DSPlaceholder`（维保记录页本轮改过来） |
-| 颜色 | 令牌 631 处 + `.green`/`.orange`/`.red` 直用 4 处 | 直用清零（`AppStore.statusColor`、省电开关、电池达成率） |
+| 颜色 | 令牌 631 处 + `.green`/`.orange`/`.red`/`.white`/`.black` 直用，散在 25 个文件 | **全库清零**；补了三个缺口令牌：`scrim`（遮罩/暗角/阴影）、`labelOnTint`（彩色面上的文字）、`fillSubtle` 家族 |
+| 跨 target 令牌 | 小组件用 `WT.*`，CarPlay/AppClip/Watch 各自写死一套（合计 39 处字面量） | **CarPlay / AppClip 与小组件共用 `Shared/WidgetTokens.swift`**（同一份源文件）；Watch 显式豁免（理由已核实，见下） |
 
 ---
 
@@ -106,6 +107,7 @@ ScrollView {
 | `scan/access.py` | 跨文件引用 `private` 成员（`类型.成员` 形式） |
 | `scan/shadowguard.py` | 把泛用名（`Color` 之类）劫持进项目命名空间的形状 |
 | `scan/unreachable.py` / `deep.py` / `eol.py` / `logic.py` / `lexguard.py` / `scenes.py` / `targets.py` / `futureproof.py` | 见各自文件头 |
+| `scan/design.py` | **字号 / 颜色分量 / 色相字面量**只能出现在令牌定义文件里（`Tokens.swift` / `WidgetTokens.swift` / `ArtTheme.swift`）；豁免必须写明理由，输出 ⚠️ 而不是 ✅ |
 | `CarKeeper/check_style.js` | 风格（含被删的 Tab 骨架残留） |
 
 **注意**：这些脚本能可靠抓的是**结构**（跨文件 private、未声明成员、路径缺失、孤儿页面）。
@@ -114,15 +116,56 @@ ScrollView {
 
 ---
 
-## 5. 下一批（未完成，写明数量，不装作完成）
+## 5. 字号与颜色的唯一来源（本轮补完的口子）
 
-1. **电池页**：16 处旧世代（`ExpandingCardBox` 3 / `CardBox` 4 / `KVRow` 5 / `ListDivider` 3
-   / `Theme.font` 4）→ `DSExpandGroup` / `DSGroup` / `DSKeyValueRow` / `DSSeparator`。
-   同时接真实电芯数据：`nevChargeSystemVoltageDtoList`（88 节，3.800–3.823，压差 23mV）、
-   `nevChargeSystemTemperatureDtoList`（26 个探针，23–24℃）、`insulateResistance:20000`。
-2. **车控页**：12 处旧世代 → DS；并按 `funCode` 开合控件。
-3. **行程 / 停车的数据缺口**：`tripHistory` / `parkingHistory` 全库**没有任何写入点**，
+### 三个令牌文件，各管一段
+
+| 文件 | 管什么 | 谁用 |
+|---|---|---|
+| `CarKeeper/Design/Tokens.swift` | App 内的全部取值（颜色/字号/间距/圆角/字距/尺寸/发丝线） | App target |
+| `Shared/WidgetTokens.swift` | **世界面**的取值（系统语义色真值）+ `VehicleSnapshot` 数据契约 | 小组件、CarPlay、AppClip、App |
+| `Design/ArtTheme.swift` | 艺术主题（原生/夜光/纸上/巨字）的**取值表**：换主题 = 换这里的值 | App target 经 `TokensPalette` 读 |
+
+**为什么小组件不直接用 `TokensPalette`**：扩展不编译 App 的 `Design/`。所以 v4 的做法是
+「值只写在 `WT` 一处，App 的 `TokensPalette` 从那里转发」—— 两边由**编译器**保证不漂移。
+本轮把 CarPlay 与 AppClip 也接进这一份（各自只加 `- path: Shared/WidgetTokens.swift` 一个文件，
+不加整个 `Shared/`：`ChargingActivityAttributes` 需要 ActivityKit，车机与 AppClip 不该把它编进来）。
+
+### 字号只有两条路
+
+1. **文字** → 系统语义阶梯（`TokensTypo.title/body/footnote/caption…`）。它们跟随 Dynamic Type。
+2. **零件**（图钉、药丸、图标字形、环内读数）→ `TokensTypo.fixed(N, weight:)`。**不跟随** Dynamic Type
+   —— 画布是几何图形，放大就会撑破它。尺寸仍然只从令牌文件出（`grep "fixed("` 就是全 App 的定尺清单）。
+
+数字另有 `display(N) / metric(N) / data / dataSmall / digits(N)` —— 它们等宽，换数值时不跳动。
+
+### 颜色只有一条路
+
+`TokensPalette.*`。本轮补的三个口子值得单独说，因为它们是「同一件事被做了很多次」的典型：
+
+- `scrim` —— 遮罩 / 暗角 / 落地阴影。**它不是一个全局的黑**：纸主题里它是墨（纯黑在暖纸上发蓝）。
+  调用点只给不透明度。
+- `labelOnTint` —— 铺在**彩色面之上**的文字色。琥珀底配白字只有 1.9:1，所以它必须是主题的一部分。
+- `fillSubtle` / `glassLight` / `glassHighlight` —— 浅填充与玻璃高光边（三者本来就是同一个值的两个名字，已合并取值）。
+
+### Watch 为什么豁免（已核实，不是偷懒）
+
+`WT.Palette` 里的系统语义色在 watchOS 上**不存在**：Apple 文档 JSON 里
+`secondarySystemGroupedBackground` 的 `platforms` = iOS / iPadOS / Mac Catalyst / visionOS，**无 watchOS**。
+所以手表不能共享这份文件，它的 19 处字面量是它自己 155pt 画布的阶梯 ——
+豁免理由是**平台事实**，写在了 `scan/design.py` 的 `EXEMPT` 里。
+
+---
+
+## 6. 下一批（未完成，写明数量，不装作完成）
+
+1. **行程 / 停车的数据缺口**：`tripHistory` / `parkingHistory` 全库**没有任何写入点**，
    所以「行程」层与时间轴必然是空的 —— 先按第 3 节第 4 条接事件配对。
-4. **硬编码字号**：应用内 68 处 → `TokensTypo`。
-5. **假数据**：`MonthlyReportGenerator` 现在是写死的 `1250 km / 14.5 / 8 次 / 65% / 85 分`
+2. **假数据**：`MonthlyReportGenerator` 现在是写死的 `1250 km / 14.5 / 8 次 / 65% / 85 分`
    （代码注释写着"模拟生成"）→ 接 `tripHistory` + `ChargeLedger`。
+   AppClip 那一屏的「特斯拉 Model 3 / 85% / 420km」同理（它连车型都是编的）。
+3. **车控按 `funCode` 开合控件**（本车不支持车窗/定时充电，现在照样显示按钮）。
+4. **数据龄期降级**（`gpsTime` 判断"有没有新数据"，而不是看 HTTP 200）。
+5. **`0000-00-00` 哨兵日期拒绝**（`daysUntil` 现在会算出「已过期 73 万天」）。
+6. **里程键修复**：`AppStore` 写 `carkeeper_current_mileage` 时读的键名与真实报文
+   （`totalOdometer`）不匹配 → 维保提醒永远不会响。

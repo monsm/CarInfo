@@ -63,10 +63,10 @@ struct EmergencyPanel: View {
 
                 VStack(spacing: 4) {
                     Image(systemName: "exclamationmark.octagon.fill")
-                        .font(.system(size: 28))
+                        .font(TokensTypo.fixed(28))
                         .foregroundStyle(TokensPalette.error)
                     Text("SOS")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(TokensTypo.footnote.weight(.bold))
                         .foregroundStyle(TokensPalette.error)
                 }
             }
@@ -140,15 +140,15 @@ struct EmergencyPanel: View {
     // MARK: - 紧急叠加层
     private var emergencyOverlay: some View {
         ZStack {
-            Color.black.opacity(0.8).ignoresSafeArea()
+            TokensPalette.scrim.opacity(0.8).ignoresSafeArea()
             VStack(spacing: 20) {
                 Image(systemName: "exclamationmark.octagon.fill")
-                    .font(.system(size: 64))
+                    .font(TokensTypo.fixed(64))
                     .foregroundStyle(TokensPalette.error)
 
                 Text("紧急呼叫中...")
                     .font(TokensTypo.title.bold())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(TokensPalette.labelOnTint)
 
                 Text("正在联系 \(emergencyContact)")
                     .font(.subheadline)
@@ -156,11 +156,13 @@ struct EmergencyPanel: View {
 
                 Button(action: cancelEmergency) {
                     Text("取消")
-                        .font(.headline)
-                        .foregroundStyle(.white)
+                        .font(TokensTypo.headline)
+                        .foregroundStyle(TokensPalette.labelOnTint)
                         .padding(.horizontal, 32)
                         .padding(.vertical, 12)
-                        .background(Color.gray.opacity(0.5))
+                        // 原来是写死的「中灰」（#808080 一类）。改用令牌里的中性填充：
+                        // 取消本来就是次要动作，它在暗遮罩上比中灰更收敛，且跟随主题。
+                        .background(TokensPalette.track)
                         .cornerRadius(24)
                 }
             }

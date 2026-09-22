@@ -22,10 +22,19 @@
 //   .native 跟随系统（等于切换前的现状）；三个艺术方向自带明暗，由
 //   CarKeeperApp 的 root 用 preferredColorScheme 施加 —— 纸上=亮，夜光/巨字=暗。
 //
-// 未做（如实说明，别以为已经做了）：
-//   ① App 里仍有约 130 处直接写死的 `Color(uiColor:)` / `.white` / `.black`，
-//      它们**不跟随主题**。要全部跟随，需要逐处迁移到令牌，属于下一轮的事。
-//   ② 切换靠 root 上的 `.id` 重建整棵树 —— 副作用是那一瞬间**子树里的 @State 会重置**
+// 已做（2026-09-22 那一轮）：
+//   ① 曾经散在全库的写死颜色 / 字号已全部迁到令牌 —— `TokensPalette.scrim`（遮罩与暗角）、
+//      `labelOnTint`（彩色面上的文字）、`TokensTypo.fixed`（不跟随 Dynamic Type 的零件）
+//      就是那一轮补的三个口子。**由 `scan/design.py` 长期把守**：字号与颜色字面量
+//      只允许出现在 Tokens.swift / WidgetTokens.swift / 本文件里，
+//      除此之外任何一处都要显式豁免并写明理由（未豁免就报错）。
+//   ② 小组件 / CarPlay / AppClip 共用 Shared/WidgetTokens.swift（同一份源文件，
+//      编译器保证不漂移）；Watch **不能**共享它 —— `WT.Palette` 的系统语义色在 watchOS
+//      上不存在（secondarySystemGroupedBackground 的 platforms 无 watchOS，已核实），
+//      所以手表那份是显式豁免。
+//
+// 仍未做（如实说明，别以为已经做了）：
+//   切换靠 root 上的 `.id` 重建整棵树 —— 副作用是那一瞬间**子树里的 @State 会重置**
 //      （例如正在跑的下载进度条会归零；导航状态不受影响，它存在 NavState.shared 里）。
 //      彻底解决要先把令牌改成可观察对象，那是一次涉及 ~340 处调用点的重构。
 //      对"挑方向"这个用途而言，这是可接受的代价。
@@ -93,6 +102,10 @@ struct ArtThemeSpec {
     var fillSubtle: Color
     /// 浮层 / 玻璃的高光边（暗底是白光，纸面是淡墨）
     var glassHighlight: Color
+    /// 遮罩：弹层 / HUD 背后的一层、以及光照不到的暗角。
+    /// 与 glassHighlight 同理 —— 它不是一个全局的「黑」：纸主题里遮罩是**墨**，
+    /// 纯黑会在暖纸上发蓝。调用点只给不透明度。
+    var scrim: Color
 
     // ---- 艺术规则（不是颜色）----
     /// 画布装饰
@@ -177,6 +190,7 @@ enum ArtTheme: String, CaseIterable, Identifiable {
                 lightSource: artHex(0xFFF6E8),
                 fillSubtle: artHex(0xF6EFE4, alpha: 0.06),
                 glassHighlight: artHex(0xFFE8C8, alpha: 0.15),
+                scrim: artHex(0x08070A),
                 decor: .lightPool,
                 allowsGlow: true,
                 usesSerifTitles: false,
@@ -209,6 +223,7 @@ enum ArtTheme: String, CaseIterable, Identifiable {
                 lightSource: artHex(0x8E2A1E),
                 fillSubtle: artHex(0x1E1B16, alpha: 0.05),
                 glassHighlight: artHex(0x1E1B16, alpha: 0.08),
+                scrim: artHex(0x1E1B16),
                 decor: .paperGrain,
                 allowsGlow: false,
                 usesSerifTitles: true,
@@ -238,6 +253,7 @@ enum ArtTheme: String, CaseIterable, Identifiable {
                 lightSource: artHex(0xF7F5F1),
                 fillSubtle: artHex(0xEDEAE4, alpha: 0.06),
                 glassHighlight: artHex(0xEDEAE4, alpha: 0.10),
+                scrim: artHex(0x08080A),
                 decor: .hairlineGrid,
                 allowsGlow: false,
                 usesSerifTitles: false,
@@ -274,6 +290,8 @@ enum ArtTheme: String, CaseIterable, Identifiable {
             lightSource: Color.white,
             fillSubtle: Color(uiColor: .quaternarySystemFill),
             glassHighlight: Color.white.opacity(0.15),
+            // 原生 = 切换前逐像素相同：遮罩就是纯黑 + 调用点给的不透明度。
+            scrim: Color.black,
             decor: .none,
             allowsGlow: true,
             usesSerifTitles: false,

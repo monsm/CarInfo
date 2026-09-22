@@ -41,7 +41,7 @@ struct TripsTimelineView: View {
     private var emptyState: some View {
         VStack(spacing: TokensSpacing.md) {
             Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
-                .font(.system(size: 34, weight: .light))
+                .font(TokensTypo.fixed(34, weight: .light))
                 .foregroundStyle(TokensPalette.tertiary)
             Text("还没有行程记录")
                 .font(TokensTypo.headline)
@@ -177,7 +177,7 @@ struct TripsTimelineView: View {
             ForEach(spots.prefix(3)) { s in
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: "mappin.circle.fill")
-                        .font(.system(size: 13))
+                        .font(TokensTypo.fixed(13))
                         .foregroundStyle(TokensPalette.accent)
                     Text("\(s.visits) 次")
                         .font(TokensTypo.footnote)

@@ -15,14 +15,14 @@ struct BiometricLockOverlay: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.6)
+            TokensPalette.scrim.opacity(0.6)
                 .ignoresSafeArea()
 
             // 卡片与按钮全部回到 DS：这是全 App 唯一的验证浮层，它不该是第四套外观。
             DSCard(padding: TokensSpacing.lg, radius: TokensRadius.large) {
                 VStack(spacing: TokensSpacing.lg) {
                     Image(systemName: "faceid")
-                        .font(.system(size: 60))
+                        .font(TokensTypo.fixed(60))
                         .foregroundColor(TokensPalette.ambient)
                         .symbolEffect(.bounce)
 
