@@ -398,6 +398,26 @@ VERIFIED_SDK_ADDITIONS = {
     "Equatable": "Swift.Equatable（Swift 标准库；externalID doc://com.apple.Swift/documentation/Swift/Equatable）——天气快照要能比较",
     "URLQueryItem": "Foundation.URLQueryItem（iOS 8+；externalID doc://com.apple.foundation/documentation/Foundation/URLQueryItem）——拼 Open-Meteo 的查询参数",
     "URLComponents": "Foundation.URLComponents（iOS 7+；externalID doc://com.apple.foundation/documentation/Foundation/URLComponents）——用它拼 URL 而不是手写字符串，避免转义踩坑",
+    # App Intents（Siri 车控）：整族都对着 Apple 文档 JSON 核过，
+    # 旧的 INIntent 子类因为没有 Intent Extension target，永远不可能被唤起。
+    "AppIntent": "AppIntents.AppIntent 协议（iOS 16+；decl: protocol AppIntent : PersistentlyIdentifiable, _SupportsAppDependencies, Sendable；externalID doc://com.apple.AppIntents/documentation/AppIntents/AppIntent）",
+    "AppShortcutsProvider": "AppIntents.AppShortcutsProvider（iOS 16+；externalID doc://com.apple.AppIntents/documentation/AppIntents/AppShortcutsProvider）——实现它就等于把指令注册进系统「快捷指令」，不需要额外 target",
+    "AppShortcut": "AppIntents.AppShortcut（iOS 16+；decl: init(intent:phrases:shortTitle:systemImageName:)；externalID doc://com.apple.AppIntents/documentation/AppIntents/AppShortcut）",
+    "IntentDescription": "AppIntents.IntentDescription（iOS 16+；externalID doc://com.apple.AppIntents/documentation/AppIntents/IntentDescription）",
+    "IntentDialog": "AppIntents.IntentDialog（iOS 16+；externalID doc://com.apple.AppIntents/documentation/AppIntents/IntentDialog）——Siri 的回话文案",
+    "LocalizedStringResource": "Foundation.LocalizedStringResource（iOS 16+；externalID doc://com.apple.foundation/documentation/Foundation/LocalizedStringResource）——IntentDialog 的构造入参",
+    "IntentResult": "AppIntents.IntentResult 协议（iOS 16+；return .result(dialog:) 的返回类型）",
+    "ProvidesDialog": "AppIntents.ProvidesDialog 协议（iOS 16+；与 IntentResult 组合表示「这次执行有一句话要说」）",
+    "appShortcuts": "AppShortcutsProvider.appShortcuts（协议要求实现的静态属性）",
+    "shortTitle": "AppShortcut.init(intent:phrases:shortTitle:systemImageName:) 的 shortTitle 参数",
+    "systemImageName": "AppShortcut.init(intent:phrases:shortTitle:systemImageName:) 的 systemImageName 参数",
+    "phrases": "AppShortcut.init(intent:phrases:shortTitle:systemImageName:) 的 phrases 参数（LocalizedStringResource 数组，用 .applicationName 插值）",
+    "openAppWhenRun": "AppIntent.openAppWhenRun（协议提供的静态属性；车控是后台动作，设为 false）",
+    "perform": "AppIntent.perform()（协议要求实现的唯一方法）",
+    "applicationName": "AppShortcutPhrase 里的 .applicationName（自动替换成 App 名）",
+    # 全局搜索 HUD（本轮）：两个系统修饰符，登记前都打印了 decl 确认：
+    "fullScreenCover": "View.fullScreenCover(isPresented:onDismiss:content:)（iOS 14+；decl: nonisolated func fullScreenCover<Content>(isPresented: Binding<Bool>, onDismiss: (() -> Void)? = nil, @ContentBuilder content: @escaping () -> Content) -> some View；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/fullScreenCover(isPresented:onDismiss:content:)）——搜索 HUD 要盖住全屏，半屏 sheet 会把压暗背景拆成两段",
+    "submitLabel": "View.submitLabel(_:)（iOS 15+；decl: nonisolated func submitLabel(_ submitLabel: SubmitLabel) -> some View；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/submitLabel(_:)）——搜索框回车键改成「搜索」",
 }
 
 

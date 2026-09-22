@@ -8,12 +8,25 @@ import UIKit
 //  ① 令牌按类分组：画布与表面 / 文字 / 语义色 / 几何 / 动效
 //     —— 每个色块都带 HEX，每种字体都用自己的字号渲染出来（不是写一句话描述它）
 //  ② 运行状态：加载耗时、指令数、能耗记录数、缓存条目、网络状态
+//     —— 还包括那批「启动了但从来没人看」的监控（内存 / 网络质量 / 离线 /
+//        性能 / 崩溃 / 充电状态 / 摇一摇 / 维保里程）。它们本来就跑着，
+//        只是输出没有任何界面在显示 —— 那就等于没有。
 //  ③ 操作：复制诊断信息 / 清除缓存（带确认）
 // =============================================================================
 
 struct DevView: View {
     private let store = AppStore.shared
     @State private var showClearConfirm = false
+
+    // 订阅那些「启动了但没人看」的监控。用 @ObservedObject 而不是直接读单例：
+    // 内存每 10 秒刷新一次、网络质量也是周期性的 —— 不订阅就永远停在打开那一瞬的值。
+    @ObservedObject private var memory = MemoryMonitor.shared
+    @ObservedObject private var networkQuality = NetworkQualityMonitor.shared
+    @ObservedObject private var offline = OfflineModeManager.shared
+    @ObservedObject private var performance = PerformanceTracker.shared
+    @ObservedObject private var chargeMonitor = ChargingStatusMonitor.shared
+    @ObservedObject private var focus = FocusModeManager.shared
+    private let crashReporter = CrashReporter.shared
 
     private struct SWatch: Identifiable {
         let id = UUID()
@@ -237,14 +250,41 @@ struct DevView: View {
     private var runtime: [(String, String)] {
         let homeLoad = UserDefaults.standard.double(forKey: "carkeeper_home_load_time")
         let cachedCount = store.caches.compactMap { $0.value }.count
+        let mileage = UserDefaults.standard.integer(forKey: "carkeeper_current_mileage")
+        let lastService = UserDefaults.standard.integer(forKey: AppStore.lastServiceMileageKey)
+        let crashes = crashReporter.readCrashHistory().count
+
         return [
             ("首页加载耗时", homeLoad > 0 ? String(format: "%.2f s", homeLoad) : "—"),
             ("指令历史", "\(store.commandHistory.count) 条"),
             ("能耗记录", "\(store.energyHistory.count) 次"),
             ("已缓存接口", "\(cachedCount) 项"),
             ("网络状态", networkText),
-            ("车辆 ID", store.carId.isEmpty ? "—" : store.carId)
+            ("车辆 ID", store.carId.isEmpty ? "—" : store.carId),
+            // ——— 监控：每个都对应一个真的在跑的服务 ———
+            ("内存占用", memory.usedMemoryMB > 0
+                ? String(format: "%.1f MB", memory.usedMemoryMB) + "（\(memoryLevelText)）"
+                : "采样中…"),
+            ("网络延迟", networkQuality.latency > 0
+                ? String(format: "%.0f ms", networkQuality.latency) + " · \(networkQuality.connectionType)"
+                : "未测出"),
+            ("离线模式", offline.isOffline ? "已开启" : "关闭"),
+            ("API 成功率", performance.apiSuccessRate().map { String(format: "%.0f%%", $0 * 100) } ?? "—"),
+            ("崩溃记录", crashes == 0 ? "无" : "\(crashes) 条"),
+            ("充电监控", chargeMonitor.summary),
+            ("摇一摇锁车", ShakeDetector.shared.isEnabled ? "已开启" : "关闭"),
+            ("专注模式", focus.config.enabled ? "已开启" : "关闭"),
+            ("车端里程", mileage > 0 ? "\(mileage) km" : "未取到"),
+            ("上次保养里程", lastService > 0 ? "\(lastService) km" : "未设置")
         ]
+    }
+
+    private var memoryLevelText: String {
+        switch memory.warningLevel {
+        case 2: return "临界"
+        case 1: return "偏高"
+        default: return "正常"
+        }
     }
 
     private var networkText: String { store.networkStatus.rawValue }

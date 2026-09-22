@@ -8,8 +8,12 @@ import UserNotifications
 class MaintenanceReminderScheduler {
     static let shared = MaintenanceReminderScheduler()
 
-    // 保养提醒阈值（提前天数）
-    private let mileageThresholds = [1000, 500, 100]
+    /// 提前多少公里开始提醒。此前这里是一个阈值数组 + 500 km 宽的窗口
+    /// （`remaining <= t && remaining > t - 500`）：只有 App 恰好在那一小段里
+    /// 被打开过一次才会响，越过了就永远不会响。现在只留一个「开始提醒的距离」。
+    private let remindWithinKm = 2000
+
+    private let requestId = "maintenance_due"
 
     private init() {}
 
@@ -31,43 +35,53 @@ class MaintenanceReminderScheduler {
         }
     }
 
-    /// 调度保养提醒
-    func scheduleMaintenanceReminder(lastServiceMileage: Int, nextServiceMileage: Int? = nil) async {
+    /// 调度保养提醒。
+    ///
+    /// 里程由调用方传入（`AppStore.recordHistory()` 从车端报文里读），不再偷偷去
+    /// UserDefaults 取一个没人写过的键 —— 那正是这条提醒永远不可能响的原因。
+    ///
+    /// 触发时机：我们**只知道公里数、不知道哪一天跑到**，所以用每天 9:00 重复提醒，
+    /// 并在每次里程更新时用同一个 id **替换**掉旧的（id 相同 → 内容刷新而不是叠加）。
+    /// 离开提醒区间（还差很远、或已经过了）就把待发提醒撤掉，不纠缠。
+    func scheduleMaintenanceReminder(lastServiceMileage: Int,
+                                     currentMileage: Int,
+                                     interval: Int = AppStore.defaultServiceInterval) async {
         let center = UNUserNotificationCenter.current()
-        let currentMileage = UserDefaults.standard.integer(forKey: "carkeeper_current_mileage")
-        let nextMileage = nextServiceMileage ?? (lastServiceMileage + 10000)
-
-        // 计算剩余里程
+        let nextMileage = lastServiceMileage + interval
         let remainingMileage = nextMileage - currentMileage
 
-        for threshold in mileageThresholds {
-            if remainingMileage <= threshold && remainingMileage > threshold - 500 {
-                let content = UNMutableNotificationContent()
-                content.title = "🚗 保养提醒"
-                content.body = "您的车辆距离下次保养仅剩 \(remainingMileage) km，请及时安排保养"
-                content.sound = .default
-                content.badge = 1
-
-                // 每天检查一次
-                let trigger = UNCalendarNotificationTrigger(
-                    dateMatching: DateComponents(hour: 9, minute: 0),
-                    repeats: true
-                )
-
-                let request = UNNotificationRequest(
-                    identifier: "maintenance_\(threshold)",
-                    content: content,
-                    trigger: trigger
-                )
-
-                try? await center.add(request)
-            }
+        // 不在提醒区间：撤掉待发的那条（包括已经过头很多的情况）
+        guard remainingMileage <= remindWithinKm && remainingMileage > -2000 else {
+            center.removePendingNotificationRequests(withIdentifiers: [requestId])
+            return
         }
+
+        let content = UNMutableNotificationContent()
+        content.sound = .default
+        if remainingMileage > 0 {
+            content.title = "保养提醒"
+            content.body = "距下次保养还剩 \(remainingMileage) km（上次保养 \(lastServiceMileage) km，"
+                + "间隔 \(interval) km）。"
+        } else {
+            content.title = "已到保养里程"
+            content.body = "当前 \(currentMileage) km，已超出计划 \(-remainingMileage) km。"
+        }
+
+        // 每天 9:00 检查一次；内容里的公里数是**调度那一刻**的值，
+        // 所以每次里程变化都会重发一次（同一个 id，替换而非叠加）。
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: DateComponents(hour: 9, minute: 0),
+            repeats: true
+        )
+        try? await center.add(UNNotificationRequest(identifier: requestId,
+                                                   content: content,
+                                                   trigger: trigger))
     }
 
-    /// 清除所有提醒
-    func clearAllReminders() async {
-        let center = UNUserNotificationCenter.current()
-        center.removeAllPendingNotificationRequests()
+    /// 撤掉本调度器自己排的提醒。
+    /// 此前这里是 `removeAllPendingNotificationRequests()` —— 名字叫「清除所有提醒」，
+    /// 它真的会清掉**全 App 所有**待发通知（包括保险到期、智能提醒）。只撤自己的。
+    func clearAllReminders() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [requestId])
     }
 }

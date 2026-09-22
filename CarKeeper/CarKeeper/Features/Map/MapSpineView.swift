@@ -753,6 +753,17 @@ struct MapSpineView: View {
             }
             .accessibilityLabel(Text("全部功能"))
         }
+        // 全局搜索：此前那个 HUD 搜的是写死的字符串、点下去什么都不发生，
+        // 而且没有任何入口 —— 现在从地图顶部就能到。
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button {
+                TokensHaptic.tap()
+                nav.showSearch = true
+            } label: {
+                Image(systemName: "magnifyingglass")
+            }
+            .accessibilityLabel(Text("搜索页面、车、行程、指令"))
+        }
         ToolbarItem(placement: .navigationBarLeading) {
             Button {
                 TokensHaptic.tap()

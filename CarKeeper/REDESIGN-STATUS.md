@@ -213,3 +213,76 @@
 - 本轮新用的 SDK 名字（`Equatable` / `URLQueryItem` / `URLComponents`）**逐个对过 Apple 文档 JSON**（记下 externalID）才登记，显式核实清单到 41 个。
 - 新增 8 条纯函数测试（云量衰减式子、阴天正午 = 25%、单调性、降水加重颗粒、表的说法随数据变、URL 里不得出现精确坐标、解析缺字段返回 nil、作废距离）。
 - **仍然没有编译器**：这一批同样只经过静态验证，push 后由 CI 给出结论。
+
+## 10. 查漏补缺：把「写了但没人能用到」的东西接上（2026-09-22）
+
+这一批不是调色，是一次**审计 + 接线**。判据只有一条：一段代码如果
+「没有入口」「没有调用点」或「调用了但什么都没做」，它就不算功能。
+
+### 10.1 三个空桩变成了真实现
+
+- **`ChargingStatusMonitor`**（原来 12 行、方法体是空的，壳层只写了
+  `_ = ChargingStatusMonitor.shared`，连 `startMonitoring()` 都没调）
+  → 改成由**真实报文驱动**：`AppStore.recordHistory()` 每次拿到车端数据就调用
+  `observe(soc:charging:powerKW:)`，只在「开始充电 / 充电结束 / 充满」三个**跃迁**上
+  推一条本地通知。它不生成充电记录（那是 `HistoryStore` + `ChargeLedger` 的活），
+  两边各算一遍会出现两个不一样的总度数。
+- **`AppIntentsManager`**（空桩、只被 `_ =` 引用一次）→ **删除**。
+- **Siri 车控**：旧的三个 `INIntent` 子类需要 Intents Extension target 才可能被唤起，
+  而 `project.yml` 里没有那个 target —— 所谓「Siri 车控」从来没通。改成真正的
+  `AppIntent` + `AppShortcutsProvider`（不需要额外 target），五条短语：锁车 / 解锁 /
+  开空调 / 关空调 / 寻车。顺带修掉一处静默错位：使用次数记的是 `lock_on` / `lock_off`，
+  而卡片读的是 `lock_true` / `lock_false` —— 所以卡片永远显示「还没有用过语音指令」。
+
+### 10.2 两处「提醒永远不可能响」
+
+- **维保提醒**读 `carkeeper_current_mileage`，而这个键**全库只有读、没有写**（恒为 0）
+  → 现在由 `AppStore.recordHistory()` 从车端 `Mileage` 字段写入，并真正调用调度器。
+- **保险提醒**的 `scheduleInsuranceReminder` **从来没有调用点**；而且它的触发器只写了
+  「9:00」、**把到期日整个丢掉**了（于是无论保到什么时候，都是明天 9:00 响一次）；
+  窗口还写成 `days <= 30 && days > 20`（只有恰好落在那几天里被打开才排得上）。
+  现在按到期日倒推真实日期，并由「年检与保险」页在进入/新增时调用。
+- 两个调度器的 `clearAllReminders()` 原来用的是 `removeAllPendingNotificationRequests()`
+  —— 那会连**别人的**待发通知一起清掉。各自只撤自己的。
+
+### 10.3 摇一摇锁车：它以前不锁车
+
+- `ShakeDetector.onShake` 的唯一设置点只弹一句「摇一摇已触发」，**不发任何指令**；
+  阈值 1.5 g 也意味着走路放兜里就会被触发（静止时合加速度本就是重力 1.0 g）。
+  现在：阈值 2.6 g + 8 秒冷却；真的走「验登录 → 验 PIN → 发 `CentralLock` → 记指令历史」，
+  车已锁着就不发（照实说「车已锁好」）。
+- 这个功能此前**没有任何地方能打开**（`carkeeper_shake_to_lock` 默认 false 且无人写入）
+  → 「我的」里补了开关。
+
+### 10.4 全局搜索：以前搜的是写死的字符串
+
+`GlobalSearchHUD` 原先搜 6 条硬编码文案、每条的 `action` 都是空闭包，而且**没有任何入口**。
+现在搜真东西：16 个页面（跳转走统一导航）、车辆档案字段、实时读数、行程、指令历史、
+充电会话；入口在地图顶栏与「我的」。
+
+### 10.5 「我的」：26 个磁贴一条平铺 + 一个到不了的退出登录
+
+- 磁贴按意图分六组：车辆 / 用车 / 钱与证件 / 报告与共享 / 设备与模式 / 应用。
+  「维保提醒」与「维保记录」原来是两个磁贴、同一个 `.service`，现在只留一个。
+- **`logout()` 一直存在，但没有任何按钮调用它** —— 用户无法退出登录。现已接上（带二次确认）。
+- 监控接进「开发者工具」：内存 / 网络延迟 / 离线模式 / API 成功率 / 崩溃记录 /
+  充电监控 / 摇一摇 / 专注模式 / 车端里程 / 上次保养里程。它们本来就跑着，
+  只是输出没有任何界面在显示 —— 那就等于没有。
+
+### 10.6 一处工程告警的病因确认
+
+AppIcon 每次 CI 都报「3 unassigned children」：实测 `Contents.json` 与磁盘**一一对应**
+（12 条目 / 12 文件），真正的成因是 `1x` 的 76×76 / 29×29 / 40×40 三个槽位在当前 SDK
+已不再分配（数量正好是 3）。已删条目与对应的三个 PNG。
+
+### 10.7 验证
+
+- `scan.py`：未声明的类型 / 构造·函数 / 方法 / 未知成员 **全为 0**，幽灵构造 0；显式核实的
+  SDK 名字 **58 个**（本轮新增的 `AppIntent` / `AppShortcutsProvider` / `AppShortcut` /
+  `IntentDescription` / `IntentDialog` / `LocalizedStringResource` / `IntentResult` /
+  `ProvidesDialog` / `fullScreenCover` / `submitLabel` 都先打印 Apple 文档 JSON 的
+  `decl` 与 externalID 才登记）。
+- `lexguard` / `shadowguard` / `logic` / `deep` / `eol` / `futureproof` / `scenes` /
+  `targets` / `unreachable` / `orphans` 全 0；`check_style` 0 问题。
+- 24 个改动文件的括号净余额与 HEAD 逐文件零差异。
+- **这台机器仍然没有 Swift 编译器**：本批只经过静态验证，push 后由 CI 给结论。

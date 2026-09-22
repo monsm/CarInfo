@@ -253,24 +253,22 @@ struct CarKeeperApp: App {
             // #N14 远程锁定监听
             RemoteLockManager.shared.startMonitoring()
             // #N46 摇一摇锁车
+            // 锁车动作现在由 ShakeDetector 自己在触发时完成（验 PIN → 发 CentralLock）；
+            // 这里那层只弹提示的闭包已经去掉 —— 它让「摇一摇已触发」看起来像做了事。
             ShakeDetector.shared.startMonitoring()
-            ShakeDetector.shared.onShake = { _ in
-                if store.carId.isEmpty == false {
-                    // 触发锁车提示
-                    EnhancedToastManager.shared.show("摇一摇已触发", icon: "shake")
-                }
-            }
             // #NEW-118/N119 维保+保险提醒调度器初始化
             _ = MaintenanceReminderScheduler.shared
             _ = InsuranceReminderScheduler.shared
-            // #NEW-120 App Intents 注册（Siri 对话入口）
-            _ = AppIntentsManager.shared
+            // #NEW-120 Siri/快捷指令：真正的 AppIntent 在 Features/SiriShortcuts.swift。
+            // 旧的那份 `AppIntentsManager`（空桩）已删；旧的 INIntent 子类也没有
+            // Intent Extension target 去注册，永远不可能被唤起。
             // E17-E18 触觉反馈 + E47 性能监控启动
             _ = PerformanceTracker.shared
             // E38 专注模式监听
             _ = FocusModeManager.shared
-            // E40 充电状态监控
-            _ = ChargingStatusMonitor.shared
+            // E40 充电状态监控（此前只写了 `_ = ChargingStatusMonitor.shared`，
+            // 连 startMonitoring 都没调，而那个方法本身也是空的）
+            ChargingStatusMonitor.shared.startMonitoring()
             // N10 车牌加密初始化
             DataEncryption.ensureKey()
         }
@@ -297,6 +295,8 @@ final class NavState: ObservableObject, @unchecked Sendable {
     @Published var chargePath: [Deeplink] = []
     @Published var tripsPath: [Deeplink] = []
     @Published var minePath: [Deeplink] = []
+    /// 全局搜索是否展开（地图工具栏与「我的」都能把它打开）
+    @Published var showSearch = false
 
     private init() {}
 
@@ -524,6 +524,12 @@ struct MainTabView: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: nav.currentToast?.text)
+        // 全局搜索：用 fullScreenCover 而不是 sheet —— 它本来就是一个盖住全程的 HUD，
+        // 半屏 sheet 会把那个压暗背景拆成两段。
+        .fullScreenCover(isPresented: $nav.showSearch) {
+            GlobalSearchHUD(isPresented: $nav.showSearch)
+                .environmentObject(nav)
+        }
     }
 }
 

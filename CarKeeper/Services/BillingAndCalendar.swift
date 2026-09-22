@@ -8,12 +8,14 @@ import SwiftUI
 import UIKit
 
 // MARK: - N32 充电历史账单 PDF
+/// 账单里的一行。**数据来自 `ChargeLedger` 的真实会话**（功率采样积分出来的 kWh），
+/// 不是人工记账；SOC 取不到就是 nil —— 那一格在 PDF 里印 `--`，不编一个数字。
 struct ChargeRecord: Codable {
     let date: Date
     let kWh: Double
     let cost: Double
-    let socStart: Int
-    let socEnd: Int
+    let socStart: Int?
+    let socEnd: Int?
 }
 
 class ChargeBillGenerator {
@@ -74,15 +76,17 @@ class ChargeBillGenerator {
                 let rowY = headerY + 35 + CGFloat(idx) * 25
                 formatter.dateFormat = "MM/dd"
                 let dateStr = formatter.string(from: record.date)
-                let row = [dateStr, "\(record.socStart)%", "\(record.socEnd)%",
+                let row = [dateStr,
+                           record.socStart.map { "\($0)%" } ?? "--",
+                           record.socEnd.map { "\($0)%" } ?? "--",
                            String(format: "%.1f", record.kWh), String(format: "%.2f", record.cost)]
                 row.enumerated().forEach { i, text in
                     text.draw(at: CGPoint(x: colX[i], y: rowY), withAttributes: rowAttrs)
                 }
             }
 
-            // 底部说明
-            let note = "本账单由 CarKeeper 自动生成，仅供参考。"
+            // 底部说明：把「这些数字是怎么来的」印在纸上，而不是只写在代码里
+            let note = "度数由车端充电功率采样积分得出；费用 = 度数 × 你在 App 里设的电价（非充电站实际价）。"
             let noteAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 10),
                 .foregroundColor: UIColor.tertiaryLabel
@@ -259,56 +263,209 @@ struct InspectionEditForm: View {
     }
 }
 
-// MARK: - UI: 年检日历视图
+// MARK: - UI: 证件与到期日（年检 + 保险）
+/// 年检与保险是同一件事的两面：「哪个证件什么时候到期」。
+/// 这一页只存**用户自己填的日期**（本机 UserDefaults，没有云端副本），
+/// 并把这些日期交给提醒调度器 —— 提醒这件事以前从来没被调用过（见文件尾注释）。
 struct InspectionCalendarView: View {
-    @State private var calendar = InspectionCalendar.shared
-    @State private var showAdd = false
-    @State private var vehicleName = ""
+    /// `InspectionCalendar` 是 `ObservableObject`（`@Published` 存的是 inspections）。
+    /// 用 `@State` 装一个 class 不会触发重绘 —— 存进去后「添加年检」要等退出重进才看得见。
+    @StateObject private var calendar = InspectionCalendar.shared
+    /// 保险政策是本机存储的（`InsuranceManager`），所以用一个可刷新的镜像。
+    @State private var policies: [InsurancePolicy] = InsuranceManager.shared.policies
+    @State private var inspectionName = ""
     @State private var inspectionDate = Date()
+    @State private var insurer = ""
+    @State private var insuranceType = "交强险"
+    @State private var insuranceEnd = Date()
+    @State private var premiumText = ""
+
+    private static let insuranceTypes = ["交强险", "商业险", "座位险"]
 
     var body: some View {
-        List {
-            Section("即将到期（60天内）") {
-                if calendar.upcomingInspections.isEmpty {
-                    Text("暂无即将到期的年检")
-                        .foregroundColor(.secondary)
-                } else {
-                    ForEach(calendar.upcomingInspections) { inspection in
-                        InspectionRow(inspection: inspection, currentMileage: 0)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                // ① 最近要到的（年检 + 保险合在一个时间轴上）
+                DSGroup(title: "最近到期",
+                        footer: "到期前 30 天与 7 天会各提醒一次（需允许通知）。") {
+                    if dueItems.isEmpty {
+                        DSGroupRow(showsSeparator: false) {
+                            Text("还没有记录。下面添一条，它就会出现在这里。")
+                                .font(TokensTypo.footnote)
+                                .foregroundStyle(TokensPalette.secondary)
+                        }
+                    } else {
+                        ForEach(Array(dueItems.enumerated()), id: \.offset) { idx, item in
+                            DSGroupRow(showsSeparator: idx < dueItems.count - 1) {
+                                DSRow(icon: item.icon, title: item.title,
+                                      subtitle: item.date.formatted(date: .abbreviated, time: .omitted),
+                                      value: item.daysText, valueCls: item.cls)
+                            }
+                        }
+                    }
+                }
+
+                // ② 年检
+                DSGroup(title: "年检",
+                        footer: "\u{201C}即将到期\u{201D}按 60 天算。过期的那条会标红。") {
+                    ForEach(calendar.inspections.sorted { $0.date < $1.date }) { inspection in
+                        DSGroupRow {
+                            DSRow(icon: "calendar",
+                                  title: inspection.vehicleName,
+                                  subtitle: inspection.date.formatted(date: .abbreviated, time: .omitted),
+                                  value: inspectionDaysText(inspection),
+                                  valueCls: inspectionDays(inspection) < 0 ? "bad" : (inspectionDays(inspection) <= 30 ? "warn" : "ok"))
+                        }
+                    }
+                    if calendar.inspections.isEmpty {
+                        DSGroupRow(showsSeparator: false) {
+                            Text("暂无年检记录").font(TokensTypo.footnote)
+                                .foregroundStyle(TokensPalette.secondary)
+                        }
+                    }
+                }
+
+                // ③ 保险
+                DSGroup(title: "保险",
+                        footer: "只存你填的这些字段；保费合计 = 已记录的保单之和（不是任何接口读到的值）。") {
+                    ForEach(policies) { p in
+                        DSGroupRow {
+                            DSKeyValueRow(key: "\(p.name) · \(p.type)",
+                                          value: "到期 \(p.endDate.formatted(date: .abbreviated, time: .omitted)) · ¥\(String(format: "%.0f", p.premium))")
+                        }
+                    }
+                    if policies.isEmpty {
+                        DSGroupRow(showsSeparator: false) {
+                            Text("暂无保单").font(TokensTypo.footnote)
+                                .foregroundStyle(TokensPalette.secondary)
+                        }
+                    }
+                    if !policies.isEmpty {
+                        DSGroupRow(showsSeparator: false) {
+                            DSKeyValueRow(key: "保费合计",
+                                          value: "¥\(String(format: "%.0f", policies.map { $0.premium }.reduce(0, +)))")
+                        }
+                    }
+                }
+
+                // ④ 添加
+                DSGroup(title: "添加年检", footer: "添加后立即可提醒。") {
+                    DSGroupRow {
+                        TextField("车辆名称", text: $inspectionName)
+                            .font(TokensTypo.subheadline)
+                    }
+                    DSGroupRow {
+                        DatePicker("年检到期日", selection: $inspectionDate, displayedComponents: .date)
+                            .font(TokensTypo.subheadline)
+                    }
+                    DSGroupRow(showsSeparator: false) {
+                        Button("保存年检") {
+                            guard !inspectionName.isEmpty else { return }
+                            calendar.addInspection(Inspection(vehicleName: inspectionName,
+                                                              date: inspectionDate, notes: ""))
+                            inspectionName = ""
+                        }
+                        .font(TokensTypo.subheadline.weight(.semibold))
+                        .foregroundStyle(inspectionName.isEmpty ? TokensPalette.tertiary : TokensPalette.accent)
+                        .disabled(inspectionName.isEmpty)
+                    }
+                }
+
+                DSGroup(title: "添加保险") {
+                    DSGroupRow {
+                        TextField("保险公司（如：平安）", text: $insurer)
+                            .font(TokensTypo.subheadline)
+                    }
+                    DSGroupRow {
+                        Picker("险种", selection: $insuranceType) {
+                            ForEach(Self.insuranceTypes, id: \.self) { Text($0).tag($0) }
+                        }
+                        .font(TokensTypo.subheadline)
+                    }
+                    DSGroupRow {
+                        DatePicker("到期日", selection: $insuranceEnd, displayedComponents: .date)
+                            .font(TokensTypo.subheadline)
+                    }
+                    DSGroupRow {
+                        HStack {
+                            Text("保费（元）").font(TokensTypo.subheadline)
+                            Spacer()
+                            TextField("如 3800", text: $premiumText)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .font(TokensTypo.data)
+                        }
+                    }
+                    DSGroupRow(showsSeparator: false) {
+                        Button("保存保单") { savePolicy() }
+                            .font(TokensTypo.subheadline.weight(.semibold))
+                            .foregroundStyle(insurer.isEmpty ? TokensPalette.tertiary : TokensPalette.accent)
+                            .disabled(insurer.isEmpty)
                     }
                 }
             }
-
-            Section("历史记录") {
-                ForEach(calendar.inspections.filter { $0.date < Date() }) { inspection in
-                    InspectionRow(inspection: inspection, currentMileage: 0)
-                        .opacity(0.5)
-                }
-                if calendar.inspections.filter({ $0.date < Date() }).isEmpty {
-                    Text("暂无历史记录")
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            Section("添加年检") {
-                VStack(spacing: 12) {
-                    TextField("车辆名称", text: $vehicleName)
-                    DatePicker("年检日期", selection: $inspectionDate, displayedComponents: .date)
-                    Button("保存") {
-                        guard !vehicleName.isEmpty else { return }
-                        calendar.addInspection(Inspection(
-                            vehicleName: vehicleName,
-                            date: inspectionDate,
-                            notes: ""
-                        ))
-                        vehicleName = ""
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(vehicleName.isEmpty)
-                }
-                .padding(.vertical, 8)
-            }
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.vertical, TokensSpacing.sm)
         }
+        .task { await syncReminders() }
+    }
+
+    // MARK: 计算与动作
+
+    private struct DueItem {
+        let title: String
+        let date: Date
+        let days: Int
+        let icon: String
+        var daysText: String { days < 0 ? "已过期 \(-days) 天" : "\(days) 天后" }
+        var cls: String { days < 0 ? "bad" : (days <= 30 ? "warn" : "ok") }
+    }
+
+    private func inspectionDays(_ i: Inspection) -> Int {
+        calendar.daysUntilInspection(for: i)
+    }
+
+    private func inspectionDaysText(_ i: Inspection) -> String {
+        let d = inspectionDays(i)
+        return d < 0 ? "已过期" : "\(d) 天后"
+    }
+
+    /// 年检 + 保险合起来按到期日排序（只列未来的）
+    private var dueItems: [DueItem] {
+        let now = Date()
+        var out: [DueItem] = []
+        for i in calendar.inspections where i.date >= now {
+            out.append(DueItem(title: "年检 · \(i.vehicleName)", date: i.date,
+                               days: calendar.daysUntilInspection(for: i), icon: "calendar"))
+        }
+        for p in policies where p.endDate >= now {
+            let d = Calendar.current.dateComponents([.day], from: now, to: p.endDate).day ?? 0
+            out.append(DueItem(title: "\(p.type) · \(p.name)", date: p.endDate, days: d, icon: "shield.lefthalf.filled"))
+        }
+        return out.sorted { $0.date < $1.date }
+    }
+
+    private func savePolicy() {
+        let p = InsurancePolicy(name: insurer,
+                                type: insuranceType,
+                                policyNumber: "",
+                                startDate: Date(),
+                                endDate: insuranceEnd,
+                                premium: Double(premiumText) ?? 0,
+                                claimHistory: [])
+        InsuranceManager.shared.addPolicy(p)
+        policies = InsuranceManager.shared.policies
+        insurer = ""
+        premiumText = ""
+        Task { await syncReminders() }
+    }
+
+    /// 把最近要到期的那张保单交给提醒调度器。
+    /// 此前 `scheduleInsuranceReminder` **从来没有调用点** —— 那个提醒永远不可能响。
+    private func syncReminders() async {
+        guard let next = policies.map(\.endDate).filter({ $0 > Date() }).min() else { return }
+        _ = await InsuranceReminderScheduler.shared.requestNotificationPermission()
+        await InsuranceReminderScheduler.shared.scheduleInsuranceReminder(insuranceEndDate: next)
     }
 }
 
@@ -326,117 +483,146 @@ struct VehicleValuationView: View {
     }
 
     var body: some View {
-        Form {
-            Section("车辆信息") {
-                TextField("购车价格（元）", text: $initialPrice)
-                    .keyboardType(.decimalPad)
-                DatePicker("购车日期", selection: $purchaseDate, displayedComponents: .date)
-                TextField("当前里程（km）", text: $currentMileage)
-                    .keyboardType(.decimalPad)
-            }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                // 先把「这是什么」说在前面：它是**按一条固定规则算出来的估算**，
+                // 不是二手车市场价。把规则印在结果的上面，而不是藏在页脚。
+                DSNotice(kind: .info,
+                         text: "这是按下方那条固定折旧规则算的**估算**，不是二手车市场价（App 拿不到交易数据）。")
 
-            Section("估值结果") {
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text("当前估值")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text("¥\(String(format: "%.0f", estimatedValue))")
-                            .font(.title).fontWeight(.bold)
-                            .foregroundColor(TokensPalette.success)
+                DSGroup(title: "车的条件") {
+                    DSGroupRow {
+                        HStack {
+                            Text("购车价").font(TokensTypo.subheadline)
+                            Spacer()
+                            TextField("200000", text: $initialPrice)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .font(TokensTypo.data)
+                        }
                     }
-                    Spacer()
-                    VStack(alignment: .trailing) {
-                        Text("折旧率")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        let price = Double(initialPrice) ?? 200000
-                        let rate = (1 - estimatedValue / price) * 100
-                        Text(String(format: "%.1f%%", rate))
-                            .font(.title3)
-                            .foregroundColor(rate > 60 ? .red : rate > 30 ? .orange : .green)
+                    DSGroupRow {
+                        DatePicker("购车日期", selection: $purchaseDate, displayedComponents: .date)
+                            .font(TokensTypo.subheadline)
+                    }
+                    DSGroupRow(showsSeparator: false) {
+                        HStack {
+                            Text("当前里程（km）").font(TokensTypo.subheadline)
+                            Spacer()
+                            TextField("30000", text: $currentMileage)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .font(TokensTypo.data)
+                        }
                     }
                 }
-                .padding(.vertical, 8)
-            }
 
-            Section("折旧说明") {
-                Text("前3年每年折旧15%，之后每年10%。里程折旧每万公里2%，上限30%。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                DSGroup(title: "估算") {
+                    DSGroupRow {
+                        DSBigNumber(value: String(format: "%.0f", estimatedValue), unit: "元",
+                                    caption: "按规则算出的估算值", size: 52,
+                                    tint: TokensPalette.primary)
+                    }
+                    DSGroupRow(showsSeparator: false) {
+                        DSKeyValueRow(key: "相对购车价的折旧",
+                                      value: String(format: "%.1f%%", depreciationPercent))
+                    }
+                }
+
+                DSGroup(title: "用的是什么规则",
+                        footer: "想换一套系数？这条规则就写在 `VehicleValuation.estimateValue` 里，"
+                              + "改它等于改结果 —— 这就是把它写出来的意义。") {
+                    DSGroupRow { DSKeyValueRow(key: "年限折旧", value: "前 3 年每年 −15%，之后每年 −10%") }
+                    DSGroupRow(showsSeparator: false) {
+                        DSKeyValueRow(key: "里程折旧", value: "每 1 万公里 −2%，上限 −30%")
+                    }
+                }
             }
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.vertical, TokensSpacing.sm)
         }
-        .navigationTitle("车辆估值")
+    }
+
+    private var depreciationPercent: Double {
+        let price = max(1, Double(initialPrice) ?? 200000)
+        return (1 - estimatedValue / price) * 100
     }
 }
 
 // MARK: - UI: 充电账单 Sheet
 struct ChargeBillSheet: View {
     private let store = AppStore.shared
-    @State private var showingPDF = false
+    @State private var savedFile: URL? = nil
 
-    var chargeRecords: [ChargeRecord] {
-        // 从 energyHistory 估算充电记录（实际应从后端获取）
-        return []
+    /// **真实充电记录**：来自 `ChargeLedger`（车端 1 分钟一个的功率采样积分出 kWh），
+    /// 费用 = 度数 × 用户自设电价。
+    /// 旧版这里写的是 `return []` —— 于是账单页永远显示「暂无充电记录」，
+    /// 而下面那句「完成首次充电后将自动生成月度账单」永远等不到。
+    private var records: [ChargeRecord] {
+        ChargeLedger.shared.sessions.map { s in
+            ChargeRecord(date: s.start,
+                         kWh: s.kWh,
+                         cost: ChargeLedger.shared.cost(s),
+                         socStart: s.socStart,
+                         socEnd: s.socEnd)
+        }
     }
 
+    private var totalKWh: Double { records.map(\.kWh).reduce(0, +) }
+    private var totalCost: Double { records.map(\.cost).reduce(0, +) }
+
     var body: some View {
-        NavigationStack {
-            VStack(spacing: TokensSpacing.lg) {
-                if chargeRecords.isEmpty {
-                    EmptyStateView(
-                        icon: "bolt.slash",
-                        title: "暂无充电记录",
-                        message: "完成首次充电后将自动生成月度账单",
-                        actionTitle: "去充电",
-                        action: {}
-                    )
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                if records.isEmpty {
+                    DSPlaceholder(icon: "bolt.slash",
+                                  title: "还没有充电记录",
+                                  message: "App 只在充电中采样：车端每上报一次功率就留一个点，"
+                                         + "凑够一次会话（≥0.5 kWh）才会出现在这里。")
                 } else {
-                    ForEach(chargeRecords, id: \.date) { record in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(record.date, format: .dateTime.day().month())
-                                    .font(.subheadline)
-                                Text("¥\(String(format: "%.2f", record.cost))")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Text("\(record.kWh) kWh")
-                                .font(.subheadline)
-                                .foregroundColor(TokensPalette.ambient)
+                    DSGroup(title: "合计") {
+                        DSGroupRow {
+                            DSKeyValueRow(key: "充电次数", value: "\(records.count) 次")
+                        }
+                        DSGroupRow {
+                            DSKeyValueRow(key: "总度数", value: "\(ChargeLedger.kwhText(totalKWh)) kWh")
+                        }
+                        DSGroupRow(showsSeparator: false) {
+                            DSKeyValueRow(key: "总费用",
+                                          value: "¥\(ChargeLedger.moneyText(totalCost))（按你设的 \(ChargeLedger.rateText(ChargeLedger.shared.rate)) 元/度）")
                         }
                     }
-                }
 
-                Button {
-                    // 生成 PDF
-                    if ChargeBillGenerator.shared.generatePDF(
-                        records: chargeRecords,
-                        vehiclePlate: store.car?["plate"] as? String ?? "车辆"
-                    ) != nil {
-                        showingPDF = true
+                    DSGroup(title: "每一次充电",
+                            footer: "度数 = ∫功率 dt（梯形法，采样 1 分钟一个）；"
+                                  + "费用 = 度数 × 你在设置里填的电价 —— 它**不是**充电站的实际价。") {
+                        ForEach(Array(records.enumerated()), id: \.offset) { idx, r in
+                            DSGroupRow(showsSeparator: idx < records.count - 1) {
+                                DSKeyValueRow(key: r.date.formatted(date: .abbreviated, time: .shortened),
+                                              value: "\(ChargeLedger.kwhText(r.kWh)) kWh · ¥\(ChargeLedger.moneyText(r.cost))")
+                            }
+                        }
                     }
-                } label: {
-                    Label("导出 PDF 账单", systemImage: "doc.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(TokensPalette.ambient)
-                        .foregroundColor(TokensPalette.labelOnTint)
-                        .cornerRadius(TokensRadius.medium)
-                }
-                .padding(.horizontal)
 
-                if showingPDF {
-                    Text("PDF 已保存到文件 App")
-                        .font(.caption)
-                        .foregroundColor(TokensPalette.success)
+                    Button {
+                        savedFile = ChargeBillGenerator.shared.generatePDF(
+                            records: records,
+                            vehiclePlate: store.car?["plate"] as? String ?? "车辆")
+                    } label: {
+                        Label("导出 PDF 账单", systemImage: "doc.fill")
+                    }
+                    .buttonStyle(DSPrimaryButtonStyle())
+
+                    if let f = savedFile {
+                        // 说清文件到底去哪了（旧版写的是「已保存到文件 App」，而我们写的是沙盒）
+                        DSNotice(kind: .success,
+                                 text: "已生成 \(f.lastPathComponent)（在 App 的文稿目录里；从「文件」App → 我的 iPhone → 长安车管家 可以看到）。")
+                    }
                 }
             }
-            .sheet(isPresented: $showingPDF) {
-                // 展示 PDF
-            }
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.top, TokensSpacing.sm)
+            .padding(.bottom, TokensSpacing.xxl)
         }
     }
 }

@@ -28,6 +28,8 @@ struct MineView: View {
     @State private var showInspection = false
     @State private var showValuation = false
     @State private var showChargeBill = false
+    /// 退出登录二次确认（按钮在 tilesCard 的「应用」组里）
+    @State private var logoutConfirm = false
     // 行程分析 / 指令历史 / 维保记录 / 停车位置 / 紧急求助 / 车辆提示 / 驾驶评分
     // 走 nav.pushNavigation（这些页已在壳层 navigationDestination 注册），
     // 不再保留一堆从未绑定 sheet 的 @State（此前 7 个磁贴设了状态却没人监听 = 死按钮）。
@@ -149,6 +151,12 @@ struct MineView: View {
                     .dsSheetCanvas()
                     .navigationBarTitleDisplayMode(.inline)
             }
+        }
+        .alert("退出登录", isPresented: $logoutConfirm) {
+            Button("退出", role: .destructive) { logout() }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("退出后需要用手机号重新登录。本机的行程、充电与记账记录不会被删除。")
         }
     }
 
@@ -272,118 +280,192 @@ struct MineView: View {
 
     // MARK: 常用磁贴
     private var tilesCard: some View {
-        CardBox(title: "常用功能") {
-            VStack(spacing: 12) {
-                HStack(spacing: 10) {
-                    tile("shield.lefthalf.filled", "健康报告", tint: TokensPalette.success) {
-                        nav.pushNavigation(.health, targetTab: .home)
+        VStack(spacing: TokensSpacing.lg) {
+            CardBox(title: "车辆", footer: "车况主屏是地图；这几个是它的深潜页。") {
+                VStack(spacing: 12) {
+                    HStack(spacing: 10) {
+                        tile("shield.lefthalf.filled", "健康报告", tint: TokensPalette.success) {
+                            nav.pushNavigation(.health, targetTab: .home)
+                        }
+                        tile("battery.100", "电池充电", tint: TokensPalette.success) {
+                            nav.pushNavigation(.battery, targetTab: .home)
+                        }
                     }
-                       tile("battery.100", "电池充电", tint: TokensPalette.success) {
-                           nav.pushNavigation(.battery, targetTab: .home)
-                       }
-                }
-                HStack(spacing: 10) {
-                       tile("chart.bar.xaxis", "全量数据", tint: TokensPalette.accent) {
-                           nav.pushNavigation(.data, targetTab: .home)
-                       }
-                       tile("doc.text.fill", "车辆档案", tint: TokensPalette.warning) {
-                           nav.pushNavigation(.vehicle, targetTab: .home)
-                       }
-                }
-                HStack(spacing: 10) {
-                    tile("bubble.left.fill", "消息中心", tint: TokensPalette.info) { nav.pushNavigation(.messages) }
-                       tile("wrench.adjustable", "开发者工具", tint: TokensPalette.accent) {
-                           nav.pushNavigation(.dev, targetTab: .home)
-                       }
-                }
-                // #31 省电模式
-                PowerSavingToggle()
-                    .padding(.horizontal, 4)
-                // #NEW-115 夜间模式切换
-                HStack {
-                    Text("夜间模式").font(TokensTypo.headline)
-                    Spacer()
-                    Picker("主题", selection: Binding(
-                        get: { nightModeManager.currentMode },
-                        set: { nightModeManager.setMode($0) }
-                    )) {
-                        Text("自动").tag(NightModeMode.auto)
-                        Text("浅色").tag(NightModeMode.light)
-                        Text("深色").tag(NightModeMode.dark)
+                    HStack(spacing: 10) {
+                        tile("doc.text.fill", "车辆档案", tint: TokensPalette.warning) {
+                            nav.pushNavigation(.vehicle, targetTab: .home)
+                        }
+                        tile("chart.bar.xaxis", "全量数据", tint: TokensPalette.accent) {
+                            nav.pushNavigation(.data, targetTab: .home)
+                        }
                     }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .onChange(of: nightModeManager.currentMode) { _, mode in
-                        nightModeManager.setMode(mode)
+                    HStack(spacing: 10) {
+                        tile("gauge.with.dots.needle.50percent", "驾驶总览", tint: TokensPalette.info) {
+                            nav.pushNavigation(.dashboard, targetTab: .home)
+                        }
+                        tile("trophy.fill", "驾驶评分", tint: TokensPalette.ambient) {
+                            nav.pushNavigation(.score)
+                        }
                     }
                 }
-                .padding(16)
-                .glassCard()
+            }
 
-                // #45 驾驶行为评分：这里原来还有一块"急加速 N 次 · 急刹车 M 次"，
-                // 但车端报文里根本没有这两个键（AggressiveAccel / HarshBrake 全项目
-                // 只在那段代码里出现过），所以它永远是 0 次 + 100 分。
-                // 评分集中在评分页：只用行程里真有的事实算。这里只留入口。
-                // #44 充电站：地图主屏的「充电」层就是这件事 —— 它按**车的位置**实时搜，
-                // 这里不再自己搜一份（原来那份搜的是写死的北京坐标 39.9042, 116.4074）。
-                tile("bolt.fill", "附近充电站", tint: TokensPalette.ambient) {
-                    MapSpineLayer.charge.makeCurrent()
-                    nav.popToRoot()
-                    nav.selectedTab = .home
-                }
-                // #39 月度驾驶报告入口
-                MonthlyReportGenerator()
-                // #NEW-128 里程记账本入口
-                HStack(spacing: 10) {
-                    tile("banknote.fill", "里程记账", tint: TokensPalette.success) { showMileageJournal = true }
-                    tile("clock.fill", "维保提醒", tint: TokensPalette.warning) { nav.pushNavigation(.service) }
-                }
-                // #NEW-38 OTA 版本日志入口
-                HStack(spacing: 10) {
-                    tile("tray.fill", "OTA日志", tint: TokensPalette.info) { showOTAChangelog = true }
-                    tile("doc.plaintext.fill", "专注模式", tint: TokensPalette.accent) { toggleFocus() }
-                }
-                // #N11 隐私仪表盘 + N43 语音播报
-                HStack(spacing: 10) {
-                    tile("eye.fill", "隐私与数据", tint: TokensPalette.accent) { showPrivacyDashboard = true }
-                    // 此前是空操作（VoiceBroadcastManager 自动启动，点这里什么都不发生）。
-                    // 现在是真能用的开关：翻转 VoiceBroadcastManager 读取的 UserDefaults 键。
-                    tile("speaker.wave.3.fill", "语音播报", tint: TokensPalette.accent) { toggleVoice() }
-                }
-                // #N30/N31 临时钥匙 + 家庭管理
-                HStack(spacing: 10) {
-                    tile("key.fill", "共享钥匙", tint: TokensPalette.accent) { showTempKeys = true }
-                    tile("person.2.fill", "家庭管理", tint: TokensPalette.warning) { showFamily = true }
-                }
-                // #N33/N34 车辆估值 + 年检日历
-                HStack(spacing: 10) {
-                    tile("dollarsign.circle.fill", "车辆估值", tint: TokensPalette.success) { showValuation = true }
-                    tile("calendar.fill", "年检日历", tint: TokensPalette.accent) { showInspection = true }
-                }
-                // #N32 充电账单 PDF
-                tile("doc.plaintext.fill", "充电账单", tint: TokensPalette.accent) { showChargeBill = true }
-                // E新增功能入口
-                HStack(spacing: 10) {
-                       tile("chart.bar.fill", "行程分析", tint: TokensPalette.info) {
-                           nav.pushNavigation(.trips, targetTab: .trips)
-                       }
-                    tile("clock.fill", "指令历史", tint: TokensPalette.accent) { nav.pushNavigation(.commands) }
-                }
-                HStack(spacing: 10) {
-                    tile("wrench.and.screwdriver.fill", "维保记录", tint: TokensPalette.warning) {
-                        nav.pushNavigation(.service)
+            CardBox(title: "用车") {
+                VStack(spacing: 12) {
+                    HStack(spacing: 10) {
+                        tile("chart.bar.fill", "行程分析", tint: TokensPalette.info) {
+                            nav.pushNavigation(.trips, targetTab: .trips)
+                        }
+                        tile("clock.fill", "指令历史", tint: TokensPalette.accent) {
+                            nav.pushNavigation(.commands)
+                        }
                     }
-                    tile("mappin.circle.fill", "停车位置", tint: TokensPalette.success) { nav.pushNavigation(.parking) }
-                }
-                HStack(spacing: 10) {
-                    tile("exclamationmark.octagon.fill", "紧急求助", tint: TokensPalette.error) {
-                        nav.pushNavigation(.emergency)
+                    HStack(spacing: 10) {
+                        tile("wrench.and.screwdriver.fill", "维保记录", tint: TokensPalette.warning) {
+                            nav.pushNavigation(.service)
+                        }
+                        tile("mappin.circle.fill", "停车位置", tint: TokensPalette.success) {
+                            nav.pushNavigation(.parking)
+                        }
                     }
-                    tile("lightbulb.fill", "车辆提示", tint: TokensPalette.warning) { nav.pushNavigation(.tips) }
+                    HStack(spacing: 10) {
+                        tile("lightbulb.fill", "车辆提示", tint: TokensPalette.warning) {
+                            nav.pushNavigation(.tips)
+                        }
+                        tile("exclamationmark.octagon.fill", "紧急求助", tint: TokensPalette.error) {
+                            nav.pushNavigation(.emergency)
+                        }
+                    }
+                    // #44 充电站：地图主屏的「充电」层就是这件事 —— 它按**车的位置**实时搜，
+                    // 这里不再自己搜一份（原来那份搜的是写死的北京坐标 39.9042, 116.4074）。
+                    tile("bolt.fill", "附近充电站", tint: TokensPalette.ambient) {
+                        MapSpineLayer.charge.makeCurrent()
+                        nav.popToRoot()
+                        nav.selectedTab = .home
+                    }
                 }
-                    tile("trophy.fill", "驾驶评分",
-                          tint: TokensPalette.ambient) { nav.pushNavigation(.score) }
+            }
+
+            CardBox(title: "钱与证件",
+                    footer: "数字来自本机记录（里程记账 / 年检 / 保险的字段由你自己填）。") {
+                VStack(spacing: 12) {
+                    HStack(spacing: 10) {
+                        tile("banknote.fill", "里程记账", tint: TokensPalette.success) { showMileageJournal = true }
+                        tile("doc.plaintext.fill", "充电账单", tint: TokensPalette.accent) { showChargeBill = true }
+                    }
+                    HStack(spacing: 10) {
+                        tile("dollarsign.circle.fill", "车辆估值", tint: TokensPalette.success) { showValuation = true }
+                        tile("calendar.fill", "年检与保险", tint: TokensPalette.accent) { showInspection = true }
+                    }
+                }
+            }
+
+            CardBox(title: "报告与共享") {
+                VStack(spacing: 12) {
+                    HStack(spacing: 10) {
+                        tile("key.fill", "共享钥匙", tint: TokensPalette.accent) { showTempKeys = true }
+                        tile("person.2.fill", "家庭管理", tint: TokensPalette.warning) { showFamily = true }
+                    }
+                    // #39 月度驾驶报告入口
+                    MonthlyReportGenerator()
+                }
+            }
+
+            CardBox(title: "设备与模式",
+                    footer: "摇一摇锁车默认关闭 —— 它会真的发一条锁车指令。") {
+                VStack(spacing: 12) {
+                    shakeToggle
+                    // #31 省电模式
+                    PowerSavingToggle()
+                        .padding(.horizontal, 4)
+                    nightModeRow
+                    tile("moon.fill", "专注模式", tint: TokensPalette.accent) { toggleFocus() }
+                }
+            }
+
+            CardBox(title: "应用") {
+                VStack(spacing: 12) {
+                    HStack(spacing: 10) {
+                        tile("magnifyingglass", "全局搜索", tint: TokensPalette.info) { nav.showSearch = true }
+                        tile("bubble.left.fill", "消息中心", tint: TokensPalette.info) { nav.pushNavigation(.messages) }
+                    }
+                    HStack(spacing: 10) {
+                        tile("eye.fill", "隐私与数据", tint: TokensPalette.accent) { showPrivacyDashboard = true }
+                        tile("tray.fill", "OTA日志", tint: TokensPalette.info) { showOTAChangelog = true }
+                    }
+                    HStack(spacing: 10) {
+                        // 此前是空操作（VoiceBroadcastManager 自动启动，点这里什么都不发生）。
+                        // 现在是真能用的开关：翻转 VoiceBroadcastManager 读取的 UserDefaults 键。
+                        tile("speaker.wave.3.fill", "语音播报", tint: TokensPalette.accent) { toggleVoice() }
+                        tile("wrench.adjustable", "开发者工具", tint: TokensPalette.accent) {
+                            nav.pushNavigation(.dev, targetTab: .home)
+                        }
+                    }
+                    logoutRow
+                }
             }
         }
+    }
+
+    // MARK: 设备与模式 / 退出登录（都在 tilesCard 里用）
+
+    /// 摇一摇锁车开关。
+    /// 此前这个功能只有一个从未被写入过的 UserDefaults 键（`carkeeper_shake_to_lock`，
+    /// bool 默认 false）—— 也就是说它永远是关的，而且没有任何地方能把它打开。
+    private var shakeToggle: some View {
+        HStack(spacing: TokensSpacing.sm) {
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 15))
+                .foregroundStyle(TokensPalette.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("摇一摇锁车").font(TokensTypo.headline).foregroundStyle(TokensPalette.primary)
+                Text("摇一下手机，发一条锁车指令（需 PIN）")
+                    .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
+            }
+            Spacer(minLength: TokensSpacing.sm)
+            Toggle("", isOn: Binding(
+                get: { ShakeDetector.shared.isEnabled },
+                set: { ShakeDetector.shared.isEnabled = $0 }
+            ))
+            .labelsHidden()
+        }
+    }
+
+    /// #NEW-115 夜间模式切换
+    private var nightModeRow: some View {
+        HStack {
+            Text("夜间模式").font(TokensTypo.headline)
+            Spacer()
+            Picker("主题", selection: Binding(
+                get: { nightModeManager.currentMode },
+                set: { nightModeManager.setMode($0) }
+            )) {
+                Text("自动").tag(NightModeMode.auto)
+                Text("浅色").tag(NightModeMode.light)
+                Text("深色").tag(NightModeMode.dark)
+            }
+            .pickerStyle(SegmentedPickerStyle())
+        }
+        .padding(16)
+        .glassCard()
+    }
+
+    /// 退出登录。`logout()` 一直存在，但**没有任何按钮调它** —— 它是一段到不了的代码。
+    private var logoutRow: some View {
+        Button {
+            logoutConfirm = true
+        } label: {
+            HStack(spacing: TokensSpacing.sm) {
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                    .font(.system(size: 15))
+                Text("退出登录").font(TokensTypo.headline)
+                Spacer()
+            }
+            .foregroundStyle(TokensPalette.error)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: 检查更新

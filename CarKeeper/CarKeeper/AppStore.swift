@@ -583,6 +583,27 @@ final class AppStore: @unchecked Sendable {
             .map { ciNumber(control, [$0]) }
 
         HistoryStore.shared.record(socPct: e.socPct, charging: isCharging, powerKW: pow, tyres: tyres)
+
+        // E40 充电状态监控：把这次报文交给它（只在「开始/结束/充满」的跃迁时才会推送）。
+        // 在此之前它是个空桩，而壳层只写了 `_ = ChargingStatusMonitor.shared` —— 从没被调用。
+        ChargingStatusMonitor.shared.observe(soc: e.socPct, charging: isCharging, powerKW: pow)
+
+        // #NEW-118 维保提醒的真实里程。
+        // `MaintenanceReminderScheduler` 读的是 `carkeeper_current_mileage`，
+        // 而全库**只有读、没有写** —— 那个键恒为 0，所以提醒里永远是
+        // 「距下次保养 10000 km」，永远不会触发。这里补上唯一的写入点。
+        if let km = ciNumber(control, ["Mileage", "mileage", "TotalMileage"]), km > 0 {
+            let intKm = Int(km.rounded())
+            let previous = UserDefaults.standard.integer(forKey: "carkeeper_current_mileage")
+            if previous != intKm {
+                UserDefaults.standard.set(intKm, forKey: "carkeeper_current_mileage")
+                let lastService = UserDefaults.standard.integer(forKey: Self.lastServiceMileageKey)
+                if lastService > 0 {
+                    Task { await MaintenanceReminderScheduler.shared
+                        .scheduleMaintenanceReminder(lastServiceMileage: lastService, currentMileage: intKm) }
+                }
+            }
+        }
     }
 
     // MARK: - 与 Widget / Watch / 实时活动共享数据
