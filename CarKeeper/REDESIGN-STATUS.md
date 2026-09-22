@@ -384,3 +384,52 @@ CI 静态门禁清单因此从 13 项变成 14 项（新增 `access`）。
 **能查的类型问题只有真类型检查器能查；静态脚本能可靠抓的是「结构」类问题**
 （跨文件 private、未声明成员、路径缺失、孤儿页面），一旦伸到类型语义就会变成噪音，
 而噪音门禁比没有门禁更糟 —— 因为它会训练人忽略它。
+
+## 14. 批 0：拆掉 5 Tab 骨架（方案 A 的第一批）
+
+### 14.1 病灶：48 个入口指向约 24 个页面
+
+用户的判词是「缝合怪」，而这不是感觉，是结构：**两套信息架构同时在跑**。
+
+| 入口系统 | 位置 | 规模 |
+|---|---|---|
+| 底部 5 个 tab | `CarKeeperApp:TabView` | 首页(地图) / 车控 / 充电 / 行程 / 我的，各一个独立 `NavigationStack` |
+| 地图 4 个图层 | `MapSpineData` | 现在 / 行程 / 停车 / 充电 |
+| 地图右上角索引页 | `MapSpineView:indexSheet` | `ForEach(Deeplink.allCases)` —— 16 项平铺 |
+| 「我的」磁贴墙 | `MineView` | 27 个磁贴 |
+
+物证是那句留了两代人的注释：**「全部功能在右上角的索引页里（去掉 Tab 栏的代价补在那里）」**
+—— 某个版本的方向是**去掉 Tab 栏、地图是唯一入口**，索引页是为那个世界建的；
+后来 Tab 栏回来了，索引页没拆。于是同一个「行程」有 4 个入口，「停车」有 3 个。
+
+### 14.2 这一批做了什么
+
+- `MainTab` 枚举、`selectedTab`、`controlPath` / `chargePath` / `tripsPath` / `minePath`、
+  `clearTabPaths()`、`selectedTabVoiceOverLabel`、`Deeplink.hostTab`、Tab 角标、
+  切 Tab 朗读 —— **整体删除**。`TabView` 换成**一个** `NavigationStack`，
+  根是 `MapSpineView`（壳层 586 → 429 行）。
+- `pushNavigation(_ link:targetTab:)` → `pushNavigation(_ link:)`：没有 Tab 可切，
+  导航只有一个栈。11 个调用点（地图 7、搜索 3、我的 1）全部改到位。
+- **新增 `Deeplink.mine`**：`MineView` 原本靠「我的」Tab 才能到达，Tab 栏一删它就成了
+  孤儿页。加这个 case 之后它由索引页的「系统」组进入（批 3 会把它改造成「车与账号」）。
+- **索引页升级为唯一目录**：从平铺 16 项改为按意图分四组 ——
+  这辆车 / 出行 / 保养与钱 / 系统。并且**刻意不列 `.dashboard` 与 `.parking`**：
+  它们指向的页面与 `.score` / `.trips` 是同一个（深链仍可用，只是不出现在目录里）。
+- 低电量角标原本挂在 Tab 上，Tab 没了 → 改挂在**既有的 Toast** 上（跌破 20% 提示一次，
+  回到 20% 以上才重新武装）。不新造控件。
+- 三处把 Tab 栏当真的注释一并改掉（`DS.swift` 的玻璃规则、`MapSpineView` 的架构规则、
+  `CarKeeperApp` 的分屏说明）—— 注释说谎比代码说谎更贵。
+
+### 14.3 `orphans.py` 当场抓到我的漏项
+
+我加了 `Deeplink.mine`，却忘了把它接进 `deeplinkDestination` 的 switch ——
+于是 `MineView` 变成一个**打不开的孤儿页**。检查器立刻报 ❌ 并给出两种修法。
+
+这是「孤儿页面」检查器第二次发挥作用（第一次是 `GlobalSearchHUD` 本身），
+而且这次抓的是**我同一批改动里的错**：本地几秒内发现，不必等一轮 CI。
+（编译器也会报非穷举 switch，但那是下一轮 CI 的事。）
+
+### 14.4 还没做的（下一批）
+
+批 1 必须紧跟：**没有 Tab 栏 = 锁车/开空调多一次点击**。高频操作应该在批 1
+以「地图上的常驻操作条」补回来 —— 答案在地图上，不是把 Tab 栏加回来。

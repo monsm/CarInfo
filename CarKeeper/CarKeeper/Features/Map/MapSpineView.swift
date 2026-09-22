@@ -15,7 +15,8 @@
 // 三条架构规则（写错就出问题，不是风格问题）：
 //   ① 钉 = 屏幕空间（`Annotation`），面积/轨迹 = 地理空间（`MapPolyline`）。
 //   ② 内容层不透明：图层条与底部面板用 `TokensPalette.surface`，
-//      玻璃只允许出现在导航栏 / Tab 栏 / 弹层（这是 v4 就定下的规则）。
+//      玻璃只允许出现在导航栏 / 弹层 / 底部操作条（这是 v4 就定下的规则；
+//      macOS 的那条「Tab 栏」实例随 5 Tab 骨架一起删了 —— 现在没有 Tab 栏）。
 //   ③ 地图样式来自 `ArtTheme.mapSpec` —— 换艺术主题 = 换真实 MapKit 配置，
 //      阈值与理由都写在 MapStyleSpec.swift 里。
 //
@@ -563,11 +564,11 @@ struct MapSpineView: View {
         HStack(spacing: TokensSpacing.sm) {
             // 主操作只有一个，其余三个是并列的 —— 四个都一样重要 = 没有重要的
             action("车控", "slider.horizontal.3", hot: true) {
-                nav.pushNavigation(.control, targetTab: .control)
+                nav.pushNavigation(.control)
             }
             action("找车", "location.circle") { centerOnCar(force: true) }
-            action("充电", "bolt.fill") { nav.pushNavigation(.battery, targetTab: .charge) }
-            action("异常", "exclamationmark.triangle") { nav.pushNavigation(.messages, targetTab: .mine) }
+            action("充电", "bolt.fill") { nav.pushNavigation(.battery) }
+            action("异常", "exclamationmark.triangle") { nav.pushNavigation(.messages) }
         }
     }
 
@@ -631,7 +632,7 @@ struct MapSpineView: View {
                     }
                 }
             }
-            Button("全部行程") { nav.pushNavigation(.trips, targetTab: .trips) }
+            Button("全部行程") { nav.pushNavigation(.trips) }
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.accent)
                 .buttonStyle(.plain)
@@ -660,7 +661,7 @@ struct MapSpineView: View {
                         .foregroundStyle(TokensPalette.tertiary)
                 }
             }
-            Button("去行程时间轴看全部停车与旅程") { nav.pushNavigation(.parking, targetTab: .trips) }
+            Button("去行程时间轴看全部停车与旅程") { nav.pushNavigation(.trips) }
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.accent)
                 .buttonStyle(.plain)
@@ -719,7 +720,7 @@ struct MapSpineView: View {
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.tertiary)
         }
-        Button("充电与账单") { nav.pushNavigation(.battery, targetTab: .charge) }
+        Button("充电与账单") { nav.pushNavigation(.battery) }
             .font(TokensTypo.footnote)
             .foregroundStyle(TokensPalette.accent)
             .buttonStyle(.plain)
@@ -790,8 +791,11 @@ struct MapSpineView: View {
         }
     }
 
-    /// 索引页：**去掉 Tab 栏的代价在哪里，就补在哪里**。
-    /// 每一个深潜页都能从这里到达；旧版首页也留在这里（可对照、可回退）。
+    /// 索引页：**App 唯一的功能目录**。
+    ///
+    /// 它曾经是「去掉 Tab 栏的代价补在这里」，而 Tab 栏并没去掉 —— 于是两套目录并存，
+    /// 同一页在 Tab、地图图层、索引页、「我的」磁贴里最多出现 4 次。现在 Tab 栏没了，
+    /// 这一页是真目录，所以它**按意图分组**（我现在要做什么），不再平铺 16 项让人找。
     private func indexSheet(_ d: MapSpineData) -> some View {
         NavigationStack {
             ScrollView {
@@ -807,28 +811,13 @@ struct MapSpineView: View {
                     }
                     .background(cardBackground)
 
-                    DSSectionHeader(title: "全部功能")
-                    VStack(spacing: 0) {
-                        ForEach(Deeplink.allCases, id: \.self) { link in
-                            indexRow(deeplinkTitle(link), "chevron.right", "") {
-                                showIndex = false
-                                nav.pushNavigation(link)
-                            }
-                        }
-                    }
-                    .background(cardBackground)
-
-                    DSSectionHeader(title: "对照与外观")
-                    VStack(spacing: 0) {
-                        indexRow("开发者工具 · 艺术主题与检查器", "chevron.right", "") {
-                            showIndex = false
-                            nav.pushNavigation(.dev)
-                        }
-                    }
-                    .background(cardBackground)
+                    indexGroup("这辆车", [.vehicle, .battery, .health, .data, .control, .tips])
+                    indexGroup("出行", [.trips, .commands, .emergency])
+                    indexGroup("保养与钱", [.service, .export, .score])
+                    indexGroup("系统", [.messages, .dev, .mine])
 
                     Text("三种艺术主题（夜光 / 纸上 / 巨字）住在开发者工具里，按一下换一套。"
-                         + "这一页是「去掉 Tab 栏」之后它们的家：每一个深潜页都能从这里到达。")
+                         + "这一页是 App 唯一的功能目录：地图是主屏，其余全在这里。")
                         .font(TokensTypo.caption)
                         .foregroundStyle(TokensPalette.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -973,8 +962,28 @@ struct MapSpineView: View {
     }
 
     /// 深潜页的显示名。穷举（无 default）：新增深链时编译器会强制在这里表态。
+    /// 索引页的一组：小标题 + 一组行。
+    ///
+    /// 刻意不列 `.dashboard` 与 `.parking`：它们指向的页面与 `.score` / `.trips` 是同一个，
+    /// 同一页摆两个入口就是「缝合怪」最直接的来源（深链 `carkeeper://dashboard`
+    /// 与 `carkeeper://parking` 仍然可用，只是不出现在目录里）。
+    @ViewBuilder
+    private func indexGroup(_ title: String, _ links: [Deeplink]) -> some View {
+        DSSectionHeader(title: title)
+        VStack(spacing: 0) {
+            ForEach(links, id: \.self) { link in
+                indexRow(deeplinkTitle(link), "chevron.right", "") {
+                    showIndex = false
+                    nav.pushNavigation(link)
+                }
+            }
+        }
+        .background(cardBackground)
+    }
+
     private func deeplinkTitle(_ link: Deeplink) -> String {
         switch link {
+        case .mine: return "车与账号"
         case .vehicle: return "车辆档案"
         case .health: return "健康报告"
         case .battery: return "电池与充电"

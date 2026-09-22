@@ -244,7 +244,7 @@ struct MineView: View {
         return Button {
             // 此前发 .navToVehicle 通知，根视图只写首页的 path —— 在「我的」Tab 点了毫无反应，
             // 要再点一次首页 Tab 才“突然出现”。改走统一导航：切到首页 Tab 并 push。
-            nav.pushNavigation(.vehicle, targetTab: .home)
+            nav.pushNavigation(.vehicle)
         } label: {
             HStack(spacing: TokensSpacing.lg) {
                 Image(systemName: "car.fill")
@@ -285,23 +285,23 @@ struct MineView: View {
                 VStack(spacing: 12) {
                     HStack(spacing: 10) {
                         tile("shield.lefthalf.filled", "健康报告", tint: TokensPalette.success) {
-                            nav.pushNavigation(.health, targetTab: .home)
+                            nav.pushNavigation(.health)
                         }
                         tile("battery.100", "电池充电", tint: TokensPalette.success) {
-                            nav.pushNavigation(.battery, targetTab: .home)
+                            nav.pushNavigation(.battery)
                         }
                     }
                     HStack(spacing: 10) {
                         tile("doc.text.fill", "车辆档案", tint: TokensPalette.warning) {
-                            nav.pushNavigation(.vehicle, targetTab: .home)
+                            nav.pushNavigation(.vehicle)
                         }
                         tile("chart.bar.xaxis", "全量数据", tint: TokensPalette.accent) {
-                            nav.pushNavigation(.data, targetTab: .home)
+                            nav.pushNavigation(.data)
                         }
                     }
                     HStack(spacing: 10) {
                         tile("gauge.with.dots.needle.50percent", "驾驶总览", tint: TokensPalette.info) {
-                            nav.pushNavigation(.dashboard, targetTab: .home)
+                            nav.pushNavigation(.dashboard)
                         }
                         tile("trophy.fill", "驾驶评分", tint: TokensPalette.ambient) {
                             nav.pushNavigation(.score)
@@ -314,7 +314,7 @@ struct MineView: View {
                 VStack(spacing: 12) {
                     HStack(spacing: 10) {
                         tile("chart.bar.fill", "行程分析", tint: TokensPalette.info) {
-                            nav.pushNavigation(.trips, targetTab: .trips)
+                            nav.pushNavigation(.trips)
                         }
                         tile("clock.fill", "指令历史", tint: TokensPalette.accent) {
                             nav.pushNavigation(.commands)
@@ -341,7 +341,7 @@ struct MineView: View {
                     tile("bolt.fill", "附近充电站", tint: TokensPalette.ambient) {
                         MapSpineLayer.charge.makeCurrent()
                         nav.popToRoot()
-                        nav.selectedTab = .home
+                        // 地图就是首页：popToRoot() 之后已经落在地图上，没有 Tab 可切
                     }
                 }
             }
@@ -398,7 +398,7 @@ struct MineView: View {
                         // 现在是真能用的开关：翻转 VoiceBroadcastManager 读取的 UserDefaults 键。
                         tile("speaker.wave.3.fill", "语音播报", tint: TokensPalette.accent) { toggleVoice() }
                         tile("wrench.adjustable", "开发者工具", tint: TokensPalette.accent) {
-                            nav.pushNavigation(.dev, targetTab: .home)
+                            nav.pushNavigation(.dev)
                         }
                     }
                     logoutRow

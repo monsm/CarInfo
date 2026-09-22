@@ -1,8 +1,17 @@
 import SwiftUI
 import UIKit
 
-// App 入口：未登录 → 登录页；已登录 → 主 Tab（车况 / 车控 / 消息 / 我的）。
-// 深潜页（车辆档案 / 健康报告 / 电池与充电 / 全量数据 / 开发者工具）通过 shared NavigationStack path 从任意 tab 打开。
+// App 入口：未登录 → 登录页；已登录 → **地图主屏（唯一的屏）**。
+//
+// 导航模型（2026-09-22 定案）：**没有 Tab 栏**。地图是家，功能是「地点上的层」：
+//   • 四个图层 = 四个真实问题（现在 / 行程 / 停车 / 充电）
+//   • 地图右上角的索引页 = **唯一**的功能目录
+//   • 深潜页仍然 push 到同一个 NavigationStack，返回手势与返回按钮交给系统
+//
+// 为什么删掉 5 Tab 骨架：Tab 栏建立的是「五个平行 App」的心智，而地图主屏建立的是
+// 「一切都在地点上」。两套 IA 同时存在时，同一个功能最多有 4 个入口
+// （Tab / 地图图层 / 索引页 / 「我的」的 27 个磁贴）—— 那就是「缝合怪」的来源。
+// `MainTab`、`selectedTab`、每 Tab 一个 path、Tab 角标与切 Tab 朗读都已整体删除。
 
 extension Notification.Name {
     static let navToVehicle = Notification.Name("navToVehicle")
@@ -18,51 +27,19 @@ extension Notification.Name {
     static let locationUpdated = Notification.Name("locationUpdated")
 }
 
-// MARK: - 主 Tab 的类型化标识
+// MARK: - 深潜页（唯一的导航目标）
 
-/// 底部导航的五个 Tab。
+/// 所有深潜页。**它们不再归属任何 Tab** —— 地图是家，索引页是唯一的目录。
 ///
-/// 取代此前裸 `Int` 索引（0…4）：标题、图标、无障碍朗读名都挂在枚举上，
-/// 深链、角标、切 Tab 因此共用同一份定义 —— `selectedTab = 7` 这种越界值
-/// 在编译期就不存在，标签与选中值也不可能再对不上。
-enum MainTab: Int, Hashable, CaseIterable, Sendable {
-    // 声明顺序即底部导航从左到右的顺序
-    case home = 0
-    case control = 1
-    case charge = 2
-    case trips = 3
-    case mine = 4
-
-    /// 底部导航标题（同时是 VoiceOver 朗读名）
-    var title: String {
-        switch self {
-        case .home: return "车况"
-        case .control: return "车控"
-        case .charge: return "充电"
-        case .trips: return "行程"
-        case .mine: return "我的"
-        }
-    }
-
-    /// 底部导航图标（行程图标走 SafeSymbol 兜底：写错的 symbol 会渲染成空白，
-    /// 在 Tab 上就表现为「没有图标」）
-    var systemImage: String {
-        switch self {
-        case .home: return "car.fill"
-        case .control: return "slider.horizontal.3"
-        case .charge: return "bolt.fill"
-        case .trips: return SafeSymbol.name("point.topleft.down.to.point.bottomright.curvepath", fallback: "map.fill")
-        case .mine: return "person.fill"
-        }
-    }
-
-    /// VoiceOver 在导航栏内的朗读顺序（与底部从左到右一致）
-    var sortRank: Double { Double(rawValue) }
-}
-
+/// `.dashboard` 与 `.parking` 保留为深链别名（`carkeeper://dashboard`、
+/// `carkeeper://parking` 仍然可用），但它们**指向的页面与 `.score` / `.trips` 是同一个**，
+/// 所以索引页不列这两个入口：同一页摆两个入口，正是「缝合怪」的第一来源。
 enum Deeplink: Hashable, CaseIterable {
     case vehicle, health, battery, data, dev, messages, control, dashboard
     case trips, commands, service, parking, export, emergency, tips, score
+    /// 「车与账号」（原「我的」Tab 的根页）。设置类内容的去处 —— 它不是功能目录，
+    /// 功能目录归地图右上角的索引页；这个深链保证它不再依附于 Tab 才能到达。
+    case mine
 
     /// 深链 key，对应 carkeeper://<key>
     var key: String {
@@ -83,20 +60,7 @@ enum Deeplink: Hashable, CaseIterable {
         case .emergency: return "emergency"
         case .tips: return "tips"
         case .score: return "score"
-        }
-    }
-
-    /// 该页所属的 Tab（打开时先切到对应 Tab）
-    /// 穷举（无 default）：新增深链时编译器会强制在这里表态。
-    var hostTab: MainTab {
-        switch self {
-        case .control: return .control
-        case .battery: return .charge
-        case .trips: return .trips
-        case .messages: return .mine
-        case .vehicle, .health, .data, .dev, .dashboard, .commands,
-             .service, .parking, .export, .emergency, .tips, .score:
-            return .home
+        case .mine: return "mine"
         }
     }
 
@@ -150,7 +114,7 @@ struct CarKeeperApp: App {
         // 共同决定；入口在地图主屏的工具栏，用 supportsMultipleWindows 判定。
         //
         // ⚠️ 两个场景当前共用 NavState.shared（详见 DetailSplitView 的说明）：副窗口与主窗口是
-        //    同一份导航状态 —— 同一个 Tab、同一条路径。即“能同时看两个窗口”，但还不是两块独立画布。
+        //    同一份导航状态 —— 同一条路径。即“能同时看两个窗口”，但还不是两块独立画布。
         WindowGroup(id: SceneID.detail) {
             DetailSplitView()
                 .preferredColorScheme(ArtThemeStore.current.spec.preferredScheme)
@@ -170,18 +134,11 @@ struct CarKeeperApp: App {
 
     /// 处理 carkeeper:// 深链。
     /// 此前 Info.plist 注册了 scheme，但全项目没有任何 onOpenURL 接收方 —— 扫二维码/点链接豪无反应。
+    /// 现在只有一个栈，所以深链就是「把它设为根之下的那一页」。
     private func openDeeplink(_ url: URL) {
         guard let link = Deeplink(url: url) else { return }
         guard store.isLoggedIn else { return }   // 未登录时先让用户完成登录，登录后可从界面进入
-        nav.selectedTab = link.hostTab
-        // 按目标 Tab 写入对应路径（枚举穷举，不存在写错的索引）
-        switch link.hostTab {
-        case .control: nav.controlPath = [link]
-        case .charge: nav.chargePath = [link]
-        case .trips: nav.tripsPath = [link]   // 行程 Tab；此前误写进 minePath，深链打不开
-        case .mine: nav.minePath = [link]
-        case .home: nav.path = [link]
-        }
+        nav.path = [link]
     }
 
     private var root: some View {
@@ -199,26 +156,19 @@ struct CarKeeperApp: App {
                 // #NEW-113 Onboarding 引导
                 OnboardingView()
             } else if store.isLoggedIn {
-                MainTabView()
+                MapShellView()
                     .environmentObject(nav)
                     .onReceive(NotificationCenter.default.publisher(for: .navToVehicle)) { _ in nav.path = [.vehicle] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToHealth)) { _ in nav.path = [.health] }
-                    .onReceive(NotificationCenter.default.publisher(for: .navToBattery)) { _ in
-                        nav.selectedTab = .charge
-                        nav.chargePath = []
-                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .navToBattery)) { _ in nav.path = [.battery] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToData)) { _ in nav.path = [.data] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToDev)) { _ in nav.path = [.dev] }
-                    .onReceive(NotificationCenter.default.publisher(for: .navToMessages)) { _ in
-                        nav.selectedTab = .mine
-                        nav.minePath = [.messages]
-                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .navToMessages)) { _ in nav.path = [.messages] }
                     .onReceive(ToastManager.shared.$currentItem) { item in
                         nav.currentToast = item
                     }
                     .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
                         nav.path = []
-                        nav.selectedTab = .home
                     }
             } else {
                 LoginView()
@@ -288,64 +238,40 @@ struct CarKeeperApp: App {
 // 全局导航状态（深潜页 push 与 tab 切换共享）
 final class NavState: ObservableObject, @unchecked Sendable {
     static let shared = NavState()
+    /// **唯一**的导航路径。地图主屏与所有深潜页共用它 —— 没有第二个栈。
     @Published var path: [Deeplink] = []
-    @Published var selectedTab: MainTab = .home
     @Published var currentToast: (text: String, icon: String)? = nil
-    @Published var controlPath: [Deeplink] = []
-    @Published var chargePath: [Deeplink] = []
-    @Published var tripsPath: [Deeplink] = []
-    @Published var minePath: [Deeplink] = []
-    /// 全局搜索是否展开（地图工具栏与「我的」都能把它打开）
+    /// 全局搜索是否展开（地图工具栏与「车与账号」都能把它打开）
     @Published var showSearch = false
 
     private init() {}
 
     func popToRoot() { path = [] }
 
-    /// 统一导航：从任意 Tab push 深潜页，自动切换到对应 Tab（若有）
-    /// - Parameters:
-    ///   - link: 目标深潜页
-    ///   - targetTab: 目标 Tab（nil = 保持当前 Tab）
-    func pushNavigation(_ link: Deeplink, targetTab: MainTab? = nil) {
-        // 先切换到目标 Tab（如有）
-        if let t = targetTab { selectedTab = t }
-        // 根据当前 Tab 写入对应路径
-        switch selectedTab {
-        case .home: path.append(link)
-        case .control: controlPath.append(link)
-        case .charge: chargePath.append(link)
-        case .trips: tripsPath.append(link)
-        case .mine: minePath.append(link)
-        }
+    /// 统一导航：从任意位置 push 深潜页。
+    ///
+    /// 旧的 `targetTab:` 参数已删 —— 没有 Tab 可切，导航只有一个栈。
+    func pushNavigation(_ link: Deeplink) {
+        path.append(link)
     }
-
-    func clearTabPaths() {
-        controlPath = []
-        chargePath = []
-        tripsPath = []
-        minePath = []
-    }
-
-    /// 获取当前选中 Tab 的无障碍朗读文本
-    var selectedTabVoiceOverLabel: String { selectedTab.title }
 }
 
-// MARK: - 主 Tab
+// MARK: - 地图外壳（唯一的屏）
 
-// 壳层约定：
-//   • 每个 Tab 用 iOS 18+ 的 `Tab(value:content:label:)` 声明：选中值是类型化的 MainTab，
-//     标签文案/图标/朗读名都取自 MainTab 本身 —— 标题、选中值、角标不再各写一份。
-//     旧写法（在子视图上挂 .tabItem/.tag）必须挂在最外层，一旦外面套了容器就会丢标题、
-//     选中态被弹回首页；新写法从结构上排除了这一类问题。
-//   • 每个 Tab 是标准 NavigationStack + navigationDestination
-//   • 返回手势、返回按钮、转场动画全部交给系统（系统同款动画做得更稳）
-//   • 导航栏用系统液态玻璃材质（浮在内容之上，是玻璃唯一该出现的地方）
+// 壳层约定（取代此前 5 Tab 骨架）：
+//   • **一个** NavigationStack：根是地图主屏，深潜页 push 在上面；
+//     返回手势、返回按钮、转场动画全部交给系统。
+//   • **一个**目录：地图右上角的索引页（不再与 Tab 栏、「我的」磁贴三套并存）。
+//   • Tab 栏及其附带物（选中值、每 Tab 一个 path、角标、切 Tab 朗读）已删。
+//     代价是高频操作会多一次点击 —— 它们应该在批 1 以「地图上的常驻操作条」补回来，
+//     而不是把 Tab 栏加回来（「高频操作」的答案在地图上，不在另一层导航上）。
 
-struct MainTabView: View {
+struct MapShellView: View {
     @StateObject private var nav = NavState.shared
-    @State private var lastAnnouncedTab: MainTab = .home
     private let store = AppStore.shared
-    @State private var lowBatteryBadge: Bool = false
+    /// 低电量只提醒一次：跌破 20% 时给一条 Toast，回到 20% 以上才重新武装。
+    /// （旧写法是 Tab 上的角标 —— 角标随 Tab 栏一起不存在了，改挂在既有的 Toast 上。）
+    @State private var lowBatteryArmed = true
     private let networkMonitorTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     /// 深潜页目标视图（独立函数避免巨型 switch 拖慢类型检查）
@@ -373,24 +299,18 @@ struct MainTabView: View {
         case .emergency: EmergencyPanel().environmentObject(nav)
         case .tips: VehicleTipsView().environmentObject(nav)
         case .score: DrivingScorePage().environmentObject(nav)
+        // 「车与账号」（原「我的」Tab 的根页）。**它必须在这里有一个 case** ——
+        // 它就是设置类内容的唯一去处；批 3 会把它从 27 个磁贴的功能目录
+        // 改成「车 / 账号 / 数据与隐私 / 关于与工具」四组。
+        case .mine: MineView().environmentObject(nav)
         }
     }
 
-    /// Tab 标签：文案/图标取自 MainTab（不再是手写字符串）。
-    /// sortRank 仅用于 VoiceOver 朗读顺序（与底部从左到右一致）；hint 只有行程 Tab 用。
-    private func tabLabel(_ tab: MainTab, hint: String? = nil) -> some View {
-        Label(tab.title, systemImage: tab.systemImage)
-            .accessibilitySortPriority(tab.sortRank)
-            .accessibilityHint(hint ?? "")
-    }
-
-    private var homeTab: some View {
+    /// 唯一的栈：根是地图主屏（Features/Map/MapSpineView.swift）。
+    /// 车的一切都发生在某个地方，所以导航长在地方上；
+    /// 四个图层 = 四个真实问题，功能目录在右上角的索引页里。
+    private var mapStack: some View {
         NavigationStack(path: $nav.path) {
-            // 首页**以地图为主屏**（Features/Map/MapSpineView.swift）。
-            // 车的一切都发生在某个地方，所以导航长在地方上；四个图层 = 四个真实问题，
-            // 全部功能在右上角的索引页里（去掉 Tab 栏的代价补在那里）。
-            // 旧版列表首页已随重设计删除（它的 LocationMapView 还依赖已删的 MapView，
-            // 本身就是断链页面）—— 回退 = git revert，不再保留两套真相。
             MapSpineView()
                 .navigationDestination(for: Deeplink.self) { link in
                     deeplinkDestination(link)
@@ -398,10 +318,15 @@ struct MainTabView: View {
                 // 导航栏材质交给系统：iOS 26/27 会在内容滚动到其下方时自动给出材质。
                 // 手写 .toolbarBackground 反而会把系统行为覆盖掉。
         }
-            // #5 低电量角标：由统一的数据变更通知驱动
+            // 低电量：跌破 20% 给一次提示，回到 20% 以上才重新武装
             .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
                 let energy = VM.energy(store.caches, store.car)
-                lowBatteryBadge = energy.socPct < 20
+                if energy.socPct < 20, lowBatteryArmed {
+                    lowBatteryArmed = false
+                    nav.currentToast = (text: "电量低于 20%", icon: "battery.25")
+                } else if energy.socPct >= 20 {
+                    lowBatteryArmed = true
+                }
             }
             .onReceive(networkMonitorTimer) { _ in
                 // #4 简单网络检测：尝试 ping 一个已知端点
@@ -418,96 +343,14 @@ struct MainTabView: View {
             }
     }
 
-    private var controlTab: some View {
-            NavigationStack(path: $nav.controlPath) {
-                ControlView()
-                    .navigationDestination(for: Deeplink.self) { link in
-                        deeplinkDestination(link)
-                    }
-            }
-    }
-
-    private var chargeTab: some View {
-            NavigationStack(path: $nav.chargePath) {
-                BatteryView()
-                    .navigationDestination(for: Deeplink.self) { link in
-                        deeplinkDestination(link)
-                    }
-            }
-    }
-
-    private var tripsTab: some View {
-            NavigationStack(path: $nav.tripsPath) {
-                TripsTimelineView()
-                    .navigationDestination(for: Deeplink.self) { link in
-                        deeplinkDestination(link)
-                    }
-            }
-    }
-
-    private var mineTab: some View {
-            NavigationStack(path: $nav.minePath) {
-                MineView()
-                    .navigationDestination(for: Deeplink.self) { link in
-                        deeplinkDestination(link)
-                    }
-            }
-    }
-
     var body: some View {
-        // iOS 18+ Tab 语法：选中值换成类型化的 MainTab（替代 .tag(0…4)），
-        // 标签文案与图标同样取自 MainTab —— 手写字符串与裸索引一并消失。
-        TabView(selection: $nav.selectedTab) {
-            Tab(value: MainTab.home) {
-                homeTab
-            } label: {
-                tabLabel(.home)
-            }
-            // 低电量时在 Tab 上给出角标（只有真需要用户注意时才出现）
-            .badge(lowBatteryBadge ? Text("低") : nil)
-
-            Tab(value: MainTab.control) {
-                controlTab
-            } label: {
-                tabLabel(.control)
-            }
-
-            Tab(value: MainTab.charge) {
-                chargeTab
-            } label: {
-                tabLabel(.charge)
-            }
-
-            Tab(value: MainTab.trips) {
-                tripsTab
-            } label: {
-                tabLabel(.trips, hint: "里程、能耗与每一次出行记录")
-            }
-
-            Tab(value: MainTab.mine) {
-                mineTab
-            } label: {
-                tabLabel(.mine)
-            }
-        }
-        // 情感化配色：时间感知主色调
+        // 情感化配色：时间感知主色调（系统控件的主色调）
+        mapStack
         .tint(TokensPalette.ambient)
-        // VoiceOver：切换 Tab 时朗读当前页面名称（仅首次切换到新 Tab）
-        .onChange(of: nav.selectedTab) { _, newTab in
-            if newTab != lastAnnouncedTab {
-                lastAnnouncedTab = newTab
-                UIAccessibility.post(notification: .announcement, argument: "已切换到\(newTab.title)页")
-            }
-        }
-        // #5 低电量角标检测：每次车控数据更新时检查
-        .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
-            let energy = VM.energy(store.caches, store.car)
-            lowBatteryBadge = energy.socPct < 20
-        }
         .task { await store.bootstrap() }
-        // 设置 TabView 整体无障碍描述和朗读顺序
-        .accessibilityLabel(Text("主导航栏"))
-        .accessibilityHint(Text("五个主要功能模块：车况、车控、充电、行程、我的。左右滑动可切换标签页"))
+        // VoiceOver：这是一个「地图 + 索引页」的外壳，不再是一条 Tab 栏
+        .accessibilityLabel(Text("地图主屏"))
+        .accessibilityHint(Text("地图是主屏，右上角的全部功能可以到达每一个页面"))
         .accessibilitySortPriority(0)
         // #4 网络状态指示器 + #NEW-3 离线模式提示
         .overlay(alignment: .top) {
@@ -538,10 +381,10 @@ struct MainTabView: View {
 /// 第二个窗口（`WindowGroup(id: SceneID.detail)`）的根视图，由 iPad 分屏入口打开。
 ///
 /// ⚠️ 它用的是共用的 `NavState.shared`，所以副窗口与主窗口是**同一份导航状态**：
-///    `MainTabView` 内部是 `@StateObject private var nav = NavState.shared`（读单例、不读环境），
-///    两个场景因此绑定到同一个实例，Tab 选中与各 Tab 的路径完全同步。
+///    `MapShellView` 内部是 `@StateObject private var nav = NavState.shared`（读单例、不读环境），
+///    两个场景因此绑定到同一个实例，push 出来的页面在两窗口间完全同步。
 ///    要让两个窗口真正各走各的：NavState 去掉单例、由每个 Scene 各建一个实例并通过
-///    `.environmentObject` 注入（代码里已没有直接写 `NavState.shared.selectedTab` 的地方）。
+///    `.environmentObject` 注入（代码里已没有直接写 `NavState.shared` 的地方）。
 struct DetailSplitView: View {
     @StateObject private var nav = NavState.shared
     private let store = AppStore.shared
@@ -549,7 +392,7 @@ struct DetailSplitView: View {
     var body: some View {
         Group {
             if store.isLoggedIn {
-                MainTabView()
+                MapShellView()
                     .environmentObject(nav)
             } else {
                 LoginView()

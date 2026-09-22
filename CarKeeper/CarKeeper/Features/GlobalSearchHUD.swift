@@ -129,7 +129,7 @@ struct GlobalSearchHUD: View {
         for page in Self.pages {
             if page.title.lowercased().contains(q) || page.hint.lowercased().contains(q) {
                 out.append(SearchResult(title: page.title, subtitle: page.hint, icon: page.icon) { [nav] in
-                    nav.pushNavigation(page.link, targetTab: page.link.hostTab)
+                    nav.pushNavigation(page.link)
                 })
             }
         }
@@ -147,7 +147,7 @@ struct GlobalSearchHUD: View {
                     out.append(SearchResult(title: "\(f.0) \(f.1)",
                                             subtitle: "车辆档案",
                                             icon: "car.fill") { [nav] in
-                        nav.pushNavigation(.vehicle, targetTab: .home)
+                        nav.pushNavigation(.vehicle)
                     })
                 }
             }
@@ -164,7 +164,7 @@ struct GlobalSearchHUD: View {
         ]
         for r in readings where r.0.contains(q) || q.contains(r.0) {
             out.append(SearchResult(title: "\(r.0)：\(r.1)", subtitle: "实时车况", icon: r.2) { [nav] in
-                nav.pushNavigation(r.3, targetTab: r.3.hostTab)
+                nav.pushNavigation(r.3)
             })
         }
 
@@ -177,7 +177,7 @@ struct GlobalSearchHUD: View {
                 out.append(SearchResult(title: "行程 \(dist)",
                                         subtitle: "\(when) · \(soc)",
                                         icon: "point.topleft.down.curvedto.point.bottomright.up") { [nav] in
-                    nav.selectedTab = .trips
+                    nav.pushNavigation(.trips)
                 })
             }
         }
@@ -190,7 +190,7 @@ struct GlobalSearchHUD: View {
                 out.append(SearchResult(title: "指令 \(entry.name)",
                                         subtitle: "\(when) · \(state) · 用时 \(entry.durationText)",
                                         icon: entry.iconName) { [nav] in
-                    nav.pushNavigation(.commands, targetTab: .home)
+                    nav.pushNavigation(.commands)
                 })
             }
         }
@@ -203,7 +203,7 @@ struct GlobalSearchHUD: View {
                 out.append(SearchResult(title: "充电 \(kwh)",
                                         subtitle: "\(when) · ¥\(ChargeLedger.moneyText(ChargeLedger.shared.cost(s)))",
                                         icon: "bolt.fill") { [nav] in
-                    nav.selectedTab = .charge
+                    nav.pushNavigation(.battery)
                 })
             }
         }
@@ -225,6 +225,7 @@ struct GlobalSearchHUD: View {
         ("指令历史", "发过的每一条车控指令与结果", "clock.fill", .commands),
         ("维保记录", "保养里程与提醒", "wrench.and.screwdriver.fill", .service),
         ("停车位置", "最近一次停放的位置", "mappin.circle.fill", .parking),
+        ("车与账号", "车辆、账号、隐私与关于", "person.fill", .mine),
         ("车辆提示", "针对你车的用车建议", "lightbulb.fill", .tips),
         ("紧急求助", "拖车、保险、救援电话", "exclamationmark.octagon.fill", .emergency),
         ("导出数据", "把行程与充电记录导出去", "square.and.arrow.up", .export),
