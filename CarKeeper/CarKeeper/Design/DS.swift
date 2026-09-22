@@ -938,6 +938,7 @@ struct DSSection<Content: View>: View {
     var title: String
     var trailing: String? = nil
     var trailingCls: String = "na"
+    var footer: String? = nil
     @ViewBuilder var content: () -> Content
 
     @State private var expanded: Bool = false
@@ -945,10 +946,12 @@ struct DSSection<Content: View>: View {
     init(title: String,
          trailing: String? = nil,
          trailingCls: String = "na",
+         footer: String? = nil,
          @ViewBuilder content: @escaping () -> Content) {
         self.title = title
         self.trailing = trailing
         self.trailingCls = trailingCls
+        self.footer = footer
         self.content = content
     }
 
@@ -981,6 +984,14 @@ struct DSSection<Content: View>: View {
 
             if expanded {
                 VStack(spacing: 0) { content() }
+            }
+
+            if let footer {
+                Text(footer)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
             }
         }
     }

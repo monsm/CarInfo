@@ -1097,7 +1097,7 @@ struct ACStepperView: View {
         Button {
             action()
         } label: {
-            Image(safeSymbol: \(sym).circle.fill, fallback: \(sym).circle.fill)
+            Image(safeSymbol: sym + ".circle.fill", fallback: sym + ".circle.fill")
                 .font(TokensTypo.display(42))
                 .foregroundStyle(canDo ? TokensPalette.ambient : Color(.systemGray4))
         }
