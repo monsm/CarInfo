@@ -121,8 +121,6 @@ targets:
         #   allowed for the extension point com.apple.widgetkit-extension)
         # 小组件的入口是代码里的 `@main struct CarKeeperWidgetBundle: WidgetBundle`，
         # 不需要（也不允许）在 plist 里再声明一次。
-        # （CarPlay 那个 target 是另一回事：com.apple.carplay.app-service 确实需要
-        #   PrincipalClass，所以它那里保留。）
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
@@ -194,35 +192,6 @@ targets:
         GENERATE_INFOPLIST_FILE: 'NO'
     dependencies:
     - target: WatchApp
-  CarPlay:
-    type: bundle
-    platform: iOS
-    sources:
-    - path: CarPlay/
-      excludes:
-      - '**/.*'
-    # 设计令牌（WT）与 App / 小组件**同一份源文件**：车机屏幕上的字号与颜色
-    # 也从这里出，否则它就是第四个自带一套数值的地方（这正是「缝合感」的来源）。
-    # 只加这一个文件，不加整个 Shared/ —— ChargingActivityAttributes 需要 ActivityKit，
-    # 车机与 AppClip 都不该把它编进来。
-    - path: Shared/WidgetTokens.swift
-    info:
-      path: CarPlay/Info.plist
-      properties:
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.carplay.app-service
-          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).CPParentViewController
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper.carplay
-        PRODUCT_NAME: CarPlay
-        GENERATE_INFOPLIST_FILE: 'YES'
-        ENABLE_PREVIEWS: 'NO'
-        CODE_SIGNING_ALLOWED: 'NO'
-        # 车机扩展必须能读 App Group 里的 VehicleSnapshot，否则读到的是空数据
-        CODE_SIGN_ENTITLEMENTS: CarPlay/CarPlay.entitlements
-    dependencies:
-    - target: CarKeeper
   AppClip:
     type: application
     platform: iOS

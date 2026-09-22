@@ -21,7 +21,7 @@
 | 字体 | 令牌 358 处 + `Theme.font(...)` 中转 + 应用内硬编码 `.font(.system(size:` 68 处 | `Theme.font` 清零；**字号字面量全库清零**（定义处之外 0 处，仅 3 处显式豁免）；`Theme.font` / `Theme.lineHeight` / `Color(hex:)` 已从代码里删掉 |
 | 空态 | `DSPlaceholder`（12 处）／`PageLoadingView`+`PageErrorView`（各 1 处）／手写灰图标 | 空态一律 `DSPlaceholder`（维保记录页本轮改过来） |
 | 颜色 | 令牌 631 处 + `.green`/`.orange`/`.red`/`.white`/`.black` 直用，散在 25 个文件 | **全库清零**；补了三个缺口令牌：`scrim`（遮罩/暗角/阴影）、`labelOnTint`（彩色面上的文字）、`fillSubtle` 家族 |
-| 跨 target 令牌 | 小组件用 `WT.*`，CarPlay/AppClip/Watch 各自写死一套（合计 39 处字面量） | **CarPlay / AppClip 与小组件共用 `Shared/WidgetTokens.swift`**（同一份源文件）；Watch 显式豁免（理由已核实，见下） |
+| 跨 target 令牌 | 小组件用 `WT.*`，AppClip/Watch 各自写死一套（合计 23 处字面量） | **AppClip 与小组件共用 `Shared/WidgetTokens.swift`**（同一份源文件）；Watch 显式豁免（理由已核实，见下） |
 
 ---
 
@@ -123,12 +123,12 @@ ScrollView {
 | 文件 | 管什么 | 谁用 |
 |---|---|---|
 | `CarKeeper/Design/Tokens.swift` | App 内的全部取值（颜色/字号/间距/圆角/字距/尺寸/发丝线） | App target |
-| `Shared/WidgetTokens.swift` | **世界面**的取值（系统语义色真值）+ `VehicleSnapshot` 数据契约 | 小组件、CarPlay、AppClip、App |
+| `Shared/WidgetTokens.swift` | **世界面**的取值（系统语义色真值）+ `VehicleSnapshot` 数据契约 | 小组件、AppClip、App |
 | `Design/ArtTheme.swift` | 艺术主题（原生/夜光/纸上/巨字）的**取值表**：换主题 = 换这里的值 | App target 经 `TokensPalette` 读 |
 
 **为什么小组件不直接用 `TokensPalette`**：扩展不编译 App 的 `Design/`。所以 v4 的做法是
 「值只写在 `WT` 一处，App 的 `TokensPalette` 从那里转发」—— 两边由**编译器**保证不漂移。
-本轮把 CarPlay 与 AppClip 也接进这一份（各自只加 `- path: Shared/WidgetTokens.swift` 一个文件，
+本轮把 AppClip 也接进这一份（只加 `- path: Shared/WidgetTokens.swift` 一个文件，
 不加整个 `Shared/`：`ChargingActivityAttributes` 需要 ActivityKit，车机与 AppClip 不该把它编进来）。
 
 ### 字号只有两条路
@@ -357,6 +357,6 @@ ScrollView {
 | # | 做了什么 | 落在哪个面 |
 |---|---|---|
 | ✅22 | **CI 修复**：① `DSSection` 补上 `footer: String?` 参数（`insulationCard` 调用时缺此参数）；② `ControlView.tempButton` 里 `\(sym).circle.fill` 是字符串插值语法误出现在字符串外（之前 sed 批量替换残留），还原为 `sym + ".circle.fill"` | DS.swift / ControlView.swift |
-| ✅23 | **CarPlay 全量实现**：重写 `CPParentViewController.swift`，接入 App Group 快照做实时地图 + 车况页。新增 `VehicleSnapshot.lat/lng` 字段，主 App `syncSharedDefaults()` 写入位置。详见下文教程 | CarPlay/ CPParentViewController.swift / WidgetTokens.swift / AppStore.swift |
+| ✅23 | **CarPlay 已移除**：因免费账号无法配置 CarPlay entitlement，相关 target / 源码 / CI 步骤 / 文档已全部清理。保留 `VehicleSnapshot.lat/lng` 字段（主 App 地图仍用），删除 `CarPlay/` 目录 | WidgetTokens.swift / AppStore.swift |
 
 **门禁同步**：无新增门禁。

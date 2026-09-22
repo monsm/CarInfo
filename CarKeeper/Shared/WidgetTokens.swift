@@ -58,7 +58,7 @@ enum WT {
             light: (0.000, 0.780, 0.745),
             dark: (0.400, 0.839, 1.000)
         )
-        /// 铺在**彩色面之上**的文字色（AppClip 的渐变卡、CarPlay 的深底）。
+        /// 铺在**彩色面之上**的文字色（AppClip 的渐变卡、地图主面的深色）。
         /// 它在两种外观下都是白 —— 因为它站的那块底是彩色的，不是画布。
         /// （App 内对应的是 `TokensPalette.labelOnTint`，两者同名同义。）
         static let onAccent = Color.white
@@ -186,7 +186,7 @@ struct VehicleSnapshot: Codable, Equatable {
     /// 语义色分类：ok / charge / warn / bad / na（与 App 的 e.chargeCls 同一套）
     var chargeCls: String = "na"
     var updatedAt: Date = .distantPast
-    // CarPlay 专用：车辆位置（单位：度，GCJ-02 坐标系，与车端报文一致）
+    // 车辆位置（单位：度，GCJ-02 坐标系，与车端报文一致）
     var lat: Double? = nil
     var lng: Double? = nil
 

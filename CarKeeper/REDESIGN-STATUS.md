@@ -11,7 +11,7 @@
 | **设计层** | 令牌（颜色/字/间距/圆角/动效/触觉）+ 四套艺术主题 + DS 组件 | `Design/Tokens.swift`、`Design/ArtTheme.swift`、`Design/DS.swift`、`Design/Theme.swift` |
 | **数据适配层** | 把 `AppStore` 的真实缓存翻译成"地图上画得出来的东西"；**没有数据就是 nil** | `Features/Map/MapSpineData.swift`、`Services/ChargeLedger.swift`、`Services/HistoryStore.swift` |
 | **页面层** | 地图主屏 + 深潜页（43 个文件 → 现在 12 个面） | `Features/Map/*`、`Features/Battery/*`、`Features/Control/*`、`Features/Mine/*` |
-| **系统层** | Widget / Watch / CarPlay / App Clip / Siri / 无障碍 | `Widgets/`、`WatchApp/`、`CarPlay/`、`AppClip/`、`Shared/` |
+| **系统层** | Widget / Watch / App Clip / Siri / 无障碍 | `Widgets/`、`WatchApp/`、`AppClip/`、`Shared/` |
 
 **换肤是换值，不是换名字**：`TokensPalette` / `TokensTypo` 的取值全部转发自当前主题（`ArtThemeStore.spec`），所以全 App 约 800 处调用点跟随主题切换而**零改动**。
 艺术方向的入口：我的 → 开发者工具 → 艺术主题（`Features/ThemeGalleryView.swift`，四套样张各自用那套主题的令牌真渲染）。
@@ -447,7 +447,7 @@ Tab 角标 / 切 Tab 朗读：全库各只剩 **一行「已整体删除」的�
 ### 15.2 残留一：CI 只编译了 7 个 target 里的 1 个
 
 `scheme CarKeeper` 的 build action 只列了 `CarKeeper`，于是
-**WidgetBundle / CarPlay / AppClip / WatchApp / WatchKitApp 从来没有被 CI 编译过一次**。
+**WidgetBundle / AppClip / WatchApp / WatchKitApp 从来没有被 CI 编译过一次**。
 里面有错也看不见 —— 这正是「构建过了」这句话之前一直不成立的原因。
 
 现在 build job 末尾多了一步 **编译体检**（`Compile other targets`，非阻断）：
@@ -635,7 +635,7 @@ CI 里那个 `unit-tests`（`Unit tests (pure logic, non-blocking)`）整体删�
 | `.font(.system(size: N))` 字面量 | 112 处 / 26 个文件 | **0 处**（定义处之外；3 处显式豁免） |
 | 颜色分量字面量（手写 RGB） | 4 处（含纸纹的暖棕、遮罩的纯黑、阴影） | **0 处**（全部进 ArtTheme 的取值表） |
 | 色相直用（`.white` / `.red` / `.black` / `.green` …） | 25 个文件里有 | **0 处** |
-| 跨 target 各自一套数值 | CarPlay 6 / AppClip 19 / 小组件 6（各自写死） | CarPlay / AppClip / 小组件**共用 `Shared/WidgetTokens.swift`** |
+| 跨 target 各自一套数值 | AppClip 19 / 小组件 6（各自写死） | AppClip / 小组件**共用 `Shared/WidgetTokens.swift`** |
 | `Theme.swift` | 1128 行（第二代设计系统：`CardBox` / `FluidHeroFont` / Dynamic Type 工具…） | **415 行**：只剩画布与光、两个小零件、两个被「车与账号」直接用的视图 |
 | `Color(hex:)` / `Theme.font` / `Theme.lineHeight` | 三个"第二个入口" | **已删**（字体只从 `TokensTypo` 出，颜色只从 `TokensPalette` 出） |
 
