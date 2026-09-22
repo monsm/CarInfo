@@ -47,6 +47,7 @@ struct MineView: View {
             }
 
         }
+        .pageBackground()
         .scrollBounceBehavior(.basedOnSize)
         .dsPageTitle("我的")
             .accessibilityLabel(Text("我的"))
@@ -390,7 +391,7 @@ struct MineView: View {
         CardBox(title: "检查更新", side: nil) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("下载最新 GitHub 构建的 ipa，分享后用自签工具安装")
-                    .font(TokensTypo.caption).foregroundStyle(.secondary)
+                    .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
                 // OTA 检查中：骨架旋转指示器
                 if isChecking {
                     HStack(spacing: 10) {
@@ -398,7 +399,7 @@ struct MineView: View {
                             .tint(TokensPalette.ambient)
                         Text("正在检查最新版本…")
                             .font(TokensTypo.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(TokensPalette.secondary)
                     }
                     .padding(.vertical, 8)
                 } else if showDownload {
@@ -418,7 +419,7 @@ struct MineView: View {
                             .foregroundStyle(updateMsgIsError ? TokensPalette.error : TokensPalette.ambient)
                         Text(m)
                             .font(TokensTypo.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(TokensPalette.secondary)
                         Spacer()
                     }
                 }
@@ -508,7 +509,7 @@ struct MineView: View {
         } label: {
             Label("Token", systemImage: "key.fill")
                 .font(TokensTypo.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(TokensPalette.secondary)
                 .padding(.horizontal, 12).padding(.vertical, 10)
                 .background(TokensPalette.fillSubtle, in: Capsule())
         }

@@ -77,6 +77,7 @@ struct DataView: View {
             .padding(.bottom, TokensSpacing.xxxl)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .pageBackground()
         .scrollBounceBehavior(.basedOnSize)
         .navigationTitle("全量数据")
         .toolbar {

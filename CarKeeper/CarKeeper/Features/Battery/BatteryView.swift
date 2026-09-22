@@ -41,6 +41,7 @@ struct BatteryView: View {
                 sections
             }
         }
+        .pageBackground()
         .scrollBounceBehavior(.basedOnSize)
         .dsPageTitle("充电")
             .accessibilityLabel(Text("充电"))
@@ -315,7 +316,7 @@ struct BatteryView: View {
                 sideCls: b.faultTotal > 0 ? "bad" : "ok") {
             if b.faults.filter({ $0.count > 0 }).isEmpty {
                 Text("驱动电机 / 储能 / 发动机均无故障")
-                    .font(TokensTypo.caption).foregroundStyle(.secondary)
+                    .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
             } else {
                 VStack(spacing: 10) {
                     ForEach(b.faults.filter { $0.count > 0 }) { f in
@@ -365,17 +366,17 @@ struct BatteryView: View {
     }
 
     // MARK: 辅助
+    /// 卡片内的子标题：走全 App 的同一行字（衬线 + 疏排），不再自造一个加粗灰字。
     private func sectionLabel(_ t: String) -> some View {
-        Text(t).font(Theme.font(.footnote as Font).bold()).foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        DSSectionHeader(title: t)
     }
 
     private func miniStat(_ k: String, _ v: String, _ unit: String, warn: Bool = false) -> some View {
         HStack(spacing: 4) {
-            Text(k).font(TokensTypo.footnote).foregroundStyle(.secondary)
+            Text(k).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
             Text(v).font(Theme.font(.caption as Font).bold()).monospacedDigit()
                 .foregroundStyle(warn ? TokensPalette.error : .primary)
-            Text(unit).font(TokensTypo.caption2).foregroundStyle(.secondary)
+            Text(unit).font(TokensTypo.caption2).foregroundStyle(TokensPalette.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
@@ -564,9 +565,9 @@ struct DestinationCalculatorView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Text("目的地续航计算").font(TokensTypo.title3).foregroundStyle(.primary)
+            Text("目的地续航计算").font(TokensTypo.title3).foregroundStyle(TokensPalette.primary)
             Text("输入目的地距离，估算当前电量是否足够到达")
-                .font(TokensTypo.caption).foregroundStyle(.secondary)
+                .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
                 .multilineTextAlignment(.center)
 
             TextField("目的地距离 (km)", text: $distance)
@@ -597,7 +598,7 @@ struct DestinationCalculatorView: View {
 
             Button("取消") { dismiss() }
                 .font(TokensTypo.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(TokensPalette.secondary)
         }
         .padding(TokensSpacing.xxl)
         .presentationDetents([.medium])

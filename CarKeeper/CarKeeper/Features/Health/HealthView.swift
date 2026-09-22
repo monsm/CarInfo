@@ -46,6 +46,7 @@ struct HealthView: View {
             .padding(.bottom, TokensSpacing.xxl)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .pageBackground()
         .scrollBounceBehavior(.basedOnSize)
         .navigationTitle("健康报告")
         .refreshable { await load() }

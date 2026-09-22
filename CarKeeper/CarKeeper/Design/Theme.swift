@@ -255,6 +255,14 @@ struct GlassCardModifier: ViewModifier {
             // v4：内容层没有描边、没有阴影 —— 深度只由系统表面色表达。
             // （它们曾经是“卡片感”的来源，也是界面显廉价的主因。）
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            // v5：艺术方向下补一条发丝描边 —— 纸与墨的语言里，「一块面」是靠线画出来的。
+            // 原生主题不加（原生 = 现状）。这一处一改，全 App 剩下的每一张卡片同时变。
+            .overlay {
+                if TokensPalette.decor != .none {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line)
+                }
+            }
     }
 }
 
@@ -314,22 +322,35 @@ struct CardBox<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            HStack(alignment: .firstTextBaseline) {
+        // 标题搬到表面**外面**（inset-grouped 的做法，与 DSGroup / DSCard 同一套语法）。
+        // 旧写法把标题和内容放进同一层玻璃里：于是「哪一层是分组、哪一层是内容」
+        // 只能靠圆角去猜；而且同一个 App 里分组标题长得不一样（卡片内一套、卡外一套）。
+        VStack(alignment: .leading, spacing: TokensSpacing.xs) {
+            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                 Text(title.uppercased())
-                    .font(TokensTypo.sectionLabel)
-                    .tracking(0.6)
+                    .font(TokensSerif.section(13))
+                    .tracking(TokensTracking.label)
                     .foregroundStyle(TokensPalette.secondary)
                 Spacer(minLength: TokensSpacing.sm)
+                // 状态胶囊留在标题行：它说的是「这一组现在是什么样」，属于标题
                 if let side, !side.isEmpty {
                     DSChip(text: side, cls: sideCls.isEmpty ? "na" : sideCls)
                 }
             }
-            content()
+            VStack(alignment: .leading, spacing: TokensSpacing.md) { content() }
+                .padding(TokensSpacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(TokensPalette.surface)
+                }
+                .overlay {
+                    if TokensPalette.decor != .none {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line)
+                    }
+                }
         }
-        .padding(TokensSpacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(corner: cornerRadius)
     }
 }
 

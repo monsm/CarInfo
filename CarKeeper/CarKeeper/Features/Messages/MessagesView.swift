@@ -83,6 +83,7 @@ struct MessagesView: View {
             .padding(.bottom, TokensSpacing.xxl)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .pageBackground()
         .scrollBounceBehavior(.basedOnSize)
         .dsPageTitle("消息")
         .searchable(text: $searchText,

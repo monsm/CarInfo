@@ -187,7 +187,7 @@ struct ControlView: View {
                     sectionLabel("车门")
                     ForEach(Array(bd.doorRows.enumerated()), id: \.offset) { _, r in
                         HStack {
-                            Text(r.0).font(TokensTypo.caption).foregroundStyle(.secondary)
+                            Text(r.0).font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
                             Spacer()
                             Text(r.1).font(TokensTypo.caption)
                                 .foregroundStyle(r.2 == "bad" ? TokensPalette.error : .primary)
@@ -198,7 +198,7 @@ struct ControlView: View {
                     sectionLabel("车窗")
                     ForEach(Array(bd.windowRows.enumerated()), id: \.offset) { _, r in
                         HStack {
-                            Text(r.0).font(TokensTypo.caption).foregroundStyle(.secondary)
+                            Text(r.0).font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
                             Spacer()
                             Text(r.1).font(TokensTypo.caption)
                                 .foregroundStyle(r.2 == "bad" ? TokensPalette.error : .primary)
@@ -209,7 +209,7 @@ struct ControlView: View {
                     sectionLabel("舱盖/天窗")
                     ForEach(Array(bd.extraRows.enumerated()), id: \.offset) { _, r in
                         HStack {
-                            Text(r.0).font(TokensTypo.caption).foregroundStyle(.secondary)
+                            Text(r.0).font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
                             Spacer()
                             Text(r.1).font(TokensTypo.caption)
                                 .foregroundStyle(r.2 == "bad" ? TokensPalette.error : .primary)
@@ -229,9 +229,9 @@ struct ControlView: View {
             }
         }
     }
+    /// 卡片内的子标题：走全 App 的同一行字（衬线 + 疏排），不再自造一个加粗灰字。
     private func sectionLabel(_ t: String) -> some View {
-        Text(t).font(Theme.font(.footnote as Font).bold()).foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        DSSectionHeader(title: t)
     }
     var body: some View {
         ScrollView {
@@ -249,6 +249,7 @@ struct ControlView: View {
             .padding(.top, TokensSpacing.sm)
             .padding(.bottom, TokensSpacing.huge)
         }
+        .pageBackground()
         .scrollBounceBehavior(.basedOnSize)
         .refreshable {
             tempDisplayCount = 0
@@ -455,18 +456,18 @@ struct ControlView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(scene.name).font(TokensTypo.body)
                                 if let note = scene.note {
-                                    Text(note).font(TokensTypo.footnote).foregroundStyle(.secondary)
+                                    Text(note).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
                                 }
                             }
                             Spacer()
                             if busy || running != nil {
                                 Image(systemName: "clock.fill")
                                     .font(TokensTypo.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(TokensPalette.secondary)
                             } else {
                                 Image(systemName: "chevron.right")
                                     .font(TokensTypo.caption)
-                                    .foregroundStyle(.tertiary)
+                                    .foregroundStyle(TokensPalette.tertiary)
                             }
                         }
                         .padding(.vertical, 10)
@@ -509,7 +510,7 @@ struct ControlView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(run.name).font(TokensTypo.headline)
                 Text(run.progress.isEmpty ? "正在等待车辆响应…" : run.progress)
-                    .font(TokensTypo.caption).foregroundStyle(.secondary)
+                    .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
             }
             Spacer()
         }
@@ -539,7 +540,7 @@ struct ControlView: View {
                     HStack {
                         Image(systemName: showMoreCommands ? "chevron.up" : "chevron.down")
                             .font(Theme.font(.footnote as Font).bold())
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(TokensPalette.tertiary)
                         Text(showMoreCommands ? "收起" : "更多指令")
                             .font(TokensTypo.caption)
                             .foregroundStyle(TokensPalette.ambient)
@@ -566,13 +567,13 @@ struct ControlView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name).font(TokensTypo.body)
                     if let note = item.note {
-                        Text(note).font(TokensTypo.footnote).foregroundStyle(.secondary)
+                        Text(note).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
                     }
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(Theme.font(.footnote as Font).bold())
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(TokensPalette.tertiary)
             }
             .padding(.vertical, 10)
             .contentShape(Rectangle())
@@ -598,7 +599,7 @@ struct ControlView: View {
                         Spacer()
                         Text(item.startedAt.suffix(5))
                             .font(TokensTypo.data)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(TokensPalette.secondary)
                     }
                     .padding(.vertical, 8)
                     if idx < history.count - 1 { ListDivider() }
@@ -734,7 +735,7 @@ struct ControlView: View {
                     Pill(text: r.resultText, cls: r.resultCls, dot: false)
                 }
                 if !r.progress.isEmpty {
-                    Text(r.progress).font(TokensTypo.caption).foregroundStyle(.secondary)
+                    Text(r.progress).font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
                 }
                 if !r.handleCode.isEmpty {
                     KVRow(k: "错误码", v: r.handleCode)
@@ -947,7 +948,7 @@ struct PINKeypadView: View {
             Capsule().fill(.secondary.opacity(0.4)).frame(width: 40, height: 5)
             VStack(spacing: 4) {
                 Text("输入控车码").font(TokensTypo.title)
-                Text("6 位数字 · 输满后自动执行").font(TokensTypo.caption).foregroundStyle(.secondary)
+                Text("6 位数字 · 输满后自动执行").font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
             }
             HStack(spacing: 10) {
                 ForEach(0..<6, id: \.self) { i in
@@ -975,14 +976,14 @@ struct PINKeypadView: View {
                         .frame(maxWidth: .infinity, minHeight: 56)
                         .background(TokensPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 14, style:
  .continuous))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(TokensPalette.primary)
                     }
                     .buttonStyle(.plain)
                 }
             }
             Button("取消") { dismiss() }
                 .font(TokensTypo.headline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(TokensPalette.secondary)
                 .padding(.bottom, 8)
         }
         .padding(TokensSpacing.xxl)
@@ -1022,7 +1023,7 @@ struct ACStepperView: View {
             Capsule().fill(.secondary.opacity(0.4)).frame(width: 40, height: 5)
             VStack(spacing: 4) {
                 Text("空调温度").font(TokensTypo.title)
-                Text("设置范围 17 – 33 ℃").font(TokensTypo.caption).foregroundStyle(.secondary)
+                Text("设置范围 17 – 33 ℃").font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
             }
             HStack(spacing: 32) {
                 tempButton("minus", canDo: temp > 17) { temp -= 1 }
@@ -1031,7 +1032,7 @@ struct ACStepperView: View {
                         .font(TokensTypo.display(72))
                         .foregroundStyle(TokensPalette.ambient)
                         .contentTransition(.numericText())
-                    Text("℃").font(TokensTypo.caption).foregroundStyle(.secondary)
+                    Text("℃").font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
                 }
                 tempButton("plus", canDo: temp < 33) { temp += 1 }
             }
@@ -1050,7 +1051,7 @@ struct ACStepperView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 8)
             Button("取消") { dismiss() }
-                .font(TokensTypo.caption).foregroundStyle(.secondary)
+                .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
         }
         .padding(TokensSpacing.xxl)
         .presentationDetents([.medium])

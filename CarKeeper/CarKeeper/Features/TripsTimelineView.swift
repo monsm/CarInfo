@@ -68,6 +68,7 @@ struct TripsTimelineView: View {
             .padding(.top, TokensSpacing.md)
             .padding(.bottom, TokensSpacing.huge)
         }
+        .pageBackground()
         .scrollBounceBehavior(.basedOnSize)
     }
 
