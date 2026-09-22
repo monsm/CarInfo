@@ -97,98 +97,74 @@ struct MileageJournalView: View {
     @State private var currentPeriod = 0
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: TokensSpacing.md) {
-                // 周期选择
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: TokensSpacing.sm) {
-                        ForEach(months.indices, id: \.self) { i in
-                            Text(months[i])
-                                .font(.subheadline)
-                                .foregroundColor(
-                                    currentPeriod == i ? TokensPalette.labelOnTint : TokensPalette.secondary
-                                )
-                                .padding(.horizontal, TokensSpacing.md)
-                                .padding(.vertical, TokensSpacing.xs)
-                                .background(currentPeriod == i ? TokensPalette.ambient : Color.clear)
-                                .cornerRadius(TokensRadius.small)
-                                .onTapGesture { currentPeriod = i }
+        // 不再套一层 NavigationStack：本页是「我的」导航栈里打开的浮层，
+        // 再套一层会出现两条导航栏、标题说两遍。
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "里程记账", subtitle: "充电、停车、维保 —— 花在车上的每一笔")
+
+                // 周期：三个互斥的口径 → 系统的分段语法
+                DSSegmented(options: months.indices.map { (value: $0, title: months[$0]) },
+                            selection: $currentPeriod)
+
+                // 统计：一组键值行，不是一个彩色方块矩阵
+                DSGroup {
+                    ForEach(Array(TripCostType.allCases.prefix(4)), id: \.self) { type in
+                        DSGroupRow {
+                            DSKeyValueRow(key: type.displayName,
+                                          value: "¥\(tracker.totalByType(type), specifier: "%.1f")")
                         }
                     }
                 }
 
-                // 统计卡片
-                HStack(spacing: TokensSpacing.sm) {
-                    ForEach(Array(TripCostType.allCases.prefix(4)), id: \.self) { type in
-                        CostSummaryTile(type: type, total: tracker.totalByType(type))
-                    }
-                }
+                // 明细
+                entriesSection
 
-                Divider().opacity(0.3)
-
-                // 明细列表
-                VStack(spacing: 0) {
-                    ForEach(tracker.entries) { entry in
-                        CostEntryRow(entry: entry)
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) { tracker.deleteEntry(entry.id) }
-                                    .labelStyle(.iconOnly)
-                                    .tint(TokensPalette.error)
-                            }
-                    }
-                }
-                .listStyle(.plain)
-
-                Spacer()
-
-                // 添加按钮
+                // 添加
                 Button { showAddSheet = true } label: {
                     Label("添加记录", systemImage: "plus.circle.fill")
-                        .font(.body)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(TokensPalette.ambient)
-                        .foregroundColor(TokensPalette.labelOnTint)
-                        .cornerRadius(TokensRadius.medium)
+                        .font(TokensTypo.body.weight(.semibold))
                 }
-                .padding(.top, TokensSpacing.sm)
+                .buttonStyle(DSPrimaryButtonStyle())
             }
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.vertical, TokensSpacing.lg)
+        }
+        .scrollBounceBehavior(.basedOnSize)
             .sheet(isPresented: $showAddSheet) {
                 AddCostEntrySheet(selectedType: $selectedType, amountText: $amountText, noteText: $noteText)
                     .onAppear { amountText = "" ; noteText = "" }
                     .dsSheetCanvas()
             }
-            .navigationTitle("里程记账")
+            .dsPageTitle("里程记账", inline: true)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("清空历史", role: .destructive) {
                         // 清空所有记录（需确认）
                     }
-                    .font(.caption)
+                    .font(TokensTypo.caption)
+                    .disabled(tracker.entries.isEmpty)
+                }
+            }
+    }
+
+    /// 明细：一组长按可删的行。
+    ///
+    /// 原来这里写的是「VStack 里的 ForEach + .swipeActions(edge:) + .listStyle(.plain)」——
+    /// `swipeActions` 只在 `List` 的行内生效，所以那条滑动删除**从来没有工作过**
+    /// （`.listStyle` 加在 VStack 上也是空转）。现在删除挂在长按菜单上，并在页脚说明。
+    private var entriesSection: some View {
+        DSGroup(title: "明细",
+                footer: tracker.entries.isEmpty ? "还没有记录。" : "长按一条记录可以删除。") {
+            ForEach(tracker.entries) { entry in
+                DSGroupRow {
+                    CostEntryRow(entry: entry)
+                }
+                .contextMenu {
+                    Button("删除", role: .destructive) { tracker.deleteEntry(entry.id) }
                 }
             }
         }
-    }
-}
-
-struct CostSummaryTile: View {
-    let type: TripCostType
-    let total: Double
-    var body: some View {
-        VStack(spacing: TokensSpacing.xs) {
-            Image(safeSymbol: type.icon, fallback: "doc.text.fill")
-                .font(.title2)
-                .foregroundColor(TokensPalette.ambient)
-            Text("\(total, specifier: "%.1f")")
-                .font(.callout)
-                .fontWeight(.semibold)
-            Text(type.displayName)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, TokensSpacing.sm)
-        .glassCard()
     }
 }
 
@@ -270,27 +246,28 @@ struct CostEntryRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.type.displayName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Text(entry.note.isEmpty ? entry.date.formatted(date: .omitted, time: .standard) : entry.note)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(TokensTypo.body)
+                    .foregroundStyle(TokensPalette.primary)
+                Text(entry.note.isEmpty
+                     ? entry.date.formatted(date: .omitted, time: .standard)
+                     : entry.note)
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.secondary)
             }
 
-            Spacer()
+            Spacer(minLength: TokensSpacing.sm)
 
             VStack(alignment: .trailing, spacing: 2) {
+                // 金额走等宽数字：一列金额的右边缘才是齐的
                 Text("-¥\(entry.amount, specifier: "%.2f")")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(TokensPalette.error)
+                    .font(TokensTypo.data)
+                    .foregroundStyle(TokensPalette.error)
                 if let km = entry.odometerKm {
                     Text(String(format: "%.0f km", km))
-                        .font(.caption2)
-                        .foregroundColor(Color(.tertiaryLabel))
+                        .font(TokensTypo.caption2)
+                        .foregroundStyle(TokensPalette.tertiary)
                 }
             }
         }
-        .padding(.vertical, TokensSpacing.xs)
     }
 }

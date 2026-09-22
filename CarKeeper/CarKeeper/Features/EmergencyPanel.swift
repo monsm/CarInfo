@@ -13,7 +13,9 @@ struct EmergencyPanel: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "紧急求助", subtitle: "SOS 拨打紧急电话，其余是常用动作")
+
                 // SOS 紧急呼叫
                 sosButton
 
@@ -26,11 +28,10 @@ struct EmergencyPanel: View {
                 // 位置共享
                 locationShareCard
             }
-            .padding(.horizontal, TokensSpacing.lg)
-            .padding(.vertical, TokensSpacing.md)
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.vertical, TokensSpacing.lg)
         }
-        .navigationTitle("紧急求助")
-        .navigationBarTitleDisplayMode(.inline)
+        .dsPageTitle("紧急求助", inline: true)
         .alert("确认拨打", isPresented: $showConfirm) {
             Button("取消", role: .cancel) {}
             Button("拨打 \(emergencyContact)", role: .destructive) { makeCall() }
@@ -76,77 +77,64 @@ struct EmergencyPanel: View {
 
     // MARK: - 快捷操作
     private var quickActions: some View {
-        VStack(spacing: 12) {
-            Text("快捷操作").font(Theme.font(.subheadline as Font).bold())
-            HStack(spacing: 12) {
-                actionButton(icon: "car.fill", title: "远程锁车", color: .blue) { Task { await lockCar() } }
-                actionButton(icon: "speaker.wave.3.fill", title: "鸣笛寻车", color: .orange) { Task { await honkCar() } }
-                actionButton(icon: "lightbulb.fill", title: "闪灯", color: .yellow) { Task { await flashLights() } }
-                actionButton(icon: "fan.fill", title: "开空调", color: .cyan) { Task { await turnOnAC() } }
+        // 四个动作 = 四行（图标 + 名称 + 箭头），不是一个彩色按钮矩阵。
+        // 原来的蓝/橙/黄/青四个底色跟「状态」毫无关系 —— 它们只是四个动作，
+        // 而界面里唯一的「彩色」应该留给真的状态（这里是 SOS 的红）。
+        DSGroup(title: "快捷操作") {
+            DSGroupRow {
+                DSRow(icon: "car.fill", title: "远程锁车", showsChevron: true) {
+                    Task { await lockCar() }
+                }
+            }
+            DSGroupRow {
+                DSRow(icon: "speaker.wave.3.fill", title: "鸣笛寻车", showsChevron: true) {
+                    Task { await honkCar() }
+                }
+            }
+            DSGroupRow {
+                DSRow(icon: "lightbulb.fill", title: "闪灯", showsChevron: true) {
+                    Task { await flashLights() }
+                }
+            }
+            DSGroupRow {
+                DSRow(icon: "fan.fill", title: "开空调", showsChevron: true) {
+                    Task { await turnOnAC() }
+                }
             }
         }
-        .glassCard(corner: TokensRadius.medium)
-    }
-
-    private func actionButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                Image(safeSymbol: icon, fallback: "exclamationmark.triangle.fill")
-                    .font(.title2)
-                    .foregroundStyle(color)
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.primary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(color.opacity(0.08))
-            .cornerRadius(TokensRadius.small)
-        }
-        .pressFeedback()
     }
 
     // MARK: - 紧急联系人
     private var contactCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("紧急联系人").font(Theme.font(.subheadline as Font).bold())
-            HStack {
-                Image(systemName: "person.fill")
-                    .foregroundStyle(TokensPalette.ambient)
-                TextField("输入紧急电话", text: $emergencyContact)
-                    .keyboardType(.phonePad)
-                Button(action: saveContact) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(TokensPalette.success)
+        DSGroup(title: "紧急联系人", footer: "SOS 会拨打这个号码。") {
+            DSGroupRow {
+                HStack(spacing: TokensSpacing.md) {
+                    Image(systemName: "person.fill")
+                        .foregroundStyle(TokensPalette.ambient)
+                    TextField("输入紧急电话", text: $emergencyContact)
+                        .keyboardType(.phonePad)
+                        .font(TokensTypo.data)
+                    Button(action: saveContact) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(TokensPalette.success)
+                    }
+                    .accessibilityLabel(Text("保存联系人"))
                 }
             }
-            .padding()
-            .background(Color.primary.opacity(0.05))
-            .cornerRadius(TokensRadius.small)
         }
-        .glassCard(corner: TokensRadius.medium)
     }
 
     // MARK: - 位置共享
     private var locationShareCard: some View {
-        Button(action: shareLocation) {
-            HStack {
-                Image(systemName: "location.fill")
-                    .foregroundStyle(TokensPalette.error)
-                VStack(alignment: .leading) {
-                    Text("共享当前位置")
-                        .font(Theme.font(.subheadline as Font).bold())
-                    Text("发送坐标给紧急联系人")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Image(systemName: "arrow.up.right")
-                    .foregroundStyle(.secondary)
+        DSGroup {
+            DSGroupRow {
+                DSRow(icon: "location.fill",
+                      title: "共享当前位置",
+                      subtitle: "发送坐标给紧急联系人",
+                      showsChevron: true,
+                      action: shareLocation)
             }
-            .padding()
         }
-        .glassCard(corner: TokensRadius.medium)
     }
 
     // MARK: - 紧急叠加层

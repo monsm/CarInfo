@@ -109,22 +109,34 @@ class CarFindIntent: INIntent {
 struct SiriShortcutsCard: View {
     let store = AppStore.shared
 
+    /// 五条指令、它们的真实计数键。「语音说 X」是提示语，不是数据。
+    private static let shortcuts: [(icon: String, title: String, phrase: String, key: String)] = [
+        ("lock.fill", "锁车", "语音说「锁车」", "lock_true"),
+        ("lock.open.fill", "解锁", "语音说「解锁」", "lock_false"),
+        ("fan.fill", "开空调", "语音说「开空调」", "ac_on"),
+        ("power", "关空调", "语音说「关空调」", "ac_off"),
+        ("speaker.wave.2.fill", "寻车", "语音说「寻车」", "find_car")
+    ]
+
     var body: some View {
-        CardBox(title: "Siri 快捷指令", side: "语音控制", cornerRadius: TokensRadius.medium) {
-            VStack(spacing: 12) {
-                ShortcutRow(icon: "lock.fill", title: "锁车", subtitle: "语音说「锁车」", usage:
- store.siriUsageCount["lock_true"] ?? 0)
-                ShortcutRow(icon: "lock.open.fill", title: "解锁", subtitle: "语音说「解锁」", usage:
- store.siriUsageCount["lock_false"] ?? 0)
-                ShortcutRow(icon: "fan.fill", title: "开空调", subtitle: "语音说「开空调」", usage:
- store.siriUsageCount["ac_on"] ?? 0)
-                ShortcutRow(icon: "power", title: "关空调", subtitle: "语音说「关空调」", usage:
- store.siriUsageCount["ac_off"] ?? 0)
-                ShortcutRow(icon: "speaker.wave.2.fill", title: "寻车", subtitle: "语音说「寻车」", usage:
- store.siriUsageCount["find_car"] ?? 0)
+        DSGroup(title: "Siri 快捷指令", footer: footer) {
+            ForEach(Self.shortcuts, id: \.key) { s in
+                DSGroupRow {
+                    ShortcutRow(icon: s.icon,
+                                title: s.title,
+                                subtitle: s.phrase,
+                                usage: store.siriUsageCount[s.key] ?? 0)
+                }
             }
-            .padding(.vertical, 8)
         }
+    }
+
+    /// 计数只说真话：一次都没用过就照实说，不摆一排「0 次」。
+    private var footer: String {
+        let total = Self.shortcuts.reduce(0) { $0 + (store.siriUsageCount[$1.key] ?? 0) }
+        return total == 0
+            ? "还没有用过语音指令 —— 在「快捷指令」里加一句就能用。"
+            : "共 \(total) 次语音指令。"
     }
 }
 
@@ -135,25 +147,22 @@ struct ShortcutRow: View {
     let usage: Int
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: TokensSpacing.md) {
             Image(safeSymbol: icon, fallback: "car.fill")
-                .font(.title3)
+                .font(TokensTypo.title3)
                 .foregroundStyle(TokensPalette.ambient)
-                .frame(width: 36, height: 36)
-                .background(TokensPalette.fillSubtle, in: Circle())
-            VStack(alignment: .leading, spacing: 2) {
+                .frame(width: TokensSize.iconColumn, alignment: .center)
+            VStack(alignment: .leading, spacing: 1) {
                 Text(title).font(TokensTypo.body).foregroundStyle(TokensPalette.primary)
-                Text(subtitle).font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
+                Text(subtitle).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
             }
-            Spacer()
+            Spacer(minLength: TokensSpacing.sm)
+            // 次数是真实计数；没出现过就不显示（「0 次」是一个假读数）
             if usage > 0 {
-                Text("\(usage)次")
-                    .font(TokensTypo.caption2)
-                    .foregroundStyle(.tertiary)
+                Text("\(usage) 次")
+                    .font(TokensTypo.dataSmall)
+                    .foregroundStyle(TokensPalette.tertiary)
             }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
     }
 }

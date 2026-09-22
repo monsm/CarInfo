@@ -53,8 +53,10 @@ struct ServiceHistoryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // 统计卡
+            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "维保记录", subtitle: "每一次保养、每一笔花费都在这里")
+
+                // 统计
                 statsCard
 
                 // 即将到期提醒
@@ -68,11 +70,10 @@ struct ServiceHistoryView: View {
                 // 时间线
                 timelineCard
             }
-            .padding(.horizontal, TokensSpacing.lg)
-            .padding(.vertical, TokensSpacing.md)
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.vertical, TokensSpacing.lg)
         }
-        .navigationTitle("维保记录")
-        .navigationBarTitleDisplayMode(.inline)
+        .dsPageTitle("维保记录", inline: true)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showAddService = true }) {
@@ -90,56 +91,64 @@ struct ServiceHistoryView: View {
 
     // MARK: - 统计卡
     private var statsCard: some View {
-        HStack(spacing: 0) {
-            statCell(label: "总花费", value: "¥\(Int(totalCost))", tint: TokensPalette.info)
-            statCell(label: "年均花费", value: "¥\(Int(avgAnnualCost))/年", tint: TokensPalette.success)
-            statCell(label: "记录次数", value: "\(entries.count)", tint: TokensPalette.warning)
+        // 三个数字，不要三种颜色：它们都是「钱与次数」，不是三种状态。
+        // （原来 总花费=蓝 年均=绿 次数=橙 —— 颜色在这里不携带任何信息）
+        DSGroup {
+            DSGroupRow {
+                HStack(spacing: 0) {
+                    statCell(label: "总花费", value: "¥\(Int(totalCost))")
+                    statCell(label: "年均", value: "¥\(Int(avgAnnualCost))")
+                    statCell(label: "记录", value: "\(entries.count)")
+                }
+                .padding(.vertical, TokensSpacing.xs)
+            }
         }
-        .glassCard(corner: TokensRadius.medium)
     }
 
-    private func statCell(label: String, value: String, tint: Color) -> some View {
-        VStack(spacing: 4) {
-            Text(value).font(TokensTypo.title3).foregroundStyle(tint)
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+    private func statCell(label: String, value: String) -> some View {
+        VStack(spacing: TokensSpacing.xs) {
+            Text(value)
+                .font(TokensTypo.title3)
+                .foregroundStyle(TokensPalette.primary)
+            Text(label)
+                .font(TokensTypo.caption2)
+                .foregroundStyle(TokensPalette.secondary)
         }
         .frame(maxWidth: .infinity)
     }
 
     // MARK: - 即将到期
     private var upcomingCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(TokensPalette.warning)
-                Text("即将到期").font(Theme.font(.subheadline as Font).bold())
-                Spacer()
-            }
+        VStack(alignment: .leading, spacing: TokensSpacing.xs) {
+            // 分组标题走全 App 那一行字；警示色只留给图标（它真是一类状态：待处理）
+            DSSectionHeader(title: "即将到期", trailing: "\(upcomingServices.count) 项")
 
-            ForEach(upcomingServices.prefix(3)) { entry in
-                HStack {
-                    typeIcon(entry.type)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.type).font(.caption).foregroundStyle(.primary)
-                        Text("里程: \(entry.mileage)km → \(entry.nextMileage ?? 0)km")
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if let next = entry.nextMileage {
-                        let remaining = next - store.totalMileage
-                        Text("\(max(0, remaining))km")
-                            .font(.caption.monospaced())
-                            .foregroundStyle(remaining < 500 ? TokensPalette.error : TokensPalette.warning)
+            DSGroup {
+                ForEach(upcomingServices.prefix(3)) { entry in
+                DSGroupRow {
+                    HStack(spacing: TokensSpacing.md) {
+                        typeIcon(entry.type)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.type)
+                                .font(TokensTypo.subheadline)
+                                .foregroundStyle(TokensPalette.primary)
+                            Text("里程 \(entry.mileage)km → \(entry.nextMileage ?? 0)km")
+                                .font(TokensTypo.caption2)
+                                .foregroundStyle(TokensPalette.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        if let next = entry.nextMileage {
+                            let remaining = next - store.totalMileage
+                            // 「还剩多少公里」是真实余量；接近了就转红（余量本身是状态）
+                            Text("\(max(0, remaining))km")
+                                .font(TokensTypo.dataSmall)
+                                .foregroundStyle(remaining < 500 ? TokensPalette.error : TokensPalette.warning)
+                        }
                     }
                 }
-                .padding(.vertical, 6)
-                if entry != upcomingServices.last { Divider().opacity(0.3) }
+                }
             }
         }
-        .padding()
-        .glassCard(corner: TokensRadius.medium)
-        .background(TokensPalette.warning.opacity(0.05))
     }
 
     private func typeIcon(_ type: String) -> some View {

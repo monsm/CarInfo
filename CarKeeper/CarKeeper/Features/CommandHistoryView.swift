@@ -35,8 +35,10 @@ struct CommandHistoryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // 统计卡片
+            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "指令历史", subtitle: "每一次远程操作与它的结果")
+
+                // 统计（一组，不是三张各自带底的卡）
                 statsCard
 
                 // 筛选
@@ -45,168 +47,126 @@ struct CommandHistoryView: View {
                 // 列表
                 commandList
             }
-            .padding(.horizontal, TokensSpacing.lg)
-            .padding(.vertical, TokensSpacing.md)
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.vertical, TokensSpacing.lg)
         }
-        .navigationTitle("指令历史")
-        .navigationBarTitleDisplayMode(.inline)
+        .dsPageTitle("指令历史", inline: true)
         .accessibilityLabel(Text("指令历史"))
     }
 
     // MARK: - 统计卡片
     private var statsCard: some View {
-        HStack(spacing: 0) {
-            statBubble(label: "总指令", value: "\(store.commandHistory.count)", tint: TokensPalette.info)
-            let rateStr = successRate > 0 ? String(format: "%.0f%%", successRate * 100) : "—"
-            statBubble(label: "成功率", value: rateStr, tint: TokensPalette.success)
-            statBubble(label: "进行中", value: "\(inProgressCount)", tint: TokensPalette.warning)
+        // 三个统计本来就是同一组事实：给它们一个面，而不给三个颜色。
+        // 「成功率」不是状态，用正文色；「进行中」超过 0 才真的是一种状态，那时才带警示色。
+        DSGroup {
+            DSGroupRow {
+                HStack(spacing: 0) {
+                    statBubble(label: "总指令", value: "\(store.commandHistory.count)",
+                               tint: TokensPalette.primary)
+                    let rateStr = successRate > 0 ? String(format: "%.0f%%", successRate * 100) : "—"
+                    statBubble(label: "成功率", value: rateStr, tint: TokensPalette.primary)
+                    statBubble(label: "进行中", value: "\(inProgressCount)",
+                               tint: inProgressCount > 0 ? TokensPalette.warning : TokensPalette.primary)
+                }
+                .padding(.vertical, TokensSpacing.xs)
+            }
         }
-        .glassCard(corner: TokensRadius.medium)
     }
 
     private func statBubble(label: String, value: String, tint: Color) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: TokensSpacing.xs) {
             Text(value)
                 .font(TokensTypo.title)
                 .foregroundStyle(tint)
             Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(TokensTypo.caption2)
+                .foregroundStyle(TokensPalette.secondary)
         }
         .frame(maxWidth: .infinity)
     }
 
     // MARK: - 筛选
     private var filterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(filters, id: \.self) { f in
-                    Button(role: nil, action: { filter = f }) {
-                        Text(f)
-                            .font(.caption)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(filter == f ? TokensPalette.ambient.opacity(0.2) : Color.clear)
-                            .foregroundStyle(filter == f ? TokensPalette.ambient : TokensPalette.secondary)
-                            .cornerRadius(20)
-                    }
-                }
-            }
-        }
+        // 用系统的分段控件语法，不再自造一排药丸（自造药丸是「理工男」气质的第二来源：
+        // 四种筛选本来就该长得像四个互斥的选项）
+        DSSegmented(options: filters.map { (value: $0, title: $0) }, selection: $filter)
     }
 
     // MARK: - 列表
     @ViewBuilder
     private var commandList: some View {
         if filteredCommands.isEmpty {
-            VStack(spacing: 12) {
-                Image(systemName: "list.bullet.clipboard")
-                    .font(.system(size: 36))
-                    .foregroundStyle(.secondary.opacity(0.4))
-                Text("暂无指令记录").font(.subheadline).foregroundStyle(.tertiary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
+            DSPlaceholder(icon: "list.bullet.clipboard",
+                          title: "暂无指令记录",
+                          message: "在「车控」里操作一次，这里会留下那一次的指令与结果。")
         } else {
-            VStack(spacing: 8) {
-                ForEach(Array(filteredCommands.enumerated()), id: \.element.id) { idx, cmd in
-                    commandRow(cmd, idx: idx)
+            // 一叠各自带底的卡片 → 一个分组：行的分隔靠发丝线，不靠每行再画一个圆角矩形。
+            DSGroup(title: "记录") {
+                ForEach(Array(filteredCommands.enumerated()), id: \.element.id) { _, cmd in
+                    DSGroupRow {
+                        commandRow(cmd)
+                    }
                 }
             }
         }
     }
 
-    private func commandRow(_ cmd: AppStore.HistoryEntry, idx: Int) -> some View {
+    private func commandRow(_ cmd: AppStore.HistoryEntry) -> some View {
         let isExpanded = expandedCmds.contains(cmd.id)
 
-        return Button(role: nil, action: {
+        // 原来一行里有两个状态图标（左侧印章 + 右侧对/叉）与两种转场（按钮 + onTapGesture）。
+        // 现在只有一处状态、一种交互：点整行展开。
+        return Button {
             withAnimation(.spring(response: 0.35)) {
                 if isExpanded { expandedCmds.remove(cmd.id) }
                 else { expandedCmds.insert(cmd.id) }
             }
-        }) {
+        } label: {
             VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    // 状态图标（原来是一个纯色圆环 dot —— 只靠颜色区分成功/失败）
-                    Image(safeSymbol: cmd.success ? "checkmark.seal.fill" : "exclamationmark.triangle.fill",
-                          fallback: cmd.iconName)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(cmd.statusColor)
-                        .frame(width: 14)
-                        .accessibilityLabel(Text(cmd.success ? "执行成功" : "执行失败"))
-
-                    // 图标
+                HStack(spacing: TokensSpacing.md) {
                     Image(safeSymbol: cmd.iconName, fallback: "checkmark.circle.fill")
-                        .font(.caption)
+                        .font(TokensTypo.caption)
                         .foregroundStyle(cmd.statusColor)
-                        .frame(width: 28, height: 28)
-                        .background(cmd.statusColor.opacity(0.1))
-                        .cornerRadius(6)
+                        .frame(width: TokensSize.iconColumn, alignment: .center)
 
-                    // 名称
-                    Text(cmd.name)
-                        .font(TokensTypo.subheadline)
-                        .foregroundStyle(.primary)
-
-                    Spacer()
-
-                    // 时间
-                    Text(cmd.startedAt, style: .time)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-
-                    // 状态图标
-                    if cmd.finishedAt != nil {
-                        Image(systemName: cmd.success ? "checkmark.circle.fill" : "xmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(cmd.statusColor)
-                    } else {
-                        Image(systemName: "circle.dashed")
-                            .font(.caption)
-                            .foregroundStyle(TokensPalette.warning)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(cmd.name)
+                            .font(TokensTypo.body)
+                            .foregroundStyle(TokensPalette.primary)
+                        Text(cmd.startedAt, style: .time)
+                            .font(TokensTypo.caption2)
+                            .foregroundStyle(TokensPalette.secondary)
                     }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
 
-                // 展开详情
+                    Spacer(minLength: TokensSpacing.sm)
+
+                    Image(systemName: cmd.finishedAt == nil
+                          ? "circle.dashed"
+                          : (cmd.success ? "checkmark.circle.fill" : "xmark.circle.fill"))
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(cmd.finishedAt == nil ? TokensPalette.warning : cmd.statusColor)
+                        .accessibilityLabel(Text(cmd.finishedAt == nil
+                            ? "进行中"
+                            : (cmd.success ? "执行成功" : "执行失败")))
+                }
+
+                // 展开详情：四个字段就是四条键值行（与「全量数据」同一种写法）
                 if isExpanded, let finishedAt = cmd.finishedAt {
-                    VStack(alignment: .leading, spacing: 6) {
-                        DetailRow(label: "开始时间", value: cmd.startedAt.formatted(date: .omitted, time: .standard))
-                        DetailRow(label: "结束时间", value: finishedAt.formatted(date: .omitted, time: .standard))
-                        DetailRow(label: "耗时", value: cmd.durationText)
-                        DetailRow(label: "结果", value: cmd.success ? "成功" : "失败")
-                        if !cmd.success {
-                            DetailRow(label: "错误", value: "服务端返回异常（模拟）")
-                                .foregroundStyle(TokensPalette.error)
-                        }
+                    VStack(alignment: .leading, spacing: 0) {
+                        DSKeyValueRow(key: "开始", value: cmd.startedAt.formatted(date: .omitted, time: .standard))
+                        DSKeyValueRow(key: "结束", value: finishedAt.formatted(date: .omitted, time: .standard))
+                        DSKeyValueRow(key: "耗时", value: cmd.durationText)
+                        DSKeyValueRow(key: "结果",
+                                      value: cmd.success ? "成功" : "失败",
+                                      valueCls: cmd.success ? "ok" : "err")
+                        // 失败的原因不在这里编：`HistoryEntry` 只记了「成没成」，
+                        // 没记服务端返回了什么。要写原因，得先把它真的存下来。
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 12)
-                    .font(.caption)
+                    .padding(.top, TokensSpacing.sm)
                 }
             }
-            .glassCard(corner: TokensRadius.small)
-            .onTapGesture {
-                withAnimation(.spring(response: 0.35)) {
-                    if isExpanded { expandedCmds.remove(cmd.id) }
-                    else { expandedCmds.insert(cmd.id) }
-                }
-            }
-            .pressFeedback()
         }
-    }
-}
-
-struct DetailRow: View {
-    let label: String
-    let value: String
-    var body: some View {
-        HStack {
-            Text(label).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).foregroundStyle(.primary)
-        }
+        .buttonStyle(DSRowButtonStyle())
     }
 }
 

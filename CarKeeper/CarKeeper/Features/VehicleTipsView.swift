@@ -115,26 +115,29 @@ struct VehicleTipsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "车辆提示", subtitle: "由车上报的读数推出的提醒")
+
                 // 分类筛选
                 categoryPicker
 
-                // 提示列表
+                // 提示列表：一个分组（原来是一叠各自带底的卡）
                 if tips.isEmpty {
                     emptyState
                 } else {
-                    VStack(spacing: 10) {
+                    DSGroup(title: "提示", trailing: "\(filteredTips.count) 条") {
                         ForEach(filteredTips) { tip in
-                            tipRow(tip)
+                            DSGroupRow {
+                                tipRow(tip)
+                            }
                         }
                     }
                 }
             }
-            .padding(.horizontal, TokensSpacing.lg)
-            .padding(.vertical, TokensSpacing.md)
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.vertical, TokensSpacing.lg)
         }
-        .navigationTitle("车辆提示")
-        .navigationBarTitleDisplayMode(.inline)
+        .dsPageTitle("车辆提示", inline: true)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: dismissAll) {
@@ -149,21 +152,9 @@ struct VehicleTipsView: View {
 
     // MARK: - 分类筛选
     private var categoryPicker: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(TipCategory.allCases) { cat in
-                    Button(action: { selectedCategory = cat }) {
-                        Text(cat.rawValue)
-                            .font(.caption)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(selectedCategory == cat ? TokensPalette.ambient.opacity(0.2) : Color.clear)
-                            .foregroundStyle(selectedCategory == cat ? TokensPalette.ambient : TokensPalette.secondary)
-                            .cornerRadius(16)
-                    }
-                }
-            }
-        }
+        // 五个互斥的分类 → 系统的分段语法（自造药丸撑不住「选中」这个状态）
+        DSSegmented(options: TipCategory.allCases.map { (value: $0, title: $0.rawValue) },
+                    selection: $selectedCategory)
     }
 
     private var filteredTips: [VehicleTip] {
@@ -173,65 +164,48 @@ struct VehicleTipsView: View {
 
     // MARK: - 提示行
     private func tipRow(_ tip: VehicleTip) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                // 严重度图标（原来是纯色小圆点，只靠颜色区分 critical / warning / info）
-                Image(safeSymbol: tip.severity.iconName, fallback: "info.circle.fill")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(tip.severity.color)
-                    .frame(width: 14)
-                    .accessibilityLabel(Text(tip.severity.label))
+        // 一行只有一个图标（原来同一行里有严重度小图标 + 提示图标两个，
+        // 它们指向同一个意思，只是把「红黄蓝」说两通）。
+        HStack(spacing: TokensSpacing.md) {
+            Image(safeSymbol: tip.icon, fallback: "info.circle.fill")
+                .font(TokensTypo.caption)
+                .foregroundStyle(tip.severity.color)
+                .frame(width: TokensSize.iconColumn, alignment: .center)
+                .accessibilityLabel(Text(tip.severity.label))
 
-                // 图标
-                Image(safeSymbol: tip.icon, fallback: "info.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(tip.severity.color)
-                    .frame(width: 28, height: 28)
-                    .background(tip.severity.color.opacity(0.1))
-                    .cornerRadius(6)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tip.title)
+                    .font(TokensTypo.subheadline)
+                    .foregroundStyle(TokensPalette.primary)
+                Text(tip.body)
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: TokensSpacing.sm)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(tip.title).font(TokensTypo.subheadline).foregroundStyle(.primary)
-                    Text(tip.body).font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-
-                if let action = tip.action {
-                    Button(action: { handleAction(tip) }) {
-                        Text(action)
-                            .font(.caption)
-                            .foregroundStyle(TokensPalette.ambient)
-                    }
-                }
-
-                Button(action: { dismiss(tip) }) {
-                    Image(systemName: "xmark")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+            if let action = tip.action {
+                Button(action: { handleAction(tip) }) {
+                    Text(action)
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.ambient)
                 }
             }
-        }
-        .padding()
-        .glassCard(corner: TokensRadius.small)
-        .onTapGesture {
-            if tip.severity != .info { dismiss(tip) }
+
+            Button(action: { dismiss(tip) }) {
+                Image(systemName: "xmark")
+                    .font(TokensTypo.caption2)
+                    .foregroundStyle(TokensPalette.tertiary)
+            }
+            .accessibilityLabel(Text("忽略这条提示"))
         }
     }
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(TokensPalette.success.opacity(0.5))
-            Text("一切正常")
-                .font(TokensTypo.subheadline)
-                .foregroundStyle(.secondary)
-            Text("车辆状态良好，暂无新提示")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
+        DSPlaceholder(icon: "checkmark.seal.fill",
+                      title: "一切正常",
+                      message: "车辆状态良好，暂无新提示。",
+                      cls: "ok")
     }
 
     // MARK: - 操作

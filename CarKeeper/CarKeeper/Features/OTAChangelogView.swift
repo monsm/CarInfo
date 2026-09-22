@@ -15,33 +15,42 @@ struct OTAChangelogView: View {
     }
 
     var body: some View {
-        List(versionLogs) { log in
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(log.version)
-                        .font(.headline)
-                    Spacer()
-                    Text(log.date, style: .date)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(log.changes, id: \.self) { change in
-                    HStack {
-                        // 原来是一个 6pt 纯色圆点（只靠颜色当项目符号），改成真正的图标
-                        Image(safeSymbol: "checkmark.circle.fill", fallback: "checkmark")
-                            .font(.system(size: 12))
-                            .foregroundStyle(TokensPalette.ambient)
-                        Text(change)
-                            .font(.caption)
-                            .foregroundStyle(.primary)
+        // 清单不再用 List：版本 = 一个分组，改动 = 分组里的行。
+        // 这样它与全 App 其它「分组」是同一件东西（同一个圆角、同一条发丝线）。
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                ForEach(versionLogs) { log in
+                    DSGroup(title: log.version, footer: dateText(log.date)) {
+                        ForEach(log.changes, id: \.self) { change in
+                            DSGroupRow {
+                                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+                                    // 项目符号是图标，不是「一个纯色圆点」—— 形状扛得住色弱
+                                    Image(safeSymbol: "checkmark.circle.fill", fallback: "checkmark")
+                                        .font(TokensTypo.caption)
+                                        .foregroundStyle(TokensPalette.ambient)
+                                    Text(change)
+                                        .font(TokensTypo.subheadline)
+                                        .foregroundStyle(TokensPalette.primary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.vertical, TokensSpacing.xs)
+                            }
+                        }
                     }
                 }
             }
-            .padding(.vertical, 4)
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.vertical, TokensSpacing.lg)
         }
-        .listStyle(.plain)
-        .navigationTitle("更新日志")
+        .scrollBounceBehavior(.basedOnSize)
+        .dsPageTitle("更新日志", inline: true)
         .onAppear { loadVersionLogs() }
+    }
+
+    /// 日期的格式化只在这一处 —— 界面上只出现一种日期写法
+    private func dateText(_ d: Date) -> String {
+        d.formatted(date: .long, time: .omitted)
     }
 
     private func loadVersionLogs() {

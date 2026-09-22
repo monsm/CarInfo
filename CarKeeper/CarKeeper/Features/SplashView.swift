@@ -15,64 +15,49 @@ struct SplashView: View {
 
     var body: some View {
         ZStack {
-            // 全屏背景
-            TokensPalette.background.ignoresSafeArea()
-
-            // 品牌光晕
-            GeometryReader { geo in
-                Circle()
-                    .fill(TokensPalette.ambient.opacity(0.3))
-                    .frame(width: 300, height: 300)
-                    .blur(radius: 60)
-                    .position(x: geo.size.width / 2, y: geo.size.height / 2 - 40)
-                    .opacity(brandGlow)
-            }
-
+            // 不再自铺不透明底，也不再自己画一团琥珀光晕：
+            // 画布与光在根部只画一次（Design/Theme.swift 的 AppCanvas），启动画面吃同一束光。
+            // 自己再画一个光源就是「光有两个来源」—— 而且它的方向还是编的。
             VStack(spacing: TokensSpacing.xxl) {
-                // 品牌标：呼吸光效
-                ZStack {
-                    Circle()
-                        .fill(TokensPalette.ambient)
-                        .frame(width: 80, height: 80)
-                        .blur(radius: 20)
-                        .opacity(brandGlow * 0.5)
-
-                    Image(systemName: "car.side.fill")
-                        .font(.system(size: 36, weight: .medium))
-                        .foregroundColor(TokensPalette.primary)
-                        .frame(width: 80, height: 80)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(TokensPalette.ambient)
-                        )
-                }
+                // 品牌标：入场淡入（一次性，不是常驻呼吸）
+                Image(systemName: "car.side.fill")
+                    .font(.system(size: 34, weight: .light))
+                    .foregroundColor(TokensPalette.primary)
+                    .frame(width: 80, height: 80)
+                    .background(
+                        RoundedRectangle(cornerRadius: TokensRadius.large, style: .continuous)
+                            .fill(TokensPalette.ambient)
+                    )
+                    .opacity(brandGlow)
 
                 VStack(spacing: TokensSpacing.sm) {
                     Text("长安车管家")
-                        .font(.system(size: 28, weight: .bold))
+                        // 艺术方向下走衬线（原生下 TokensSerif.page 就是原来的系统字）
+                        .font(TokensSerif.page(28))
                         .foregroundColor(TokensPalette.primary)
-                        .tracking(2)
+                        .tracking(TokensTracking.title)
 
                     Text("CHANGAN CONNECT")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(TokensTypo.caption2)
                         .foregroundColor(TokensPalette.tertiary)
                         .tracking(4)
                 }
 
-                // 进度条
+                // 进度：一条正在被画出来的线 —— 它对应一个真实状态（「正在启动」）
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(TokensPalette.glassBorder)
-                            .frame(height: 3)
-                        RoundedRectangle(cornerRadius: 2)
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(TokensPalette.track)
+                            .frame(height: 2)
+                        RoundedRectangle(cornerRadius: 1)
                             .fill(TokensPalette.ambient)
-                            .frame(width: geo.size.width * progress, height: 3)
+                            .frame(width: geo.size.width * progress, height: 2)
                     }
                 }
-                .frame(width: 160, height: 3)
+                .frame(width: 160, height: 2)
                 .padding(.top, TokensSpacing.md)
             }
+            .padding(.horizontal, TokensSpacing.page)
         }
         .onAppear {
             withAnimation(.linear(duration: duration)) {

@@ -21,54 +21,42 @@ struct ExportDataView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                // 选择导出类型
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("导出类型").font(Theme.font(.subheadline as Font).bold())
-                    Picker("类型", selection: $exportType) {
-                        ForEach(ExportType.allCases, id: \.self) { type in
-                            Text(type.rawValue).tag(type)
-                        }
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
+            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "导出数据", subtitle: "带走你自己的记录")
+
+                // 选择导出类型（四个互斥选项 → 系统的分段语法）
+                VStack(alignment: .leading, spacing: TokensSpacing.xs) {
+                    DSSectionHeader(title: "导出类型")
+                    DSSegmented(options: ExportType.allCases.map { (value: $0, title: $0.rawValue) },
+                                selection: $exportType)
                 }
 
                 // 导出内容预览
                 previewCard
 
-                // 操作按钮
-                VStack(spacing: 12) {
+                // 操作：两个格式，不是两个颜色。主操作只有一个（CSV），PDF 是次要的。
+                VStack(spacing: TokensSpacing.sm) {
                     Button(action: exportAsCSV) {
-                        HStack {
+                        HStack(spacing: TokensSpacing.sm) {
                             Image(systemName: "doc.plaintext")
                             Text("导出 CSV")
-                                .font(Theme.font(.subheadline as Font).bold())
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(TokensPalette.ambient)
-                        .foregroundStyle(TokensPalette.labelOnTint)
-                        .cornerRadius(12)
                     }
+                    .buttonStyle(DSPrimaryButtonStyle())
 
                     Button(action: exportAsPDF) {
-                        HStack {
+                        HStack(spacing: TokensSpacing.sm) {
                             Image(systemName: "doc.richtext")
                             Text("导出 PDF")
-                                .font(Theme.font(.subheadline as Font).bold())
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(TokensPalette.success)
-                        .foregroundStyle(TokensPalette.labelOnTint)
-                        .cornerRadius(12)
                     }
+                    .buttonStyle(DSSecondaryButtonStyle())
                 }
             }
-            .padding()
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.vertical, TokensSpacing.lg)
         }
-        .navigationTitle("导出数据")
-        .navigationBarTitleDisplayMode(.inline)
+        .dsPageTitle("导出数据", inline: true)
         .alert("导出成功", isPresented: $showSuccess) {
             Button("分享", action: shareExportedFile)
             Button("关闭", role: .cancel) {}
@@ -82,7 +70,9 @@ struct ExportDataView: View {
 
     private var previewCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("导出预览").font(.caption).foregroundStyle(.secondary)
+            Text("导出预览")
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.secondary)
 
             let lines = previewLines
             ScrollView {

@@ -297,14 +297,27 @@ struct DSBigNumber: View {
     }
 }
 
-/// 页面大标题（艺术方向下用）：导航栏的字体改不了（系统字体），
+/// 页面大标题（**艺术方向下才有**）：导航栏的字体改不了（系统字体），
 /// 所以「标题的字体」只能画在内容里 —— 这既是代价也是印刷物的做法：
 /// 标题属于版面，不属于系统栏。
+///
+/// 它必须与 `dsPageTitle` **成套**：后者在艺术方向下把导航栏清空，这一支把标题补进版面。
+/// 原生主题下这里什么也不画 —— 否则同一句话会说两遍
+/// （导航栏的大标题 + 内容里的大标题），那不是「原生等于现状」。
 struct DSPageTitle: View {
     var title: String
     var subtitle: String? = nil
 
+    @ViewBuilder
     var body: some View {
+        if TokensPalette.decor == .none {
+            EmptyView()
+        } else {
+            artBody
+        }
+    }
+
+    private var artBody: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(TokensSerif.page(30))
@@ -328,9 +341,12 @@ extension View {
     ///   原生      = iOS 大标题留在导航栏（逐像素等于切换前的现状）
     ///   艺术方向  = 导航栏清空，大标题搬进版面（衬线 + 疏排）
     /// 它必须与 `DSPageTitle` **成套**出现：只清导航栏不补内容，那一屏就没标题了。
-    func dsPageTitle(_ title: String) -> some View {
+    /// `inline: true` = 原生下也用行内标题（有些页面本来就一直用行内标题 ——
+    /// 原生必须逐像素等于切换前的现状，所以那个选择要保留）。
+    func dsPageTitle(_ title: String, inline: Bool = false) -> some View {
         if TokensPalette.decor == .none {
-            return AnyView(navigationTitle(title).navigationBarTitleDisplayMode(.large))
+            return AnyView(navigationTitle(title)
+                .navigationBarTitleDisplayMode(inline ? .inline : .large))
         }
         return AnyView(navigationTitle("").navigationBarTitleDisplayMode(.inline))
     }

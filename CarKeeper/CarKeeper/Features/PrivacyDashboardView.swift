@@ -52,74 +52,69 @@ struct PrivacyDashboardView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: TokensSpacing.lg) {
-                    // 汇总卡片
-                    VStack(spacing: TokensSpacing.sm) {
-                        Image(safeSymbol: "checkerboard.shield", fallback: "shield.fill")
-                            .font(.system(size: 48))
-                            .foregroundColor(TokensPalette.ambient)
-                        Text("数据透明度")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        Text("本应用共存储 \(totalRecords) 条记录")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, TokensSpacing.md)
-                    .glassCard()
+        // 不再在里面套一层 NavigationStack：这个页面是「我的」的导航栈里打开的浮层，
+        // 再套一层就会出现两条导航栏、标题说两遍（而且两个栈各自记一份返回路径）。
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                DSPageTitle(title: "隐私与数据", subtitle: "本机存了什么，全部列在下边")
 
-                    // 分类详情
-                    ForEach(dataCategories, id: \.title) { category in
-                        PrivacyCategorySection(category: category)
+                // 汇总：一个数字，不靠一张卡来证明自己重要
+                DSGroup {
+                    DSGroupRow {
+                        DSBigNumber(value: "\(totalRecords)",
+                                    unit: "条",
+                                    caption: "本机存储的记录总数",
+                                    size: 56)
+                            .padding(.vertical, TokensSpacing.xs)
                     }
+                }
 
-                    // 一键清除按钮
-                    VStack(spacing: TokensSpacing.sm) {
+                // 分类详情
+                ForEach(dataCategories, id: \.title) { category in
+                    PrivacyCategorySection(category: category)
+                }
+
+                // 清除：后果写在按钮旁边，不藏在确认框里
+                DSGroup(title: "清除",
+                        footer: "清除后无法恢复：这些记录只在本机，没有云端副本。") {
+                    DSGroupRow {
                         Button(role: .destructive) {
                             showClearConfirm = true
                         } label: {
                             Label("清除全部本地数据", systemImage: "trash.fill")
-                                .font(.subheadline.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(TokensPalette.error.opacity(0.15))
-                                .foregroundColor(TokensPalette.error)
-                                .cornerRadius(TokensRadius.medium)
+                                .font(TokensTypo.subheadline.weight(.semibold))
+                                .foregroundStyle(TokensPalette.error)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
+                    }
 
+                    DSGroupRow {
                         Button {
                             // 仅清除行程和能耗数据
                             store.tripHistory = []
                             store.energyHistory = []
                             store.commandHistory = []
                         } label: {
-                            Label("清除行程记录", systemImage: "arrow.triangle.clockwise")
-                                .font(.subheadline)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(TokensPalette.warning.opacity(0.1))
-                                .foregroundColor(TokensPalette.warning)
-                                .cornerRadius(TokensRadius.medium)
+                            Label("清除行程与能耗记录", systemImage: "arrow.triangle.clockwise")
+                                .font(TokensTypo.subheadline)
+                                .foregroundStyle(TokensPalette.primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
-                    .padding(.top, TokensSpacing.sm)
                 }
-                .padding()
             }
-            // v5：不自己铺底 —— 画布与光在 App 根部只画一次（原生主题下逐像素相同）。
-            .navigationTitle("隐私与数据")
-            .navigationBarTitleDisplayMode(.inline)
-            .alert("确认清除", isPresented: $showClearConfirm) {
-                Button("清除所有数据", role: .destructive) {
-                    store.clearAllData()
-                }
-                Button("取消", role: .cancel) {}
-            } message: {
-                Text("这将清除所有本地记录，包括行程、能耗和控制历史。此操作不可撤销。")
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.vertical, TokensSpacing.lg)
+        }
+        // v5：不自己铺底 —— 画布与光在 App 根部只画一次（原生主题下逐像素相同）。
+        .dsPageTitle("隐私与数据", inline: true)
+        .alert("确认清除", isPresented: $showClearConfirm) {
+            Button("清除所有数据", role: .destructive) {
+                store.clearAllData()
             }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("这将清除所有本地记录，包括行程、能耗和控制历史。此操作不可撤销。")
         }
     }
 }
@@ -128,34 +123,28 @@ struct PrivacyCategorySection: View {
     let category: (title: String, items: [(name: String, size: String, type: String)])
 
     var body: some View {
-        VStack(alignment: .leading, spacing: TokensSpacing.xs) {
-            Text(category.title)
-                .font(.headline)
-                .padding(.horizontal)
-                .padding(.top, TokensSpacing.sm)
-
-            ForEach(Array(category.items.enumerated()), id: \.offset) { idx, item in
-                HStack {
-                    Text(item.name)
-                        .font(.subheadline)
-                    Spacer()
-                    Text(item.size)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(item.type)
-                        .font(.caption2)
-                        .foregroundColor(Color(.tertiaryLabel))
-                }
-                .padding(.horizontal)
-                .padding(.vertical, TokensSpacing.xs)
-                if idx != category.items.count - 1 {
-                    Divider().opacity(0.3)
-                        .padding(.horizontal)
+        // 一个分类 = 一个分组（与全 App 其它分组同一件东西：同一个面、同一条发丝线）
+        DSGroup(title: category.title) {
+            ForEach(Array(category.items.enumerated()), id: \.offset) { _, item in
+                DSGroupRow {
+                    HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.md) {
+                        Text(item.name)
+                            .font(TokensTypo.subheadline)
+                            .foregroundStyle(TokensPalette.primary)
+                        Spacer(minLength: TokensSpacing.sm)
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text(item.size)
+                                .font(TokensTypo.dataSmall)
+                                .foregroundStyle(TokensPalette.secondary)
+                            // 存储位置：原来是写死的 Color(.tertiaryLabel)，于是四套主题里都是同一块系统灰
+                            Text(item.type)
+                                .font(TokensTypo.caption2)
+                                .foregroundStyle(TokensPalette.tertiary)
+                        }
+                    }
                 }
             }
         }
-        .glassCard()
-        .padding(.vertical, TokensSpacing.xs)
     }
 }
 

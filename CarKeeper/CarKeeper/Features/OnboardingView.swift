@@ -35,7 +35,6 @@ enum OnboardingPage: String, CaseIterable, Identifiable {
 
 struct OnboardingView: View {
     @State private var currentPage = 0
-    @State private var isLastPage = false
     @AppStorage("carkeeper_onboarding_seen") private var onboardingSeen = false
 
     var body: some View {
@@ -50,64 +49,38 @@ struct OnboardingView: View {
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
             .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
 
-            // 底部操作区
-            VStack(spacing: 20) {
-                Text(isLastPage ? "准备好了吗？" : "")
-                    .font(TokensTypo.title3)
-                    .foregroundStyle(.primary)
+            // 底部操作区：直接坐在版面上（不再是一片带边的卡）
+            // —— 引导页能做的事只有「下一步」和「跳过」，它们不需要一个容器来证明自己是一组。
+            HStack {
+                Button("跳过") {
+                    onboardingSeen = true
+                }
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.secondary)
 
-                if isLastPage {
-                    Button("开始使用") {
-                        onboardingSeen = true
-                    }
-                    .font(TokensTypo.body.weight(.semibold))
-                    .foregroundStyle(TokensPalette.labelOnTint)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(TokensPalette.ambient, in: RoundedRectangle(cornerRadius: TokensRadius.medium))
-                    .shadow(color: TokensPalette.ambient.opacity(0.3), radius: 8, y: 4)
+                Spacer(minLength: TokensSpacing.md)
 
-                    Button("跳过引导") {
-                        onboardingSeen = true
-                    }
-                    .font(TokensTypo.caption)
-                    .foregroundStyle(.secondary)
-                } else {
-                    HStack {
-                        Button("跳过") {
+                Button(currentPage < OnboardingPage.allCases.count - 1 ? "下一步" : "完成") {
+                    withAnimation(.spring(response: 0.3)) {
+                        if currentPage < OnboardingPage.allCases.count - 1 {
+                            currentPage += 1
+                        } else {
                             onboardingSeen = true
                         }
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(.secondary)
-
-                        Spacer()
-
-                        Button(currentPage < OnboardingPage.allCases.count - 1 ? "下一步" : "完成") {
-                            withAnimation(.spring(response: 0.3)) {
-                                if currentPage < OnboardingPage.allCases.count - 1 {
-                                    currentPage += 1
-                                } else {
-                                    onboardingSeen = true
-                                }
-                            }
-                        }
-                        .font(TokensTypo.body.weight(.semibold))
-                        .foregroundStyle(TokensPalette.labelOnTint)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(TokensPalette.ambient, in: RoundedRectangle(cornerRadius: TokensRadius.medium))
                     }
                 }
+                .font(TokensTypo.body.weight(.semibold))
+                .foregroundStyle(TokensPalette.labelOnTint)
+                .padding(.horizontal, TokensSpacing.lg)
+                .padding(.vertical, TokensSpacing.sm + 4)
+                .background(TokensPalette.ambient,
+                            in: RoundedRectangle(cornerRadius: TokensRadius.pill, style: .continuous))
             }
-            .padding(.horizontal, TokensSpacing.xxxl)
-            .padding(.vertical, TokensSpacing.xxl)
-            .background(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                .fill(TokensPalette.nightSurface))
-            .overlay(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                .strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.line))
-            .padding(.top, TokensSpacing.xl)
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.vertical, TokensSpacing.lg)
         }
-        // 旧版：整屏三色渐变（主色 + 紫 + 蓝）。新版：单一画布色。
+        // 旧版：整屏三色渐变（主色 + 紫 + 蓝）+ 一枚彩色发光阴影。
+        // 新版：单一画布（光在根上由真实太阳位置算），按钮用形状表达层级，不用光。
     }
 
     private func onboardingPage(_ page: OnboardingPage) -> some View {
@@ -123,15 +96,15 @@ struct OnboardingView: View {
                     .foregroundStyle(TokensPalette.ambient)
             }
 
-            // 标题和描述
+            // 标题和描述（标题走衬线：艺术方向下「引导页」也是一页纸）
             VStack(spacing: 12) {
                 Text(page.title)
-                    .font(TokensTypo.title)
-                    .foregroundStyle(.primary)
+                    .font(TokensSerif.page(28))
+                    .foregroundStyle(TokensPalette.primary)
 
                 Text(page.description)
                     .font(TokensTypo.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(TokensPalette.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
@@ -149,23 +122,19 @@ struct OnboardingView: View {
     }
 }
 
+/// 引导页上的「例子」：一行键值（例：示例车牌 / 京A·12345）。
+/// 它用与「全量数据」同一套键值行 —— 同一个 App 里「左键右值」只该有一种写法。
 struct ExampleCard: View {
     let title: String
     let value: String
 
     var body: some View {
-        HStack {
-            Text(title)
-                .font(TokensTypo.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .font(TokensTypo.body.monospaced())
-                .foregroundStyle(TokensPalette.ambient)
+        DSGroup {
+            DSGroupRow {
+                DSKeyValueRow(key: title, value: value, mono: false)
+            }
         }
-        .padding()
-        .background(TokensPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 40)
+        .padding(.horizontal, TokensSpacing.xxxl)
     }
 }
 

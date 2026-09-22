@@ -25,46 +25,66 @@ struct GlobalSearchHUD: View {
                 .onTapGesture { isPresented = false }
 
             VStack(spacing: 0) {
-                // 搜索框
-                HStack(spacing: 12) {
+                // 搜索框（它是浮在内容之上的一层 → 玻璃合法）
+                HStack(spacing: TokensSpacing.sm) {
                     Image(systemName: "magnifyingglass")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
+                        .font(TokensTypo.title3)
+                        .foregroundStyle(TokensPalette.secondary)
 
                     TextField("搜索车况、设置...", text: $searchText)
-                        .font(.title3)
+                        .font(TokensTypo.subheadline)
                         .textFieldStyle(.plain)
-                        .foregroundColor(.primary)
+                        .foregroundColor(TokensPalette.primary)
 
                     if !searchText.isEmpty {
                         Button {
                             searchText = ""
                         } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(TokensPalette.secondary)
                         }
                     }
                 }
-                .padding()
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                .padding(.horizontal)
+                .padding(TokensSpacing.md)
+                .background(.ultraThinMaterial,
+                            in: RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous))
+                .overlay {
+                    // 艺术方向下给浮层一条发丝边（浮层自己也有线，与卡片同一规则）
+                    if TokensPalette.decor != .none {
+                        RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                            .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line)
+                    }
+                }
+                .padding(.horizontal, TokensSpacing.page)
 
-                // 搜索结果
+                // 搜索结果：一个分组 + 行，不再是一叠各自带底的卡片
                 ScrollView {
-                    VStack(spacing: 8) {
-                        ForEach(searchResults) { result in
-                            SearchResultRow(result: result) {
-                                result.action()
-                                isPresented = false
+                    if searchResults.isEmpty {
+                        Text(searchText.isEmpty ? "输入关键词，搜车况与设置。" : "没有匹配的项。")
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, TokensSpacing.page)
+                            .padding(.top, TokensSpacing.md)
+                    } else {
+                        DSGroup {
+                            ForEach(searchResults) { result in
+                                DSGroupRow {
+                                    SearchResultRow(result: result) {
+                                        result.action()
+                                        isPresented = false
+                                    }
+                                }
                             }
                         }
+                        .padding(.horizontal, TokensSpacing.page)
+                        .padding(.top, TokensSpacing.md)
                     }
-                    .padding()
                 }
 
                 Spacer()
             }
-            .padding(.top, 16)
+            .padding(.top, TokensSpacing.md)
         }
         .onChange(of: searchText) { _, text in
             searchResults = performSearch(text)
@@ -128,30 +148,12 @@ struct SearchResultRow: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(safeSymbol: result.icon, fallback: "magnifyingglass")
-                    .font(.title2)
-                    .foregroundStyle(TokensPalette.ambient)
-                    .frame(width: 36)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(result.title)
-                        .font(.headline)
-                    Text(result.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding()
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-        }
-        .buttonStyle(.plain)
+        // DSRow 自己就是那个按钮（传 action 时它会包一层 Button + 按压反馈），
+        // 外面不再套一层 —— 套两层会出现两个按钮语义，读屏会念两遍。
+        DSRow(icon: result.icon,
+              title: result.title,
+              subtitle: result.subtitle,
+              showsChevron: true,
+              action: action)
     }
 }
