@@ -1,10 +1,14 @@
 // =============================================================================
-// VehicleTipsView - 车辆提示与建议（个性化提醒 + 保养建议 + 节能技巧）
+// 用车提示 — 由车上报的读数推出的提醒
+//
+// 原为独立页面（`VehicleTipsView`，深链 `carkeeper://tips`）。批 3 把它并进
+// **车辆档案**：提示是从这辆车的读数推出来的，它属于车，不属于另一个页面。
+// 它现在只提供内容（`VehicleTipsSection`），页面外壳归 `VehicleView`。
 // =============================================================================
 
 import SwiftUI
 
-struct VehicleTipsView: View {
+struct VehicleTipsSection: View {
     private let store = AppStore.shared
     @State private var selectedCategory: TipCategory = .all
     @State private var dismissedTips: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "dismissed_tips")
@@ -114,40 +118,36 @@ struct VehicleTipsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "车辆提示", subtitle: "由车上报的读数推出的提醒")
+        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+            sectionHeader
 
-                // 分类筛选
-                categoryPicker
+            // 分类筛选
+            categoryPicker
 
-                // 提示列表：一个分组（原来是一叠各自带底的卡）
-                if tips.isEmpty {
-                    emptyState
-                } else {
-                    DSGroup(title: "提示", trailing: "\(filteredTips.count) 条") {
-                        ForEach(filteredTips) { tip in
-                            DSGroupRow {
-                                tipRow(tip)
-                            }
+            // 提示列表：一个分组（原来是一叠各自带底的卡）
+            if tips.isEmpty {
+                emptyState
+            } else {
+                DSGroup(title: "提示", trailing: "\(filteredTips.count) 条") {
+                    ForEach(filteredTips) { tip in
+                        DSGroupRow {
+                            tipRow(tip)
                         }
                     }
                 }
             }
-            .padding(.horizontal, TokensSpacing.page)
-            .padding(.vertical, TokensSpacing.lg)
-        }
-        .dsPageTitle("车辆提示", inline: true)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: dismissAll) {
-                    Text("全部已读")
-                        .font(.caption)
-                        .foregroundStyle(TokensPalette.ambient)
-                }
-            }
         }
         .accessibilityLabel(Text("车辆智能提示"))
+    }
+
+    /// 「全部已读」挂在分组标题的最右侧。
+    ///
+    /// 原来它在导航栏的工具栏里 —— 并入车辆档案之后这一节没有自己的导航栏，
+    /// 所以动作必须落在内容里；凭空造一个按钮反而会让这一节看起来又像一个页面。
+    private var sectionHeader: some View {
+        DSSectionHeader(title: "用车提示",
+                        trailing: tips.isEmpty ? nil : "全部已读",
+                        action: tips.isEmpty ? nil : { dismissAll() })
     }
 
     // MARK: - 分类筛选
@@ -224,16 +224,11 @@ struct VehicleTipsView: View {
     }
 
     private func handleAction(_ tip: VehicleTip) {
-        switch tip.title {
-        case "电量较低":
-            // Navigate to charging
-            break
-        case "故障警告":
-            // Navigate to fault detail
-            break
-        default:
-            EnhancedToastManager.shared.show(tip.body, icon: tip.icon)
-        }
+        // 原来这里有两支空实现（`// Navigate to charging` + break）：
+        // 按「去充电」或「查看详情」**什么都不发生**，然后提示就被标记已读 ——
+        // 用户以为处理过了，其实只是被藏起来了。这一节没有自己的导航目标，
+        // 所以先把话说清楚：给一个可见的回应，再标记已读。
+        EnhancedToastManager.shared.show(tip.body, icon: tip.icon)
         dismiss(tip)
     }
 }
@@ -292,10 +287,8 @@ enum TipSeverity {
 }
 
 // MARK: - Preview
-struct VehicleTipsView_Previews: PreviewProvider {
+struct VehicleTipsSection_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationStack {
-            VehicleTipsView()
-        }
+        ScrollView { VehicleTipsSection() }
     }
 }

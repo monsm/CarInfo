@@ -697,3 +697,33 @@ secondarySystemGroupedBackground
 
 15 个检查器（新增 `design`）+ `check_style` 全绿；31 个改动文件括号余额逐文件配平
 （用 `design.py` 的同一套字符串/注释剥离实现来数，不另写一套）。
+
+---
+
+## 批 3：「车」一屏收口 —— 车辆档案 ← 里程记账 + 用车提示
+
+页面集合从 20 收成 7 的第三批。两个页面**不是被删掉，而是被吸收**：内容一行不丢，
+页面外壳（`ScrollView` / `DSPageTitle` / `.dsPageTitle` / 工具栏）删掉，改由车辆档案提供。
+
+| 原 | 现 | 备注 |
+|---|---|---|
+| `MileageJournalView`（从「我的」以 sheet 打开） | `Features/Vehicle/MileageJournalSection.swift` | 文件随内容一起搬进 `Features/Vehicle/` |
+| `VehicleTipsView`（深链 `carkeeper://tips`） | `Features/Vehicle/VehicleTipsSection.swift` | 同上 |
+| `Deeplink.tips` | 已删 | 索引页 / 搜索 / `MineView` 三处重复入口一并去掉 |
+| `MineView` 的「里程记账」行 + sheet | 已删 | 它现在在车辆档案里；分组页脚文案改成实话 |
+
+### 吸收时逮到的三个「不会改变任何东西的控件」
+
+1. **里程记账的「本月 / 上月 / 全部」分段只换选中态。** 统计读全量、明细也读全量 ——
+   切到「上月」数字纹丝不动。现在规格真正生效：一个 `periodRange` 定义口径，
+   统计与明细共用它，分组右侧还显示这一口径下的条数。
+2. **里程记账工具栏的「清空历史」闭包是空的**（`// 清空所有记录（需确认）` 后面什么都没有）：
+   按下去什么都不发生。现在 `MileageTracker.clearAll()` 真的清，且必须先过 `confirmationDialog`。
+3. **用车提示里「去充电」/「查看详情」是两支空实现**（`// Navigate to charging` + `break`）：
+   按下去什么都看不到，**然后这条提示被标记已读** —— 用户以为处理过了，其实只是被藏起来了。
+   这一节没有自己的导航目标，所以改成给一个可见回应（既有 Toast）+ 说明写在注释里。
+
+另外「全部已读」从导航栏工具栏挪到分组标题最右侧（`DSSectionHeader(trailing:action:)`）——
+并入之后这一节没有自己的导航栏，动作必须落在内容里。
+
+15 个检查器 + `check_style` 全绿；七个改动文件括号余额逐文件配平。

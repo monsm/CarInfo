@@ -62,7 +62,7 @@ struct VehicleView: View {
         }
                 .dsPageTitle("车辆档案")
         .accessibilityLabel(Text("车辆档案"))
-        .accessibilityHint(Text("车牌、VIN、车型配置与保险保养信息，点任意字段可复制"))
+        .accessibilityHint(Text("车牌、VIN、车型配置、用车提示与里程记账，点任意字段可复制"))
         .refreshable {
             await store.fetchVehicleData()
         }
@@ -86,8 +86,12 @@ struct VehicleView: View {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
                 DSPageTitle(title: "车辆档案", subtitle: "车牌、VIN、车型配置与保险保养")
                 identitySection(sum)
+                // 用车提示：由这辆车的读数推出来的提醒（原 `车辆提示` 页）
+                VehicleTipsSection()
                 archiveGroups
                 photoSection
+                // 里程记账：花在车上的每一笔（原「我的」里的独立页 + sheet）
+                MileageJournalSection()
             }
             .padding(.top, TokensSpacing.sm)
             .padding(.bottom, TokensSpacing.xxxl)

@@ -1,5 +1,9 @@
 // =============================================================================
-// #NEW-128 里程记账本 — 记录加油/充电/保养花费明细
+// 里程记账 — 记录加油/充电/保养花费明细
+//
+// 原为独立页面（`MileageJournalView`，从「我的」里以 sheet 打开）。批 3 把它
+// 并进**车辆档案**：花在车上的钱是这辆车的一部分，不是另一个功能目录。
+// 它现在只提供内容（`MileageJournalSection`），页面外壳归 `VehicleView`。
 // =============================================================================
 
 import Foundation
@@ -84,11 +88,18 @@ class MileageTracker : ObservableObject {
     func totalByType(_ type: TripCostType) -> Double {
         entries.filter { $0.type == type }.map { $0.amount }.reduce(0, +)
     }
+
+    /// 清空全部记录。按键上的「清空历史」此前是个**空闭包**（点了什么都不发生），
+    /// 现在真的能清，且调用方必须先确认。
+    func clearAll() {
+        UserDefaults.standard.removeObject(forKey: "carkeeper_mileage_entries")
+    }
 }
 
-struct MileageJournalView: View {
+struct MileageJournalSection: View {
     @StateObject private var tracker = MileageTracker.shared
     @State private var showAddSheet = false
+    @State private var showClearConfirm = false
     @State private var selectedType: TripCostType = .charge
     @State private var amountText: String = ""
     @State private var noteText: String = ""
@@ -97,55 +108,90 @@ struct MileageJournalView: View {
     @State private var currentPeriod = 0
 
     var body: some View {
-        // 不再套一层 NavigationStack：本页是「我的」导航栈里打开的浮层，
-        // 再套一层会出现两条导航栏、标题说两遍。
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "里程记账", subtitle: "充电、停车、维保 —— 花在车上的每一笔")
+        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+            DSSectionHeader(title: "里程记账")
 
-                // 周期：三个互斥的口径 → 系统的分段语法
-                DSSegmented(options: months.indices.map { (value: $0, title: months[$0]) },
-                            selection: $currentPeriod)
+            // 周期：三个互斥的口径 → 系统的分段语法
+            DSSegmented(options: months.indices.map { (value: $0, title: months[$0]) },
+                        selection: $currentPeriod)
 
-                // 统计：一组键值行，不是一个彩色方块矩阵
-                DSGroup {
-                    ForEach(Array(TripCostType.allCases.prefix(4)), id: \.self) { type in
-                        DSGroupRow {
-                            DSKeyValueRow(key: type.displayName,
-                                          value: String(format: "¥%.1f", tracker.totalByType(type)))
-                        }
+            // 统计：一组键值行，不是一个彩色方块矩阵（口径跟着上面的分段走）
+            DSGroup(footer: "口径与上面的分段一致：本月 / 上月 / 全部。") {
+                ForEach(Array(TripCostType.allCases.prefix(4)), id: \.self) { type in
+                    DSGroupRow {
+                        DSKeyValueRow(key: type.displayName,
+                                      value: String(format: "¥%.1f", total(type)))
                     }
                 }
-
-                // 明细
-                entriesSection
-
-                // 添加
-                Button { showAddSheet = true } label: {
-                    Label("添加记录", systemImage: "plus.circle.fill")
-                        .font(TokensTypo.body.weight(.semibold))
-                }
-                .buttonStyle(DSPrimaryButtonStyle())
             }
-            .padding(.horizontal, TokensSpacing.page)
-            .padding(.vertical, TokensSpacing.lg)
-        }
-        .scrollBounceBehavior(.basedOnSize)
-            .sheet(isPresented: $showAddSheet) {
-                AddCostEntrySheet(selectedType: $selectedType, amountText: $amountText, noteText: $noteText)
-                    .onAppear { amountText = "" ; noteText = "" }
-                    .dsSheetCanvas()
+
+            // 明细
+            entriesSection
+
+            // 添加
+            Button { showAddSheet = true } label: {
+                Label("添加记录", systemImage: "plus.circle.fill")
+                    .font(TokensTypo.body.weight(.semibold))
             }
-            .dsPageTitle("里程记账", inline: true)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("清空历史", role: .destructive) {
-                        // 清空所有记录（需确认）
-                    }
+            .buttonStyle(DSPrimaryButtonStyle())
+
+            // 清空：原来它挂在工具栏上，闭包是**空的** —— 点了什么都不发生。
+            // 账目不可撤销，所以真清之前必须先确认。
+            if !tracker.entries.isEmpty {
+                Button("清空全部记录", role: .destructive) { showClearConfirm = true }
                     .font(TokensTypo.caption)
-                    .disabled(tracker.entries.isEmpty)
-                }
+                    .buttonStyle(.plain)
             }
+        }
+        .sheet(isPresented: $showAddSheet) {
+            AddCostEntrySheet(selectedType: $selectedType, amountText: $amountText, noteText: $noteText)
+                .onAppear { amountText = "" ; noteText = "" }
+                .dsSheetCanvas()
+        }
+        .confirmationDialog("清空全部里程记账？",
+                            isPresented: $showClearConfirm,
+                            titleVisibility: .visible) {
+            Button("清空 \(tracker.entries.count) 条记录", role: .destructive) {
+                tracker.clearAll()
+            }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("这些记录只存在本机，清空后无法恢复。")
+        }
+    }
+
+    // MARK: - 口径
+
+    /// 周期口径：0 = 本月，1 = 上月，其它 = 全部。
+    ///
+    /// 原来这个分段控件**只换选中态**：统计读全量、明细也读全量，
+    /// 切到「上月」数字纹丝不动 —— 一个不会改变任何东西的控件。
+    private var periodRange: (start: Date, end: Date?)? {
+        let cal = Calendar.current
+        let now = Date()
+        switch currentPeriod {
+        case 0:
+            guard let start = cal.date(from: cal.dateComponents([.year, .month], from: now)) else { return nil }
+            return (start, nil)
+        case 1:
+            guard let thisMonth = cal.date(from: cal.dateComponents([.year, .month], from: now)),
+                  let start = cal.date(byAdding: .month, value: -1, to: thisMonth) else { return nil }
+            return (start, thisMonth)
+        default:
+            return nil
+        }
+    }
+
+    private var periodEntries: [CostEntry] {
+        guard let range = periodRange else { return tracker.entries }
+        return tracker.entries.filter { entry in
+            if let end = range.end, entry.date >= end { return false }
+            return entry.date >= range.start
+        }
+    }
+
+    private func total(_ type: TripCostType) -> Double {
+        periodEntries.filter { $0.type == type }.map(\.amount).reduce(0, +)
     }
 
     /// 明细：一组长按可删的行。
@@ -155,8 +201,9 @@ struct MileageJournalView: View {
     /// （`.listStyle` 加在 VStack 上也是空转）。现在删除挂在长按菜单上，并在页脚说明。
     private var entriesSection: some View {
         DSGroup(title: "明细",
-                footer: tracker.entries.isEmpty ? "还没有记录。" : "长按一条记录可以删除。") {
-            ForEach(tracker.entries) { entry in
+                trailing: "\(periodEntries.count)",
+                footer: periodEntries.isEmpty ? "这一口径下还没有记录。" : "长按一条记录可以删除。") {
+            ForEach(periodEntries) { entry in
                 DSGroupRow {
                     CostEntryRow(entry: entry)
                 }

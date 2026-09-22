@@ -853,7 +853,8 @@ struct MapSpineView: View {
                     // 就是「同一件事两个入口」——缝合怪的第一来源。
                     // 索引页从此只做一件事：列**离开地图**的深潜页。
 
-                    indexGroup("这辆车", [.vehicle, .battery, .health, .data, .control, .tips])
+                    // 「用车提示」不再单列：它已并入车辆档案（`VehicleTipsSection`）。
+                    indexGroup("这辆车", [.vehicle, .battery, .health, .data, .control])
                     indexGroup("出行", [.trips, .emergency])
                     indexGroup("保养与钱", [.service, .export, .score])
                     indexGroup("系统", [.messages, .dev, .mine])
@@ -1039,7 +1040,6 @@ struct MapSpineView: View {
         case .parking: return "停车位置"
         case .export: return "导出数据"
         case .emergency: return "应急面板"
-        case .tips: return "用车提示"
         case .score: return "驾驶评分"
         }
     }

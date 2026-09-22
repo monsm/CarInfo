@@ -20,7 +20,6 @@ struct MineView: View {
     @State private var shareSheetFlag = false
     @State private var isRefreshing = false     // 下拉刷新进行中标志
     @State private var isChecking = false        // OTA 检查中（不含下载）
-    @State private var showMileageJournal = false
     @State private var showOTAChangelog = false
     @State private var showPrivacyDashboard = false
     @State private var showTempKeys = false
@@ -95,14 +94,6 @@ struct MineView: View {
             Button("取消", role: .cancel) { }
         }
         .sheet(isPresented: $shareSheetFlag) { ShareSheet(items: shareItems) }
-        .sheet(isPresented: $showMileageJournal) {
-            NavigationStack {
-                MileageJournalView()
-                    .navigationTitle("里程记账")
-                    .dsSheetCanvas()
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-        }
         .sheet(isPresented: $showOTAChangelog) {
             NavigationStack {
                 OTAChangelogView()
@@ -305,7 +296,6 @@ struct MineView: View {
                 // 「指令历史」不再单列：它就是车控页里的「做过什么」那一节。
                 linkRow("wrench.and.screwdriver.fill", "维保记录", .service)
                 linkRow("mappin.circle.fill", "停车位置", .parking)
-                linkRow("lightbulb.fill", "车辆提示", .tips)
                 linkRow("exclamationmark.octagon.fill", "紧急求助", .emergency)
                 // #44 充电站：地图主屏的「充电」层就是这件事 —— 它按**车的位置**实时搜，
                 // 这里不再自己搜一份（原来那份搜的是写死的北京坐标 39.9042, 116.4074）。
@@ -316,8 +306,7 @@ struct MineView: View {
             }
 
             DSGroup(title: "钱与证件",
-                    footer: "数字来自本机记录（里程记账 / 年检 / 保险的字段由你自己填）。") {
-                actionRow("banknote.fill", "里程记账") { showMileageJournal = true }
+                    footer: "数字来自本机记录（年检 / 保险的字段由你自己填）；里程记账在「车辆档案」里。") {
                 actionRow("doc.plaintext.fill", "充电账单") { showChargeBill = true }
                 actionRow("dollarsign.circle.fill", "车辆估值") { showValuation = true }
                 actionRow("calendar.fill", "年检与保险", last: true) { showInspection = true }

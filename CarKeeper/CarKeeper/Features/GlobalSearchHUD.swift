@@ -226,7 +226,6 @@ struct GlobalSearchHUD: View {
         ("维保记录", "保养里程与提醒", "wrench.and.screwdriver.fill", .service),
         ("停车位置", "最近一次停放的位置", "mappin.circle.fill", .parking),
         ("车与账号", "车辆、账号、隐私与关于", "person.fill", .mine),
-        ("车辆提示", "针对你车的用车建议", "lightbulb.fill", .tips),
         ("紧急求助", "拖车、保险、救援电话", "exclamationmark.octagon.fill", .emergency),
         ("导出数据", "把行程与充电记录导出去", "square.and.arrow.up", .export),
         ("消息中心", "车辆给你发的通知", "bubble.left.fill", .messages),

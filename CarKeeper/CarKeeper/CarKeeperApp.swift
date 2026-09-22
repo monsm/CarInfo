@@ -38,7 +38,9 @@ enum Deeplink: Hashable, CaseIterable {
     case vehicle, health, battery, data, dev, messages, control, dashboard
     // `.commands`（指令历史页）已删：历史就是车控页里「做过什么」那一节，
     // 同一件事不再有两个界面（详情见 ControlView 的 historyCard 注释）。
-    case trips, service, parking, export, emergency, tips, score
+    // `.tips`（车辆提示页）已删：提示是从这辆车的读数推出来的，已并入车辆档案
+    // （`VehicleTipsSection`），不再单占一个深链。
+    case trips, service, parking, export, emergency, score
     /// 「车与账号」（原「我的」Tab 的根页）。设置类内容的去处 —— 它不是功能目录，
     /// 功能目录归地图右上角的索引页；这个深链保证它不再依附于 Tab 才能到达。
     case mine
@@ -59,7 +61,6 @@ enum Deeplink: Hashable, CaseIterable {
         case .parking: return "parking"
         case .export: return "export"
         case .emergency: return "emergency"
-        case .tips: return "tips"
         case .score: return "score"
         case .mine: return "mine"
         }
@@ -297,7 +298,7 @@ struct MapShellView: View {
         case .parking: TripsTimelineView().environmentObject(nav)
         case .export: ExportDataView().environmentObject(nav)
         case .emergency: EmergencyPanel().environmentObject(nav)
-        case .tips: VehicleTipsView().environmentObject(nav)
+        // .tips（车辆提示页）已并入车辆档案 —— 见 `Deeplink` 枚举上的注释。
         case .score: DrivingScorePage().environmentObject(nav)
         // 「车与账号」（原「我的」Tab 的根页）。**它必须在这里有一个 case** ——
         // 它就是设置类内容的唯一去处；批 3 会把它从 27 个磁贴的功能目录
