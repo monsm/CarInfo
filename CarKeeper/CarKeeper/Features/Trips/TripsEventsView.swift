@@ -30,19 +30,83 @@ struct TripsEventsView: View {
         MapSpineData.clusterHotspots(from: store.parkingHistory, excluding: store.parkingLocation)
     }
 
+    /// 从消息缓存里的 IGNITION / FLAMEOUT 事件直接配成行程（不等 ingestEvents）。
+    /// 数据源与 `store.tripHistory` 是**同一件事**，但这里多一个好处：
+    /// 消息一拉到手就能渲染，不依赖 `fetchVehicleData()` 的触发时机。
+    private var tripsFromMessages: [AppStore.TripRecord] {
+        let raw = store.caches["messages"] as? [[String: Any]] ?? []
+        guard !raw.isEmpty else { return [] }
+        // 复用 AppStore 里已有的现成方法：跳去、配对、写进 tripHistory
+        // —— 不行，那会改全局状态。这里只做「展示用」的临时配对，不写。
+        let events: [(ignition: Bool, at: Date, loc: CLLocationCoordinate2D?, addr: String)] = raw
+            .compactMap { m -> (Bool, Date, CLLocationCoordinate2D?, String)? in
+                guard let kind = ciString(m, ["InfoTypeId", "infoTypeId"])?.uppercased(),
+                      kind == "IGNITION" || kind == "FLAMEOUT" else { return nil }
+                let p = AppStore.jumpParams(m)
+                guard let at = VM.serverDate(p["gpsTime"]) ?? VM.serverDate(ciPick(m, ["CreatedAt", "createdAt"])) else { return nil }
+                var loc: CLLocationCoordinate2D?
+                if let lat = VM.vnum(p["lat"]), let lng = VM.vnum(p["lng"]) {
+                    loc = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                }
+                let addr = (p["addrName"] as? String) ?? ""
+                return (kind == "IGNITION", at, loc, addr)
+            }
+            .sorted { $0.at < $1.at }
+
+        // 点火 → 下一个熄火 = 一段行程（里程差 = 两点直线距离，只有 GPS 时才真）
+        var out: [AppStore.TripRecord] = []
+        var open: (ignitionAt: Date, ignitionLoc: CLLocationCoordinate2D?, ignitionAddr: String)?
+        for e in events {
+            if e.ignition {
+                open = (e.at, e.loc, e.addr)
+            } else if let o = open {
+                let dist: Double = {
+                    guard let a = o.ignitionLoc, let b = e.loc else { return 0 }
+                    let m1 = CLLocation(latitude: a.latitude, longitude: a.longitude)
+                    let m2 = CLLocation(latitude: b.latitude, longitude: b.longitude)
+                    return m1.distance(from: m2) / 1000
+                }()
+                out.append(AppStore.TripRecord(
+                    id: "msg-\(o.ignitionAt.timeIntervalSince1970)-\(e.at.timeIntervalSince1970)",
+                    startTime: o.ignitionAt, endTime: e.at,
+                    startLocation: o.ignitionLoc.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) },
+                    endLocation: e.loc.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) },
+                    distanceKm: dist,
+                    startSoc: 0, endSoc: 0,
+                    avgEfficiency: nil, kmPerPercent: nil))
+                open = nil
+            }
+        }
+        // 只有点着火还没熄火的：也展示（进行中的一段）
+        if let o = open {
+            out.append(AppStore.TripRecord(
+                id: "msg-open-\(o.ignitionAt.timeIntervalSince1970)",
+                startTime: o.ignitionAt, endTime: nil,
+                startLocation: o.ignitionLoc.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) },
+                endLocation: nil,
+                distanceKm: 0,
+                startSoc: 0, endSoc: 0,
+                avgEfficiency: nil, kmPerPercent: nil))
+        }
+        return out
+    }
+
+    /// 展示用的行程：本机记录的优先；如果本机还是空，从消息直接配出。
+    private var displayTrips: [AppStore.TripRecord] {
+        !trips.isEmpty ? trips : tripsFromMessages
+    }
+
     var body: some View {
         // 出行只有一张画布：行程在上、常停之地在中间、车的事件在下。
-        // （原本「空态」与「有数据」是两条互斥的整页分支，各自带一套
-        //  `ScrollView` + 页面标题 —— 同一页两套外壳，正是缝合的来源。）
         DSPaperPage {
             DSPageTitle(title: "出行", subtitle: "每一次出行、常停的地方，以及车发来的事件")
 
-            if trips.isEmpty {
+            if displayTrips.isEmpty {
                 emptyState
             } else {
-                summaryHeader(trips)
-                ForEach(Array(trips.enumerated()), id: \.element.id) { idx, trip in
-                    timelineRow(trip, isLast: idx == trips.count - 1)
+                summaryHeader(displayTrips)
+                ForEach(Array(displayTrips.enumerated()), id: \.element.id) { idx, trip in
+                    timelineRow(trip, isLast: idx == displayTrips.count - 1)
                 }
                 if !hotspots.isEmpty {
                     hotspotsBand(hotspots)
