@@ -67,7 +67,6 @@ struct TripsEventsView: View {
                     return m1.distance(from: m2) / 1000
                 }()
                 out.append(AppStore.TripRecord(
-                    id: "msg-\(o.ignitionAt.timeIntervalSince1970)-\(e.at.timeIntervalSince1970)",
                     startTime: o.ignitionAt, endTime: e.at,
                     startLocation: o.ignitionLoc.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) },
                     endLocation: e.loc.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) },
@@ -80,7 +79,6 @@ struct TripsEventsView: View {
         // 只有点着火还没熄火的：也展示（进行中的一段）
         if let o = open {
             out.append(AppStore.TripRecord(
-                id: "msg-open-\(o.ignitionAt.timeIntervalSince1970)",
                 startTime: o.ignitionAt, endTime: nil,
                 startLocation: o.ignitionLoc.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) },
                 endLocation: nil,
