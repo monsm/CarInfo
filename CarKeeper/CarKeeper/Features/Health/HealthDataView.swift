@@ -12,7 +12,11 @@ import UIKit
 //  规则：分组标题在画布上、行在分组表面上；颜色只表达状态；玻璃不进入内容层。
 // =============================================================================
 
-struct HealthView: View {
+/// 体检与数据 —— 车端自检的结论（评分 / 逐系统明细 / 检测信息）+ 它依据的原始字段。
+///
+/// 原为「健康报告」页（`HealthView`）。批 6 把「全量数据」吸收进来：
+/// 结论与依据同源（都是同一次 `carcheck`），分成两页只是把一句话拆成两屏。
+struct HealthDataView: View {
     private let store = AppStore.shared
     @State private var model: HealthModel?
     @State private var loading = true
@@ -23,7 +27,7 @@ struct HealthView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "健康报告", subtitle: "车端自检的结论与依据")
+                DSPageTitle(title: "体检与数据", subtitle: "车端自检的结论，以及它依据的原始字段")
                 if loading {
                     loadingState
                 } else if let model {
@@ -42,6 +46,10 @@ struct HealthView: View {
                                   message: "车辆完成一次全车检测后，这里会显示评分与逐系统明细",
                                   actionTitle: "重新加载") { Task { await load() } }
                 }
+
+                // 依据：同一次 carcheck 的原文（原「全量数据」页）。
+                // 它在 if/else **之外** —— 体检报告读不到时，原始字段往往正是排错要看的东西。
+                RawDataSection(kind: .check)
             }
             .padding(.top, TokensSpacing.sm)
             .padding(.bottom, TokensSpacing.xxl)
@@ -49,7 +57,7 @@ struct HealthView: View {
         }
         .pageBackground()
         .scrollBounceBehavior(.basedOnSize)
-        .dsPageTitle("健康报告")
+        .dsPageTitle("体检与数据")
         .refreshable { await load() }
         .onAppear {
             if expandedSystems.isEmpty, let m = model {

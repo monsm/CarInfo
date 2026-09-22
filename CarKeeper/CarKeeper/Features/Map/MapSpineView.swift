@@ -854,7 +854,8 @@ struct MapSpineView: View {
                     // 索引页从此只做一件事：列**离开地图**的深潜页。
 
                     // 「用车提示」不再单列：它已并入车辆档案（`VehicleTipsSection`）。
-                    indexGroup("这辆车", [.vehicle, .battery, .health, .data, .control])
+                    // 「全量数据」不再单列：它并进了体检与数据（`RawDataSection`）。
+                    indexGroup("这辆车", [.vehicle, .battery, .health, .control])
                     indexGroup("出行", [.trips, .emergency])
                     // 「导出数据」不再单列：它并进了保养与钱（`ExportDataSection`）。
                     indexGroup("保养与钱", [.service, .score])
@@ -1029,9 +1030,8 @@ struct MapSpineView: View {
         switch link {
         case .mine: return "车与账号"
         case .vehicle: return "车辆档案"
-        case .health: return "健康报告"
+        case .health: return "体检与数据"
         case .battery: return "电池与充电"
-        case .data: return "全量数据"
         case .dev: return "开发者工具"
         case .messages: return "消息与通知"
         case .control: return "车控"

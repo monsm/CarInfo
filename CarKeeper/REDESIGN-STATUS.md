@@ -765,3 +765,21 @@ secondarySystemGroupedBackground
 `Theme.swift` 里那句「导出页的 `ExportDataView` 才是真的导出」也改成现在的实话。
 
 15 个检查器 + `check_style` 全绿；七个改动文件括号余额逐文件配平。
+
+---
+
+## 批 6：「体检与数据」一屏 —— 结论 + 依据
+
+「健康报告」与「全量数据」讲的是同一次 `carcheck`：一个是结论，一个是原文。
+分成两页等于把一句话拆成两屏，所以合并：
+
+| 原 | 现 | 备注 |
+|---|---|---|
+| `HealthView`（深链 `.health`） | `HealthDataView`（`Features/Health/`） | 页面标题改成「体检与数据」 |
+| `DataView`（深链 `.data`） | `RawDataSection`（同目录） | 8 个分类菜单 + 复制/刷新/分享从导航栏挪进内容里的节标题行 |
+| `Deeplink.data` + `navToData` 通知 | 已删 | 索引页 / 搜索两处入口一并去掉 |
+
+`RawDataSection` 放在 if/else 链**之外**：体检报告读不到时，原始字段往往正是排错要看的东西。
+默认分类也从「全量分析」改成「检测报告原文」—— 它就在评分的正下方，读者顺着结论往下就是依据。
+
+15 个检查器 + `check_style` 全绿；五个改动文件括号余额逐文件配平。

@@ -218,9 +218,8 @@ struct GlobalSearchHUD: View {
     /// 可搜的页面清单。与壳层的 `Deeplink` 一一对应（少一个就等于少一条入口）。
     private static let pages: [(title: String, hint: String, icon: String, link: Deeplink)] = [
         ("车辆档案", "车牌、车型、保险与保养到期", "doc.text.fill", .vehicle),
-        ("健康报告", "胎压、故障码、保养建议", "shield.lefthalf.filled", .health),
+        ("体检与数据", "车端自检的结论与它依据的原始字段", "shield.lefthalf.filled", .health),
         ("电池充电", "SOC、充电曲线、充电账单", "battery.100", .battery),
-        ("全量数据", "所有原始读数与历史曲线", "chart.bar.xaxis", .data),
         ("驾驶评分", "用行程里真有的事实算的评分", "trophy.fill", .score),
         ("行程分析", "每一次出行的时间与能耗", "chart.bar.fill", .trips),
         ("保养与钱", "保养、年检保险、充电账单、估值与导出", "wrench.and.screwdriver.fill", .service),

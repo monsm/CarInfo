@@ -13,7 +13,12 @@ import SwiftUI
 //     不是数据。真实图表接入后再回到这一页。
 // =============================================================================
 
-struct DataView: View {
+/// 车端原始字段。
+///
+/// 原为独立页「全量数据」（`DataView`，深链 `carkeeper://data`）。批 6 并进
+/// **体检与数据** —— 体检给结论，这一节给依据（同一次 `carcheck` 的原文就在眼前）。
+/// 它现在只提供内容（`RawDataSection`），页面外壳归 `HealthDataView`。
+struct RawDataSection: View {
     private let store = AppStore.shared
 
     enum Kind: String, CaseIterable, Identifiable {
@@ -45,9 +50,11 @@ struct DataView: View {
     }
 
     var body: some View {
-        ScrollView {
+        Group {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "全量数据", subtitle: "车端返回的字段，原样列出")
+                // 这一节自己带分类 / 复制 / 分享 —— 原来它们在页面导航栏里，
+                // 并入之后这一节没有自己的导航栏，控件必须落在内容里。
+                sectionBar
                 if loading {
                     loadingState
                 } else if blocks.isEmpty {
@@ -74,33 +81,32 @@ struct DataView: View {
                         .padding(.horizontal, TokensHair.inset)
                 }
             }
-            .padding(.top, TokensSpacing.sm)
-            .padding(.bottom, TokensSpacing.xxxl)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .pageBackground()
-        .scrollBounceBehavior(.basedOnSize)
-        .dsPageTitle("全量数据")
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) { kindMenu }
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: TokensSpacing.lg) {
-                    Button { copyAll() } label: { Image(systemName: "doc.on.doc") }
-                        .accessibilityLabel(Text("复制全部数据"))
-                    Button { reload() } label: { Image(systemName: "arrow.clockwise") }
-                        .accessibilityLabel(Text("刷新"))
-                    ShareLink(item: shareText,
-                              subject: Text("全量数据 · \(kind.title)"),
-                              preview: SharePreview(kind.title)) {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                    .accessibilityLabel(Text("分享"))
-                }
-            }
         }
         .onAppear { loadIfNeeded() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
-        .refreshable { await load() }
+    }
+
+    /// 节标题 + 分类菜单 + 三个动作（复制 / 刷新 / 分享）。
+    ///
+    /// `DSSectionHeader` 内部自带 `Spacer`，所以它会把这几个控件推到最右侧 ——
+    /// 和它当页面导航栏标题时长得一样，只是现在它在内容里。
+    private var sectionBar: some View {
+        HStack(spacing: TokensSpacing.lg) {
+            DSSectionHeader(title: "车端原始字段")
+            kindMenu
+            Button { copyAll() } label: { Image(systemName: "doc.on.doc") }
+                .accessibilityLabel(Text("复制全部数据"))
+            Button { reload() } label: { Image(systemName: "arrow.clockwise") }
+                .accessibilityLabel(Text("刷新"))
+            ShareLink(item: shareText,
+                      subject: Text("全量数据 · \(kind.title)"),
+                      preview: SharePreview(kind.title)) {
+                Image(systemName: "square.and.arrow.up")
+            }
+            .accessibilityLabel(Text("分享"))
+        }
+        .font(TokensTypo.fixed(15))
+        .foregroundStyle(TokensPalette.ambient)
     }
 
     // MARK: - 分类菜单（替代旧的彩色胶囊横向滚动条）

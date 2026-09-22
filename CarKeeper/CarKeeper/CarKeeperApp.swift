@@ -18,7 +18,6 @@ extension Notification.Name {
     static let pinConfirmed = Notification.Name("car_pin_confirmed")
     static let tempConfirmed = Notification.Name("car_temp_confirmed")
     static let navToDev = Notification.Name("navToDev")
-    static let navToData = Notification.Name("navToData")
     static let navToHealth = Notification.Name("navToHealth")
     static let navToBattery = Notification.Name("navToBattery")
     static let navToMessages = Notification.Name("navToMessages")
@@ -35,7 +34,9 @@ extension Notification.Name {
 /// `carkeeper://parking` 仍然可用），但它们**指向的页面与 `.score` / `.trips` 是同一个**，
 /// 所以索引页不列这两个入口：同一页摆两个入口，正是「缝合怪」的第一来源。
 enum Deeplink: Hashable, CaseIterable {
-    case vehicle, health, battery, data, dev, messages, control, dashboard
+    // `.data`（全量数据页）已删：原始字段并进体检与数据（`RawDataSection`），
+    // 结论与依据同源，不再分两屏。
+    case vehicle, health, battery, dev, messages, control, dashboard
     // `.commands`（指令历史页）已删：历史就是车控页里「做过什么」那一节，
     // 同一件事不再有两个界面（详情见 ControlView 的 historyCard 注释）。
     // `.tips`（车辆提示页）已删：提示是从这辆车的读数推出来的，已并入车辆档案
@@ -52,7 +53,6 @@ enum Deeplink: Hashable, CaseIterable {
         case .vehicle: return "vehicle"
         case .health: return "health"
         case .battery: return "battery"
-        case .data: return "data"
         case .dev: return "dev"
         case .messages: return "messages"
         case .control: return "control"
@@ -163,7 +163,6 @@ struct CarKeeperApp: App {
                     .onReceive(NotificationCenter.default.publisher(for: .navToVehicle)) { _ in nav.path = [.vehicle] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToHealth)) { _ in nav.path = [.health] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToBattery)) { _ in nav.path = [.battery] }
-                    .onReceive(NotificationCenter.default.publisher(for: .navToData)) { _ in nav.path = [.data] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToDev)) { _ in nav.path = [.dev] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToMessages)) { _ in nav.path = [.messages] }
                     .onReceive(ToastManager.shared.$currentItem) { item in
@@ -281,9 +280,8 @@ struct MapShellView: View {
     private func deeplinkDestination(_ link: Deeplink) -> some View {
         switch link {
         case .vehicle: VehicleView().environmentObject(nav)
-        case .health: HealthView().environmentObject(nav)
+        case .health: HealthDataView().environmentObject(nav)
         case .battery: BatteryView().environmentObject(nav)
-        case .data: DataView(kind: .status).environmentObject(nav)
         case .dev: DevView().environmentObject(nav)
         case .messages: MessagesView().environmentObject(nav)
         case .control: ControlView().environmentObject(nav)
