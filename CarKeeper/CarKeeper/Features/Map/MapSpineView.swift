@@ -616,7 +616,9 @@ struct MapSpineView: View {
             // 那一个在地图下方的常驻操作条里。两个都叫「找车」= 用户分不清点哪个。
             action("回到车", "location.circle") { centerOnCar(force: true) }
             action("充电", "bolt.fill") { nav.pushNavigation(.battery) }
-            action("异常", "exclamationmark.triangle") { nav.pushNavigation(.messages) }
+            // 「事件」而不是「异常」：这一列里多数是点火/熄火这类**正常事件**，
+            // 叫「异常」等于把正常行驶也标成故障。它并进出行页了（`MessagesSection`）。
+            action("事件", "exclamationmark.triangle") { nav.pushNavigation(.trips) }
         }
     }
 
@@ -857,9 +859,11 @@ struct MapSpineView: View {
                     // 「全量数据」不再单列：它并进了体检与数据（`RawDataSection`）。
                     indexGroup("这辆车", [.vehicle, .battery, .health, .control])
                     indexGroup("出行", [.trips, .emergency])
-                    // 「导出数据」不再单列：它并进了保养与钱（`ExportDataSection`）。
-                    indexGroup("保养与钱", [.service, .score])
-                    indexGroup("系统", [.messages, .dev, .mine])
+                    // 「导出数据」并进了保养与钱，「驾驶评分」并进了出行页 ——
+                    // 这一组现在只剩一个入口，分组也就不必存在了。
+                    indexGroup("保养与钱", [.service])
+                    // 「消息」不再单列：它并进了出行页（`MessagesSection`）。
+                    indexGroup("系统", [.dev, .mine])
 
                     Text("三种艺术主题（夜光 / 纸上 / 巨字）住在开发者工具里，按一下换一套。"
                          + "这一页是 App 唯一的功能目录：地图是主屏，其余全在这里。")
@@ -1033,10 +1037,9 @@ struct MapSpineView: View {
         case .health: return "体检与数据"
         case .battery: return "电池与充电"
         case .dev: return "开发者工具"
-        case .messages: return "消息与通知"
         case .control: return "车控"
         case .dashboard: return "仪表"
-        case .trips: return "行程分析"
+        case .trips: return "出行"
         case .service: return "保养与钱"
         case .parking: return "停车位置"
         case .emergency: return "应急面板"

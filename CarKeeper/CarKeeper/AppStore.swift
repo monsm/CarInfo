@@ -238,8 +238,8 @@ final class AppStore: @unchecked Sendable {
         UserDefaults.standard.synchronize()
     }
 
-    // #NEW-5 消息已读计数（服务端没有 mark-all，本地统计）
-    var unreadMessageCount: Int { 0 }  // 由 MessagesView 自己管理
+    // `unreadMessageCount` 已删：它**永远返回 0**，而且全仓零个读取点 ——
+    // 未读数由消息那一节自己按本地已读状态算（`MessagesSection`）。
 
     // #NEW-7 控制中心快速车况数据（供 ControlCenter 扩展使用）
     struct CCQuickStatus {

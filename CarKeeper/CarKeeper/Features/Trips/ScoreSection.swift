@@ -1,5 +1,5 @@
 // =============================================================================
-//  DrivingScorePage — 驾驶评分
+//  ScoreSection — 驾驶评分（出行页里的一节）
 // =============================================================================
 //  这一页只做**数据允许它做**的事：用行程里真有的事实打分。
 //
@@ -21,7 +21,11 @@ import SwiftUI
 import Charts
 import Foundation
 
-struct DrivingScorePage: View {
+/// 驾驶评分 —— 出行页里的一节（原为独立页 `DrivingScorePage`）。
+///
+/// 评分完全由**这一段行程的电耗**算出来（见下面三项），所以它就该长在
+/// 行程时间轴旁边：看到一段开得费电，紧接着就能看到它对分数做了什么。
+struct ScoreSection: View {
     private let store = AppStore.shared
 
     /// 能耗基准（kWh/100km）。与地图主屏「为什么」里引用的是同一个口径，
@@ -102,9 +106,9 @@ struct DrivingScorePage: View {
     // -------------------------------------------------------------------------
 
     var body: some View {
-        ScrollView {
+        Group {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "驾驶评分", subtitle: "每一次出行的能耗与平稳度")
+                DSSectionHeader(title: "驾驶评分")
                 hero
 
                 if overallScore == nil {
@@ -116,10 +120,7 @@ struct DrivingScorePage: View {
 
                 caveat
             }
-            .padding(.horizontal, TokensSpacing.page)
-            .padding(.vertical, TokensSpacing.md)
         }
-        .dsPageTitle("驾驶评分", inline: true)
         .accessibilityLabel(Text("驾驶评分详情"))
     }
 

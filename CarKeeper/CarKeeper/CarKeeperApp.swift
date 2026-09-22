@@ -20,7 +20,6 @@ extension Notification.Name {
     static let navToDev = Notification.Name("navToDev")
     static let navToHealth = Notification.Name("navToHealth")
     static let navToBattery = Notification.Name("navToBattery")
-    static let navToMessages = Notification.Name("navToMessages")
     static let navHome = Notification.Name("navHome")
     static let didLogout = Notification.Name("didLogout")
     static let locationUpdated = Notification.Name("locationUpdated")
@@ -36,7 +35,9 @@ extension Notification.Name {
 enum Deeplink: Hashable, CaseIterable {
     // `.data`（全量数据页）已删：原始字段并进体检与数据（`RawDataSection`），
     // 结论与依据同源，不再分两屏。
-    case vehicle, health, battery, dev, messages, control, dashboard
+    // `.messages`（消息页）已删：车的事件并进出行页（`MessagesSection`）——
+    // 消息流里的点火/熄火事件本来就是行程的骨架，两页读同一件事。
+    case vehicle, health, battery, dev, control, dashboard
     // `.commands`（指令历史页）已删：历史就是车控页里「做过什么」那一节，
     // 同一件事不再有两个界面（详情见 ControlView 的 historyCard 注释）。
     // `.tips`（车辆提示页）已删：提示是从这辆车的读数推出来的，已并入车辆档案
@@ -54,7 +55,6 @@ enum Deeplink: Hashable, CaseIterable {
         case .health: return "health"
         case .battery: return "battery"
         case .dev: return "dev"
-        case .messages: return "messages"
         case .control: return "control"
         case .dashboard: return "dashboard"
         case .trips: return "trips"
@@ -164,7 +164,6 @@ struct CarKeeperApp: App {
                     .onReceive(NotificationCenter.default.publisher(for: .navToHealth)) { _ in nav.path = [.health] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToBattery)) { _ in nav.path = [.battery] }
                     .onReceive(NotificationCenter.default.publisher(for: .navToDev)) { _ in nav.path = [.dev] }
-                    .onReceive(NotificationCenter.default.publisher(for: .navToMessages)) { _ in nav.path = [.messages] }
                     .onReceive(ToastManager.shared.$currentItem) { item in
                         nav.currentToast = item
                     }
@@ -283,22 +282,23 @@ struct MapShellView: View {
         case .health: HealthDataView().environmentObject(nav)
         case .battery: BatteryView().environmentObject(nav)
         case .dev: DevView().environmentObject(nav)
-        case .messages: MessagesView().environmentObject(nav)
         case .control: ControlView().environmentObject(nav)
         // 仪表盘（DashboardView）已删除：它的三块内容（SOC 曲线 / 三个指标块 /
         // 评分环）分别由电池页的趋势、地图主屏的「现在」层和评分页承接，
         // 而它那三个子分数是用总分做算术编出来的（score / 3、+10、+20）。
-        case .dashboard: DrivingScorePage().environmentObject(nav)
-        case .trips: TripsTimelineView().environmentObject(nav)
+        // `.dashboard` / `.score` 都是**别名**：驾驶评分现在是出行页里的一节
+        // （`ScoreSection`），深链指到那一页，不再有单独的评分页。
+        case .dashboard: TripsEventsView().environmentObject(nav)
+        case .trips: TripsEventsView().environmentObject(nav)
         case .service: MaintenanceMoneyView().environmentObject(nav)
         // .parking 已并入行程时间轴（同一份停车史：时间轴列旅程，地图「停车」层
         // 画常停圈，两处同源）。深链指向时间轴，不再指向已删除的页面。
-        case .parking: TripsTimelineView().environmentObject(nav)
+        case .parking: TripsEventsView().environmentObject(nav)
         // .export（导出数据页）已并入保养与钱（ExportDataSection）——
         // 导出的就是那几类记录，它和钱/保养在同一屏里更短一步。
         case .emergency: EmergencyPanel().environmentObject(nav)
         // .tips（车辆提示页）已并入车辆档案 —— 见 `Deeplink` 枚举上的注释。
-        case .score: DrivingScorePage().environmentObject(nav)
+        case .score: TripsEventsView().environmentObject(nav)
         // 「车与账号」（原「我的」Tab 的根页）。**它必须在这里有一个 case** ——
         // 它就是设置类内容的唯一去处；批 3 会把它从 27 个磁贴的功能目录
         // 改成「车 / 账号 / 数据与隐私 / 关于与工具」四组。

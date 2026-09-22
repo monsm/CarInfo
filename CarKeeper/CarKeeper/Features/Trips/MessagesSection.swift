@@ -2,7 +2,11 @@ import SwiftUI
 import Foundation
 
 // =============================================================================
-//  消息 —— v4 信息架构
+//  车辆消息与事件 —— 出行页的一节（原「消息」页）
+//
+//  批 7 把这一页并进「出行」：消息里最多的就是点火/熄火/控制事件，
+//  它们和行程时间轴讲的是同一件事（车何时动过、在哪里）。
+//  它现在只提供内容（`MessagesSection`），页面外壳归 `TripsEventsView`。
 // =============================================================================
 //  ① 搜索交给系统：.searchable（iOS 的消息搜索本来就长在那里）
 //  ② 筛选是「全部 / 未读」一个分段控件 + 标签胶囊，不再用两个语义不明的图标按钮
@@ -11,7 +15,7 @@ import Foundation
 //     阅读状态不再只靠颜色：未读有圆点，标题字重也不同（颜色 + 字重双通道）。
 // =============================================================================
 
-struct MessagesView: View {
+struct MessagesSection: View {
     private let store = AppStore.shared
     @State private var items: [MessageItem] = []
     @State private var loading = true
@@ -20,7 +24,6 @@ struct MessagesView: View {
     @State private var searchText = ""
     @State private var filterTag: String? = nil
     @State private var showUnreadOnly = false
-    @EnvironmentObject var nav: NavState
 
     // 本地已读持久化（无服务端 mark-read 接口，用 UserDefaults 记已读消息 ID）。
     private static let readKey = "changan_read_message_ids"
@@ -50,9 +53,16 @@ struct MessagesView: View {
     }
 
     var body: some View {
-        ScrollView {
+        Group {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "消息")
+                // 「全部已读」原来是导航栏按钮，并入之后这一节没有自己的导航栏。
+                DSSectionHeader(title: "车辆消息与事件",
+                                trailing: items.allSatisfy { $0.read } ? nil : "全部已读",
+                                action: items.allSatisfy { $0.read } ? nil : { markAllRead() })
+
+                // 搜索原来挂在 `.searchable` 上（消息 App 的写法）。
+                // 这一节不是页面，所以搜索框回到内容里。
+                searchField
                 filterBar
 
                 if loading {
@@ -79,30 +89,38 @@ struct MessagesView: View {
                     }
                 }
             }
-            .padding(.top, TokensSpacing.sm)
-            .padding(.bottom, TokensSpacing.xxl)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .pageBackground()
-        .scrollBounceBehavior(.basedOnSize)
-        .dsPageTitle("消息")
-        .searchable(text: $searchText,
-                    placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: "搜索标题或内容")
-        .accessibilityLabel(Text("消息"))
-        .accessibilityHint(Text("车辆通知和历史消息，支持搜索、按标签筛选与只看未读"))
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("全部已读") { markAllRead() }
-                    .font(TokensTypo.subheadline.weight(.semibold))
-                    .foregroundStyle(TokensPalette.ambient)
-                    .disabled(items.allSatisfy { $0.read })
-                    .accessibilityLabel(Text("全部标为已读"))
-            }
         }
         .onAppear { loadIfNeeded() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
-        .refreshable { await load() }
+    }
+
+    /// 搜索框：与全局搜索同一个图形语汇（放大镜 + 输入框），不再向导航栏要位置。
+    private var searchField: some View {
+        HStack(spacing: TokensSpacing.sm) {
+            Image(systemName: "magnifyingglass")
+                .font(TokensTypo.fixed(15))
+                .foregroundStyle(TokensPalette.tertiary)
+            TextField("搜索标题或内容", text: $searchText)
+                .font(TokensTypo.subheadline)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .accessibilityLabel(Text("搜索消息"))
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(TokensTypo.fixed(15))
+                        .foregroundStyle(TokensPalette.tertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("清除搜索"))
+            }
+        }
+        .padding(.horizontal, TokensSpacing.md)
+        .frame(height: TokensSpacing.row)
+        .background(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+            .fill(TokensPalette.nightSurface))
     }
 
     // MARK: - 筛选条（分段控件 + 标签胶囊）

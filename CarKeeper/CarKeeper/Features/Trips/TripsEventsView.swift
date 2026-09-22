@@ -1,5 +1,5 @@
 // =============================================================================
-// TripsTimelineView — 行程 tab：一条时间轴，每一段都长在地图上
+// TripsEventsView — 出行：一条时间轴，每一段都长在地图上，下面是常停之地与车的事件
 // =============================================================================
 //
 // 取代旧 TripAnalyticsView（分段柱状图 + 汇总卡）之后，这一屏回答的问题变了：
@@ -15,26 +15,58 @@
 import SwiftUI
 import MapKit
 
-struct TripsTimelineView: View {
+/// 出行 —— 每一次出行的时间轴 + 常停的地方 + 车发来的事件。
+///
+/// 原为「行程」页（`TripsTimelineView`）。批 7 把「消息」吸收进来：
+/// 消息流里的 IGNITION / FLAMEOUT 事件本来就是行程的骨架，两页读的是同一件事。
+struct TripsEventsView: View {
     private let store = AppStore.shared
 
+    private var trips: [AppStore.TripRecord] {
+        store.tripHistory.sorted { $0.startTime > $1.startTime }
+    }
+
+    private var hotspots: [MapHotspot] {
+        MapSpineData.clusterHotspots(from: store.parkingHistory, excluding: store.parkingLocation)
+    }
+
     var body: some View {
-        let trips = store.tripHistory.sorted { $0.startTime > $1.startTime }
-        let hotspots = MapSpineData.clusterHotspots(from: store.parkingHistory,
-                                                    excluding: store.parkingLocation)
-        Group {
-            if trips.isEmpty {
-                VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                    DSPageTitle(title: "行程", subtitle: "每一次出行都会落在时间轴上")
+        // 出行只有一张画布：行程在上、常停之地在中间、车的事件在下。
+        // （原本「空态」与「有数据」是两条互斥的整页分支，各自带一套
+        //  `ScrollView` + 页面标题 —— 同一页两套外壳，正是缝合的来源。）
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                DSPageTitle(title: "出行", subtitle: "每一次出行、常停的地方，以及车发来的事件")
+                    .padding(.bottom, TokensSpacing.lg)
+
+                if trips.isEmpty {
                     emptyState
+                } else {
+                    summaryHeader(trips)
+                    ForEach(Array(trips.enumerated()), id: \.element.id) { idx, trip in
+                        timelineRow(trip, isLast: idx == trips.count - 1)
+                    }
+                    if !hotspots.isEmpty {
+                        hotspotsBand(hotspots)
+                    }
                 }
-                .padding(.horizontal, TokensSpacing.page)
-            } else {
-                timeline(trips, hotspots: hotspots)
+
+                // 分数：完全由上面那些行程的电耗算出来（原「驾驶评分」页）
+                ScoreSection()
+                    .padding(.top, TokensSpacing.xl)
+
+                // 车的事件：点火/熄火/控制记录（原「消息」页）
+                MessagesSection()
+                    .padding(.top, TokensSpacing.xl)
             }
+            .padding(.horizontal, TokensSpacing.lg)
+            .padding(.top, TokensSpacing.md)
+            .padding(.bottom, TokensSpacing.huge)
         }
-        .dsPageTitle("行程")
-        .accessibilityLabel(Text("行程时间轴"))
+        .pageBackground()
+        .scrollBounceBehavior(.basedOnSize)
+        .dsPageTitle("出行")
+        .accessibilityLabel(Text("出行"))
     }
 
     // ---- 空态：一句真话，不放假统计 ----
@@ -51,30 +83,9 @@ struct TripsTimelineView: View {
                 .foregroundStyle(TokensPalette.secondary)
                 .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(TokensSpacing.xxl)
-    }
-
-    // ---- 时间轴本体 ----
-    private func timeline(_ trips: [AppStore.TripRecord], hotspots: [MapHotspot]) -> some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                DSPageTitle(title: "行程", subtitle: "每一次出行都会落在时间轴上")
-                    .padding(.bottom, TokensSpacing.lg)
-                summaryHeader(trips)
-                ForEach(Array(trips.enumerated()), id: \.element.id) { idx, trip in
-                    timelineRow(trip, isLast: idx == trips.count - 1)
-                }
-                if !hotspots.isEmpty {
-                    hotspotsBand(hotspots)
-                }
-            }
-            .padding(.horizontal, TokensSpacing.lg)
-            .padding(.top, TokensSpacing.md)
-            .padding(.bottom, TokensSpacing.huge)
-        }
-        .pageBackground()
-        .scrollBounceBehavior(.basedOnSize)
+        // 不再吃掉整屏高度：它下面还有「车的事件」这一节
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, TokensSpacing.xxl)
     }
 
     private func summaryHeader(_ trips: [AppStore.TripRecord]) -> some View {
