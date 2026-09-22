@@ -72,7 +72,7 @@ struct TripsEventsView: View {
     // ---- 空态：一句真话，不放假统计 ----
     private var emptyState: some View {
         VStack(spacing: TokensSpacing.md) {
-            Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+            Image(safeSymbol: "point.topleft.down.to.point.bottomright.curvepath", fallback: "point.topleft.down.to.point.bottomright.curvepath")
                 .font(TokensTypo.fixed(34, weight: .light))
                 .foregroundStyle(TokensPalette.tertiary)
             Text("还没有行程记录")
@@ -193,7 +193,7 @@ struct TripsEventsView: View {
             DSSectionHeader(title: "常来之地")
             ForEach(spots.prefix(3)) { s in
                 HStack(alignment: .firstTextBaseline) {
-                    Image(systemName: "mappin.circle.fill")
+                    Image(safeSymbol: "mappin.circle.fill", fallback: "mappin.circle.fill")
                         .font(TokensTypo.fixed(13))
                         .foregroundStyle(TokensPalette.accent)
                     Text("\(s.visits) 次")

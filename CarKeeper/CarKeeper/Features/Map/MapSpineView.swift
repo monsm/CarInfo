@@ -358,7 +358,7 @@ struct MapSpineView: View {
     /// 那个箭头的角度就是真实方位角（正北为 0，顺时针）—— 不是装饰罗盘。
     private func lightPill(_ sky: SkyLight) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: "arrow.up")
+            Image(safeSymbol: "arrow.up", fallback: "arrow.up")
                 .font(TokensTypo.fixed(10, weight: .semibold))
                 .rotationEffect(.degrees(sky.azimuth))
             Text(sky.phase.title)
@@ -632,7 +632,7 @@ struct MapSpineView: View {
             run()
         } label: {
             VStack(spacing: 6) {
-                Image(systemName: icon)
+                Image(safeSymbol: icon, fallback: icon)
                     .font(TokensTypo.fixed(17, weight: .medium))
                 Text(title)
                     .font(TokensTypo.caption)
@@ -791,7 +791,7 @@ struct MapSpineView: View {
                     await searchChargersIfNeeded(force: true)
                 }
             } label: {
-                Image(systemName: "arrow.clockwise")
+                Image(safeSymbol: "arrow.clockwise", fallback: "arrow.clockwise")
             }
             .disabled(isRefreshing)
             .accessibilityLabel(Text("刷新车的数据"))
@@ -801,7 +801,7 @@ struct MapSpineView: View {
                 TokensHaptic.tap()
                 showIndex = true
             } label: {
-                Image(systemName: "square.grid.2x2")
+                Image(safeSymbol: "square.grid.2x2", fallback: "square.grid.2x2")
             }
             .accessibilityLabel(Text("全部功能"))
         }
@@ -812,7 +812,7 @@ struct MapSpineView: View {
                 TokensHaptic.tap()
                 nav.showSearch = true
             } label: {
-                Image(systemName: "magnifyingglass")
+                Image(safeSymbol: "magnifyingglass", fallback: "magnifyingglass")
             }
             .accessibilityLabel(Text("搜索页面、车、行程、指令"))
         }
@@ -821,7 +821,7 @@ struct MapSpineView: View {
                 TokensHaptic.tap()
                 centerOnCar(force: true)
             } label: {
-                Image(systemName: "location.fill")
+                Image(safeSymbol: "location.fill", fallback: "location.fill")
             }
             .disabled(d.hasLocation == false)
             .accessibilityLabel(Text("回到车的位置"))
@@ -835,7 +835,7 @@ struct MapSpineView: View {
                     TokensHaptic.tap()
                     openWindow(id: SceneID.detail)
                 } label: {
-                    Image(systemName: "rectangle.on.rectangle")
+                    Image(safeSymbol: "rectangle.on.rectangle", fallback: "rectangle.on.rectangle")
                 }
                 .accessibilityLabel(Text("在新窗口打开车况"))
             }
@@ -992,7 +992,7 @@ struct MapSpineView: View {
                     .font(TokensTypo.body)
                     .foregroundStyle(TokensPalette.primary)
                 Spacer(minLength: TokensSpacing.sm)
-                Image(systemName: icon)
+                Image(safeSymbol: icon, fallback: icon)
                     .font(TokensTypo.fixed(12, weight: .semibold))
                     .foregroundStyle(TokensPalette.tertiary)
             }
@@ -1054,7 +1054,7 @@ struct MapSpineView: View {
 
     private func emptyNotice(_ text: String) -> some View {
         HStack(alignment: .top, spacing: TokensSpacing.sm) {
-            Image(systemName: "info.circle")
+            Image(safeSymbol: "info.circle", fallback: "info.circle")
                 .font(TokensTypo.fixed(13))
                 .foregroundStyle(TokensPalette.tertiary)
             Text(text)
@@ -1124,7 +1124,7 @@ struct MapSpineView: View {
                 showReplay = true
             } label: {
                 HStack(spacing: TokensSpacing.sm) {
-                    Image(systemName: "chart.xyaxis.line")
+                    Image(safeSymbol: "chart.xyaxis.line", fallback: "chart.xyaxis.line")
                         .font(TokensTypo.fixed(13, weight: .medium))
                     Text("看这次充电的功率曲线")
                         .font(TokensTypo.footnote)
@@ -1132,7 +1132,7 @@ struct MapSpineView: View {
                     Text(ChargeLedger.kwhText(latest.kWh) + " kWh")
                         .font(TokensTypo.digits(13))
                         .foregroundStyle(TokensPalette.secondary)
-                    Image(systemName: "chevron.right")
+                    Image(safeSymbol: "chevron.right", fallback: "chevron.right")
                         .font(TokensTypo.fixed(11, weight: .semibold))
                         .foregroundStyle(TokensPalette.tertiary)
                 }

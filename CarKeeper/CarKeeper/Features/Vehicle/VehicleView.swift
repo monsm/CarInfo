@@ -204,7 +204,7 @@ struct VehicleView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Spacer(minLength: TokensSpacing.sm)
-                Image(systemName: "doc.on.doc")
+                Image(safeSymbol: "doc.on.doc", fallback: "doc.on.doc")
                     .font(TokensTypo.fixed(15))
                     .foregroundStyle(TokensPalette.ambient)
             }
@@ -263,7 +263,7 @@ struct VehicleView: View {
                             showPhotoPicker = true
                         } label: {
                             VStack(spacing: TokensSpacing.xs) {
-                                Image(systemName: "plus")
+                                Image(safeSymbol: "plus", fallback: "plus")
                                     .font(TokensTypo.fixed(20, weight: .light))
                                 Text("添加")
                                     .font(TokensTypo.caption)

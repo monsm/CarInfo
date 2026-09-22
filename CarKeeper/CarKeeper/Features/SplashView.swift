@@ -20,7 +20,7 @@ struct SplashView: View {
             // 自己再画一个光源就是「光有两个来源」—— 而且它的方向还是编的。
             VStack(spacing: TokensSpacing.xxl) {
                 // 品牌标：入场淡入（一次性，不是常驻呼吸）
-                Image(systemName: "car.side.fill")
+                Image(safeSymbol: "car.side.fill", fallback: "car.side.fill")
                     .font(TokensTypo.fixed(34, weight: .light))
                     .foregroundColor(TokensPalette.primary)
                     .frame(width: 80, height: 80)

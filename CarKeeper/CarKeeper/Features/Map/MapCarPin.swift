@@ -315,7 +315,7 @@ struct MapSpotPin: View {
                     .fill(TokensPalette.surface)
                     .frame(width: 22, height: 22)
                     .overlay { Circle().strokeBorder(inkSoft.opacity(0.6), lineWidth: 1) }
-                Image(systemName: "bolt.fill")
+                Image(safeSymbol: "bolt.fill", fallback: "bolt.fill")
                     .font(TokensTypo.fixed(10, weight: .semibold))
                     .foregroundStyle(TokensPalette.info)
             }

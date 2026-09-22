@@ -47,7 +47,7 @@ struct GlobalSearchHUD: View {
             VStack(spacing: 0) {
                 // 搜索框（浮在内容之上的一层 → 允许玻璃）
                 HStack(spacing: TokensSpacing.sm) {
-                    Image(systemName: "magnifyingglass")
+                    Image(safeSymbol: "magnifyingglass", fallback: "magnifyingglass")
                         .font(TokensTypo.title3)
                         .foregroundStyle(TokensPalette.secondary)
 
@@ -62,7 +62,7 @@ struct GlobalSearchHUD: View {
                         Button {
                             searchText = ""
                         } label: {
-                            Image(systemName: "xmark.circle.fill")
+                            Image(safeSymbol: "xmark.circle.fill", fallback: "xmark.circle.fill")
                                 .foregroundStyle(TokensPalette.secondary)
                         }
                         .buttonStyle(.plain)

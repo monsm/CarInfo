@@ -193,7 +193,7 @@ struct VehicleTipsSection: View {
             }
 
             Button(action: { dismiss(tip) }) {
-                Image(systemName: "xmark")
+                Image(safeSymbol: "xmark", fallback: "xmark")
                     .font(TokensTypo.caption2)
                     .foregroundStyle(TokensPalette.tertiary)
             }

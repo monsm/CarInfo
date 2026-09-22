@@ -76,7 +76,7 @@ struct MapQuickBar: View {
                     begin(item.cmd, title: item.title)
                 } label: {
                     HStack(spacing: 6) {
-                        Image(safeSymbol: item.icon, fallback: item.icon)
+                        Image(safeSymbol: "item.icon", fallback: "item.icon")
                             .font(TokensTypo.fixed(TokensSize.iconSm, weight: .semibold))
                         Text(item.title)
                             .font(TokensTypo.caption)

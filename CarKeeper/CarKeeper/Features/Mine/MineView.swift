@@ -238,7 +238,7 @@ struct MineView: View {
                     DSChip(text: d < 0 ? "保险到期" : "保险剩 \(d) 天",
                            cls: d < 0 ? "bad" : (d <= 30 ? "warn" : "ok"))
                 }
-                Image(systemName: "chevron.right")
+                Image(safeSymbol: "chevron.right", fallback: "chevron.right")
                     .font(TokensTypo.fixed(13, weight: .semibold))
                     .foregroundStyle(TokensPalette.tertiary)
             }
@@ -379,7 +379,7 @@ struct MineView: View {
             logoutConfirm = true
         } label: {
             HStack(spacing: TokensSpacing.sm) {
-                Image(systemName: "rectangle.portrait.and.arrow.right")
+                Image(safeSymbol: "rectangle.portrait.and.arrow.right", fallback: "rectangle.portrait.and.arrow.right")
                     .font(TokensTypo.fixed(15))
                 Text("退出登录").font(TokensTypo.headline)
                 Spacer()

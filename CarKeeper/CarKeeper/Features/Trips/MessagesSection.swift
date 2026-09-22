@@ -100,7 +100,7 @@ struct MessagesSection: View {
     /// 搜索框：与全局搜索同一个图形语汇（放大镜 + 输入框），不再向导航栏要位置。
     private var searchField: some View {
         HStack(spacing: TokensSpacing.sm) {
-            Image(systemName: "magnifyingglass")
+            Image(safeSymbol: "magnifyingglass", fallback: "magnifyingglass")
                 .font(TokensTypo.fixed(15))
                 .foregroundStyle(TokensPalette.tertiary)
             TextField("搜索标题或内容", text: $searchText)
@@ -112,7 +112,7 @@ struct MessagesSection: View {
                 Button {
                     searchText = ""
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
+                    Image(safeSymbol: "xmark.circle.fill", fallback: "xmark.circle.fill")
                         .font(TokensTypo.fixed(15))
                         .foregroundStyle(TokensPalette.tertiary)
                 }
@@ -218,7 +218,7 @@ struct MessagesSection: View {
                             Text(shortTime(item.time))
                             .font(TokensTypo.footnote)
                             .foregroundStyle(TokensPalette.secondary)
-                            Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                            Image(safeSymbol: isOpen ? "chevron.up" : "chevron.down", fallback: isOpen ? "chevron.up" : "chevron.down")
                                 .font(TokensTypo.fixed(11, weight: .semibold))
                                 .foregroundStyle(TokensPalette.tertiary)
                         }

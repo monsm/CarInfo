@@ -142,7 +142,7 @@ struct EmergencyPanel: View {
         ZStack {
             TokensPalette.scrim.opacity(0.8).ignoresSafeArea()
             VStack(spacing: 20) {
-                Image(systemName: "exclamationmark.octagon.fill")
+                Image(safeSymbol: "exclamationmark.octagon.fill", fallback: "exclamationmark.octagon.fill")
                     .font(TokensTypo.fixed(64))
                     .foregroundStyle(TokensPalette.error)
 

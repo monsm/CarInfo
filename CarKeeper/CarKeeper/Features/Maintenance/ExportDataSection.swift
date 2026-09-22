@@ -39,7 +39,7 @@ struct ExportDataSection: View {
                 VStack(spacing: TokensSpacing.sm) {
                     Button(action: exportAsCSV) {
                         HStack(spacing: TokensSpacing.sm) {
-                            Image(systemName: "doc.plaintext")
+                            Image(safeSymbol: "doc.plaintext", fallback: "doc.plaintext")
                             Text("导出 CSV")
                         }
                     }
@@ -47,7 +47,7 @@ struct ExportDataSection: View {
 
                     Button(action: exportAsPDF) {
                         HStack(spacing: TokensSpacing.sm) {
-                            Image(systemName: "doc.richtext")
+                            Image(safeSymbol: "doc.richtext", fallback: "doc.richtext")
                             Text("导出 PDF")
                         }
                     }

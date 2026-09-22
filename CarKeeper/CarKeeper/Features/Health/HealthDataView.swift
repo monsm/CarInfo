@@ -278,7 +278,7 @@ struct HealthDataView: View {
                             .lineLimit(2)
                     }
                     Spacer(minLength: TokensSpacing.sm)
-                    Image(systemName: "doc.on.doc")
+                    Image(safeSymbol: "doc.on.doc", fallback: "doc.on.doc")
                         .font(TokensTypo.fixed(15))
                         .foregroundStyle(TokensPalette.ambient)
                 }

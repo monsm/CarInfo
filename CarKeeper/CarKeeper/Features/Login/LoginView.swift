@@ -126,7 +126,7 @@ struct LoginView: View {
                     }
                     .focused($focused, equals: .phone)
                     if phoneValid {
-                        Image(systemName: "checkmark.circle.fill")
+                        Image(safeSymbol: "checkmark.circle.fill", fallback: "checkmark.circle.fill")
                             .font(TokensTypo.fixed(15))
                             .foregroundStyle(TokensPalette.success)
                             .accessibilityHidden(true)

@@ -296,7 +296,7 @@ struct ControlView: View {
                     Button {
                         speakStatus()
                     } label: {
-                        Image(systemName: "speaker.wave.3.fill")
+                        Image(safeSymbol: "speaker.wave.3.fill", fallback: "speaker.wave.3.fill")
                     }
                     .accessibilityLabel(Text("语音播报车况"))
                 }
@@ -546,7 +546,7 @@ struct ControlView: View {
                     withAnimation(TokensMotion.press) { showMoreCommands.toggle() }
                 } label: {
                     HStack(spacing: TokensSpacing.sm) {
-                        Image(systemName: showMoreCommands ? "chevron.up" : "chevron.down")
+                        Image(safeSymbol: showMoreCommands ? "chevron.up" : "chevron.down", fallback: showMoreCommands ? "chevron.up" : "chevron.down")
                             .font(TokensTypo.footnote.weight(.bold))
                             .foregroundStyle(TokensPalette.tertiary)
                         Text(showMoreCommands ? "收起" : "更多指令")
@@ -692,7 +692,7 @@ struct ControlView: View {
                             .foregroundStyle(TokensPalette.secondary)
                     }
                     Spacer(minLength: TokensSpacing.sm)
-                    Image(systemName: item.iconName)
+                    Image(safeSymbol: item.iconName, fallback: item.iconName)
                         .font(TokensTypo.caption)
                         .foregroundStyle(item.statusColor)
                 }
@@ -991,7 +991,7 @@ struct PINKeypadView: View {
                         onKey(k)
                     } label: {
                         Group {
-                            if k == "del" { Image(systemName: "delete.left") }
+                            if k == "del" { Image(safeSymbol: "delete.left", fallback: "delete.left") }
                             else if k == "" { Color.clear }
                             else { Text(k) }
                         }
@@ -1097,7 +1097,7 @@ struct ACStepperView: View {
         Button {
             action()
         } label: {
-            Image(systemName: "\(sym).circle.fill")
+            Image(safeSymbol: \(sym).circle.fill, fallback: \(sym).circle.fill)
                 .font(TokensTypo.display(42))
                 .foregroundStyle(canDo ? TokensPalette.ambient : Color(.systemGray4))
         }

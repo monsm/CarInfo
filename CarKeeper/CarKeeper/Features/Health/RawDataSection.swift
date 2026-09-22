@@ -94,14 +94,14 @@ struct RawDataSection: View {
         HStack(spacing: TokensSpacing.lg) {
             DSSectionHeader(title: "车端原始字段")
             kindMenu
-            Button { copyAll() } label: { Image(systemName: "doc.on.doc") }
+            Button { copyAll() } label: { Image(safeSymbol: "doc.on.doc", fallback: "doc.on.doc") }
                 .accessibilityLabel(Text("复制全部数据"))
-            Button { reload() } label: { Image(systemName: "arrow.clockwise") }
+            Button { reload() } label: { Image(safeSymbol: "arrow.clockwise", fallback: "arrow.clockwise") }
                 .accessibilityLabel(Text("刷新"))
             ShareLink(item: shareText,
                       subject: Text("全量数据 · \(kind.title)"),
                       preview: SharePreview(kind.title)) {
-                Image(systemName: "square.and.arrow.up")
+                Image(safeSymbol: "square.and.arrow.up", fallback: "square.and.arrow.up")
             }
             .accessibilityLabel(Text("分享"))
         }
@@ -130,7 +130,7 @@ struct RawDataSection: View {
             HStack(spacing: 4) {
                 Text(kind.title)
                     .font(TokensTypo.subheadline.weight(.semibold))
-                Image(systemName: "chevron.up.chevron.down")
+                Image(safeSymbol: "chevron.up.chevron.down", fallback: "chevron.up.chevron.down")
                     .font(TokensTypo.caption2.weight(.semibold))
             }
             .foregroundStyle(TokensPalette.ambient)
