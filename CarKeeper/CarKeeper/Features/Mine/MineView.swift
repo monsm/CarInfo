@@ -47,7 +47,7 @@ struct MineView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "车与账号", subtitle: "车辆、账号、数据与工具")
+                DSPageTitle(title: "车与账号", subtitle: "账号、车辆切换、数据与隐私、关于")
                 profileCard
                 if let car = store.car { carCard(car) }
                 settingsGroups
@@ -59,7 +59,7 @@ struct MineView: View {
         .scrollBounceBehavior(.basedOnSize)
         .dsPageTitle("车与账号")
             .accessibilityLabel(Text("车与账号"))
-            .accessibilityHint(Text("账号设置、个人信息和应用程序管理"))
+            .accessibilityHint(Text("账号设置、车辆切换、数据与隐私、关于"))
         .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
             // 其他 Tab 退出登录时，重置 OTA 状态，避免残留下载进度
             updateBusy = false
@@ -278,33 +278,11 @@ struct MineView: View {
     //
     // 旧写法是 6 个 `CardBox`，每个里面再摆 2 列「Tesla 式磁贴」（一共 28 个）——
     // 那是**第三套容器 + 第三套行**：全 App 只有这一页这么排，从别的页面走进来像换了一个 App。
-    // 现在它和 iOS 设置一样：分组标题在画布上、行在分组表面上、行与行之间是发丝线。
+    // 后来改成 iOS 设置式的分组，但它仍然自己列了一份功能目录（车辆 / 用车两组，
+    // 与地图右上角索引页逐行重复）——同一个页面两个入口，正是缝合怪的来源。
+    // 批 4 把那两组去掉：**功能目录只在地图上有一份**，这一页只留设置。
     private var settingsGroups: some View {
         VStack(spacing: TokensSpacing.xl) {
-            DSGroup(title: "车辆", footer: "车况主屏是地图；下面是它的深潜页。") {
-                linkRow("shield.lefthalf.filled", "健康报告", .health)
-                linkRow("battery.100", "电池与充电", .battery)
-                linkRow("doc.text.fill", "车辆档案", .vehicle)
-                linkRow("chart.bar.xaxis", "全量数据", .data)
-                // 「驾驶总览」原本与「驾驶评分」指向**同一个页面**（`.dashboard` 只是别名），
-                // 同一页摆两个入口正是缝合的来源，所以只留一个。
-                linkRow("trophy.fill", "驾驶评分", .score, last: true)
-            }
-
-            DSGroup(title: "用车") {
-                linkRow("chart.bar.fill", "行程分析", .trips)
-                // 「指令历史」不再单列：它就是车控页里的「做过什么」那一节。
-                linkRow("wrench.and.screwdriver.fill", "维保记录", .service)
-                linkRow("mappin.circle.fill", "停车位置", .parking)
-                linkRow("exclamationmark.octagon.fill", "紧急求助", .emergency)
-                // #44 充电站：地图主屏的「充电」层就是这件事 —— 它按**车的位置**实时搜，
-                // 这里不再自己搜一份（原来那份搜的是写死的北京坐标 39.9042, 116.4074）。
-                actionRow("bolt.fill", "附近充电站", last: true) {
-                    MapSpineLayer.charge.makeCurrent()
-                    nav.popToRoot()
-                }
-            }
-
             DSGroup(title: "钱与证件",
                     footer: "数字来自本机记录（年检 / 保险的字段由你自己填）；里程记账在「车辆档案」里。") {
                 actionRow("doc.plaintext.fill", "充电账单") { showChargeBill = true }
