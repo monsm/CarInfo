@@ -38,8 +38,14 @@ final class CommandCenter: ObservableObject {
     /// 无法解释 —— 车辆回执里只有 TaskId，没有「第几条」。
     @Published private(set) var busy = false
     @Published private(set) var running: ControlRun?
-    @Published private(set) var history: [ControlRun] = []
     @Published private(set) var lastResult: ControlRun?
+
+    // 这里曾经有一个 `history: [ControlRun]`（本次运行、最近 10 条）。
+    // 它和 `store.commandHistory` 是两个都在讲「发过什么」的列表，而界面只读它、
+    // 于是摇一摇锁车与 Siri 指令从来没有出现在车控页里。现在历史只有一处：AppStore。
+
+    /// 本次执行的开始时刻：用来算**真的**耗时（原来是写死的 5 秒）。
+    private var runStartedAt = Date()
 
     /// 结果详情的 sheet 该不该出现：车控页用它。
     /// 地图**不用**它 —— 一条锁车指令不该把用户推到另一个页面，那里只看状态条与 toast。
@@ -66,6 +72,7 @@ final class CommandCenter: ObservableObject {
     func send(cmd: String, temperature: Int, pin: String, displayName: String) {
         guard !cmd.isEmpty, !busy, running == nil, !store.carId.isEmpty else { return }
         busy = true
+        runStartedAt = Date()
         let run = ControlRun(id: Self.seq(), cmd: cmd, name: displayName,
                              startedAt: VM.nowText(), taskId: "",
                              status: "run", progress: "", resultText: "", resultCls: "")
@@ -149,11 +156,11 @@ final class CommandCenter: ObservableObject {
         lastResult = newRun
         running = nil
         busy = false
-        history.insert(newRun, at: 0)
-        if history.count > 10 { history.removeLast() }
-
-        // 同步到 AppStore 全局历史记录
-        store.addCommandHistory(cmd: run.cmd, name: run.name, success: ok, duration: 5)
+        // 全局历史（现在唯一的历史来源）。耗时传**真的**那段时间：
+        // 原先这里是写死的 5 秒，而 `HistoryEntry.durationText` 又按分钟显示，
+        // 于是每一条记录都写着「0min」—— 一个看起来像数据、其实是常量的字段。
+        store.addCommandHistory(cmd: run.cmd, name: run.name, success: ok,
+                                duration: Date().timeIntervalSince(runStartedAt))
 
         // 车况缓存重拉：刚下发的指令会改变门锁/空调状态，
         // 不重拉的话「车现在什么样」还停在指令之前的样子

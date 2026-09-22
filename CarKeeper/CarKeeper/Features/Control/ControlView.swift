@@ -59,16 +59,23 @@ struct ControlView: View {
                     note: "发一条「锁车」")
     ]
 
-    // 执行状态（busy / running / history / lastResult / showResult）全部搬到了
+    // 执行状态（busy / running / lastResult / showResult）全部搬到了
     // `CommandCenter` —— 地图上的常驻操作条与这一屏共用同一条执行路径。
     // 下面这些是**只读转发**：一千多行视图代码只读它们，所以一行都不用改；
     // 写入都发生在中心里（也是唯一能写的地方）。
     @ObservedObject private var commands = CommandCenter.shared
     private var busy: Bool { commands.busy }
     private var running: ControlRun? { commands.running }
-    private var history: [ControlRun] { commands.history }
     private var lastResult: ControlRun? { commands.lastResult }
     private var showResult: Bool { commands.showResult }
+
+    // MARK: 指令历史的状态
+    //
+    // 历史**不再**读 `CommandCenter.history` —— 那个列表只活在本机内存里、只留 10 条，
+    // 而且摇一摇锁车与 Siri 指令（它们直接写 AppStore）在里面根本不出现。
+    // 现在唯一的来源是 `store.commandHistory`：持久、含所有发起路径、最多 50 条。
+    @State private var historyFilter = "all"
+    @State private var expandedRuns: Set<UUID> = []
 
     @State private var showPin = false
     @State private var showBiometricLock = false  // #N13 生物识别二次验证
@@ -258,7 +265,7 @@ struct ControlView: View {
                 // ③ 还能做什么 → ④ 一键场景 → ⑤ 做过什么（按用到它们的频率从高到低）
                 commandCard
                 presetScenesCard
-                if !history.isEmpty { historyCard }
+                historyCard
                 SiriShortcutsCard()
             }
             .padding(.top, TokensSpacing.sm)
@@ -559,29 +566,128 @@ struct ControlView: View {
     }
 
     // MARK: 记录
+    //
+    // 这一节现在是**唯一**的指令历史界面。原来还有一个独立的「指令历史」页，
+    // 两处讲同一件事、数据源却不同（那页读持久历史，这节读本次运行的内存列表）——
+    // 同一件事有两个界面、两套数据，正是「缝合」的典型。融合时取了更全的那个数据源。
+    private var allRuns: [AppStore.HistoryEntry] { store.commandHistory }
+
+    private var filteredRuns: [AppStore.HistoryEntry] {
+        switch historyFilter {
+        case "ok": return allRuns.filter { $0.success }
+        case "fail": return allRuns.filter { !$0.success }
+        default: return allRuns
+        }
+    }
+
+    /// 两个统计：总数与成功率。
+    /// 刻意**没有**「进行中」：`addCommandHistory` 只在一次执行结束时被调用，
+    /// 所以持久历史里不可能有未完成的条目 —— 做一个永远为 0 的筛选项就是界面在说谎。
+    /// 真正在跑的那条在上面的 `runningCard` 里。
+    private var successRateText: String {
+        guard !allRuns.isEmpty else { return "—" }
+        let ok = allRuns.filter { $0.success }.count
+        return String(format: "%.0f%%", Double(ok) / Double(allRuns.count) * 100)
+    }
+
     private var historyCard: some View {
-        DSExpandGroup(title: "做过什么", trailing: "\(history.count) 条",
-                      footer: "这里只留最近 10 条（本机、本次运行）；全部记录在「指令历史」页里。") {
-            ForEach(Array(history.enumerated()), id: \.element.id) { idx, item in
-                DSGroupRow(showsSeparator: idx < history.count - 1) {
-                    HStack(spacing: TokensSpacing.md) {
-                        StatusDot(cls: item.resultCls)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.name)
-                                .font(TokensTypo.footnote)
-                                .foregroundStyle(TokensPalette.primary)
-                            Text(item.resultText)
-                                .font(TokensTypo.footnote)
-                                .foregroundStyle(TokensPalette.statusColor(item.resultCls))
-                        }
-                        Spacer(minLength: TokensSpacing.sm)
-                        Text(item.startedAt.suffix(5))
-                            .font(TokensTypo.dataSmall)
+        DSExpandGroup(title: "做过什么",
+                      trailing: allRuns.isEmpty ? "还没有" : "\(allRuns.count) 条",
+                      footer: "App / Siri / 摇一摇 发出的指令都记在这里（最近 50 条，仅本机）。点一条看它的开始、结束与耗时。") {
+            if allRuns.isEmpty {
+                DSGroupRow(showsSeparator: false) {
+                    DSPlaceholder(icon: "list.bullet.clipboard",
+                                  title: "还没有指令记录",
+                                  message: "上面按一次「锁车」，这里就会留下那一次的结果。")
+                }
+            } else {
+                // 筛选用系统的分段控件语法，不自造一排药丸
+                DSGroupRow {
+                    DSSegmented(options: [(value: "all", title: "全部"),
+                                          (value: "ok", title: "成功"),
+                                          (value: "fail", title: "失败")],
+                                selection: $historyFilter)
+                }
+                DSGroupRow(showsSeparator: false) {
+                    HStack(spacing: 0) {
+                        historyStat(label: "总指令", value: "\(allRuns.count)", tint: TokensPalette.primary)
+                        historyStat(label: "成功率", value: successRateText, tint: TokensPalette.primary)
+                    }
+                    .padding(.vertical, TokensSpacing.xs)
+                }
+
+                if filteredRuns.isEmpty {
+                    DSGroupRow(showsSeparator: false) {
+                        Text(historyFilter == "ok" ? "没有成功的指令" : "没有失败的指令")
+                            .font(TokensTypo.footnote)
                             .foregroundStyle(TokensPalette.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(minHeight: TokensSpacing.row)
+                    }
+                } else {
+                    ForEach(Array(filteredRuns.enumerated()), id: \.element.id) { idx, item in
+                        DSGroupRow(showsSeparator: idx < filteredRuns.count - 1) {
+                            historyRow(item)
+                        }
                     }
                 }
             }
         }
+    }
+
+    private func historyStat(label: String, value: String, tint: Color) -> some View {
+        VStack(spacing: TokensSpacing.xs) {
+            Text(value)
+                .font(TokensTypo.metric(28))
+                .foregroundStyle(tint)
+            Text(label)
+                .font(TokensTypo.caption2)
+                .foregroundStyle(TokensPalette.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// 一条历史：整行可点，点开就是四条键值行（与「全量数据」同一种写法）。
+    /// 开始 / 结束 / 耗时 / 结果 都是真的记下来了的东西 —— 失败原因没有记，所以不编。
+    private func historyRow(_ item: AppStore.HistoryEntry) -> some View {
+        let isOpen = expandedRuns.contains(item.id)
+        return Button {
+            withAnimation(TokensMotion.value) {
+                if isOpen { expandedRuns.remove(item.id) } else { expandedRuns.insert(item.id) }
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: TokensSpacing.md) {
+                    StatusDot(cls: item.success ? "ok" : "bad")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.name)
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.primary)
+                        Text(item.startedAt.formatted(date: .omitted, time: .shortened))
+                            .font(TokensTypo.caption2)
+                            .foregroundStyle(TokensPalette.secondary)
+                    }
+                    Spacer(minLength: TokensSpacing.sm)
+                    Image(systemName: item.iconName)
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(item.statusColor)
+                }
+                if isOpen {
+                    VStack(alignment: .leading, spacing: 0) {
+                        DSKeyValueRow(key: "开始",
+                                      value: item.startedAt.formatted(date: .omitted, time: .standard))
+                        DSKeyValueRow(key: "结束",
+                                      value: item.finishedAt?.formatted(date: .omitted, time: .standard) ?? "—")
+                        DSKeyValueRow(key: "耗时", value: item.durationText)
+                        DSKeyValueRow(key: "结果", value: item.success ? "成功" : "失败",
+                                      valueCls: item.success ? "ok" : "bad")
+                    }
+                    .padding(.top, TokensSpacing.sm)
+                }
+            }
+            .frame(minHeight: TokensSpacing.row)
+        }
+        .buttonStyle(DSRowButtonStyle())
     }
 
     // MARK: 指令执行逻辑（不变）

@@ -36,7 +36,9 @@ extension Notification.Name {
 /// 所以索引页不列这两个入口：同一页摆两个入口，正是「缝合怪」的第一来源。
 enum Deeplink: Hashable, CaseIterable {
     case vehicle, health, battery, data, dev, messages, control, dashboard
-    case trips, commands, service, parking, export, emergency, tips, score
+    // `.commands`（指令历史页）已删：历史就是车控页里「做过什么」那一节，
+    // 同一件事不再有两个界面（详情见 ControlView 的 historyCard 注释）。
+    case trips, service, parking, export, emergency, tips, score
     /// 「车与账号」（原「我的」Tab 的根页）。设置类内容的去处 —— 它不是功能目录，
     /// 功能目录归地图右上角的索引页；这个深链保证它不再依附于 Tab 才能到达。
     case mine
@@ -53,7 +55,6 @@ enum Deeplink: Hashable, CaseIterable {
         case .control: return "control"
         case .dashboard: return "dashboard"
         case .trips: return "trips"
-        case .commands: return "commands"
         case .service: return "service"
         case .parking: return "parking"
         case .export: return "export"
@@ -290,7 +291,6 @@ struct MapShellView: View {
         // 而它那三个子分数是用总分做算术编出来的（score / 3、+10、+20）。
         case .dashboard: DrivingScorePage().environmentObject(nav)
         case .trips: TripsTimelineView().environmentObject(nav)
-        case .commands: CommandHistoryView().environmentObject(nav)
         case .service: ServiceHistoryView().environmentObject(nav)
         // .parking 已并入行程时间轴（同一份停车史：时间轴列旅程，地图「停车」层
         // 画常停圈，两处同源）。深链指向时间轴，不再指向已删除的页面。

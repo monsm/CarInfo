@@ -190,7 +190,8 @@ struct GlobalSearchHUD: View {
                 out.append(SearchResult(title: "指令 \(entry.name)",
                                         subtitle: "\(when) · \(state) · 用时 \(entry.durationText)",
                                         icon: entry.iconName) { [nav] in
-                    nav.pushNavigation(.commands)
+                    // 指令记录现在住在车控页的「做过什么」里，所以搜到指令 → 去车控页
+                    nav.pushNavigation(.control)
                 })
             }
         }
@@ -222,7 +223,6 @@ struct GlobalSearchHUD: View {
         ("全量数据", "所有原始读数与历史曲线", "chart.bar.xaxis", .data),
         ("驾驶评分", "用行程里真有的事实算的评分", "trophy.fill", .score),
         ("行程分析", "每一次出行的时间与能耗", "chart.bar.fill", .trips),
-        ("指令历史", "发过的每一条车控指令与结果", "clock.fill", .commands),
         ("维保记录", "保养里程与提醒", "wrench.and.screwdriver.fill", .service),
         ("停车位置", "最近一次停放的位置", "mappin.circle.fill", .parking),
         ("车与账号", "车辆、账号、隐私与关于", "person.fill", .mine),

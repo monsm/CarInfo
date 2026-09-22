@@ -819,7 +819,7 @@ struct MapSpineView: View {
                     .background(cardBackground)
 
                     indexGroup("这辆车", [.vehicle, .battery, .health, .data, .control, .tips])
-                    indexGroup("出行", [.trips, .commands, .emergency])
+                    indexGroup("出行", [.trips, .emergency])
                     indexGroup("保养与钱", [.service, .export, .score])
                     indexGroup("系统", [.messages, .dev, .mine])
 
@@ -1000,7 +1000,6 @@ struct MapSpineView: View {
         case .control: return "车控"
         case .dashboard: return "仪表"
         case .trips: return "行程分析"
-        case .commands: return "指令历史"
         case .service: return "保养记录"
         case .parking: return "停车位置"
         case .export: return "导出数据"

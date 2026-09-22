@@ -302,7 +302,7 @@ struct MineView: View {
 
             DSGroup(title: "用车") {
                 linkRow("chart.bar.fill", "行程分析", .trips)
-                linkRow("clock.fill", "指令历史", .commands)
+                // 「指令历史」不再单列：它就是车控页里的「做过什么」那一节。
                 linkRow("wrench.and.screwdriver.fill", "维保记录", .service)
                 linkRow("mappin.circle.fill", "停车位置", .parking)
                 linkRow("lightbulb.fill", "车辆提示", .tips)

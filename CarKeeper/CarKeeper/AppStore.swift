@@ -48,7 +48,13 @@ final class AppStore: @unchecked Sendable {
         // 颜色只能从令牌来：`.green` / `.red` 在四套艺术主题里都不会跟着变。
         var statusColor: Color { success ? TokensPalette.success : TokensPalette.error }
         var iconName: String { success ? "checkmark.circle.fill" : "xmark.circle.fill" }
-        var durationText: String { duration > 0 ? "\(Int(duration/60))min" : "--" }
+        // 一条车控指令通常是几秒到几十秒。原来这里一律按分钟显示，
+        // 于是每一次都是「0min」—— 看起来像数据，其实是把秒数除没了。
+        var durationText: String {
+            guard duration > 0 else { return "--" }
+            if duration < 60 { return String(format: "%.1fs", duration) }
+            return "\(Int(duration / 60))min"
+        }
     }
 
     func addCommandHistory(cmd: String, name: String, success: Bool, duration: TimeInterval) {
