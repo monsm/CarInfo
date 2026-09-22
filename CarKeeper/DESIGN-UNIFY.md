@@ -342,3 +342,12 @@ ScrollView {
 
 > ⚠️ `ThemeGalleryView.swift` 仍豁免：它的职责是展示主题的真实取值，**必须用原始字号**。
 > ⚠️ Watch 仍豁免：watchOS 有自己的字号阶梯，不共享 `TokensTypo`。
+
+### 第五轮：消息 API 修复 + 电池页框框背景（2026-09-22 第五轮）
+
+| # | 做了什么 | 落在哪个面 |
+|---|---|---|
+| ✅20 | **messages 消息流**：修三处根因——① `AppStore.needsRefresh` 类型检查只认 `[String: Any]` 不认 `[[String: Any]]`，导致消息永远不缓存；② `MessagesSection.loadIfNeeded` 里 `items.isEmpty` 会误触发无限刷新循环；③ 新增 `onChange(of: store.carId)` 监听，解决 bootstrap 未完成时进入页面永远空白的问题。同时改为只缓存非空列表（空列表 = 重试，不缓存） | 出行页 > 消息节 |
+| ✅21 | **电池页「框框背景」**：BatteryView 的 8 个卡片（`verdictCard`/`consistencyCard`/`chargeCard`/`motorCard`/`faultCard`/`alarmCard` 等）各自用 `DSExpandGroup`/`DSGroup`，每个都有独立的 `nightSurface` 背景矩形，叠在一起出现多框视觉效果。修复：新增 `DSSection`（与 `DSExpandGroup` 相同的标题行 + 折叠交互，但无背景）；`BatteryView.sections` 改为 `socHero` + `detailsGroup()` 两栏，`detailsGroup` 用 `dsSurface()` 包一层统一背景 | 电池页 |
+
+**门禁同步**：无新增门禁，复用 `scan/keys.py` / `scan/design.py`。
