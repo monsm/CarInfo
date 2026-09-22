@@ -3,6 +3,29 @@ import UIKit
 import Combine
 import LocalAuthentication
 
+// =============================================================================
+// LoginView.swift — 登录（所有人看到的第一屏）
+// =============================================================================
+//
+// 版面：与全 App 同一套语言 —— 画布 + 发丝线 + 字号层级，表单是 inset-grouped 分组。
+//   • **不自己铺底**：旧版这里套了一层 `DSCanvas`（不透明的页面底色），而光在
+//     App 根部只画一次 —— 那层底把光整个挡在门外，于是登录页成了全 App 唯一
+//     「没有光」的一屏。原生主题本来就没有光，所以去掉它不影响原生。
+//   • 表单是 **inset-grouped 分组**（iOS 设置 / 钱包的做法）：不再在卡片里再挖一层
+//     填充输入框（那是两层容器说同一件事）。
+//   • 一屏只有一个实心胶囊：登录。
+//
+// 逻辑：**这六个动作函数此前全是空壳** ——
+//     `private func performLogin() { /* 保持原有逻辑 */ }`
+//   也就是说登录按钮点了什么都不会发生（从 b3af51e 起被删掉，注释却还写着
+//   「保持原有逻辑」）。这里按 b3af51e 的历史版本恢复，并保持与 APIClient /
+//   AppStore 现有签名一致（`smsSend(phone:picCode:)` / `login(phone:smsCode:picCode:)`）。
+//
+// 顺带修掉一个一直没生效的东西：倒计时原先用 `Timer.publish(...).autoconnect()`
+//   写成**计算属性** —— 每次视图求值都会新建一个定时器并重建订阅，倒计时因此
+//   时灵时不灵。改成 Task 循环，取消时机明确（离开页面即取消）。
+// =============================================================================
+
 struct LoginView: View {
     @State private var phone: String = ""
     @State private var picCode: String = ""
@@ -14,6 +37,7 @@ struct LoginView: View {
     @State private var smsBtnDisabled: Bool = false
     @State private var smsBtnText: String = "获取验证码"
     @State private var countdown: Int = 0
+    @State private var countdownTask: Task<Void, Never>? = nil
     @State private var biometricAvailable = false
     @State private var biometricAuthPending = false
     @State private var showBiometricPrompt = false
@@ -21,242 +45,329 @@ struct LoginView: View {
     private enum Field: Hashable { case phone, pic, sms }
     @FocusState private var focused: Field?
 
-    private var countdownTimer: Publishers.Autoconnect<Timer.TimerPublisher> {
-        Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    }
-
     private var phoneValid: Bool { phone.trimmingCharacters(in: .whitespaces).count >= 11 }
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private var canSubmit: Bool { phoneValid && !picCode.isEmpty && !smsCode.isEmpty }
 
     var body: some View {
-        NavigationStack {
-            DSCanvas {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: TokensSpacing.xxl) {
-                        // 品牌区
-                        brandHeader
-                            .padding(.top, TokensSpacing.xxxl)
-
-                        // 表单卡片
-                        formCard
-
-                        if !statusText.isEmpty {
-                            DSNotice(
-                                kind: statusErr ? .error : .success,
-                                text: statusText
-                            )
-                        }
-
-                        VStack(spacing: TokensSpacing.md) {
-                            loginButton
-                            if biometricAvailable {
-                                biometricButton
-                            }
-                        }
-                    }
-                    .padding(.bottom, TokensSpacing.xxxl)
+        ScrollView {
+            VStack(alignment: .leading, spacing: TokensSpacing.xxl) {
+                brand
+                creditionalsGroup
+                if !statusText.isEmpty {
+                    DSNotice(kind: statusErr ? .error : .success, text: statusText)
                 }
-                .scrollBounceBehavior(.basedOnSize)
-                .scrollDismissesKeyboard(.interactively)
-                .onReceive(countdownTimer) { _ in
-                    if countdown > 0 {
-                        countdown -= 1
-                        smsBtnText = "\(countdown)s"
-                    } else if countdown == 0 && smsBtnDisabled {
-                        smsBtnDisabled = false
-                        smsBtnText = "获取验证码"
-                    }
-                }
-                .onAppear { loadCaptcha(); checkBiometric() }
-                .alert("生物识别登录", isPresented: $showBiometricPrompt) {
-                    Button("取消") { showBiometricPrompt = false }
-                    Button("确认登录") {
-                        Task { await biometricLogin() }
-                    }
-                } message: {
-                    Text("使用 Face ID / Touch ID 快速登录")
-                }
+                actions
+                footer
             }
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.top, TokensSpacing.xxxl)
+            .padding(.bottom, TokensSpacing.xxxl)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.interactively)
+        .pageBackground()
+        .onAppear { loadCaptcha(); checkBiometric() }
+        .onDisappear { countdownTask?.cancel() }
+        .alert("生物识别登录", isPresented: $showBiometricPrompt) {
+            Button("取消", role: .cancel) { showBiometricPrompt = false }
+            Button("确认登录") {
+                Task { await biometricLogin() }
+            }
+        } message: {
+            Text("使用 Face ID / Touch ID 快速登录")
         }
     }
 
-    // MARK: - 品牌区
-    private var brandHeader: some View {
-        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            HStack {
-                Image(systemName: "car.side.fill")
-                    .font(.system(size: 40, weight: .medium))
-                    .foregroundColor(TokensPalette.primary)
-                    .frame(width: 80, height: 80)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(TokensPalette.ambient)
-                    )
-                    .shadow(color: TokensPalette.ambient.opacity(0.4), radius: 12, y: 4)
+    // =========================================================================
+    // MARK: 品牌
+    // =========================================================================
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("长安车管家")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(TokensPalette.primary)
-                    Text("CHANGAN CONNECT")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(TokensPalette.tertiary)
-                        .tracking(2)
-                }
-                .padding(.leading, TokensSpacing.md)
-            }
-
-            Text("登录以管理您的爱车")
+    /// 品牌区：衬线大字 + 疏排小字 + 一条发丝线。
+    /// 没有图标砖、没有渐变、没有阴影 —— 第一屏的分量靠字号差，不靠装饰。
+    private var brand: some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+            Text("长安车管家")
+                .font(TokensSerif.page(34))
+                .tracking(TokensTracking.title)
+                .foregroundStyle(TokensPalette.primary)
+            Text("CHANGAN CONNECT")
                 .font(TokensTypo.caption)
-                .foregroundColor(TokensPalette.secondary)
+                .tracking(TokensTracking.label)
+                .foregroundStyle(TokensPalette.tertiary)
+            Text("登录后可以看车在哪、还剩多少电、还能跑多远。")
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, TokensSpacing.xs)
+                .padding(.bottom, TokensSpacing.sm)
+            DSDivider()
         }
     }
 
-    // MARK: - 表单卡片
-    // 这里原本是 `GlassCard { … }` —— 那个类型在清理设计文件时被误判为「零引用」删掉了
-    // （grep 只看了 `GlassCard(` 这类写法，漏了「类型名 + 尾随闭包」这种容器用法）。
-    // 改用 v4 的 DSCard：不透明表面，padding 交给内层 VStack 自己控制。
-    private var formCard: some View {
-        DSCard(padding: 0, radius: TokensRadius.large) {
-            VStack(spacing: TokensSpacing.lg) {
-                // 手机号输入
-                VStack(alignment: .leading, spacing: TokensSpacing.xs) {
-                    Text("手机号")
-                        .font(TokensTypo.caption)
-                        .foregroundColor(TokensPalette.secondary)
-                    TextField("请输入手机号", text: $phone)
-                        .keyboardType(.phonePad)
-                        .foregroundColor(TokensPalette.primary)
-                        .font(TokensTypo.subtitle)
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
-                                .fill(TokensPalette.glassLight)
-                        )
-                        .onChange(of: phone) { phone = String(phone.prefix(11)) }
-                }
-                .focused($focused, equals: .phone)
+    // =========================================================================
+    // MARK: 凭据（inset-grouped 分组）
+    // =========================================================================
 
-                DSDivider()
-
-                // 图形验证码
-                VStack(alignment: .leading, spacing: TokensSpacing.xs) {
-                    Text("图形验证码")
-                        .font(TokensTypo.caption)
-                        .foregroundColor(TokensPalette.secondary)
-                    HStack(spacing: TokensSpacing.sm) {
-                        TextField("输入验证码", text: $picCode)
-                            .foregroundColor(TokensPalette.primary)
+    private var creditionalsGroup: some View {
+        DSGroup(title: "登录信息") {
+            DSGroupRow {
+                HStack(alignment: .center, spacing: TokensSpacing.md) {
+                    fieldColumn("手机号") {
+                        TextField("11 位手机号", text: $phone)
+                            .keyboardType(.phonePad)
+                            .textContentType(.telephoneNumber)
                             .font(TokensTypo.subtitle)
-                            .padding()
-                            .background(
-                                RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
-                                    .fill(TokensPalette.glassLight)
-                            )
-
-                        if let data = captchaData, let captcha = UIImage(data: data) {
-                            Image(uiImage: captcha)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 80, height: 40)
-                                .onTapGesture { loadCaptcha() }
-                        } else {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(TokensPalette.glassLight)
-                                .frame(width: 80, height: 40)
-                                .onTapGesture { loadCaptcha() }
-                        }
+                            .foregroundStyle(TokensPalette.primary)
+                            .onChange(of: phone) { _, new in
+                                // 协议里的手机号固定 11 位：多打的字直接不要
+                                // （旧写法 `String(phone.prefix(11))` 同样只截断）
+                                if new.count > 11 { phone = String(new.prefix(11)) }
+                            }
+                    }
+                    .focused($focused, equals: .phone)
+                    if phoneValid {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 15))
+                            .foregroundStyle(TokensPalette.success)
+                            .accessibilityHidden(true)
                     }
                 }
-                .focused($focused, equals: .pic)
+            }
 
-                DSDivider()
+            DSGroupRow {
+                HStack(alignment: .center, spacing: TokensSpacing.md) {
+                    fieldColumn("图形验证码") {
+                        TextField("输入图中字符", text: $picCode)
+                            .font(TokensTypo.subtitle)
+                            .foregroundStyle(TokensPalette.primary)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }
+                    .focused($focused, equals: .pic)
 
-                // 短信验证码
-                VStack(alignment: .leading, spacing: TokensSpacing.xs) {
-                    Text("短信验证码")
-                        .font(TokensTypo.caption)
-                        .foregroundColor(TokensPalette.secondary)
-                    HStack(spacing: TokensSpacing.sm) {
-                        TextField("6位数字", text: $smsCode)
+                    captchaView
+                }
+            }
+
+            DSGroupRow(showsSeparator: false) {
+                HStack(alignment: .center, spacing: TokensSpacing.md) {
+                    fieldColumn("短信验证码") {
+                        TextField("6 位数字", text: $smsCode)
                             .keyboardType(.numberPad)
-                            .foregroundColor(TokensPalette.primary)
-                            .font(TokensTypo.hero)
-                            .padding()
-                            .background(
-                                RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
-                                    .fill(TokensPalette.glassLight)
-                            )
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        Button {
-                            sendSMS()
-                        } label: {
-                            Text(smsBtnText)
-                                .font(TokensTypo.caption)
-                                .foregroundColor(smsBtnDisabled ? TokensPalette.tertiary : TokensPalette.ambient)
-                                .padding(.horizontal, TokensSpacing.md)
-                                .padding(.vertical, TokensSpacing.sm)
-                                .background(
-                                    TokensPalette.ambient.opacity(smsBtnDisabled ? 0.3 : 1)
-                                )
-                                .cornerRadius(TokensRadius.small)
-                        }
-                        .disabled(smsBtnDisabled)
+                            .textContentType(.oneTimeCode)
+                            .font(TokensTypo.subtitle)
+                            .foregroundStyle(TokensPalette.primary)
                     }
+                    .focused($focused, equals: .sms)
+
+                    Button { sendSMS() } label: {
+                        Text(smsBtnText)
+                            .font(TokensTypo.subheadline.weight(.semibold))
+                            .foregroundStyle(smsBtnDisabled ? TokensPalette.tertiary : TokensPalette.accent)
+                            .padding(.horizontal, TokensSpacing.sm)
+                            .frame(minHeight: TokensSize.tap)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(smsBtnDisabled || phone.isEmpty || picCode.isEmpty)
                 }
-                .focused($focused, equals: .sms)
             }
-            .padding(TokensSpacing.lg)
+        }
+        .disabled(busy)
+    }
+
+    /// 一行输入 = 小标签 + 输入框（标签在上，值在下；不做内嵌填充框）
+    private func fieldColumn<Content: View>(_ label: String,
+                                            @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.tertiary)
+            content()
+        }
+        .frame(minHeight: TokensSpacing.row, alignment: .center)
+    }
+
+    /// 图形验证码。点一下换一张（服务端每次请求都出新图）。
+    @ViewBuilder
+    private var captchaView: some View {
+        if let data = captchaData, let captcha = UIImage(data: data) {
+            Image(uiImage: captcha)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 84, height: 40)
+                .onTapGesture { loadCaptcha() }
+                .accessibilityLabel(Text("图形验证码，点一下换一张"))
+        } else {
+            // 还没拿到图（或取图失败）：**说清状态**，不放一个假装是验证码的灰块
+            Button { loadCaptcha() } label: {
+                Text(phone.isEmpty ? "先填手机号" : "取图失败 · 重试")
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.tertiary)
+                    .frame(width: 84, height: 40)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
+                            .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line)
+                    }
+            }
+            .buttonStyle(.plain)
+            .disabled(phone.isEmpty)
         }
     }
 
-    // MARK: - 登录按钮
-    private var loginButton: some View {
-        Button {
-            performLogin()
-        } label: {
-            HStack {
-                if busy {
-                    ProgressView().tint(TokensPalette.labelOnTint)
+    // =========================================================================
+    // MARK: 操作
+    // =========================================================================
+
+    /// 一屏唯一的实心胶囊 = 登录；其余都是次操作。
+    private var actions: some View {
+        VStack(spacing: TokensSpacing.md) {
+            Button { performLogin() } label: {
+                HStack(spacing: TokensSpacing.sm) {
+                    if busy { ProgressView().tint(TokensPalette.labelOnTint) }
+                    Text(busy ? "登录中…" : "登录")
                 }
-                Text(busy ? "登录中…" : "登录")
-                    .font(TokensTypo.heading)
-                    .foregroundColor(TokensPalette.labelOnTint)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, TokensSpacing.lg)
-            .background(TokensPalette.ambient)
-            .cornerRadius(TokensRadius.medium)
-            .shadow(color: TokensPalette.ambient.opacity(0.4), radius: 12, y: 4)
+            .buttonStyle(DSPrimaryButtonStyle())
+            .disabled(busy || !canSubmit)
+            .opacity(canSubmit ? 1 : 0.45)
+
+            if biometricAvailable {
+                Button { showBiometricPrompt = true } label: {
+                    Label("用 Face ID 登录", systemImage: "faceid")
+                }
+                .buttonStyle(DSSecondaryButtonStyle())
+                .disabled(busy)
+            }
+
+            if !canSubmit {
+                // 说清为什么按钮是灰的，而不是让用户猜
+                Text(loginBlocker())
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.tertiary)
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(busy || !phoneValid)
     }
 
-    // MARK: - 生物识别按钮
-    private var biometricButton: some View {
-        Button {
+    private func loginBlocker() -> String {
+        if !phoneValid { return "填满 11 位手机号才能登录" }
+        if picCode.isEmpty { return "还需要图形验证码" }
+        return "还需要短信验证码"
+    }
+
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+            DSDivider()
+            Text("登录走长安车联网接口（changan.com.cn）；密码不会被保存，控制用的 PIN 存在本机 Keychain。"
+                 + "登录令牌在本机存储，退出登录会一并清除。")
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // =========================================================================
+    // MARK: - 逻辑（按 b3af51e 的历史版本恢复）
+    // =========================================================================
+
+    private func showStatus(_ msg: String, isErr: Bool) {
+        statusText = msg
+        statusErr = isErr
+    }
+
+    /// 倒计时用 Task 循环：取消时机明确，不会像计算属性里的 Timer 那样每次求值重建订阅。
+    private func startCountdown() {
+        countdown = 60
+        smsBtnDisabled = true
+        smsBtnText = "\(countdown)s"
+        countdownTask?.cancel()
+        countdownTask = Task {
+            while !Task.isCancelled, countdown > 0 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { return }
+                countdown -= 1
+                smsBtnText = countdown > 0 ? "\(countdown)s" : "获取验证码"
+                if countdown == 0 { smsBtnDisabled = false }
+            }
+        }
+    }
+
+    /// 取图形验证码（服务端按手机号出图）
+    private func loadCaptcha() {
+        let trimmed = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        Task {
+            if let data = await APIClient.shared.getPicCode(phone: trimmed) {
+                captchaData = data
+            }
+        }
+    }
+
+    /// 发短信验证码。返回「无记录」时必须刷新图形验证码 —— 那是服务端的语义，
+    /// 不是失败：直接重试会一直撞同一堵墙。
+    private func sendSMS() {
+        let trimmed = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !picCode.isEmpty else {
+            showStatus("请填写手机号和图形验证码", isErr: true)
+            return
+        }
+        Task {
+            let r = await APIClient.shared.smsSend(phone: trimmed, picCode: picCode)
+            if r.ok {
+                showStatus(r.msg, isErr: false)
+                startCountdown()
+            } else if r.noRecord {
+                loadCaptcha()
+                picCode = ""
+                showStatus("验证码已刷新，请重新输入图形验证码后重试", isErr: false)
+            } else {
+                showStatus(r.msg, isErr: true)
+            }
+        }
+    }
+
+    /// 登录：成功后写入令牌状态并 bootstrap（与旧版一致）
+    private func performLogin() {
+        let trimmedPhone = phone.trimmingCharacters(in: .whitespaces)
+        guard !trimmedPhone.isEmpty, !smsCode.isEmpty, !picCode.isEmpty else {
+            showStatus("请填写手机号、图形验证码与短信验证码", isErr: true)
+            return
+        }
+        busy = true
+        statusText = ""
+        Task { [trimmedPhone, smsCode, picCode] in
+            do {
+                _ = try await APIClient.shared.login(phone: trimmedPhone,
+                                                     smsCode: smsCode,
+                                                     picCode: picCode)
+                AppStore.shared.isLoggedIn = true
+                AppStore.shared.phone = phone
+                await AppStore.shared.bootstrap()
+            } catch {
+                showStatus(error.localizedDescription, isErr: true)
+            }
+            busy = false
+        }
+    }
+
+    private func checkBiometric() {
+        biometricAvailable = AppStore.shared.canUseBiometric()
+        if biometricAvailable && AppStore.shared.hasBiometricSetup {
             showBiometricPrompt = true
-        } label: {
-            HStack {
-                Image(systemName: "faceid")
-                Text("Face ID 登录")
-                    .font(TokensTypo.subtitle)
-                    .foregroundColor(TokensPalette.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, TokensSpacing.md)
-            .background(TokensPalette.glassHighlight)
-            .cornerRadius(TokensRadius.medium)
         }
-        .buttonStyle(.plain)
     }
 
-    // MARK: - 操作方法
-    private func loadCaptcha() { /* 保持原有逻辑 */ }
-    private func sendSMS() { /* 保持原有逻辑 */ }
-    private func performLogin() { /* 保持原有逻辑 */ }
-    private func checkBiometric() { /* 保持原有逻辑 */ }
-    private func biometricLogin() async { /* 保持原有逻辑 */ }
+    /// 生物识别只证明「是本人」—— 它**不换新令牌**：进去之后能不能拉到数据，
+    /// 仍由本机已存的令牌决定（令牌失效时会在数据层拿不到东西，不会假装成功）。
+    private func biometricLogin() async {
+        biometricAuthPending = true
+        let success = await AppStore.shared.authenticateWithBiometrics(reason: "验证身份以登录账号")
+        biometricAuthPending = false
+        if success {
+            AppStore.shared.isLoggedIn = true
+            await AppStore.shared.bootstrap()
+        } else {
+            showStatus("生物识别验证失败，请使用短信验证码登录", isErr: true)
+        }
+    }
 }

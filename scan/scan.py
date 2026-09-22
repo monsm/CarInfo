@@ -393,6 +393,11 @@ VERIFIED_SDK_ADDITIONS = {
     "mapControls": "View.mapControls(_:)（iOS 17+；decl: func mapControls(@ViewBuilder _ content: () -> some View)，externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/mapControls(_:)：把系统地图控件放进地图）",
     "mapControlVisibility": "View.mapControlVisibility(_:)（iOS 17+；decl: func mapControlVisibility(_ visibility: Visibility)，externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/mapControlVisibility(_:)）",
     "contextMenu": "View.contextMenu(menuItems:)（iOS 13+；decl: nonisolated func contextMenu<MenuItems>(@ContentBuilder menuItems: () -> MenuItems)，externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/contextMenu(menuItems:)：长按菜单——明细行的删除挂在它上面）",
+    # 天气（WeatherService）：三个都是 Foundation / Swift 标准库的名字，
+    # 登记前对着 Apple 文档 JSON 核过存在性与平台（iOS 全平台）：
+    "Equatable": "Swift.Equatable（Swift 标准库；externalID doc://com.apple.Swift/documentation/Swift/Equatable）——天气快照要能比较",
+    "URLQueryItem": "Foundation.URLQueryItem（iOS 8+；externalID doc://com.apple.foundation/documentation/Foundation/URLQueryItem）——拼 Open-Meteo 的查询参数",
+    "URLComponents": "Foundation.URLComponents（iOS 7+；externalID doc://com.apple.foundation/documentation/Foundation/URLComponents）——用它拼 URL 而不是手写字符串，避免转义踩坑",
 }
 
 

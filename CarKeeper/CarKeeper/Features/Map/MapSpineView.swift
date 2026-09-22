@@ -34,6 +34,8 @@ struct MapSpineView: View {
     /// iPad 分栏用（SceneID.detail 的场景声明在 CarKeeperApp.swift）
     @Environment(\.openWindow) private var openWindow
     @Environment(\.horizontalSizeClass) private var sizeClass
+    /// 天气实况（光需要云量）：**订阅**它 —— 快照是异步到达的，不订阅这一屏就不会重画。
+    @ObservedObject private var weather = WeatherService.shared
 
     @AppStorage(ArtThemeStore.key) private var themeRaw: String = ArtTheme.native.rawValue
     /// 记住上次看的图层（地图主屏的"当前位置"应该被记住，不该每次回到默认）
@@ -90,6 +92,7 @@ struct MapSpineView: View {
             await refresh()
             centerOnCar(force: true)
             if layer == .charge { await searchChargersIfNeeded() }
+            await refreshWeatherIfNeeded()
         }
         .onChange(of: layer) { _, new in
             TokensHaptic.select()
@@ -99,6 +102,14 @@ struct MapSpineView: View {
         .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
             centerOnCar(force: false)
         }
+    }
+
+    /// 取一次天气（TTL 与「车没走远」两道护栏都在服务里）。
+    /// 手动（下拉刷新 / 「光」表里的按钮）用 `force: true` 绕过 TTL。
+    @MainActor
+    private func refreshWeatherIfNeeded(force: Bool = false) async {
+        guard let c = data.carCoordinate else { return }
+        await WeatherService.shared.refreshIfNeeded(coordinate: c, force: force)
     }
 
     // =========================================================================
@@ -365,6 +376,12 @@ struct MapSpineView: View {
             Text(String(format: "%.0f°", sky.altitude))
                 .font(TokensTypo.digits(11))
                 .foregroundStyle(TokensPalette.tertiary)
+            // 云量只在「看此刻」时挂上来：它是**此刻**的实况，滑块拖出的时刻没有对应值
+            if skyLive, let w = sky.weather {
+                Text("云 \(w.cloudText)")
+                    .font(TokensTypo.digits(11))
+                    .foregroundStyle(TokensPalette.tertiary)
+            }
             // 回放时必须看得见自己不在实时上 —— 不然这就是一屏假象
             if !skyLive {
                 Text("回放")
@@ -866,9 +883,14 @@ struct MapSpineView: View {
                         .padding(TokensSpacing.md)
                         .background(cardBackground)
 
+                        if case .failed(let msg) = weather.status {
+                            DSNotice(kind: .warning,
+                                     text: "天气没取到（\(msg)）—— 上面那几行是晴空模型的算法值，不是实测。")
+                        }
+
                         Text("太阳的高度角与方位角，由车所在的经纬度与此刻算出（NOAA 简化算法，纯数学，不联网），可以复算。"
-                             + "「晴空辐照度」是晴空模型 1050×sin(高度角) —— App 里没有天气数据源，"
-                             + "所以它不是实测值，云量不会体现在这一栏里。")
+                             + "云量 / 降水 / 天气码来自 Open-Meteo 实况，辐照度 = 晴空模型 × 云量衰减（式子印在上面那行的说明里）。"
+                             + "没有取到实况时（离线、取数失败、或还没取到）退回晴空模型，并在那一行写明「没有天气数据」。")
                             .font(TokensTypo.footnote)
                             .foregroundStyle(TokensPalette.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -884,6 +906,19 @@ struct MapSpineView: View {
             .navigationBarTitleDisplayMode(.inline)
             .presentationDetents([.medium, .large])
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        Task { await refreshWeatherIfNeeded(force: true) }
+                    } label: {
+                        if weather.status == .loading {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Text("重取天气")
+                        }
+                    }
+                    .font(TokensTypo.footnote)
+                    .disabled(weather.status == .loading)
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("完成") { showSky = false }
                 }

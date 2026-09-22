@@ -232,6 +232,11 @@ struct CarKeeperApp: App {
             if store.isLoggedIn && store.cars.isEmpty {
                 Task { await store.bootstrap() }
             }
+            // 天气实况（光需要云量）：有车的位置就取一次。
+            // 取不到就退回「晴空模型」，界面上照实写明 —— 不拿默认值冒充实况。
+            if let c = store.currentLocation?.coordinate {
+                Task { await WeatherService.shared.refreshIfNeeded(coordinate: c) }
+            }
             // #NEW-111 CloudKit 同步
             Task { await store.triggerCloudSync() }
             // #N38 崩溃上报初始化
@@ -271,6 +276,11 @@ struct CarKeeperApp: App {
         }
         .onOpenURL { url in
             openDeeplink(url)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
+            // 车的位置变了就重取天气（TTL 内且没走远时 refreshIfNeeded 会挡掉，不发请求）
+            guard let c = store.currentLocation?.coordinate else { return }
+            Task { await WeatherService.shared.refreshIfNeeded(coordinate: c) }
         }
         // 注意：根视图上不得再挂任何「无限循环动画」修饰符。
         // 它们会让整棵视图树反复失效，深色模式下表现为整屏发暗发黏，且持续耗电。

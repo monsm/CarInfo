@@ -149,9 +149,13 @@ struct SheetCanvasModifier: ViewModifier {
 //   ② 同一束光必须只有一份 —— 两个屏幕上的光方向不一样，比没有光更糟。
 // @MainActor：AppStore 是 @MainActor（View 的 body 本来就在主线程上）。
 struct AppCanvas: View {
+    /// 天气实况（云量）。**订阅**它：快照到达时整棵树重画一次 ——
+    /// 光依赖一份异步到达的数据，不订阅就会停在「取到天气之前」的那一版。
+    @ObservedObject private var weather = WeatherService.shared
+
     @MainActor private var sky: SkyLight? {
         guard let c = AppStore.shared.currentLocation?.coordinate else { return nil }
-        return SkyLight.now(at: Date(), coordinate: c)
+        return SkyLight.now(at: Date(), coordinate: c, weather: weather.current)
     }
 
     var body: some View {
@@ -166,6 +170,13 @@ struct AppCanvas: View {
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
+        // 取天气挂在根画布上（它每一屏都在），而不是逐屏去取：
+        // TTL 是护栏，不该被当成调度器。取不到就退回晴空模型，界面照实写明。
+        .task {
+            let coordinate = await MainActor.run { AppStore.shared.currentLocation?.coordinate }
+            guard let coordinate else { return }
+            await WeatherService.shared.refreshIfNeeded(coordinate: coordinate)
+        }
     }
 }
 
@@ -319,6 +330,9 @@ struct CardBox<Content: View>: View {
     var side: String? = nil
     var sideCls: String = ""
     var cornerRadius: CGFloat = TokensRadius.medium
+    /// 分组脚下的那行小字：规则、边界、后果写在这里（与 DSGroup 的 footer 同一套语法）。
+    /// 一句要说清的事不该藏进注释 —— 注释只有写代码的人看得见。
+    var footer: String? = nil
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -350,6 +364,13 @@ struct CardBox<Content: View>: View {
                             .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line)
                     }
                 }
+            if let footer {
+                Text(footer)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, TokensSpacing.xs)
+            }
         }
     }
 }
@@ -360,6 +381,9 @@ struct ExpandingCardBox<Content: View>: View {
     var side: String? = nil
     var sideCls: String = ""
     var cornerRadius: CGFloat = TokensRadius.medium
+    /// 折叠区脚下的小字：**收起时也看得见** —— 「这块只留 10 条」这种规则
+    /// 必须写在收起状态里，不然用户不会去展开它。
+    var footer: String? = nil
     @ViewBuilder var content: () -> Content
 
     @State private var isExpanded = false
@@ -434,6 +458,15 @@ struct ExpandingCardBox<Content: View>: View {
                             .frame(height: 1)
                             .padding(.horizontal, -TokensSpacing.xl)
                     }
+            }
+
+            if let footer {
+                Text(footer)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, TokensSpacing.md)
+                    .padding(.bottom, TokensSpacing.lg)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

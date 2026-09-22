@@ -38,10 +38,32 @@ struct ControlView: View {
         ("RemoteSearchCar", "远程寻车", "location", nil)
     ]
     // #18 快捷预设场景
-    private let presetScenes: [(key: String, name: String, symbol: String, commands: [String], note: String?)] = [
-        ("winterPreheat", "冬天预热", "snowflake", ["OpenAir"], "22℃ 座椅加热 + 后窗除雾"),
-        ("summerCool", "夏天降温", "sun.max.fill", ["OpenAir"], "18℃ 强冷模式"),
-        ("lockAll", "一键锁车", "lock.fill", ["LockDoor"], "锁车 + 关窗 + 折叠后视镜"),
+    /// 一个场景 = **一条真指令 + 它自己带的温度**。
+    /// `note` 里只许写这个场景真的会发出去的东西 —— 旧版三条说明分别写着
+    /// 「22℃ 座椅加热 + 后窗除雾」「18℃ 强冷模式」「锁车 + 关窗 + 折叠后视镜」，
+    /// 而实际发出去的只有一条 OpenAir、温度还是上一次残留的值。
+    /// 遥控制最不能忍的就是这种：按了锁车，界面说还捎带关了窗。
+    private struct PresetScene {
+        let key: String
+        let name: String
+        let symbol: String
+        let commands: [String]
+        /// 空调温度（包含 OpenAir 的场景才有）：这个值真的会被发给车
+        let temp: Int?
+        /// 一行说明：只写真的会发的东西
+        let note: String
+    }
+
+    private let presetScenes: [PresetScene] = [
+        PresetScene(key: "winterPreheat", name: "冬天预热", symbol: "snowflake",
+                    commands: ["OpenAir"], temp: 26,
+                    note: "发一条「开启空调」，温度 26℃"),
+        PresetScene(key: "summerCool", name: "夏天降温", symbol: "sun.max.fill",
+                    commands: ["OpenAir"], temp: 18,
+                    note: "发一条「开启空调」，温度 18℃"),
+        PresetScene(key: "lockAll", name: "一键锁车", symbol: "lock.fill",
+                    commands: ["LockDoor"], temp: nil,
+                    note: "发一条「锁车」")
     ]
 
     @State private var busy = false
@@ -235,16 +257,31 @@ struct ControlView: View {
     }
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "车控")
-                controlHeader
-                primarySceneButton
-                if let run = running { runningCard(run) }
-                if let bd = bodyDetail { bodyDetailCard(bd) }
+            // 这一屏的版面就是它的信息架构：**车现在什么样 → 现在该做什么 → 还能做什么
+            // → 做过什么**。旧版是一条平铺的卡片堆，从上到下没有顺序可言 ——
+            // 状态、动作、记录混在同一层里，读的人得自己找。
+            LazyVStack(alignment: .leading, spacing: TokensSpacing.xl) {
+                DSPageTitle(title: "车控",
+                            subtitle: "指令先验身份，发出后等车辆回执 —— 回执到了才算完成")
+
+                // ① 车现在是什么样：姿态图 + 一句话状态 + 逐字段明细（同一块，不拆开）
+                VStack(alignment: .leading, spacing: TokensSpacing.md) {
+                    controlHeader
+                    if let bd = bodyDetail { bodyDetailCard(bd) }
+                }
+
+                // ② 现在该做的一件事：一屏唯一的实心胶囊（状态有问题时它就是「锁车关窗」）
+                VStack(alignment: .leading, spacing: TokensSpacing.md) {
+                    DSSectionHeader(title: "现在该做的")
+                    primarySceneButton
+                    if let run = running { runningCard(run) }
+                }
+
+                // ③ 还能做什么 → ④ 一键场景 → ⑤ 做过什么（按用到它们的频率从高到低）
                 commandCard
                 presetScenesCard
-                SiriShortcutsCard()
                 if !history.isEmpty { historyCard }
+                SiriShortcutsCard()
             }
             .padding(.top, TokensSpacing.sm)
             .padding(.bottom, TokensSpacing.huge)
@@ -438,7 +475,8 @@ struct ControlView: View {
 
     // MARK: 快捷预设场景 (#18)
     private var presetScenesCard: some View {
-        CardBox(title: "快捷场景", cornerRadius: TokensRadius.medium) {
+        CardBox(title: "一键场景", cornerRadius: TokensRadius.medium,
+                footer: "每个场景只发一条指令；温度是场景自己带的值，不走上次的设置。与其他指令一样，先验证身份再发。") {
             VStack(spacing: 10) {
                 ForEach(Array(presetScenes.enumerated()), id: \.element.key) { idx, scene in
                     Button {
@@ -455,9 +493,7 @@ struct ControlView: View {
                                 )
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(scene.name).font(TokensTypo.body)
-                                if let note = scene.note {
-                                    Text(note).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
-                                }
+                                Text(scene.note).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
                             }
                             Spacer()
                             if busy || running != nil {
@@ -482,14 +518,20 @@ struct ControlView: View {
         }
     }
 
-    private func onPresetScene(
-        _ scene: (key: String, name: String, symbol: String,
-                  commands: [String], note: String?)) {
-        // 执行场景内的所有指令（按顺序）
-        for _ in scene.commands {
-            if !busy && running == nil {
-                execute(pinDigits)
-            }
+    private func onPresetScene(_ scene: PresetScene) {
+        guard !busy, running == nil else { return }
+        guard let cmd = scene.commands.first else { return }
+        // 旧版这里直接 `execute(pinDigits)`，而 **pendingCmd 与 pendingTemp 两样都没设** ——
+        // pendingCmd 默认是空串（execute 开头就 return），温度用的是上一次残留值。
+        // 也就是说「一键锁车」很可能什么都没发。现在场景自己带上要发的指令与温度。
+        pendingCmd = cmd
+        if let t = scene.temp { pendingTemp = t }
+        // 与单个指令走**同一道门**：敏感操作先验身份、再进 PIN 输入。
+        // （省掉这道门的话，场景会拿着一个可能为空的 PIN 直接发指令。）
+        if store.canUseBiometric() && store.hasBiometricSetup {
+            showBiometricLock = true
+        } else {
+            showPin = true
         }
     }
 
@@ -519,7 +561,9 @@ struct ControlView: View {
 
     // MARK: 指令列表
     private var commandCard: some View {
-        CardBox(title: "远程控制", side: busy || running != nil ? "执行中" : nil, sideCls: "acc") {
+        CardBox(title: "还能做什么",
+                side: busy || running != nil ? "执行中" : nil, sideCls: "acc",
+                footer: "指令发出去后等车辆回执：12 次查询（约 60 秒）仍没有终态时会标成「结果待确认」，不算成功。") {
             VStack(spacing: 0) {
                 // 高频指令（默认展示）
                 ForEach(Array(mainCommands.enumerated()), id: \.offset) { idx, item in
@@ -585,8 +629,9 @@ struct ControlView: View {
 
     // MARK: 记录
     private var historyCard: some View {
-        ExpandingCardBox(title: "执行记录", side: "\(history.count) 条", sideCls: "na", cornerRadius:
- TokensRadius.medium) {
+        ExpandingCardBox(title: "做过什么", side: "\(history.count) 条", sideCls: "na",
+                         cornerRadius: TokensRadius.medium,
+                         footer: "这里只留最近 10 条（本机、本次运行）；全部记录在「指令历史」页里。") {
             VStack(spacing: 0) {
                 ForEach(Array(history.enumerated()), id: \.element.id) { idx, item in
                     HStack(spacing: 12) {

@@ -15,9 +15,10 @@
 //   ① **天文事实**：太阳高度角、方位角 —— 由经纬度与时刻唯一决定，可复算。
 //   ② **设计规则**：把天文事实翻译成界面数值的那几条映射（都写在下面每个字段上，
 //      也原样印在界面里）。它们不是气象事实，是我定的规则 —— 所以必须可争论。
-//   ③ **App 里没有的东西**：真实云量 / 天气码 / 实测辐照度。App 没有天气数据源，
-//      所以这里给的是**晴空模型**（假设无云），不是实测值 —— 界面上照实写"晴空模型"。
-//      （样品版用的是 Open-Meteo 的实时天气；App 内没有接这个源，不假装有。）
+//   ③ **天气实况**：云量 / 降水 / 天气码来自 Open-Meteo（见 `WeatherService.swift`）。
+//      有实况时：辐照度 = 晴空模型 × **云量衰减**（式子印在界面上，可争论）。
+//      没有实况时（离线 / 取数失败 / 还没取到）：退回**晴空模型**（假设无云），
+//      并照实写"无天气数据，不是实测"。两种情况的差别写在界面上，不靠用户猜。
 //
 // 命名：顶层类型，不嵌套泛用名（历史事故见 ArtTheme.swift 的说明）。
 // =============================================================================
@@ -153,6 +154,15 @@ struct SkyFact: Identifiable {
 // MARK: - 光
 /// 这一屏的光。全部数值都由下面的规则从太阳位置算出 —— 没有一处是"配"出来的。
 struct SkyLight {
+
+    // MARK: 云量 → 衰减
+    /// 云量对辐照度的衰减：G = G_晴空 × (1 − 0.75 × N^3.4)，N = 云量（0…1）。
+    /// 这是**公开发表的经验近似**（Kasten–Czeplak 云量-辐照度关系的常用形式），
+    /// 不是实测：它把"阴天更暗"变成一个可复算的数，而不是拍脑袋的乘系数。
+    static func cloudAttenuation(cloudCover: Double) -> Double {
+        let n = skyClamp(cloudCover / 100, 0, 1)
+        return skyClamp(1 - 0.75 * pow(n, 3.4), 0, 1)
+    }
     /// 光名
     let phase: SkyPhase
     /// 太阳高度角（度）—— 天文事实
@@ -163,6 +173,12 @@ struct SkyLight {
     /// **晴空模型**：1050 × sin(高度角)。真实辐照度会被云削掉一大半，
     /// 而 App 里没有天气数据源 —— 所以这里写"晴空"，不写"实测"。
     let clearSky: Double
+    /// **全天空辐照度**（W/m²）= 晴空模型 × 云量衰减。
+    /// 有天气实况时它是"按实况云量折算"的值，没有时它等于 `clearSky`。
+    /// 界面模式与车灯都用它 —— 阴天的正午确实更暗，这是真实效果，不是装饰。
+    let radiation: Double
+    /// 天气实况（取不到就是 nil —— 界面照实写「无天气数据」）
+    let weather: SkyWeather?
     /// 车灯亮度 0…1（设计规则：1 − 辐照度/220 —— 日照下不该开车灯）
     let lamp: Double
     /// 色温 −1（冷蓝）…+1（琥珀）（设计规则：贴近地平线→琥珀；地平线下越深→冷蓝）
@@ -187,25 +203,47 @@ struct SkyLight {
         return names[idx] + " " + "\(Int(azimuth.rounded()))°"
     }
 
+    /// 天气的一句话（没有数据就是 nil —— 调用方据此决定显不显示）
+    func weatherNote(at now: Date) -> String? {
+        guard let w = weather else { return nil }
+        let wet = w.precipitation > 0.05 ? " · \(w.precipitationText)" : ""
+        return "\(w.codeText) \(w.cloudText) 云\(wet)"
+    }
+
     /// 界面上的「光」表。**一行一行都是可复算的**，规则也写在值旁边。
-    var facts: [SkyFact] {
-        [
+    var facts: [SkyFact] { facts(at: Date()) }
+
+    /// 与 `facts` 相同，只是"现在"由调用方给（时间戳要能复算，不能自己偷看时钟）。
+    func facts(at now: Date) -> [SkyFact] {
+        var rows: [SkyFact] = [
             SkyFact(id: "phase", label: "光名", value: phase.title, note: phase.note),
             SkyFact(id: "alt", label: "太阳高度",
                     value: String(format: "%.1f°", altitude),
                     note: "由车的经纬度与此刻算出的天文事实"),
             SkyFact(id: "az", label: "方位", value: bearingText,
-                    note: "光从这个方向来 —— 图上光池的位置就是它"),
-            SkyFact(id: "rad", label: "晴空辐照度",
-                    value: "\(Int(clearSky.rounded())) W/m²",
-                    note: "晴空模型 1050×sin(高度角)；App 内没有天气数据源，这不是实测"),
-            SkyFact(id: "mode", label: "界面模式",
-                    value: isDaylight ? "日光（纸）" : "夜行（深）",
-                    note: "辐照度 > 150 W/m² 切日光模式，95–205 之间完成"),
-            SkyFact(id: "lamp", label: "车灯亮度",
-                    value: "\(Int((lamp * 100).rounded()))%",
-                    note: "规则：1 − 辐照度/220 —— 日照下不该开车灯")
+                    note: "光从这个方向来 —— 图上光池的位置就是它")
         ]
+        if let w = weather {
+            rows.append(SkyFact(id: "sky", label: "云量",
+                                value: w.cloudText,
+                                note: w.sourceText(at: now) + " · 每 \(Int(WeatherService.refreshMinutes)) 分钟一次"))
+            rows.append(SkyFact(id: "wx", label: "天气",
+                                value: w.codeText,
+                                note: "WMO 天气码 \(w.code)；降水 \(w.precipitationText) · \(w.temperatureText)"))
+        }
+        rows.append(SkyFact(id: "rad",
+                            label: weather == nil ? "晴空辐照度" : "全天空辐照度",
+                            value: "\(Int(radiation.rounded())) W/m²",
+                            note: weather == nil
+                                ? "晴空模型 1050×sin(高度角)；没有天气数据，这不是实测"
+                                : "晴空模型 × 云量衰减 (1 − 0.75 × 云量^3.4)；云量来自实况"))
+        rows.append(SkyFact(id: "mode", label: "界面模式",
+                            value: isDaylight ? "日光（纸）" : "夜行（深）",
+                            note: "辐照度 > 150 W/m² 切日光模式，95–205 之间完成"))
+        rows.append(SkyFact(id: "lamp", label: "车灯亮度",
+                            value: "\(Int((lamp * 100).rounded()))%",
+                            note: "规则：1 − 辐照度/220 —— 日照下不该开车灯"))
+        return rows
     }
 
     /// 把「看几点」换成一个今天的具体时刻。`hour == nil` 就是此刻（实时）。
@@ -221,14 +259,19 @@ struct SkyLight {
     }
 
     /// 由车的位置与此刻算光。**没有位置就没有光**（不拿设备位置冒充车的位置）。
-    static func now(at date: Date, coordinate: CLLocationCoordinate2D) -> SkyLight {
+    static func now(at date: Date,
+                    coordinate: CLLocationCoordinate2D,
+                    weather: SkyWeather? = nil) -> SkyLight {
         let fix = SolarMath.fix(at: date, coordinate: coordinate)
         let alt = fix.altitude
         let azimuth = (fix.azimuth.truncatingRemainder(dividingBy: 360) + 360)
             .truncatingRemainder(dividingBy: 360)
 
-        // ---- ① 有多少光：晴空模型 ----
-        let radiation = max(0, 1050 * sin(skyRad(alt)))
+        // ---- ① 有多少光：晴空模型 × 云量衰减 ----
+        // 没有天气实况时衰减系数是 1：辐照度就等于晴空模型（界面写明"不是实测"）。
+        let clearRadiation = max(0, 1050 * sin(skyRad(alt)))
+        let attenuation = weather.map { cloudAttenuation(cloudCover: $0.cloudCover) } ?? 1
+        let radiation = clearRadiation * attenuation
 
         // ---- ② 界面模式：不过渡，直接换 ----
         // 为什么不做连续插值：早先版本用线性混合，08:00 时背景 rgb(142,138,132)、
@@ -264,13 +307,17 @@ struct SkyLight {
 
         // ---- ⑦ 暗角 / 颗粒 ----
         let vignette = skyLerp(0.62, 0.14, lightAmount)
-        let grain = skyLerp(0.055, 0.04, lightAmount)
+        // 颗粒的底子是"夜里比白天多一点"，降水再往上加 —— 湿的街面会脏，脏的就是颗粒。
+        let wet = weather.map { skyClamp($0.precipitation / 2, 0, 1) } ?? 0
+        let grain = skyLerp(0.055, 0.04, lightAmount) + wet * 0.03
 
         return SkyLight(
             phase: SkyPhase.of(altitude: alt),
             altitude: alt,
             azimuth: azimuth,
-            clearSky: radiation,
+            clearSky: clearRadiation,
+            radiation: radiation,
+            weather: weather,
             lamp: lamp,
             warmth: warmth,
             pool: pool,

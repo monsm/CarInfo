@@ -74,6 +74,26 @@ struct PrivacyDashboardView: View {
                     PrivacyCategorySection(category: category)
                 }
 
+                // 离开本机的数据：「数据去了哪」是隐私披露里最该说清、也最容易被含糊过去的一节。
+                // 三处都是代码里真实存在的域名（APIConfig / WeatherService.host / UpdateService）。
+                DSGroup(title: "离开本机的数据",
+                        footer: "三处都只发该功能需要的最小信息。天气那次只给经纬度，且**保留两位小数**"
+                              + "（约 1.1 km 网格）—— 云量不需要比这更准，而精度的每一次增加都是隐私的每一次减少。"
+                              + "三个请求都不带车辆标识 / 账号 / 设备号；天气快照只在内存里，不落盘。") {
+                    DSGroupRow {
+                        DSRow(icon: "car.fill", title: "长安车联网",
+                              subtitle: "车辆状态、控制指令、登录 —— 只在你用这些功能时")
+                    }
+                    DSGroupRow {
+                        DSRow(icon: "cloud.sun.fill", title: "Open-Meteo（天气实况）",
+                              subtitle: "车的位置（两位小数）；每 \(Int(WeatherService.refreshMinutes)) 分钟最多一次 —— 用来算云量对光的影响")
+                    }
+                    DSGroupRow(showsSeparator: false) {
+                        DSRow(icon: "arrow.down.circle", title: "GitHub（版本检查）",
+                              subtitle: "只在你点「检查更新」时")
+                    }
+                }
+
                 // 清除：后果写在按钮旁边，不藏在确认框里
                 DSGroup(title: "清除",
                         footer: "清除后无法恢复：这些记录只在本机，没有云端副本。") {
