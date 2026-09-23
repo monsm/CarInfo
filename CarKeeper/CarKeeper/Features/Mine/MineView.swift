@@ -78,6 +78,9 @@ struct MineView: View {
     /// 拆卡按问题分：我是谁（账号）、我的车（车辆）、我能改什么（设置）、
     /// 这个 App 是什么（关于）。
     ///
+    /// 「设置」与「检查更新」各占**一张**卡（用户 2026-09-23：超长卡拆小卡）——
+    /// 旧版把全部设置组塞进一张卡，叠叠乐里永远读不完。拆开后每屏都有得读。
+    ///
     /// `private`：它按本页的实时状态现算，只有本视图的 `cards` 有权调它。
     @MainActor
     private var sectionCards: [StackCard] {
@@ -290,10 +293,6 @@ struct MineView: View {
                 actionRow("key.fill", "共享钥匙") { showTempKeys = true }
                 actionRow("person.2.fill", "家庭管理", last: true) { showFamily = true }
             }
-
-            // #39 月度驾驶报告：**内联展开**而不是拉起浮层（2026-09-23 降成「节」）。
-            // 它与「设置」属于同一屏，展开后往下看就行，不用离开当前页。
-            MonthlyReportSection()
 
             DSGroup(title: "设备与模式",
                     footer: "摇一摇会真的发锁车指令。") {

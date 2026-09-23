@@ -12,7 +12,7 @@ import SwiftUI
 //  三件事分开：
 //    ① `StackVariant`  —— 叠法（原型里 A~G 七种，用来让人挑）
 //    ② `StackMetrics`  —— 一个叠法的全部数值
-//    ③ `StackMath`     —— 纯函数：焦点序号、吸附落点、越界阻尼
+//    ③ `StackMath`     —— 纯函数：焦点序号、吸附落点、两端硬停
 //
 //  ③ 之所以要单独拎出来：它是**没有视图也能验的**那部分。手感的对错最终要靠
 //  真机，但「拖到 47% 该不该翻页」「最后一张能不能吸到阅读线」是算出来的，
@@ -136,7 +136,7 @@ enum StackVariant: String, CaseIterable, Identifiable {
         switch self {
         case .arc:
             // tiltDeg = 0：用户 2026-09-23 明确要求「卡片显示保持正常，不要倾斜特效」。
-            // 叠叠乐的艺术感由消失带与间距扌，不靠把卡转个角度。
+            // 叠叠乐的艺术感由消失带与间距支撑，不靠把卡转个角度。
             return StackMetrics(kind: .flow, padTop: 152, padBottom: 180, gap: 20,
                                 fadeTop: 150, fadeBottom: 140,
                                 tiltDeg: 0, shrink: 0.07, fadeOut: 0.16)

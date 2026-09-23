@@ -154,10 +154,8 @@ struct VehicleView: View {
             // 用车提示：由这辆车的读数推出来的提醒（原 `车辆提示` 页）
             StackCard(id: "tips", title: "用车提示", content: AnyView(VehicleTipsSection())),
             // 档案里的里程与车架号来自车控报文（`control`）—— 时间戳跟的是那个源，
-            // 不是「这一页什么时候画出来的」。
-            StackCard(id: "archive", title: "档案",
-                      at: store.cacheTime("control"),
-                      content: AnyView(archiveGroups)),
+            // 不是「这一页什么时候画出来的」。档案按**问题**拆开（一组一卡）：
+            out.append(contentsOf: archiveGroups),
             StackCard(id: "photos", title: "维保照片", content: AnyView(photoSection)),
             // 里程记账：花在车上的每一笔（原「我的」里的独立页 + sheet）
             StackCard(id: "journal", title: "里程记账", content: AnyView(MileageJournalSection()))
@@ -283,18 +281,35 @@ struct VehicleView: View {
 
     // MARK: - ④ 档案分组
 
-    private var archiveGroups: some View {
+    /// 档案分组**逐组拆成小卡**（用户 2026-09-23：超长卡拆小卡）。
+    /// 旧版把全部组堆进一张卡：组一多（身份/配置/注册保险/服务/设备/扩展/车况）
+    /// 就超出整屏，叠叠乐里一张卡永远读不完。拆开后一组一卡，每张都可读。
+    private var archiveGroups: [StackCard] {
         let gs = groups
-        return ForEach(Array(gs.enumerated()), id: \.element.name) { _, group in
-            DSGroup(title: group.name,
-                    trailing: "\(group.rows.count)",
-                    footer: "点一行可复制") {
-                ForEach(Array(group.rows.enumerated()), id: \.element.k) { idx, r in
-                    DSGroupRow(showsSeparator: idx < group.rows.count - 1) {
-                        DSRow(title: r.k, value: r.v) { copy(r.v, label: r.k) }
-                    }
+        guard !gs.isEmpty else { return [] }
+        return gs.enumerated().map { idx, group in
+            StackCard(
+                id: "archive-\(idx)",
+                title: group.name,
+                value: "\(group.rows.count) 项",
+                at: store.cacheTime("control"),
+                content: AnyView(groupCard(group))
+            )
+        }
+    }
+
+    /// 档案里的一整组（卡里不再包 `DSGroup` 的壳 —— 卡的头已经是组名了）。
+    private func groupCard(_ group: Grp) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(group.rows.enumerated()), id: \.element.k) { idx, r in
+                DSGroupRow(showsSeparator: idx < group.rows.count - 1) {
+                    DSRow(title: r.k, value: r.v) { copy(r.v, label: r.k) }
                 }
             }
+            Text("点一行可复制")
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.tertiary)
+                .padding(.top, TokensSpacing.sm)
         }
     }
 

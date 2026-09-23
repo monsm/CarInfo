@@ -274,8 +274,9 @@ struct ControlView: View {
                              content: AnyView(presetScenesCard)))
         out.append(StackCard(id: "history", title: "执行记录",
                              content: AnyView(historyCard)))
-        out.append(StackCard(id: "siri", title: "快捷指令",
-                             content: AnyView(SiriShortcutsCard())))
+        // 「快捷指令」从卡表里拿掉（用户 2026-09-23：控制页不要快捷指令卡）：
+        // Siri 快捷方式仍由 `SiriShortcuts.swift` 注册，界面只是不再摆这张卡。
+        // 若以后要恢复：重新把 `siri` 卡加回这里即可（`SiriShortcutsCard` 还留着）。
         return out
     }
 
