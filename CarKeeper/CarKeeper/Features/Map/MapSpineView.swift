@@ -16,12 +16,14 @@
 //
 //   Apple Maps —— 一张满屏地图 + 一张贴底的纸（sheet）。地图是唯一的岗位，
 //                 页面全从它身上长出来，没有 Tab、没有平行的一等公民。
-//   相机 App   —— 换模式**不离开取景框**：模式条紧贴在内容的上沿，
-//                 每一档只有文字、选中只靠颜色，且条子自身可横向滚动。
-//                 （细节与「为什么没照搬左右滑换模式」见 modeStrip）
+//   相机 App   —— 换档**不离开取景框**：模式条紧贴在内容的上沿，
+//                 每一档只有文字、选中只靠颜色；条子可手拖、松手吸附、中心项放大。
+//                 实现见 `Design/DSSwipeStrip.swift`，档位定义见 `HomeMode.swift`。
 //
-// 四个模式 = 四个真实问题（不是一个分类菜单）：现在 / 行程 / 停车 / 充电。
-// 换模式 = 同一张图换一个提问，图、车钉、手势全程不变。
+// 模式条分两级，**不要再混**：
+//   一级 `modeBar`（HomeMode，9 档）= 看哪个功能界面。全站唯一的入口。
+//   二级 `layerStrip`（MapSpineLayer，4 档）= 「现在」那一档内部看地图的哪个问题。
+// 此前四套入口（Tab 栏 / 顶部图层胶囊 / 右上角索引页 / 「我的」磁贴）已收归这一条。
 //
 // 三条架构规则（写错就出问题，不是风格问题）：
 //   ① 钉 = 屏幕空间（`Annotation`），面积/轨迹 = 地理空间（`MapPolyline`）。
@@ -53,6 +55,13 @@ struct MapSpineView: View {
     /// 记住上次看的图层（地图主屏的"当前位置"应该被记住，不该每次回到默认）
     // 键名定义在 MapSpineLayer.storageKey（别处把地图开到某一层也用同一个键）
     @AppStorage(MapSpineLayer.storageKey) private var layerRaw: String = MapSpineLayer.now.rawValue
+    /// 底部模式条停在哪一档（`HomeMode`）。
+    /// 它与 `layerRaw` 是**两个层级**：档位 = 我在看哪个功能界面；
+    /// 图层 = 「现在」那一档内部的第二级选择（现在 / 行程 / 停车 / 充电）。
+    @AppStorage(HomeMode.storageKey) private var homeModeRaw: String = HomeMode.now.rawValue
+    /// 模式条的**连续**位置（3.0 = 停在第四档，2.4 = 拖在第二、三档之间）。
+    /// 宿主只用它做内容过渡 —— 条子自己不用它排版。
+    @State private var modePosition: Double = 0
 
     @State private var camera: MapCameraPosition = .automatic
     @State private var didCenterOnce = false
@@ -76,23 +85,42 @@ struct MapSpineView: View {
     private var theme: ArtTheme { ArtTheme(rawValue: themeRaw) ?? .native }
     private var spec: MapStyleSpec { theme.mapSpec }
     private var layer: MapSpineLayer { MapSpineLayer(rawValue: layerRaw) ?? .now }
+    private var homeMode: HomeMode { HomeMode(rawValue: homeModeRaw) ?? .now }
+
+    /// 拖动中的内容透明度：停在整档时 1.0，拖到两档正中间最低 0.45。
+    /// 这是「换档」的观感 —— 内容不是被替掉，而是**在过渡**。
+    private var cardOpacity: Double {
+        let frac = abs(modePosition - modePosition.rounded())
+        return 1.0 - min(frac, 0.5) * 1.1
+    }
+
+    /// 内容的横向视差：跟着手指走一点点，方向与条子一致。
+    /// 只给 26pt（不是整屏位移）—— 多一点就成了翻页，而这里是换模式。
+    private var cardShift: CGFloat {
+        CGFloat(modePosition - modePosition.rounded()) * 26
+    }
 
     /// 数据在 main actor 上组装（AppStore 是 @MainActor @Observable）。
     @MainActor private var data: MapSpineData { MapSpineData.build() }
 
     var body: some View {
         let d = data
-        ZStack(alignment: .bottom) {
-            mapCanvas(d)
+        // GeometryReader 只为了一个数：纸的高度。
+        // 高度必须**固定**，因为模式条要长在那张纸的上沿 —— 纸一伸缩，条子就跳，
+        // 而相机那条模式条从不跳（它在 9 档之间的位置与高度一字不动）。
+        GeometryReader { geo in
+            ZStack(alignment: .bottom) {
+                mapCanvas(d)
 
-            VStack(spacing: 0) {
-                topBar(d)
-                Spacer(minLength: 0)
-                // 常驻操作条：高频动作不离开这张图就能发出去。
-                // 它与底部面板是**两件事**：面板是「车现在什么样」，条子是「现在能做什么」——
-                // 面板只服务「现在」这一层，而锁车在「行程/停车/充电」层里同样会发生。
-                MapQuickBar()
-                bottomPanel(d)
+                VStack(spacing: 0) {
+                    topBar(d)
+                    Spacer(minLength: 0)
+                    // 常驻操作条：高频动作不离开这张图就能发出去。
+                    // 它与底部面板是**两件事**：面板是「车现在什么样」，条子是「现在能做什么」——
+                    // 面板只服务「现在」这一档，而锁车在别的档位里同样会发生。
+                    MapQuickBar()
+                    bottomPanel(d, cardHeight: max(292, geo.size.height * 0.56))
+                }
             }
         }
         .background(TokensPalette.canvas)
@@ -305,7 +333,8 @@ struct MapSpineView: View {
     @ViewBuilder
     private func topBar(_ d: MapSpineData) -> some View {
         VStack(spacing: TokensSpacing.sm) {
-            // 顶部的图层胶囊条已**整个移到底部纸的上沿**，并改成相机 App 的模式条语法（见 modeStrip）。
+            // 顶部的图层胶囊条已**整个移到底部纸的上沿**，并改成相机 App 的模式条语法
+            // （一级 `modeBar` / 二级 `layerStrip`）。
             // 顶部现在只剩一件事：这台车此刻的数据是不是新的。
             HStack(spacing: TokensSpacing.sm) {
                 HStack(spacing: TokensSpacing.sm) {
@@ -391,21 +420,37 @@ struct MapSpineView: View {
     // =========================================================================
 
     @ViewBuilder
-    private func bottomPanel(_ d: MapSpineData) -> some View {
-        VStack(alignment: .leading, spacing: TokensSpacing.md) {
+    private func bottomPanel(_ d: MapSpineData, cardHeight: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             panelGrab
-            modeStrip
-            panelTitle(d)
-            if d.hasLocation == false {
-                // 没有位置时，**不摆一堆 -- 占位**，只说清为什么
-                emptyNotice("还没收到车的位置上报。连上车之后这张图才会有东西可看。")
-            } else {
-                switch layer {
-                case .now: nowContent(d)
-                case .trips: tripsContent(d)
-                case .holds: holdsContent(d)
-                case .charge: chargeContent(d)
+            // ===== 全站唯一的入口 =====
+            // 9 档功能界面都在这一条上，位置/高度/底色在 9 档之间完全不变。
+            // 它取代了此前四套入口（Tab 栏 / 顶部图层 / 索引页 / 「我的」磁贴）
+            // ——“同一个功能有四个入口”就是「缝合怪」的来源。
+            modeBar
+            Group {
+                if homeMode == .now {
+                    nowPanel(d)
+                } else {
+                    // 页面本身就是一张带滚动的纸（`DSPaperPage`），直接放进固定高度的大卡：
+                    // 内容多了在纸里滚，纸不会撑高，所以模式条的位置一动不动。
+                    // 两张纸用**同一个** `TokensPalette.surface`，叠在一起只是多出一条
+                    // 发丝线 —— 那条线刚好把「切换器」和「切换出来的内容」分开。
+                    pageContent(homeMode)
                 }
+            }
+            .frame(height: cardHeight, alignment: .top)
+            .opacity(cardOpacity)
+            // 视差只给 26pt（±13pt），位移落在卡片自己的内边距里，不会潦到地图上。
+            .offset(x: cardShift)
+            // 长按纸面 → 把这一档**推入整屏**。
+            // 卡片是固定高度的窗口，长页面在窗口里滚；想看整屏就读整屏。
+            // 每个档位与它那个深链的对应关系（`HomeMode.deeplink`）就落在这一行 ——
+            // 不写在这里，它就是一个没人用的映射表。
+            .onLongPressGesture {
+                guard let link = homeMode.deeplink else { return }
+                TokensHaptic.tap()
+                nav.pushNavigation(link)
             }
         }
         .padding(.horizontal, TokensSpacing.md)
@@ -427,8 +472,61 @@ struct MapSpineView: View {
     }
 
     // =========================================================================
-    // MARK: 模式条（相机 App 的语法，替代了顶部的胶囊条）
+    // MARK: 模式条 —— 一级（功能界面）与二级（地图图层）
     // =========================================================================
+
+    /// 底部那条模式条：**全站唯一的入口**。
+    /// 它长得跟相机那条一模一样，因为它就是同一件东西 —— 一个可手拖、松手吸附、
+    /// 中心项放大的档位选择器（实现见 `Design/DSSwipeStrip.swift`）。
+    /// 换档**不换屏**：地图与这张纸都不动，动的只有纸里的内容。
+    private var modeBar: some View {
+        DSSwipeStrip(items: HomeMode.stripItems, selectedID: $homeModeRaw) { pos in
+            modePosition = pos
+        }
+    }
+
+    /// 「现在」这一档的纸：二级选择（地图图层）+ 车名/地址 + 该图层的内容。
+    /// 它包在 ScrollView 里：纸的高度是固定的（ModeBar 要长在固定的上沿），
+    /// 所以内容多的时候就该**在纸里滚**，而不是把纸撞高。
+    @ViewBuilder
+    private func nowPanel(_ d: MapSpineData) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: TokensSpacing.md) {
+                layerStrip
+                panelTitle(d)
+                if d.hasLocation == false {
+                    // 没有位置时，**不摆一堆 -- 占位**，只说清为什么
+                    emptyNotice("还没收到车的位置上报。连上车之后这张图才会有东西可看。")
+                } else {
+                    switch layer {
+                    case .now: nowContent(d)
+                    case .trips: tripsContent(d)
+                    case .holds: holdsContent(d)
+                    case .charge: chargeContent(d)
+                    }
+                }
+            }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+    }
+
+    /// 每一档 = 一个完整的功能界面。
+    /// **入口只有一个 switch**：加页面就在 `HomeMode` 里加一档、在这里加一个 case。
+    /// 这里是全 App 唯一列全功能界面的地方 —— 再没有第二处“入口清单”可以对不上。
+    @ViewBuilder
+    private func pageContent(_ mode: HomeMode) -> some View {
+        switch mode {
+        case .now: EmptyView()              // 「现在」不走这条路：它就是地图那张纸本身
+        case .vehicle: VehicleView()
+        case .health: HealthDataView()
+        case .battery: BatteryView()
+        case .control: ControlView()
+        case .trips: TripsEventsView()
+        case .service: MaintenanceMoneyView()
+        case .mine: MineView()
+        case .dev: DevView()
+        }
+    }
     // 主框架 = **Apple Maps 的一张全屏地图 + 一张贴着底边的纸**，
     // 而「换这张纸在回答哪个问题」用的是**相机 App 的模式条**：
     //
@@ -444,7 +542,9 @@ struct MapSpineView: View {
     //
     // 为什么它不在顶部（原来的胶囊条在顶部）：那既不像地图（Maps 把模式选择放在纸的上沿，
     // 紧挨它控制的内容），也不像相机（相机的模式条在内容下沿），还和顶部的同步状态抢同一条视线。
-    private var modeStrip: some View {
+    /// 「现在」这一档内部的二级选择（四个地图图层）。
+    /// 它是**第二级**：一级的九个功能界面归 `modeBar`。
+    private var layerStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: TokensSpacing.xl) {
                 ForEach(MapSpineLayer.allCases) { l in

@@ -43,7 +43,8 @@ struct TripsEventsView: View {
                 guard let kind = ciString(m, ["InfoTypeId", "infoTypeId"])?.uppercased(),
                       kind == "IGNITION" || kind == "FLAMEOUT" else { return nil }
                 let p = AppStore.jumpParams(m)
-                guard let at = VM.serverDate(p["gpsTime"]) ?? VM.serverDate(ciPick(m, ["CreatedAt", "createdAt"])) else { return nil }
+                let fallbackAt = VM.serverDate(ciPick(m, ["CreatedAt", "createdAt"]))
+                guard let at = VM.serverDate(p["gpsTime"]) ?? fallbackAt else { return nil }
                 var loc: CLLocationCoordinate2D?
                 if let lat = VM.vnum(p["lat"]), let lng = VM.vnum(p["lng"]) {
                     loc = CLLocationCoordinate2D(latitude: lat, longitude: lng)
@@ -127,7 +128,8 @@ struct TripsEventsView: View {
     // ---- 空态：一句真话，不放假统计 ----
     private var emptyState: some View {
         VStack(spacing: TokensSpacing.md) {
-            Image(safeSymbol: "point.topleft.down.to.point.bottomright.curvepath", fallback: "point.topleft.down.to.point.bottomright.curvepath")
+            Image(safeSymbol: "point.topleft.down.to.point.bottomright.curvepath",
+                            fallback: "point.topleft.down.to.point.bottomright.curvepath")
                 .font(TokensTypo.fixed(34, weight: .light))
                 .foregroundStyle(TokensPalette.tertiary)
             Text("还没有行程记录")

@@ -226,7 +226,8 @@ struct MessagesSection: View {
                             Text(shortTime(item.time))
                             .font(TokensTypo.footnote)
                             .foregroundStyle(TokensPalette.secondary)
-                            Image(safeSymbol: isOpen ? "chevron.up" : "chevron.down", fallback: isOpen ? "chevron.up" : "chevron.down")
+                            Image(safeSymbol: isOpen ? "chevron.up" : "chevron.down",
+                                    fallback: isOpen ? "chevron.up" : "chevron.down")
                                 .font(TokensTypo.fixed(11, weight: .semibold))
                                 .foregroundStyle(TokensPalette.tertiary)
                         }

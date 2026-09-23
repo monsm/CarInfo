@@ -541,7 +541,8 @@ struct ControlView: View {
                     withAnimation(TokensMotion.press) { showMoreCommands.toggle() }
                 } label: {
                     HStack(spacing: TokensSpacing.sm) {
-                        Image(safeSymbol: showMoreCommands ? "chevron.up" : "chevron.down", fallback: showMoreCommands ? "chevron.up" : "chevron.down")
+                        Image(safeSymbol: showMoreCommands ? "chevron.up" : "chevron.down",
+                              fallback: showMoreCommands ? "chevron.up" : "chevron.down")
                             .font(TokensTypo.footnote.weight(.bold))
                             .foregroundStyle(TokensPalette.tertiary)
                         Text(showMoreCommands ? "收起" : "更多指令")

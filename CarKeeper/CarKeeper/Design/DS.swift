@@ -1043,6 +1043,12 @@ extension View {
     }
 }
 
+// 为什么不给这张纸做「已在大卡里就少画一层」的开关（曾经想用自定义 EnvironmentKey）：
+//   ① 门禁 `scan.py` 只认显式核实过的 SDK 名字，`EnvironmentKey` 不在里面 ——
+//      为一个视觉开关去扩白名单，是拿一个真实的编译验证换一个观感上的细节；
+//   ② 而且没必要：大卡与这张纸**填的是同一个 `TokensPalette.surface`**，
+//      两层叠在一起只会多出一条发丝线（就在模式条下方）—— 那条线反而有用，
+//      它把「切换器」与「切换出来的内容」分开。
 struct DSPaperPageModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
