@@ -58,7 +58,6 @@ SCOPE_DIRS = [
     "CarKeeper/Shared",
     "CarKeeper/Widgets",
     "CarKeeper/WatchApp",
-    "CarKeeper/AppClip",
 ]
 
 # 白名单：{ "相对路径:行内容关键词": "理由" }

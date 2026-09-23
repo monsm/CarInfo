@@ -210,7 +210,7 @@ def workflow_build_targets(workflow_dir):
 
     为什么必须读它：scheme 的 build action 只列了主 App，其余 target 是
     靠这段循环编的。清单漏了谁，谁就永远不被编译 —— 这正是 2026-09-22 之前的
-    真实状态（WidgetBundle / WatchApp / WatchKitApp / CarPlay / AppClip 从未编译过）。
+    真实状态（WidgetBundle / WatchApp / WatchKitApp 从未编译过）。
     """
     out = []
     if not os.path.isdir(workflow_dir):

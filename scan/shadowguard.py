@@ -16,7 +16,7 @@ from pathlib import Path
 STRICT = "--strict" in sys.argv
 ARGV = [a for a in sys.argv[1:] if not a.startswith("--")]
 
-TK = ["CarKeeper", "Services", "Shared", "Widgets", "WatchApp", "AppClip", "CarPlay", "Models", "Design", "HealthKit"]
+TK = ["CarKeeper", "Services", "Shared", "Widgets", "WatchApp", "Models", "Design", "HealthKit"]
 
 # 已核实的「现存」SDK / 标准库类型名 —— 嵌套同名 = 真遮蔽（默认即报错）。
 # 核实方式：Apple 文档 JSON 端点存在性（例：/documentation/swiftui/link.json 200）。

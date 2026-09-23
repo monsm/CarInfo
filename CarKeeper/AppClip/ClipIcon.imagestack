@@ -1,7 +1,0 @@
-<!-- AppClip Icon Configuration -->
-<!-- Create 3 image layers for the AppClip icon: -->
-<!-- 1. Front: 835x835px PNG -->
-<!-- 2. Middle: 835x835px PNG (shown when tapped) -->
-<!-- 3. Back: 835x835px PNG -->
-<!-- Place in AppClip/AppClipIcon.imagestack/Media.applatest/ -->
-<!-- This is a reference file; actual images should be created in Xcode -->

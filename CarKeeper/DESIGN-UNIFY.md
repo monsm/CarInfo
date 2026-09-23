@@ -389,3 +389,13 @@ ScrollView {
 | ✅23 | **CarPlay 已移除**：因免费账号无法配置 CarPlay entitlement，相关 target / 源码 / CI 步骤 / 文档已全部清理。保留 `VehicleSnapshot.lat/lng` 字段（主 App 地图仍用），删除 `CarPlay/` 目录 | WidgetTokens.swift / AppStore.swift |
 
 **门禁同步**：无新增门禁。
+
+### 第七轮：免费账号能力的收尾（2026-09-23 第七轮）
+
+| # | 做了什么 | 落在哪个面 |
+|---|---|---|
+| ✅24 | **App Clip target 删除**：它的调用前提是 associated-domains 里的 `appclips:` 域（那份 entitlement 上一轮已随免费账号清理删掉），而分发只能走 App Store / TestFlight（均需付费）。于是它只能是一个「编译得动、但永远打不开」的 target，还占着一个图标与一次 target 编译。连同 `AppClip/` 目录、`project.yml` 一段、工作流里的编译清单、七个扫描器里的引用一起删 | project.yml / CI / scan/*.py |
+| ✅25 | **Info.plist 死键清掉**：`NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription`（HealthKit 代码早删）、`CKCloudKitEnabled`（CloudKit 同步早删）—— 留着就是在说一件不存在的事（系统会为一个永远不会发生的权限准备文案） | CarKeeper/Resources/Info.plist |
+| ✅26 | **新增第 19 项门禁 `scan/paidcap.py`**：把「免费账号用不了的能力」变成可执行的约束。四条判据：entitlements 键白名单（目前只准 App Groups）· Info.plist 禁键 · 源码禁 import / API（CloudKit / HealthKit / WeatherKit / StoreKit / Family Controls / APNs / **MKDirections** ……）· target 白名单（AppClip / CarPlay 不许回来）。依据是 Apple《Supported capabilities (iOS)》那份表，同页注释明写：**非 ADP 成员可以用 MapKit，但不能提供路线导航** | scan/paidcap.py + CI |
+
+**门禁同步**：18 → 19 项（`traps.py` 之后新增 `paidcap.py`）。

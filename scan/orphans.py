@@ -16,8 +16,8 @@
 
 判据（刻意收窄，避免假阳性）：
   • 只看 `CarKeeper/CarKeeper/**`、`CarKeeper/{Services,Models,Design,Shared,HealthKit}/**`
-    —— 这些是编进 App 主 target 的源码；扩展 target（Widgets / WatchApp /
-    CarPlay / AppClip）与测试不在报告范围（但它们的引用**算数**）。
+    —— 这些是编进 App 主 target 的源码；扩展 target（Widgets / WatchApp）
+    与测试不在报告范围（但它们的引用**算数**）。
   • 一个文件里的**顶层类型声明**（列 0 的 struct/class/enum/actor）如果在
     **其它任何文件**里一次都没被提到，就算孤儿。
   • 跳过入口类文件：含 `@main` / `PreviewProvider` / `#Preview` /

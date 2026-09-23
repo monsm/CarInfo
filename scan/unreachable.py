@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(".")
-TK = ["CarKeeper/", "Services/", "Shared/", "Widgets/", "WatchApp/", "AppClip/", "CarPlay/", "HealthKit/", "Models/", "Design/"]
+TK = ["CarKeeper/", "Services/", "Shared/", "Widgets/", "WatchApp/", "HealthKit/", "Models/", "Design/"]
 
 files = []
 for tk in TK:

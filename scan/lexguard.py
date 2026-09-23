@@ -42,7 +42,7 @@ import sys
 from pathlib import Path
 
 TK = ["CarKeeper", "Services", "Shared", "Widgets", "WatchApp",
-      "AppClip", "CarPlay", "Models", "Design", "HealthKit"]
+      "Models", "Design", "HealthKit"]
 
 
 def is_cjk(ch):

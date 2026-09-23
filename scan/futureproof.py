@@ -14,7 +14,7 @@ import re
 import sys
 from pathlib import Path
 
-TK = ["CarKeeper", "Services", "Shared", "Widgets", "WatchApp", "AppClip", "CarPlay", "Models", "Design", "HealthKit"]
+TK = ["CarKeeper", "Services", "Shared", "Widgets", "WatchApp", "Models", "Design", "HealthKit"]
 
 # 项目自己声明的类型名（从 Kansei/DS 等令牌与常见模型里来），用于区分「自有枚举」
 PROJECT_ENUM_HINT = re.compile(

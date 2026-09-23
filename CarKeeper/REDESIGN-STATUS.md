@@ -972,3 +972,48 @@ CI 一直在报 `AppIcon has 2 unassigned children`。原因：出包的
 
 **还没被证明的那一步**：本次修复本身只经过静态门禁（18 项全绿），真机确认要重新装一轮 IPA。
 
+---
+
+## 免费账号能力的收尾（2026-09-23）
+
+依据：Apple《Supported capabilities (iOS)》—— 那张表按 ADP / ADEP / Apple Developer（免费）
+三档列出每个能力；同一页的注释里还写着：非 ADP 成员可以用 MapKit，**但不能提供路线导航**。
+
+### 删掉
+
+| 删了什么 | 为什么它用不了 | 代价 |
+|---|---|---|
+| `AppClip/` 整个 target（8 个文件） | 调用前提是 associated-domains 里的 `appclips:` 域 —— 那份 entitlement 上一轮已删；分发又只能走 App Store / TestFlight（均需付费）。它只能是一个「编译得动、但永远打不开」的 target | 少编 2 个文件 + 一个 target；`project.yml` 一段、工作流清单、7 个扫描器的引用同步清 |
+| Info.plist 的 `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription` | HealthKit 代码早删；而且 HealthKit 是要注册的能力。留着就是让系统为一个永远不会发生的权限准备文案 | 无 |
+| Info.plist 的 `CKCloudKitEnabled` | CloudKit 同步那套代码早删 | 无 |
+
+删 App Clip 时顺手清掉了 `scan/baseline` 之外的七个扫描器里对 CarPlay / AppClip 的残留引用 ——
+它们的 docstring 还在说「扩展 target（Widgets / WatchApp / CarPlay / AppClip）」，
+而 CarPlay 目录早已不存在：**文档跟代码对不上时，文档就是那句谎言。**
+
+### 新增第 19 项门禁：`scan/paidcap.py`
+
+这类东西的共同特征是「编译得过・门禁全绿・UI 上看得见入口・点下去永远拿不到东西」，
+而且**后来的人会照着它继续写**。所以把它变成可执行的约束，四条判据：
+
+| 判据 | 内容 |
+|---|---|
+| ① entitlements 键白名单 | 目前只准 `com.apple.security.application-groups` 一项 |
+| ② Info.plist 禁键 | UIBackgroundModes / BGTaskScheduler / HealthKit 用途说明 / CKCloudKitEnabled / NSAppClip / aps-environment / weatherkit / icloud-* |
+| ③ 源码禁 import 与禁 API | CloudKit・HealthKit・WeatherKit・StoreKit・PassKit・HomeKit・GameKit・NetworkExtension・SensorKit・MusicKit・CoreNFC・DeviceCheck・Sign in with Apple・FamilyControls/DeviceActivity/ManagedSettings・BGTaskScheduler，以及 APNs 注册、`CKContainer`、`HKHealthStore`、critical/time-sensitive 通知、内购、**`MKDirections`** |
+| ④ target 白名单 | CarKeeper / WidgetBundle / WatchApp / WatchKitApp / CarKeeperTests；AppClip / CarPlay 不许回来 |
+
+**它不是摆设**：注入探针（`aps-environment` + `com.apple.developer.healthkit` 两个 entitlement 键，
+以及 `import CloudKit` / `CKContainer.default()` / `MKDirections.Request()` /
+`registerForRemoteNotifications()`）一次全部被抓到，探针删除后立刻转绿。
+第一次跑还被 `scan/baseline/` 误伤过 —— 那是**冻结的旧树快照**，不该被当前纪律追着改，
+已在扫描范围里排除。
+
+### 仍在用、且免费那一档拿不到的：App Group（唯一一项）
+
+小组件 / Watch / 实时活动靠 `UserDefaults(suiteName: "group.com.you.CarKeeper")` 共用车况快照。
+风险在于：免费账号在开发者后台**看不到 Identifiers 列表**，侧载工具重新签名时可能把这份
+entitlement 摘掉。**所有读取点都带兜底**（`?? .standard` 或 `guard let … else`），
+所以最坏情况是小组件显示占位数据，而不会崩 —— 这一点已由 `paidcap.py` 判据④守住。
+如果要它真的显示真数据，需要付费会员；是否删掉这三个扩展，待真机侧载环境确认后决定。
+

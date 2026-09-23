@@ -11,7 +11,6 @@ FILES = [
     "CarKeeper/CarKeeper/Features/Map/MapSpineData.swift",
     "CarKeeper/CarKeeper/Features/Dev/DevView.swift",
     "CarKeeper/CarKeeper/AppStore.swift",
-    "CarKeeper/AppClip/AppClipEntrance.swift",
 ]
 
 BS = chr(92)

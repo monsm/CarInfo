@@ -42,12 +42,11 @@
     <string>用于保存车辆照片到相册</string>
     <key>NSFaceIDUsageDescription</key>
     <string>用于验证身份后访问敏感信息</string>
-    <key>NSHealthShareUsageDescription</key>
-    <string>用于读取健康数据换算碳减排</string>
-    <key>NSHealthUpdateUsageDescription</key>
-    <string>用于把碳减排数据写入健康 App</string>
-    <key>CKCloudKitEnabled</key>
-    <false/>
+    <!-- 2026-09-23 删掉的死键（留着就是在说一件不存在的事）：
+           · NSHealthShareUsageDescription / NSHealthUpdateUsageDescription
+             —— HealthKit 的用途说明。读健康数据的代码早已删除，HealthKit
+                也是要注册的能力（免费账号用不了），系统只会问一个永远不会发生的权限。
+           · CKCloudKitEnabled —— iCloud/CloudKit 的残留开关，同步那套代码早已删光。 -->
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>
