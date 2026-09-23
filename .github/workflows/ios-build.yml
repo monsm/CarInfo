@@ -53,11 +53,17 @@ jobs:
           # 2026-09-23 真机崩溃就是这么来的：`6 + type.hashValue * 2` 溢出（SIGTRAP），
           # 而那行在默认值里 —— 也就是「只要用户没存过提醒，切到车辆档必崩」。
           # 17 项门禁全绿、本地看不出、连编译器都不出声；能出声的只有真机报告。
+          # scopeguard.py：作用域。2026-09-23 那轮 CI 红了 12 个错误，其中 8 个是同一个成因：
+          # 把四处 `arr.isEmpty ? "--" : arr.min()!` 收成助手时，调用写成了裸名字，
+          # 而助手住在 `enum AN` 里、调用点在顶层函数内。名字在项目里**确实存在**，
+          # 所以 scan.py 放行（它只查「有没有声明」），能看见的只有 macOS 上那台编译器。
+          # 这条把「跳类型调静态成员必须带前缀」变成 Linux 上秒级可查的约束，
+          # 代价只是一次本地运行，而它可以省下一整轮 10 倍计费的 macOS runner。
           # paidcap.py：免费 Apple 个人账号（未付 99 美金）用不了的能力。
           # 已因此删过四轮：CloudKit 同步、BGTaskScheduler、CarPlay target、AppClip target。
           # 这类东西的特征是「编译得过、UI 上看得见入口、点下去永远拿不到东西」——
           # 代码里存在一个用户永远用不了的假功能，后来的人还会照着它继续写。
-          for s in paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps paidcap; do
+          for s in paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps scopeguard paidcap; do
             echo "::group::$s.py"
             python3 scan/$s.py
             echo "::endgroup::"

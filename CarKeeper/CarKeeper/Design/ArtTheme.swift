@@ -27,7 +27,8 @@
 //      `labelOnTint`（彩色面上的文字）、`TokensTypo.fixed`（不跟随 Dynamic Type 的零件）
 //      就是那一轮补的三个口子。**由 `scan/design.py` 长期把守**：字号与颜色字面量
 //      只允许出现在 Tokens.swift / WidgetTokens.swift / 本文件里，
-//      除此之外任何一处都要显式豁免并写明理由（未豁免就报错）。  //   ② 小组件 / AppClip 共用 Shared/WidgetTokens.swift（同一份源文件，
+//      除此之外任何一处都要显式豁免并写明理由（未豁免就报错）。
+//   ② 小组件与 App 共用 Shared/WidgetTokens.swift（同一份源文件，
 //      编译器保证不漂移）；Watch **不能**共享它 —— `WT.Palette` 的系统语义色在 watchOS
 //      上不存在（secondarySystemGroupedBackground 的 platforms 无 watchOS，已核实），
 //      所以手表那份是显式豁免。

@@ -421,16 +421,16 @@ func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
             count: VM.n0(ciPick(sub, ["CurrentBatteryCount"])) ?? VM.n0(ciPick(sub, ["BatteryCount"])) ?? "--",
             volt: VM.n1(ciPick(sub, ["ChargeSystemVoltage"])) ?? "--",
             amp: VM.n0(ciPick(sub, ["ChargeSystemCurrent"])) ?? "--",
-            vMin: extremeText(numberList(sub, "BatteryVoltage"), digits: 3, lowest: true),
-            vMax: extremeText(numberList(sub, "BatteryVoltage"), digits: 3, lowest: false)
+            vMin: AN.extremeText(AN.numberList(sub, "BatteryVoltage"), digits: 3, lowest: true),
+            vMax: AN.extremeText(AN.numberList(sub, "BatteryVoltage"), digits: 3, lowest: false)
         )
     }
     let tempSubs: [TempSub] = (ciArray(control, ["NevChargeSystemTemperatureDtoList"]) ?? []).map { sub in
         TempSub(
             num: VM.n0(ciPick(sub, ["ChildSystemNum"])) ?? "--",
             count: VM.n0(ciPick(sub, ["ChargeTemperatureProbeNum"])) ?? "--",
-            tMin: extremeText(numberList(sub, "ProbeTemperatures"), digits: 1, lowest: true),
-            tMax: extremeText(numberList(sub, "ProbeTemperatures"), digits: 1, lowest: false)
+            tMin: AN.extremeText(AN.numberList(sub, "ProbeTemperatures"), digits: 1, lowest: true),
+            tMax: AN.extremeText(AN.numberList(sub, "ProbeTemperatures"), digits: 1, lowest: false)
         )
     }
 

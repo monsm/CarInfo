@@ -58,7 +58,7 @@ enum WT {
             light: (0.000, 0.780, 0.745),
             dark: (0.400, 0.839, 1.000)
         )
-        /// 铺在**彩色面之上**的文字色（AppClip 的渐变卡、地图主面的深色）。
+        /// 铺在**彩色面之上**的文字色（小组件的彩色底、地图主面的深色）。
         /// 它在两种外观下都是白 —— 因为它站的那块底是彩色的，不是画布。
         /// （App 内对应的是 `TokensPalette.labelOnTint`，两者同名同义。）
         static let onAccent = Color.white
@@ -109,7 +109,7 @@ enum WT {
         static func data(_ size: CGFloat = 15) -> Font {
             .system(size: size).monospacedDigit()
         }
-        /// 定尺文字（**不随 Dynamic Type**）：画布是固定几何（小组件、车机、AppClip 圆形 Logo）时用。
+        /// 定尺文字（**不随 Dynamic Type**）：画布是固定几何（小组件、实时活动的圆形 Logo）时用。
         /// 与 App 侧的 `TokensTypo.fixed` 同名同义 —— 两边都只能从令牌文件里出尺寸。
         static func fixed(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
             .system(size: size, weight: weight)

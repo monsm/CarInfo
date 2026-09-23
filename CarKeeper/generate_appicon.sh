@@ -38,18 +38,18 @@ else
     fi
 fi
 
-# 定义尺寸映射
+# 定义尺寸映射 —— 只列 Contents.json 真正引用的七个槽位。
+#
+# 1x 槽位（29×29 / 40×40 / 76×76）在 iOS 26 上没有任何消费者（支持机型全是
+# @2x/@3x）；iPad 专属槽位（76×76@2x / 83.5×83.5@2x）会被 actool 记成
+# 「AppIcon has N unassigned children」而忽略，iPad 图标由 1024 自动生成
+# （AppIcon-SPEC.md 有证据）。生成它们只会得到没人引用的文件。
 declare -A SIZES=(
     ["AppIcon-1024x1024.png"]="1024x1024"
     ["AppIcon-60x60@2x.png"]="120x120"
     ["AppIcon-60x60@3x.png"]="180x180"
-    ["AppIcon-76x76.png"]="76x76"
-    ["AppIcon-76x76@2x.png"]="152x152"
-    ["AppIcon-83.5x83.5@2x.png"]="167x167"
-    ["AppIcon-29x29.png"]="29x29"
     ["AppIcon-29x29@2x.png"]="58x58"
     ["AppIcon-29x29@3x.png"]="87x87"
-    ["AppIcon-40x40.png"]="40x40"
     ["AppIcon-40x40@2x.png"]="80x80"
     ["AppIcon-40x40@3x.png"]="120x120"
 )

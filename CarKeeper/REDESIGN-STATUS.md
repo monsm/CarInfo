@@ -269,11 +269,13 @@
   充电监控 / 摇一摇 / 专注模式 / 车端里程 / 上次保养里程。它们本来就跑着，
   只是输出没有任何界面在显示 —— 那就等于没有。
 
-### 10.6 一处工程告警的病因确认
+### 10.6 一处工程告警的病因确认（**结论已更正**，见文末「CI 复红」一节）
 
-AppIcon 每次 CI 都报「3 unassigned children」：实测 `Contents.json` 与磁盘**一一对应**
-（12 条目 / 12 文件），真正的成因是 `1x` 的 76×76 / 29×29 / 40×40 三个槽位在当前 SDK
-已不再分配（数量正好是 3）。已删条目与对应的三个 PNG。
+当时记的结论是：AppIcon 每次 CI 都报「3 unassigned children」，成因是 `1x` 的
+76×76 / 29×29 / 40×40 三个槽位在当前 SDK 已不再分配（数量「正好是 3」）。
+**这个结论是错的** —— 3 只是巧合：那一轮把三个 1x 全删之后，N 并没有归零，
+而是 3 → 2，剩下的 2 正好等于 `Contents.json` 里 `idiom: "ipad"` 的条数。
+真正的成因是 `idiom`，证据与推演见 `AppIcon-SPEC.md`。
 
 ### 10.7 验证
 
@@ -859,14 +861,14 @@ secondarySystemGroupedBackground
 现在只看 token；解析出 0 条会 NSLog 打顶层键与响应长度；空状态区分「真没消息」
 与「拉取失败（带真实错误）」；已读判据回到小程序的 `readStatus`。
 
-### 4. 图标：两份并存，其中一份还缺 iPad 76×76 1x（已对齐）
+### 4. 图标：两份并存（已对齐）
 
-CI 一直在报 `AppIcon has 2 unassigned children`。原因：出包的
-`Assets.xcassets/AppIcon.appiconset` 只有 9 个槽位，缺 iPad 76×76 **1x**，
-使那两个 iPad @2x 槽位变成未分配。仓库根目录另有一份 `AppIcon/`（12 个 PNG，
-文档里的旧命令写进去的）—— 而 Xcode 只认 appiconset。
-已把 76×76 补进 appiconset（补槽位 + 拷文件，两侧一致已校验），删掉根目录那份，
-并把 `AppIcon-SPEC.md` 的生成命令改成唯一的 `generate_appicon.sh`。
+仓库根目录另有一份 `AppIcon/`（12 个 PNG，文档里的旧命令写进去的）—— 而 Xcode 只认
+appiconset。已删掉根目录那份，并把 `AppIcon-SPEC.md` 的生成命令改成唯一的
+`generate_appicon.sh`。
+
+（这一节原先还写着「缺 iPad 76×76 1x 导致 2 unassigned children，已补齐」——
+那句话是错的：补齐之后 N 从 2 变成了 3。成因与证据见文末「CI 复红」一节。）
 
 ### 5. 删掉的死代码
 
@@ -1052,4 +1054,50 @@ entitlement 摘掉。**所有读取点都带兜底**（`?? .standard` 或 `guard
   反向自测：注释里的假清单被忽略，而真清单漏掉 `WatchKitApp` 仍然报红。
 
 下一步就等下一轮 CI 日志里那段「IPA 内容体检」。它一出结论，就知道该改工程还是改侧载流程。
+
+---
+
+## CI 复红（2026-09-23 01:50）—— 12 个编译错误 + 一处「永远显示 0」
+
+读完上一次推送的 CI 日志，红的原因是 12 个编译错误，而它们**全是上一轮我自己引入的**：
+
+| 现象 | 真因 |
+|---|---|
+| `cannot find 'extremeText' / 'numberList' in scope`（Analysis.swift ×8） | 把四处 `arr.isEmpty ? "--" : arr.min()!` 收成助手时写成了**裸名字**。助手住在 `enum AN` 里，而调用点在**顶层函数** `batteryModel(_:)` 内 —— 越了作用域。改成 `AN.extremeText(AN.numberList(...))` |
+| `HomeModeHead:186 cast ... always fails` | 诊断档那行「消息缓存 N 条」写的是 `ciVal(caches, "messages") as? [[String: Any]]`，而 `ciVal` 只返回 `[String: Any]?` —— 这个转换**恒失败**，于是该行永远是 0 条，看上去像「消息拉不到」，其实只是取错了形状（消息缓存存的是数组，`MessagesSection` 自己就是直接下标取的）。改为 `store.caches["messages"] as? [[String: Any]]` |
+| `HomeModeHead:82/147 downcast ... does nothing`（警告） | `ciVal(...) as? [String: Any]` 是空转（返回值本来就是 `[String: Any]?`）。去掉 `as?` |
+
+顺手做了同类扫描：`AN` 的所有成员（`stats` / `numberList` / `extremeText` / `barsOf` /
+`summarize` / 四个状态常量）在 `AN` 体外是否还有裸调 —— 结论是没有别处。
+
+### 同一份日志里的 AppIcon 警告：结论纠正
+
+N 从 2 变 3 是这一轮造成的（往 `Contents.json` 里加了一条 `idiom: "ipad"` 的 76×76 1x）。
+把四个提交的 JSON 组成与 CI 的 N 对齐之后，成因确定了：**被忽略的是 `idiom: "ipad"`
+的条目，不是 1x 槽位**。判决点是 `ad02a88` —— 那一轮把三个 1x 全删，N 只从 3 变 2。
+详见 `AppIcon-SPEC.md`。
+
+处置：`Contents.json` 与磁盘都收到 **7 条 / 7 文件，全部 `idiom: "universal"` +
+`platform: "ios"`**（1024 + 60@2x/3x + 29@2x/3x + 40@2x/3x）；两个生成脚本的槽位表
+同步收窄，免得重新生成又把那五个没人引用的文件写回来。依据是 Apple 文档那句
+「iOS, iPadOS, tvOS, and watchOS apps can auto-generate all icon variations from a
+single 1024×1024 pixel image」。
+
+预期下一轮 CI 的 N = 0 —— 这一条**只能由 CI 证实**，本地没有 Xcode。
+
+### 新增第 19 项门禁 `scan/scopeguard.py`
+
+那 8 个错误的成因值得写成规则：**名字在项目里、但在调用点不在作用域**。
+`scan.py` 见到「项目内有这个声明」就放行，所以它看不见；能看见它的只有 10 倍计费的
+macOS runner。判据只有一条：某个类型的 `static` 成员被跨类型裸调（没写 `类型.` 前缀）。
+
+合法情形全部实测放行：调用点在该名字所属类型体内（含嵌套与外层）、文件顶层有同名声明、
+项目里有同名全局函数、名字短于 6 个字符（太容易撞上局部变量与参数）。
+
+双向都验过，不是摆设：注入探针（`enum ProbeOwner { static func probeHelper }` + 顶层函数
+与另一个类型里的两个调用点）**两处都报**；删掉探针立刻转绿。它还先测出一个假阴性：
+第一版把同文件内的静态成员当成「文件局部」，而事故恰好发生在同一个文件里
+（`extremeText` 与调用点都在 Analysis.swift）—— 那样它会静默放行这起真实事故。
+假阳性也修过一轮：`BatteryView` / `ControlView` 各自都有 `private func sectionLabel(...)`，
+而 `sectionLabel` 同时是令牌类型的静态成员，第一版误报 9 处。
 

@@ -21,27 +21,6 @@
       "size" : "60x60"
     },
     {
-      "filename" : "AppIcon-76x76.png",
-      "idiom" : "ipad",
-      "platform" : "ios",
-      "scale" : "1x",
-      "size" : "76x76"
-    },
-    {
-      "filename" : "AppIcon-76x76@2x.png",
-      "idiom" : "ipad",
-      "platform" : "ios",
-      "scale" : "2x",
-      "size" : "76x76"
-    },
-    {
-      "filename" : "AppIcon-83.5x83.5@2x.png",
-      "idiom" : "ipad",
-      "platform" : "ios",
-      "scale" : "2x",
-      "size" : "83.5x83.5"
-    },
-    {
       "filename" : "AppIcon-29x29@2x.png",
       "idiom" : "universal",
       "platform" : "ios",

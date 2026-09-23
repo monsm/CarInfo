@@ -79,7 +79,7 @@ struct HomeModeHead: View {
             return Hero(value: "\(e.socPct)", unit: "%",
                         caption: Self.line([e.range.isEmpty ? nil : "续航 \(e.range)", e.carName]))
         case .health:
-            guard let h = VM.healthModel(ciVal(store.caches, "check") as? [String: Any]) else {
+            guard let h = VM.healthModel(ciVal(store.caches, "check")) else {
                 return Hero(value: "--", caption: "还没有体检记录", size: 44, tint: TokensPalette.secondary)
             }
             return Hero(value: "\(h.scorePct)", unit: "分", caption: Self.line(["体检 \(h.time)"]))
@@ -144,7 +144,7 @@ struct HomeModeHead: View {
                 Fact(key: "电池温度", value: e.battTemp)
             ]
         case .health:
-            guard let h = VM.healthModel(ciVal(store.caches, "check") as? [String: Any]) else { return [] }
+            guard let h = VM.healthModel(ciVal(store.caches, "check")) else { return [] }
             return h.counts.prefix(3).map { Fact(key: $0.key, value: $0.n, cls: $0.cls) }
         case .control:
             // 车锁 / 车窗 / 后备箱这类「开还是关」的事实：直接用车况芯片，
@@ -183,7 +183,10 @@ struct HomeModeHead: View {
                                                     s?.insuranceDays.map { "\($0) 天后" }]))
             ]
         case .dev:
-            let msgs = (ciVal(store.caches, "messages") as? [[String: Any]])?.count ?? 0
+            // 消息缓存是**数组**（`MessagesSection` 存的就是 `[[String: Any]]`），
+            // 不能用 `ciVal` —— 它只返回 `[String: Any]?`，`as? [[String: Any]]` 恒失败，
+            // 结果是这一行永远显示 0 条（看起来像「消息拉不到」，其实只是取错了形状）。
+            let msgs = (store.caches["messages"] as? [[String: Any]])?.count ?? 0
             return [
                 Fact(key: "车辆列表", value: "\(store.cars.count) 辆"),
                 Fact(key: "消息缓存", value: "\(msgs) 条"),

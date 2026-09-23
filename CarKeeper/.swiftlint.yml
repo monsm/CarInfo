@@ -88,22 +88,17 @@ custom_rules:
 
 # 排除目录
 excluded:
-  - CarKeeper/CarKeeper/Design/DS.swift
-  - CarKeeper/CarKeeper/Design/Theme.swift
-  - CarKeeper/CarKeeper/Design/Kansei.swift
-  - CarKeeper/CarKeeper/Design/Glass.swift
-  - CarKeeper/CarKeeper/Design/Canvas.swift
-  - CarKeeper/CarKeeper/Design/Instrument.swift
-  - CarKeeper/CarKeeper/Design/Car.swift
-  - CarKeeper/CarKeeper/Design/OrbitNav.swift
-  - CarKeeper/CarKeeper/Design/Charts.swift
+  # 清单里只留**确实存在**的路径。这一版逐项与磁盘核过：原来 14 项里有 9 项指向不存在的
+  # 路径 —— 6 个在这棵树里从来没有过的设计文件（Kansei / Glass / Canvas / Instrument /
+  # Car / OrbitNav）、前缀写错的 `Charts.swift`（真的图表零件在
+  # `CarKeeper/Design/Charts.swift`，295 行、够不着阈值），以及 `CarPlay` / `AppClip`
+  # 两个已删目录（更早一轮还删过 `CarKeeper/HealthKit`）。
+  # 指向不存在的东西，swiftlint 只会报「找不到这些路径」，而后来的人会以为那里还有代码。
+  - CarKeeper/CarKeeper/Design/DS.swift      # 1077 行 > file_length.error(1000)
+  - CarKeeper/CarKeeper/Design/Theme.swift   # 取值表：超长是它的形状
   - CarKeeper/CarKeeper/Services
   - CarKeeper/WatchApp
   - CarKeeper/Widgets
-  - CarKeeper/CarPlay
-  - CarKeeper/AppClip
-  # `CarKeeper/HealthKit` 已移除：那个目录已随死代码清理删除（git 不跟踪空目录），
-  # 留着它只会让人以为那里还有代码。
 
 # 配置文件格式
 file_length:

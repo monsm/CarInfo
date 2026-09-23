@@ -188,19 +188,21 @@ def make_icon(size):
     return img.convert('RGB')
 
 def main():
+    # 只生成 Contents.json 真正引用的七个槽位。
+    #
+    # 原来的 12 个里多出的五个是 1x（29×29 / 40×40 / 76×76）与 iPad 专属
+    # （76×76@2x / 83.5×83.5@2x）：前者在本项目的最低系统（iOS 26，全部支持机型
+    # 都是 @2x/@3x）上没有任何消费者，后者会被 actool 记成
+    # 「AppIcon has N unassigned children」而**忽略**（iPad 图标由 1024 自动生成，
+    # 详见 AppIcon-SPEC.md）。生成出来只会是没人引用的多余文件。
     sizes = [
         ("AppIcon-1024x1024.png", 1024),
         ("AppIcon-60x60@3x.png", 180),
         ("AppIcon-60x60@2x.png", 120),
         ("AppIcon-40x40@3x.png", 120),
         ("AppIcon-40x40@2x.png", 80),
-        ("AppIcon-40x40.png", 40),
         ("AppIcon-29x29@3x.png", 87),
         ("AppIcon-29x29@2x.png", 58),
-        ("AppIcon-29x29.png", 29),
-        ("AppIcon-76x76@2x.png", 152),
-        ("AppIcon-76x76.png", 76),
-        ("AppIcon-83.5x83.5@2x.png", 167),
     ]
     
     count = 0
