@@ -20,13 +20,33 @@
 //                 每一档只有文字、选中只靠颜色；条子可手拖、松手吸附、中心项放大。
 //                 实现见 `Design/DSSwipeStrip.swift`，档位定义见 `HomeMode.swift`。
 //
-// 模式条分两级，**不要再混**：
-//   一级 `modeBar`（HomeMode，9 档）= 看哪个功能界面。全站唯一的入口。
-//   二级 `layerStrip`（MapSpineLayer，4 档）= 「现在」那一档内部看地图的哪个问题。
-// 此前四套入口（Tab 栏 / 顶部图层胶囊 / 右上角索引页 / 「我的」磁贴）已收归这一条。
+// 模式条是**一级**：`DSSwipeStrip`（`HomeMode`，6 档）= 看哪个功能界面。
+// 全站唯一的入口。此前四套入口（Tab 栏 / 顶部图层胶囊 / 右上角索引页 /
+// 「我的」磁贴）已收归这一条。
+//
+// 2026-09-23：**一级「现在」这一档按原型 `design-preview/stack.html` 重排**。
+// 原型 `pageNow()` 的全部元素是：`.map` + `.plate{left:20;top:62}` +
+// `.float{left:16;bottom:98;gap:12}`（两张卡）+ `.compass` + `.scale`。
+// 上一版在这一屏多摆了五样原型没有的东西（顶栏三枚钮、图层选择卡、
+// 常驻操作条、光名药丸、回到车浮钮），于是「首页」看起来像一块控制面板。
+// 这一轮把它们全部收进**车牌徽标**（原型本来就有的那个位置，点开是菜单），
+// 并把二级图层选择从一张卡改成菜单里的一项 —— 图上看的仍然是四个图层，
+// 但默认状态与原型逐项对齐。
+//
+// 2026-09-23（第二轮）：**六页同屏的交叉过渡**。
+// 上一版只画当前那一档，过渡是「变暗 + 横移 26pt」—— 那与原型是两回事。
+// 原型 `render()` 的过渡是**原地交叉**：`scale(1 − 0.035a)` / `opacity(1 − 1.6a)`，
+// `a = |页下标 − 条子连续位置|`，`a ≥ 0.62` 隐藏；六页从装配起就一直在那里。
+// 三处真错处都是量出来的：横移是原型明确否掉的做法（档距 65.6pt vs 页宽 390pt）、
+// 五页各留着一条空标题的顶栏（把卡片窗压低 44pt，而原型六页都没有顶栏）、
+// 条子按安全区底放在离底 60pt（原型 `bottom:26` 是从**屏幕**量的）。
+// 与之一起来的改动：地图回到「现在」那一页**里面**（原型 `#page-now` 里的 `.map`），
+// 于是换走时它跟着淡出缩小，而不是「别的页浮在一张活地图上」。
 //
 // 三条架构规则（写错就出问题，不是风格问题）：
 //   ① 钉 = 屏幕空间（`Annotation`），面积/轨迹 = 地理空间（`MapPolyline`）。
+//   ② 「现在」这一档**没有顶栏**（`.toolbar(.hidden, for: .navigationBar)`）：
+//      地图一直画到屏幕最上沿，车牌在安全区下 8pt、浮动两卡贴底 98pt。
 //   ② 内容层不透明：模式条与底部纸用 `TokensPalette.surface`，
 //      玻璃只允许出现在导航栏 / 弹层 / 底部操作条（这是 v4 就定下的规则；
 //      macOS 的那条「Tab 栏」实例随 5 Tab 骨架一起删了 —— 现在没有 Tab 栏）。
@@ -44,7 +64,8 @@ import CoreLocation
 
 struct MapSpineView: View {
     private let store = AppStore.shared
-    @EnvironmentObject private var nav: NavState
+    /// 不是 `private`：`MapSpineLayers.swift` 里那几个图层内容要用它换档。
+    @EnvironmentObject var nav: NavState
     /// iPad 分栏用（SceneID.detail 的场景声明在 CarKeeperApp.swift）
     @Environment(\.openWindow) private var openWindow
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -61,11 +82,20 @@ struct MapSpineView: View {
     @AppStorage(HomeMode.storageKey) private var homeModeRaw: String = HomeMode.now.rawValue
     /// 模式条的**连续**位置（3.0 = 停在第四档，2.4 = 拖在第二、三档之间）。
     /// 宿主只用它做内容过渡 —— 条子自己不用它排版。
-    @State private var modePosition: Double = 0
+    /// 初值 `-1` 是**哨兵**：条子的回调要等 `onAppear`，而第一帧已经画了。
+    /// 用 0 当初值会让冷启动先闪一帧第一档（「出行」）再到记住的那一档。
+    @State private var modePosition: Double = -1
+    /// 底条是否正在展开（手指按在条子上）。
+    /// 它只服务一件事：展开时把两侧的两枚圆钮**让出宽度并淡出** ——
+    /// 原型 `.bottom.open .arm{opacity:0;transform:scale(.86)}`，
+    /// 而“让出宽度”比单单淡出更要紧：条子展开后要 374pt（屏宽 390），
+    /// 留给两枚圆钮就只能把间距压扁，而压间距正是原型明确否掉的那一件事。
+    @State private var barOpen = false
 
     @State private var camera: MapCameraPosition = .automatic
     @State private var didCenterOnce = false
-    @State private var chargers: [MapCharger] = []
+    /// 不是 `private`：同上，充电那一层的内容在 `MapSpineLayers.swift` 里读它。
+    @State var chargers: [MapCharger] = []
     @State private var chargerCenterKey = ""
     @State private var isRefreshing = false
     /// 「此刻的光」表 —— 这一屏的光是怎么算出来的（药丸点开）
@@ -84,46 +114,58 @@ struct MapSpineView: View {
     private var layer: MapSpineLayer { MapSpineLayer(rawValue: layerRaw) ?? .now }
     private var homeMode: HomeMode { HomeMode(rawValue: homeModeRaw) ?? .now }
 
-    /// 拖动中的内容透明度：停在整档时 1.0，拖到两档正中间最低 0.45。
-    /// 这是「换档」的观感 —— 内容不是被替掉，而是**在过渡**。
-    private var cardOpacity: Double {
-        let frac = abs(modePosition - modePosition.rounded())
-        return 1.0 - min(frac, 0.5) * 1.1
+    /// 条子的连续位置。哨兵（-1）时按记住的那一档画 —— 见 `modePosition` 的说明。
+    private var deckPos: Double {
+        modePosition >= 0 ? modePosition : Double(modeIndex)
     }
 
-    /// 内容的横向视差：跟着手指走一点点，方向与条子一致。
-    /// 只给 26pt（不是整屏位移）—— 多一点就成了翻页，而这里是换模式。
-    private var cardShift: CGFloat {
-        CGFloat(modePosition - modePosition.rounded()) * 26
+    /// 当前档在 `HomeMode.allCases` 里的下标 = 页面的层号。
+    private var modeIndex: Int {
+        HomeMode.allCases.firstIndex(of: homeMode) ?? 0
+    }
+
+    /// 第 i 层离当前档多远：`0` = 正在看，`1` = 隔一整档 —— 原型 `render()` 里的 `a`。
+    private func fade(_ i: Int) -> Double {
+        min(1, abs(Double(i) - deckPos))
     }
 
     /// 数据在 main actor 上组装（AppStore 是 @MainActor @Observable）。
     @MainActor private var data: MapSpineData { MapSpineData.build() }
 
+    /// 底条占掉的纵向空间：26（离底）+ 46（条高）+ 14（呼吸位）= 86。
+    /// **同一个数在原型里是 `.stack{bottom:86px}`** —— 页面内容的窗口正好停在条子上沿。
+    /// 真机上它从**安全区底**算起（安全区之上再留 26），所以刘海屏与旧机型都是同一个观感。
+    private static let barTotal: CGFloat = 86
+    /// 底条离底多远（原型 `.bottom{bottom:26px}`）
+    private static let barGap: CGFloat = 26
+    /// 两侧圆钮的直径（原型 `.arm{width:calc(var(--H) + 4px)}`，H = 46）
+    private static let armSize: CGFloat = 50
+
     var body: some View {
         let d = data
-        // GeometryReader 只为了一个数：纸的高度。
-        // 高度必须**固定**，因为模式条要长在那张纸的上沿 —— 纸一伸缩，条子就跳，
-        // 而相机那条模式条从不跳（它在 9 档之间的位置与高度一字不动）。
-        GeometryReader { geo in
-            ZStack(alignment: .bottom) {
-                mapCanvas(d)
+        ZStack(alignment: .bottom) {
+            // ⓪ 六层页面同屏（原型 `.pages > .page{inset:0}` × 6）。
+            pageDeck()
 
-                VStack(spacing: 0) {
-                    topBar(d)
-                    Spacer(minLength: 0)
-                    // 常驻操作条：高频动作不离开这张图就能发出去。
-                    // 它与底部面板是**两件事**：面板是「车现在什么样」，条子是「现在能做什么」——
-                    // 面板只服务「现在」这一档，而锁车在别的档位里同样会发生。
-                    MapQuickBar()
-                    bottomPanel(d, cardHeight: max(292, geo.size.height * 0.56))
-                }
-            }
+            // ① 顶：底条 = 左臂（车牌）｜模式条｜右臂（搜索），贴底 26。
+            //    原型 `.bottom{position:absolute;left:0;right:0;bottom:26;gap:9;
+            //    height:calc(var(--H) + 14px)}`：模式条就长在**最底**，
+            //    内容从它上面长上去 —— 相机就是这么摆的。
+            bottomBar
         }
+        // 底条离底 26、页面窗到「屏底 − 86」：原型的这两个数都是从**屏幕**量的
+        // （`.bottom{bottom:26}` / `.stack{bottom:86}`）。安全区底那 34pt 若不排除，
+        // 条子会凭空抬高一截 —— 与原型差出一个手指的宽度。
+        .ignoresSafeArea(edges: .bottom)
         .background(TokensPalette.canvas)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { toolbarItems(d) }
+        // 原型里**六页都没有顶栏**：地图画到屏幕最上沿，其余五页的第一张卡是巨字头，
+        // 状态栏之下没有任何栏。留一条空标题的栏不只是多一条 chrome ——
+        // 它把卡片窗整体压低 44pt，于是「第一张卡落在哪」与原型差出一个卡头。
+        // 原来靠它挂着的两件事搬进了页面自己：车控的语音播报在那一叠里（另一张卡），
+        // 保养的「添加记录」在那一张卡里（一个动作），见各自文件。
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showSky) { skySheet(d).dsSheetCanvas() }
         .task {
             await refresh()
@@ -163,6 +205,10 @@ struct MapSpineView: View {
         // 比例尺：地图上唯一能让「这一段有多长」变得可核对的东西。
         // 它是系统控件（MapKit 的 MapScaleView），不占位、不在原生主题下改变现有观感。
         .mapControls {
+            // 罗盘与比例尺都在原型里（`.compass` / `.scale`）—— 它们是地图自己的仪器，
+            // 不是我们摆上去的控件：一个回答「哪边是北」，一个回答「这一段有多长」。
+            MapCompass()
+                .mapControlVisibility(.visible)
             MapScaleView()
                 .mapControlVisibility(.visible)
         }
@@ -328,181 +374,464 @@ struct MapSpineView: View {
     }
 
     // =========================================================================
-    // MARK: 顶部：图层 + 同步状态
+    // MARK: 车牌徽标上的那颗状态点
     // =========================================================================
 
-    @ViewBuilder
-    private func topBar(_ d: MapSpineData) -> some View {
-        VStack(spacing: TokensSpacing.sm) {
-            // 顶部的图层胶囊条已**整个移到底部纸的上沿**，并改成相机 App 的模式条语法
-            // （一级 `modeBar` / 二级 `layerStrip`）。
-            // 顶部现在只剩一件事：这台车此刻的数据是不是新的。
-            HStack(spacing: TokensSpacing.sm) {
-                HStack(spacing: TokensSpacing.sm) {
-                    statusDot(d.online)
-                    Text(d.online.text)
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(TokensPalette.secondary)
-                    Text("·")
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(TokensPalette.tertiary)
-                    Text("上报 \(d.updatedText)")
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(TokensPalette.tertiary)
-                }
-                .padding(.horizontal, TokensSpacing.sm + 2)
-                .padding(.vertical, 6)
-                .background { Capsule().fill(TokensPalette.surface.opacity(0.94)) }
-
-                Spacer(minLength: 0)
-
-                if d.hasLocation == false {
-                    Text("没有位置")
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(TokensPalette.warning)
-                } else if let sky = d.sky(at: skyDate) {
-                    Button {
-                        TokensHaptic.tap()
-                        showSky = true
-                    } label: {
-                        lightPill(sky)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text("此刻的光：\(sky.phase.title)，"
-                                             + "太阳高度 \(Int(sky.altitude.rounded())) 度。"
-                                             + "点开看算法"))
-                }
-            }
-        }
-        .padding(.horizontal, TokensSpacing.page)
-        .padding(.top, TokensSpacing.sm)
-    }
-
+    /// 「在动 / 停了 / 掉线了」那颗点。它是原型 `.plate .st i` 的展开 ——
+    /// 车牌徽标是它唯一的使用者（`.st{display:flex;gap:6px}`）。
     private func statusDot(_ online: OnlineState) -> some View {
         Circle()
             .fill(color(for: online.cls))
             .frame(width: 6, height: 6)
     }
 
-    /// 光名药丸：这一刻的光叫什么、太阳多高、**从哪个方向来**。
-    /// 那个箭头的角度就是真实方位角（正北为 0，顺时针）—— 不是装饰罗盘。
-    private func lightPill(_ sky: SkyLight) -> some View {
-        HStack(spacing: 6) {
-            Image(safeSymbol: "arrow.up", fallback: "arrow.up")
-                .font(TokensTypo.fixed(10, weight: .semibold))
-                .rotationEffect(.degrees(sky.azimuth))
-            Text(sky.phase.title)
-                .font(TokensSerif.label(11))
+    // =========================================================================
+    // MARK: 底条（两臂 + 模式条）
+    // =========================================================================
+
+    /// 相机 App 的那一行：左臂（车牌）｜模式条｜右臂（搜索）。
+    ///
+    /// 为什么两臂必须在这里：原型那条子**不是**孤零零一根——两边各有一枚玻璃圆钮，
+    /// 左边是车、右边是搜索。它让「模式条」看起来是相机的那排控件，而不是一根付出代价的浮条。
+    private var bottomBar: some View {
+        HStack(spacing: 9) {
+            arm(text: plateShort) { nav.openMode(.vehicle) }
+                .accessibilityLabel(Text("车辆"))
+
+            DSSwipeStrip(items: HomeMode.stripItems, selectedID: $homeModeRaw) { pos in
+                modePosition = pos
+            } onExpand: { open in
+                withAnimation(TokensMotion.fade) { barOpen = open }
+            }
+
+            arm(icon: "magnifyingglass") { nav.showSearch = true }
+                .accessibilityLabel(Text("搜索"))
+        }
+        .padding(.horizontal, 8)
+        .padding(.bottom, Self.barGap)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// 一枚圆钮。展开时**宽度让给条子**（原型里它们是被挤到屏外的），
+    /// 不是“看不见但还占着 50pt” —— 后者会把条子压到装不下六档，
+    /// 于是条子只能压间距，而压间距正是原型明确否掉的那一件事。
+    private func arm(text: String? = nil, icon: String? = nil,
+                     _ run: @escaping () -> Void) -> some View {
+        Button {
+            TokensHaptic.tap()
+            run()
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(TokensPalette.glassHighlight)
+                    .glassEffect(.regular, in: Circle())
+                    .overlay {
+                        Circle().strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border)
+                    }
+                if let text {
+                    Text(text)
+                        .font(TokensTypo.fixed(11, weight: .bold))
+                        .foregroundStyle(TokensPalette.secondary)
+                } else if let icon {
+                    Image(safeSymbol: icon, fallback: icon)
+                        .font(TokensTypo.fixed(17, weight: .medium))
+                        .foregroundStyle(TokensPalette.primary)
+                }
+            }
+            .frame(width: Self.armSize, height: Self.armSize)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .frame(width: barOpen ? 0 : Self.armSize, height: Self.armSize)
+        .opacity(barOpen ? 0 : 1)
+        .scaleEffect(barOpen ? 0.86 : 1)
+        .clipped()
+    }
+
+    /// 左臂上的字：车牌的前两个字（原型是「鄂A」）。取不到就退回「车」。
+    private var plateShort: String {
+        let p = VM.vehicleSummary(store.car, store.controlCache)?.plate ?? ""
+        return p.isEmpty ? "车" : String(p.prefix(2))
+    }
+
+    // =========================================================================
+    // MARK: 每一档的页面
+    // =========================================================================
+
+    /// 六层同屏（原型 `.pages > .page{inset:0}` × 6）：每一档一直在那里，
+    /// 交叉过渡由条子的连续位置直接驱动 —— 过渡是**原地**发生的，不是换页。
+    ///
+    /// 为什么必须六层同时在：原型装配时把六页全建出来，之后每帧只改
+    /// `style.opacity / transform`。只画当前那一页，换档就只能是「旧的变淡、
+    /// 新的啪一下出现」，而「从 96.5% 长出来」那点实体感**恰恰在中间那一段**。
+    @ViewBuilder
+    private func pageDeck() -> some View {
+        ZStack {
+            ForEach(HomeMode.allCases.indices, id: \.self) { i in
+                let a = fade(i)
+                pageBody(HomeMode.allCases[i])
+                    // 原型 render()：`scale(1 − a*0.035)` —— 进来的从 96.5% 长出。
+                    .scaleEffect(1 - a * 0.035)
+                    // 原型 render()：`opacity = a ≥ 0.62 ? 0 : 1 − 1.6a`
+                    //（0.62 正是 `1 − 1.6a` 到 0 的位置，不夹会算出负数）。
+                    .opacity(a >= 0.62 ? 0 : 1 - a * 1.6)
+                    // 隐掉的层不吃事件、也不给读屏读：视觉上只有一页，
+                    // 读屏却读出六页内容，是六层同屏唯一真正的代价，必须自己挡住。
+                    .allowsHitTesting(i == modeIndex)
+                    .accessibilityHidden(i != modeIndex)
+            }
+        }
+    }
+
+    /// 一层页面。两个形态与原型的两个 `.page` 形态一一对应：
+    ///   · 「现在」＝ `.map{inset:0}` + 浮动两卡，**铺满全屏**（地图画到屏幕最上沿）
+    ///   · 其余五档＝ `.stack{top:54;bottom:86}`：不透明的一页，卡片窗停在条子上沿
+    @ViewBuilder
+    private func pageBody(_ mode: HomeMode) -> some View {
+        if mode == .now {
+            nowLayer()
+        } else {
+            // 窗口 = 安全区顶（原型的 54 就是状态栏高，真机上安全区给出同一个数）
+            //      → 屏底 − 86（条子上沿）。
+            pageContent(mode)
+                .padding(.bottom, Self.barTotal)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                // 不透明：六层同屏时它必须盖住底下的地图（原型那五页各有自己的底）。
+                .background(TokensPalette.canvas.ignoresSafeArea())
+        }
+    }
+
+    /// 「现在」这一档：地图 + 车牌徽标 + 底部浮动两卡。
+    ///
+    /// 原型 `pageNow()` 的全部元素就是这些：
+    ///   `.map` + `.plate{left:20;top:62}` + `.float{left:16;right:16;bottom:98;gap:12}`
+    ///   + `.compass`（罗盘）+ `.scale`（比例尺）。
+    /// **再多一样就不是那张图了** —— 上一版在这里摆了四样原型没有的东西
+    /// （图层选择卡、常驻操作条、光名药丸、回到车浮钮），加上顶栏一共五样，
+    /// 于是「首页」看起来像一个控制面板，而不是原型那张地图。
+    /// 那几件事现在都在原型本来就有的位置上：**车牌徽标**（点开是菜单）、
+    /// 地图自己的罗盘与比例尺。
+    @ViewBuilder
+    private func nowLayer() -> some View {
+        let d = data
+        ZStack(alignment: .bottom) {
+            // 地图是这一页**本身**（原型 `#page-now` 里的 `.map{inset:0}`），
+            // 不是衬在六页底下的背景：换走时它跟着淡出、缩小，
+            // 而不是「别的页浮在一张活地图上」（那样两页交界处会露出地图）。
+            mapCanvas(d)
+
+            // 原型这一页在底图之上还有**两层压暗**，两层各有各的用处：
+            //   `.maptop{height:240px}`  —— 顶上那层是给车牌与状态行铺读得出来的底。
+            //     不铺的话，浅色底图上白字会直接淹掉（车牌是这一屏唯一的身份）。
+            //   `.mapvig{inset:0}`       —— 四角压暗，把视线收到中间的车上。
+            // 两者都取 `TokensPalette.scrim` 而不是纯黑：令牌的说明里写着它「也用于
+            // 光照不到的暗角」，纸主题下这块遮罩是**墨**，不是黑。
+            mapDims
+
+            // `.float{left:16;right:16;bottom:98;gap:12}`：底边离屏底 98
+            //（条子占 86 + 12 的呼吸位），两卡之间 12。
+            VStack(alignment: .leading, spacing: 12) {
+                nowCard(d)
+                readoutChips(d)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, Self.barTotal + 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        // `.plate{left:20;top:62}`：车牌徽标挂在安全区下的左上角（62 ≈ 54 + 8）。
+        .overlay(alignment: .topLeading) {
+            plateBadge(d)
+                .padding(.leading, 20)
+                .padding(.top, 8)
+        }
+    }
+
+    /// 底图之上的两层压暗（原型 `.maptop` + `.mapvig`）。
+    /// 它们**不跟着艺术主题消失**：底图是系统瓦片（改不了颜色），
+    /// 而「车牌读得出来」与「视线收在车上」是任何底图上都要成立的两件事。
+    private var mapDims: some View {
+        ZStack {
+            LinearGradient(
+                stops: [
+                    .init(color: TokensPalette.scrim.opacity(0.72), location: 0),
+                    .init(color: TokensPalette.scrim.opacity(0.32), location: 0.52),
+                    .init(color: TokensPalette.scrim.opacity(0), location: 1)
+                ],
+                startPoint: .top, endPoint: .bottom)
+                .frame(height: 240)
+                .frame(maxHeight: .infinity, alignment: .top)
+
+            GeometryReader { g in
+                RadialGradient(
+                    stops: [
+                        .init(color: TokensPalette.scrim.opacity(0), location: 0),
+                        .init(color: TokensPalette.scrim.opacity(0), location: 0.38),
+                        .init(color: TokensPalette.scrim.opacity(0.38), location: 0.80),
+                        .init(color: TokensPalette.scrim.opacity(0.58), location: 1)
+                    ],
+                    center: UnitPoint(x: 0.5, y: 0.44),
+                    startRadius: 0,
+                    endRadius: max(g.size.width, g.size.height) * 0.76)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// 车牌徽标：车牌 + 状态点 + 一句真话。
+    ///
+    /// 它同时是这一屏的**菜单**。原型这个位置只有一个静态徽标，而这一版把
+    /// 「不常按但必须能到」的几件事收进它：看哪一层（图上四个图层）、重取数据、
+    /// 此刻的光、回到车（iPad 上再加一个新车况窗口）。
+    /// 收进来是**结构决定**，不是图省事：首页每多一枚钮，它就不再是原型那张图；
+    /// 而这几件事原来各占一枚 —— 图层一张卡、光一枚药丸、回到车一枚浮钮、
+    /// 顶栏三枚（刷新 / 搜索 / 回到车，而且它们当时长在**六页每一页**上）。
+    private func plateBadge(_ d: MapSpineData) -> some View {
+        Menu {
+            ForEach(MapSpineLayer.allCases) { l in
+                Button {
+                    TokensHaptic.select()
+                    layerRaw = l.rawValue
+                } label: {
+                    // 菜单里没有别的选中态可用 —— 当前那一层自己带勾
+                    Label(l.title, systemImage: l == layer ? "checkmark.circle.fill" : "circle")
+                }
+            }
+            Divider()
+            Button {
+                TokensHaptic.tap()
+                Task { await refresh() }
+            } label: {
+                Label("重取数据", systemImage: "arrow.clockwise")
+            }
+            Button {
+                TokensHaptic.tap()
+                showSky = true
+            } label: {
+                Label(lightTitle(d), systemImage: "sun.max")
+            }
+            Button {
+                TokensHaptic.tap()
+                centerOnCar(force: true)
+            } label: {
+                Label("回到车", systemImage: "location.fill")
+            }
+            if sizeClass == .regular {
+                Button {
+                    TokensHaptic.tap()
+                    openWindow(id: SceneID.detail)
+                } label: {
+                    Label("新车况窗口", systemImage: "rectangle.on.rectangle")
+                }
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(plateText(d))
+                    .font(TokensTypo.digits(20))
+                    .tracking(1.5)
+                    .foregroundStyle(TokensPalette.primary)
+                    .shadow(color: TokensPalette.scrim, radius: 6, y: 1)
+                HStack(spacing: 6) {
+                    statusDot(d.online)
+                    Text("\(d.online.text) · 上报 \(d.updatedText)")
+                        .font(TokensTypo.caption)
+                        .foregroundStyle(TokensPalette.secondary)
+                }
+                .shadow(color: TokensPalette.scrim, radius: 6, y: 1)
+            }
+        }
+        .accessibilityLabel(Text("车牌 \(plateText(d))，\(d.online.text)"))
+        .accessibilityHint(Text("点开：看哪一层、重取数据、此刻的光、回到车"))
+    }
+
+    /// 车牌。取不到就退回车名 —— 车牌空着不是「没有车」，是「还没取到」。
+    private func plateText(_ d: MapSpineData) -> String {
+        let p = VM.vehicleSummary(store.car, store.controlCache)?.plate ?? ""
+        if !p.isEmpty { return p }
+        return d.carName.isEmpty ? "车" : d.carName
+    }
+
+    /// 菜单里那一项的标题带上此刻的光名（「此刻的光 · 上午」）。
+    /// 原来它是一枚压在右上角的药丸 —— 那是原型里没有的一件东西。
+    private func lightTitle(_ d: MapSpineData) -> String {
+        guard let sky = d.sky(at: skyDate) else { return "此刻的光" }
+        return "此刻的光 · \(sky.phase.title)"
+    }
+
+    /// 「现在」这一档的浮动首卡。形态与内容都照原型 `.float > .card`：
+    ///   头  `.hd`   =「当前位置」+「这份读数有多新」
+    ///   地址 `.ch`  = 车端上报的那句地址（大字）
+    ///   巨字 `.big` = **续航**（原型大字就是 412 km 续航，不是电量百分比）
+    ///   副行 `.sub` = 电量 · 表显里程 · 充不充电
+    ///   光带 `.gain`= 电量（全 App 唯一的形状）
+    /// 换了图层（行程 / 停车 / 充电站）时换成那一层的内容 ——
+    /// 于是「图上在看哪个问题」与「读它的数」是同一张卡，不必再多一张选择卡。
+    @ViewBuilder
+    private func nowCard(_ d: MapSpineData) -> some View {
+        GlassCard(accent: HomeMode.now.accent) {
+            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+                nowHead(d)
+                switch layer {
+                case .now:
+                    if d.hasLocation == false {
+                        // 没有位置时不摆一堆「--」：说清为什么
+                        emptyNotice(MapSpineLayer.now.emptyNote)
+                    } else {
+                        nowMetrics(d)
+                    }
+                case .trips: tripsContent(d)
+                case .holds: holdsContent(d)
+                case .charge: chargeContent(d)
+                }
+            }
+        }
+    }
+
+    /// 卡头：左边「在看什么」，右边「这份读数有多新」——原型的 `.hd .ct` 与 `.hd .away`。
+    /// 图层不是「现在」时，左边就写那一层的名字（行程 / 停车 / 充电），
+    /// 于是这一行永远是「这张卡在回答哪个问题」。
+    private func nowHead(_ d: MapSpineData) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+            Text(layer == .now ? "当前位置" : layer.title)
+                .font(TokensTypo.caption)
                 .tracking(TokensTracking.label)
-            Text(String(format: "%.0f°", sky.altitude))
+                .foregroundStyle(TokensPalette.secondary)
+            Spacer(minLength: 0)
+            Text(d.updatedText)
                 .font(TokensTypo.digits(11))
                 .foregroundStyle(TokensPalette.tertiary)
-            // 云量只在「看此刻」时挂上来：它是**此刻**的实况，滑块拖出的时刻没有对应值
-            if skyLive, let w = sky.weather {
-                Text("云 \(w.cloudText)")
-                    .font(TokensTypo.digits(11))
-                    .foregroundStyle(TokensPalette.tertiary)
-            }
-            // 回放时必须看得见自己不在实时上 —— 不然这就是一屏假象
-            if !skyLive {
-                Text("回放")
-                    .font(TokensTypo.caption2)
-                    .foregroundStyle(TokensPalette.warning)
-            }
         }
-        .foregroundStyle(TokensPalette.secondary)
-        .padding(.horizontal, TokensSpacing.sm + 2)
-        .padding(.vertical, 6)
-        .background { Capsule().fill(TokensPalette.surface.opacity(0.94)) }
     }
 
-    // =========================================================================
-    // MARK: 底部面板
-    // =========================================================================
-
+    /// 现状卡的读数：地址 → 巨字续航 → 副行 → 光带 → 四轮胎压。
     @ViewBuilder
-    private func bottomPanel(_ d: MapSpineData, cardHeight: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-            panelGrab
-            // ===== 全站唯一的入口 =====
-            // 9 档功能界面都在这一条上，位置/高度/底色在 9 档之间完全不变。
-            // 它取代了此前四套入口（Tab 栏 / 顶部图层 / 索引页 / 「我的」磁贴）
-            // ——“同一个功能有四个入口”就是「缝合怪」的来源。
-            modeBar
-            Group {
-                if homeMode == .now {
-                    nowPanel(d)
-                } else {
-                    // 每一档都是一叠玻璃卡（`StackPageView`）：巨字头就是那一叠的
-                    // **第一张卡**，所以头与内容之间不再需要发丝线 ——
-                    // 卡片之间的间距本身就是分隔。
-                    //
-                    // 从「头固定 + 下面一整页滚动」改成「一叠卡」的关键差别：
-                    // 旧版整屏一起滚，巨字会滚出去；现在巨字是**一张可以被滑走的卡**，
-                    // 它走了之后下一张顶上来，而“刚才那个数字”往后一拉还能拉回来。
-                    pageContent(homeMode)
+    private func nowMetrics(_ d: MapSpineData) -> some View {
+        if !d.address.isEmpty {
+            Text(d.address)
+                .font(TokensSerif.title(22))
+                .tracking(TokensTracking.title)
+                .foregroundStyle(TokensPalette.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        if d.rangeText == "--" {
+            // 车没报续航就**不摆「-- km」** —— 那是一个假的读数
+            GlassCardEmpty(text: "还没收到剩余续航", icon: "bolt.slash")
+        } else {
+            DSBigNumber(value: d.rangeText, unit: "km", caption: "续航", size: 56,
+                        tint: TokensPalette.primary)
+        }
+        nowSub(d)
+        // 光带 = 电量（全 App 唯一的形状，在地图上它是「车钉外面那圈弧」的展开）
+        DSLightBar(progress: Double(d.socPct) / 100,
+                   height: 5,
+                   showsGlow: spec.allowsGlow,
+                   tint: TokensPalette.lightBar)
+        tyreRow(d)
+    }
+
+    /// 副行。空段直接丢掉（不摆占位）—— 「电量 68% · 表显 53,766 km · 未充电」
+    /// 里任何一个字取不到，那一句就不出现，而不是留一个 `--`。
+    @ViewBuilder
+    private func nowSub(_ d: MapSpineData) -> some View {
+        let mileage = VM.vehicleSummary(store.car, store.controlCache)?.mileage
+        let line = Self.join(["电量 \(d.socPct)%",
+                              mileage.map { "表显 \($0) km" },
+                              d.chargeText])
+        if !line.isEmpty {
+            Text(line)
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.tertiary)
+        }
+    }
+
+    /// 把若干片段拼成一行：空段与 `--` 直接丢掉（全站统一的做法）。
+    private static func join(_ parts: [String?]) -> String {
+        parts.compactMap { $0 }
+            .filter { !$0.isEmpty && $0 != "--" }
+            .joined(separator: " · ")
+    }
+
+    // ---- 四格读数 ----
+    //
+    //  原型 `.card.chips`：车速 / 电量 / 胎压 / 车门，四格，
+    //  而且**奇偶上下错开 7px**（`.chip:nth-child(odd){translateY(-7px)}`）——
+    //  那是这一页的「错位」手感，不是排版事故，照搬。
+    //  四格是**读数**，不是按钮：车控那一档已经有一整排真控件了，
+    //  同一个动作在首页再摆一遍就是第二个入口。
+
+    /// 一格读数
+    private struct Readout: Identifiable {
+        let id: String
+        let key: String
+        let value: String
+        var unit: String? = nil
+        var cls: String = "na"
+    }
+
+    private func readoutChips(_ d: MapSpineData) -> some View {
+        let cells = readouts(d)
+        return GlassCard(accent: HomeMode.now.accent) {
+            HStack(spacing: 9) {
+                ForEach(Array(cells.enumerated()), id: \.element.id) { i, c in
+                    readoutCell(c, offset: i % 2 == 0 ? -7 : 7)
                 }
             }
-            .frame(height: cardHeight, alignment: .top)
-            .opacity(cardOpacity)
-            // 视差只给 26pt（±13pt），位移落在卡片自己的内边距里，不会潦到地图上。
-            .offset(x: cardShift)
         }
-        .padding(.horizontal, TokensSpacing.md)
-        .padding(.top, TokensSpacing.md)
-        .padding(.bottom, TokensSpacing.sm)
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 四格的值。取不到的那一格**照实说「无数据」**：不摆 `--`、也不拿别的数顶上。
+    @MainActor
+    private func readouts(_ d: MapSpineData) -> [Readout] {
+        let speed = VM.driveStatus(store.caches).speed
+        let lock = VM.bodyStatus(store.caches).first { $0.label == "车锁" }
+        // 胎压取**最低的那一条**：一格放不下四条，而四轮里最危险的就是它。
+        // 「哪一轮低」在「车辆 → 体检」里有完整的一行，这里只做首页的一瞥。
+        let lowest = d.tyres.min { (Int($0.kpa) ?? Int.max) < (Int($1.kpa) ?? Int.max) }
+        return [
+            Readout(id: "speed", key: "车速",
+                    value: speed == "--" ? "无数据" : speed,
+                    unit: speed == "--" ? nil : "km/h"),
+            Readout(id: "soc", key: "电量", value: "\(d.socPct)", unit: "%", cls: d.socCls),
+            Readout(id: "tyre", key: "胎压",
+                    value: lowest?.kpa ?? "无数据",
+                    unit: lowest == nil ? nil : "kPa",
+                    cls: lowest?.warn == true ? "bad" : "na"),
+            Readout(id: "lock", key: "车锁",
+                    value: lock?.text ?? "无数据",
+                    cls: lock?.cls ?? "na")
+        ]
+    }
+
+    /// 一格：上面是键（小字），下面是值（数字体）。`offset` 就是原型的奇偶错位。
+    private func readoutCell(_ r: Readout, offset: CGFloat) -> some View {
+        VStack(spacing: 5) {
+            Text(r.key)
+                .font(TokensTypo.caption2)
+                .foregroundStyle(TokensPalette.tertiary)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(r.value)
+                    .font(TokensTypo.digits(15))
+                    .foregroundStyle(r.cls == "na" ? TokensPalette.primary
+                                                   : TokensPalette.statusColor(r.cls))
+                if let unit = r.unit {
+                    Text(unit)
+                        .font(TokensTypo.caption2)
+                        .foregroundStyle(TokensPalette.tertiary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 9)
         .background {
-            UnevenRoundedRectangle(topLeadingRadius: TokensRadius.large,
-                                   topTrailingRadius: TokensRadius.large,
-                                   style: .continuous)
-                .fill(TokensPalette.surface)
-                .ignoresSafeArea(edges: .bottom)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(TokensPalette.fillSubtle)
         }
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(TokensPalette.hairline)
-                .frame(height: TokensHair.line)
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border)
         }
-    }
-
-    // =========================================================================
-    // MARK: 模式条 —— 一级（功能界面）与二级（地图图层）
-    // =========================================================================
-
-    /// 底部那条模式条：**全站唯一的入口**。
-    /// 它长得跟相机那条一模一样，因为它就是同一件东西 —— 一个可手拖、松手吸附、
-    /// 中心项放大的档位选择器（实现见 `Design/DSSwipeStrip.swift`）。
-    /// 换档**不换屏**：地图与这张纸都不动，动的只有纸里的内容。
-    private var modeBar: some View {
-        DSSwipeStrip(items: HomeMode.stripItems, selectedID: $homeModeRaw) { pos in
-            modePosition = pos
-        }
-    }
-
-    /// 「现在」这一档的纸：二级选择（地图图层）+ 车名/地址 + 该图层的内容。
-    /// 它包在 ScrollView 里：纸的高度是固定的（ModeBar 要长在固定的上沿），
-    /// 所以内容多的时候就该**在纸里滚**，而不是把纸撞高。
-    @ViewBuilder
-    private func nowPanel(_ d: MapSpineData) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: TokensSpacing.md) {
-                layerStrip
-                panelTitle(d)
-                if d.hasLocation == false {
-                    // 没有位置时，**不摆一堆 -- 占位**，只说清为什么
-                    emptyNotice("还没收到位置上报")
-                } else {
-                    switch layer {
-                    case .now: nowContent(d)
-                    case .trips: tripsContent(d)
-                    case .holds: holdsContent(d)
-                    case .charge: chargeContent(d)
-                    }
-                }
-            }
-        }
-        .scrollBounceBehavior(.basedOnSize)
+        .offset(y: offset)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(r.unit.map { "\(r.key) \(r.value) \($0)" } ?? "\(r.key) \(r.value)"))
     }
 
     /// 每一档 = 一个完整的功能界面。
@@ -524,156 +853,6 @@ struct MapSpineView: View {
         case .mine: MineView()
         }
     }
-    // 主框架 = **Apple Maps 的一张全屏地图 + 一张贴着底边的纸**，
-    // 而「换这张纸在回答哪个问题」用的是**相机 App 的模式条**：
-    //
-    //   ① 换模式**不离开这张图**：没有页面推入、没有 Tab、没有遮罩 —— 取景框不变，
-    //      变的只是它此刻在回答哪个问题（现在在哪 / 去过哪儿 / 停在哪 / 去哪充电）；
-    //   ② 每一项**只有文字**：没有图标、没有底、没有描边。选中只靠颜色与字重说话
-    //      （相机靠黄色，我们靠主题的 accent —— 全 App 唯一的强调色）；
-    //   ③ 它**横向可滚动**，所以再加第五、第六个模式不会撑坏版式。
-    //
-    // 有一件**刻意没有照搬**：相机 App 里左右滑取景框就换模式，可地图的横向拖拽是**平移**。
-    // 抢掉它会让「拖地图」变成「换模式」—— 那比少一个手势糟得多。所以第 ③ 条只落实到
-    // 「条子自己可滚」。
-    //
-    // 为什么它不在顶部（原来的胶囊条在顶部）：那既不像地图（Maps 把模式选择放在纸的上沿，
-    // 紧挨它控制的内容），也不像相机（相机的模式条在内容下沿），还和顶部的同步状态抢同一条视线。
-    /// 「现在」这一档内部的二级选择（四个地图图层）。
-    /// 它是**第二级**：一级的九个功能界面归 `modeBar`。
-    private var layerStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: TokensSpacing.xl) {
-                ForEach(MapSpineLayer.allCases) { l in
-                    let selected = l == layer
-                    Button {
-                        guard !selected else { return }
-                        layerRaw = l.rawValue
-                    } label: {
-                        VStack(spacing: 3) {
-                            Text(l.title)
-                                .font(TokensTypo.subheadline.weight(selected ? .semibold : .regular))
-                                .foregroundStyle(selected ? TokensPalette.accent : TokensPalette.secondary)
-                            // 车机/户外都读得出来的「当前模式」：相机靠颜色，我们再给一个 3pt 的点。
-                            Circle()
-                                .fill(selected ? TokensPalette.accent : Color.clear)
-                                .frame(width: 3, height: 3)
-                        }
-                        .padding(.vertical, TokensSpacing.xs)
-                        .frame(minWidth: 44)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text("看\(l.title)"))
-                    .accessibilityAddTraits(selected ? [.isSelected] : [])
-                }
-            }
-            .padding(.horizontal, TokensSpacing.xxs)
-        }
-        .scrollBounceBehavior(.basedOnSize)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(TokensPalette.hairline)
-                .frame(height: TokensHair.line)
-        }
-    }
-
-    /// 抓手：面板是「一张可以拉起来的纸」，这一点必须看得见（样品版就是靠它读的）。
-    private var panelGrab: some View {
-        Capsule()
-            .fill(TokensPalette.hairline)
-            .frame(width: 40, height: 4)
-            .frame(maxWidth: .infinity)
-            .accessibilityHidden(true)
-    }
-
-    /// 面板标题：衬线大字 + 一台**描边画出来的**小车（不是 SF Symbol）。
-    /// 负字距是大字才需要的 -
-    /// 字号一大，字距不收紧就散。
-    private func panelTitle(_ d: MapSpineData) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-            Text(d.carName.isEmpty ? "车" : d.carName)
-                .font(TokensSerif.title(26))
-                .tracking(TokensTracking.title)
-                .foregroundStyle(TokensPalette.primary)
-                .lineLimit(1)
-            CarGlyph(width: 30, height: 16, color: TokensPalette.secondary)
-                .offset(y: -3)
-            Spacer(minLength: 0)
-            Text(d.address)
-                .font(TokensTypo.caption)
-                .foregroundStyle(TokensPalette.tertiary)
-                .lineLimit(1)
-                .layoutPriority(-1)
-        }
-    }
-
-    // ---- 现在 ----
-    @ViewBuilder
-    private func nowContent(_ d: MapSpineData) -> some View {
-        // 车名与地址已经搬到了面板标题行（衬线大字），这里只留三句读数
-        HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-            Text("车头朝\(d.headingText)")
-                .font(TokensTypo.digits(12))
-                .foregroundStyle(TokensPalette.tertiary)
-            if !d.gpsText.isEmpty {
-                Text("·")
-                    .font(TokensTypo.caption)
-                    .foregroundStyle(TokensPalette.tertiary)
-                Text("GPS \(d.gpsText)")
-                    .font(TokensTypo.digits(12))
-                    .foregroundStyle(TokensPalette.tertiary)
-            }
-            Spacer(minLength: 0)
-        }
-
-        HStack(alignment: .bottom, spacing: TokensSpacing.lg) {
-            DSBigNumber(value: "\(d.socPct)", unit: "%", size: 54, tint: TokensPalette.primary)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("续航 \(d.rangeText)")
-                    .font(TokensTypo.subheadline)
-                    .foregroundStyle(TokensPalette.primary)
-                Text(d.chargeText)
-                    .font(TokensTypo.caption)
-                    .foregroundStyle(color(for: d.chargeCls))
-                if let avg = d.avgConsumption {
-                    Text("百公里 \(avg) kWh")
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(TokensPalette.tertiary)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-
-        // 光带 = 电量（全 App 唯一的形状，在地图上它是"车钉外面那圈弧"的展开）
-        DSLightBar(progress: Double(d.socPct) / 100,
-                   height: 5,
-                   showsGlow: spec.allowsGlow,
-                   tint: TokensPalette.lightBar)
-
-        tyreRow(d)
-
-        if !d.reasons.isEmpty {
-            DSSectionHeader(title: "为什么")
-            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-                ForEach(d.reasons.prefix(4)) { r in
-                    HStack(alignment: .top, spacing: TokensSpacing.sm) {
-                        Circle()
-                            .fill(color(for: r.cls))
-                            .frame(width: 5, height: 5)
-                            .padding(.top, 6)
-                        Text(r.text)
-                            .font(TokensTypo.footnote)
-                            .foregroundStyle(TokensPalette.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-        }
-
-        actionRow(d)
-    }
-
     /// 四轮胎压：一条安静的事实行。**任何一轮没真读到，整行就不出现** —— 不摆占位符。
     /// 报警位是车端自己置的（LfPressureWarning），颜色取自主题的 error，不是写死的红。
     @ViewBuilder
@@ -702,230 +881,13 @@ struct MapSpineView: View {
         }
     }
 
-    /// 控制长在对象上：不新写一套车控，而是**拨到那一档**。
-    /// 这里用的是 `nav.openMode`：把模式条拨到车控/电池/出行，而不是 push 出
-    /// 一份同样内容的第二页面 —— 同一功能两种存在方式就是「缝合怪」。
-    private func actionRow(_ d: MapSpineData) -> some View {
-        HStack(spacing: TokensSpacing.sm) {
-            // 主操作只有一个，其余三个是并列的 —— 四个都一样重要 = 没有重要的
-            action("车控", "slider.horizontal.3", hot: true) {
-                nav.openMode(.control)
-            }
-            // 叫「回到车」而不是「找车」：它做的是把镜头移回车所在位置。
-            // 「找车」是另一件事（下发 RemoteSearchCar 让车鸣笛闪灯），
-            // 那一个在地图下方的常驻操作条里。两个都叫「找车」= 用户分不清点哪个。
-            action("回到车", "location.circle") { centerOnCar(force: true) }
-            action("充电", "bolt.fill") { nav.openMode(.charge) }
-            // 「事件」而不是「异常」：这一列里多数是点火/熄火这类**正常事件**，
-            // 叫「异常」等于把正常行驶也标成故障。它并进出行页了（`MessagesSection`）。
-            action("事件", "exclamationmark.triangle") { nav.openMode(.trips) }
-        }
-    }
-
-    /// 四宫格动作块：图标在上、疏排小字在下（样品版的 q4 结构）。
-    /// `hot` 只给**一个**动作 —— 强调一旦泛滥就等于没有强调。
-    private func action(_ title: String, _ icon: String, hot: Bool = false,
-                        _ run: @escaping () -> Void) -> some View {
-        Button {
-            TokensHaptic.tap()
-            run()
-        } label: {
-            VStack(spacing: 6) {
-                Image(safeSymbol: icon, fallback: icon)
-                    .font(TokensTypo.fixed(17, weight: .medium))
-                Text(title)
-                    .font(TokensTypo.caption)
-                    .tracking(TokensTracking.label)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 58)
-            .background {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(hot ? TokensPalette.accent : TokensPalette.raised)
-            }
-            .foregroundStyle(hot ? TokensPalette.labelOnTint : TokensPalette.primary)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(title))
-    }
-
-    // ---- 行程 ----
-    @ViewBuilder
-    private func tripsContent(_ d: MapSpineData) -> some View {
-        DSSectionHeader(title: "行程", trailing: d.trips.isEmpty ? nil : "\(d.trips.count) 段")
-        if d.trips.isEmpty {
-            emptyNotice(MapSpineLayer.trips.emptyNote)
-        } else {
-            // 把话说在前面：线是起终点，不是轨迹
-            Text("起点到终点（没有逐点轨迹）")
-                .font(TokensTypo.caption)
-                .foregroundStyle(TokensPalette.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            ForEach(d.trips.prefix(3)) { t in
-                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-                    // 注意：`TokensTypo.data` 是**属性**，带尺寸的那支叫 digits(_:)
-                    Text(t.timeText)
-                        .font(TokensTypo.digits(13))
-                        .foregroundStyle(TokensPalette.primary)
-                    Text(String(format: "%.1f km", t.distanceKm))
-                        .font(TokensTypo.digits(13))
-                        .foregroundStyle(TokensPalette.primary)
-                    Text("\(t.startSoc)% → \(t.endSoc)%")
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(TokensPalette.secondary)
-                    Spacer(minLength: 0)
-                    if let eff = t.efficiency {
-                        Text(String(format: "%.1f kWh/100km", eff))
-                            .font(TokensTypo.caption)
-                            .foregroundStyle(TokensPalette.tertiary)
-                    }
-                }
-            }
-            Button("全部行程") { nav.openMode(.trips) }
-                .font(TokensTypo.footnote)
-                .foregroundStyle(TokensPalette.accent)
-                .buttonStyle(.plain)
-        }
-    }
-
-    // ---- 停车 ----
-    @ViewBuilder
-    private func holdsContent(_ d: MapSpineData) -> some View {
-        DSSectionHeader(title: "停车", trailing: d.holds.isEmpty ? nil : "\(d.holds.count) 个点")
-        if d.holds.isEmpty {
-            emptyNotice(MapSpineLayer.holds.emptyNote)
-        } else {
-            ForEach(d.holds.prefix(3)) { h in
-                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-                    Text(h.isLatest ? "上次" : h.agoText)
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(h.isLatest ? TokensPalette.accent : TokensPalette.tertiary)
-                    Text(h.address)
-                        .font(TokensTypo.footnote)
-                        .foregroundStyle(TokensPalette.primary)
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                    Text(MapSpineData.agoText(h.time))
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(TokensPalette.tertiary)
-                }
-            }
-            Button("全部停车与旅程") { nav.openMode(.trips) }
-                .font(TokensTypo.footnote)
-                .foregroundStyle(TokensPalette.accent)
-                .buttonStyle(.plain)
-        }
-    }
-
-    // ---- 充电 ----
-    @ViewBuilder
-    private func chargeContent(_ d: MapSpineData) -> some View {
-        DSSectionHeader(title: "充电", trailing: chargers.isEmpty ? nil : "附近 \(chargers.count) 个")
-        if let s = d.charging {
-            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-                Text(s.power)
-                    .font(TokensTypo.digits(17))
-                    .foregroundStyle(TokensPalette.info)
-                Text(s.start + " → " + s.end)
-                    .font(TokensTypo.caption)
-                    .foregroundStyle(TokensPalette.secondary)
-                Spacer(minLength: 0)
-                if let full = d.timeToFull {
-                    Text("充满还要 \(full)")
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(TokensPalette.tertiary)
-                }
-            }
-        }
-
-        if chargers.isEmpty {
-            emptyNotice(MapSpineLayer.charge.emptyNote)
-        } else {
-            ForEach(chargers.prefix(3)) { c in
-                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-                    Text(c.name)
-                        .font(TokensTypo.footnote)
-                        .foregroundStyle(TokensPalette.primary)
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                    Text(c.distanceText)
-                        .font(TokensTypo.digits(13))
-                        .foregroundStyle(TokensPalette.secondary)
-                    Text(c.isEVCharger ? "快充" : "—")
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(TokensPalette.tertiary)
-                }
-            }
-            Text("按车的位置实时搜索")
-                .font(TokensTypo.caption)
-                .foregroundStyle(TokensPalette.tertiary)
-            Text("只存起终点，做不了回放")
-                .font(TokensTypo.caption)
-                .foregroundStyle(TokensPalette.tertiary)
-        }
-        Button("充电与账单") { nav.openMode(.charge) }
-            .font(TokensTypo.footnote)
-            .foregroundStyle(TokensPalette.accent)
-            .buttonStyle(.plain)
-    }
 
     // =========================================================================
-    // MARK: 工具栏
+    // MARK: 此刻的光（可复算的那张表）
     // =========================================================================
-
-    @ToolbarContentBuilder
-    private func toolbarItems(_ d: MapSpineData) -> some ToolbarContent {
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Button {
-                TokensHaptic.tap()
-                Task {
-                    await refresh()
-                    await searchChargersIfNeeded(force: true)
-                }
-            } label: {
-                Image(safeSymbol: "arrow.clockwise", fallback: "arrow.clockwise")
-            }
-            .disabled(isRefreshing)
-            .accessibilityLabel(Text("刷新车的数据"))
-        }
-        // 全局搜索：此前那个 HUD 搜的是写死的字符串、点下去什么都不发生，
-        // 而且没有任何入口 —— 现在从地图顶部就能到。
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Button {
-                TokensHaptic.tap()
-                nav.showSearch = true
-            } label: {
-                Image(safeSymbol: "magnifyingglass", fallback: "magnifyingglass")
-            }
-            .accessibilityLabel(Text("搜索页面、车、行程、指令"))
-        }
-        ToolbarItem(placement: .navigationBarLeading) {
-            Button {
-                TokensHaptic.tap()
-                centerOnCar(force: true)
-            } label: {
-                Image(safeSymbol: "location.fill", fallback: "location.fill")
-            }
-            .disabled(d.hasLocation == false)
-            .accessibilityLabel(Text("回到车的位置"))
-        }
-        // iPad：把车况另开一个窗口。场景声明在 CarKeeperApp（WindowGroup(id: SceneID.detail)），
-        // 能不能真开由平台 + Info.plist 的 UIApplicationSupportsMultipleScenes 决定 ——
-        // 所以这里只在常规宽度（iPad）出现，iPhone 上不摆一个必然失败的按钮。
-        if sizeClass == .regular {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    TokensHaptic.tap()
-                    openWindow(id: SceneID.detail)
-                } label: {
-                    Image(safeSymbol: "rectangle.on.rectangle", fallback: "rectangle.on.rectangle")
-                }
-                .accessibilityLabel(Text("在新窗口打开车况"))
-            }
-        }
-    }
-
+    //
+    //  它是首页那枚药丸搬进车牌菜单之后**唯一**的入口：药丸没了，但「这一屏的光
+    //  是怎么算出来的」必须还能被调出来（每一行都是一个可复算的事实）。
 
     /// 「此刻的光」：样品版里那张表的真机版。
     /// 它不是「关于」页 —— 它让这一屏的光**可以被争论**：每一行都是一个可复算的事实，
@@ -1027,7 +989,8 @@ struct MapSpineView: View {
     // MARK: 交互与数据
     // =========================================================================
 
-    private func emptyNotice(_ text: String) -> some View {
+    /// 不是 `private`：同上（三个图层内容都用它写「取不到」那一句）。
+    func emptyNotice(_ text: String) -> some View {
         HStack(alignment: .top, spacing: TokensSpacing.sm) {
             Image(safeSymbol: "info.circle", fallback: "info.circle")
                 .font(TokensTypo.fixed(13))

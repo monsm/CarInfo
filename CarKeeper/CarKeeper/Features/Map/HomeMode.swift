@@ -115,7 +115,11 @@ enum HomeMode: String, CaseIterable, Identifiable {
     /// 「现在」那一档没有头 —— 那张纸本身就是地图的面板（车名 + 地址 + 状态行），
     /// 再叠一个巨字就是两层标题（见 `HomeModeHead` 的第 ③ 条自约束）。
     var headCards: [StackCard] {
-        self == .now ? [] : [StackCard(id: "head", content: AnyView(HomeModeHead(mode: self)))]
+        // 卡头写**这一档的名字**：原型的每页首卡都有一行 `.ct` 标出它是什么
+        // （`Trips · 今天` / `Charge · 电池` / `Control · 远控`）。
+        // 没有它，首卡就是一行没有出处的巨字。
+        self == .now ? [] : [StackCard(id: "head", title: title,
+                                       content: AnyView(HomeModeHead(mode: self)))]
     }
 }
 

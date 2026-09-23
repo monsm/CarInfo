@@ -235,6 +235,10 @@ struct DSSwipeStrip: View {
             }
         }
         .frame(width: barW, height: barHeight)
+        // 条自己把越界的那半格裁掉：原型 `.strip{overflow:hidden}`。
+        // 少了这一步，半压在条边上的那个字会**漏到条外** —— 而条是带圆角的，
+        // 露出去的那半截正好把「静止只露三档」这个形态破掉。
+        .clipShape(RoundedRectangle(cornerRadius: barHeight * 0.31, style: .continuous))
         .frame(maxWidth: .infinity, alignment: .center)
         .allowsHitTesting(false)
     }

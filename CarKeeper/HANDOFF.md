@@ -234,19 +234,35 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 
 ## 4. 界面逐项
 
-### 4.1 地图主屏（「现在」档）—— 全 App 唯一的屏
+### 4.1 地图主屏（「现在」档）—— 全 App 唯一的屏**文件**：`Features/Map/MapSpineView.swift`（1092 行，骨架：六页同屏 / 底条 / 车牌 / 浮动两卡）、
+`MapSpineLayers.swift`（139 行，「现在」那一档四个图层各自的内容 —— 2026-09-23 拆出，
+理由见那里的文件头）、`MapSpineData.swift`（数据层）、`MapCarPin.swift`（车钉）、
+`HomeModeHead.swift`（巨字头）。
 
-**文件**：`Features/Map/MapSpineView.swift`（1125 行，最大）、`MapSpineData.swift`（数据层）、
-`MapCarPin.swift`（车钉）、`MapQuickBar.swift`（操作条）、`HomeModeHead.swift`（巨字头）。
+**骨架（2026-09-23 按原型 `design-preview/stack.html` 重排过）**：一张全屏 MapKit 地图，
+上面只摆原型里本来就有的东西 —— **车牌徽标**（左上，安全区下 8pt）+ **底部浮动两卡**
+（`.float`：底边离屏底 98pt、卡间 12）+ 地图自己的**罗盘**与**比例尺**。
+**这一档没有导航栏**（`.toolbar(.hidden, for: .navigationBar)`）：地图一直画到屏幕最上沿。
+底图之上还有原型的两层压暗（`mapDims`，**不是**艺术主题的蒙版）：`.maptop{height:240px}`
+给车牌铺读得出来的底（不铺的话浅色底图上白字会淹掉），`.mapvig{inset:0}` 四角压暗把
+视线收到车上。两层都取 `TokensPalette.scrim` —— 纸主题下它是墨，不是黑。
 
-**骨架**：一张全屏 MapKit 地图 + 一张贴底的纸（`UnevenRoundedRectangle` 圆角 + `surface` 底色）。
-纸的高度固定（`cardHeight`），内容多了**在纸里滚**（`DSPaperPage`），所以模式条与巨字头永不移动。
+**浮动两卡**（顺序就是读的顺序）：
 
-**顶部**：图层胶囊 + 同步状态（`statusDot` 在线/离线）+ 工具栏（搜索、图层、定位、iPad 分屏入口）。
-光的说明挂在 `lightPill`（点开是 `skySheet`，列出「为什么现在是这个光」的事实表）。
+| 卡 | 头 | 内容 |
+|---|---|---|
+| 现状卡 `nowCard` | 「当前位置」+「上报多久了」 | 地址（大字）→ 巨字**续航**（`DSBigNumber`）→ 副行（电量 · 表显 · 充不充电）→ 光带 → 四轮胎压 |
+| 四格读数 `readoutChips` | 无 | 车速 / 电量 / 胎压（取四轮里**最低**那条）/ 车锁，奇偶上下错开 7px（原型 `.chip:nth-child(odd)`） |
 
-**二级选择条**：4 个图层，横向可滚，只有文字。**刻意没有照搬**「左右滑取景框换模式」——
-地图的横向拖拽是平移，抢掉它比少一个手势糟得多。
+**车牌徽标同时是这一屏的菜单**（`Menu`）：四个地图图层（当前那层带勾）、重取数据、
+此刻的光（`skySheet`）、回到车；iPad 上多一项「新车况窗口」。
+把这几件事收进菜单是**结构**上的选择：原型首页只有「车牌 + 两卡」，每多一枚钮就不像它了。
+那一屏多出来的四样（图层选择卡、常驻操作条、光名药丸、回到车浮钮）与顶栏三枚钮就是这么收掉的。
+
+**图层选择现在在菜单里，不是一张卡**：图上仍然四个图层，换层时浮动首卡换成那一层的内容
+（`tripsContent` / `holdsContent` / `chargeContent`），所以「看图上的哪个问题」与「读它的数」
+还是同一张卡。**刻意没有照搬**「左右滑取景框换模式」——地图的横向拖拽是平移，
+抢掉它比少一个手势糟得多。
 
 **四个图层各自画什么、数据从哪来**：
 
@@ -257,14 +273,16 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 | `holds` | 常停点 + 热区圈（`MapHotspot`，聚类） | `store.parkingHistory` / `parkingPoints` | 还没有停车记录 |
 | `charge` | 附近充电站（`MKLocalSearch` + 聚合 `MapChargerCluster`） | 现场搜索 + 充电会话 | 正在搜索附近充电站 |
 
-**四个图层底下的纸内容**：`nowContent`（巨字电量 + 轮胎 + 四个动作）/ `tripsContent` / `holdsContent` /
-`chargeContent`，都在 `MapSpineView` 内，各自有 `emptyNotice`。
+**换层时首卡里的内容**：`tripsContent` / `holdsContent` / `chargeContent`，都在 `MapSpineView` 内，
+各自有 `emptyNotice`（取不到就说取不到，不摆占位）。
 
 **车钉（`MapCarPin`）**：四种画法对四个艺术方向 —— 夜光（刻度盘 + 弧形 + 发光 + 接地阴影）、
 纸上（墨线圈，无发光无阴影）、巨字（发丝环 + 十字准线）、原生。车头朝向由 `Heading` 驱动。
 
-**操作条（`MapQuickBar`）**：4 个动作 —— 锁车 `LockDoor` / 解锁 `UnLockDoor` / 空调 `OpenAir`（先弹温度） /
-寻车 `RemoteSearchCar`。静息态是四个动作，执行中条子**变成那条指令本身**；发出前按需验 PIN / FaceID。
+**那个常驻操作条已经不在了**（`MapQuickBar.swift` 已删，2026-09-23）：它那 4 个动作
+（锁车 `LockDoor` / 解锁 `UnLockDoor` / 空调 `OpenAir` / 寻车 `RemoteSearchCar`）与验 PIN / FaceID
+在**车控那一档**一模一样地存在（同一套 `CommandCenter`）。这符合全站那条“同一功能只有一种存在方式”：
+首页是一条取景框 + 一条模式条，不再兼任控制台。
 
 **镜头**：`focusOn(_:)` / `centerOnCar(force:)`；`AppStore.mapFocus` 是跨页请求「把地图移到某点」的唯一通道。
 
@@ -555,8 +573,9 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 
 ### 9.3 已核实的文档/注释漂移（代码是对的，注释旧了）
 
-- `MapSpineView.swift` 头部与 `bottomPanel` 注释仍写「**9 档**」，实际是 **6 档**（2026-09-23 合并后未回改注释）。
-- `CarKeeperApp.swift` 头部注释仍写「**10 档** = 10 个功能界面」。
+- ~~`MapSpineView.swift` 头部与 `bottomPanel` 注释写「9 档」、`CarKeeperApp.swift` 写「10 档」~~
+  **已改**：`bottomPanel` 这个类型本身已随结构对齐删掉，两处计数注释都改成 6 档。
+  留着这条是因为它的成因还没被机制拦住 —— 「注释里的数字」没有任何门禁在盯。
 - `DESIGN-SPEC.md` 的小节标题仍用旧页面名（如「行程页 (TripAnalyticsView)」），实际类型是 `TripsEventsView`。
 - `GlobalSearchHUD` 的空态提示曾写「搜页面、车牌、行程、指令、**充电记录**。」，而充电记录随
   充电账本一起删了（代码里的注释已注明），提示却还在承诺它 —— **已改**。
