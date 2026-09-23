@@ -38,7 +38,11 @@ enum UpdateService {
     /// 查询 tag=latest 的 Release（取其中 .ipa 附件）。
     static func fetchLatestRelease(token: String) async throws -> ReleaseInfo {
         guard !token.isEmpty else { throw UpdateError.noToken }
-        let url = URL(string: "https://api.github.com/repos/\(repoOwner)/\(repoName)/releases/tags/\(tagLatest)")!
+        // 不用 `!`：这三个常量拼出来的字符串如果哪天出意外（改了常量、带了空格），
+        // 崩的是用户的 App，而这里本来就在一个 throws 函数里。
+        guard let url = URL(string: "https://api.github.com/repos/\(repoOwner)/\(repoName)/releases/tags/\(tagLatest)") else {
+            throw UpdateError.fetchFailed("更新地址拼不出来（仓库名或 tag 里有非法字符）")
+        }
         var req = URLRequest(url: url)
         req.httpMethod = "GET"
         for (k, v) in apiHeader(token) { req.setValue(v, forHTTPHeaderField: k) }
@@ -81,7 +85,10 @@ enum UpdateService {
         let target = dir.appendingPathComponent("CarKeeper-latest.ipa")
         try? FileManager.default.removeItem(at: target)
 
-        let request = URLRequest(url: URL(string: url)!)
+        // `url` 来自 GitHub 的 JSON（browser_download_url）—— 服务端给什么就是什么，
+        // 直接 `!` 等于把服务端的一次异常变成一个崩溃。
+        guard let remote = URL(string: url) else { throw URLError(.badURL) }
+        let request = URLRequest(url: remote)
         let location = try await downloadWithProgress(request: request, progress: progress)
         try FileManager.default.moveItem(at: location, to: target)
         return target

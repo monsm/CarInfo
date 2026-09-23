@@ -42,7 +42,9 @@ class InsuranceManager {
     /// 获取即将到期的保险（60天内）
     var expiringPolicies: [InsurancePolicy] {
         let now = Date()
-        let sixtyDays = Calendar.current.date(byAdding: .day, value: 60, to: now)!
+        // 窗口算不出来就退回「此刻」→ 这一栏为空：
+        // 不产生一条并不存在的到期提醒（宁可少报，不误报）。
+        let sixtyDays = Calendar.current.date(byAdding: .day, value: 60, to: now) ?? now
         return policies.filter { $0.endDate >= now && $0.endDate <= sixtyDays }
             .sorted { $0.endDate < $1.endDate }
     }

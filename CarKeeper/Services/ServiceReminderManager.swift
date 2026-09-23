@@ -75,23 +75,33 @@ class ServiceReminderManager {
         }
     }
 
-    /// 获取即将到期的提醒（30天内或500km内）
-    var upcomingReminders: [ServiceReminder] {
-        let now = Date()
-        let thirtyDays = Calendar.current.date(byAdding: .day, value: 30, to: now)!
-        return reminders.filter { $0.nextDate <= thirtyDays }.sorted { $0.nextDate < $1.nextDate }
-    }
-
+    /// 默认维保周期（用户还没有任何记录时的那份底）。
+    ///
+    /// **曾经用 `ServiceType.hashValue` 参与算术**，而 `hashValue` 是**每进程随机种子**
+    /// （既不是固定值，也不是枚举序号）：
+    ///   · `6 + hashValue * 2` 经常直接**整数溢出** → 进程 SIGTRAP；
+    ///   · 就算没溢出，`date(byAdding: .month, value: 4.6e18)` 也返回 nil，
+    ///     而代码用了 `!` → 同样炸。
+    ///
+    /// 2026-09-23 的真机崩溃报告就是这条（`EXC_BREAKPOINT`，栈：
+    /// `VehicleTipsSection.body → tips → ServiceReminderManager.reminders → defaultReminders`）：
+    /// 它把「切到车辆档」变成了一次闪退。注意它崩在**默认值**上 ——
+    /// 只要用户没存过提醒（也就是绝大多数人），进那一档就必崩。
+    ///
+    /// 现在默认值**全是确定的**：每个类型用它自己的周期表（`serviceIntervalMiles`），
+    /// 上次保养 = 今天往前一个周期，下次 = 今天往后一个周期，里程从 0 起算 ——
+    /// 不编数据（hashValue 那版会给出 4.6e19 km 这种数字），也不做任何会崩的计算。
     private var defaultReminders: [ServiceReminder] {
         let today = Date()
         let cal = Calendar.current
         return ServiceType.allCases.map { type in
-            ServiceReminder(
+            let interval = serviceIntervalMiles(type)
+            return ServiceReminder(
                 type: type,
-                nextMileageKm: 10000 + Double(type.hashValue) * 5000,
-                nextDate: cal.date(byAdding: .month, value: 6 + type.hashValue * 2, to: today)!,
-                lastMileageKm: Double(type.hashValue) * 5000,
-                lastDate: cal.date(byAdding: .month, value: -(6 + type.hashValue * 2), to: today)!,
+                nextMileageKm: interval.km,
+                nextDate: cal.date(byAdding: .month, value: interval.months, to: today) ?? today,
+                lastMileageKm: 0,
+                lastDate: cal.date(byAdding: .month, value: -interval.months, to: today) ?? today,
                 notes: ""
             )
         }

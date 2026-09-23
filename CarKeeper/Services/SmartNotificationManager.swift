@@ -149,7 +149,8 @@ class SmartNotificationManager: ObservableObject {
     func checkServiceDue(nextDate: Date?) {
         guard let next = nextDate, serviceRemindersEnabled else { return }
         let cal = Calendar.current
-        let sevenDays = cal.date(byAdding: .day, value: 7, to: Date())!
+        // 同上：窗口算不出来就当作「没有要提醒的」—— 不崩，也不误报一条保养到期。
+        let sevenDays = cal.date(byAdding: .day, value: 7, to: Date()) ?? Date()
         let today = cal.startOfDay(for: Date())
         let nextDay = cal.startOfDay(for: next)
 

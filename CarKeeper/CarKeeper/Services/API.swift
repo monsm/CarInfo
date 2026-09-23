@@ -156,7 +156,9 @@ final class APIClient: @unchecked Sendable {
         } else if let body {
             let data: Data
             switch body {
-            case let s as String: data = s.data(using: .utf8)!
+            // `data(using: .utf8)` 实际不会失败，但 `!` 在这里没有任何好处：
+            // 退化成空 body 会让请求直接报错（可见），而崩是静默的。
+            case let s as String: data = s.data(using: .utf8) ?? Data()
             default: data = try JSONSerialization.data(withJSONObject: body, options: [])
             }
             req.httpBody = data

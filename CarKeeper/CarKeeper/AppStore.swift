@@ -479,7 +479,8 @@ final class AppStore: @unchecked Sendable {
     private static let biometricSetupKey = "carkeeper_biometric_setup"
 
     func savePin(_ pin: String) {
-        let pinData = pin.data(using: .utf8)!
+        // 编码不出来就**不存**，而不是存一段空数据（那会让「已设置控车码」变成谎话）。
+        guard let pinData = pin.data(using: .utf8) else { return }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Self.pinKeychainService,

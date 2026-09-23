@@ -912,6 +912,63 @@ CI 一直在报 `AppIcon has 2 unassigned children`。原因：出包的
 | 档位 ↔ `pageContent` 一一对应 | 加了档位、忘了接页面（或反过来） |
 | 档位在 `HomeModeHead` 里出现两次（巨字 + 依据行） | 加了档位、但那档看起来不像一家人 |
 
-它已接进工作流的门禁列表（现在共 17 条）。设计契约 `DESIGN-UNIFY.md` 第 6 节同步成
-「两级模式条 + 一份目录」的现状。
+它已接进工作流的门禁列表（当时共 17 条；加上下面的 `traps.py` 后为 18 条）。设计契约
+`DESIGN-UNIFY.md` 第 6 节同步成「两级模式条 + 一份目录」的现状。
+
+---
+
+## 真机崩溃（2026-09-23 09:14）—— `hashValue` 冒充业务数据
+
+第一份真机报告（iPhone17,1 / iOS 27.2 beta；`bug_type 309`，`EXC_BREAKPOINT`）。
+它不是「布局不对」，是**切到车辆档必崩**。栈：
+
+    VehicleTipsSection.body.getter
+      → VehicleTipsSection.tips.getter
+        → ServiceReminderManager.reminders.getter
+          → ServiceReminderManager.defaultReminders.getter   ← SIGTRAP
+
+崩的那行是：
+
+    nextDate: cal.date(byAdding: .month, value: 6 + type.hashValue * 2, to: today)!
+
+`hashValue` 是**每进程随机种子**（既不是固定值，也不是枚举序号），能到 ±9.2e18：
+
+1. `6 + hashValue * 2` 本身就可能**整数溢出** → Swift 溢出即 trap（SIGTRAP）；
+2. 就算侥幸不溢出，`date(byAdding: .month, value: 4.6e18)` 返回 nil，而代码用了 `!`；
+3. `10000 + Double(type.hashValue) * 5000` 同源 —— 默认里程会变成 4.6e19 km 这种数字。
+
+它崩在**默认值**上，也就是「只要用户没自己存过提醒（绝大多数人），进那一档必崩」。
+
+### 改法
+
+`defaultReminders` 改成**确定的**：每型用它自己的周期表（`serviceIntervalMiles`），
+上次 = 今天往前一个周期，下次 = 今天往后一个周期，里程从 0 起算 —— 不编数据、也不做会崩的计算。
+
+同一类隐患一次清完（全是「上游一变就崩」）：
+
+| 位置 | 原写法 | 现在 |
+|---|---|---|
+| `ServiceReminderManager.defaultReminders` | `6 + type.hashValue * 2` + `!` | 周期表 + `?? today` |
+| `ServiceReminderManager.upcomingReminders` | `date(byAdding:)!` | **删掉**（全项目零调用 → 死代码，还带一个 trap） |
+| `FamilyAndKeySharing.createKey` | `date(byAdding: days)!` | `?? Date()`：算不出来就发一把已过期的钥匙 |
+| `InsuranceManager.expiringPolicies` | `date(byAdding: 60d)!` | `?? now`：宁可少报，不误报 |
+| `SmartNotificationManager.checkServiceDue` | `date(byAdding: 7d)!` | `?? Date()`：窗口算不出来就不发 |
+| `MileageJournalSection.totalThisMonth` | `date(from:)!` | `?? now` |
+| `AN.stats` | `arr.min()! / arr.max()!` | `guard let mn = …, mx = …` |
+| `AN` 四处电池极值 | `arr.isEmpty ? "--" : arr.min()!` ×4 | `extremeText(numberList(…))`（新助手，四份抄写收成一份） |
+| `HistoryStore.record` 三处 | `x.last == nil \|\| … x.last!.t …` | `x.last.map { … } ?? true` |
+| `AppStore.savePin` | `pin.data(using: .utf8)!` | `guard let … else { return }`（不存空 PIN） |
+| `UpdateService` 两处 URL | `URL(string: …)!`，其中一处是**服务端返回的**字符串 | `guard let` + `throw` |
+| `API.request` | `s.data(using: .utf8)!` | `?? Data()` |
+
+### 把这一类交给 CI：`scan/traps.py`（第 18 项门禁）
+
+编译期不报错、静态门禁原先也看不见、本地无 Xcode 更看不出来 —— 这类构造只能靠规则拦。
+五条判据：`.hashValue` 出现在业务代码 · 日期构造后 `!` · **任何**调用结果 `)!` ·
+`first/last/min/max` 后 `!` · `try!` / `as!`。
+
+用真机报告里的原文验过：那两行命中①与②，而同源的 `hashValue` 里程行命中①；
+改成 `?? today` / 周期表之后不再命中 —— 门禁不是摆设。
+
+**还没被证明的那一步**：本次修复本身只经过静态门禁（18 项全绿），真机确认要重新装一轮 IPA。
 

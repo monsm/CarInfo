@@ -33,7 +33,10 @@ class TempKeyManager: ObservableObject {
     /// 生成临时钥匙
     func createKey(recipient: String, days: Int = 7, maxUses: Int = 10) -> TemporaryKey {
         let code = String(format: "%06d", Int.random(in: 100000...999999))
-        let expiresAt = Calendar.current.date(byAdding: .day, value: days, to: Date())!
+        // `days` 来自调用方，极端取值下 `date(byAdding:)` 会返回 nil。
+        // 算不出来就发一把**已经过期**的钥匙 —— 宁可不用，也不能给一把永不过期的：
+        // 临时钥匙的整个意义就是“会过期”。
+        let expiresAt = Calendar.current.date(byAdding: .day, value: days, to: Date()) ?? Date()
         let key = TemporaryKey(
             recipientName: recipient,
             code: code,

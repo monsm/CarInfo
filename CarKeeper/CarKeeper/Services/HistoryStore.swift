@@ -88,7 +88,10 @@ final class HistoryStore {
 
         // ---- SOC ----
         if socPct > 0 {
-            let due = soc.last == nil || now.timeIntervalSince(soc.last!.t) >= Self.socInterval
+            // 「没有上一个点」与「距上一个点够久了」是同一件事：都该记一个点。
+            // 原写法 `soc.last == nil || …soc.last!.t…` 逻辑上对，但把安全性
+            // 押在读的人是否会回头核对左半边上；`map … ?? true` 不用核对。
+            let due = soc.last.map { now.timeIntervalSince($0.t) >= Self.socInterval } ?? true
             let jumped = soc.last.map { abs(Double(socPct) - $0.v) >= Self.socJump } ?? false
             if due || jumped {
                 soc.append(Point(t: now, v: Double(socPct)))
@@ -99,7 +102,7 @@ final class HistoryStore {
 
         // ---- 充电功率（只在充电中记：不充电时功率本就没有意义）----
         if charging, let p = powerKW, p > 0.05 {
-            if power.last == nil || now.timeIntervalSince(power.last!.t) >= Self.powerInterval {
+            if power.last.map({ now.timeIntervalSince($0.t) >= Self.powerInterval }) ?? true {
                 power.append(Point(t: now, v: p))
                 trim(&power, cap: powerCap)
                 dirty = true
@@ -108,7 +111,7 @@ final class HistoryStore {
 
         // ---- 胎压 ----
         if tyres.contains(where: { $0 != nil }) {
-            let due = tyre.last == nil || now.timeIntervalSince(tyre.last!.t) >= Self.tyreInterval
+            let due = tyre.last.map { now.timeIntervalSince($0.t) >= Self.tyreInterval } ?? true
             let changed = tyre.last.map { old -> Bool in
                 let olds = [old.fl, old.fr, old.rl, old.rr]
                 for i in 0..<4 {

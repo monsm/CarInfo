@@ -11,10 +11,30 @@ enum AN {
 
     /// 距离/统计辅助
     static func stats(_ arr: [Double]) -> (min: Double, max: Double, avg: Double, count: Int)? {
-        guard !arr.isEmpty else { return nil }
-        let mn = arr.min()!, mx = arr.max()!
+        // 不用 `arr.min()!` / `arr.max()!`：空数组上它们是 nil，而 `!` 是崩溃。
+        // `guard let` 既保住了「空就返回 nil」的原意，又不需要读者去核对前一行的守卫。
+        guard let mn = arr.min(), let mx = arr.max() else { return nil }
         let avg = arr.reduce(0, +) / Double(arr.count)
         return (mn, mx, avg, arr.count)
+    }
+
+    /// `BatteryVoltage` / `ProbeTemperatures` 这类「一组数」的抽取：字符串与 NSNumber 都要认。
+    static func numberList(_ dict: [String: Any]?, _ key: String) -> [Double] {
+        (ciPick(dict, [key]) as? [Any])?.compactMap { (v) -> Double? in
+            if let s = v as? String { return Double(s) }
+            if let n = v as? NSNumber { return n.doubleValue }
+            return nil
+        } ?? []
+    }
+
+    /// 一组数的极值 → 字符串；空数组给 "--"。
+    ///
+    /// 原写法是 `arr.isEmpty ? "--" : String(format: "%.3f", arr.min()!)`，同一个模式
+    /// 在本文件里抄了四遍、每遍带一个 `!`。`min()` / `max()` 本来就返回 Optional ——
+    /// 用 Optional 链路表达更短，也不需要读的人回头核对「上面守没守空数组」。
+    static func extremeText(_ arr: [Double], digits: Int, lowest: Bool) -> String {
+        let v = lowest ? arr.min() : arr.max()
+        return v.map { String(format: "%.\(digits)f", $0) } ?? "--"
     }
 
     /// 抽样上限 128：本车的电芯是 **88 节**，64 的采样步长是 2 —— 会丢掉一半电芯，
@@ -401,24 +421,16 @@ func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
             count: VM.n0(ciPick(sub, ["CurrentBatteryCount"])) ?? VM.n0(ciPick(sub, ["BatteryCount"])) ?? "--",
             volt: VM.n1(ciPick(sub, ["ChargeSystemVoltage"])) ?? "--",
             amp: VM.n0(ciPick(sub, ["ChargeSystemCurrent"])) ?? "--",
-            vMin: { let arr = (ciPick(sub, ["BatteryVoltage"]) as? [Any])?.compactMap { (v) -> Double? in
-                if let s = v as? String { return Double(s) }; if let n = v as? NSNumber { return n.doubleValue }; return nil } ?? []
-                return arr.isEmpty ? "--" : String(format: "%.3f", arr.min()!) }(),
-            vMax: { let arr = (ciPick(sub, ["BatteryVoltage"]) as? [Any])?.compactMap { (v) -> Double? in
-                if let s = v as? String { return Double(s) }; if let n = v as? NSNumber { return n.doubleValue }; return nil } ?? []
-                return arr.isEmpty ? "--" : String(format: "%.3f", arr.max()!) }()
+            vMin: extremeText(numberList(sub, "BatteryVoltage"), digits: 3, lowest: true),
+            vMax: extremeText(numberList(sub, "BatteryVoltage"), digits: 3, lowest: false)
         )
     }
     let tempSubs: [TempSub] = (ciArray(control, ["NevChargeSystemTemperatureDtoList"]) ?? []).map { sub in
         TempSub(
             num: VM.n0(ciPick(sub, ["ChildSystemNum"])) ?? "--",
             count: VM.n0(ciPick(sub, ["ChargeTemperatureProbeNum"])) ?? "--",
-            tMin: { let arr = (ciPick(sub, ["ProbeTemperatures"]) as? [Any])?.compactMap { (v) -> Double? in
-                if let s = v as? String { return Double(s) }; if let n = v as? NSNumber { return n.doubleValue }; return nil } ?? []
-                return arr.isEmpty ? "--" : String(format: "%.1f", arr.min()!) }(),
-            tMax: { let arr = (ciPick(sub, ["ProbeTemperatures"]) as? [Any])?.compactMap { (v) -> Double? in
-                if let s = v as? String { return Double(s) }; if let n = v as? NSNumber { return n.doubleValue }; return nil } ?? []
-                return arr.isEmpty ? "--" : String(format: "%.1f", arr.max()!) }()
+            tMin: extremeText(numberList(sub, "ProbeTemperatures"), digits: 1, lowest: true),
+            tMax: extremeText(numberList(sub, "ProbeTemperatures"), digits: 1, lowest: false)
         )
     }
 

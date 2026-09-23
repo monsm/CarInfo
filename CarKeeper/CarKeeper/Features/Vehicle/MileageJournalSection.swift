@@ -81,7 +81,8 @@ class MileageTracker : ObservableObject {
     func totalThisMonth() -> Double {
         let now = Date()
         let cal = Calendar.current
-        let startOfMonth = cal.date(from: cal.dateComponents([.year, .month], from: now))!
+        // 取不到月初就算「今天起」：宁可少算几天，也不让记账页闪退。
+        let startOfMonth = cal.date(from: cal.dateComponents([.year, .month], from: now)) ?? now
         return entries.filter { $0.date >= startOfMonth }.map { $0.amount }.reduce(0, +)
     }
 
