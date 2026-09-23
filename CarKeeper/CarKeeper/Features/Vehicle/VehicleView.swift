@@ -147,19 +147,22 @@ struct VehicleView: View {
             return [StackCard(id: "empty", content: AnyView(
                 GlassCardEmpty(text: "车辆数据不完整", icon: "exclamationmark.triangle")))]
         }
-        return [
+        var out: [StackCard] = [
             StackCard(id: "identity", title: "身份",
                       value: sum.plate, cls: "ok",
                       content: AnyView(identitySection(sum))),
             // 用车提示：由这辆车的读数推出来的提醒（原 `车辆提示` 页）
             StackCard(id: "tips", title: "用车提示", content: AnyView(VehicleTipsSection())),
-            // 档案里的里程与车架号来自车控报文（`control`）—— 时间戳跟的是那个源，
-            // 不是「这一页什么时候画出来的」。档案按**问题**拆开（一组一卡）：
-            out.append(contentsOf: archiveGroups),
+        ]
+        // 档案里的里程与车架号来自车控报文（`control`）—— 时间戳跟的是那个源，
+        // 不是「这一页什么时候画出来的」。档案按**问题**拆开（一组一卡）：
+        out.append(contentsOf: archiveGroups)
+        out += [
             StackCard(id: "photos", title: "维保照片", content: AnyView(photoSection)),
             // 里程记账：花在车上的每一笔（原「我的」里的独立页 + sheet）
             StackCard(id: "journal", title: "里程记账", content: AnyView(MileageJournalSection()))
         ]
+        return out
     }
 
     private var loadingState: some View {

@@ -160,6 +160,12 @@ struct DSSwipeStrip: View {
         width / 2 + rowX - c
     }
 
+    /// 透镜所在的连续档位：`c` 反算成「第几档」（可带小数）。
+    /// 松手时拿它吸附（`snap`），透镜跟手时用它做起点（`setPV`）。
+    private func pvValue(c: CGFloat, gap: CGFloat) -> Double {
+        Double((c - slot / 2) / pitch(gap))
+    }
+
     /// 越界阻尼：拖得动，但越拖越沉。两端各留 0.35 档。
     private func clampC(_ raw: CGFloat, lim: ClosedRange<CGFloat>, gap: CGFloat) -> CGFloat {
         let slack = pitch(gap) * 0.35
