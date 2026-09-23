@@ -12,7 +12,8 @@ import SwiftUI
 //  现在索引页降级为二级入口（设置类内容），一级入口只有这条模式条。
 //
 //  顺序不是按功能分类排的，是按**用的频率**：
-//    现在（每次上车看）→ 车辆/电池/车控（常看常按）→ 出行/保养（偶尔）→ 我的/诊断（少见）
+//    现在（每次上车看）→ 车辆/健康/电池/车控（常看常按）→ 出行/保养（偶尔）
+//    → 我的/应急/诊断（少见，但每个都必须在一次拖动之内就能到）
 enum HomeMode: String, CaseIterable, Identifiable {
     /// 车现在在哪、什么状态 —— 也就是地图主屏本来的那张纸（含四个地图图层）
     case now
@@ -23,6 +24,10 @@ enum HomeMode: String, CaseIterable, Identifiable {
     case trips
     case service
     case mine
+    /// 紧急求助。**曾经只在索引页里**（那份“全部功能”目录）——
+    /// 而紧急入口本来就不该埋在一层目录里。它现在是条子上的一档：
+    /// 位置固定、每次都看得见，不必先打开目录再找。
+    case emergency
     case dev
 
     var id: String { rawValue }
@@ -39,6 +44,7 @@ enum HomeMode: String, CaseIterable, Identifiable {
         case .trips: return "出行"
         case .service: return "保养"
         case .mine: return "我的"
+        case .emergency: return "应急"
         case .dev: return "诊断"
         }
     }
@@ -54,6 +60,7 @@ enum HomeMode: String, CaseIterable, Identifiable {
         case .trips: return .trips
         case .service: return .service
         case .mine: return .mine
+        case .emergency: return .emergency
         case .dev: return .dev
         }
     }

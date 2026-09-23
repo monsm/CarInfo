@@ -67,7 +67,6 @@ struct MapSpineView: View {
     @State private var didCenterOnce = false
     @State private var chargers: [MapCharger] = []
     @State private var chargerCenterKey = ""
-    @State private var showIndex = false
     @State private var isRefreshing = false
     @State private var showReplay = false
     @State private var replaySession: ChargeSession?
@@ -127,7 +126,6 @@ struct MapSpineView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarItems(d) }
-        .sheet(isPresented: $showIndex) { indexSheet(d).dsSheetCanvas() }
         .sheet(isPresented: $showReplay) {
             if let s = replaySession { ChargeReplaySheet(session: s).dsSheetCanvas() }
         }
@@ -432,11 +430,20 @@ struct MapSpineView: View {
                 if homeMode == .now {
                     nowPanel(d)
                 } else {
-                    // 页面本身就是一张带滚动的纸（`DSPaperPage`），直接放进固定高度的大卡：
-                    // 内容多了在纸里滚，纸不会撑高，所以模式条的位置一动不动。
-                    // 两张纸用**同一个** `TokensPalette.surface`，叠在一起只是多出一条
-                    // 发丝线 —— 那条线刚好把「切换器」和「切换出来的内容」分开。
-                    pageContent(homeMode)
+                    // 02 的结构：**巨字先说话**（大字主角 + 三条依据），整页在最下面滚。
+                    // 头是**固定**的（不跟着页面滚）：换档时那一行巨字总在同一处，
+                    // 手指学到的是“同一块地方每次换个数字”，而不是“整屏又换了一次”。
+                    VStack(alignment: .leading, spacing: TokensSpacing.md) {
+                        HomeModeHead(mode: homeMode)
+                        Rectangle()
+                            .fill(TokensPalette.hairline)
+                            .frame(height: TokensHair.line)
+                        // 页面本身就是一张带滚动的纸（`DSPaperPage`），放进剩下的高度：
+                        // 内容多了在纸里滚，纸不会撑高，所以模式条与巨字都不会动。
+                        // 两张纸用**同一个** `TokensPalette.surface`，叠在一起只是多出一条
+                        // 发丝线 —— 那条线刚好把「头」与「内容」分开。
+                        pageContent(homeMode)
+                    }
                 }
             }
             .frame(height: cardHeight, alignment: .top)
@@ -515,6 +522,7 @@ struct MapSpineView: View {
         case .trips: TripsEventsView()
         case .service: MaintenanceMoneyView()
         case .mine: MineView()
+        case .emergency: EmergencyPanel()
         case .dev: DevView()
         }
     }
@@ -889,15 +897,6 @@ struct MapSpineView: View {
             .disabled(isRefreshing)
             .accessibilityLabel(Text("刷新车的数据"))
         }
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Button {
-                TokensHaptic.tap()
-                showIndex = true
-            } label: {
-                Image(safeSymbol: "square.grid.2x2", fallback: "square.grid.2x2")
-            }
-            .accessibilityLabel(Text("全部功能"))
-        }
         // 全局搜索：此前那个 HUD 搜的是写死的字符串、点下去什么都不发生，
         // 而且没有任何入口 —— 现在从地图顶部就能到。
         ToolbarItem(placement: .navigationBarTrailing) {
@@ -935,49 +934,6 @@ struct MapSpineView: View {
         }
     }
 
-    /// 索引页：**App 唯一的功能目录**。
-    ///
-    /// 它曾经是「去掉 Tab 栏的代价补在这里」，而 Tab 栏并没去掉 —— 于是两套目录并存，
-    /// 同一页在 Tab、地图图层、索引页、「我的」磁贴里最多出现 4 次。现在 Tab 栏没了，
-    /// 这一页是真目录，所以它**按意图分组**（我现在要做什么），不再平铺 16 项让人找。
-    private func indexSheet(_ d: MapSpineData) -> some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                    // 「地图上的地方」这一组（四个图层入口）已删：
-                    // 模式条就长在纸的上沿、永远可见，再在目录里摆同一份四个入口，
-                    // 就是「同一件事两个入口」——缝合怪的第一来源。
-                    // 索引页从此只做一件事：列**离开地图**的深潜页。
-
-                    // 「用车提示」不再单列：它已并入车辆档案（`VehicleTipsSection`）。
-                    // 「全量数据」不再单列：它并进了体检与数据（`RawDataSection`）。
-                    indexGroup("这辆车", [.vehicle, .battery, .health, .control])
-                    indexGroup("出行", [.trips, .emergency])
-                    // 「导出数据」并进了保养与钱，「驾驶评分」并进了出行页 ——
-                    // 这一组现在只剩一个入口，分组也就不必存在了。
-                    indexGroup("保养与钱", [.service])
-                    // 「消息」不再单列：它并进了出行页（`MessagesSection`）。
-                    indexGroup("系统", [.dev, .mine])
-
-                    Text("三种艺术主题（夜光 / 纸上 / 巨字）住在开发者工具里，按一下换一套。"
-                         + "这一页是 App 唯一的功能目录：地图是主屏，其余全在这里。")
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(TokensPalette.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.top, TokensSpacing.sm)
-                .padding(.bottom, TokensSpacing.xxl)
-            }
-            .pageBackground()
-            .navigationTitle("全部功能")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") { showIndex = false }
-                }
-            }
-        }
-    }
 
     /// 「此刻的光」：样品版里那张表的真机版。
     /// 它不是「关于」页 —— 它让这一屏的光**可以被争论**：每一行都是一个可复算的事实，
@@ -1074,35 +1030,6 @@ struct MapSpineView: View {
             .fill(TokensPalette.surface)
     }
 
-    private func indexRow(_ title: String, _ icon: String, _ hint: String,
-                          _ run: @escaping () -> Void) -> some View {
-        Button {
-            TokensHaptic.tap()
-            run()
-        } label: {
-            HStack(spacing: TokensSpacing.md) {
-                Text(title)
-                    .font(TokensTypo.body)
-                    .foregroundStyle(TokensPalette.primary)
-                Spacer(minLength: TokensSpacing.sm)
-                Image(safeSymbol: icon, fallback: icon)
-                    .font(TokensTypo.fixed(12, weight: .semibold))
-                    .foregroundStyle(TokensPalette.tertiary)
-            }
-            .padding(.vertical, TokensSpacing.md)
-            .padding(.horizontal, TokensSpacing.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(hint.isEmpty ? title : hint))
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(TokensPalette.hairline)
-                .frame(height: TokensHair.line)
-                .padding(.leading, TokensSpacing.md)
-        }
-    }
 
     /// 深潜页的显示名。穷举（无 default）：新增深链时编译器会强制在这里表态。
     /// 索引页的一组：小标题 + 一组行。
@@ -1111,36 +1038,7 @@ struct MapSpineView: View {
     /// 同一页摆两个入口就是「缝合怪」最直接的来源（深链 `carkeeper://dashboard`
     /// 与 `carkeeper://parking` 仍然可用，只是不出现在目录里）。
     @ViewBuilder
-    private func indexGroup(_ title: String, _ links: [Deeplink]) -> some View {
-        DSSectionHeader(title: title)
-        VStack(spacing: 0) {
-            ForEach(links, id: \.self) { link in
-                indexRow(deeplinkTitle(link), "chevron.right", "") {
-                    showIndex = false
-                    // 是档位的就拨条子，不是档位的（档案 / 设置）才 push
-                    nav.openMode(for: link)
-                }
-            }
-        }
-        .background(cardBackground)
-    }
 
-    private func deeplinkTitle(_ link: Deeplink) -> String {
-        switch link {
-        case .mine: return "车与账号"
-        case .vehicle: return "车辆档案"
-        case .health: return "体检与数据"
-        case .battery: return "电池与充电"
-        case .dev: return "开发者工具"
-        case .control: return "车控"
-        case .dashboard: return "仪表"
-        case .trips: return "出行"
-        case .service: return "保养与钱"
-        case .parking: return "停车位置"
-        case .emergency: return "应急面板"
-        case .score: return "驾驶评分"
-        }
-    }
 
     // =========================================================================
     // MARK: 交互与数据

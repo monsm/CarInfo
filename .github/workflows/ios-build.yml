@@ -44,7 +44,11 @@ jobs:
           # 而我们 Swift 的 [String: Any] 下标是大小写敏感的 —— 写成 ["RemainPower"] 就是
           # 永远 nil，而 nil 经过 num() 又常常变成 0，于是界面显示成一种「正常状态」
           # （车锁车窗恒「已锁/已关」就是这么来的）。这类 bug 不报错、不崩溃，只能靠门禁。
-          for s in paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol; do
+          # oneentry.py：入口唯一性。项目反复长回「缝合怪」的机制只有一个 ——
+          # 同一个功能又长出第二个入口（5 个 Tab / 顶部图层胶囊 / 索引页那一整份
+          # 「全部功能」目录 / 「我的」27 个磁贴 / 4 个没人发射的导航通知，全是这么来的）。
+          # 改一次不难，难的是下一次改动不再加回去；这条把约定变成 CI 会拦下的约束。
+          for s in paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry; do
             echo "::group::$s.py"
             python3 scan/$s.py
             echo "::endgroup::"
