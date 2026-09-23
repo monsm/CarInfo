@@ -3,14 +3,16 @@ import UIKit
 
 // App 入口：未登录 → 登录页；已登录 → **地图主屏（唯一的屏）**。
 //
-// 导航模型（2026-09-22 定案）：**没有 Tab 栏**。地图是家，功能是「地点上的层」：
-//   • 四个图层 = 四个真实问题（现在 / 行程 / 停车 / 充电）
-//   • 地图右上角的索引页 = **唯一**的功能目录
-//   • 深潜页仍然 push 到同一个 NavigationStack，返回手势与返回按钮交给系统
+// 导航模型（2026-09-23 定案）：**没有 Tab 栏，也没有第二份目录**。地图是家：
+//   • 底部模式条 = **唯一**的一级入口（10 档 = 10 个功能界面，相机 App 那条的移植）
+//   • 「现在」那一档里的四个图层 = 四个真实问题（现在 / 行程 / 停车 / 充电），**二级**选择
+//   • 属于某一档的页面不再 push 第二份：拨条子即可（深链也走 `openMode`）
+//   • 不是档位的东西（隐私 / OTA / 家庭 / 钥匙）才 push 到同一个 NavigationStack
 //
 // 为什么删掉 5 Tab 骨架：Tab 栏建立的是「五个平行 App」的心智，而地图主屏建立的是
 // 「一切都在地点上」。两套 IA 同时存在时，同一个功能最多有 4 个入口
-// （Tab / 地图图层 / 索引页 / 「我的」的 27 个磁贴）—— 那就是「缝合怪」的来源。
+// （Tab / 地图图层 / 索引页 / 「我的」的 27 个磁贴 —— 这四套已在 09-22 与 09-23
+// 两轮里全部改掉／删掉，最后连「索引页」那份目录也删了）—— 那就是「缝合怪」的来源。
 // `MainTab`、`selectedTab`、每 Tab 一个 path、Tab 角标与切 Tab 朗读都已整体删除。
 
 // 只有**真的有人 post、也真的有人听**的通知才配留在这里。
@@ -30,11 +32,11 @@ extension Notification.Name {
 
 // MARK: - 深潜页（唯一的导航目标）
 
-/// 所有深潜页。**它们不再归属任何 Tab** —— 地图是家，索引页是唯一的目录。
+/// 所有深潜页。**它们不再归属任何 Tab** —— 地图是家，底部模式条是唯一的目录。
 ///
 /// `.dashboard` 与 `.parking` 保留为深链别名（`carkeeper://dashboard`、
 /// `carkeeper://parking` 仍然可用），但它们**指向的页面与 `.score` / `.trips` 是同一个**，
-/// 所以索引页不列这两个入口：同一页摆两个入口，正是「缝合怪」的第一来源。
+/// 所以模式条上不列这两个入口：同一页摆两个入口，正是「缝合怪」的第一来源。
 enum Deeplink: Hashable, CaseIterable {
     // `.data`（全量数据页）已删：原始字段并进体检与数据（`RawDataSection`），
     // 结论与依据同源，不再分两屏。
@@ -48,7 +50,7 @@ enum Deeplink: Hashable, CaseIterable {
     // `.export`（导出数据页）已并入保养与钱（`ExportDataSection`）。
     case trips, service, parking, emergency, score
     /// 「车与账号」（原「我的」Tab 的根页）。设置类内容的去处 —— 它不是功能目录，
-    /// 功能目录归地图右上角的索引页；这个深链保证它不再依附于 Tab 才能到达。
+    /// 功能目录归底部模式条；这个深链保证它不再依附于 Tab 才能到达。
     case mine
 
     /// 深链 key，对应 carkeeper://<key>
@@ -142,7 +144,11 @@ struct CarKeeperApp: App {
     private func openDeeplink(_ url: URL) {
         guard let link = Deeplink(url: url) else { return }
         guard store.isLoggedIn else { return }   // 未登录时先让用户完成登录，登录后可从界面进入
-        nav.path = [link]
+        // 深链也不准开出「第二份页面」：能对应到某一档的就拨模式条，
+        // 对应不到的（隐私 / OTA / 家庭 / 钥匙）才 push。
+        // 此前写的是 `nav.path = [link]` —— 于是 `carkeeper://vehicle` 会开出一份
+        // 与「车辆」那一档内容完全相同的跳入式页面，两种返回行为、两套排版。
+        nav.openMode(for: link)
     }
 
     private var root: some View {
@@ -288,7 +294,7 @@ final class NavState: ObservableObject, @unchecked Sendable {
 // 壳层约定（取代此前 5 Tab 骨架）：
 //   • **一个** NavigationStack：根是地图主屏，深潜页 push 在上面；
 //     返回手势、返回按钮、转场动画全部交给系统。
-//   • **一个**目录：地图右上角的索引页（不再与 Tab 栏、「我的」磁贴三套并存）。
+//   • **一个**目录：底部模式条（索引页那一份「全部功能」清单也已删 —— 它是第二份目录）。
 //   • Tab 栏及其附带物（选中值、每 Tab 一个 path、角标、切 Tab 朗读）已删。
 //     代价是高频操作会多一次点击 —— 它们应该在批 1 以「地图上的常驻操作条」补回来，
 //     而不是把 Tab 栏加回来（「高频操作」的答案在地图上，不在另一层导航上）。
@@ -327,15 +333,15 @@ struct MapShellView: View {
         // .tips（车辆提示页）已并入车辆档案 —— 见 `Deeplink` 枚举上的注释。
         case .score: TripsEventsView().environmentObject(nav)
         // 「车与账号」（原「我的」Tab 的根页）。**它必须在这里有一个 case** ——
-        // 它就是设置类内容的唯一去处；批 3 会把它从 27 个磁贴的功能目录
-        // 改成「车 / 账号 / 数据与隐私 / 关于与工具」四组。
+        // 它就是设置类内容的唯一去处（批 3 已完成：27 个磁贴的功能目录已改成设置分组，
+        // 功能目录只剩底部模式条一份）。
         case .mine: MineView().environmentObject(nav)
         }
     }
 
     /// 唯一的栈：根是地图主屏（Features/Map/MapSpineView.swift）。
     /// 车的一切都发生在某个地方，所以导航长在地方上；
-    /// 四个图层 = 四个真实问题，功能目录在右上角的索引页里。
+    /// 四个图层 = 四个真实问题（二级选择），一级入口是底部模式条。
     private var mapStack: some View {
         NavigationStack(path: $nav.path) {
             MapSpineView()
@@ -375,9 +381,9 @@ struct MapShellView: View {
         mapStack
         .tint(TokensPalette.ambient)
         .task { await store.bootstrap() }
-        // VoiceOver：这是一个「地图 + 索引页」的外壳，不再是一条 Tab 栏
+        // VoiceOver：这是一个「地图 + 底部模式条」的外壳，不再是一条 Tab 栏
         .accessibilityLabel(Text("地图主屏"))
-        .accessibilityHint(Text("地图是主屏，右上角的全部功能可以到达每一个页面"))
+        .accessibilityHint(Text("地图是主屏，底部的模式条可以到达每一个功能界面"))
         .accessibilitySortPriority(0)
         // #4 网络状态指示器 + #NEW-3 离线模式提示
         .overlay(alignment: .top) {

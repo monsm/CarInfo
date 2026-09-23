@@ -13,9 +13,10 @@
   所以这条检查器把「入口只有一条」从口头约定变成 CI 会拦下的硬约束。
 
 判据（三条，每条都对应上面的一次事故）：
-  ① 属于某一档（`HomeMode`）的深链，只准在一个文件里被 `pushNavigation`：
-     `CarKeeperApp.swift` —— 那里是深链入口与 `openMode(for:)` 的兜底。
-     别处想「去看某个功能」，只能走 `nav.openMode(...)`（拨模式条）。
+  ① **任何文件**都不准 `pushNavigation(.某个属于档位的深链)` —— 包括 App 入口。
+     想「去看某个功能」只有一条路：`nav.openMode(...)`（拨模式条）。
+     深链也走它（`openDeeplink` → `openMode(for:)`）：能对应到某一档的拨条子，
+     对应不到的（隐私 / OTA / 家庭 / 钥匙）由 `openMode(for:)` 自己 push。
   ② 档位与页面一一对应：`HomeMode` 的每个 case 都要在
      `MapSpineView.pageContent` 里有一个 case（`.now` 也在 —— 它是地图本身）。
   ③ `homeMode` 的每一档都要在 `HomeModeHead` 里出现**两次**（巨字 + 依据行）——
@@ -117,7 +118,7 @@ def main():
             problems.append(f"③ 档位 `{m}` 在 HomeModeHead 里只出现 {n} 次"
                             f"（需要 2 次：巨字 hero + 依据行 facts）")
 
-    # ---- ① 属于某一档的深链只准在 App 入口里 push ----
+    # ---- ① 属于某一档的深链不准被 push（哪里都不行，深链也走 openMode）----
     banned = set(modes) | ALIASES
     pushes = []
     for f in swift_files():
@@ -126,10 +127,8 @@ def main():
             if m.group(1) in banned:
                 pushes.append((f, m.group(1), text[:m.start()].count("\n") + 1))
     for f, name, line in pushes:
-        if f.replace("\\", "/") == APP_ENTRY.replace("\\", "/"):
-            continue
         problems.append(f"① {f}:{line} 直接 push 了 `.{name}` —— 它属于某一档，"
-                        f"应当用 `nav.openMode(.{name})` 拨模式条")
+                        f"应当用 `nav.openMode(.{name})` 拨模式条（深链也一样）")
 
     # ---- ③' path 只准在 NavState / App 入口里被改写 ----
     for f in swift_files():
@@ -148,7 +147,7 @@ def main():
         return 1
 
     print(f"  档位 {len(modes)} 个：{' / '.join(modes)}")
-    print(f"  逐条核对：档位↔页面 ✅　档位↔卡头 ✅　深链 push 只在 App 入口 ✅　导航栈只有一处改写 ✅")
+    print(f"  逐条核对：档位↔页面 ✅　档位↔卡头 ✅　属于档位的深链零 push ✅　导航栈只有一处改写 ✅")
     print("\n✅ 入口唯一（功能只有一条到达路径：底部模式条）")
     return 0
 

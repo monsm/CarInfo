@@ -879,7 +879,7 @@ struct MapSpineView: View {
     }
 
     // =========================================================================
-    // MARK: 工具栏 + 索引
+    // MARK: 工具栏
     // =========================================================================
 
     @ToolbarContentBuilder
@@ -1029,15 +1029,6 @@ struct MapSpineView: View {
         RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
             .fill(TokensPalette.surface)
     }
-
-
-    /// 深潜页的显示名。穷举（无 default）：新增深链时编译器会强制在这里表态。
-    /// 索引页的一组：小标题 + 一组行。
-    ///
-    /// 刻意不列 `.dashboard` 与 `.parking`：它们指向的页面与 `.score` / `.trips` 是同一个，
-    /// 同一页摆两个入口就是「缝合怪」最直接的来源（深链 `carkeeper://dashboard`
-    /// 与 `carkeeper://parking` 仍然可用，只是不出现在目录里）。
-    @ViewBuilder
 
 
     // =========================================================================

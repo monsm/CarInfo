@@ -217,19 +217,37 @@ struct GlobalSearchHUD: View {
     }
 
     /// 可搜的页面清单。与壳层的 `Deeplink` 一一对应（少一个就等于少一条入口）。
-    private static let pages: [(title: String, hint: String, icon: String, link: Deeplink)] = [
-        ("车辆档案", "车牌、车型、保险与保养到期", "doc.text.fill", .vehicle),
-        ("体检与数据", "车端自检的结论与它依据的原始字段", "shield.lefthalf.filled", .health),
-        ("电池充电", "SOC、充电曲线、充电账单", "battery.100", .battery),
-        ("出行", "行程、常停的地方与车的事件", "chart.bar.fill", .trips),
-        ("保养与钱", "保养、年检保险、充电账单、估值与导出", "wrench.and.screwdriver.fill", .service),
-        ("车与账号", "车辆、账号、隐私与关于", "person.fill", .mine),
-        ("紧急求助", "拖车、保险、救援电话", "exclamationmark.octagon.fill", .emergency),
-        ("远程控车", "锁车、空调、寻车", "dot.radiowaves.left.and.right", .control),
-        ("开发者工具", "设计令牌、运行状态、诊断", "wrench.adjustable", .dev)
-        // 别名（`.dashboard` / `.score` / `.parking`）**不进这一列**：
-        // 它们指向的页面在上面已经各有一条；同一页摆两个入口，就是缝合的来源。
-    ]
+    /// 搜索里的「页面」= **档位本身**，不再手抄一份目录。
+    ///
+    /// 此前这是一份手写的 9 条静态数组，与 `HomeMode` 各写一遍 —— 加一档时
+    /// 搜索里就会静默地少一条（而没有任何东西会出声）。现在从 `HomeMode.allCases`
+    /// 派生，提示语与图标由一个**穷举** switch 给（无 default）：新加档位时
+    /// 编译器会强制在这里表态。`.now` 不进列表 —— 它就是这张地图本身。
+    ///
+    /// 别名（`.dashboard` / `.score` / `.parking`）**不进这一列**：
+    /// 它们指向的页面在上面已经各有一条；同一页摆两个入口，就是缝合的来源。
+    private static let pages: [(title: String, hint: String, icon: String, link: Deeplink)] =
+        HomeMode.allCases.compactMap { mode in
+            guard let link = mode.deeplink else { return nil }
+            let meta = pageMeta(for: mode)
+            return (title: mode.title, hint: meta.hint, icon: meta.icon, link: link)
+        }
+
+    /// 一档的一句话与图标。穷举（无 default），理由同上。
+    private static func pageMeta(for mode: HomeMode) -> (hint: String, icon: String) {
+        switch mode {
+        case .now: return ("车在哪、现在什么状态", "location.fill")
+        case .vehicle: return ("车牌、车型、保险与保养到期", "doc.text.fill")
+        case .health: return ("车端自检的结论与它依据的原始字段", "shield.lefthalf.filled")
+        case .battery: return ("SOC、充电曲线、充电账单", "battery.100")
+        case .control: return ("锁车、空调、寻车", "dot.radiowaves.left.and.right")
+        case .trips: return ("行程、常停的地方与车的事件", "chart.bar.fill")
+        case .service: return ("保养、年检保险、充电账单、估值与导出", "wrench.and.screwdriver.fill")
+        case .mine: return ("车辆、账号、隐私与关于", "person.fill")
+        case .emergency: return ("拖车、保险、救援电话", "exclamationmark.octagon.fill")
+        case .dev: return ("设计令牌、运行状态、诊断", "wrench.adjustable")
+        }
+    }
 }
 
 struct SearchResultRow: View {

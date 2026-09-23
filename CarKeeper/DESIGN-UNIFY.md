@@ -220,8 +220,11 @@ ScrollView {
 
 - 顶部的**图层胶囊条**（四个胶囊 + 图标）：既不像地图（Maps 把模式选择放在纸的上沿，紧挨它控制的内容），
   也不像相机（模式条在内容下沿），还和同步状态抢同一条视线。→ 删，顶部只留「数据新不新」。
-- 索引页里的**「地图上的地方」**四行（四个图层的第二个入口）。→ 删，索引页从此只做一件事：
-  列**离开地图**的深潜页。`MapSpineLayer.icon` 随之删除（模式条不带图标，留着它只会让下一轮以为该带）。
+- 索引页里的**「地图上的地方」**四行（四个图层的第二个入口）。→ 删，索引页当时只剩一件事：
+  列**离开地图**的深潜页。（2026-09-23 再进一步：那份目录本身也删了 —— 它就是第二份功能清单，
+  而模式条上每一档都能到。工具栏那个格子按钮、`indexSheet` / `indexGroup` / `indexRow` /
+  `deeplinkTitle` 四件零件一起不在代码里了。）
+  `MapSpineLayer.icon` 随之删除（模式条不带图标，留着它只会让下一轮以为该带）。
 
 ### 一个待真机确认的决定
 
@@ -239,7 +242,7 @@ ScrollView {
 
 | 目标面 | 吸收什么 | 删掉什么 | 状态 |
 |---|---|---|---|
-| **地图**（主屏） | 四个模式 + 底部操作条 + 索引页 + 搜索 + 数据龄期 | 顶部胶囊图层条、索引页的图层组 | ✅ |
+| **地图**（主屏） | 底部模式条（一级入口）+「现在」里的四个图层 + 地图上的操作条 + 搜索 + 数据龄期 | 顶部胶囊图层条、索引页的图层组、索引页本身 | ✅ |
 | **车控**（页 + 操作条共用执行路径） | 车控 + **指令历史**（筛选/成功率/展开详情） | `CommandHistoryView.swift` | ✅ |
 | **车**（车辆档案） | 车辆档案 + 里程记账 + 用车提示 | `MileageJournalView` / `VehicleTipsView` | ✅ |
 | **保养与钱** | 维保记录 + 保险/年检 + 充电账本 + 车辆估值 + 导出 | `ExportDataView` + 三个弹层（`InspectionCalendarView` / `VehicleValuationView` / `ChargeBillSheet`） | ✅ |
@@ -248,7 +251,8 @@ ScrollView {
 | **出行** | 行程时间轴 + 常停之地 + **驾驶评分** + **消息事件流**（点/熄火事件本来就是行程的骨架） | `MessagesView` / `DrivingScorePage` | ✅ |
 
 已删页面（合计）：`CommandHistoryView` · `MileageJournalView` · `VehicleTipsView` ·
-`ExportDataView` · `MessagesView` · `DrivingScorePage`。
+`ExportDataView` · `MessagesView` · `DrivingScorePage`，以及整张「全部功能」索引页
+（`indexSheet` / `indexGroup` / `indexRow` / `deeplinkTitle`）与「我的」里那份重复的功能目录。
 深链别名（指向别的页，不占屏幕）：`.dashboard` / `.score` / `.parking` → 出行页。
 
 ### 刻意保留为独立屏幕的三个（写清理由，不是漏掉）
