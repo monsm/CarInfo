@@ -446,14 +446,13 @@ final class APIClient: @unchecked Sendable {
 
     static func parseMessages(_ text: String, cars: [[String: Any]] = []) -> [[String: Any]] {
         let dict = jsonToAny(text) ?? [:]
-        // Data 可能是包含 Content 数组的对象，也可能直接是消息数组。
-        let content: [[String: Any]]
-        if let dataObj = ciObject(dict, ["Data", "data"]), let inner = ciArray(dataObj, ["Content", "content"]) {
-            content = inner
-        } else if let arr = ciPick(dict, ["Data", "data"]) as? [[String: Any]] {
-            content = arr
-        } else {
-            content = []
+        let content = Self.messageArray(dict)
+        // 空数组不能静默：把顶层键打出来。
+        // 2026-09-23 那次「消息一直是空」的调查里，最贵的代价就是
+        // 分不清「服务端真的没给」和「解析没命中」——两者在界面上长得一模一样。
+        if content.isEmpty {
+            let top = dict.keys.sorted().joined(separator: ",")
+            NSLog("parseMessages: 0 条；JSON 顶层键=[\(top)] 响应长度=\(text.count)")
         }
         // 映射车牌号（与小程序一致：realReceiverId 命中本地车辆列表则替换为车牌）
         // cars 由调用方在主线程取快照后传入（parseMessages 本身在协作线程跑，不能再 assumeIsolated）。
@@ -476,6 +475,34 @@ final class APIClient: @unchecked Sendable {
             }
             return copy
         }
+    }
+
+    /// 从响应里挖出消息数组。
+    /// 实测形状（2026-09-22 / 09-23 抓包，两次一致）：
+    ///   `{ "data": { "number":0, "numberOfElements":55, ... "content": [ {...}, ... ] } }`
+    /// 即分页外壳对象 + `content[]`。其余分支是为服务端改包装留的退路，
+    /// 按「命中即返回」的顺序排：命中不了就返回空数组，由调用方打日志。
+    private static func messageArray(_ dict: [String: Any]) -> [[String: Any]] {
+        // 外层可能直接是数组，也可能是分页对象；再外面还套过 Result 壳。
+        for shellKey in ["Data", "data", "Result", "result"] {
+            guard let shell = ciPick(dict, [shellKey]) else { continue }
+            if let arr = shell as? [[String: Any]], !arr.isEmpty { return arr }
+            if let any = shell as? [Any] {
+                let arr = any.compactMap { $0 as? [String: Any] }
+                if !arr.isEmpty { return arr }
+            }
+            if let obj = shell as? [String: Any] {
+                // 分页字段名各家不同，全列上（`content` 是实测的那个）。
+                for listKey in ["Content", "content", "records", "list", "rows", "items"] {
+                    if let inner = ciArray(obj, [listKey]) { return inner }
+                }
+            }
+        }
+        // 没有 data 壳：数组直接挂在顶层（或顶层就是数组的 content）。
+        for listKey in ["Content", "content", "records", "list", "rows", "items"] {
+            if let arr = ciArray(dict, [listKey]) { return arr }
+        }
+        return []
     }
 
     func sendControlCommand(cmd: String, carId: String, pin: String, temperature: Int = 17) async throws -> [String: Any]? {

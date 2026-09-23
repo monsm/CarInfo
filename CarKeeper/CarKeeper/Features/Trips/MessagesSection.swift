@@ -21,6 +21,8 @@ struct MessagesSection: View {
     @State private var loading = true
     @State private var expanded: Set<String> = []
     @State private var loadTask: Task<Void, Never>? = nil
+    /// 上一次拉取失败的真实原因（空状态直接展示它，而不是笼统的「暂无消息」）。
+    @State private var lastError = ""
     @State private var searchText = ""
     @State private var filterTag: String? = nil
     @State private var showUnreadOnly = false
@@ -71,16 +73,14 @@ struct MessagesSection: View {
                 if loading {
                     loadingState
                 } else if filteredItems.isEmpty {
-                    if store.carId.isEmpty {
-                        DSPlaceholder(icon: "bubble.left.and.bubble.right",
-                                      title: "暂无消息",
-                                      message: emptyHint)
-                    } else {
-                        DSPlaceholder(icon: "bubble.left.and.bubble.right",
-                                      title: "暂无消息",
-                                      message: emptyHint,
-                                      actionTitle: "重新加载") { reload() }
-                    }
+                    // 空状态必须说清是「哪一种空」：
+                    // 服务端真的没消息 / 网络或登录失败 / 筛掉了。
+                    // 以前这里只分「carId 空」和「非空」两支，而 carId 不该管消息
+                    // （见 loadIfNeeded 的注释）——结果把「网络失败」显示成「暂无消息」。
+                    DSPlaceholder(icon: "bubble.left.and.bubble.right",
+                                  title: lastError.isEmpty ? "暂无消息" : "消息获取失败",
+                                  message: lastError.isEmpty ? emptyHint : lastError,
+                                  actionTitle: "重新加载") { reload() }
                 } else {
                     ForEach(filteredGrouped) { group in
                         DSGroup(title: group.label,
@@ -401,7 +401,14 @@ struct MessagesSection: View {
     }
 
     private func loadIfNeeded() {
-        guard !store.carId.isEmpty else { loading = false; return }
+        // ⚠️ 这里原来有一道 `guard !store.carId.isEmpty else { loading = false; return }`。
+        // 它是错的，而且是「消息界面永远是空的」的真正入口：
+        //   ① 消息接口的 URL 里**没有 carId**（actionType/page/limit/startTime/endTime/token）；
+        //   ② 小程序的 messages.js 只检查 token，不检查 carId —— 它进页面就 load()；
+        //   ③ 而 carId 要等 bootstrap 的 getCars 回来才有值，getCars 一失败就永远是空串。
+        // 于是只要 bootstrap 没跑完或失败过，这一节就永远停在空状态，
+        // 哪怕服务端其实返回了 55 条事件。判断加载与否只看「缓存 + TTL」。
+        guard !TokenStore.currentToken().isEmpty else { loading = false; return }
         guard loadTask == nil || loadTask!.isCancelled else { return }
         // 与小程序一致：先渲染缓存（哪怕过期），再决定要不要联网。
         // 此前的空白根因：缓存命中与请求失败两条路都停在空列表 ——
@@ -422,11 +429,13 @@ struct MessagesSection: View {
 
     @MainActor
     private func load() async {
-        guard !store.carId.isEmpty else { loading = false; return }
+        // 同样不设 carId 闸（理由见 loadIfNeeded）。
+        guard !TokenStore.currentToken().isEmpty else { loading = false; return }
         loading = true
         do {
             let list = try await APIClient.shared.getMessages()
             apply(list)
+            lastError = list.isEmpty ? "服务端本次没有返回消息（已解析，0 条）" : ""
             // 只缓存非空列表：空列表可能是网络抖动或权限问题，缓存它会
             // 让后续所有访问都命中空缓存而永远不再重试。
             // 非空列表才是「有真实消息」的确认信号。
@@ -434,7 +443,10 @@ struct MessagesSection: View {
                 store.saveCache(["messages": list])
             }
         } catch {
-            // 失败时保留已渲染的缓存内容（与小程序一致），并明确告知，而不是悄悄清空
+            // 失败时保留已渲染的缓存内容（与小程序一致），并明确告知，而不是悄悄清空。
+            // 把真实错误留在页面上：只弹一个 2 秒的 Toast，用户回头看到的还是空页，
+            // 分不清「没消息」和「没拉到」——这正是之前反复误判的原因。
+            lastError = error.localizedDescription
             NSLog("loadMessages: \(error.localizedDescription)")
             ToastManager.shared.show("消息获取失败，展示缓存", icon: "wifi.exclamationmark")
         }
@@ -460,9 +472,17 @@ struct MessagesSection: View {
             // 说明 `readStatus` 在这套服务里并没有被用起来，`new` 才是红点的真相。
             // 两个字段都缺时才退回旧判据（ReadStatus == 1 即已读）。
             // 展开过的消息记入本地已读集合（服务端没有 mark-read 接口）。
-            let isNew = ciBool(m, ["New", "new"])
-            let serverRead = isNew.map { !$0 }
-                ?? ((ciNumber(m, ["ReadStatus", "readStatus"]) ?? 0) == 1)
+            // 已读判据以**小程序为准**：`num(it.ReadStatus) === 1`（messages.js:apply）。
+            // 2026-09-04 那份报文里 55 条全是 `readStatus: 0` 且 `new: false`，两者互相矛盾；
+            // 早前用 `new` 反推 ⇒ 全被判成「已读」⇒ 手机上永远没有红点，
+            // 而点进消息中心一条未见过的也没有，和参考实现的行为对不上。
+            // 只有报文缺 `readStatus` 时才退回 `new`。
+            let serverRead: Bool
+            if let rs = ciNumber(m, ["ReadStatus", "readStatus"]) {
+                serverRead = rs == 1
+            } else {
+                serverRead = ciBool(m, ["New", "new"]) == true ? false : true
+            }
             let p = AppStore.jumpParams(m)
             var coord: (lat: Double, lng: Double)? = nil
             if let lat = VM.vnum(p["lat"]), let lng = VM.vnum(p["lng"]) { coord = (lat, lng) }
