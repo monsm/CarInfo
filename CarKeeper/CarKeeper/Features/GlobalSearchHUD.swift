@@ -83,7 +83,7 @@ struct GlobalSearchHUD: View {
                     if searchResults.isEmpty {
                         DSPlaceholder(icon: searchText.isEmpty ? "magnifyingglass" : "questionmark.circle",
                                       title: searchText.isEmpty ? "搜什么？" : "没有匹配的项",
-                                      message: searchText.isEmpty ? "搜页面、车牌、行程、指令、充电记录。"
+                                      message: searchText.isEmpty ? "搜页面、车牌、行程、指令。"
                         : "换个词试试。只搜本机已有数据。")
                             .padding(.horizontal, TokensSpacing.page)
                             .padding(.top, TokensSpacing.lg)

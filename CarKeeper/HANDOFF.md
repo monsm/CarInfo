@@ -1,0 +1,634 @@
+# HANDOFF —— 长安车管家（iOS 原生版）
+
+> 这份文档写给**下一个接手的人**（人或 agent）。目标：不读代码也能知道「现在有什么、东西在哪、
+> 为什么这么做、改的时候会踩什么」。所有数字与路径都是 2026-09-23 在 `main` 上核对过的实测值。
+>
+> 它不替代那几份专门文档（见 §12 文档地图），而是把它们串成一条可执行的路径。
+
+---
+
+## 0. 30 秒入门
+
+| 项 | 事实 |
+|---|---|
+| 是什么 | 长安车联网官方 App 的 **iOS 原生重写**：车主查看车况、远程车控、充电、行程、保养 |
+| 后端 | **没有自己的后端**。App 直连长安官方接口（`m.iov.changan.com.cn` / `scrm.changan.com.cn`） |
+| 技术栈 | SwiftUI · iOS 26.0+ · `@Observable` · MapKit · Swift Charts · AppIntents · CryptoKit · LocalAuthentication |
+| 规模 | **71 个 Swift 文件 / 21,706 行**（`CarKeeper/` 下），2 个 target（`CarKeeper` + `CarKeeperTests`） |
+| 构建 | **XcodeGen**：`CarKeeper/project.yml` → `CarKeeper.xcodeproj`（`xcodeproj` 不入库） |
+| 交付 | GitHub Actions 出**未签名 ipa** → 侧载工具自签安装（7 天续期） |
+| 参考实现 | `ChangAnMiniProgram/`（微信小程序原版，本次重写的移植来源） |
+| 设计原型 | `design-preview/`（8 个自包含 HTML 预览页，挑版式时用） |
+
+### 唯一的硬约束：免费（未缴 99 美元）个人开发者账号
+
+这一条决定了大量取舍，**接手的第一个小时必须先接受它**：
+
+| 能力 | 状态 | 后果 |
+|---|---|---|
+| App Group | ❌ 拿不到 | 小组件 / 表盘 / 灵动岛**整条链路已删除**（含界面、target、entitlements） |
+| CloudKit / HealthKit / WeatherKit / StoreKit / Family Controls | ❌ | 已删（`scan/paidcap.py` 门禁守着不许回来） |
+| BGTaskScheduler | ❌ | 后台刷新已删，调用会抛 ObjC 异常直接杀进程 |
+| CarPlay / App Clip | ❌ | target 已删（App Clip 还额外需要备案域名 + associated-domains） |
+| MapKit 显示地图 | ✅ 可以 | **但不能提供路线导航**（无 ADP 成员资格做不了 MKDirections） |
+| 通知 / 定位 / 相机 / 相册 / FaceID | ✅ | 正常，`project.yml` 里已声明用途字符串 |
+
+---
+
+## 1. 怎么跑起来、怎么验证
+
+### 1.1 本机（Windows 开发机）的真实处境
+
+**这台开发机上没有 Swift 工具链**（`swift` / `swiftc` / Xcode 都不存在）。因此：
+
+- **编译只在 CI 上发生**。本地唯一能做的验证是静态门禁 + 风格检查 + `bash -n`。
+- 改完必须看 CI 日志才能知道「编不编得过」。这也是仓库里为什么会有 22 项门禁（§8）。
+
+```bash
+# 本机可跑的全部验证（在仓库根）
+export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
+node CarKeeper/check_style.js
+for s in paths design keys access lexguard scan logic shadowguard scenes targets \
+         unreachable futureproof orphans deep eol oneentry traps scopeguard \
+         paidcap copy lintcfg ternary; do python3 scan/$s.py; done
+```
+
+### 1.2 在 macOS 上构建（或照 CI 抄）
+
+```bash
+cd CarKeeper
+xcodegen generate                    # 由 project.yml 生成工程
+xcodebuild build \
+  -project CarKeeper.xcodeproj -scheme CarKeeper \
+  -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO -quiet
+```
+
+### 1.3 CI（`.github/workflows/ios-build.yml`）
+
+两个 job，顺序依赖：
+
+1. **`static-gate`**（ubuntu，秒级）：`check_style.js` + 22 项 `scan/*.py`。**任一红即整体失败**。
+2. **`build-unsigned-ipa`**（macos，约 3 分钟，额度按 10 倍计费）：XcodeGen → xcodebuild → 打 `Payload/` zip 成 ipa
+   → **IPA 内容体检**（只打印顶层结构，`|| true` 不阻断）→ 上传 artifact → 覆盖发布到 tag `latest` 的 Release（App 内「检查更新」从这里下载）。
+
+> 为什么静态门禁值得这么重：一个编译错误要花掉一整轮 macOS runner。**每一条能搬进静态检查的判据，
+> 都把 3 分钟 + 10 倍额度换成一次秒级检查**。§8 的表里每一条都标注了它是哪次真实事故的产物。
+
+### 1.4 签名与安装（为什么 ipa 是「未签名」的）
+
+免费账号不能走 TestFlight / App Store 分发。当前路径是：CI 产出未签名 ipa → 用侧载工具（如 AltStore / Sideloadly）
+或 Xcode 用**自己的 Apple ID** 重签后安装，**每 7 天到期需重签**。`README.md` 里有逐步说明。
+
+---
+
+## 2. 全局架构
+
+### 2.1 分层（自下而上）
+
+```
+┌ 网络层  Services/API.swift          APIClient（9 个端点）+ TokenStore（Keychain）+ Retrier
+├ 模型层  Models/ApiModels.swift      报文 → 可渲染结构（EnergyModel / HealthModel / ……）
+│         Models/ViewModels.swift     enum VM：纯计算，从 [String: Any?] 取出界面要的值
+│         Models/Analysis.swift       enum AN：8 域 verdict + overall 结论
+├ 状态层  AppStore.swift              @MainActor @Observable 单例：登录态 / caches / 命令历史 / 本机累积
+├ 设计层  Design/Tokens → ArtTheme → DS → Charts / SkyLight / SkyOverlay / MapStyleSpec / DSSwipeStrip
+├ 界面层  CarKeeperApp（入口 + NavState）→ MapShellView → MapSpineView（唯一的屏）→ 6 档页面
+└ 服务层  Services/*.swift            通知 / 提醒 / 健康钥匙 / 加密 / 采样 / 天气 / 更新 / 估值……
+```
+
+### 2.2 导航模型：**一个屏 + 一条模式条**
+
+这是整个 UI 最重要的约定，**违反它会被门禁拦住**（`scan/oneentry.py`）。
+
+```
+MapShellView（唯一的屏）
+  └ NavigationStack(path: $nav.path)     ← path 永远是空的（全库不再 push 功能页）
+      └ MapSpineView                     ← 全屏 MapKit + 贴底的一张「纸」
+          ├ 顶部：图层胶囊 + 同步状态 + 工具栏（搜索 / 图层 / 定位 / 分屏）
+          └ 底部纸：抓柄 + modeBar（DSSwipeStrip）+ 内容
+                ├ homeMode == .now → nowPanel：layerStrip（4 个地图图层）+ 图层内容
+                └ 其它档         → HomeModeHead（巨字头，固定）+ 分隔线 + pageContent(档)
+```
+
+**换档不换屏**：地图与纸的位置、高度、底色在 6 档之间完全不变，变的只有纸里装的内容。
+这条是从相机 App 的模式条学来的，`DSSwipeStrip` 就是那条条子（可手拖、跟手、吸附、中心项放大）。
+
+#### 一级：6 个功能档（`HomeMode`）
+
+| 档 | 页面 | 深链 | 说明 |
+|---|---|---|---|
+| `now` 现在 | 地图本身（4 图层） | —（无独立页） | 默认档；`MapSpineLayer` 是它的二级选择 |
+| `vehicle` 车辆 | `VehicleHubView` → 档案 / 健康 / 保养 | `.vehicle` / `.health` / `.service` | 三段回答同一个问题：这辆车怎么了 |
+| `charge` 充电 | `ChargeView`（含目的地计算器） | `.battery` | 充电 + 电池 + 趋势 |
+| `control` 车控 | `ControlView` | `.control` | 指令、车身明细、PIN、历史 |
+| `trips` 出行 | `TripsEventsView`（时间轴 + 评分 + 消息） | `.trips`（别名 `.score` / `.dashboard` / `.parking`） | |
+| `mine` 我的 | `MineHubView` → 设置 / 应急 / 诊断 | `.mine` / `.emergency` / `.dev` | |
+
+- 顺序按**使用频率**排，不按功能分类。
+- `HomeMode.storageKey = "carkeeper_home_mode"`（`@AppStorage`）→ 重启回到上次那一档。
+- 档内段落见 `HomeSub`（车辆：档案/健康/保养；我的：设置/应急/诊断）。它不是导航层级，
+  **没有第二层返回按钮**；深链落到哪一段由 `HomeMode.destination(for:)` 决定。
+
+#### 二级：「现在」档内部的 4 个地图图层（`MapSpineLayer`）
+
+`now` / `trips` / `holds` / `charge` —— 每一个是**一个真实问题**（车在哪 / 去过哪 / 停在哪 / 去哪充电），
+不是地图图层分类。持久化键 `carkeeper_map_layer`；`MapSpineLayer.makeCurrent()` 让别处也能把地图开到某一层。
+
+#### 深链（`carkeeper://`）
+
+`Deeplink` 12 个 case（见 `CarKeeperApp.swift`）。`CarKeeperApp.openDeeplink` → `NavState.openMode(for:)`
+→ 写 `HomeMode` 键 + 清空栈。**深链也不准开出「第二份页面」**——这是历史上最容易反复长回来的地方。
+
+#### 唯一的去功能入口
+
+```swift
+NavState.shared.openMode(_ mode: HomeMode, sub: HomeSub? = nil)   // 去功能只有这一种走法
+```
+
+`path` 恒为空，`popToRoot()` 仍保留只是为了让收尾逻辑能表达「回到地图」。
+`Notification.Name` 里只有 4 个通知，且**每一个都真有发射点**（`.pinConfirmed` / `.tempConfirmed` /
+`.didLogout` / `.locationUpdated`）；历史上「有名字、没发射」的 5 个导航通知已删。
+
+### 2.3 数据流（从接口到屏幕）
+
+```
+用户操作 / 定时器
+   ↓
+APIClient（9 个端点，POST 带 token）── Retrier.global 自动重试（幂等请求）
+   ↓  原始 JSON（[String: Any]）
+AppStore.gather(carId:includeMessages:includeCheck:)
+   ↓  6 个数据源**并行**（withTaskGroup）
+AppStore.saveCache([key: value])
+   ├ caches[key] = value（nil = 这次没取到 → 清空，界面显示「没取到」）
+   ├ messages → ingestEvents() → 行程（唯一行程生成器）
+   ├ charge → recordEnergySnapshot + HistoryStore.record（SOC / 功率 / 胎压三条曲线）
+   ├ 全部失败且已登录 → isOfflineMode = true
+   └ location 移动 > ≈5.5 m → post(.locationUpdated)（镜头跟随 / 重取天气 / 低电量提示）
+   ↓
+VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（纯计算，无副作用）
+   ↓
+界面（`MapSpineView` 与各档页面）
+```
+
+**关键决定：`AppStore.caches` 不是缓存。** 它只装「刚刚那一次接口响应」——
+不做 TTL、不跨启动落盘、失败不保留旧值。因此界面上的每个数字都能追溯到一次真实响应；
+某个源这次没取到，界面就显示自己的空/失败态。
+
+> 历史上这里有一整套「缓存思维」：`cacheTTL = 180s`、`needsRefresh`、`isCacheExpired`、`staleKeys`、
+> 「网络异常，显示缓存数据」、失败保留旧值。**2026-09-23 全部删除，且不要加回来**——
+> 它带来的正是「看着是数据、其实早过期」。这条改动涉及 `AppStore` + 各页的 `loadIfNeeded`。
+
+**本机累积（唯一允许落盘的一类）**：SOC / 充电功率 / 胎压三条曲线（`HistoryStore`，5 / 1 / 30 分钟采样），
+行程与停车史、保养里程、保险年检、账本类记录 —— 原因是**服务端只有「当前状态」接口**，历史无处可取。
+这类数据的取舍必须显式做（见 §6）。
+
+---
+
+## 3. 网络层（`Services/API.swift`）
+
+### 3.1 端点表（9 个，全部实测）
+
+| 方法 | 端点 | 返回 | 进哪个 cache 键 |
+|---|---|---|---|
+| `smsSend` | `scrm.changan.com.cn/app-m/prod-api/auth/cac/smsSend` | 发短信验证码（不重试） | — |
+| `getPicCode` | 同上 `/picSend`（GET 二进制，MIME 嗅探） | 图形验证码图片 | — |
+| `login` | 同上 `/appLogin` | token | —（写 Keychain） |
+| `getCars` | `m.iov.changan.com.cn/appserver/api/car/getMyCars?isNev=1` | 车辆列表 | `cars` |
+| `getUser` | `/appserver/api/user/getUserInfoByToken` | 用户 | `user` |
+| `getCarCheck` | `/appserver/api/carcheck/getCheckResult?carId&isNev=1` | 体检报告 | `check` |
+| `getCarPm25` | `/appserver/api/car/pm/getCarPm25ByCarId` | 车内 PM2.5 | `pm25` |
+| `getCharge` | `/appserver/api/charge/info` | 电量 / 充电 | `charge` |
+| `getControl` | `/api/car/getControlStatus` | 车身状态（门/窗/锁/胎压/里程） | `control` |
+| `getControlInfo` | `/api/car/getControlInfo?carId&id=taskId` | 指令执行结果（轮询） | — |
+| `getLocation` | `/appserver/api/cardata/getCarLocation?mapType=GCJ02` | 位置（Lat/Lng/Heading） | `location` |
+| `getMessages` | `/appserver/api/information/pageReceiverInfoByTime?actionType=2&limit=2000` | 事件流 | `messages` |
+| `sendControlCommand` | `/api/car/control?pin&cmd&carId`（**不重试**） | 指令受理 | — |
+| refresh | `…/auth/cac/refresh` | 新 access_token | —（写 Keychain） |
+
+### 3.2 Token 与安全
+
+- **Token 存在 Keychain**（`TokenStore`，`kSecAttrAccessibleAfterFirstUnlock`），不再放 UserDefaults：
+  实测证明 `refresh_token` **不轮换**（`expires_in: 86400`），泄露即长期可用；而 UserDefaults 会进 iCloud 备份。
+  首次读取会把旧 UserDefaults 里的令牌**迁移进 Keychain 并删掉明文**（用户无感）。
+- `TokenStore.clear()` 同时删 Keychain 与旧 UserDefaults 键（退出登录必须两处都删）。
+- `DataEncryption`（CryptoKit AES-GCM + Keychain 密钥）用于车牌等敏感字段；`SecureStorage` 是它的封装。
+- 人类可读的报文日志走 `RawLogStore`（键 `changan_raw_log`），用于排障。
+
+### 3.3 重试与刷新
+
+- `Retrier`（指数退避 + 抖动）：默认 4 次 / 1s 起 / ×2 / 上限 8s / 抖动 0.3；另有 `.aggressive`、`.dataReliable`、`.none`。
+- **有副作用的 POST 必须 `retryable: false`**（车控指令、发短信）——重复下发是真实危害。
+- token 刷新用 `AtomicTaskHolder` **并发去重**：同一时刻 N 个请求过期只刷一次。
+
+### 3.4 报文解析的两条铁律
+
+1. **键一律首字母小写**（实测：`remainPower` / `totalOdometer`）。Swift 的 `[String: Any]` 下标大小写敏感，
+   写成 `["RemainPower"]` 就是**永远 nil**，而 nil 经 `num()` 又常变成 `0` → 界面显示成一种「正常状态」。
+   读取一律走 `ci*` 家族（`ciString` / `ciNumber` / `ciBool` / `ciArray` / `ciObject` / `ciVal` / `ciPick`）。
+   **`scan/keys.py` 在 CI 上拦这条。**
+2. **没有的键不许编值**。界面缺数据时显示 `--` 或一句「未上报」，不用默认值填空。
+   （历史事故：预计充满时间读的是根本不存在的 `ChargPower` / `ChargingPower`，于是那个数字永远是空的。）
+
+---
+
+## 4. 界面逐项
+
+### 4.1 地图主屏（「现在」档）—— 全 App 唯一的屏
+
+**文件**：`Features/Map/MapSpineView.swift`（1125 行，最大）、`MapSpineData.swift`（数据层）、
+`MapCarPin.swift`（车钉）、`MapQuickBar.swift`（操作条）、`HomeModeHead.swift`（巨字头）。
+
+**骨架**：一张全屏 MapKit 地图 + 一张贴底的纸（`UnevenRoundedRectangle` 圆角 + `surface` 底色）。
+纸的高度固定（`cardHeight`），内容多了**在纸里滚**（`DSPaperPage`），所以模式条与巨字头永不移动。
+
+**顶部**：图层胶囊 + 同步状态（`statusDot` 在线/离线）+ 工具栏（搜索、图层、定位、iPad 分屏入口）。
+光的说明挂在 `lightPill`（点开是 `skySheet`，列出「为什么现在是这个光」的事实表）。
+
+**二级选择条**：4 个图层，横向可滚，只有文字。**刻意没有照搬**「左右滑取景框换模式」——
+地图的横向拖拽是平移，抢掉它比少一个手势糟得多。
+
+**四个图层各自画什么、数据从哪来**：
+
+| 图层 | 图上元素 | 数据来源 | 空态文案 |
+|---|---|---|---|
+| `now` | 车钉 + 续航范围圈 + 异常钉 | `location` + `control` + `VM.energy` | 还没收到位置上报 |
+| `trips` | 每段行程的**起终点连线**（`MapTripLine`） | `store.tripHistory` | 还没有行程记录 |
+| `holds` | 常停点 + 热区圈（`MapHotspot`，聚类） | `store.parkingHistory` / `parkingPoints` | 还没有停车记录 |
+| `charge` | 附近充电站（`MKLocalSearch` + 聚合 `MapChargerCluster`） | 现场搜索 + 充电会话 | 正在搜索附近充电站 |
+
+**四个图层底下的纸内容**：`nowContent`（巨字电量 + 轮胎 + 四个动作）/ `tripsContent` / `holdsContent` /
+`chargeContent`，都在 `MapSpineView` 内，各自有 `emptyNotice`。
+
+**车钉（`MapCarPin`）**：四种画法对四个艺术方向 —— 夜光（刻度盘 + 弧形 + 发光 + 接地阴影）、
+纸上（墨线圈，无发光无阴影）、巨字（发丝环 + 十字准线）、原生。车头朝向由 `Heading` 驱动。
+
+**操作条（`MapQuickBar`）**：4 个动作 —— 锁车 `LockDoor` / 解锁 `UnLockDoor` / 空调 `OpenAir`（先弹温度） /
+寻车 `RemoteSearchCar`。静息态是四个动作，执行中条子**变成那条指令本身**；发出前按需验 PIN / FaceID。
+
+**镜头**：`focusOn(_:)` / `centerOnCar(force:)`；`AppStore.mapFocus` 是跨页请求「把地图移到某点」的唯一通道。
+
+**已知的数据缺口（界面照实说明，不补假数据）**：
+- 行程**没有 GPS 轨迹点**（`TripRecord` 只有起终点两个坐标）→ 画的是直线，不是实际路线。
+- 异常**没有发现地点** → 只能挂在车当前位置，文案写「发现时车在这儿」。
+- 充电站**没有功率/价格**（那是第三方数据源的事）。
+
+### 4.2 车辆档 —— `VehicleHubView`（档案 / 健康 / 保养）
+
+三段共用一个分段控件，**不是三个页面**（此前它们是条子上的三格，而三格回答的是同一个问题）。
+
+- **档案 `VehicleView`**：身份区（车牌/VIN/车型，点字段可复制）+ 档案分组 + 维保照片（`PhotoPickerSheet`）
+  + **车辆提示 `VehicleTipsSection`**（从这辆车的读数推出的提示，按 `TipCategory` 过滤）
+  + **里程日志 `MileageJournalSection`**（含费用记录）。
+- **健康 `HealthDataView`**：综合评分 + **故障码** + 检测系统（逐项可展开）+ **原始字段 `RawDataSection`**
+  （结论与依据同源，所以原始数据没有再单开一页）。语义映射把 `AN` 的结论翻译成颜色与词。
+- **保养 `MaintenanceMoneyView`**：统计卡 + 即将到期 + 年份筛选 + 时间线 + 添加记录；
+  还装着 **`InspectionSection`（年检）**、**`VehicleValuationSection`（车辆估值）**、**`ExportDataSection`（导出）**。
+
+数据来源：`cars` + `control` + `check`（体检）。深链：`.vehicle` / `.health` / `.service`。
+
+### 4.3 充电档 —— `ChargeView`（2026-09-23 从零重写）
+
+旧 `BatteryView` 的问题不是排版，是**它同时是五个页面**（充电/电池健康/故障码/账本/计算器）。
+新页只有三件事，顺序就是看的顺序：
+
+1. **充电**：还在不在充、功率、还要多久（`chargeHero` + `chargeDetail`）。
+   **充电功率的唯一算法**是 `VM.chargePowerKW = totalVoltage × totalCurrent`（报文里没有 `ChargPower` 键）。
+2. **电池**：一致性（单体电压 / 温度探针柱图 + 统计）、绝缘电阻、电压/温度采样子系统、动力电机、电池告警。
+   电池域的结论只取 `AN.summarize` 里 `battery` 那一域，**其余五域归体检**（同一句话不在两页各说一遍）。
+3. **趋势**：SOC 与充电功率两条曲线（`DSTrendChart`），周期 24 小时 / 7 天 / 30 天。
+   数据来自 `HistoryStore` 的**本机采样**（服务端不提供历史），不足两个点时显示「正在积累数据」而不是空图。
+4. **目的地续航计算器 `DestinationCalculatorSection`**：按当前续航留 15% 余量判断够不够。
+
+不在这里的东西：故障码、综合评分 → 体检；**充电账本（花了多少钱）整条链路已删除**（无账单接口，
+算法是本机积分度数 × 手填电价）。
+
+### 4.4 车控档 —— `ControlView`（1103 行）
+
+- 头部：读数就在车上（一屏不堆卡片）+ `CarTopView` 俯视示意图（薄线描，不着色）。
+- 车身明细：门 / 窗 / 后备箱 / 锁（`VM.bodyStatus`）。
+- **快捷预设场景**：如「夏天上车」（`OpenAir` + 26℃）、「冬天上车」（18℃）、「离车」（`LockDoor`）。
+- 指令列表 + **执行中**状态 + **记录**（`AppStore.commandHistory`，最多 50 条）。
+  指令结果三态：成功 / 失败 / **未确认**（60 秒没等到终态，或服务端状态值不认识）——
+  「未确认」不是「失败」，这是刻意的。
+- 交互：`PINKeypadView`（玻璃化数字键盘）、`ACStepperView`（温度弹层）、`SiriShortcutsCard`。
+- 执行链路：`CommandCenter` 负责发起 → 轮询 `/api/car/getControlInfo` 到终态 → 收尾（写历史、提示）。
+  视图生命周期绑定在 `CommandCenter` 上，避免「页面关了指令还在轮询」或相反。
+
+### 4.5 出行档 —— `TripsEventsView`
+
+**一屏三节**（此前是三个独立页面/深链）：
+
+- **行程时间轴**：`store.tripHistory`，每段带 `MiniTripMap`（起终点小图）+ 里程/时长/能耗
+  （能效用**每 1% SOC 多少 km**，因为 `capacity` 是 null，kWh/100km 算不出来）。
+- **驾驶评分 `ScoreSection`**：三个维度（续航达成 / 读数一致 / 稳定），**算不出来就是 nil**，
+  不装成「没有这回事」；页面末尾还写明「这一页量不出来的东西」。
+- **消息 `MessagesSection`**：车的事件流（点火 / 熄火 / 告警…），分段控件 + 标签胶囊过滤。
+  事件流同时是**行程生成的唯一数据源**。
+
+`.parking` / `.score` / `.dashboard` 都是别名 → 落到同一页。
+
+### 4.6 我的档 —— `MineHubView`（设置 / 应急 / 诊断）
+
+- **设置 `MineView`**：Apple Profile 风格身份卡 + 车辆卡（切车 `selectCar`）+ 设置分组（退出登录、
+  检查更新） + **家庭管理 `FamilyManagementView`**、**临时钥匙 `TempKeyListView`**、
+  **隐私面板 `PrivacySection`**、**月报 `MonthlyReportSection`**、Siri 卡片入口、真开关（低电量省电 / 夜间模式）。
+- **应急 `EmergencyPanel`**：SOS 按钮 + 快捷操作 + 紧急联系人 + 位置共享 + 紧急叠加层。
+  代价说明：从「1 次拖动」变成「1 次拖动 + 1 次点击」，但 SOS 也仍然在地图操作条上。
+- **诊断 `DevView`**：色板 / 字体 / 令牌数值 / 运行状态 / 能力位图（`car.funCode`）+
+  **艺术主题入口 `ThemeGallerySection`**（主题画廊住在这里，不占档位）。
+
+### 4.7 不是档位的屏（各有一处入口，不再重复）
+
+| 屏 | 怎么到 | 说明 |
+|---|---|---|
+| `SplashView` | 冷启动 1.5 秒 | 之后再判断进登录 / 引导 / 主屏 |
+| `OnboardingView` | 未登录且没看过引导 | 键 `carkeeper_onboarding_seen` |
+| `LoginView` | 未登录 | 手机号 + 短信码 + 图形码；`TokenStore.save` 后进主屏 |
+| `GlobalSearchHUD` | 地图工具栏 / 我的 | `fullScreenCover`（不是 sheet）；搜页面、车牌、行程、指令；空态文案分「还没输」与「没匹配」两种情况 |
+| `BiometricLockOverlay` | 敏感页二次验证 | `RemoteLockManager` 后台超时自动隐藏 |
+| `ThemeGallerySection` | 诊断档 | 4 个艺术方向 + 小界面样本，切换立即生效 |
+| `PrivacyDashboardView` | 我的 | 三类：留在本机的 / 离开本机的 / 没在收集的 |
+
+---
+
+## 5. 设计系统
+
+### 5.1 四层，严格单向
+
+```
+Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套取值） → DS 原语（唯一容器/分组形态） → 页面
+```
+
+- **`Design/Tokens.swift`**：`TokensPalette`（颜色）/ `TokensSpacing`（4 的倍数，页面边距 20）/ `TokensRadius` /
+  `TokensTypo`（字号）/ `TokensMotion` / `TokensHaptic` / `TokensHair`（发丝线）/ `TokensSize` / `TokensSerif` / `TokensTracking`。
+- **`Design/DS.swift`**（1077 行）：唯一一套容器与排版原语 —— `DSCanvas`、`DSCard`、`DSGroup`/`DSGroupRow`、
+  `DSSection`（唯一的分组形态，inset-grouped）、`DSKeyValueRow`、`DSBigNumber`、`DSLightBar`、`DSStatStrip`、
+  `DSSegmented`、`DSChip`、`DSNotice`、`DSPlaceholder`、`DSSkeleton`、`DSExpandGroup`（唯一的折叠）、
+  `DSPaperPage`、`DSPrimaryButtonStyle`、`DSRowButtonStyle`、`DSSurfaceModifier`……
+- **`Design/Theme.swift`**：`AppCanvas`（画布与光**在根部只画一次**）、`SkyOverlay` 接入、`StatusDot`、`Pill`、
+  `MonthlyReportSection`、`PowerSavingToggle`。
+- **`Design/Charts.swift`**：`DSTrendChart`（单序列，SOC / 功率共用）、`DSTyreTrendChart`（四条曲线）、
+  `DSTrendEmpty`（数据不够时的说明，不是灰块）。
+
+**铁律（`scan/design.py` 在 CI 上拦）**：字号与颜色分量只允许出现在令牌定义文件里。
+不许在页面里写 `.font(.system(size: 14))` 或 `Color(red:...)`。
+
+**颜色从哪来**：`TokensPalette` 是**主题相关**的静态计算值，所以切主题靠
+`CarKeeperApp` 上的 `.id(artThemeRaw)` **重建整棵树**才生效（令牌不产生 SwiftUI 依赖）。
+
+### 5.2 四个艺术方向（`ArtTheme`）
+
+| 方向 | 信条 | 落地难度 | 明暗 | 画布装饰 |
+|---|---|---|---|---|
+| `nocturne` 夜光 | 美来自光：黑底承担信息量，光只给车 | 最能落地 | 深色 | 光池（0.16） |
+| `paper` 纸上 | 美来自印刷：纸面、墨线、红笔 | 最贵（MapKit 画不出纸与墨） | 浅色 | 纸纹（0.05） |
+| `typographic` 巨字 | 美来自尺度：极细巨字对极小标注 | 最省 | — | 发丝网格（0.08） |
+| `native` 原生 | 美来自系统：语义色、分组表面、发丝线（跟随系统外观） | 现状 | nil | 无 |
+
+### 5.3 地图样式（`Design/MapStyleSpec.swift`）
+
+`ArtTheme.mapSpec` 把主题翻译成 MapKit 旋钮。**四套用的都是 `.standard`**，差别只在参数与蒙版上
+（实测值，`Design/MapStyleSpec.swift`）：
+
+| 主题 | MapStyle | 蒙版 scrim | 不透明度 | cameraHeading | 车钉 | 发光 |
+|---|---|---|---|---|---|---|
+| `nocturne` | `.standard(elevation: .flat, emphasis: .muted, pointsOfInterest: .excludingAll, showsTraffic: false)` | `0x0A0910` | 0.55 | 7° | `.ring` | ✅ |
+| `paper` | 同上 | `0xF2E9D8` | 0.30 | 0° | `.ink` | ❌ |
+| `typographic` | 同上 | `0x0A0A0C` | 0.78 | 0° | `.rule` | ❌ |
+| `native` | `.standard`（不传参 = 系统默认） | 无 | 0 | 0° | `.ring` | ✅ |
+
+`cameraDistance` 固定 1400。四套共同点：**压暗系统瓦片 + 排除全部 POI + 关路况**，
+再用蒙版层把色彩拉向主题方向。`paper` 在代码注释里被诚实标注为「打折方案」——
+纸与墨需要整层自建地图（MapLibre + 自有样式），代价见 `MAPKIT-FEASIBILITY.md` §3.2。
+
+> 法律边界写在 `MAPKIT-FEASIBILITY.md`：**不能**用自绘瓦片替代 MapKit（会违反地图数据条款），
+> 所以「纸上」方向只能在 MapKit 之上叠纸纹与墨线，不能自己画地图。
+
+### 5.4 光（这个 App 的「颜色来自天上」的部分）
+
+- **`Design/SkyLight.swift`**：真实太阳位置算法（赤纬 / 时差 / 高度角 / 方位角，NOAA 级公式）→
+  `SkyPhase` 六相（白昼 / 低角度日光 / 日出日落 / 民用暮光 / 蓝调 / 深夜）；
+  **晴空模型 1050 × sin(高度角)**；**云量衰减 `G = 晴空 × (1 − 0.75 × N^3.4)`**（N = 云量 0…1）；
+  `SkyFact` 是「为什么现在是这个光」的逐条事实（地图的 `lightPill`/`skySheet` 展示它）。
+- **`Services/WeatherService.swift`**：`api.open-meteo.com`（免 key）。WMO 天气码 → 中文。
+  **取不到就退回晴空模型，并在界面上照实写明「上面是晴空模型的算法值」**——不拿默认值冒充实况。
+- **`Design/SkyOverlay.swift`**：光池 / 雾霭 / 暗角 / 颗粒 / 发丝网格五个图层。
+- 纯函数部分有单元测试：`Tests/PureLogicTests.swift`（太阳位置、云量衰减、充电站聚合）——
+  **只在开发机的 Xcode 上跑**（CI 的测试 job 已按成本考量删除）。
+
+---
+
+## 6. 本机持久化清单（42 个 `carkeeper_*` 键 + 网络层几个非前缀键）
+
+> 判据：**服务端有这个字段吗？** 有 → 不落盘；没有（只能本机攒）→ 落盘，并在文档与界面上说清它是本机的。
+
+| 类别 | 键（节选） | 退出登录是否清 |
+|---|---|---|
+| 账号与凭据 | `car_token_config`（**Keychain**）、`carkeeper_encryption_key`、`carkeeper_key`（PIN）、`carkeeper_biometric_setup` | ✅ |
+| 选择与导航 | `carkeeper_selected_car_id`、`carkeeper_home_mode`、`carkeeper_map_layer` | 部分 |
+| 外观与提示 | `carkeeper_art_theme`、`carkeeper_force_dark_mode` / `_light_mode`、`carkeeper_night_start_hour` / `_end_hour`、`carkeeper_voice_enabled`、`carkeeper_home_card_order`、`carkeeper_power_saving` | ❌（属于本机偏好） |
+| **本机累积**（服务端无历史接口） | `carkeeper_hist_soc_v1` / `_power_v1` / `_tyre_v1`（三条曲线）、`carkeeper_processed_event_ids`（行程生成）、`carkeeper_parking_loc` / `_time` / `_points`（停车史） | ✅ |
+| 手填记录 | `carkeeper_last_service_mileage`、`carkeeper_service_reminders`、`carkeeper_mileage_entries`、`carkeeper_maintenance_photos`、`carkeeper_insurance_policies`、`carkeeper_inspections`、`carkeeper_current_mileage` / `_total_mileage` | ✅ |
+| 提醒与勿扰 | `carkeeper_dnd_mode`、`carkeeper_charge_notify`、`carkeeper_charge_complete_notify`、`carkeeper_next_service_date`、`carkeeper_last_charge_alert` | 部分 |
+| 家人与钥匙 | `carkeeper_family_members`、`carkeeper_temp_keys` | ✅ |
+| 其它 | `carkeeper_focus_mode`、`carkeeper_current_speed`、`carkeeper_shake_to_lock`、`carkeeper_onboarding_seen` | ❌ |
+
+**已删除、不要加回来的**：`carkeeper_api_stats` / `_page_metrics` / `_home_load_time` / `_version_logs` / `_crash_log`
+（诊断统计，用户明确要求删）、充电账本、以及 App Group 里的 `widget_*` / `watch_*` 共享快照。
+
+---
+
+## 7. 服务层清单（`CarKeeper/Services/` 与 `CarKeeper/CarKeeper/Services/`）
+
+| 服务 | 干什么 | 触发/落盘 |
+|---|---|---|
+| `API.swift` | 网络、Token(Keychain)、刷新去重 | 全局 |
+| `HistoryStore` | SOC 5min / 功率 1min / 胎压 30min 采样，三条曲线 + 清理 | 每次 `saveCache` 后 |
+| `ChargingStatusMonitor` | 由报文驱动的充电观察点（开始 / 结束 / 充满跃迁时才推送） | `recordHistory` 调用 |
+| `SmartNotificationManager` | 通知类别（充电 / 胎压 / 勿扰）+ 资格与去重 | 启动注册，业务触发 |
+| `MaintenanceReminderScheduler` / `InsuranceReminderScheduler` | 保养 / 年检提醒排程 | 里程变化 / 启动 |
+| `ServiceReminderManager` | 保养项定义与进度 | 车辆档 |
+| `WeatherService` | open-meteo 实况（TTL 内且没走远不发请求） | 位置变化 / 启动 |
+| `Retrier` / `NetworkEnhancements` | 退避重试 / 网络质量监控 / 离线模式 | 请求层 |
+| `Monitoring` | 内存读数（**不落盘**） | 启动后每 10s |
+| `DataEncryption` / `SecureStorage` | AES-GCM + Keychain | 车牌等敏感字段 |
+| `BiometricLock` / `RemoteLockManager` | FaceID 二次验证 / 后台超时隐藏 | 敏感页 / 启动 |
+| `NightModeManager` / `FocusModeManager` | 夜间时段 / 专注模式 | 启动与设置 |
+| `GestureEnhancements` / `ShakeDetector` | 摇一摇锁车（自己验 PIN 后发 `CentralLock`） | 启动 |
+| `FamilyAndKeySharing` | 家庭成员 / 临时钥匙 | 我的档 |
+| `InsuranceManager` | 保单 CRUD | 保养档 |
+| `BillingAndCalendar` | 车辆估值 + 年检日历（估值是**估算**，不是市场价，界面写明） | 保养档 |
+| `UpdateService` | 检查更新（读 GitHub Release `latest`）+ 分享 | 我的档 |
+| `EnhancedToastManager` / `AppStore.ToastManager` | 全局提示 | 全局 |
+| `RawLogStore` | 请求/错误原始日志（排障） | 请求层 |
+| `MD5` | 登录签名 `signF` | 认证 |
+| `NightModeManager` 等 | 见上 | |
+
+---
+
+## 8. 工程约束与门禁（22 项 + 风格检查）
+
+### 8.1 门禁表（每一项都是某次真实事故的产物）
+
+| # | 门禁 | 拦什么 |
+|---|---|---|
+| 1 | `paths.py` | `project.yml` 与工作流里声明的路径必须存在；每个 target 必须被 CI 编到；**双向**：`scan/` 下的脚本必须在 CI 清单里或在豁免表里写明理由 |
+| 2 | `design.py` | 字号 / 颜色分量 / 色相字面量只许出现在令牌文件 |
+| 3 | `keys.py` | 报文键只准通过 `ci*` 家族读取（防大小写写错 → 静默零值） |
+| 4 | `access.py` | 剥注释与字面量，避免里面的 `foo.bar` 被当成引用（供其它检查器复用） |
+| 5 | `lexguard.py` | 中文 / 全角字符出现在**代码位置**（嵌套双引号、全角标点、未闭合字符串） |
+| 6 | `scan.py` | 地毯式结构扫描：括号 / 引号 / `#if` 配平、重复声明、未声明名字、幽灵构造 |
+| 7 | `logic.py` | 名字解析查不出的逻辑/结构类编译错误 |
+| 8 | `shadowguard.py` | 禁止嵌套 SDK 同名类型造成遮蔽 |
+| 9 | `scenes.py` | 多窗口 / 分屏（`#47`）接线必须完整 |
+| 10 | `targets.py` | 跨 target 符号可见性 |
+| 11 | `unreachable.py` | `return` 之后仍有同缩进语句 |
+| 12 | `futureproof.py` | 未来系统版本（iOS 27/28）前瞻性审计 + 根目录必须存在 |
+| 13 | `orphans.py` | 孤儿页面：「写了但没有任何地方能到达」 |
+| 14 | `deep.py` | 更深的结构问题：SDK 同名遮蔽、协议一致性、闭包参数、清洗保真度 |
+| 15 | `eol.py` | committed blob 的字节级行尾问题（字面量里裸换行 / 行中裸 CR / `\r\r\n`） |
+| 16 | `oneentry.py` | **入口唯一性**：同一件事只准有一条到达路径 |
+| 17 | `traps.py` | 编译得过但真机一走到就崩的构造（`hashValue` 参与算术、强解包、`try!` / `as!`） |
+| 18 | `scopeguard.py` | 名字在项目里、但在调用点不在作用域（跳类型调静态成员必须带前缀） |
+| 19 | `paidcap.py` | 免费账号用不了的能力（entitlements 白名单 / Info.plist 禁键 / 禁 import / target 白名单） |
+| 20 | `copy.py` | 界面文案三类判据：实现词（缓存/报文/字段/接口）不上界面、复述句式、超 30 字 |
+| 21 | `lintcfg.py` | `.swiftlint.yml` 的排除清单与阈值必须和真实文件树一致 |
+| 22 | `ternary.py` | 三元运算符的 `?` 不能贴住前一个 token（否则变可选链）—— 见 §11 事故记录 |
+| + | `check_style.js`（node） | 风格与括号配平 |
+
+**门禁的写法约定**（新加一项时照抄）：
+① 文件头写清「为什么需要它」并引用真实事故；② 判据只认「不可能合法」的形态，不猜意图；
+③ 放行表显式列出（假阳性会让整条门禁被无视）；④ 先抹掉注释与字符串正文；
+⑤ **双向验证**：注入探针必须报、撤掉必须转绿，探针结果写进文件头或提交信息。
+
+### 8.2 三条铁律（违反会被 CI 拦住）
+
+1. **入口唯一**：去功能只有 `NavState.openMode(_:)` 一条路。不许 push 第二份功能页、
+   不许再加 Tab 栏、不许再加「全部功能」目录（历史上有过 4 套入口并存）。
+2. **令牌唯一**：字号 / 颜色 / 间距只能来自 `Tokens*`。页面里不许写数值。
+3. **键大小写**：报文键一律小写读，且只能通过 `ci*` 家族。
+
+### 8.3 其它工程约定
+
+- `.gitattributes` 强制源码 **LF**（`*.swift` / `*.md` / `*.py` / `*.yml` …）。Windows 上 `autocrlf=true`
+  曾造成 `\r\r\n` 叠两层 → 裸 CR 混进字符串字面量 → 编译失败。
+- `.swiftlint.yml` 里**不再排除任何文件**（`excluded` 会让整个文件退出全部规则，包括 `force_unwrapping`）。
+  改为把 `file_length` / `type_body_length` / `function_body_length` 阈值调到与代码真实形状相符
+  （1200 / 1200 / 160），越界就由 `lintcfg.py` 拦下并要求说明理由。
+- `build.sh` 本机用 `swiftlint lint --strict`（warning 升级为错误）。
+- 提交信息用中文，写清「为什么」；历史提交可作范例（`git log --oneline`）。
+
+---
+
+## 9. 已知缺口、陷阱与「不要做」
+
+### 9.1 数据层面的硬缺口（不是 bug，是接口就没有）
+
+- **行程没有轨迹点** → 地图上是起终点连线。要画真实路线必须先有轨迹接口。
+- **`capacity` 是 null** → kWh/100km 算不出来；能效只能按「每 1% SOC 多少 km」。
+- **服务端只有「当前状态」接口**，没有历史 → 所有曲线都是本机攒的；卸载即消失。
+- **没有导航能力**（免费账号 + `MKDirections` 被列为禁 API）→ 只能显示与搜索，不能规划路线。
+- **`refresh_token` 不轮换** → 安全上按长期凭证对待（所以放 Keychain）。
+
+### 9.2 不要做
+
+- ❌ 不要加回**任何** TTL / 失败保留旧值 /「显示缓存数据」逻辑。
+- ❌ 不要加回小组件 / 表盘 / 灵动岛 / App Clip / CarPlay target（免费账号下没有一条可用链路）。
+- ❌ 不要在根视图挂**无限循环动画**（整棵树反复失效：深色下发暗发黏 + 持续耗电）。
+- ❌ 不要在 `@main` 与 `struct CarKeeperApp` 之间插入任何声明（属性绑定到下一个声明，会静默接管入口）。
+- ❌ 不要把 `Message`/`Data` 之类的系统类型名拿来做自己的类型名（`shadowguard`）。
+- ❌ 不要用 `try?` 包住「必须成功」的异步调用（`try?` 会让 `do` 体永不抛错，`catch` 变死代码）。
+- ❌ 不要为了「让界面好看」而给缺失数据填默认值。
+
+### 9.3 已核实的文档/注释漂移（代码是对的，注释旧了）
+
+- `MapSpineView.swift` 头部与 `bottomPanel` 注释仍写「**9 档**」，实际是 **6 档**（2026-09-23 合并后未回改注释）。
+- `CarKeeperApp.swift` 头部注释仍写「**10 档** = 10 个功能界面」。
+- `DESIGN-SPEC.md` 的小节标题仍用旧页面名（如「行程页 (TripAnalyticsView)」），实际类型是 `TripsEventsView`。
+- `GlobalSearchHUD` 的空态提示曾写「搜页面、车牌、行程、指令、**充电记录**。」，而充电记录随
+  充电账本一起删了（代码里的注释已注明），提示却还在承诺它 —— **已改**。
+  这一类「文案承诺了一个已删除的功能」的漂移，22 项门禁**查不到**：`copy.py` 只管词、长度与复述句式，
+  不核对「这句话说的东西还在不在」。写文档时逐屏读才会碰到。
+
+### 9.4 未验证的部分（必须如实交接）
+
+**本地无法编译**：这台开发机没有 Swift 工具链，所以**每一次改动是否编得过，只有 CI 能回答**。
+静态门禁能覆盖结构、符号、键名、文案、行尾、作用域，**覆盖不了类型检查与语法细节**——
+最近一次真实事故就是一个空格（§11）。接手后第一件事建议先跑一遍 CI 建立基线。
+
+---
+
+## 10. 常见改动怎么做（配方）
+
+### 10.1 给模式条加一档（最常见）
+
+1. `HomeMode` 加一个 `case`，填 `title` / `deeplink`；
+2. `HomeMode.destination(for:)` 里给新档相关深链加分支（**每一个 `Deeplink` 都必须落到某一档，不许落空**）；
+3. `MapSpineView.pageContent(_:)` 加一个 `case`（这是**唯一**列全功能界面的地方）；
+4. 若要档内分段：加 `HomeSub` case，并放进 `vehicleTabs` / `mineTabs` 之一 + 对应 hub 的 `switch`；
+5. `GlobalSearchHUD` 的搜索项里加新档入口；
+6. 跑门禁（`oneentry.py` 会检查入口唯一性）。
+
+### 10.2 加一个网络接口
+
+1. `APIClient` 加方法（POST + `token=` 查询参数；有副作用就 `retryable: false`）；
+2. 决定它进哪个 cache 键（新键要同时改 `AppStore.caches` 初始化、`clearCache`、`gather`）；
+3. 读字段一律用 `ci*` 家族，先查 `API-FIELD-MAP.md` 确认键名与类型；
+4. 在模型层（`ApiModels` / `ViewModels`）翻译成可渲染结构，**不要在 View 里读报文**。
+
+### 10.3 加一项门禁
+
+照 §8.1 的约定写 `scan/xxx.py`（含「为什么需要它」的文件头 + 双向探针），
+**然后必须加进 `.github/workflows/ios-build.yml` 的 `for s in ...` 清单**——
+`paths.py` 会拦住「写了但 CI 从不运行它」，但别依赖它兜底。
+
+### 10.4 改界面文案
+
+`scan/copy.py` 会对全量字面量跑三类判据。写文案前先看它的文件头——那里写着「哪三类句子是禁止的」
+以及每一条对应删过的哪句话。
+
+---
+
+## 11. 事故档案（读这几条能省很多时间）
+
+| 日期 | 事故 | 根因 | 现在的防线 |
+|---|---|---|---|
+| 09-21 | CI 编译失败 | 字符串里嵌了 ASCII 双引号 | `lexguard.py` |
+| 09-22 | CI 卡在 `xcodegen generate` | `project.yml` 声明了已删目录（本地有空壳，干净检出没有） | `paths.py` |
+| 09-22 | CI 报「没有 CarKeeper scheme」 | 一旦显式写了 `schemes:`，XcodeGen 不再自动生成其它方案 | `paths.py` |
+| 09-22 | 车锁车窗恒显示「已锁/已关」 | 报文键大小写写错 → 永远 nil → 看着像正常状态 | `keys.py` |
+| 09-22 | 12 个编译错误 | 收助手函数时调用写了裸名字，而助手住在 `enum` 里 | `scopeguard.py` |
+| 09-23 | 真机闪退（SIGTRAP） | `6 + type.hashValue * 2` 溢出，而它写在默认值里 | `traps.py` |
+| 09-23 | 预计充满时间恒为空 | 读的键（`ChargPower`）在报文里不存在 | 改为 `VM.chargePowerKW` |
+| 09-23 | CI 编译失败 | `searchText.isEmpty? "…"` 少一个空格 → 被读成可选链 | `ternary.py` |
+| 09-23 | 检查范围悄悄变小 | `rglob` 对不存在的目录不报错，白名单里留着已删目录 | `_roots.py`（根目录必须存在） |
+| 09-23 | 门禁写了但没接 | `copy.py` 没加进 CI 的 `for s in ...` | `paths.py` 的反方向检查 |
+
+---
+
+## 12. 文档地图（每份 md 管什么，别再重复写）
+
+| 文件 | 用途 | 什么时候读 |
+|---|---|---|
+| `HANDOFF.md`（本文） | **总入口**：有什么、在哪、怎么改 | 接手第一天 |
+| `README.md` | 构建 / 自签安装 / 7 天续期 / 网络说明 / 已知限制 | 要装到手机上时 |
+| `API-FIELD-MAP.md`（1024 行） | **抓包逐字段全解**：21 条请求时间线、9 个端点、每个字段的类型与含义 | 碰任何接口字段前 |
+| `DESIGN-UNIFY.md` | 统一契约：一页长什么样、一件东西只有一种做法、谁在拦 | 改 UI 结构前 |
+| `DESIGN-SPEC.md` | Kansei 设计规范（配色 / 动效 / 玻璃 / 排版 / 触觉 / 布局） | 调视觉时 |
+| `MAPKIT-FEASIBILITY.md` | 三个艺术方向 × 真实 MapKit 的可行性矩阵与法律边界 | 改地图样式前 |
+| `AppIcon-SPEC.md` | 图标规范与两种生成方法 | 换图标时 |
+| `REDESIGN-STATUS.md`（约 90KB） | **逐轮改造日志**：每轮做了什么、为什么、验证了什么、哪些没被证明 | 想知道「为什么是这样」时 |
+| `../README.md`（仓库根） | 只有一行，是仓库占位 | — |
+| `../design-preview/*.html` | 8 个自包含设计预览（三种艺术方向 / 六屏地图 / 十种融合 / 20 套样品） | 挑版式时（浏览器直接打开） |
+| `../ChangAnMiniProgram/` | 微信小程序参考实现（功能与接口的原始来源） | 想确认「原版怎么做」时 |
+
+---
+
+## 13. 接手第一天的建议顺序
+
+1. **跑一遍静态门禁**（§1.1），确认本地环境能复现 CI 的绿灯。
+2. **推一个空提交或看最近一次 CI**，确认编译基线是绿的（§9.4：编译只在 CI 上）。
+3. **读 §2.2 导航模型**，然后在模拟器/真机上只做一件事：把 6 档依次拨一遍，确认「换档不换屏」。
+4. **按 §4.3 读 `ChargeView`**（它是最新重写的页，风格最贴近当前约定），再按需读 `MapSpineView`。
+5. 想改什么，先查 §10 的配方与 §8.2 的三条铁律，再动手。
