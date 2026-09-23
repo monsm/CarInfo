@@ -114,6 +114,11 @@ enum TokensPalette {
         }
     }
 
+    /// 每一页的个性色（顺序与 `HomeMode.allCases` 一致）。
+    /// 它用在：卡片左上角那一抹、巨字下面一行光晕。**不是文字色**，
+    /// 所以不参与对比度约定；需要文字对比度的地方一律用 primary/secondary/tertiary。
+    static var pageAccents: [Color] { spec.pageAccents }
+
     /// 这套主题允不允许"光"（发光 / 光晕）。纸上不允许 —— 纸张没有发光。
     static var allowsGlow: Bool { spec.allowsGlow }
     /// 标题是不是走宋体（印刷物的做法）

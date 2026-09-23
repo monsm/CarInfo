@@ -48,8 +48,8 @@ struct VehicleView: View {
                               title: "未绑定车辆",
                               message: "请先绑定车辆",
                               actionTitle: "重新加载") { reloadVehicle() }
-            } else if let sum = VM.vehicleSummary(store.car, store.controlCache) {
-                content(sum)
+            } else if VM.vehicleSummary(store.car, store.controlCache) != nil {
+                content()
             } else {
                 DSPlaceholder(icon: "exclamationmark.triangle",
                               title: "档案解析失败",
@@ -79,18 +79,33 @@ struct VehicleView: View {
 
     // MARK: - 内容
 
-    private func content(_ sum: VehicleSummary) -> some View {
-        DSPaperPage {
-            DSPageTitle(title: "车辆档案")
-            identitySection(sum)
-            // 用车提示：由这辆车的读数推出来的提醒（原 `车辆提示` 页）
-            VehicleTipsSection()
-            archiveGroups
-            photoSection
-            // 里程记账：花在车上的每一笔（原「我的」里的独立页 + sheet）
-            MileageJournalSection()
+    private func content() -> some View {
+        StackPageView(accent: HomeMode.vehicle.accent, label: "车辆档案",
+                      cards: sectionCards)
+    }
+
+    /// 档案这一段的卡（**不含巨字头** —— 头归 `VehicleHubView` 那一叠）。
+    ///
+    /// 只有这一处决定「档案分几张卡」：hub 与自己两条路径都调它。
+    /// 拆卡的分法是按**问题**分的 —— 这辆车是谁（身份）、它有什么毛病（提示）、
+    /// 它经历过什么（档案/照片/记账），而不是按控件类型。
+    @MainActor
+    var sectionCards: [StackCard] {
+        guard let sum = VM.vehicleSummary(store.car, store.controlCache) else {
+            return [StackCard(id: "empty", content: AnyView(
+                GlassCardEmpty(text: "车辆数据不完整", icon: "exclamationmark.triangle")))]
         }
-        .pageBackground()
+        return [
+            StackCard(id: "identity", title: "身份",
+                      value: sum.plate, cls: "ok",
+                      content: AnyView(identitySection(sum))),
+            // 用车提示：由这辆车的读数推出来的提醒（原 `车辆提示` 页）
+            StackCard(id: "tips", title: "用车提示", content: AnyView(VehicleTipsSection())),
+            StackCard(id: "archive", title: "档案", content: AnyView(archiveGroups)),
+            StackCard(id: "photos", title: "维保照片", content: AnyView(photoSection)),
+            // 里程记账：花在车上的每一笔（原「我的」里的独立页 + sheet）
+            StackCard(id: "journal", title: "里程记账", content: AnyView(MileageJournalSection()))
+        ]
     }
 
     private var loadingState: some View {

@@ -20,17 +20,24 @@ import SwiftUI
 //  档内怎么分：各 hub 页用分段控件（`HomeSub`），深链落到哪一段由
 //  `destination(for:)` 决定 —— 搜索里点「健康」不该落在「档案」上。
 //
-//  顺序不是按功能分类排的，是按**用的频率**：
-//    现在（每次上车看）→ 车辆/充电/车控（常看常按）→ 出行（偶尔）→ 我的（少见）
+//  顺序不是按功能分类排的，也不是按字母 —— 是**地图在正中**：
+//    出行 · 车辆 · 【现在】 · 充电 · 车控 · 我的
+//  地图主屏是默认档（每次上车先看的就是它），它必须停在条子的正中：
+//  静止只露三档时，左右各有一个邻居可以往两边拖 —— 而首页顶在最左边时，
+//  左边是空的，第一眼看上去像「到头了」。
+//  两翼按用的频率排：左侧「出行 / 车辆」是一天看一两次的，
+//  右侧「充电 / 车控 / 我的」是常按的与收尾的。
 enum HomeMode: String, CaseIterable, Identifiable {
-    /// 车现在在哪、什么状态 —— 也就是地图主屏本来的那张纸（含四个地图图层）
-    case now
+    case trips
     case vehicle
+    /// 车现在在哪、什么状态 —— 也就是地图主屏本来的那张纸（含四个地图图层）。
+    /// **它必须排在正中**（6 档里的第 3 档）：条子的静止形态、默认档、
+    /// 以及「左右各一个邻居」这三件事都从 case 顺序推出来，写错了不会有任何报错。
+    case now
     /// 充电（含电池读数与趋势）。它原来叫「电池」，可这一页回答的是「现在充得怎么样」，
     /// 电池只是它的一个读数域。
     case charge
     case control
-    case trips
     case mine
 
     var id: String { rawValue }
@@ -85,6 +92,26 @@ enum HomeMode: String, CaseIterable, Identifiable {
     /// 供 `DSSwipeStrip` 用的档位表
     static var stripItems: [DSSwipeStrip.Item] {
         allCases.map { DSSwipeStrip.Item(id: $0.rawValue, title: $0.title) }
+    }
+
+    /// 这一档的个性色。
+    ///
+    /// 取值不在这里：它在主题表（`ArtThemeSpec.pageAccents`）里 ——
+    /// 四套艺术主题下它自动是四套配色，而调用点一行不改（与全 App 的颜色纪律一致）。
+    /// 下标取 **case 顺序**而不是 rawValue：色相是跟着在条子上的位置走的，
+    /// 第几档就应该是第几个色（换名字不会把配色也换掉）。
+    var accent: Color {
+        let all = TokensPalette.pageAccents
+        let i = Self.allCases.firstIndex(of: self) ?? 0
+        return all.indices.contains(i) ? all[i] : TokensPalette.accent
+    }
+
+    /// 这一档在叠叠乐里的**第一张卡**：巨字头。
+    ///
+    /// 「现在」那一档没有头 —— 那张纸本身就是地图的面板（车名 + 地址 + 状态行），
+    /// 再叠一个巨字就是两层标题（见 `HomeModeHead` 的第 ③ 条自约束）。
+    var headCards: [StackCard] {
+        self == .now ? [] : [StackCard(id: "head", content: AnyView(HomeModeHead(mode: self)))]
     }
 }
 

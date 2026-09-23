@@ -38,14 +38,25 @@ struct MineView: View {
     @StateObject private var nightModeManager = NightModeManager.shared
 
     // MARK: 生命周期
-    var body: some View {
-        DSPaperPage {
-            DSPageTitle(title: "车与账号", subtitle: "账号、车辆、数据、关于")
-            profileCard
-            if let car = store.car { carCard(car) }
-            settingsGroups
-            updateCard
+    /// 「设置」这一段的卡（**不含巨字头** —— 头归 `MineHubView` 那一叠）。
+    ///
+    /// 拆卡按问题分：我是谁（账号）、我的车（车辆）、我能改什么（设置）、
+    /// 这个 App 是什么（关于）。
+    @MainActor
+    var sectionCards: [StackCard] {
+        var out: [StackCard] = [
+            StackCard(id: "profile", title: "账号", content: AnyView(profileCard))
+        ]
+        if let car = store.car {
+            out.append(StackCard(id: "car", title: "车辆", content: AnyView(carCard(car))))
         }
+        out.append(StackCard(id: "settings", title: "设置", content: AnyView(settingsGroups)))
+        out.append(StackCard(id: "about", title: "关于", content: AnyView(updateCard)))
+        return out
+    }
+
+    var body: some View {
+        StackPageView(accent: HomeMode.mine.accent, label: "车与账号", cards: sectionCards)
         .pageBackground()
         .dsPageTitle("车与账号")
             .accessibilityLabel(Text("车与账号"))

@@ -122,6 +122,13 @@ struct ArtThemeSpec {
     var displayTracking: CGFloat
     /// 主题自带的明暗；nil = 跟随系统（原生）
     var preferredScheme: ColorScheme?
+    /// **每一页的个性色**，顺序与 `HomeMode.allCases` 一致：
+    /// 出行 · 车辆 · 现在 · 充电 · 车控 · 我的。
+    ///
+    /// 为什么它是主题的一部分而不是六个新常量：六页的「个性」如果写死在页面里，
+    /// 四套艺术主题下就都是同一套颜色 —— 而这一整套视觉的前提恰恰是「换主题 = 换值」。
+    /// 它是**卡片左上角那一抹**与页内光晕的色，不是文字色，所以不参与对比度约定。
+    var pageAccents: [Color]
 }
 
 // MARK: - 四个方向
@@ -197,7 +204,10 @@ enum ArtTheme: String, CaseIterable, Identifiable {
                 usesSerifTitles: false,
                 displayWeight: .ultraLight,
                 displayTracking: -0.3,
-                preferredScheme: .dark
+                preferredScheme: .dark,
+                // 夜光：六页沿用原型里那六道冷光（它们本来就是为暗底调的）
+                pageAccents: [artHex(0xB9A6FF), artHex(0x78C8FF), artHex(0x6FA8FF),
+                              artHex(0x5FD08A), artHex(0xA7C8EA), artHex(0xD9D2FF)]
             )
         // ---------------------------------------------------------------------
         case .paper:
@@ -230,7 +240,10 @@ enum ArtTheme: String, CaseIterable, Identifiable {
                 usesSerifTitles: true,
                 displayWeight: .light,
                 displayTracking: -0.2,
-                preferredScheme: .light
+                preferredScheme: .light,
+                // 纸上：不能有鲜艳的色块（纸没有发光），六页是六种**墨**
+                pageAccents: [artHex(0x6A5F92), artHex(0x3F6E9E), artHex(0x2F5B8A),
+                              artHex(0x3F7A5A), artHex(0x4A6B87), artHex(0x5F5A80)]
             )
         // ---------------------------------------------------------------------
         case .typographic:
@@ -260,7 +273,10 @@ enum ArtTheme: String, CaseIterable, Identifiable {
                 usesSerifTitles: false,
                 displayWeight: .ultraLight,
                 displayTracking: -1.6,
-                preferredScheme: .dark
+                preferredScheme: .dark,
+                // 巨字：尺度就是艺术，色彩退到近白的一点点冷暖差别
+                pageAccents: [artHex(0xE4DEEA), artHex(0xD4DCE8), artHex(0xCFD6E2),
+                              artHex(0xC9E0D2), artHex(0xD2D8E0), artHex(0xE6E2EA)]
             )
         // ---------------------------------------------------------------------
         case .native:
@@ -306,7 +322,10 @@ enum ArtTheme: String, CaseIterable, Identifiable {
             usesSerifTitles: false,
             displayWeight: .ultraLight,
             displayTracking: 0,
-            preferredScheme: nil
+            preferredScheme: nil,
+            // 原生：六个系统色（与系统语义色同一套取值）
+            pageAccents: [artHex(0xAF52DE), artHex(0x5AC8FA), artHex(0x007AFF),
+                          artHex(0x34C759), artHex(0x30B0C7), artHex(0x5856D6)]
         )
     }
 

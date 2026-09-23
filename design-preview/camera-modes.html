@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>相机式模式切换 · 5 套读解（iOS 26 / 27）</title>
+<style>
+  :root{
+    --bg:#0a0a0c; --bg2:#141418; --line:#25252c;
+    --accent:#e8b23a; --accent2:#2f6fe4;
+    --paper:#f6f4ef; --ink:#111114;
+    --f:"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+    --serif:"Songti SC","Times New Roman",serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:#eae8e3;font-family:var(--f)}
+  body{padding:22px 20px 90px}
+  h1{font-size:19px;margin:0 0 6px;font-weight:650;letter-spacing:.2px}
+  .lede{color:#9a9aa2;font-size:12.5px;line-height:1.8;max-width:1020px;margin:0 0 14px}
+
+  .facts{background:var(--bg2);border:1px solid var(--line);border-radius:14px;
+         padding:13px 16px;max-width:1020px;font-size:12.5px;line-height:1.85;color:#c9c8cf}
+  .facts>b{color:#f0e6cf}
+  .facts ul{margin:7px 0 0;padding-left:18px}
+  .facts li{margin:4px 0}
+  .facts code{background:#000;padding:1px 5px;border-radius:5px;font-size:11.5px;color:#e8d9a8}
+  .facts .src{color:#8c8c95;font-size:11.5px}
+  .facts .un{color:#d9a86a}
+
+  .bar{position:sticky;top:0;z-index:60;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;
+       background:linear-gradient(180deg,rgba(10,10,12,.98),rgba(10,10,12,.88));
+       border-bottom:1px solid var(--line);padding:10px 4px;margin:18px 0 20px}
+  .seg{display:flex;border:1px solid #33333b;border-radius:10px;overflow:hidden}
+  .seg button{background:#17171b;color:#b9b8c0;border:0;padding:7px 12px;font-size:12px;cursor:pointer;font-family:var(--f)}
+  .seg button+button{border-left:1px solid #33333b}
+  .seg button.on{background:var(--accent);color:#181509;font-weight:650}
+  .btn{background:#17171b;color:#dcdbe3;border:1px solid #33333b;border-radius:10px;
+       padding:7px 12px;font-size:12px;cursor:pointer;font-family:var(--f)}
+  .btn:hover{border-color:#4a4a55}
+  .btn.primary{background:var(--accent);color:#181509;border-color:transparent;font-weight:650}
+  .bar .hint{font-size:11.5px;color:#75757e}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:30px 24px;align-items:start}
+  .card{display:flex;flex-direction:column;gap:9px}
+  .tag{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .tag .k{font-size:16px;font-weight:700;color:var(--accent);width:20px;flex:none}
+  .tag .n{font-size:13.5px;font-weight:650}
+  .tag .rec{font-size:10.5px;padding:2px 7px;border-radius:99px;background:#2b3a1e;color:#c5e08a;border:1px solid #3d5227}
+  .note{font-size:11.5px;color:#8f8f98;line-height:1.75;min-height:80px}
+  .note b{color:#d8d7de;font-weight:600}
+  .note .same{color:#7fa77f}
+  .note .diff{color:#d9a86a}
+  .geo{font-size:11px;color:#6f6f78;font-variant-numeric:tabular-nums}
+  .geo code{background:#000;padding:1px 4px;border-radius:4px;color:#c9b98a}
+
+  .phone{width:326px;height:668px;border-radius:44px;padding:9px;background:#000;
+         border:1px solid #34343c;box-shadow:0 18px 50px rgba(0,0,0,.55);
+         position:relative;flex:none;margin:0 auto}
+  .screen{position:relative;width:100%;height:100%;border-radius:36px;overflow:hidden;background:#dfe3e8}
+  .notch{position:absolute;top:9px;left:50%;transform:translateX(-50%);
+         width:96px;height:22px;border-radius:99px;background:#000;z-index:40}
+  .homebar{position:absolute;left:50%;transform:translateX(-50%);bottom:6px;
+           width:104px;height:5px;border-radius:99px;background:rgba(255,255,255,.85);z-index:41}
+  .screen.paper .homebar{background:rgba(0,0,0,.32)}
+
+  .map{position:absolute;inset:0}
+  .map svg{position:absolute;inset:0;width:100%;height:100%}
+  .ov{position:absolute;inset:0;opacity:0;pointer-events:none}
+  .scrim{position:absolute;left:0;right:0;bottom:0;height:200px;pointer-events:none;
+         background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.16) 46%,rgba(0,0,0,.55));z-index:5}
+
+  .pin{position:absolute;width:26px;height:26px;transform:translate(-50%,-50%)}
+  .pin i{position:absolute;inset:0;border-radius:50%;background:#fff;
+         box-shadow:0 1px 5px rgba(0,0,0,.4);border:2.5px solid var(--accent2)}
+  .pin s{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px;border-radius:50%;background:#2b2b31}
+  .chg{position:absolute;width:18px;height:18px;margin:-9px;border-radius:5px;background:#2f9e63;
+       color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;
+       box-shadow:0 1px 4px rgba(0,0,0,.35)}
+  .chip{position:absolute;display:flex;gap:6px;align-items:center;background:rgba(255,255,255,.93);
+        color:#17171b;border-radius:99px;padding:4px 9px;font-size:10.5px;font-weight:600;
+        box-shadow:0 2px 8px rgba(0,0,0,.18)}
+  .chip.dark{background:rgba(22,22,26,.86);color:#f2f0ea}
+  .rng{position:absolute;border-radius:50%;border:1.5px dashed rgba(47,111,228,.55);
+       background:radial-gradient(closest-side,rgba(47,111,228,.10),rgba(47,111,228,0))}
+
+  /* 内容卡：相机里它在模式行上方（点当前档弹出的抽屉就是这个位置） */
+  .panel{position:absolute;left:12px;right:12px;bottom:88px;z-index:10;height:126px;
+         border-radius:20px;overflow:hidden;
+         background:rgba(255,255,255,.15);
+         backdrop-filter:blur(22px) saturate(180%);
+         -webkit-backdrop-filter:blur(22px) saturate(180%);
+         box-shadow:inset 0 1px 0 rgba(255,255,255,.45),
+                    inset 0 0 0 1px rgba(255,255,255,.16),
+                    0 10px 30px rgba(0,0,0,.28)}
+  .screen.paper .panel{background:var(--paper);color:var(--ink);
+         box-shadow:0 10px 30px rgba(0,0,0,.20);backdrop-filter:none;-webkit-backdrop-filter:none}
+  .pslide{position:absolute;inset:0;padding:12px 15px;opacity:0;will-change:transform,opacity}
+  .ph{font-family:var(--serif);font-size:26px;line-height:1.05;letter-spacing:-.5px;margin:0 0 7px;color:#fff}
+  .screen.paper .ph{color:var(--ink)}
+  .pr{display:flex;justify-content:space-between;align-items:baseline;
+      padding:5px 0;font-size:12.5px;color:rgba(255,255,255,.74);font-variant-numeric:tabular-nums}
+  .pr+.pr{border-top:1px solid rgba(255,255,255,.16)}
+  .pr .v{font-weight:650;color:#fff}
+  .screen.paper .pr{color:#6c6a63;border-top-color:#e2ded4}
+  .screen.paper .pr .v{color:var(--ink)}
+
+  /* 模式行：贴在屏幕最底（相机里它在快门下方）。窗口 overflow:hidden 就是那圈「硬裁」 */
+  .win{position:absolute;left:0;right:0;bottom:17px;height:50px;z-index:30;overflow:hidden}
+  .track{position:absolute;inset:0;touch-action:none;cursor:grab}
+  .track:active{cursor:grabbing}
+  .lab{position:absolute;top:0;height:50px;display:flex;align-items:center;justify-content:center;
+       white-space:nowrap;font-size:15px;font-weight:500;color:#fff;opacity:.62;
+       text-shadow:0 1px 4px rgba(0,0,0,.55);user-select:none;z-index:3;transform-origin:50% 50%}
+  .lab.sel{opacity:1;font-weight:650}
+  .screen.paper .lab{color:#111114;text-shadow:none;opacity:.46}
+  .screen.paper .lab.sel{opacity:1;font-weight:700}
+
+  /* 液态玻璃透镜（glass loupe）：它才是选中指示，跟着手指走 */
+  /* 透镜必须真的看得见——它就是这个 UI 的核心。浅色地图上只用一层 18% 白等于没有，
+     所以这里是：半透明白底 + 强模糊（折射背景）+ 顶部高光 + 一圈亮边。 */
+  .loupe{position:absolute;top:50%;height:34px;border-radius:99px;z-index:2;pointer-events:none;
+         background:linear-gradient(180deg,rgba(255,255,255,.44),rgba(255,255,255,.24));
+         backdrop-filter:blur(16px) saturate(200%);
+         -webkit-backdrop-filter:blur(16px) saturate(200%);
+         box-shadow:inset 0 1px 0 rgba(255,255,255,.78),
+                    inset 0 -1px 0 rgba(255,255,255,.30),
+                    inset 0 0 0 1px rgba(255,255,255,.55),
+                    0 2px 10px rgba(0,0,0,.30),
+                    0 0 0 .5px rgba(0,0,0,.12)}
+  .loupe::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+         background:linear-gradient(158deg,rgba(255,255,255,.55),rgba(255,255,255,0) 46%,rgba(255,255,255,.18))}
+  .screen.paper .loupe{background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,.82));
+         box-shadow:inset 0 1px 0 rgba(255,255,255,1),
+                    inset 0 0 0 1px rgba(0,0,0,.08),
+                    0 3px 10px rgba(0,0,0,.14)}
+
+  /* 放大检视：把 A 的几何整块按 ×N 缩放，所以宽度、字号、硬裁位置、透镜全部等比，
+     不用逐个参数乘系数——包裹层 transform 放大，量宽度走 offsetWidth（不受 transform 影响）。 */
+  .bareholder{position:relative;margin:0 auto;border-radius:18px;overflow:hidden;
+              border:1px solid var(--line);background:#0d0d10}
+  .bareinner{position:absolute;left:12px;top:12px;transform-origin:top left}
+
+  .foot{margin-top:46px;color:#8f8f98;font-size:12px;line-height:1.95;max-width:1020px}
+  .foot b{color:#d8d7de}
+  .foot code{background:#000;padding:1px 5px;border-radius:5px;color:#e8d9a8}
+  .kbd{display:inline-block;background:#1b1b21;border:1px solid #33333b;border-bottom-width:2px;
+       border-radius:5px;padding:0 5px;font-size:11px;color:#d7d6de}
+</style>
+</head>
+<body>
+
+<h1>相机式模式切换 · 5 套读解（骨架不变：地图是取景框，底部那一行换功能）</h1>
+<p class="lede">
+  这一版每一套都在讲同一件事：<b>贴在屏幕最底的那一条模式行</b>，它能按住横拖、跟手、松手吸附，
+  并且它自己就是「<b>选中指示</b>」——一枚连续跟手的液态玻璃透镜（glass loupe）。<br>
+  六档仍是我们真实的档位：现在 / 车辆 / 充电 / 车控 / 出行 / 我的。5 套的差别只在<b>这一行的几何与指示器</b>，不在颜色。
+</p>
+
+<div class="facts">
+  <b>先把我搜到的事实的摆出来（5 套都是对着它做的，不是我凭感觉画的）</b>
+  <ul>
+    <li><b>位置</b>：iOS 26 把模式行从快门<b>上方挪到了下方</b>——现在是「设置抽屉在上、模式行贴着屏幕最底」。
+        <span class="src">Macworld / MacRumors《iOS 26 Camera App》</span></li>
+    <li><b>iOS 26 静止只看得见两项</b>：默认只有 Video 与 Photo 醒目地显示在底部，其余六七个模式要<b>按住横向拖</b>才露出来，也可以反复点左右邻居。
+        <span class="src">Macworld：「You'll only see Photo and Video at first, but just tap and drag left and right」</span></li>
+    <li><b>iOS 27 改成静止居中在当前档</b>：你看到的是<b>这一档的左右邻居</b>，右边那个<b>只露出开头几个字母</b>（原文举例：左边 Video、右边只看见 Portrait 的前几个字母）。
+        <span class="src">AppleInsider：“it centers the section on your currently-selected mode… you see the left and right options of the mode”</span></li>
+    <li><b>一开始拖就向两侧展开</b>，六档照旧齐全——也就是<b>静止态是收拢的，拖动时才展开</b>。
+        <span class="src">AppleInsider：“It still expands the selector sideways when you start swiping… you also have the full selection of modes as before”</span></li>
+    <li><b>选中指示是一枚会移动的玻璃透镜（glass loupe）</b>，它<b>跟着手指的方向走</b>；iOS 26 专门补了一个 <code>Classic Mode Switching</code> 开关把方向反过来。
+        <span class="src">9to5Mac：「iOS 26 replaces the visual metaphor with a glass loupe that moves in the direction of your finger」</span></li>
+    <li><b>其它同代改动</b>：变焦在快门上方、前后摄切换在右下、照片缩略图在左下（改成圆的）；格式/参数从左上移到<b>顶部居中</b>，设置抽屉从右上移到<b>右下</b>，所有设置盘统一到<b>底部</b>（为单手拇指）。
+        <span class="src">AppleInsider / MacRumors</span></li>
+    <li class="un"><b>我不确定的（正是下面几套的分歧点）</b>：① 透镜的材质细节——它到底带不带放大/折射；
+        ② 静止态露出几档的<b>精确</b>宽度；③ 「透镜跟手」与「内容跟手」在屏幕上各自长什么样。
+        第 ③ 条我按下面的方式解读，如果不对请直接说。</li>
+  </ul>
+</div>
+
+<div class="bar">
+  <span style="font-size:12px;color:#9a9aa2">拖动的方向语义：</span>
+  <div class="seg" id="dirSeg">
+    <button data-dir="new" class="on">iOS 26/27 默认：透镜跟手</button>
+    <button data-dir="classic">Classic：内容跟手</button>
+  </div>
+  <span style="font-size:12px;color:#9a9aa2">拖动时：</span>
+  <div class="seg" id="expandSeg">
+    <button data-ex="1" class="on">向两侧展开</button>
+    <button data-ex="0">不展开</button>
+  </div>
+  <button class="btn primary" id="autoBtn">自动演示全部</button>
+  <button class="btn" id="resetBtn">回到起始档（充电）</button>
+  <span class="hint">直接拖那一行 · 点某一档 · <span class="kbd">←</span><span class="kbd">→</span> 换档</span>
+</div>
+
+<h2 style="margin-top:6px">几何放大检视 —— 把 A 的整套几何等比放大，用来核对「静止形态」</h2>
+<p class="lede" style="margin-bottom:12px;max-width:1020px">
+  下面这条不是新的方案，是 <b>A 的做法放大 2.2 倍</b>：窗宽 307 → 675px、字号 15 → 33px、静止空隙 120 → 264px、展开后空隙 20 → 44px，
+  全部等比，所以<b>窗口里装得下几档、邻居被裁掉多少、透镜包住多大</b>都和手机里一模一样，只是看得清。它同样能拖。
+</p>
+<div id="bare"></div>
+
+<div class="grid" id="grid"></div>
+
+<div class="foot">
+  <b>怎么判这几套</b><br>
+  · <b>A</b> 是我认为最贴 iOS 27 原意的一套：静止居中当前档、两侧被窗口<b>硬裁</b>、一拖向两侧展开、玻璃透镜连续跟手。<br>
+  · <b>B</b> 是对 iOS 26 的读解：静止<b>只露两项</b>（像 Video/Photo 那一对），拖动才展开——比 A 收得更紧。<br>
+  · <b>C</b> 是同 A 的几何但<b>不要玻璃</b>，只靠亮度与字重（若你嫌透镜太重）。<br>
+  · <b>D</b> 是把 <i>loupe</i> 按字面读：它是一枚<b>放大镜</b>，被它经过的词真的被放大。<br>
+  · <b>E</b> 是把它落到我们自己的纸面上（不压暗、深色字），用来判相机那套语言在浅色底上还成不成立。<br><br>
+  <b>两个开关请一并试</b>：①<b>方向语义</b>——「透镜跟手」是把<b>透镜本身</b>当作你手指拖动的对象（它滑过字，字基本不动，它压住谁就是选中谁）；
+  「内容跟手」是把<b>整行字</b>当作拖动对象，透镜钉在窗口正中不动，字从它下面滑过去（这就是 iOS 18 及以前的样子）。<br>
+  <b>和相机的两点刻意差异</b>：① 相机里<b>整个取景框</b>横滑也换档，但我们的地图横滑必须是<b>平移</b>——
+  抢掉它会让「拖地图」变成「换功能」，比少一个手势糟得多，所以这里只有那一行本身可拖。
+  ② 相机一档一个词，我们一档还带一段内容，所以额外验证了内容跟着选中项整屏滑动。
+</div>
+
+<script>
+/* ============================================================================
+   数据：6 档 = 6 个功能界面
+   ========================================================================== */
+const MODES = [
+  { id:'now', label:'现在', chip:'68% · 412 km', pin:'center',
+    rows:[['电池','68%'],['续航','412 km']] },
+  { id:'car', label:'车辆', chip:'体检 · 轻微 1 项', pin:'center',
+    rows:[['VIN','LS6A2E16…9F3'],['里程','53,766 km']] },
+  { id:'chg', label:'充电', chip:'附近 4 个充电站', pin:'center', chg:true,
+    rows:[['功率','-- kW'],['电池温度','26 ℃']] },
+  { id:'ctl', label:'车控', chip:'车门已锁', pin:'center', ring:true,
+    rows:[['车门','已锁'],['空调','关']] },
+  { id:'trip', label:'出行', chip:'今天 3 段 · 18.6 km', pin:'left', route:true,
+    rows:[['08:12→08:40','6.8 km'],['12:30→12:52','4.1 km']] },
+  { id:'me', label:'我的', chip:'138****0000', pin:'center',
+    rows:[['随行成员','2 人'],['临时钥匙','1 把']] }
+];
+const N = MODES.length;
+
+/* ============================================================================
+   5 套：差别只在那一行的几何、指示器、以及静止时把什么居中
+   restGap 静止空隙（决定静止看得见几档） / dragGap 展开后的空隙
+   loupe   capsule（玻璃胶囊）| magnify（放大镜）| none（不要玻璃）
+   center  'item' 静止把当前档居中（iOS 27）| 'pair' 静止把一对居中（iOS 26）
+   ========================================================================== */
+const VARIANTS = [
+  { k:'A', name:'iOS 27 读解：静止居中当前档 + 两侧硬裁 + 一拖向两侧展开', rec:true,
+    restGap:120, dragGap:20, loupe:'capsule', center:'item',
+    note:`<span class="same">照搬：</span>模式行贴在<b>屏幕最底</b>；静止时<b>居中当前档</b>，左右邻居都露出来、
+          并被窗口<b>硬裁</b>（所以右边只会看见字的开头，正对「只看见 Portrait 前几个字母」）；
+          <b>手指一碰就向两侧展开</b>；选中是一枚<b>连续跟手的玻璃透镜</b>；松手吸附并收回静止形态。` },
+
+  { k:'B', name:'iOS 26 读解：静止只露两项，拖动才展开', rec:false,
+    restGap:160, dragGap:20, loupe:'capsule', center:'pair',
+    note:`<span class="same">照搬：</span>iOS 26 的静止态——<b>只看得见两项</b>（Video / Photo 那一对），
+          其余档位按住横拖才出现。
+          <span class="diff">差别：</span>比 A 收得更紧，静止时几乎没有「还有更多」的暗示；
+          这正是 Apple 在 27 里改成居中的原因——原文：<i>“you're just prompted early that there's more available”</i>。` },
+
+  { k:'C', name:'去掉玻璃：只靠亮度与字重', rec:false,
+    restGap:120, dragGap:20, loupe:'none', center:'item',
+    note:`<span class="same">照搬：</span>与 A 完全相同的几何与手感。
+          <span class="diff">不同：</span>没有透镜，选中<b>只靠白色 + 加粗</b>、未选中压到 62% 透明。
+          好处：少一层材质，和浅色纸面不打架；代价：拖动途中少一个「跟手的锚」，
+          不容易看出自己正停在两档之间。` },
+
+  { k:'D', name:'loupe 按字面读：它是一枚放大镜', rec:false,
+    restGap:120, dragGap:10, loupe:'magnify', center:'item',
+    note:`<span class="same">照搬：</span>同样的居中 + 展开 + 跟手。
+          <span class="diff">不同：</span><i>loupe</i> 字面就是放大镜，所以这一套里<b>透镜经过的词真的被放大</b>
+          （跟着距离连续起落，不是只在选中时跳一下）。它比 A 更有物理感，
+          但放大改变了行高与基线，静止与拖动态的字号会不一致。` },
+
+  { k:'E', name:'落到我们自己的纸面上：不压暗，深色字', rec:false,
+    restGap:120, dragGap:20, loupe:'capsule', center:'item', paper:true,
+    note:`<span class="same">照搬：</span>与 A 同一套几何与透镜。
+          <span class="diff">不同：</span>相机这一行是压在<b>取景画面</b>上的白字（靠底部压暗才读得清），
+          我们底下是<b>浅色地图 + 浅色纸</b>，所以这套把字翻成深色、去掉压暗层、透镜改成浅玻璃。
+          用来判：相机那套语言在我们这个底色上还成不成立。` }
+];
+
+/* ── 地图底图（所有手机复用同一段 SVG） ───────────────────── */
+function mapSVG(){ return `
+<svg viewBox="0 0 326 648" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef1f4"/><stop offset="1" stop-color="#e0e5eb"/>
+    </linearGradient>
+  </defs>
+  <rect width="326" height="648" fill="url(#g1)"/>
+  <path d="M-20 120 L120 96 L200 150 L340 120 L360 150 L360 -20 L-20 -20 Z" fill="#dfe9df"/>
+  <path d="M0 420 Q90 380 170 430 T340 400 L360 460 L360 700 L0 700 Z" fill="#d8e4ee"/>
+  <g stroke="#cbd2d8" stroke-width="14" fill="none" stroke-linecap="round">
+    <path d="M40 700 L70 470 L120 300 L150 180 L170 40"/>
+    <path d="M-10 320 L120 330 L250 300 L360 316"/>
+    <path d="M-10 520 L140 500 L280 520 L360 500"/>
+    <path d="M250 700 L232 480 L214 300 L206 60"/>
+  </g>
+  <g stroke="#ffffff" stroke-width="7" fill="none" stroke-linecap="round">
+    <path d="M40 700 L70 470 L120 300 L150 180 L170 40"/>
+    <path d="M-10 320 L120 330 L250 300 L360 316"/>
+    <path d="M-10 520 L140 500 L280 520 L360 500"/>
+    <path d="M250 700 L232 480 L214 300 L206 60"/>
+  </g>
+  <g stroke="#e6e2d8" stroke-width="2" fill="none">
+    <path d="M96 700 L104 470 L120 330"/><path d="M186 700 L182 480 L176 300"/>
+  </g>
+  <g fill="#d3d8dd">
+    <rect x="30" y="200" width="46" height="34" rx="4"/><rect x="238" y="352" width="52" height="30" rx="4"/>
+    <rect x="60" y="546" width="40" height="40" rx="4"/><rect x="248" y="180" width="38" height="46" rx="4"/>
+  </g>
+</svg>`; }
+
+/* ── 每一档在地图上留下的痕迹（证明「真的换了一套内容」） ─── */
+function buildOverlay(m){
+  const box = document.createElement('div');
+  box.className = 'ov'; box.dataset.ov = m.id;
+  const cx = m.pin === 'left' ? 96 : 152;
+  const cy = m.pin === 'left' ? 300 : 250;
+
+  if(m.route){
+    const s = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    s.setAttribute('viewBox','0 0 326 648');
+    s.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
+    s.innerHTML = '<path d="M96 300 C130 292 150 250 176 232 S206 214 214 204" fill="none" ' +
+                  'stroke="#2f6fe4" stroke-width="4" stroke-linecap="round" opacity=".85"/>';
+    box.appendChild(s);
+  }
+  if(m.ring){
+    const r = document.createElement('div');
+    r.className = 'rng';
+    r.style.cssText = 'left:' + (cx-46) + 'px;top:' + (cy-46) + 'px;width:92px;height:92px';
+    box.appendChild(r);
+  }
+  const pin = document.createElement('div');
+  pin.className = 'pin';
+  pin.style.left = cx + 'px'; pin.style.top = cy + 'px';
+  pin.innerHTML = '<i></i><s></s>';
+  box.appendChild(pin);
+
+  if(m.chg){
+    [[74,196],[236,214],[96,318],[222,330]].forEach((p,i)=>{
+      const c = document.createElement('div');
+      c.className = 'chg'; c.textContent = String(i+1);
+      c.style.left = p[0] + 'px'; c.style.top = p[1] + 'px';
+      box.appendChild(c);
+    });
+  }
+  const chip = document.createElement('div');
+  chip.className = 'chip' + (m.chg ? ' dark' : '');
+  chip.textContent = m.chip;
+  chip.style.left = cx + 'px'; chip.style.top = (cy-62) + 'px';
+  chip.style.transform = 'translate(-50%,-50%)';
+  box.appendChild(chip);
+  return box;
+}
+
+/* ── 内容卡（相机里它在模式行上方） ───────────────────────── */
+function buildPanelPage(m){
+  const p = document.createElement('div');
+  p.className = 'pslide'; p.dataset.page = m.id;
+  let h = '<div class="ph">' + m.label + '</div>';
+  h += m.rows.map(r=>'<div class="pr"><span>' + r[0] + '</span><span class="v">' + r[1] + '</span></div>').join('');
+  p.innerHTML = h;
+  return p;
+}
+
+/* ============================================================================
+   模式行引擎
+   ──────────────────────────────────────────────────────────────────────────
+   三个量，互相不重叠，这是关键：
+     off  整行在窗口里的屏幕偏移（px）
+     L    透镜的屏幕中心（px）
+     v    连续档位位置 —— 不独立存，而是**由「透镜正压住谁」解出来**：
+          v = solveV(L - off)
+   于是「透镜跟手」= 拖 L、off 不动；「内容跟手」= 拖 off、L 不动。
+   两者都只是在写上面两个量，v 自己跟着变，选中永远是透镜底下那一个。
+   ────────────────────────────────────────────────────────────────────────── */
+const UX = { dir:'new', expand:true, auto:false };
+
+function lerp(a,b,t){ return a + (b-a)*t; }
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+
+class Strip{
+  constructor(card, cfg){
+    this.card = card; this.cfg = cfg;
+    this.win = card.querySelector('.win');
+    this.track = card.querySelector('.track');
+    this.loupeEl = card.querySelector('.loupe');
+    this.labels = Array.prototype.slice.call(card.querySelectorAll('.lab'));
+    this.pages  = Array.prototype.slice.call(card.querySelectorAll('.pslide'));
+    this.ovs    = Array.prototype.slice.call(card.querySelectorAll('.ov'));
+
+    this.pad = cfg.loupe === 'magnify' ? 22 : 16;
+    this.g = cfg.restGap;
+    this.expand = 0; this.targetExpand = 0;
+
+    this.v = 0;                 // 连续档位位置（解出来的）
+    this.offBase = 0;           // 已落位的行偏移
+    this.LBase = 0;             // 已落位的透镜位置
+    this.dragL = 0; this.dragOff = 0;   // 手指直接产生的位移
+    this.dragAnchorV = 0;               // 展开的锚点（按下那一刻的 v）
+    this.dragging = false; this.moved = false;
+    this.commit = 0;            // 松手后吸附到的整数档（高亮用它，避免回弹途中闪）
+
+    this.w = []; this.W = 0; this.avgW = 40;
+    this.cumG = null; this.cumCache = null;
+    this.bound = false; this.lastKey = '';
+
+    /* 起始档故意不放在第 1 档：在我们这六档里，第 1 档左边没有邻居，
+       iOS 27 那个「当前档居中、左右各露一半」的静止形态会自然退化。
+       从第 3 档（充电）起步，一开页就能看见它本来的样子。 */
+    this.commit = 2; this.start = 2;
+
+    this.measure();
+    this.offBase = this.W/2 - this.anchorAt(this.g, this.commit);
+    this.LBase = this.centerAt(this.g, this.commit) + this.offBase;
+    this.v = this.commit;
+    this.bind();
+    this.render(true);
+  }
+
+  measure(){
+    this.W = this.win.clientWidth || 308;
+    /* 量的是「字的自然宽度」，所以必须先把 width 与 scale 都摘掉——
+       否则 D 套那种会放大自己的方案，每量一次就把自己的宽度再乘一次放大系数。 */
+    /* 用 offsetWidth 而不是 getBoundingClientRect：前者是布局宽度，不受 transform 影响，
+       所以外面套一层 scale 做放大检视时，量出来的仍然是真实的字宽。 */
+    this.w = this.labels.map(n=>{
+      const keepW = n.style.width, keepT = n.style.transform;
+      n.style.width = ''; n.style.transform = 'none';
+      const wd = n.offsetWidth || 34;
+      n.style.width = keepW; n.style.transform = keepT;
+      return Math.max(26, Math.round(wd));
+    });
+    this.avgW = this.w.reduce((a,b)=>a+b, 0) / N;
+    this.cumG = null;
+  }
+
+  /* 累计左端位置（同一 gap 只算一次） */
+  cum(g){
+    if(this.cumG === g && this.cumCache) return this.cumCache;
+    const out = []; let x = 0;
+    for(let i=0;i<N;i++){ out.push(x); x += this.w[i] + g; }
+    this.cumG = g; this.cumCache = out;
+    return out;
+  }
+  /* 连续位置 v 对应的档中心（相对行起点）。两端线性外推，便于阻尼越界 */
+  centerAt(g, v){
+    const c = this.cum(g);
+    const i0 = clamp(Math.floor(v), 0, N-2);
+    const t = v - i0;
+    return lerp(c[i0] + this.w[i0]/2, c[i0+1] + this.w[i0+1]/2, t);
+  }
+  /* 反解：让 centerAt(v) = target 的那个 v（centerAt 单调，二分即可） */
+  solveV(target){
+    let lo = -0.6, hi = N - 1 + 0.6;
+    for(let k=0;k<22;k++){
+      const mid = (lo + hi) / 2;
+      if(this.centerAt(this.g, mid) < target) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+  step(){ return this.avgW + this.g; }
+  /* 静止时把什么放到窗口正中：iOS 27 放当前档，iOS 26 放「包含当前档的一对」的中点 */
+  anchorAt(g, idx){
+    if(this.cfg.center !== 'pair') return this.centerAt(g, idx);
+    const p0 = clamp(Math.floor(idx/2) * 2, 0, N-2);
+    return (this.centerAt(g, p0) + this.centerAt(g, p0+1)) / 2;
+  }
+
+  bind(){
+    if(this.bound) return; this.bound = true;
+    const s = this.track;
+    let sx = 0;
+
+    s.addEventListener('pointerdown', e=>{
+      if(UX.auto) return;
+      try{ s.setPointerCapture(e.pointerId); }catch(err){ /* 合成事件 */ }
+      this.dragging = true; this.moved = false;
+      sx = e.clientX;
+      this.dragAnchorV = this.v;      // 展开时以按下那一刻的位置为锚点
+      this.targetExpand = 1;
+      this.buzz();
+    });
+
+    s.addEventListener('pointermove', e=>{
+      if(!this.dragging) return;
+      const dx = e.clientX - sx;
+      if(Math.abs(dx) > 3) this.moved = true;
+      if(UX.dir === 'new'){
+        /* 透镜跟手：拖的是透镜本身，行基本不动，透镜滑过那些字 */
+        this.dragL = dx; this.dragOff = 0;
+      }else{
+        /* 内容跟手：拖的是整行，透镜钉在窗口中心，字从它下面滑过去 */
+        this.dragL = 0; this.dragOff = dx;
+      }
+      this.clampV();
+    });
+
+    const end = ()=>{
+      if(!this.dragging) return;
+      this.dragging = false;
+      this.commit = clamp(Math.round(this.v), 0, N-1);
+      this.dragL = 0; this.dragOff = 0;
+      this.buzz();
+      if(this.moved) setTimeout(()=>{ if(!this.dragging) this.targetExpand = 0; }, 540);
+      else this.targetExpand = 0;
+      this.emit();
+    };
+    s.addEventListener('pointerup', end);
+    s.addEventListener('pointercancel', end);
+    s.addEventListener('lostpointercapture', end);
+
+    window.addEventListener('keydown', e=>{
+      if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      this.pick(clamp(this.commit + (e.key === 'ArrowRight' ? 1 : -1), 0, N-1));
+    });
+  }
+
+  /* 把越界的部分推回手指所写的那个量，使两端既拖得动又回得来 */
+  clampV(){
+    const L = this.LBase + this.dragL, off = this.offBase + this.dragOff;
+    let v = this.solveV(L - off);
+    const vc = clamp(v, -0.35, N - 1 + 0.35);
+    if(vc !== v){
+      if(UX.dir === 'new') this.dragL = (this.offBase + this.centerAt(this.g, vc)) - this.LBase;
+      else this.dragOff = this.LBase - this.centerAt(this.g, vc) - this.offBase;
+    }
+    this.v = vc;
+  }
+
+  buzz(){ if(navigator.vibrate) navigator.vibrate(5); }
+  pick(i){ if(i === this.commit) return; this.commit = i; this.buzz(); this.emit(); }
+  emit(){ this.card.dispatchEvent(new CustomEvent('mode', { detail:this.commit, bubbles:true })); }
+
+  /* ── 每帧 ─────────────────────────────────────────────── */
+  tick(){
+    /* 1. 展开/收拢：同时补 offBase，让展开是从选中项向两侧长出去，而不是从行首长 */
+    const e = UX.expand ? this.expand : 0;
+    this.expand += ((UX.expand ? this.targetExpand : 0) - this.expand) * 0.16;
+    if(Math.abs(this.expand - (UX.expand ? this.targetExpand : 0)) < 0.002)
+      this.expand = UX.expand ? this.targetExpand : 0;
+    const gNew = lerp(this.cfg.restGap, this.cfg.dragGap, this.expand);
+    if(Math.abs(gNew - this.g) > 0.02){
+      /* 锚点取「按下那一刻的档」，不取实时 v —— 取实时 v 的话，行会一路跟着透镜跑，
+         「透镜从字上滑过」就变成了「整行跟着手指走」，两种方向语义就分不出来了。 */
+      const av = this.dragging ? this.dragAnchorV : this.commit;
+      this.offBase += this.centerAt(this.g, av) - this.centerAt(gNew, av);
+      this.g = gNew;
+      this.cumG = null;
+    }
+    void e;
+
+    /* 2. 松手后：offBase / LBase 一起走向静止形态 */
+    if(!this.dragging){
+      const offT = this.W/2 - this.anchorAt(this.g, this.commit);
+      const LT   = this.centerAt(this.g, this.commit) + offT;
+      this.offBase += (offT - this.offBase) * 0.20;
+      this.LBase   += (LT   - this.LBase)   * 0.20;
+      if(Math.abs(offT - this.offBase) < 0.3 && Math.abs(LT - this.LBase) < 0.3){
+        this.offBase = offT; this.LBase = LT;
+      }
+    }
+
+    /* 3. v 永远由「透镜压住谁」解出来 */
+    this.v = this.solveV(this.LBase + this.dragL - this.offBase - this.dragOff);
+    this.render();
+  }
+
+  render(force){
+    const cum = this.cum(this.g);
+    const off = this.offBase + this.dragOff;
+
+    const key = [this.g.toFixed(2), off.toFixed(2), this.v.toFixed(3), this.commit].join('|');
+    if(!force && key === this.lastKey) return;
+    this.lastKey = key;
+
+    const magK = this.cfg.loupe === 'magnify' ? 0.34 : 0;
+    const sel = this.dragging ? clamp(Math.round(this.v), 0, N-1) : this.commit;
+
+    for(let i=0;i<N;i++){
+      const n = this.labels[i];
+      const d = Math.abs(i - this.v);
+      const sc = 1 + Math.max(0, 1 - d) * magK;
+      n.style.width = this.w[i] + 'px';
+      n.style.transform = 'translateX(' + (cum[i] + off).toFixed(2) + 'px) scale(' + sc.toFixed(3) + ')';
+      n.classList.toggle('sel', i === sel);
+    }
+
+    /* 透镜：中心与宽度都从连续位置插值出来，所以它能在两档之间平滑滑行 */
+    if(this.loupeEl){
+      if(this.cfg.loupe === 'none'){
+        this.loupeEl.style.display = 'none';
+      }else{
+        this.loupeEl.style.display = '';
+        const i0 = clamp(Math.floor(this.v), 0, N-2);
+        const wRaw = lerp(this.w[i0], this.w[i0+1], this.v - i0);
+        const w = wRaw * (1 + magK) + this.pad * 2;
+        const L = this.LBase + this.dragL;
+        this.loupeEl.style.width = w.toFixed(1) + 'px';
+        this.loupeEl.style.transform =
+          'translateX(' + (L - w/2).toFixed(2) + 'px) translateY(-50%)';
+      }
+    }
+
+    /* 内容按「选中位置」而不是「行的位置」排 —— 一页正好差一个窗口宽，
+       于是透镜滑过一格，内容也就滑过一屏，两个方向语义下都不会冻结。 */
+    for(let i=0;i<this.pages.length;i++){
+      const p = this.pages[i];
+      const rel = (i - this.v) * this.W;
+      const w = Math.max(0, 1 - Math.abs(i - this.v) * 1.15);
+      p.style.opacity = String(w > 0.02 ? 1 : 0);
+      p.style.transform = 'translateX(' + rel.toFixed(2) + 'px)';
+    }
+    /* 地图上的痕迹：只有当前档那一套在 */
+    for(let i=0;i<this.ovs.length;i++){
+      const o = this.ovs[i];
+      const idx = MODES.findIndex(m=>m.id === o.dataset.ov);
+      const w = Math.max(0, 1 - Math.abs(idx - this.v) * 1.5);
+      o.style.opacity = String(w);
+      o.style.display = w < 0.02 ? 'none' : '';
+    }
+  }
+}
+
+/* ============================================================================
+   建装 5 套
+   ========================================================================== */
+const grid = document.getElementById('grid');
+
+function buildPhone(v){
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.dataset.variant = v.k;
+
+  const tag = document.createElement('div');
+  tag.className = 'tag';
+  tag.innerHTML = '<span class="k">' + v.k + '</span><span class="n">' + v.name + '</span>' +
+                  (v.rec ? '<span class="rec">这一套最接近 iOS 27 的描述</span>' : '');
+  card.appendChild(tag);
+
+  const phone = document.createElement('div');
+  phone.className = 'phone';
+  const screen = document.createElement('div');
+  screen.className = 'screen' + (v.paper ? ' paper' : '');
+
+  const map = document.createElement('div');
+  map.className = 'map'; map.innerHTML = mapSVG();
+  screen.appendChild(map);
+  MODES.forEach(m=>screen.appendChild(buildOverlay(m)));
+  if(!v.paper){ const sc = document.createElement('div'); sc.className = 'scrim'; screen.appendChild(sc); }
+
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  MODES.forEach(m=>panel.appendChild(buildPanelPage(m)));
+  screen.appendChild(panel);
+
+  const win = document.createElement('div');
+  win.className = 'win';
+  if(v.loupe !== 'none'){
+    const lp = document.createElement('div'); lp.className = 'loupe';
+    win.appendChild(lp);
+  }
+  const track = document.createElement('div');
+  track.className = 'track';
+  MODES.forEach((m,i)=>{
+    const n = document.createElement('div');
+    n.className = 'lab'; n.textContent = m.label; n.dataset.i = String(i);
+    track.appendChild(n);
+  });
+  win.appendChild(track);
+  screen.appendChild(win);
+
+  const notch = document.createElement('div'); notch.className = 'notch'; screen.appendChild(notch);
+  const hb = document.createElement('div'); hb.className = 'homebar'; screen.appendChild(hb);
+
+  phone.appendChild(screen);
+  card.appendChild(phone);
+
+  const note = document.createElement('div'); note.className = 'note'; note.innerHTML = v.note;
+  card.appendChild(note);
+
+  grid.appendChild(card);
+  return new Strip(card, v);
+}
+
+const phoneEngines = VARIANTS.map(buildPhone);
+
+/* ── 几何放大检视：同一个引擎，外面套一层 transform:scale 等比放大 ──
+   包裹层放大不会影响布局宽度，所以引擎量出来的字宽依然是真的，几何与手机里完全一致。 */
+function buildBare(cfg, scale, label, note){
+  const card = document.createElement('div');
+  card.className = 'card';
+
+  const tag = document.createElement('div');
+  tag.className = 'tag';
+  tag.innerHTML = '<span class="k">⌕</span><span class="n">' + label + '</span>';
+  card.appendChild(tag);
+
+  const holder = document.createElement('div');
+  holder.className = 'bareholder';
+  holder.style.width = (307*scale + 24) + 'px';
+  holder.style.height = (92*scale + 24) + 'px';
+
+  const inner = document.createElement('div');
+  inner.className = 'bareinner';
+  inner.style.width = '307px';
+  inner.style.height = '92px';
+  inner.style.transform = 'scale(' + scale + ')';
+
+  const map = document.createElement('div');
+  map.className = 'map'; map.innerHTML = mapSVG();
+  inner.appendChild(map);
+
+  const sc = document.createElement('div');
+  sc.className = 'scrim'; sc.style.height = '92px';
+  inner.appendChild(sc);
+
+  const win = document.createElement('div');
+  win.className = 'win';
+  const lp = document.createElement('div'); lp.className = 'loupe'; win.appendChild(lp);
+  const track = document.createElement('div'); track.className = 'track';
+  MODES.forEach((m,i)=>{
+    const n = document.createElement('div');
+    n.className = 'lab'; n.textContent = m.label; n.dataset.i = String(i);
+    track.appendChild(n);
+  });
+  win.appendChild(track);
+  inner.appendChild(win);
+  holder.appendChild(inner);
+  card.appendChild(holder);
+
+  const nt = document.createElement('div');
+  nt.className = 'note'; nt.style.minHeight = '0'; nt.innerHTML = note;
+  card.appendChild(nt);
+  document.getElementById('bare').appendChild(card);
+  return new Strip(card, cfg);
+}
+
+const bareEngines = [ buildBare(VARIANTS[0], 2.2,
+  '放大 2.2× —— A 的静止形态（当前档居中、左右邻居只露出字的开头）',
+  '注意两件事：① 邻居是<b>被窗口硬裁</b>的（只看见半个字），不是渐隐——这正是 AppleInsider 那句「只看见 Portrait 前几个字母」；' +
+  '② 透镜<b>只包住当前档一个词</b>，不比它宽。拖动时整条会向两侧展开到六档全见，松手再收回这个形态。') ];
+
+const engines = phoneEngines.concat(bareEngines);
+
+/* 几何读数：让「静止看得见几档」是可核对的数字，而不是感觉 */
+function reportGeo(){
+  document.querySelectorAll('.geo').forEach(n=>n.remove());
+  engines.forEach(en=>{
+    const rd = document.createElement('div');
+    rd.className = 'geo';
+    const rest = en.W / (en.avgW + en.cfg.restGap);
+    const drag = en.W / (en.avgW + en.cfg.dragGap);
+    rd.innerHTML = '静止窗口容得下 <code>' + rest.toFixed(2) + '</code> 档 · ' +
+                   '展开后容得下 <code>' + drag.toFixed(2) + '</code> 档 · ' +
+                   '窗口宽 <code>' + en.W + 'px</code> · 单项均宽 <code>' + en.avgW.toFixed(1) + 'px</code>';
+    en.card.appendChild(rd);
+  });
+}
+
+/* ── 全局控制 ───────────────────────────────────────────── */
+document.getElementById('dirSeg').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  Array.prototype.forEach.call(e.currentTarget.children, x=>x.classList.toggle('on', x === b));
+  UX.dir = b.dataset.dir;
+});
+document.getElementById('expandSeg').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  Array.prototype.forEach.call(e.currentTarget.children, x=>x.classList.toggle('on', x === b));
+  UX.expand = b.dataset.ex === '1';
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  engines.forEach(en=>{
+    en.commit = en.start; en.dragL = 0; en.dragOff = 0;
+    en.targetExpand = 0; en.expand = 0;
+    en.g = en.cfg.restGap; en.cumG = null;
+    en.offBase = en.W/2 - en.anchorAt(en.g, en.commit);
+    en.LBase = en.centerAt(en.g, en.commit) + en.offBase;
+    en.v = en.commit; en.render(true);
+  });
+});
+let autoTimer = null;
+document.getElementById('autoBtn').addEventListener('click', e=>{
+  const b = e.currentTarget;
+  if(UX.auto){
+    clearInterval(autoTimer); UX.auto = false;
+    b.textContent = '自动演示全部'; b.classList.add('primary'); return;
+  }
+  UX.auto = true; b.textContent = '停止演示'; b.classList.remove('primary');
+  let step = 1;
+  autoTimer = setInterval(()=>{
+    engines.forEach(en=>{ if(!en.dragging) en.pick(step % N); });
+    step++;
+  }, 1400);
+});
+
+/* ── 单一 rAF 循环驱动全部手机 ─────────────────────────── */
+function loop(){
+  for(let i=0;i<engines.length;i++) engines[i].tick();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* 字体到位后重量一次宽度，再算读数 */
+function remeasure(){
+  engines.forEach(en=>{
+    en.measure();
+    en.g = lerp(en.cfg.restGap, en.cfg.dragGap, en.expand);
+    en.offBase = en.W/2 - en.anchorAt(en.g, en.commit);
+    en.LBase = en.centerAt(en.g, en.commit) + en.offBase;
+    en.render(true);
+  });
+  reportGeo();
+}
+if(document.fonts && document.fonts.ready){
+  document.fonts.ready.then(remeasure);
+}else{
+  reportGeo();
+}
+window.addEventListener('resize', remeasure);
+</script>
+</body>
+</html>

@@ -50,20 +50,9 @@ struct ChargeView: View {
     }
 
     var body: some View {
-        DSPaperPage {
-            DSPageTitle(title: "充电")
-
-            let e = VM.energy(store.caches, store.car)
-            let b = batteryModel(store.caches)
-
-            chargeHero(e)
-            chargeDetail(b)
-            batterySection(b, e)
-            trendSection(e)
-            DestinationCalculatorSection()
-        }
-        .pageBackground()
-        .dsPageTitle("充电")
+        StackPageView(accent: HomeMode.charge.accent, label: "充电", cards: cards)
+            .pageBackground()
+            .dsPageTitle("充电")
         .accessibilityLabel(Text("充电"))
         .onAppear { loadIfNeeded() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
@@ -83,6 +72,38 @@ struct ChargeView: View {
                               cls: "warn") { Task { await load() } }
             }
         }
+    }
+
+    // =====================================================================
+    // MARK: - 叠叠乐：这一档的卡
+    // =====================================================================
+    //
+    //  顺序就是读的顺序：**此刻 → 明细 → 电池 → 趋势 → 长途**。
+    //  此前这五项是同一张纸里的五节 —— 换档时整屏一起闪；现在它们是五张卡，
+    //  上下滑是一张一张过。
+    //
+    //  三态的责任在这里落：
+    //    · 有数据 → 卡头右侧带读数
+    //    · 无数据 → 卡片正文自己说一句真话（`GlassCardEmpty`），**不摆 `--`**
+    //    · 过期   → 卡头右侧带时间（`at`）
+    @MainActor
+    private var cards: [StackCard] {
+        let e = VM.energy(store.caches, store.car)
+        let b = batteryModel(store.caches)
+        return HomeMode.charge.headCards + [
+            StackCard(id: "state", title: "此刻",
+                      value: e.chargeText, cls: e.chargeCls,
+                      content: AnyView(chargeHero(e))),
+            StackCard(id: "detail", title: "明细",
+                      content: AnyView(chargeDetail(b))),
+            StackCard(id: "battery", title: "电池",
+                      value: "\(e.socPct)%", cls: "ok",
+                      content: AnyView(batterySection(b, e))),
+            StackCard(id: "trend", title: "趋势",
+                      content: AnyView(trendSection(e))),
+            StackCard(id: "plan", title: "长途",
+                      content: AnyView(DestinationCalculatorSection()))
+        ]
     }
 
     // MARK: - ① 充电（此刻的状态）

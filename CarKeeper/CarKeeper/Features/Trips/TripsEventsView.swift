@@ -95,31 +95,38 @@ struct TripsEventsView: View {
         !trips.isEmpty ? trips : tripsFromMessages
     }
 
-    var body: some View {
-        // 出行只有一张画布：行程在上、常停之地在中间、车的事件在下。
-        DSPaperPage {
-            DSPageTitle(title: "出行")
-
-            if displayTrips.isEmpty {
-                emptyState
-            } else {
-                summaryHeader(displayTrips)
-                ForEach(Array(displayTrips.enumerated()), id: \.element.id) { idx, trip in
-                    timelineRow(trip, isLast: idx == displayTrips.count - 1)
-                }
-                if !hotspots.isEmpty {
-                    hotspotsBand(hotspots)
-                }
+    /// 这一档的叠叠乐。**行程本身是「一组组」的** ——
+    /// 每一段行程单独占一张玻璃卡，而不是一张长列表：上下滑过的是一程一程，
+    /// 每程自己一个可读的块（这正是「行程叠叠乐」想要的速度感）。
+    @MainActor
+    private var cards: [StackCard] {
+        var out = HomeMode.trips.headCards
+        let list = displayTrips
+        if list.isEmpty {
+            out.append(StackCard(id: "empty", content: AnyView(emptyState)))
+        } else {
+            out.append(StackCard(id: "summary", title: "总览",
+                                 content: AnyView(summaryHeader(list))))
+            for (idx, trip) in list.enumerated() {
+                out.append(StackCard(id: "trip-\(idx)", title: "行程",
+                                     value: String(format: "%.1f km", trip.distanceKm), cls: "ok",
+                                     content: AnyView(timelineRow(trip, isLast: idx == list.count - 1))))
             }
-
-            // 分数：完全由上面那些行程的电耗算出来（原「驾驶评分」页）
-            ScoreSection()
-                .padding(.top, TokensSpacing.xl)
-
-            // 车的事件：点火/熄火/控制记录（原「消息」页）
-            MessagesSection()
-                .padding(.top, TokensSpacing.xl)
+            if !hotspots.isEmpty {
+                out.append(StackCard(id: "hotspots", title: "常停之地",
+                                     content: AnyView(hotspotsBand(hotspots))))
+            }
         }
+        // 分数：完全由上面那些行程的电耗算出来（原「驾驶评分」页）
+        out.append(StackCard(id: "score", title: "评分", content: AnyView(ScoreSection())))
+        // 车的事件：点火/熄火/控制记录（原「消息」页）
+        out.append(StackCard(id: "events", title: "车的事件", content: AnyView(MessagesSection())))
+        return out
+    }
+
+    var body: some View {
+        // 出行只有一套卡：行程在上、常停之地在中间、车的事件在下。
+        StackPageView(accent: HomeMode.trips.accent, label: "出行", cards: cards)
         .pageBackground()
         .dsPageTitle("出行")
         .accessibilityLabel(Text("出行"))

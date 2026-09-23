@@ -442,6 +442,16 @@ VERIFIED_SDK_ADDITIONS = {
     "Sendable": "Swift.Sendable 协议（Swift 标准库；decl: protocol Sendable : SendableMetatype；externalID doc://com.apple.Swift/documentation/Swift/Sendable）——Siri 指令的结果枚举要能跨隔离传递",
     "submitLabel": "View.submitLabel(_:)（iOS 15+；decl: nonisolated func submitLabel(_ submitLabel: SubmitLabel) -> some View；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/submitLabel(_:)）——搜索框回车键改成「搜索」",
     "truncationMode": "View.truncationMode(_:)（iOS 13+；decl: nonisolated func truncationMode(_ mode: Text.TruncationMode) -> some View；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/truncationMode(_:)）——地图操作条在跑指令时，把「第 3 次查询 · 车辆处理中」从中间截断（尾巴比中间重要：进度数字在头部）。注：它是 View 的方法，不是 Text 的",
+    # 叠叠乐与相机式模式条（Design/StackSpec.swift、ArcStack.swift、GlassCard.swift、
+    # DSSwipeStrip.swift）。以下每个都写进代码前对着 Apple 文档核过 decl 与平台。
+    "glassEffect": "View.glassEffect(_:in:)（iOS 26+；decl: func glassEffect(_ glass: Glass = .regular, in shape: some Shape = .capsule) -> some View；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/glassEffect(_:in:)；概述见「Applying Liquid Glass to custom views」）——卡片与模式条的**唯一材质来源**。用系统玻璃而不是自己叠 blur+opacity：折射与反射是物理材质，四套艺术主题下都会自己去适配底色",
+    "interpolatingSpring": "Animation.interpolatingSpring(mass:stiffness:damping:initialVelocity:)（iOS 13+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/Animation/interpolatingSpring(mass:stiffness:damping:initialVelocity:)）——吸附回落的弹簧。选它而不是 easeOutBack：过冲是同一件事，但弹簧能被下一次手势接管，缓动不能",
+    "rotation3DEffect": "View.rotation3DEffect(_:axis:anchor:anchorZ:perspective:)（iOS 13+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/rotation3DEffect(_:axis:anchor:anchorZ:perspective:)）——卡片离开阅读线时向后转出去，滚轮叠法靠它绕圆柱面",
+    "zIndex": "View.zIndex(_:)（iOS 13+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/zIndex(_:)）——把压在阅读线上的那张抬到最上层；重合叠放不加它会出现「近的那张被远的盖住」",
+    "clipped": "View.clipped(antialiased:)（iOS 13+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/clipped(antialiased:)）——叠叠乐是一个固定窗口，带外的卡必须先裁掉再谈渐隐",
+    "highPriorityGesture": "View.highPriorityGesture(_:including:)（iOS 13+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/highPriorityGesture(_:including:)）——模式条要「按下就展开」，所以整条的拖动优先于标签自己的点选（点选由同一条手势里判断位移来做，见 DSSwipeStrip）",
+    "textCase": "View.textCase(_:)（iOS 13+；decl: func textCase(_ textCase: Text.Case?) -> some View）——卡片小标题走 iOS 分组头的大写形态",
+    "accessibilityAction": "View.accessibilityAction(_:_:)（iOS 13+；decl: func accessibilityAction(_ actionKind: AccessibilityActionKind = .default, _ handler: @escaping () -> Void) -> ModifiedContent<Self, AccessibilityAttachmentModifier>；.scrollUp / .scrollDown 为 AccessibilityActionKind 的静态成员）——叠叠乐**没有 ScrollView**，也就没有系统给的三指滚动；不挂这两个动作，VoiceOver 用户完全无法翻页，而且不会有任何报错提醒你",
 }
 
 

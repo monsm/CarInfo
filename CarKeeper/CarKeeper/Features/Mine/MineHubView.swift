@@ -17,21 +17,29 @@ struct MineHubView: View {
     @State private var tab: HomeSub = .settings
 
     var body: some View {
-        VStack(spacing: 0) {
-            DSSegmented(options: HomeSub.mineTabs.map { (value: $0, title: $0.title) },
-                        selection: $tab)
-                .padding(.horizontal, TokensSpacing.page)
-                .padding(.vertical, TokensSpacing.sm)
-                .background(TokensPalette.surface)
+        StackPageView(accent: HomeMode.mine.accent, label: "我的", cards: cards)
+            .onAppear { consumeHint() }
+            .onChange(of: nav.homeSub) { _, _ in consumeHint() }
+    }
 
-            switch tab {
-            case .emergency: EmergencyPanel()
-            case .dev: DevView()
-            default: MineView()
-            }
+    /// 这一档的叠叠乐：巨字头 → 分段控件 → 当前那一段的卡。
+    /// 与「车辆」同理：换段只换下面那一叠的一个成员，巨字头与分段控件不动。
+    @MainActor
+    private var cards: [StackCard] {
+        var out = HomeMode.mine.headCards
+        out.append(StackCard(id: "tabs", content: AnyView(
+            DSSegmented(options: HomeSub.mineTabs.map { (value: $0, title: $0.title) },
+                        selection: $tab))))
+        switch tab {
+        case .emergency:
+            out.append(StackCard(id: "emergency", title: "应急",
+                                 content: AnyView(EmergencyPanel())))
+        case .dev:
+            out.append(StackCard(id: "dev", title: "诊断", content: AnyView(DevView())))
+        default:
+            out.append(contentsOf: MineView.sectionCards)
         }
-        .onAppear { consumeHint() }
-        .onChange(of: nav.homeSub) { _, _ in consumeHint() }
+        return out
     }
 
     private func consumeHint() {

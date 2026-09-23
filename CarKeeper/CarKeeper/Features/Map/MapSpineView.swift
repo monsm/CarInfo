@@ -226,10 +226,18 @@ struct MapSpineView: View {
     }
 
     /// 行程：**一条一条的起终点连线**（不是轨迹 —— TripRecord 里没有轨迹点）
+    ///
+    /// 每条线画两遍：先一条更宽更淡的（光晕），再一条细的（主线）。
+    /// 只加这一点，路线就从「贴在瓦片上的线」变成「发着光的路径」——
+    /// 原型里那个观感差主要就差在这一层，而不是差在底图上。
+    /// 颜色仍是**同一个 accent**，没有新增颜色。
     @MapContentBuilder
     private func tripLines(_ d: MapSpineData) -> some MapContent {
         if layer == .trips {
             ForEach(d.trips) { t in
+                MapPolyline(MKPolyline(coordinates: [t.from, t.to], count: 2))
+                    .stroke(TokensPalette.accent.opacity(0.16),
+                            style: StrokeStyle(lineWidth: 10, lineCap: .round))
                 MapPolyline(MKPolyline(coordinates: [t.from, t.to], count: 2))
                     .stroke(TokensPalette.accent.opacity(0.9),
                             style: StrokeStyle(lineWidth: 3, lineCap: .round))
@@ -425,20 +433,14 @@ struct MapSpineView: View {
                 if homeMode == .now {
                     nowPanel(d)
                 } else {
-                    // 02 的结构：**巨字先说话**（大字主角 + 三条依据），整页在最下面滚。
-                    // 头是**固定**的（不跟着页面滚）：换档时那一行巨字总在同一处，
-                    // 手指学到的是“同一块地方每次换个数字”，而不是“整屏又换了一次”。
-                    VStack(alignment: .leading, spacing: TokensSpacing.md) {
-                        HomeModeHead(mode: homeMode)
-                        Rectangle()
-                            .fill(TokensPalette.hairline)
-                            .frame(height: TokensHair.line)
-                        // 页面本身就是一张带滚动的纸（`DSPaperPage`），放进剩下的高度：
-                        // 内容多了在纸里滚，纸不会撑高，所以模式条与巨字都不会动。
-                        // 两张纸用**同一个** `TokensPalette.surface`，叠在一起只是多出一条
-                        // 发丝线 —— 那条线刚好把「头」与「内容」分开。
-                        pageContent(homeMode)
-                    }
+                    // 每一档都是一叠玻璃卡（`StackPageView`）：巨字头就是那一叠的
+                    // **第一张卡**，所以头与内容之间不再需要发丝线 ——
+                    // 卡片之间的间距本身就是分隔。
+                    //
+                    // 从「头固定 + 下面一整页滚动」改成「一叠卡」的关键差别：
+                    // 旧版整屏一起滚，巨字会滚出去；现在巨字是**一张可以被滑走的卡**，
+                    // 它走了之后下一张顶上来，而“刚才那个数字”往后一拉还能拉回来。
+                    pageContent(homeMode)
                 }
             }
             .frame(height: cardHeight, alignment: .top)

@@ -17,6 +17,8 @@ import UIKit
 struct DevView: View {
     private let store = AppStore.shared
     @State private var showClearConfirm = false
+    /// 叠法对照页（`Features/Dev/StackLabView.swift`）
+    @State private var showStackLab = false
 
     // 订阅那些「启动了但没人看」的监控。用 @ObservedObject 而不是直接读单例：
     // 内存每 10 秒刷新一次、网络质量也是周期性的 —— 不订阅就永远停在打开那一瞬的值。
@@ -46,6 +48,7 @@ struct DevView: View {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
                 DSPageTitle(title: "设计令牌", subtitle: "颜色、字体、间距、圆角、动效的唯一来源")
                 themeEntry
+                stackEntry
                 swatchGroup(title: "画布与表面", footer: "内容层不透明：玻璃只允许出现在导航栏、Tab 栏与弹层。", items: surfaceTokens)
                 swatchGroup(title: "语义色", footer: "颜色只来自系统，且只表达状态；界面里没有装饰性彩色。", items: semanticTokens)
                 typographyGroup
@@ -63,6 +66,7 @@ struct DevView: View {
         .pageBackground()
         .scrollBounceBehavior(.basedOnSize)
         .dsPageTitle("设计令牌")
+        .fullScreenCover(isPresented: $showStackLab) { StackLabView() }
         .confirmationDialog("清除全部车端缓存？", isPresented: $showClearConfirm, titleVisibility: .visible) {
             Button("清除缓存", role: .destructive) {
                 store.clearCache()
@@ -85,6 +89,34 @@ struct DevView: View {
     /// （`ThemeGallerySection`）—— 「诊断」里再多一层导航，只会让人以为又是另一个 App。
     private var themeEntry: some View {
         ThemeGallerySection()
+    }
+
+    // MARK: - 叠法对照入口
+
+    /// 上下滑动有七种做法（弧出 / 吸附堆叠 / 压层叠 / 纵深叠 / 错位叠 / 钱夹叠 / 滚轮）。
+    /// 这里显示的是**当前生效的那一种**；进去挑完，六页立刻跟着换。
+    /// 它必须能在真机上挑：数字对得上不代表看着对。
+    private var stackEntry: some View {
+        DSGroup(title: "叠叠乐",
+                footer: "功能界面的卡是上下滑的，有七种叠法。挑中哪一种，六页立刻都用它。") {
+            DSGroupRow(showsSeparator: false) {
+                Button {
+                    showStackLab = true
+                } label: {
+                    HStack(spacing: TokensSpacing.sm) {
+                        Text("当前叠法")
+                            .font(TokensTypo.body)
+                            .foregroundStyle(TokensPalette.primary)
+                        Spacer(minLength: TokensSpacing.sm)
+                        Text(StackSpec.chosen.title)
+                            .font(TokensTypo.dataSmall)
+                            .foregroundStyle(TokensPalette.accent)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(Text("打开叠法对照"))
+            }
+        }
     }
 
     // MARK: - 色板

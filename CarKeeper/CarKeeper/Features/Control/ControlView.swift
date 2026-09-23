@@ -245,33 +245,40 @@ struct ControlView: View {
     private func sectionLabel(_ t: String) -> some View {
         DSSectionHeader(title: t)
     }
-    var body: some View {
-        DSPaperPage {
-            // 这一屏的版面就是它的信息架构：**车现在什么样 → 现在该做什么 → 还能做什么
-            // → 做过什么**。旧版是一条平铺的卡片堆，从上到下没有顺序可言 ——
-            // 状态、动作、记录混在同一层里，读的人得自己找。
-            DSPageTitle(title: "车控",
-                        subtitle: nil)
-
-            // ① 车现在是什么样：姿态图 + 一句话状态 + 逐字段明细（同一块，不拆开）
+    /// 这一档的叠叠乐。顺序就是它的信息架构：
+    /// **车身 → 现在该做的 → 指令 → 场景 → 记录 → 快捷指令**。
+    /// 旧版是一条平铺的卡片堆，上下滑到底；现在它们是六张独立的卡散文，
+    /// 滑过去的是一张一张，而不是一整屏。
+    @MainActor
+    private var cards: [StackCard] {
+        var out = HomeMode.control.headCards
+        // ① 车现在是什么样：姿态图 + 一句话状态 + 逐字段明细（同一张卡，不拆开）
+        out.append(StackCard(id: "body", title: "车身", content: AnyView(
             VStack(alignment: .leading, spacing: TokensSpacing.md) {
                 controlHeader
                 if let bd = bodyDetail { bodyDetailCard(bd) }
-            }
-
-            // ② 现在该做的一件事：一屏唯一的实心胶囊（状态有问题时它就是「锁车关窗」）
+            })))
+        // ② 现在该做的一件事：实心胶囊（状态有问题时它就是「锁车关窗」）
+        out.append(StackCard(id: "todo", title: "现在该做的", content: AnyView(
             VStack(alignment: .leading, spacing: TokensSpacing.md) {
-                DSSectionHeader(title: "现在该做的")
                 primarySceneButton
                 if let run = running { runningCard(run) }
-            }
+            })))
+        // ③ 还能做什么 → ④ 一键场景 → ⑤ 做过什么（按用到它们的频率从高到低）
+        out.append(StackCard(id: "commands", title: "指令",
+                             value: running == nil ? nil : "执行中", cls: "acc",
+                             content: AnyView(commandCard)))
+        out.append(StackCard(id: "scenes", title: "一键场景",
+                             content: AnyView(presetScenesCard)))
+        out.append(StackCard(id: "history", title: "执行记录",
+                             content: AnyView(historyCard)))
+        out.append(StackCard(id: "siri", title: "快捷指令",
+                             content: AnyView(SiriShortcutsCard())))
+        return out
+    }
 
-            // ③ 还能做什么 → ④ 一键场景 → ⑤ 做过什么（按用到它们的频率从高到低）
-            commandCard
-            presetScenesCard
-            historyCard
-            SiriShortcutsCard()
-        }
+    var body: some View {
+        StackPageView(accent: HomeMode.control.accent, label: "车控", cards: cards)
         .pageBackground()
         .refreshable {
             tempDisplayCount = 0
