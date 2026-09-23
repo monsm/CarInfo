@@ -32,26 +32,25 @@ struct SiriCarController {
 
     func lock(locked: Bool) async -> Outcome {
         await send(cmd: locked ? "CentralLock" : "CentralUnlock",
-                   name: locked ? "锁车" : "解锁",
-                   usageKey: locked ? "lock_true" : "lock_false")
+                   name: locked ? "锁车" : "解锁")
     }
 
     func air(on: Bool, temperature: Int = 22) async -> Outcome {
         // 温度只对 OpenAir 有意义（API 只在 cmd == "OpenAir" 时拼进 URL），
         // 所以关机指令根本不带这个参数，而不是传一个用不上的值。
         if on {
-            return await send(cmd: "OpenAir", name: "开空调",
-                              usageKey: "ac_on", temperature: temperature)
+            return await send(cmd: "OpenAir", name: "开空调", temperature: temperature)
         } else {
-            return await send(cmd: "CloseAir", name: "关空调", usageKey: "ac_off")
+            return await send(cmd: "CloseAir", name: "关空调")
         }
     }
 
     func findCar() async -> Outcome {
-        await send(cmd: "HornLight", name: "寻车", usageKey: "find_car")
+        await send(cmd: "HornLight", name: "寻车")
     }
 
-    /// 唯一的一条发送路径：验登录 → 验 PIN → 发指令 → 记历史 + 记使用次数。
+    /// 唯一的一条发送路径：验登录 → 验 PIN → 发指令 → 记历史。
+    /// （这里曾多一步「记使用次数」—— 那份本机计数已删，见 AppStore 里的说明。）
     ///
     /// 使用次数的 key 必须与 `SiriShortcutsCard` 里那张表一致：旧代码记的是
     /// `lock_on` / `lock_off`，而卡片读的是 `lock_true` / `lock_false` ——
@@ -60,7 +59,7 @@ struct SiriCarController {
     /// `temperature` 是非可选，默认值与 `APIClient.sendControlCommand` 一致（17）：
     /// 那个参数**只对 `OpenAir` 生效**（API 只在 `cmd == "OpenAir"` 时把它拼进 URL），
     /// 所以锁车/寻车这类指令根本用不到它，写 `Int?` 只会引入一个永远为 nil 的分支。
-    private func send(cmd: String, name: String, usageKey: String, temperature: Int = 17) async -> Outcome {
+    private func send(cmd: String, name: String, temperature: Int = 17) async -> Outcome {
         let store = AppStore.shared
         guard store.isLoggedIn, !store.carId.isEmpty else { return .notLoggedIn }
         guard let pin = store.readPin(), !pin.isEmpty else { return .noPin }
@@ -73,7 +72,6 @@ struct SiriCarController {
                                                              temperature: temperature)
             store.addCommandHistory(cmd: cmd, name: name, success: true,
                                     duration: Date().timeIntervalSince(start))
-            store.recordSiriUsage(usageKey)
             return .sent
         } catch {
             store.addCommandHistory(cmd: cmd, name: name, success: false,
@@ -191,43 +189,34 @@ struct CarKeeperShortcuts: AppShortcutsProvider {
 struct SiriShortcutsCard: View {
     let store = AppStore.shared
 
-    /// 五条指令、它们的真实计数键（与 `SiriCarController.send` 的 usageKey 一一对应）。
-    /// 「语音说 X」是提示语，不是数据。
-    private static let shortcuts: [(icon: String, title: String, phrase: String, key: String)] = [
-        ("lock.fill", "锁车", "语音说「锁车」", "lock_true"),
-        ("lock.open.fill", "解锁", "语音说「解锁」", "lock_false"),
-        ("fan.fill", "开空调", "语音说「开空调」", "ac_on"),
-        ("wind", "关空调", "语音说「关空调」", "ac_off"),
-        ("speaker.wave.2.fill", "寻车", "语音说「寻车」", "find_car")
+    /// 五条指令。「语音说 X」是提示语，不是数据。
+    private static let shortcuts: [(icon: String, title: String, phrase: String)] = [
+        ("lock.fill", "锁车", "语音说「锁车」"),
+        ("lock.open.fill", "解锁", "语音说「解锁」"),
+        ("fan.fill", "开空调", "语音说「开空调」"),
+        ("wind", "关空调", "语音说「关空调」"),
+        ("speaker.wave.2.fill", "寻车", "语音说「寻车」")
     ]
 
     var body: some View {
         DSGroup(title: "Siri 快捷指令", footer: footer) {
-            ForEach(Self.shortcuts, id: \.key) { s in
+            ForEach(Self.shortcuts, id: \.title) { s in
                 DSGroupRow {
-                    ShortcutRow(icon: s.icon,
-                                title: s.title,
-                                subtitle: s.phrase,
-                                usage: store.siriUsageCount[s.key] ?? 0)
+                    ShortcutRow(icon: s.icon, title: s.title, subtitle: s.phrase)
                 }
             }
         }
     }
 
-    /// 计数只说真话：一次都没用过就照实说，不摆一排「0 次」。
-    private var footer: String {
-        let total = Self.shortcuts.reduce(0) { $0 + (store.siriUsageCount[$1.key] ?? 0) }
-        return total == 0
-            ? "还没有用过。短语已注册进「快捷指令」，直接对 Siri 说即可。"
-            : "共 \(total) 次语音指令。"
-    }
+    /// 这里原来还报一句「共 N 次语音指令」——它的计数来自已删除的 Siri 使用统计。
+    /// 现在只剩一句实话：这些短语怎么用。
+    private var footer: String { "短语已注册进「快捷指令」，直接对 Siri 说即可。" }
 }
 
 struct ShortcutRow: View {
     let icon: String
     let title: String
     let subtitle: String
-    let usage: Int
 
     var body: some View {
         HStack(spacing: TokensSpacing.md) {
@@ -240,12 +229,6 @@ struct ShortcutRow: View {
                 Text(subtitle).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
             }
             Spacer(minLength: TokensSpacing.sm)
-            // 次数是真实计数；没出现过就不显示（「0 次」是一个假读数）
-            if usage > 0 {
-                Text("\(usage) 次")
-                    .font(TokensTypo.dataSmall)
-                    .foregroundStyle(TokensPalette.tertiary)
-            }
         }
     }
 }

@@ -260,15 +260,20 @@ struct Pill: View {
 // =============================================================================
 
 // =============================================================================
-// MonthlyReportGenerator — #39 驾驶报告月报（PDFKit）
-// 生成本月驾驶报告 PDF
+// MonthlyReportSection — #39 驾驶报告月报
+// 「我的」那一屏里的一节（展开后才算），可再导出一个 HTML 文件去分享
+// （标题里曾写着「（PDFKit）」—— 它从来没有生成过 PDF，`import PDFKit` 也没用过）
 // =============================================================================
-struct MonthlyReportGenerator: View {
-    @State private var showReport = false
+struct MonthlyReportSection: View {
+    @State private var expanded = false
     @State private var reportData: ReportData?
     
-    /// 报表数据全部来自**本机真实记录**：行程历史（由点火/熄火事件自动生成）+ 充电账本 + 评分。
+    /// 报表数据全部来自**本机真实记录**：行程历史（由点火/熄火事件自动生成）+ 评分。
     /// 每一项都可能算不出来 —— 那就显示「—」，不编。
+    ///
+    /// ⚠️ 这里原有 `chargeSessions` / `chargeKWh` 两行（充电次数与度数）。
+    ///    充电账本 2026-09-23 整条删除，报表里那两行也随之去掉 ——
+    ///    剩下的四项全是行程与评分，都是 App 记录的真实事件算出来的。
     struct ReportData {
         /// 例：2026年9月
         let monthLabel: String
@@ -276,23 +281,16 @@ struct MonthlyReportGenerator: View {
         let totalMileage: Double
         /// 每 1% SOC 的续航（km）。不需要电池容量，所以是目前唯一算得出的能效口径。
         let kmPerPercent: Double?
-        let chargeSessions: Int
-        let chargeKWh: Double
         /// 平均电量：来自本机的 SOC 采样（**不是你整月的平均** —— 采样只保留最近一小段）。
         let avgSoc: Int?
         let driveScore: Int?
 
         /// 本月一条真记录都没有。这时不该画一张空表，而要直说为什么。
-        var hasAnyRecord: Bool { tripCount > 0 || chargeSessions > 0 }
+        var hasAnyRecord: Bool { tripCount > 0 }
         var mileageText: String { tripCount > 0 ? String(format: "%.1f km", totalMileage) : "—" }
         var tripText: String { tripCount > 0 ? "\(tripCount) 段" : "—" }
         var efficiencyText: String {
             kmPerPercent.map { String(format: "每 1%% 电量 %.1f km", $0) } ?? "—"
-        }
-        var chargeText: String {
-            chargeSessions > 0
-                ? "\(chargeSessions) 次 · \(String(format: "%.1f", chargeKWh)) kWh"
-                : "—"
         }
         var avgSocText: String { avgSoc.map { "\($0)%" } ?? "—" }
         var scoreText: String { driveScore.map { "\($0) 分" } ?? "—" }
@@ -309,22 +307,31 @@ struct MonthlyReportGenerator: View {
     }
     
     var body: some View {
-        // 它就是「一行」：内缩、最小行高、箭头全部交给 DSRow。
-        // 旧写法自己 padding + 自己一层卡片底，于是它在「我的」的分组里长得像另一个 App。
-        DSRow(icon: "doc.text.fill",
-              title: "本月驾驶报告",
-              subtitle: "本月里程 / 能耗 / 充电次数",
-              showsChevron: true) {
-            generateReport()
-        }
-        .sheet(isPresented: $showReport) {
-            if let data = reportData {
-                MonthlyReportView(data: data).dsSheetCanvas()
+        VStack(alignment: .leading, spacing: TokensSpacing.md) {
+            DSGroup {
+                DSGroupRow(showsSeparator: false) {
+                    DSRow(icon: "doc.text.fill",
+                          title: "本月驾驶报告",
+                          subtitle: "里程 / 能耗 / 评分",
+                          value: expanded ? "收起" : nil,
+                          showsChevron: true) { toggle() }
+                }
+            }
+            if expanded, let d = reportData {
+                MonthlyReportCard(data: d)
             }
         }
     }
-    
-    private func generateReport() {
+
+    /// 展开时才真的去算 —— 不必为一个没人看的报表在每次重绘都跑一遍行程统计。
+    /// 它以前是拉起一个浮层；浮层是另一屏，现在就是这一屏往下多几行。
+    private func toggle() {
+        if expanded { expanded = false; return }
+        reportData = generateReport()
+        expanded = true
+    }
+
+    private func generateReport() -> ReportData {
         // 这里**曾经**是写死的 1250 km / 14.5 kWh / 8 次 / 65% / 85 分（注释写着「模拟生成」）。
         // 一份编造的月报比没有月报坏得多 —— 用户会拿它判断自己的车。
         let store = AppStore.shared
@@ -332,9 +339,6 @@ struct MonthlyReportGenerator: View {
         let now = Date()
         let trips = store.tripHistory.filter {
             cal.isDate($0.startTime, equalTo: now, toGranularity: .month)
-        }
-        let sessions = ChargeLedger.shared.sessions.filter {
-            cal.isDate($0.start, equalTo: now, toGranularity: .month)
         }
         let distance = trips.reduce(0.0) { $0 + $1.distanceKm }
         // 每 1% SOC 的续航：把本月所有行程的里程与百分点各自求和再相除
@@ -348,70 +352,53 @@ struct MonthlyReportGenerator: View {
             tripCount: trips.count,
             totalMileage: distance,
             kmPerPercent: socUsed > 0 ? distance / Double(socUsed) : nil,
-            chargeSessions: sessions.count,
-            chargeKWh: sessions.reduce(0.0) { $0 + $1.kWh },
             avgSoc: samples.isEmpty ? nil : Int(samples.reduce(0, +) / Double(samples.count)),
             driveScore: store.drivingScore
         )
-        reportData = data
-        showReport = true
+        return data
     }
 }
 
-struct MonthlyReportView: View {
-    let data: MonthlyReportGenerator.ReportData
-    @Environment(\.dismiss) private var dismiss
-    
+/// 月报本体。它不再是浮层 —— 没有自己的导航栏、没有「关闭」按钮，
+/// 因为它是「我的」那一屏往下多出来的几行（调用点就在上面那个展开动作里）。
+struct MonthlyReportCard: View {
+    let data: MonthlyReportSection.ReportData
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                // 不用 DSPageTitle：这个浮层没有导航栏，原生主题下 DSPageTitle 什么都不画。
-                Text("月度驾驶报告")
-                    .font(TokensSerif.page(30))
-                    .tracking(TokensTracking.title)
-                    .foregroundStyle(TokensPalette.primary)
+        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+            Text(data.monthLabel)
+                .font(TokensTypo.subheadline)
+                .foregroundStyle(TokensPalette.secondary)
 
-                Text(data.monthLabel)
-                    .font(TokensTypo.subheadline)
-                    .foregroundStyle(TokensPalette.secondary)
-
-                if !data.hasAnyRecord {
-                    DSNotice(kind: .info,
-                             text: "本月还没有记录。跑一段路、充一次电，这里就有数了。")
-                }
-
-                DSGroup(title: "行驶统计") {
-                    DSGroupRow { DSKeyValueRow(key: "行程段数", value: data.tripText) }
-                    DSGroupRow { DSKeyValueRow(key: "总里程", value: data.mileageText) }
-                    // kWh/100km 需要电池容量（报文里 capacity 是 null），所以这里用口径说清楚的 km/1%
-                    DSGroupRow { DSKeyValueRow(key: "能效", value: data.efficiencyText) }
-                    DSGroupRow { DSKeyValueRow(key: "充电", value: data.chargeText) }
-                    DSGroupRow(showsSeparator: false) {
-                        DSKeyValueRow(key: "平均电量（近期采样）", value: data.avgSocText)
-                    }
-                }
-
-                DSGroup(title: "驾驶评分") {
-                    DSGroupRow { DSKeyValueRow(key: "综合评分", value: data.scoreText) }
-                    DSGroupRow(showsSeparator: false) {
-                        DSKeyValueRow(key: "评价", value: data.scoreGrade)
-                    }
-                }
-
-                Button("分享报告") { shareReport() }
-                    .buttonStyle(DSPrimaryButtonStyle())
-
-                Button("关闭") { dismiss() }
-                    .buttonStyle(DSSecondaryButtonStyle())
+            if !data.hasAnyRecord {
+                DSNotice(kind: .info, text: "本月还没有行程记录。")
             }
-            .padding(.horizontal, TokensSpacing.page)
-            .padding(.vertical, TokensSpacing.lg)
+
+            DSGroup(title: "行驶统计") {
+                DSGroupRow { DSKeyValueRow(key: "行程段数", value: data.tripText) }
+                DSGroupRow { DSKeyValueRow(key: "总里程", value: data.mileageText) }
+                // kWh/100km 需要电池容量（报文里 capacity 是 null），所以这里用口径说清楚的 km/1%
+                DSGroupRow { DSKeyValueRow(key: "能效", value: data.efficiencyText) }
+                DSGroupRow(showsSeparator: false) {
+                    DSKeyValueRow(key: "平均电量（近期采样）", value: data.avgSocText)
+                }
+            }
+
+            DSGroup(title: "驾驶评分") {
+                DSGroupRow { DSKeyValueRow(key: "综合评分", value: data.scoreText) }
+                DSGroupRow(showsSeparator: false) {
+                    DSKeyValueRow(key: "评价", value: data.scoreGrade)
+                }
+            }
+
+            Button("分享报告") { shareReport() }
+                .buttonStyle(DSPrimaryButtonStyle())
         }
-        .presentationDetents([.large])
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
-    
+
     private func shareReport() {
-        // 生成 PDF 并分享
+        // 生成一份 HTML 再分享（这里曾写着「生成 PDF 并分享」—— 它从来没生成过 PDF）
         let html = generateHTMLReport()
         let url = saveHTMLToTemp(html: html)
         let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
@@ -430,7 +417,6 @@ struct MonthlyReportView: View {
         <li>行程段数: \(data.tripText)</li>
         <li>总里程: \(data.mileageText)</li>
         <li>能效: \(data.efficiencyText)</li>
-        <li>充电: \(data.chargeText)</li>
         <li>平均电量（近期采样）: \(data.avgSocText)</li>
         </ul>
         <h2>驾驶评分</h2>

@@ -63,7 +63,16 @@ jobs:
           # 已因此删过四轮：CloudKit 同步、BGTaskScheduler、CarPlay target、AppClip target。
           # 这类东西的特征是「编译得过、UI 上看得见入口、点下去永远拿不到东西」——
           # 代码里存在一个用户永远用不了的假功能，后来的人还会照着它继续写。
-          for s in paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps scopeguard paidcap; do
+          # copy.py：界面文案。上一条 line 与这一条都是「能写出规则就不靠人重读一遍」的产物：
+          # 精简过一遍文案之后，如果没有任何机器盯住「回潮」，下一轮又会慢慢长回教学式长句。
+          # 判据只有三类（每一条都对应真实删过的一句话）：实现词不许上界面（缓存/报文/字段/接口）、
+          # 复述句式不许用（「点下面…就会…」）、长句不许超 30 字。走的是全量字面量，不是抽样。
+          # lintcfg.py：`SwiftLint 配置与真实文件树必须一致。它查出两件事（两半都错着）：
+          # ① `.swiftlint.yml` 的 excluded 路径基准错了一层（配置住在 CarKeeper/，SwiftLint
+          #    按配置文件所在目录解析，于是那 5 条全部空转）；② 删扩展留下的
+          #    WatchApp / Widgets 两条指向已删目录，而 1126 行的 MapSpineView 反倒没进清单。
+          # 它不需要 swiftlint、不需要 macOS —— 能在 Linux 上秒级拦住「配置与代码各走各的」。
+          for s in paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps scopeguard paidcap copy lintcfg; do
             echo "::group::$s.py"
             python3 scan/$s.py
             echo "::endgroup::"
@@ -126,62 +135,35 @@ jobs:
           ls -la
 
           # ------------------------------------------------------------------
-          # IPA 内容体检：**小组件 / 手表 / 灵动岛的界面都住在嵌套扩展里**，
-          # 它们不在包里就永远不会出现在系统里 —— 而这件事以前在日志里是看不见的
-          # （2026-09-23：用户报「手机桌面上压根没得选、小组件没出现」，
-          #   而当前日志无法区分两种完全相反的原因：
-          #     ① 包里有未签名的 .appex，是侧载工具没把它签进去；
-          #     ② 包里根本没有 .appex（XcodeGen 的 embed 没生效）。
-          #   两种情况的修法完全相反 —— 所以先把它变成看得见的事实。）
+          # IPA 内容体检。
+          #
+          # 这里曾有一段很详细的检查，用来回答「小组件为什么在系统里没得选」：
+          # 列出 PlugIns/ 里每个 .appex 的扩展点、bundle id、**签没签**，
+          # 再对比「有 / 没有 PlugIns」两种分支。
+          #
+          # 2026-09-23 那段检查的**结论已经落地**：小组件 / 表盘 / 灵动岛三个扩展
+          # 已整体删除（免费账号拿不到 App Group，那条链路没有一条可用路径）。
+          # 所以现在这里只做一件事：把包里的顶层结构打出来。
+          # 预期结果里**不应该**再出现 PlugIns —— 出现了就说明有人把扩展加回来了。
           #
           # 全程 `|| true`：这是体检，不是门禁；任何一行都不允许把构建弄红。
           # ------------------------------------------------------------------
-          echo "::group::IPA 内容体检（扩展是否随包分发）"
+          echo "::group::IPA 内容体检"
           APP_NAME=$(basename "$APP_PATH")
           echo "App bundle: Payload/$APP_NAME"
           echo
-          echo "顶层（PlugIns 就是嵌套扩展的位置）："
+          echo "顶层："
           ls -1 "Payload/$APP_NAME" | sed 's/^/  /' || true
           echo
           if [ -d "Payload/$APP_NAME/PlugIns" ]; then
-            echo "PlugIns 里的扩展："
-            # 刻意用 `find | while read` 而不是「按清单逐项迭代」的那种 for 循环：
-            # `scan/paths.py` 会把「某个 for 循环、变量 in 清单」当成**编译 target 清单**
-            # 读（那条规则是防「加了 target 却忘了加进编译体检」的）。两种迭代写法等价，
-            # 但写成那个形式会被它当成一个叫 `Payload/$APP_NAME"/PlugIns/*` 的 target，
-            # 当场把这一轮拦下来 —— 就是本段第一次提交时的真实遭遇。
-            find "Payload/$APP_NAME/PlugIns" -mindepth 1 -maxdepth 1 | while read -r x; do
-              echo "  · $(basename "$x")"
-              echo -n "      扩展点: "; \
-                /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPointIdentifier' "$x/Info.plist" 2>/dev/null || echo "（没有 NSExtension 声明）"
-              echo -n "      bundle id: "; \
-                /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$x/Info.plist" 2>/dev/null || echo "（读不到）"
-              echo -n "      版本: "; \
-                /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$x/Info.plist" 2>/dev/null || echo "（读不到）"
-              if codesign -dv "$x" >/dev/null 2>&1; then
-                echo "      签名: 已签名"
-              else
-                echo "      签名: 未签名 —— 侧载工具必须自己把它签进去，否则系统不会注册它"
-              fi
-            done
+            echo "⚠️  包里出现了 PlugIns —— 说明又有嵌套扩展被加回来了。"
+            echo "    它们的界面依赖 App Group（免费账号拿不到），请不要重新引入。"
+            ls -1 "Payload/$APP_NAME/PlugIns" | sed 's/^/  /' || true
           else
-            echo "⚠️  .app 里没有 PlugIns 目录。小组件 / 手表 / 灵动岛的界面都住在扩展里，"
-            echo "    所以它们不会出现在系统里 —— 这与网络、数据、免费账号都无关。"
+            echo "没有嵌套扩展（符合预期：只有 App 本体）。"
           fi
           echo
-          if codesign -dv "Payload/$APP_NAME" >/dev/null 2>&1; then
-            echo "App 自身签名: 已签名"
-            codesign -d --entitlements - "Payload/$APP_NAME" 2>/dev/null | sed 's/^/  /' || true
-          else
-            echo "App 自身签名: 未签名（未签名 IPA —— 侧载时由工具重新签名并注入 entitlements；"
-            echo "  所以「App Group 到底有没有」取决于那一步，不取决于仓库里的 entitlements 文件）"
-          fi
-          echo
-          echo "版本号（扩展必须与 App 一致，否则系统不注册）："
-          echo -n "  App: "; /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "Payload/$APP_NAME/Info.plist" 2>/dev/null || echo "（读不到）"
-          echo
-          echo "IPA 里与扩展/手表相关的条目："
-          unzip -l CarKeeper-unsigned.ipa 2>/dev/null | grep -E "PlugIns|appex|Watch" | head -20 || echo "  （一个都没有）"
+          echo -n "版本号: "; /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "Payload/$APP_NAME/Info.plist" 2>/dev/null || echo "（读不到）"
           echo "::endgroup::"
 
       - name: Upload artifacts (best-effort)
@@ -210,53 +192,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 编译体检（非阻断）：把 `scheme CarKeeper` **看不见**的那些 target 也编一遍。
-      #
-      # 为什么需要它：scheme 的 build action 只列了 CarKeeper 一个 target，所以
-      # WidgetBundle / WatchApp / WatchKitApp 这 3 个
-      # **从来没有被 CI 编译过一次** —— 里面有错也看不见，问题只会在别人真正
-      # 去构建它们的那天集中爆发。
-      #
-      # AppClip / CarPlay 两个 target 已删（免费账号无法配置它们所需的能力），
-      # 所以它们不在下面这份清单里 —— 不是漏了。
-      #
-      # 为什么现在是非阻断：它们第一次被编译，大概率有错（先从没编过）；
-      # 先把错误照出来，比让整条流水线红掉更有用。等它绿了就该把它改成阻断的。
-      #
-      # 下面这份清单是**唯一**的 target 覆盖说明，`scan/paths.py` 会读它：
-      # 新增了 target 却忘了加进这里，会被静态门禁直接拦下（Linux 上，秒级）。
-      - name: Compile other targets (non-blocking health check)
-        continue-on-error: true
-        run: |
-          cd CarKeeper
-          fail=0
-          for pair in WidgetBundle:iphoneos WatchApp:watchos WatchKitApp:watchos; do
-            t="${pair%%:*}"
-            sdk="${pair##*:}"
-            echo "::group::编译 $t ($sdk)"
-            # 注意：不要写成 `xcodebuild ... | tail` —— 管道的退出码取自 tail（恒为 0），
-            # 失败会被当成成功。先落盘再判断。
-            if xcodebuild build \
-                 -project CarKeeper.xcodeproj \
-                 -target "$t" \
-                 -configuration Release \
-                 -sdk "$sdk" \
-                 CODE_SIGNING_ALLOWED=NO \
-                 CODE_SIGNING_REQUIRED=NO \
-                 -derivedDataPath "./DerivedData-$t" \
-                 -quiet > "/tmp/$t.log" 2>&1; then
-              echo "✅ $t 编译通过"
-            else
-              echo "❌ $t 编译失败："
-              tail -60 "/tmp/$t.log"
-              fail=1
-            fi
-            echo "::endgroup::"
-          done
-          if [ "$fail" != 0 ]; then
-            echo "::warning title=target 编译体检未全绿::上面有 target 编译失败。它们目前不作为门禁（从未被编译过，先看清错误）；修完应改为阻断。"
-          fi
-          exit 0
+      # 这里曾有一个「编译其他 target」的非阻断体检步：scheme 的 build action 只列了
+      # CarKeeper，所以 WidgetBundle / WatchApp / WatchKitApp 需要通过它才被编译一次。
+      # 2026-09-23：那三个 target 已整体删除，项目现在只有 CarKeeper 与 CarKeeperTests
+      # 两个 target，而两者都在 CarKeeper scheme 里 —— 这一整步没有对象了，故删掉。
+      # 将来若重新引入扩展 target，必须同时把这一步加回来（`scan/paths.py` 会拦住漏掉的情况）。
 
       - name: Failure hint
         if: failure()

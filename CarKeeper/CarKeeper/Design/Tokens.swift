@@ -6,8 +6,8 @@
 //
 // 三条取值原则（按优先级）：
 //   1. 能用系统语义值的，绝不自造：颜色、字号、分隔线、圆角都取 iOS 真值。
-//      `WT.Palette`（Shared/WidgetTokens.swift）是同一套值的世界面副本，
-//      小组件 / 实时活动与 App 由编译器保证不漂移 —— App 侧一律从这里转发。
+//      这些值原来是 App 与小组件共用一份源文件（Shared/WidgetTokens.swift）保证不漂移；
+//      小组件体系已删，现在只此一处，`ArtTheme` 的 native 取值与之逐值相同。
 //   2. 强调色全局唯一（系统蓝）。旧的「时间感知琥珀金」已整体废弃：
 //      一个 App 同时挂两套强调色，等于没有强调色。
 //   3. 文字只有三档（label / 60% / 30%），且必须**跟随浅色/深色** ——
@@ -101,7 +101,7 @@ enum TokensPalette {
     static var glassHighlight: Color { spec.glassHighlight }
 
     /// 状态类名（ok / warn / charge…）→ 颜色。
-    /// 原生主题下与小组件的 `WT.Palette.status(_:)` 逐个等价（同一套判定），
+    /// 原生主题下与 `ArtTheme.nativeSpec` 的语义色逐个等价（同一套判定），
     /// 换成艺术主题时改走主题的语义色。
     static func statusColor(_ cls: String) -> Color {
         switch cls {
@@ -138,7 +138,7 @@ enum TokensSpacing {
     static let row = CGFloat(44)
 }
 
-// MARK: - 圆角（与小组件 WT.RadiusTokens 同值）
+// MARK: - 圆角（inset-grouped 的取值）
 enum TokensRadius {
     static let small = CGFloat(8)
     /// inset-grouped 分组面

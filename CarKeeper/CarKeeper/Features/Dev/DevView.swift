@@ -23,10 +23,8 @@ struct DevView: View {
     @ObservedObject private var memory = MemoryMonitor.shared
     @ObservedObject private var networkQuality = NetworkQualityMonitor.shared
     @ObservedObject private var offline = OfflineModeManager.shared
-    @ObservedObject private var performance = PerformanceTracker.shared
     @ObservedObject private var chargeMonitor = ChargingStatusMonitor.shared
     @ObservedObject private var focus = FocusModeManager.shared
-    private let crashReporter = CrashReporter.shared
 
     private struct SWatch: Identifiable {
         let id = UUID()
@@ -79,42 +77,14 @@ struct DevView: View {
 
     // MARK: - 艺术主题入口
 
-    /// 艺术主题入口。切换后**全 App** 立刻变 ——
+    /// 艺术主题。切换后**全 App** 立刻变 ——
     /// 令牌（TokensPalette）是唯一读取点，而这里换的是值，不是名字。
-    /// 样张页：Features/ThemeGalleryView.swift；取值：Design/ArtTheme.swift。
+    /// 样张与取值：Features/ThemeGalleryView.swift、Design/ArtTheme.swift。
+    ///
+    /// 它以前是一个 NavigationLink，推开一整页样张；2026-09-23 降成这一屏里的一节
+    /// （`ThemeGallerySection`）—— 「诊断」里再多一层导航，只会让人以为又是另一个 App。
     private var themeEntry: some View {
-        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-            DSSectionHeader(title: "艺术主题")
-            NavigationLink {
-                ThemeGalleryView()
-            } label: {
-                HStack(spacing: TokensSpacing.md) {
-                    Circle()
-                        .fill(TokensPalette.accent)
-                        .frame(width: 10, height: 10)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(ArtThemeStore.current.title)
-                            .font(TokensTypo.subheadline)
-                            .foregroundStyle(TokensPalette.primary)
-                        Text(ArtThemeStore.current.mechanism)
-                            .font(TokensTypo.caption)
-                            .foregroundStyle(TokensPalette.secondary)
-                            .multilineTextAlignment(.leading)
-                    }
-                    Spacer(minLength: TokensSpacing.sm)
-                    Image(safeSymbol: "chevron.right", fallback: "chevron.right")
-                        .font(TokensTypo.fixed(TokensSize.iconSm, weight: .semibold))
-                        .foregroundStyle(TokensPalette.tertiary)
-                }
-                .padding(TokensSpacing.md)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background {
-                    RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                        .fill(TokensPalette.surface)
-                }
-            }
-            .buttonStyle(.plain)
-        }
+        ThemeGallerySection()
     }
 
     // MARK: - 色板
@@ -250,20 +220,22 @@ struct DevView: View {
 
     // MARK: - 运行状态与操作
 
+    /// 这一组全是**此刻真在跑的东西**的读数，没有一项来自本机累积的统计。
+    ///
+    /// ⚠️ 这里原有六行：「首页加载耗时」（那个键从来没有人写过，永远显示「—」）、
+    ///    「已缓存接口」（它数的是 `store.caches` 里非 nil 的项，而那不是缓存，
+    ///    名字本身就是错的）、「API 成功率」与「崩溃记录」（两项都来自已删的
+    ///    埋点与崩溃记录）。2026-09-23 一并删除，同时删掉了写入这些键的
+    ///    `PerformanceTracker` 与 `CrashReporter`。
     private var runtime: [(String, String)] {
-        let homeLoad = UserDefaults.standard.double(forKey: "carkeeper_home_load_time")
-        let cachedCount = store.caches.compactMap { $0.value }.count
         let mileage = UserDefaults.standard.integer(forKey: AppStore.currentMileageKey)
         let lastService = UserDefaults.standard.integer(forKey: AppStore.lastServiceMileageKey)
         // 同一辆车、同一份报文算出来的保养计划（间隔与上次保养来自服务端字段）
         let plan = store.maintenancePlan
-        let crashes = crashReporter.readCrashHistory().count
 
         return [
-            ("首页加载耗时", homeLoad > 0 ? String(format: "%.2f s", homeLoad) : "—"),
             ("指令历史", "\(store.commandHistory.count) 条"),
             ("能耗记录", "\(store.energyHistory.count) 次"),
-            ("已缓存接口", "\(cachedCount) 项"),
             ("网络状态", networkText),
             ("车辆 ID", store.carId.isEmpty ? "—" : store.carId),
             // ——— 监控：每个都对应一个真的在跑的服务 ———
@@ -274,8 +246,6 @@ struct DevView: View {
                 ? String(format: "%.0f ms", networkQuality.latency) + " · \(networkQuality.connectionType)"
                 : "未测出"),
             ("离线模式", offline.isOffline ? "已开启" : "关闭"),
-            ("API 成功率", performance.apiSuccessRate().map { String(format: "%.0f%%", $0 * 100) } ?? "—"),
-            ("崩溃记录", crashes == 0 ? "无" : "\(crashes) 条"),
             ("充电监控", chargeMonitor.summary),
             ("摇一摇锁车", ShakeDetector.shared.isEnabled ? "已开启" : "关闭"),
             ("专注模式", focus.config.enabled ? "已开启" : "关闭"),

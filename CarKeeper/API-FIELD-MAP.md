@@ -893,7 +893,11 @@ POST {base}/api/car/control?pin={控制码}&cmd={Command}&carId={carId}&phoneTyp
 | `chargingPowerHistory` | 只在 `pow > 0.1` 时写 → **永远是空** | 充电功率（见 11.1 #1） |
 | `carkeeper_current_mileage` | 读取方还在，写入点**读错了键** | `totalOdometer` |
 | `carkeeper_total_mileage` | **零写入点**（setter 从未被调） | `totalOdometer` |
-| `MaintenanceReminderScheduler` / `ChargingStatusMonitor` / `ChargeLedger` | 已实现、已被调用 | 上两行的真实数据 |
+| `MaintenanceReminderScheduler` / `ChargingStatusMonitor` | 已实现、已被调用 | 上两行的真实数据 |
+
+> ⚠️ 本行原还列着 `ChargeLedger`（充电账本）。它已于 2026-09-23 随「全局去缓存」一并删除
+> —— 账本的一大半是「由本机累积的功率采样积分出度数」，而服务端只有当前状态接口，
+> 那串数字删了就永远回不来，本身也就不是一个可被核对的量。
 
 → **结论：好几个"新功能"其实是"把现成接收器接上真实数据源"**，不是从零开发。
 

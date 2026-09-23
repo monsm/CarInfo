@@ -8,9 +8,11 @@
 //     ② 页面画布  —— pageBackground() 按主题叠一层装饰（光池 / 纸纹 / 网格）
 //   换的是**值**，不是名字；所以任何一处用了令牌的界面都会立刻跟着变。
 //
-// 与小组件的关系：
-//   WT.Palette 仍然是小组件 / 实时活动的唯一真源。艺术主题**只作用在 App 内**，
-//   刻意不覆盖 WT —— 否则小组件会跟着 App 的临时主题一起漂移。
+// 与小组件的关系（2026-09-23 已作废）：
+//   这里曾写着「WT.Palette 是小组件 / 实时活动的唯一真源，艺术主题只作用在 App 内」。
+//   小组件 / 表盘 / 灵动岛三个 target 已随免费账号清理全部删除（见 project.yml），
+//   连那份 `Shared/WidgetTokens.swift` 也不在了 —— 现在**只有 App 一处界面**，
+//   所以不再存在「App 的主题要不要外传」这个问题。
 //
 // 命名约定（历史教训，不是洁癖）：
 //   一律用顶层类型（ArtTheme / ArtThemeSpec / ArtThemeStore / CanvasDecor）。
@@ -28,10 +30,9 @@
 //      就是那一轮补的三个口子。**由 `scan/design.py` 长期把守**：字号与颜色字面量
 //      只允许出现在 Tokens.swift / WidgetTokens.swift / 本文件里，
 //      除此之外任何一处都要显式豁免并写明理由（未豁免就报错）。
-//   ② 小组件与 App 共用 Shared/WidgetTokens.swift（同一份源文件，
-//      编译器保证不漂移）；Watch **不能**共享它 —— `WT.Palette` 的系统语义色在 watchOS
-//      上不存在（secondarySystemGroupedBackground 的 platforms 无 watchOS，已核实），
-//      所以手表那份是显式豁免。
+//   ② 小组件与 App 曾共用 Shared/WidgetTokens.swift（同一份源文件）；Watch 那份
+//      曾因 watchOS 上没有某些系统语义色而单独豁免 —— 这两份都已随扩展删除。
+//      现在字号与颜色的字面量只允许出现在 Tokens.swift 与**本文件**里。
 //
 // 仍未做（如实说明，别以为已经做了）：
 //   切换靠 root 上的 `.id` 重建整棵树 —— 副作用是那一瞬间**子树里的 @State 会重置**
@@ -269,23 +270,31 @@ enum ArtTheme: String, CaseIterable, Identifiable {
 
     /// 原生 = 切换前的 v4 取值（系统语义色）。**这里一个值都不许改**，
     /// 否则"原生"就不再等于现状，我们也失去一个可信的对照。
+    ///
+    /// ⚠️ 这些值原先引用 `WT.Palette`（Shared/WidgetTokens.swift —— 小组件与实时活动那份
+    /// 世界面令牌）。那个文件随小组件体系整份删除，于是这里的引用**逐个内联**，
+    /// 字面量一个都没动（对照 git 历史里 `WidgetTokens.Palette` 的字面量）。
+    ///
+    /// ⚠️ **不能**改写成 `TokensPalette.canvas` 这类写法：`TokensPalette` 读的是
+    /// `ArtThemeStore.spec`，而 `.native` 的 spec 就是本函数 —— 那会变成无限递归。
     private static var nativeSpec: ArtThemeSpec {
         ArtThemeSpec(
-            canvas: WT.Palette.canvas,
-            surface: WT.Palette.surface,
+            canvas: Color(uiColor: UIColor.systemGroupedBackground),
+            surface: Color(uiColor: UIColor.secondarySystemGroupedBackground),
             raised: Color(uiColor: .tertiarySystemGroupedBackground),
-            hairline: WT.Palette.hairline,
-            track: WT.Palette.track,
-            label: WT.Palette.label,
-            labelSecondary: WT.Palette.labelSecondary,
-            labelTertiary: WT.Palette.labelTertiary,
-            accent: WT.Palette.tint,
-            success: WT.Palette.ok,
-            warning: WT.Palette.warn,
-            error: WT.Palette.bad,
-            info: WT.Palette.charge,
+            hairline: Color(uiColor: UIColor.separator),
+            track: Color(uiColor: .quaternaryLabel),
+            label: Color(uiColor: .label),
+            labelSecondary: Color(uiColor: .secondaryLabel),
+            labelTertiary: Color(uiColor: .tertiaryLabel),
+            accent: nativeDynamic(light: (0.000, 0.478, 1.000), dark: (0.039, 0.518, 1.000)),
+            success: nativeDynamic(light: (0.204, 0.780, 0.349), dark: (0.188, 0.820, 0.345)),
+            warning: nativeDynamic(light: (1.000, 0.584, 0.000), dark: (1.000, 0.624, 0.039)),
+            error: nativeDynamic(light: (1.000, 0.231, 0.188), dark: (1.000, 0.271, 0.227)),
+            info: nativeDynamic(light: (0.000, 0.780, 0.745), dark: (0.400, 0.839, 1.000)),
             onAccent: Color.white,
-            lightBar: [Color.white, Color(red: 0.612, green: 0.776, blue: 1.000), WT.Palette.tint],
+            lightBar: [Color.white, Color(red: 0.612, green: 0.776, blue: 1.000),
+                       nativeDynamic(light: (0.000, 0.478, 1.000), dark: (0.039, 0.518, 1.000))],
             // 下面三个刻意保留原来的写死值 —— 「原生」必须逐值等于切换前的 v4。
             lightSource: Color.white,
             fillSubtle: Color(uiColor: .quaternarySystemFill),
@@ -299,6 +308,20 @@ enum ArtTheme: String, CaseIterable, Identifiable {
             displayTracking: 0,
             preferredScheme: nil
         )
+    }
+
+    /// 明暗两套取值。
+    /// 原先由 `WT.Palette.dynamic(light:dark:)` 提供；随 WidgetTokens 删除后内联在这里，
+    /// 语义与取值完全一致（系统深色时取 dark，否则取 light）。
+    private static func nativeDynamic(
+        light: (CGFloat, CGFloat, CGFloat),
+        dark: (CGFloat, CGFloat, CGFloat)
+    ) -> Color {
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+            ? UIColor(red: dark.0, green: dark.1, blue: dark.2, alpha: 1)
+            : UIColor(red: light.0, green: light.1, blue: light.2, alpha: 1)
+        })
     }
 }
 

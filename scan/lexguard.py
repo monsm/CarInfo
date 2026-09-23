@@ -41,8 +41,11 @@ Swift 在 `是"` 处提前结束字符串，接着把 `去掉` 当成标识符�
 import sys
 from pathlib import Path
 
-TK = ["CarKeeper", "Services", "Shared", "Widgets", "WatchApp",
-      "Models", "Design", "HealthKit"]
+from _roots import swift_files
+
+# 源码根目录，逐项必须存在（见 `_roots.py` 的说明）。
+TK = ["CarKeeper/CarKeeper", "CarKeeper/Services", "CarKeeper/Models",
+      "CarKeeper/Design", "CarKeeper/Tests"]
 
 
 def is_cjk(ch):
@@ -223,7 +226,7 @@ def orphan_attrs(path):
 
 
 def main():
-    files = sorted({str(p) for tk in TK for p in Path(tk).rglob("*.swift")})
+    files = swift_files(TK)
     hits = [(f, ln, why) for f in files for ln, why in scan(f)]
     orphans = [(f, ln, why) for f in files for ln, why in orphan_attrs(f)]
 

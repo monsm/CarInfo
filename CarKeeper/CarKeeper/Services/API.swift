@@ -317,7 +317,7 @@ final class APIClient: @unchecked Sendable {
         let dict = d as? [String: Any] ?? [:]
         let token = ciString(dict, ["access_token", "accessToken", "access_Token"])
         guard let t = token, !t.isEmpty else {
-            throw APIError(message: "登录失败：接口返回无效Token")
+            throw APIError(message: "登录失败：凭证无效")
         }
         let refresh = ciString(dict, ["refresh_token", "refreshToken"]) ?? ""
         TokenStore.save(TokenConfig(accessToken: t, refreshToken: refresh, mobile: phone, updateTime: Date().description))

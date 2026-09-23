@@ -1,10 +1,22 @@
 // =============================================================================
-// N11 隐私仪表盘 — 展示 App 收集的所有数据，支持一键清除
+// N11 隐私与数据 —— 「我的」档里的一节（不是另一屏）
+// =============================================================================
+//  它原来是一个独立浮层（`PrivacyDashboardView`），由「我的 → 隐私与数据」拉起。
+//  2026-09-23 降成一节：**「本机存了什么」本来就是设置的一部分** —— 少一层浮层，
+//  也少一条「从设置进入另一个 App」的错觉。
+//
+//  这一节说的是本机到底存了什么，所以它自己在变短：行程与曲线还在，
+//  而充电账本、诊断统计、使用小记录已经不在这一页上了（它们已被删除）。
+//
+//  ⚠️ 右列（「存在哪」）原本写的是 `CoreLocation` / `UserDefaults` / `Keychain` /
+//  `LocalAuthentication` / `UUID` —— 那是**代码里的模块名**，不是给人看的字。
+//  现在它是「定位服务 / 本机 / 钥匙串 / 生物识别保护」——同一个事实，用中文说。
+//  这一条现在由 `scan/copy.py` 的「开发词」规则守住。
 // =============================================================================
 
 import SwiftUI
 
-struct PrivacyDashboardView: View {
+struct PrivacySection: View {
     private let store = AppStore.shared
     @State private var showClearConfirm = false
 
@@ -13,35 +25,35 @@ struct PrivacyDashboardView: View {
         (
             title: "位置数据",
             items: [
-                ("停车位置", "≈ 64B", "CoreLocation"),
-                ("行驶轨迹", "≈ 2KB/次", "CoreLocation"),
-                ("历史位置", "\(store.tripHistory.count) 条记录", "UserDefaults")
+                ("停车位置", "≈ 64B", "定位服务"),
+                ("行驶轨迹", "≈ 2KB/次", "定位服务"),
+                ("历史位置", "\(store.tripHistory.count) 条记录", "本机")
             ]
         ),
         (
             title: "车辆数据",
             items: [
-                ("SOC 历史", "\(store.energyHistory.count) 条", "UserDefaults"),
-                ("行程记录", "\(store.tripHistory.count) 条", "UserDefaults"),
-                ("控制命令", "\(store.commandHistory.count) 条", "UserDefaults"),
-                ("维保记录", "\(store.serviceTimestamp != 0 ? "有" : "无")", "UserDefaults")
+                ("SOC 采样", "\(store.energyHistory.count) 条", "本机"),
+                ("行程记录", "\(store.tripHistory.count) 条", "本机"),
+                ("控制命令", "\(store.commandHistory.count) 条", "本机"),
+                ("维保记录", "\(store.serviceTimestamp != 0 ? "有" : "无")", "本机")
             ]
         ),
         (
             title: "账户数据",
             items: [
-                ("登录凭证", "Keychain", "LocalAuthentication"),
-                ("生物识别", store.hasBiometricSetup ? "已启用" : "未启用", "Keychain"),
-                ("设备 ID", "UUID", "UserDefaults")
+                ("登录凭证", "钥匙串", "生物识别保护"),
+                ("生物识别", store.hasBiometricSetup ? "已启用" : "未启用", "钥匙串"),
+                ("设备 ID", "随机", "本机")
             ]
         ),
         (
             title: "设置偏好",
             items: [
                 ("夜间模式", UserDefaults.standard.object(forKey: "carkeeper_force_dark_mode") != nil ? "自定义" : "跟随系统",
-                 "UserDefaults"),
-                ("卡片排序", "\(store.cardOrder.count) 个自定义", "UserDefaults"),
-                ("语言", Locale.current.language.languageCode?.identifier ?? "zh", "UserDefaults"),
+                 "本机"),
+                ("卡片排序", "\(store.cardOrder.count) 个自定义", "本机"),
+                ("语言", Locale.current.language.languageCode?.identifier ?? "zh", "本机"),
                 ]
         )
     ]
@@ -52,81 +64,59 @@ struct PrivacyDashboardView: View {
     }
 
     var body: some View {
-        // 不再在里面套一层 NavigationStack：这个页面是「我的」的导航栈里打开的浮层，
-        // 再套一层就会出现两条导航栏、标题说两遍（而且两个栈各自记一份返回路径）。
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "隐私与数据", subtitle: "本机存了什么")
+        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+            DSSectionHeader(title: "隐私与数据", trailing: "本机 \(totalRecords) 条")
 
-                // 汇总：一个数字，不靠一张卡来证明自己重要
-                DSGroup {
-                    DSGroupRow {
-                        DSBigNumber(value: "\(totalRecords)",
-                                    unit: "条",
-                                    caption: "本机记录总数",
-                                    size: 56)
-                            .padding(.vertical, TokensSpacing.xs)
+            ForEach(dataCategories, id: \.title) { category in
+                PrivacyCategorySection(category: category)
+            }
+
+            // 离开本机的数据：「数据去了哪」是隐私披露里最该说清、也最容易被含糊过去的一节。
+            // 三处都是代码里真实存在的域名（APIConfig / WeatherService.host / UpdateService）。
+            DSGroup(title: "离开本机的数据",
+                    footer: "天气只给两位小数的经纬度，三处都不带车辆标识。") {
+                DSGroupRow {
+                    DSRow(icon: "car.fill", title: "长安车联网",
+                          subtitle: "只在你用这些功能时")
+                }
+                DSGroupRow {
+                    DSRow(icon: "cloud.sun.fill", title: "Open-Meteo（天气实况）",
+                          subtitle: "车的位置（两位小数）")
+                }
+                DSGroupRow(showsSeparator: false) {
+                    DSRow(icon: "arrow.down.circle", title: "GitHub（版本检查）",
+                          subtitle: "只在你点「检查更新」时")
+                }
+            }
+
+            // 清除：后果写在按钮旁边，不藏在确认框里
+            DSGroup(title: "清除", footer: "清除后无法恢复，本机没有云端副本。") {
+                DSGroupRow {
+                    Button(role: .destructive) {
+                        showClearConfirm = true
+                    } label: {
+                        Label("清除全部本地数据", systemImage: "trash.fill")
+                            .font(TokensTypo.subheadline.weight(.semibold))
+                            .foregroundStyle(TokensPalette.error)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
-                // 分类详情
-                ForEach(dataCategories, id: \.title) { category in
-                    PrivacyCategorySection(category: category)
-                }
-
-                // 离开本机的数据：「数据去了哪」是隐私披露里最该说清、也最容易被含糊过去的一节。
-                // 三处都是代码里真实存在的域名（APIConfig / WeatherService.host / UpdateService）。
-                DSGroup(title: "离开本机的数据",
-                        footer: "三处都只发该功能需要的最小信息。天气只给**两位小数**的经纬度；"
-                              + "都不带车辆标识、账号、设备号，天气快照不落盘。") {
-                    DSGroupRow {
-                        DSRow(icon: "car.fill", title: "长安车联网",
-                              subtitle: "只在你用这些功能时")
-                    }
-                    DSGroupRow {
-                        DSRow(icon: "cloud.sun.fill", title: "Open-Meteo（天气实况）",
-                              subtitle: "车的位置（两位小数），每 \(Int(WeatherService.refreshMinutes)) 分钟最多一次")
-                    }
-                    DSGroupRow(showsSeparator: false) {
-                        DSRow(icon: "arrow.down.circle", title: "GitHub（版本检查）",
-                              subtitle: "只在你点「检查更新」时")
-                    }
-                }
-
-                // 清除：后果写在按钮旁边，不藏在确认框里
-                DSGroup(title: "清除",
-                        footer: "清除后无法恢复，本机没有云端副本。") {
-                    DSGroupRow {
-                        Button(role: .destructive) {
-                            showClearConfirm = true
-                        } label: {
-                            Label("清除全部本地数据", systemImage: "trash.fill")
-                                .font(TokensTypo.subheadline.weight(.semibold))
-                                .foregroundStyle(TokensPalette.error)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-
-                    DSGroupRow {
-                        Button {
-                            // 仅清除行程和能耗数据
-                            store.tripHistory = []
-                            store.energyHistory = []
-                            store.commandHistory = []
-                        } label: {
-                            Label("清除行程与能耗记录", systemImage: "arrow.triangle.clockwise")
-                                .font(TokensTypo.subheadline)
-                                .foregroundStyle(TokensPalette.primary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
+                DSGroupRow(showsSeparator: false) {
+                    Button {
+                        // 仅清除行程与能耗数据
+                        store.tripHistory = []
+                        store.energyHistory = []
+                        store.commandHistory = []
+                    } label: {
+                        Label("清除行程与能耗记录", systemImage: "arrow.triangle.clockwise")
+                            .font(TokensTypo.subheadline)
+                            .foregroundStyle(TokensPalette.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
-            .padding(.horizontal, TokensSpacing.page)
-            .padding(.vertical, TokensSpacing.lg)
         }
-        // v5：不自己铺底 —— 画布与光在 App 根部只画一次（原生主题下逐像素相同）。
-        .dsPageTitle("隐私与数据", inline: true)
         .alert("确认清除", isPresented: $showClearConfirm) {
             Button("清除所有数据", role: .destructive) {
                 store.clearAllData()

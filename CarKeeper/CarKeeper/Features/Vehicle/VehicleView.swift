@@ -53,14 +53,14 @@ struct VehicleView: View {
             } else {
                 DSPlaceholder(icon: "exclamationmark.triangle",
                               title: "档案解析失败",
-                              message: "车辆数据缺少可识别字段",
+                              message: "车辆数据不完整",
                               actionTitle: "重新加载",
                               cls: "warn") { reloadVehicle() }
             }
         }
                 .dsPageTitle("车辆档案")
         .accessibilityLabel(Text("车辆档案"))
-        .accessibilityHint(Text("点字段可复制"))
+        .accessibilityHint(Text("点一行可复制"))
         .refreshable {
             await store.fetchVehicleData()
         }
@@ -377,8 +377,8 @@ struct VehicleView: View {
             ctlRows.append(Row(k: "协议版本", v: "V\(pv)"))
         }
         if let tl = ciString(ctl, ["ignitionTime"]), !tl.isEmpty { ctlRows.append(Row(k: "点火时间", v: tl)) }
-        if let ll = ciString(ctl, ["lastLoginTime"]), !ll.isEmpty { ctlRows.append(Row(k: "报文登录时间", v: ll)) }
-        if !ctlRows.isEmpty { out.append(Grp(name: "车况报文", rows: ctlRows)) }
+        if let ll = ciString(ctl, ["lastLoginTime"]), !ll.isEmpty { ctlRows.append(Row(k: "登录时间", v: ll)) }
+        if !ctlRows.isEmpty { out.append(Grp(name: "车况", rows: ctlRows)) }
         return out
     }
 }

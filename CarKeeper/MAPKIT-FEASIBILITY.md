@@ -142,6 +142,14 @@ mapView.overrideUserInterfaceStyle = .dark  // 暗色瓦片（iOS 13+，UIKit �
 
 | 位置 | 现在怎么写 | 迁移建议 |
 |---|---|---|
+> ⚠️ **本表指的是当时（三条路径并存时）的文件位置，其中的路径已全部不存在**：
+> `Features/TripDetailView.swift` / `Features/ParkingMapView.swift` / `Features/Home/HomeView.swift`
+> 都已在「收成一条脊背」那一批里删掉或并入。现在地图只有一处：
+> `CarKeeper/Features/Map/MapSpineView.swift`（行号会变，所以不再标行号），
+> 风格由 `CarKeeper/Design/MapStyleSpec.swift` 决定。下表保留作为决策记录。
+
+| 位置 | 现在怎么写 | 迁移建议 |
+|---|---|---|
 | `Features/TripDetailView.swift:371` | `MapView: UIViewRepresentable` 包 `MKMapView`；`MKPointAnnotation` + `MKPolyline` + `MKMarkerAnnotationView` 画车与行程 | **保留**（它是唯一有真实涂层的），接受 `preferredConfiguration` 换风格 |
 | `Features/ParkingMapView.swift:10` | SwiftUI `Map` + `MKCoordinateRegion` | 合并进主屏（停车位置 = 车钉的历史点） |
 | `Features/Home/HomeView.swift:1296` | SwiftUI `Map` + `MKCoordinateRegion` | 合并进主屏 |

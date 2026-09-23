@@ -3,11 +3,9 @@ options:
   bundleIdPrefix: com.you
   deploymentTarget:
     iOS: '26.0'
-    watchOS: '26.0'
   createIntermediateGroups: true
 settings:
   base:
-    APPLICATION_GROUP_IDENTIFIER: group.com.you.CarKeeper
     SWIFT_EMIT_LOC_STRINGS: 'YES'
     CURRENT_PROJECT_VERSION: 1
     MARKETING_VERSION: 1.0.0
@@ -26,8 +24,10 @@ targets:
     # 不存在，XcodeGen 直接以「missing source directory」失败：整轮 CI 连编译都没开始。
     # 本地开发机上目录还在（被删文件留下的空壳），所以本地 `xcodegen generate` 不会报。
     # 该目录里的类型已全仓零引用，不再重新创建。现在由 `scan/paths.py` 守住这类声明。
-    # 与小组件/实时活动共享的设计令牌与数据契约（同一批文件也被 WidgetBundle 编译）
-    - path: Shared
+    #
+    # ⚠️ 这里曾声明 `- path: Shared`（与小组件/实时活动共享的设计令牌与数据契约）。
+    # 那一整套随小组件扩展一起删除，目录本身也不存在了 —— 留着它会让 XcodeGen
+    # 以「missing source directory」直接失败（与上面 HealthKit 那次的成因相同）。
     resources:
     - path: CarKeeper/Resources/Assets.xcassets
       group: Resources/Assets.xcassets
@@ -71,8 +71,9 @@ targets:
         # 静默失败，界面上的入口点了没有任何反应。
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
-        # 实时活动总开关：缺这个键 Activity.request 不会生效，锁屏/灵动岛永远不会出现
-        NSSupportsLiveActivities: true
+        # ⚠️ 这里曾有 `NSSupportsLiveActivities: true`。实时活动的界面必须住在
+        # 小组件扩展里，而那个扩展已随免费账号清理删除 —— 留着这个键等于告诉系统
+        # 「本 App 提供实时活动」，实际却永远不会有。
         UIRequiredDeviceCapabilities:
         - arm64
     settings:
@@ -82,106 +83,24 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: 1,2
         ENABLE_USER_SCRIPT_SANDBOXING: 'NO'
-        # ⚠️ 路径相对 SRCROOT（即本目录），原值 CarKeeper/CarKeeper/… 多了一层，
-        # 指向的是不存在的文件 —— 于是 App Group 等 entitlements 一直没被用上。
-        CODE_SIGN_ENTITLEMENTS: CarKeeper/CarKeeper.entitlements
-    dependencies:
-    # 小组件/实时活动扩展必须由 App 依赖，才会被构建并嵌入 App 包里；
-    # 反过来写（扩展依赖 App）不会产生 Embed 阶段，小组件在系统里永远不出现。
-    - target: WidgetBundle
-  WidgetBundle:
-    # app-extension（不是 bundle）：只有真正的 appex 才会被系统注册为小组件宿主，
-    # 也只有它才能被 Embed 进 App 包里。
-    type: app-extension
-    platform: iOS
-    sources:
-    - path: Widgets/
-      excludes:
-      - '**/.*'
-    # 设计令牌（WT）与实时活动数据契约（ChargingActivityAttributes）与 App 同一份源文件
-    - path: Shared
-    info:
-      path: Widgets/Info.plist
-      properties:
-        # ⚠️ WidgetKit 扩展点**只允许** NSExtensionPointIdentifier 这一个键。
-        # 千万不要加 NSExtensionPrincipalClass / NSExtensionMainStoryboard ——
-        # 安装时会直接被拒（这不是警告，是装不上）：
-        #   AppexBundleContainsClassOrStoryboard (… WidgetBundle.appex … defines either
-        #   an NSExtensionMainStoryboard or NSExtensionPrincipalClass key, which is not
-        #   allowed for the extension point com.apple.widgetkit-extension)
-        # 小组件的入口是代码里的 `@main struct CarKeeperWidgetBundle: WidgetBundle`，
-        # 不需要（也不允许）在 plist 里再声明一次。
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.widgetkit-extension
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper.widget
-        PRODUCT_NAME: WidgetBundle
-        GENERATE_INFOPLIST_FILE: 'YES'
-        ENABLE_PREVIEWS: 'NO'
-        CODE_SIGNING_ALLOWED: 'NO'
-        # 扩展要读 App 写在同一 App Group 里的快照，没有这份 entitlements 就只能读到 0
-        CODE_SIGN_ENTITLEMENTS: Widgets/Widgets.entitlements
-        TARGETED_DEVICE_FAMILY: 1,2
-        # 这个扩展不做任何网络请求（只读 App 写进 App Group 的快照），
-        # 所以不声明 NSAppTransportSecurity —— 少一个键就少一处需要维护的差异。
-        # 若将来小组件要自己联网（例如 AppIntent 里拉车况），在这里补回 ATS 并说明用途。
-    # 这里原来写的是「扩展依赖 App」—— 方向反了：
-    #   · 扩展无法 import App 模块（东西拿不到），
-    #   · 而且 App 现在依赖本目标，两边互指会构成依赖循环。
-    # 扩展真正需要的东西（设计令牌 + 数据契约）由上面的 Shared/ 直接提供。
+        # 无 entitlements：本 App 唯一需要过的是 App Group，而它随小组件一起删了。
+        # 删掉这个键之前先确认过：现在没有任何能力需要签名文件，少一份文件就少一处
+        # 「侧载重签时被摘掉」的可能。
     dependencies: []
-  # 原来的 ChargingLiveActivity 目标已删除：实时活动的界面必须住在**小组件扩展**里
-  # （扩展点 com.apple.widgetkit-extension + ActivityConfiguration），
-  # 而原目标用的是 com.apple.usernotifications.liveactivity —— 那个扩展点不存在，
-  # 而且它只声明了一个普通 View，所以实时活动从未出现过。
-  # 现在：界面在 Widgets/WidgetBundle.swift，数据契约在 Shared/ChargingActivityAttributes.swift。
-  WatchApp:
-    type: bundle
-    platform: watchOS
-    sources:
-    # 只编译扩展自身的两个文件；WatchApp/WatchApp/Sources 属于 WatchKitApp target，
-    # 若整个目录递归收录会出现同名类型重复声明。
-    - path: WatchApp/WatchApp.swift
-    - path: WatchApp/ComplicationController.swift
-    info:
-      path: WatchApp/Info.plist
-      properties:
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.watchkit
-          NSExtensionAttributes:
-            WKAppBundleIdentifier: com.you.CarKeeper.watchkitapp
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper.watchkitextension
-        PRODUCT_NAME: WatchApp
-        GENERATE_INFOPLIST_FILE: 'YES'
-        ENABLE_PREVIEWS: 'NO'
-        CODE_SIGNING_ALLOWED: 'NO'
-        WATCHOS_DEPLOYMENT_TARGET: '26.0'
-    dependencies:
-    - target: CarKeeper
-  WatchKitApp:
-    type: application
-    platform: watchOS
-    sources:
-    - path: WatchApp/WatchApp/Sources
-      excludes:
-      - '**/.*'
-    info:
-      path: WatchApp/WatchApp/Info.plist
-      properties:
-        WKCompanionAppBundleIdentifier: com.you.CarKeeper
-        WKWatchKitApp: true
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.you.CarKeeper.watchkitapp
-        PRODUCT_NAME: WatchKitApp
-        CODE_SIGN_ENTITLEMENTS: WatchApp/WatchApp.entitlements
-        WATCHOS_DEPLOYMENT_TARGET: '26.0'
-        GENERATE_INFOPLIST_FILE: 'NO'
-    dependencies:
-    - target: WatchApp
+  # ── 这里曾有 WidgetBundle / WatchApp / WatchKitApp 三个 target（2026-09-23 全删）──
+  # 它们存在的唯一理由是「把车况快照投到 App 之外」：小组件、表盘、灵动岛都靠
+  # App Group 里的那份共享快照活。而 App Group 恰好是免费（未缴费）开发者账号
+  # **拿不到**的能力 —— 侧载工具重签名时会把它摘掉，于是小组件只会显示占位，
+  # 甚至因为扩展未被签进包里而在系统里根本不出现。
+  #
+  # 用户的原话是「全删，包含界面也删，因为我没有交 99 美金」。于是：
+  #   · Widgets/（WidgetBundle + 实时活动界面）、WatchApp/（表盘与 App）三个目录已删；
+  #   · Shared/ 里的 WidgetTokens（WT 令牌）与 ChargingActivityAttributes 已删；
+  #   · App 侧的 LiveActivityBridge 与 syncSharedDefaults 已删 —— 不再往外写任何快照；
+  #   · 三份 entitlements 与 `APPLICATION_GROUP_IDENTIFIER` 已删。
+  #
+  # ⚠️ 不要「顺手」把它们加回来：这三个 target 在免费账号下**没有一条可用链路**，
+  # 加回来只会让 CI 多编三个永远不会被装上的包。`scan/paidcap.py` 会在 CI 上拦住。
   # App Clip target 已删（2026-09-23）：它的调用前提是 Associated Domains 里的
   # `appclips:` 域，而那份 entitlement 上一轮已随免费账号清理一并移除 ——
   # 没有它，App Clip 在真实世界里**永远不会被拉起**；分发又只能走 App Store /

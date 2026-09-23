@@ -1125,3 +1125,86 @@ macOS runner。判据只有一条：某个类型的 `static` 成员被跨类型�
 改动只碰中文与说明性英文，未动任何键名、CSV 表头、故障码表（`ApiModels` 里那些是车端故障名原文）。
 19 项静态门禁 + 风格检查 + 括号配平全绿。
 
+---
+
+## 查漏补缺（2026-09-23，收尾复查）
+
+上一轮结束时留了几个没被验过的口子。逐个走一遍 —— 其中第一个是**真会挂编译**的。
+
+### 1. `SkyLight.swift` 括号不配平（会挂编译）
+
+`facts(at:)` 里少了一个右括号：`rows.append(SkyFact(...))` 只写了一层 `)`，
+于是从那一行起，整个文件的深度永久停在 1，尾部多出一个悬空的 `}`。
+它由 `scan.py` 的结构性检查报出（`括号不配平 (=136 )=135`）。
+补上右括号后 `(=136 )=136`，`scan.py` 转绿。
+
+这条值得记一笔：它是**括号配平这一整个人工检查类别**里唯一一条机器看得见、
+而当时没人看的。`scan/_brackets.py` 本来就是干这个的，但它是一支临时脚本、
+硬编码着一份包括已删 `BatteryView.swift` 在内的文件清单，从未接进 CI —— 于是它**自己成了
+死代码**（真的跑不起来了：`FileNotFoundError` 指向那个已删文件）。本次已删除它。
+
+覆盖面核过：`scan.py` 的结构性检查查的是 `()` / `[]` / `{}` 配平 + 字符串未闭合 +
+`#if`/`#endif` 配平 —— `_brackets.py` 只做了其中的第一项，所以删掉它没有任何覆盖损失。
+
+### 2. `.swiftlint.yml` 的排除清单整份是空转的（两个方向都错）
+
+新增第 20 项门禁 `scan/lintcfg.py` 后查出：
+
+| 方向 | 事实 |
+|---|---|
+| 基准错一层 | 清单写的是 `CarKeeper/CarKeeper/Design/DS.swift`，而配置住在 `CarKeeper/.swiftlint.yml`。SwiftLint 文档：included / excluded 按**配置文件所在目录**解析 —— 于是实际指向 `CarKeeper/CarKeeper/CarKeeper/Design/DS.swift`，五条全不存在。**这份清单从来没有排除过任何文件。** |
+| 只减不增 | `CarKeeper/WatchApp` / `CarKeeper/Widgets` 随小组件删除后没清掉；而 `MapSpineView.swift` 长到 1126 行、越过 `file_length.error(1000)`，反倒没进清单。 |
+
+处置不是把路径改对，而是**不再排除任何文件**：写进 `excluded` 会让整个文件退出 swiftlint
+—— 退的不只是尺寸那条，还有 `force_unwrapping` / `implicitly_unwrapped_optional` 这些
+真正防事故的规则。被排除的恰好是最大、最复杂的文件，用「关掉全部检查」换「少一条超长提示」，
+代价与收益差得太远。改为把尺子调到与代码真实形状相符（`file_length` 1200、
+`type_body_length` 1200、`function_body_length` 160，余量按当前最大值给），于是
+**每个文件都被每一条规则检查**；越过阈值时由 `lintcfg.py` 在 Linux 上秒级拦下，
+要求你「要么改小、要么把为什么该调说清」。
+
+这条同时修掉一个隐性后果：`build.sh` 用的是 `swiftlint lint --strict`，warning 会被升级 ——
+也就是本次改动之前，本机 `./build.sh` 的 lint 步是红的（11 个文件越过 500 行）。
+
+### 3. 检查范围正在悄悄缩小：不存在的根目录由静默跳过变成硬失败
+
+`futureproof` / `lexguard` / `shadowguard` 三个检查器都用
+`Path(tk).rglob("*.swift")` 收集文件，而 `rglob` 对**不存在的目录不报错、只返回空**。
+于是删除小组件 / 表盘 / App Clip / CarPlay / HealthKit 之后，它们的根目录清单里仍留着
+`Shared` / `Widgets` / `WatchApp` / `HealthKit` 二十多项死路径，而输出依然是「0 个问题 ✅」。
+
+新增 `scan/_roots.py`：列出来的根目录必须存在、且里面得有 .swift，否则直接失败。
+三个检查器 + `copy.py` 的目录清单全部改走它（`copy.py` 的 `SHARED` / `WIDGETS` / `WATCH`
+三项也一并清掉，并补上此前漏掉的 `CarKeeper/Models`）。覆盖范围核对无误：现在三个检查器
+扫到的 71 个文件 = 全仓 Swift 文件总数。
+
+`scan.py` 里同一形状的两处也修了：`APP` 清单里的 `HealthKit` / `Shared`，
+以及**整个恒为 0 的 WIDGET 半边**（`Widgets` + `Shared` 两棵目录已不存在，
+它从此只会打印「重复声明: 0 / 幽灵构造: 0」—— 一个恒为 0 的绿灯不是绿灯，
+因为它让「检查过」与「没检查」无法区分）。`target_files` 也改成缺路径即失败。
+
+### 4. 文案门禁接进 CI
+
+`scan/copy.py` 上一轮写好但**没有进 CI 的 `for s in ...` 循环** —— 等于没接。
+现在它与 `lintcfg.py` 一起进了门禁清单，共 21 项。
+
+### 5. 文档里把已删东西写成现存的段落
+
+逐条核过并改：`README.md` 的「功能移植对照」表里 5 个实现名（`HomeView` / `MessagesView` /
+`HealthView` / `BatteryView` / `DataView`）**在原树里一个都不存在**，已改成真实入口
+并补上「入口只有底部模式条」这条规则；`DESIGN-SPEC.md` 的 `充电页 (BatteryView)`、
+`车况页 (HomeView)` 改成实际类型名；`DESIGN-UNIFY.md` 的跨 target 令牌表、
+三个令牌文件表、以及「刻意保留为独立屏幕的三个」整节标注作废并写明现在的真相；
+`API-FIELD-MAP.md` 行里的 `ChargeLedger`、`MAPKIT-FEASIBILITY.md` §4 表里三个已不存在的
+文件路径，都改成「这是当时的记录，现在在哪」。
+
+### 已核实上一轮确实落了地（不是漏）
+
+- `HomeMode` 就是 6 档（现在 / 车辆 / 充电 / 车控 / 出行 / 我的），
+  `destination(for:)` 把**每一个** `Deeplink` 都映射到「档 + 档内分段」，没有落空的分支。
+- 合并页在磁盘上都在：`VehicleHubView` / `MineHubView` / `ChargeView` / `DestinationCalculatorView`。
+- 小组件 / 表盘 / 实时活动三棵树、`Shared/`、三份 entitlements、`project.yml` 里的对应 target
+  均已删除；`scan/targets.py` 与 `scan/paidcap.py` 都在守它们不回来。
+
+21 项门禁（含新增的 `copy` 与 `lintcfg`）全绿；风格检查 0 问题；工作流 YAML 与内联 shell 语法通过。
+

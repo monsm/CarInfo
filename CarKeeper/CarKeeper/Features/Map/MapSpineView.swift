@@ -68,8 +68,6 @@ struct MapSpineView: View {
     @State private var chargers: [MapCharger] = []
     @State private var chargerCenterKey = ""
     @State private var isRefreshing = false
-    @State private var showReplay = false
-    @State private var replaySession: ChargeSession?
     /// 「此刻的光」表 —— 这一屏的光是怎么算出来的（药丸点开）
     @State private var showSky = false
     /// 时刻滑块：`skyLive` = 看此刻；一旦拖过滑块就变成「看那一刻的光」
@@ -126,9 +124,6 @@ struct MapSpineView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarItems(d) }
-        .sheet(isPresented: $showReplay) {
-            if let s = replaySession { ChargeReplaySheet(session: s).dsSheetCanvas() }
-        }
         .sheet(isPresented: $showSky) { skySheet(d).dsSheetCanvas() }
         .task {
             await refresh()
@@ -515,15 +510,14 @@ struct MapSpineView: View {
     private func pageContent(_ mode: HomeMode) -> some View {
         switch mode {
         case .now: EmptyView()              // 「现在」不走这条路：它就是地图那张纸本身
-        case .vehicle: VehicleView()
-        case .health: HealthDataView()
-        case .battery: BatteryView()
+        // 车辆档自带三段（档案 / 健康 / 保养）—— 它们回答的是同一个问题，
+        // 所以是同一张纸里的三段，不是条子上的三格。
+        case .vehicle: VehicleHubView()
+        case .charge: ChargeView()
         case .control: ControlView()
         case .trips: TripsEventsView()
-        case .service: MaintenanceMoneyView()
-        case .mine: MineView()
-        case .emergency: EmergencyPanel()
-        case .dev: DevView()
+        // 「我的」同理：设置 / 应急 / 诊断。
+        case .mine: MineHubView()
         }
     }
     // 主框架 = **Apple Maps 的一张全屏地图 + 一张贴着底边的纸**，
@@ -717,7 +711,7 @@ struct MapSpineView: View {
             // 「找车」是另一件事（下发 RemoteSearchCar 让车鸣笛闪灯），
             // 那一个在地图下方的常驻操作条里。两个都叫「找车」= 用户分不清点哪个。
             action("回到车", "location.circle") { centerOnCar(force: true) }
-            action("充电", "bolt.fill") { nav.openMode(.battery) }
+            action("充电", "bolt.fill") { nav.openMode(.charge) }
             // 「事件」而不是「异常」：这一列里多数是点火/熄火这类**正常事件**，
             // 叫「异常」等于把正常行驶也标成故障。它并进出行页了（`MessagesSection`）。
             action("事件", "exclamationmark.triangle") { nav.openMode(.trips) }
@@ -841,12 +835,6 @@ struct MapSpineView: View {
             }
         }
 
-        // 充电回放：只有功率采样真的攒出了一条会话才出现；正在充的那次不回放（还没结果）
-        replayEntry()
-
-        // 钱和电在同一层：这一充花了多少，是车端功率采样积分出来的真值
-        ChargeMoneyBlock()
-
         if chargers.isEmpty {
             emptyNotice(MapSpineLayer.charge.emptyNote)
         } else {
@@ -872,7 +860,7 @@ struct MapSpineView: View {
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.tertiary)
         }
-        Button("充电与账单") { nav.openMode(.battery) }
+        Button("充电与账单") { nav.openMode(.charge) }
             .font(TokensTypo.footnote)
             .foregroundStyle(TokensPalette.accent)
             .buttonStyle(.plain)
@@ -1097,40 +1085,10 @@ struct MapSpineView: View {
         isRefreshing = false
     }
 
-    /// 回放入口。有已完成的会话才出现；点击打开采样曲线。
-    @ViewBuilder
-    private func replayEntry() -> some View {
-        if let latest = ChargeLedger.shared.sessions.first {
-            Button {
-                TokensHaptic.tap()
-                replaySession = latest
-                showReplay = true
-            } label: {
-                HStack(spacing: TokensSpacing.sm) {
-                    Image(safeSymbol: "chart.xyaxis.line", fallback: "chart.xyaxis.line")
-                        .font(TokensTypo.fixed(13, weight: .medium))
-                    Text("看功率曲线")
-                        .font(TokensTypo.footnote)
-                    Spacer(minLength: 0)
-                    Text(ChargeLedger.kwhText(latest.kWh) + " kWh")
-                        .font(TokensTypo.digits(13))
-                        .foregroundStyle(TokensPalette.secondary)
-                    Image(safeSymbol: "chevron.right", fallback: "chevron.right")
-                        .font(TokensTypo.fixed(11, weight: .semibold))
-                        .foregroundStyle(TokensPalette.tertiary)
-                }
-                .padding(.vertical, TokensSpacing.sm)
-                .padding(.horizontal, TokensSpacing.md)
-                .background {
-                    RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                        .fill(TokensPalette.raised)
-                }
-                .foregroundStyle(TokensPalette.primary)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text("查看最近一次充电的功率曲线"))
-        }
-    }
+    // 这里曾有 `replayEntry()`：地图「充电」层上那个「看功率曲线」的入口，
+    // 点开是 `ChargeReplaySheet`。两者都随充电账本删除（2026-09-23）——
+    // 它读的「最近一次充电会话」本来就是账本派生出来的东西。
+    // 功率曲线本身还在：充电页的「趋势」段画的就是同一份采样。
 
     /// 按**车的位置**搜附近充电站（搜索中心不再是写死的北京坐标）
     @MainActor

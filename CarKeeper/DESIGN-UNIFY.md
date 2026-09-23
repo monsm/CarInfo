@@ -21,7 +21,7 @@
 | 字体 | 令牌 358 处 + `Theme.font(...)` 中转 + 应用内硬编码 `.font(.system(size:` 68 处 | `Theme.font` 清零；**字号字面量全库清零**（定义处之外 0 处，仅 3 处显式豁免）；`Theme.font` / `Theme.lineHeight` / `Color(hex:)` 已从代码里删掉 |
 | 空态 | `DSPlaceholder`（12 处）／`PageLoadingView`+`PageErrorView`（各 1 处）／手写灰图标 | 空态一律 `DSPlaceholder`（维保记录页本轮改过来） |
 | 颜色 | 令牌 631 处 + `.green`/`.orange`/`.red`/`.white`/`.black` 直用，散在 25 个文件 | **全库清零**；补了三个缺口令牌：`scrim`（遮罩/暗角/阴影）、`labelOnTint`（彩色面上的文字）、`fillSubtle` 家族 |
-| 跨 target 令牌 | 小组件用 `WT.*`，AppClip/Watch 各自写死一套（合计 23 处字面量） | **小组件与 App 共用 `Shared/WidgetTokens.swift`**（同一份源文件）；Watch 显式豁免（理由已核实，见下） |
+| 跨 target 令牌 | 小组件用 `WT.*`，AppClip/Watch 各自写死一套（合计 23 处字面量） | **小组件与 App 共用 `Shared/WidgetTokens.swift`**（同一份源文件）；Watch 显式豁免（理由已核实，见下）—— ⚠️ **本行已作废（2026-09-23）**：小组件 / 表盘 / 实时活动三个 target 与 `Shared/WidgetTokens.swift` 均因免费账号拿不到 App Group 而整体删除，现在只有 App 一份令牌（`Tokens.swift` + `ArtTheme.swift`） |
 
 ---
 
@@ -107,7 +107,7 @@ ScrollView {
 | `scan/access.py` | 跨文件引用 `private` 成员（`类型.成员` 形式） |
 | `scan/shadowguard.py` | 把泛用名（`Color` 之类）劫持进项目命名空间的形状 |
 | `scan/unreachable.py` / `deep.py` / `eol.py` / `logic.py` / `lexguard.py` / `scenes.py` / `targets.py` / `futureproof.py` | 见各自文件头 |
-| `scan/design.py` | **字号 / 颜色分量 / 色相字面量**只能出现在令牌定义文件里（`Tokens.swift` / `WidgetTokens.swift` / `ArtTheme.swift`）；豁免必须写明理由，输出 ⚠️ 而不是 ✅ |
+| `scan/design.py` | **字号 / 颜色分量 / 色相字面量**只能出现在令牌定义文件里（`CarKeeper/Design/Tokens.swift` / `CarKeeper/Design/ArtTheme.swift`）；豁免必须写明理由，输出 ⚠️ 而不是 ✅ |
 | `CarKeeper/check_style.js` | 风格（含被删的 Tab 骨架残留） |
 
 **注意**：这些脚本能可靠抓的是**结构**（跨文件 private、未声明成员、路径缺失、孤儿页面）。
@@ -123,14 +123,18 @@ ScrollView {
 | 文件 | 管什么 | 谁用 |
 |---|---|---|
 | `CarKeeper/Design/Tokens.swift` | App 内的全部取值（颜色/字号/间距/圆角/字距/尺寸/发丝线） | App target |
-| `Shared/WidgetTokens.swift` | **世界面**的取值（系统语义色真值）+ `VehicleSnapshot` 数据契约 | 小组件、App |
+| ~~`Shared/WidgetTokens.swift`~~ | **已删除（2026-09-23）**：它服务的小组件 / 表盘 / 实时活动三个 target 因免费账号拿不到 App Group 而整体删掉，这份「世界面取值表」也随之失去唯一消费者 | ——（曾：小组件、App） |
 | `Design/ArtTheme.swift` | 艺术主题（原生/夜光/纸上/巨字）的**取值表**：换主题 = 换这里的值 | App target 经 `TokensPalette` 读 |
 
 **为什么小组件不直接用 `TokensPalette`**：扩展不编译 App 的 `Design/`。所以 v4 的做法是
 「值只写在 `WT` 一处，App 的 `TokensPalette` 从那里转发」—— 两边由**编译器**保证不漂移。
 后来为此新增的 App Clip target 也接了同一份（只加 `- path: Shared/WidgetTokens.swift`
 一个文件，不加整个 `Shared/`：`ChargingActivityAttributes` 需要 ActivityKit）—— 那个 target
-已于 2026-09-23 随免费账号能力清理删除（见下表 ✅24），现在共用这份的只有小组件与 App。
+已于 2026-09-23 随免费账号能力清理删除（见下表 ✅24）。**随后 `Shared/WidgetTokens.swift`
+本身也不再存在** —— 小组件 / 表盘 / 实时活动三个 target 在同一个日期整体删除，这份文件的
+唯一消费者随之消失。于是「两份令牌由编译器保证不漂移」这个问题**不再存在**：现在只有
+App 一棵树、一份 `Tokens.swift`。上面那段「为什么小组件不直接用 `TokensPalette`」的讨论
+保留在这里**只作为历史**，它描述的问题已经随着跨 target 本身消失而消失。
 
 ### 字号只有两条路
 
@@ -246,27 +250,43 @@ ScrollView {
 | **地图**（主屏） | 底部模式条（一级入口）+「现在」里的四个图层 + 地图上的操作条 + 搜索 + 数据龄期 | 顶部胶囊图层条、索引页的图层组、索引页本身 | ✅ |
 | **车控**（页 + 操作条共用执行路径） | 车控 + **指令历史**（筛选/成功率/展开详情） | `CommandHistoryView.swift` | ✅ |
 | **车**（车辆档案） | 车辆档案 + 里程记账 + 用车提示 | `MileageJournalView` / `VehicleTipsView` | ✅ |
-| **保养与钱** | 维保记录 + 保险/年检 + 充电账本 + 车辆估值 + 导出 | `ExportDataView` + 三个弹层（`InspectionCalendarView` / `VehicleValuationView` / `ChargeBillSheet`） | ✅ |
+| **保养与钱** | 维保记录 + 保险/年检 + 车辆估值 + 导出 | `ExportDataView` + 三个弹层（`InspectionCalendarView` / `VehicleValuationView` / `ChargeBillSheet`） | ✅ |
 | **体检与数据** | 健康报告 + 全量数据（结论 + 依据） | `DataView` | ✅ |
 | **车与账号** | 账号 / 车辆切换 / 隐私 / 关于 / 设备与模式 / 应用 | 它自己那份与索引页逐行重复的功能目录 | ✅ |
 | **出行** | 行程时间轴 + 常停之地 + **驾驶评分** + **消息事件流**（点/熄火事件本来就是行程的骨架） | `MessagesView` / `DrivingScorePage` | ✅ |
+
+> ⚠️ **这张表已作废（2026-09-23），保留作为当时的决策记录。** 两处变化：
+> ① 目标从「地图 + 6 个面」改成「地图 + 6 个**档**」—— 面是页面，档是底部模式条上的位置，
+>    而后者才是唯一入口；② 「体检与数据」（健康 + 全量数据）不再是独立的一个面，
+>    它并入**车辆**档；「应急面板」与「开发者工具」并入**我的**档。
+> 另外「保养与钱」一栏里的**充电账本已整体删除**（2026-09-23 全局去缓存）：它的主体是
+> 本机累积的功率采样积分出的度数，而服务端只有当前状态接口 —— 删了没有历史可查。
+> 当前真实档位以 `CarKeeper/Features/Map/HomeMode.swift` 为准（6 档）。
 
 已删页面（合计）：`CommandHistoryView` · `MileageJournalView` · `VehicleTipsView` ·
 `ExportDataView` · `MessagesView` · `DrivingScorePage`，以及整张「全部功能」索引页
 （`indexSheet` / `indexGroup` / `indexRow` / `deeplinkTitle`）与「我的」里那份重复的功能目录。
 深链别名（指向别的页，不占屏幕）：`.dashboard` / `.score` / `.parking` → 出行页。
 
-### 刻意保留为独立屏幕的三个（写清理由，不是漏掉）
+### ⚠️ 这一节已作废（2026-09-23）：不再有「独立屏幕」这种存在
 
-- **电池与充电**（`BatteryView`）：它是地图「充电」层的**深度视图**（充电流水、电芯、
-  充电账本的完整版），并进车辆档案会把那一页变成两页。
-- **应急面板**（`EmergencyPanel`）：拖车 / 保险 / 救援电话。它是**紧急入口** ——
-  埋进别的页面里滚着找，就失去了意义。
-- **开发者工具**（`DevView`）：主题样张 / 令牌清单 / 设计语言说明 —— 它不是用户功能，
-  是**这个仓库的说明书**，放在用户页面里只会让用户困惑。
+下面三条原本写的是「刻意保留为独立屏幕的三个」。它们保留了一个前提 ——
+「页面可以被单独 push 出来」。**那个前提已经取消了**：
 
-**最终屏幕数**：地图（家）+ 9 个深潜面（车 / 电池与充电 / 车控 / 体检与数据 / 出行 /
-保养与钱 / 应急面板 / 车与账号 / 开发者工具）。改造前约 20 个页面。
+入口收到唯一一条 —— 底部那条能手滑的**模式条**（`HomeMode`，6 档：
+现在 / 车辆 / 充电 / 车控 / 出行 / 我的）。原来的三页变成了档内内容：
+
+- **充电**：`ChargeView`（2026-09-23 从零重写；旧 `BatteryView` 已删，不在它的基础上改）。
+  它就是「充电」档的全部内容，不是地图「充电」层 push 出来的第二个页面。
+- **应急面板**（`EmergencyPanel`）与**开发者工具**（`DevView`）：并入「我的」档的两个分段 ——
+  它们保留的理由没变（一个是紧急入口，不该埋起来找；一个是这个仓库的说明书，不该混进
+  用户功能），变的是它们所在的位置：现在都落在「我的」档的分段控件里（`HomeSub`），
+  而不是各占一个屏幕。
+- **健康 / 保养**并入「车辆」档，**诊断**并入「我的」档 —— 同样不是删功能，
+  是同一件事不再拆成两屏。
+
+这条规则不靠自觉：`scan/oneentry.py` 会在 CI 上拦下任何一处绕过条子去 push 页面的写法；
+档内落到哪一段由 `HomeMode.destination(for:)` 决定（搜索里点「健康」不会落在「档案」上）。
 
 ---
 

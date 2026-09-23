@@ -14,7 +14,14 @@ import re
 import sys
 from pathlib import Path
 
-TK = ["CarKeeper", "Services", "Shared", "Widgets", "WatchApp", "Models", "Design", "HealthKit"]
+from _roots import swift_files
+
+# 源码根目录。这里的每一项都必须真实存在 —— 由 `_roots.swift_files` 硬性保证：
+# 原来这张表里还列着 `Shared` / `Widgets` / `WatchApp` / `HealthKit`，那四个目录
+# 都已随扩展与死代码删除，而 `rglob` 对不存在的目录只是返回空 ——
+# 于是「检查范围变小」表现得和「0 个问题」一模一样。
+TK = ["CarKeeper/CarKeeper", "CarKeeper/Services", "CarKeeper/Models",
+      "CarKeeper/Design", "CarKeeper/Tests"]
 
 # 项目自己声明的类型名（从 Kansei/DS 等令牌与常见模型里来），用于区分「自有枚举」
 PROJECT_ENUM_HINT = re.compile(
@@ -37,7 +44,7 @@ def strip_literals(text):
     return s
 
 
-files = sorted({str(p) for tk in TK for p in Path(tk).rglob("*.swift")})
+files = swift_files(TK)
 no_default = []
 for f in files:
     src = strip_literals(Path(f).read_text(encoding="utf-8"))

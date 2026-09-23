@@ -1,5 +1,9 @@
 // =============================================================================
 // ThemeGalleryView.swift — 艺术主题样张（真机上一按就换，用眼睛挑）
+//
+//  2026-09-23：它从**一个独立页面**（DevView 里 NavigationLink 推开）降成
+//  **「诊断」那一屏里的一节**（`ThemeGallerySection`）。理由与其余几处一样：
+//  它是「诊断」的一部分，为它多一层导航只会让「我的」看起来像两个 App。
 // =============================================================================
 //
 // 为什么不用截图挑：三种方向在缩略图里全都"差不多好看"，差别要上手才读得出来。
@@ -11,29 +15,27 @@
 //
 // 诚实边界（别以为这里已经全都做了）：
 //   ① App 里仍有约 130 处直接写死的 Color(uiColor:) / .white / .black，不跟随主题；
-//   ② 小组件与实时活动仍走 WT.Palette（刻意不跟随 —— 否则会跟着临时主题漂移）；
-//   ③ 这张表只覆盖「令牌 + 画布」，不改变信息架构。
+//   ② 这张表只覆盖「令牌 + 画布」，不改变信息架构。
+//   （原先还有一条「小组件与实时活动不跟随主题」—— 那两个扩展已整体删除。）
 // =============================================================================
 import SwiftUI
 
-struct ThemeGalleryView: View {
+struct ThemeGallerySection: View {
     @AppStorage(ArtThemeStore.key) private var raw: String = ArtTheme.native.rawValue
 
     private var current: ArtTheme { ArtTheme(rawValue: raw) ?? .native }
 
     var body: some View {
-        // 切换器放在 ScrollView **外面**：切主题会重建整棵树（见 CarKeeperApp 的 .id），
-        // 滚动位置会回到顶部 —— 所以"按一下换一套"必须有一个永远看得见的按钮，
-        // 否则你每切一次都要往下滚才能再切下一次。
-        VStack(spacing: 0) {
+        // 切换器就在这一节的顶部。
+        // 它原来被刻意放在 ScrollView **外面** —— 切主题会重建整棵树（见 CarKeeperApp 的 .id），
+        // 滚动位置会回到顶部，所以要有一个永远看得见的按钮。
+        // 降成「节」之后它不再有自己的 ScrollView，那个理由自然也就不在了。
+        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+            // 「当前是哪一套」写在标题右边 —— 不用另占一行字（那一行只会在切换后重复一遍）
+            DSSectionHeader(title: "艺术主题", trailing: current.title)
             switcher
-            ScrollView {
-                content
-            }
-            .scrollBounceBehavior(.basedOnSize)
+            content
         }
-        .pageBackground()
-        .dsPageTitle("艺术主题")
     }
 
     // MARK: - 常驻切换器
@@ -59,16 +61,12 @@ struct ThemeGalleryView: View {
                 .accessibilityAddTraits(theme == current ? [.isSelected] : [])
             }
         }
-        .padding(.horizontal, TokensSpacing.page)
-        .padding(.top, TokensSpacing.sm)
-        .padding(.bottom, TokensSpacing.md)
     }
 
     // MARK: - 页面内容
 
     private var content: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            DSPageTitle(title: "艺术主题", subtitle: "换一套值，不换版式")
             intro
 
             DSSectionHeader(title: "四个方向")
@@ -93,9 +91,6 @@ struct ThemeGalleryView: View {
 
             footnotes
         }
-        // 横向页面边距由 pageBackground() 的 contentMargins 统一给（不在这里重复）
-        .padding(.top, TokensSpacing.sm)
-        .padding(.bottom, TokensSpacing.xxxl)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -106,7 +101,7 @@ struct ThemeGalleryView: View {
             Text("点一下，全 App 立刻换装")
                 .font(TokensTypo.headline)
                 .foregroundStyle(TokensPalette.primary)
-            Text("样张用各主题自己的令牌真渲染，不是截图。切回「原生」就是切换前的取值。")
+            Text("样张用真令牌渲染，不是截图。")
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -146,9 +141,8 @@ struct ThemeGalleryView: View {
     private var footnotes: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             DSSectionHeader(title: "没做的部分")
-            Text("① 约 130 处写死的系统颜色（Color(uiColor:) 等）不跟随主题；"
-                 + "② 小组件与实时活动仍走 WT.Palette（刻意不跟随）；"
-                 + "③ 主题只换取值，不改信息架构。")
+            Text("① 约 130 处写死的系统颜色不跟随主题；"
+                 + "② 主题只换取值，不改信息架构。")
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

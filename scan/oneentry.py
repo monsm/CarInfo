@@ -93,8 +93,15 @@ def main():
     spine = read(MAP_SPINE)
     head = read(MODE_HEAD)
 
-    # 档位名：`case now` 这一行（switch 里的 `case .now:` 不会命中，因为行尾有冒号）
-    modes = re.findall(r"^\s{4}case\s+(\w+)\s*$", home, re.M)
+    # 档位名：只从 `enum HomeMode { … }` 这一块里读（`case now` 这一行；
+    # switch 里的 `case .now:` 不会命中，因为行尾有冒号）。
+    #
+    # ⚠️ 不能直接扫整个文件：同一个文件里还有 `enum HomeSub`（档内段落：
+    #    档案/健康/保养、设置/应急/诊断），它的 case 也是 4 空格缩进 —— 扫全文会把
+    #    它们当成档位，报出 6 条「档位没有对应页面」的假问题（2026-09-23 实际发生过）。
+    #    换个说法：门禁要读的是**那个枚举**，不是一个文件。
+    home_enum = block_of(home, "enum HomeMode")
+    modes = re.findall(r"^\s{4}case\s+(\w+)\s*$", home_enum, re.M)
     if not modes:
         print("❌ 扫描失败：没能从 HomeMode.swift 里读出档位")
         return 1

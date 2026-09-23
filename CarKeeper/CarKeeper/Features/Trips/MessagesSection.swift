@@ -96,7 +96,7 @@ struct MessagesSection: View {
         .onAppear { loadIfNeeded() }
         // bootstrap（冷启动预加载）是异步的：如果用户先进入出行页，
         // carId 还是空 → loadIfNeeded 直接 return，之后 bootstrap 完成时
-        // 视图不会重新 onAppear，消息就永远空着。跟 BatteryView 一样监听 carId。
+        // 视图不会重新 onAppear，消息就永远空着。跟充电页一样监听 carId。
         .onChange(of: store.carId) { _, newId in
             guard !newId.isEmpty else { return }
             // carId 变了（切车 / 首次绑定）→ 重新加载
@@ -411,21 +411,12 @@ struct MessagesSection: View {
         // 哪怕服务端其实返回了 55 条事件。判断加载与否只看「缓存 + TTL」。
         guard !TokenStore.currentToken().isEmpty else { loading = false; return }
         guard loadTask == nil || loadTask!.isCancelled else { return }
-        // 与小程序一致：先渲染缓存（哪怕过期），再决定要不要联网。
-        // 此前的空白根因：缓存命中与请求失败两条路都停在空列表 ——
-        // 只有“网络成功”这一条路能填充 items，缓存只写不读。
-        if let cached = store.caches["messages"] as? [[String: Any]], !cached.isEmpty {
-            apply(cached)
+        // 先把手上这份响应渲染出来（它就是最近一次真实响应），再无条件取一次 ——
+        // 没有 TTL 那一层，也不再因为「刚取过」就跳过。
+        if let last = store.caches["messages"] as? [[String: Any]], !last.isEmpty {
+            apply(last)
         }
-        // 缓存缺失（首次访问 / 刚切车）或 TTL 到期 → 强制拉取。
-        // 注意：我们**不缓存空数组**（见 load() 里的条件保存）——
-        // 空数组意味着「服务端这次没返回」而不是「确实没有消息」，
-        // 留着它会让下一次访问永远命中空缓存而不再重试。
-        if store.needsRefresh("messages") {
-            loadTask = Task { await load() }
-        } else {
-            loading = false
-        }
+        loadTask = Task { await load() }
     }
 
     @MainActor
@@ -449,7 +440,7 @@ struct MessagesSection: View {
             // 分不清「没消息」和「没拉到」——这正是之前反复误判的原因。
             lastError = error.localizedDescription
             NSLog("loadMessages: \(error.localizedDescription)")
-            ToastManager.shared.show("消息获取失败，展示缓存", icon: "wifi.exclamationmark")
+            ToastManager.shared.show("消息获取失败", icon: "wifi.exclamationmark")
         }
         loading = false
     }

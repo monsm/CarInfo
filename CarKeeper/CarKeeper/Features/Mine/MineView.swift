@@ -20,8 +20,6 @@ struct MineView: View {
     @State private var shareSheetFlag = false
     @State private var isRefreshing = false     // 下拉刷新进行中标志
     @State private var isChecking = false        // OTA 检查中（不含下载）
-    @State private var showOTAChangelog = false
-    @State private var showPrivacyDashboard = false
     @State private var showTempKeys = false
     @State private var showFamily = false
     /// 退出登录二次确认（按钮在 tilesCard 的「应用」组里）
@@ -33,10 +31,9 @@ struct MineView: View {
     @State private var shakeOn = ShakeDetector.shared.isEnabled
     @State private var voiceOn = UserDefaults.standard.bool(forKey: "carkeeper_voice_enabled")
     @State private var focusOn = FocusModeManager.shared.config.enabled
-    // 行程分析 / 指令历史 / 维保记录 / 停车位置 / 紧急求助 / 车辆提示 / 驾驶评分
-    // 走 nav.pushNavigation（这些页已在壳层 navigationDestination 注册），
+    // 这一页里的「去做某件事」全部走 `nav.openMode(...)`（拨到那一档 / 那段），
     // 不再保留一堆从未绑定 sheet 的 @State（此前 7 个磁贴设了状态却没人监听 = 死按钮）。
-    @EnvironmentObject var nav: NavState            // C3: 用于 pushNavigation
+    @EnvironmentObject var nav: NavState
     // #NEW-115 夜间模式管理
     @StateObject private var nightModeManager = NightModeManager.shared
 
@@ -87,22 +84,6 @@ struct MineView: View {
             Button("取消", role: .cancel) { }
         }
         .sheet(isPresented: $shareSheetFlag) { ShareSheet(items: shareItems) }
-        .sheet(isPresented: $showOTAChangelog) {
-            NavigationStack {
-                OTAChangelogView()
-                    .navigationTitle("版本日志")
-                    .dsSheetCanvas()
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-        }
-        .sheet(isPresented: $showPrivacyDashboard) {
-            NavigationStack {
-                PrivacyDashboardView()
-                    .navigationTitle("隐私与数据")
-                    .dsSheetCanvas()
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-        }
         .sheet(isPresented: $showTempKeys) {
             NavigationStack {
                 TempKeyListView()
@@ -257,10 +238,12 @@ struct MineView: View {
         VStack(spacing: TokensSpacing.xl) {
             DSGroup(title: "报告与共享") {
                 actionRow("key.fill", "共享钥匙") { showTempKeys = true }
-                actionRow("person.2.fill", "家庭管理") { showFamily = true }
-                // #39 月度驾驶报告入口：它自己就是一行（内缩与分隔线由 DSGroupRow 给）
-                customRow(last: true) { MonthlyReportGenerator() }
+                actionRow("person.2.fill", "家庭管理", last: true) { showFamily = true }
             }
+
+            // #39 月度驾驶报告：**内联展开**而不是拉起浮层（2026-09-23 降成「节」）。
+            // 它与「设置」属于同一屏，展开后往下看就行，不用离开当前页。
+            MonthlyReportSection()
 
             DSGroup(title: "设备与模式",
                     footer: "摇一摇会真的发锁车指令。") {
@@ -280,29 +263,23 @@ struct MineView: View {
                         nav.showSearch = true
                     }
                 }
-                actionRow("eye.fill", "隐私与数据") { showPrivacyDashboard = true }
-                actionRow("tray.fill", "OTA 日志") { showOTAChangelog = true }
                 // 此前是空操作（VoiceBroadcastManager 自动启动，点这里什么都不发生）。
                 // 现在是真能用的开关：翻转 VoiceBroadcastManager 读取的 UserDefaults 键。
                 customRow {
                     DSRow(icon: "speaker.wave.3.fill", title: "语音播报",
                           value: voiceOn ? "已开启" : "已关闭") { toggleVoice() }
                 }
-                linkRow("wrench.adjustable", "开发者工具", .dev)
+                // 「诊断」是「我的」这一档里的第三段（不是另一个页面，也不再是条子上一格）。
+                actionRow("wrench.adjustable", "开发者工具") { nav.openMode(.mine, sub: .dev) }
                 customRow(last: true) { logoutRow }
             }
+
+            // 「隐私与数据」以前是一个独立浮层，现在就是这一屏里的一节。
+            PrivacySection()
         }
     }
 
     // MARK: 行的三种写法（与全 App 其余 20 屏同一套 DS 原语）
-
-    /// 跳页行：图标 + 标题 + 箭头
-    private func linkRow(_ icon: String, _ title: String, _ link: Deeplink,
-                         last: Bool = false) -> some View {
-        DSGroupRow(showsSeparator: !last) {
-            DSRow(icon: icon, title: title, showsChevron: true) { nav.openMode(for: link) }
-        }
-    }
 
     /// 动作行（开浮层 / 切图层 / 触发一件事）：图标 + 标题 + 箭头
     private func actionRow(_ icon: String, _ title: String, last: Bool = false,

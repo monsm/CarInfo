@@ -390,7 +390,7 @@ struct MapSpineData {
         if e.socPct < 20, e.range != "--" {
             out.append(MapReason(
                 id: "soc",
-                text: "电量 \(e.socPct)%，按当前续航只剩 \(e.range) —— 低于 20% 才提醒，不是每次都喊",
+                text: "电量 \(e.socPct)%，只剩 \(e.range)",
                 cls: "warn"
             ))
         }
@@ -502,7 +502,7 @@ struct MapSpineData {
         if let top = hotspots.first(where: { $0.visits >= 3 }) {
             out.append(MapReason(
                 id: "hot",
-                text: "这里你来过 \(top.visits) 次 —— 最近一次 \(agoText(top.lastVisit))，是从停车记录里聚出来的，不是猜的",
+                text: "来过 \(top.visits) 次，最近 \(agoText(top.lastVisit))",
                 cls: "na"
             ))
         }

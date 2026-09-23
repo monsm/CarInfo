@@ -7,12 +7,12 @@
 // 也就是说：你以为有一个「全局搜索」，实际是一个搜不到东西、点不动的假界面。
 //
 // 现在它搜的是真东西，搜到就能去：
-//   • 页面（16 个深潜页，跳转用统一导航 `NavState.pushNavigation`）
+//   • 页面（模式条上的每一档，跳转用统一导航 `NavState.openMode`）
 //   • 车（车辆档案里的字段：车牌 / VIN / 车型 / 颜色）
 //   • 车况读数（电量 / 续航 / 胎压 / 充电 —— 命中就跳到对应页）
 //   • 行程（`store.tripHistory`：时间、里程、起止 SOC）
 //   • 指令历史（`store.commandHistory`：指令名、成功与失败）
-//   • 充电记录（`ChargeLedger` 的真实会话）
+//   • （充电记录已删：它来自已删除的充电账本）
 //
 // 搜不到就照实说「没有匹配」，不编造结果。
 // =============================================================================
@@ -196,20 +196,10 @@ struct GlobalSearchHUD: View {
             }
         }
 
-        // ⑥ 充电记录（真实会话：功率采样积分出来的度数）
-        for s in ChargeLedger.shared.sessions.prefix(30) {
-            let when = s.start.formatted(date: .abbreviated, time: .shortened)
-            let kwh = "\(ChargeLedger.kwhText(s.kWh)) kWh"
-            if when.lowercased().contains(q) || kwh.lowercased().contains(q) {
-                out.append(SearchResult(title: "充电 \(kwh)",
-                                        subtitle: "\(when) · ¥\(ChargeLedger.moneyText(ChargeLedger.shared.cost(s)))",
-                                        icon: "bolt.fill") { [nav] in
-                    nav.openMode(.battery)
-                })
-            }
-        }
+        // （⑥「充电记录」曾在这里：列出充电账本里的每一次会话与费用。
+        //  账本 2026-09-23 整条删除，搜索里这一节也随之去掉。）
 
-        // 标题命中排在前面；同权重保持来源顺序（页面 → 车 → 车况 → 行程 → 指令 → 充电）
+        // 标题命中排在前面；同权重保持来源顺序（页面 → 车 → 车况 → 行程 → 指令）
         let matched = out.filter { !$0.title.lowercased().contains(q) }
         let titled = out.filter { $0.title.lowercased().contains(q) }
         return Array((titled + matched).prefix(24))
@@ -235,16 +225,12 @@ struct GlobalSearchHUD: View {
     /// 一档的一句话与图标。穷举（无 default），理由同上。
     private static func pageMeta(for mode: HomeMode) -> (hint: String, icon: String) {
         switch mode {
-        case .now: return ("位置与当前状态", "location.fill")
-        case .vehicle: return ("车牌、保险、保养", "doc.text.fill")
-        case .health: return ("车端自检结论", "shield.lefthalf.filled")
-        case .battery: return ("SOC、充电、账单", "battery.100")
+        case .now: return ("位置与状态", "location.fill")
+        case .vehicle: return ("档案、体检、保养", "car.fill")
+        case .charge: return ("充电、电池、趋势", "bolt.fill")
         case .control: return ("锁车、空调、寻车", "dot.radiowaves.left.and.right")
         case .trips: return ("行程与事件", "chart.bar.fill")
-        case .service: return ("保养、保险、账单、估值", "wrench.and.screwdriver.fill")
-        case .mine: return ("车辆、账号、隐私", "person.fill")
-        case .emergency: return ("拖车、保险、救援电话", "exclamationmark.octagon.fill")
-        case .dev: return ("设计令牌、运行状态、诊断", "wrench.adjustable")
+        case .mine: return ("账号、设置、应急", "person.fill")
         }
     }
 }

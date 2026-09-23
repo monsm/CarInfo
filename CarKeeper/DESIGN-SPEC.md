@@ -93,7 +93,7 @@ view.kanseiBreathe(opacity: 0.3, scale: 1.02)
 
 ## 六、页面布局规范
 
-### 车况页 (HomeView)
+### 车况页 (MapSpineView —— 地图即主屏；旧 HomeView 已并入地图脊背)
 ```
 ┌─────────────────────┐
 │   LivingCar 投影    │  ← 全屏车身剪影 + 呼吸光效
@@ -124,7 +124,7 @@ view.kanseiBreathe(opacity: 0.3, scale: 1.02)
 └─────────────────────┘
 ```
 
-### 充电页 (BatteryView)
+### 充电页 (ChargeView)
 ```
 ┌─────────────────────┐
 │   SOC 渐变光环      │  ← 环形进度

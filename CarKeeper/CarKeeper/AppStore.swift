@@ -25,14 +25,16 @@ final class AppStore: @unchecked Sendable {
     var car: [String: Any]? = nil
     var user: [String: Any]? = nil
 
-    // 缓存（charge / pm25 / location / control / check / messages）
+    // 最近一次 API 响应（charge / pm25 / location / control / check / messages）。
+    //
+    // **这里不是缓存**：不做 TTL、不跨启动落盘、失败不保留旧值。
+    // 它只装「刚刚从接口拿到的那一份」，所以界面上的每个数字都能追溯到一次真实响应；
+    // 某个源这次没取到，就把它清掉，让界面显示自己的空/失败态 ——
+    // 而不是继续端着上一次的读数（那才是缓存，也是「看着是数据其实早过期」的来源）。
     var caches: [String: Any?] = [
         "charge": nil, "pm25": nil, "location": nil,
         "control": nil, "check": nil, "messages": nil
     ]
-    // 缓存时间戳，用于 TTL 过期（3 分钟）
-    private var cacheTimestamps: [String: Date] = [:]
-    static let cacheTTL: TimeInterval = 180
 
     // 上一次已经喊过「位置变了」的坐标（`.locationUpdated` 的去重门槛）。
     // 初始是 NaN，所以第一条定位报文一定会被判为「动了」—— 第一次总要喊。
@@ -101,9 +103,9 @@ final class AppStore: @unchecked Sendable {
     /// 上次选中的车辆 id（重启后恢复，否则每次都跳回第一辆）
     nonisolated static let selectedCarIdKey = "carkeeper_selected_car_id"
 
-    /// App Group id：必须与 CarKeeper.entitlements / project.yml / Widgets / WatchApp 保持一致，
-    /// 不一致时小组件、表盘、灵动岛读不到任何数据（永远是 0）。
-    nonisolated static let appGroupId = "group.com.you.CarKeeper"
+    // 这里曾有 `appGroupId = "group.com.you.CarKeeper"`：小组件 / 表盘 / 灵动岛读快照用的
+    // 共享容器。App Group 是免费账号拿不到的能力，而读它的那三个扩展已全部删除 ——
+    // 保留一个没有任何读者的容器 id 只会误导下一处改动。
     var lastServiceMileage: Int {
         get { UserDefaults.standard.integer(forKey: Self.lastServiceMileageKey) }
         set { UserDefaults.standard.set(newValue, forKey: Self.lastServiceMileageKey) }
@@ -176,15 +178,9 @@ final class AppStore: @unchecked Sendable {
         set { UserDefaults.standard.set(newValue, forKey: "carkeeper_parking_time") }
     }
 
-    // #NEW-4 上车打卡
-    var lastCheckInDate: Date? {
-        get { UserDefaults.standard.object(forKey: "carkeeper_last_checkin") as? Date }
-        set { UserDefaults.standard.set(newValue, forKey: "carkeeper_last_checkin") }
-    }
-    var checkInCount: Int {
-        get { UserDefaults.standard.integer(forKey: "carkeeper_checkin_count") }
-        set { UserDefaults.standard.set(newValue, forKey: "carkeeper_checkin_count") }
-    }
+    // #NEW-4「上车打卡」已删（2026-09-23）：它的两个键 `carkeeper_last_checkin` /
+    // `carkeeper_checkin_count` 与 `checkIn()` **全库零个调用点** —— 写进去之后
+    // 没有任何界面读它。一个没有人看的计数就是这一轮要清的东西。
 
     // #NEW-3 离线模式标记
     var isOfflineMode: Bool = false
@@ -238,20 +234,10 @@ final class AppStore: @unchecked Sendable {
         return max(0, min(100, (efficiencyScore + stabilityScore) / 2))
     }
 
-    // #NEW-6 Siri 快捷指令最近使用统计
-    var siriUsageCount: [String: Int] {
-        get {
-            let dict = UserDefaults.standard.dictionary(forKey: "carkeeper_siri_usage") as? [String: Int] ?? [:]
-            return dict
-        }
-        set { UserDefaults.standard.set(newValue, forKey: "carkeeper_siri_usage") }
-    }
-
-    func recordSiriUsage(_ action: String) {
-        var count = siriUsageCount[action] ?? 0
-        count += 1
-        siriUsageCount[action] = count
-    }
+    // #NEW-6「Siri 快捷指令使用次数」已删（2026-09-23）：它把每个短语被用过几次
+    // 写进 UserDefaults（`carkeeper_siri_usage`），唯一用途是在快捷指令页上
+    // 多显示一行「已用过 N 次」。那是「本机攒出来的数」里最不重要的一类。
+    // 删掉之后快捷指令页只剩两件真事：这个短语是什么、当前用不用得了。
 
     func recordEnergySnapshot(soc: Int, rangeKm: Int) {
         // 防止重复记录（同一分钟内只记一次）
@@ -413,13 +399,6 @@ final class AppStore: @unchecked Sendable {
             }
         }
         processedEventIds = seen
-    }
-
-    // #NEW-4 打卡
-    func checkIn() {
-        lastCheckInDate = Date()
-        checkInCount += 1
-        UserDefaults.standard.synchronize()
     }
 
     // `unreadMessageCount` 已删：它**永远返回 0**，而且全仓零个读取点 ——
@@ -594,19 +573,6 @@ final class AppStore: @unchecked Sendable {
         inFlightRequests.remove(key)
     }
 
-    /// 判断指定 key 是否需要重新拉取（缓存缺失 或 已过期）
-    func needsRefresh(_ key: String) -> Bool {
-        guard let v = caches[key] else { return true }
-        // 只判断类型是否正确：caches 同时存 dict（control/location/charge 等）
-        // 和 array（messages 是 [[String: Any]]）。
-        // 原来只检查 [String: Any]，导致 messages 永远类型不匹配 →
-        // needsRefresh 永远返回 true → 每次打开都重新请求，且如果上一次请求
-        // 返回了 []，那 [] 就被写进缓存，之后 3 分钟内再打进来永远是空。
-        // 改成「dict 或 array 都算合法类型」即可。
-        guard v is [String: Any] || v is [[String: Any]] else { return true }
-        return isCacheExpired(key)
-    }
-
     // 这里原有 `pendingQuickCtrl`（首页把指令「穿透」给车控页，由车控页执行）。
     // 已删：**全库没有任何地方写入过它** —— 读它的只有车控页的 onAppear，
     // 而首页从来没设过。批 1 之后地图上的操作条直接执行指令，这条路已无必要。
@@ -724,9 +690,10 @@ final class AppStore: @unchecked Sendable {
             }
             var out: [String: Any?] = [:]
             for await (key, value) in group {
-                // ⚠️ 只收成功的结果。任何子请求失败都不要返回 nil ——
-                // 否则 saveCache 会把上一份好数据擦掉（弱网下整页从有值变成全 0）。
-                guard let value else { continue }
+                // 成功的收值，失败的收 nil —— 失败的也必须落进来：
+                // 由 saveCache 把那个源清空，界面如实显示「这次没取到」。
+                // （早先是「失败就跳过」，于是弱网下界面继续显示上一次的读数 ——
+                //  那就是缓存，也正是这一轮要去掉的东西。）
                 out[key] = value
             }
             return out
@@ -734,13 +701,10 @@ final class AppStore: @unchecked Sendable {
     }
 
     func saveCache(_ patch: [String: Any?]) {
-        let now = Date()
         for (k, v) in patch {
-            // ⚠️ nil = 该数据源本次拉取失败：保留旧值、不刷新时间戳，
-            // 绝不覆盖（这是弱网下数据凭空消失的根因）。
-            guard let v else { continue }
+            // nil = 这个源本次没取到：清空它。界面自己会说「没取到」，
+            // 而不是继续显示上一次的读数（不保留旧值是刻意的 —— 见 caches 上的说明）。
             caches[k] = v
-            cacheTimestamps[k] = now
         }
         // 事件 → 行程：消息缓存是**唯一**的入口（网络与缓存共用同一条路径，
         // 所以「上次打开时拿到的那些事件」也会被补上，不会只算新来的）。
@@ -762,7 +726,7 @@ final class AppStore: @unchecked Sendable {
             offlineMessage = ""
         } else if !patch.isEmpty && isLoggedIn {
             isOfflineMode = true
-            offlineMessage = "网络异常，显示缓存数据"
+            offlineMessage = "网络异常"
         }
         // 「车的位置变了」必须真有人喊出来。
         //
@@ -781,8 +745,7 @@ final class AppStore: @unchecked Sendable {
                 NotificationCenter.default.post(name: .locationUpdated, object: nil)
             }
         }
-        // 把最新车况同步到 App Group（小组件 / 表盘 / 灵动岛的数据源）
-        syncSharedDefaults()
+        // 把最新车况同步给小组件 / 表盘 / 灵动岛的那一步已删除（见下面 syncSharedDefaults 的说明）
         // 车端时间序列采样（SOC / 充电功率 / 胎压三条趋势曲线的唯一来源）
         recordHistory()
     }
@@ -847,97 +810,21 @@ final class AppStore: @unchecked Sendable {
         }
     }
 
-    // MARK: - 与 Widget / Watch / 实时活动共享数据
-    /// 把车况写进 App Group，供小组件（Widgets/WidgetBundle.swift）与表盘（WatchApp）读取。
-    /// · 零散键（widget_* / watch_*）给表盘用，键名与表盘代码必须一致。
-    /// · 结构化快照（SharedStore.snapshotKey）给小组件与实时活动用，字段只有一份定义。
-    /// 没有 App Group 能力（未签名 / 侧载重签）时写入的是普通 UserDefaults：不会崩，只是不共享。
-    func syncSharedDefaults() {
-        guard let defaults = UserDefaults(suiteName: Self.appGroupId) else { return }
-        let e = VM.energy(caches, car)
-        let comfort = VM.comfortStatus(caches)
-        let control = ciVal(caches, "control")
+    // 这里曾有 `syncSharedDefaults()`：把车况写进 App Group，供小组件（Widgets/）、
+    // 表盘（WatchApp/）与灵动岛读取。**2026-09-23 整段删除**，因为那条链路在免费
+    // （未缴 99 美元）开发者账号下根本没有一条可用路径：App Group 这个能力拿不到，
+    // 侧载重签会把它摘掉；扩展本身也未必被签进包里。于是三个 target、两份共享文件、
+    // 三份 entitlements 与 App 侧的这段写入逻辑一并删掉 —— 不再往外写任何快照。
+    // 详见 project.yml 里「WidgetBundle / WatchApp / WatchKitApp 三个 target 全删」那一段。
 
-        let soc = e.socPct
-        let rangeKm = Int(e.range.filter { $0.isNumber }) ?? 0
-        let temp = comfort.cabinTemp
-        // 锁止状态：DriverDoorLock == 0 表示已锁（报文里没有 DoorLocked 这个键）
-        let locked = ciNumber(control, ["DriverDoorLock"]).map { $0 == 0 } ?? true
-        let charging = isCharging
-        let powerText = chargingPowerHistory.last.map { String(format: "%.1f", $0.power) } ?? ""
-
-        // 小组件
-        defaults.set(soc, forKey: "widget_soc")
-        defaults.set(rangeKm, forKey: "widget_range")
-        defaults.set(temp, forKey: "widget_temp")
-        defaults.set(locked, forKey: "widget_locked")
-        defaults.set(charging, forKey: "widget_charging")
-        defaults.set(isOfflineMode, forKey: "widget_offline")
-        defaults.set(powerText, forKey: "widget_power")
-
-        // Watch
-        defaults.set(soc, forKey: "watch_soc")
-        defaults.set(rangeKm, forKey: "watch_range")
-        defaults.set(temp, forKey: "watch_temp")
-        defaults.set(locked, forKey: "watch_locked")
-        defaults.set(charging, forKey: "watch_charging")
-        defaults.set(totalMileage, forKey: "watch_mileage")
-
-        // 结构化快照：小组件与充电实时活动读的就是这一个键。
-        // 字段只有一份定义（Shared/WidgetTokens.swift 的 VehicleSnapshot），
-        // 不再靠"键名字符串两边都对得上"来维系 —— 写错键名不会报错，只会安静地显示 0。
-        // 位置：从 location 缓存取 Lat/Lng（与小程序 home.js 一致，键是大小写混合）。
-        // 取不到时保持 nil，地图 UI 会降级到静态位置显示而不是假装知道车在哪。
-        let loc = caches["location"] as? [String: Any]
-        let snapLat = ciNumber(loc, ["Lat"])
-        let snapLng = ciNumber(loc, ["Lng"])
-
-        let snapshot = VehicleSnapshot(
-            soc: soc,
-            rangeKm: rangeKm,
-            cabinTemp: temp,
-            locked: locked,
-            charging: charging,
-            chargePower: chargingPowerHistory.last?.power,
-            // ⚠️ ChargingSession.timeToFull 本身就是 String?，
-            // 直接取会得到 String?? —— 用 ?? nil 拍平，否则赋给 String? 通不过编译
-            timeToFull: e.charging?.timeToFull ?? nil,
-            offline: isOfflineMode,
-            mileageKm: totalMileage,
-            chargeCls: e.chargeCls,
-            updatedAt: Date(),
-            lat: snapLat,
-            lng: snapLng
-        )
-        // 内容真变了才刷小组件时间线、才动实时活动。
-        //
-        // ⚠️ 这里原来写着「车况每 60 秒轮询一次」—— 那句注释把行为说得比现实更勤快：
-        // 全库**没有车辆轮询循环**（只有指令结果轮询 12×5 s、短信倒计时、后台刷新 15/30 min）。
-        // 车况刷新只发生在用户动作或回到前台时，所以这一层「内容没变就不推」比注释里
-        // 设想的情形更必要 —— 它现在是真的在防重复推送。
-        if SharedStore.write(snapshot) {
-            LiveActivityBridge.sync(snapshot)
-        }
-    }
-
-    /// 返回指定 key 的缓存是否已过期（超过 TTL）
-    func isCacheExpired(_ key: String) -> Bool {
-        guard let ts = cacheTimestamps[key] else { return true }
-        return Date().timeIntervalSince(ts) > Self.cacheTTL
-    }
-
-    /// 返回「已过期、需要重新拉取」的数据键。
-    /// ⚠️ 不再删除缓存值：断网时必须继续显示旧数据，否则每次 TTL 到期整页都会变空。
-    func staleKeys() -> [String] {
-        let now = Date()
-        return cacheTimestamps
-            .filter { now.timeIntervalSince($0.value) > Self.cacheTTL }
-            .map(\.key)
-    }
-
+    /// 清空所有数据源（退出登录、切车时用）。
+    ///
+    /// 这里曾有一对 `isCacheExpired` / `staleKeys`（3 分钟 TTL）与一个 `needsRefresh`：
+    /// 它们只用来决定「要不要再请求一次」，而那一套恰恰是缓存思维的产物 ——
+    /// 数据只在 TTL 内算数、过期了又舍不得删。现在每个消费者只问一件事：
+    /// **这次请求回来了没有**；没回来就显示没回来。
     func clearCache() {
         caches = ["charge": nil, "pm25": nil, "location": nil, "control": nil, "check": nil, "messages": nil]
-        cacheTimestamps.removeAll()
     }
 
     // #24 首页卡片自定义排序
@@ -988,28 +875,21 @@ final class AppStore: @unchecked Sendable {
         energyHistory = []
         chargingPowerHistory = []
         commandHistory = []
-        // 实时活动与小组件快照同样绑定账号：退出时一起清掉，
-        // 否则锁屏 / 桌面上会继续显示上一个账号的车牌与电量。
-        LiveActivityBridge.endAll()
-        SharedStore.clear()
+        // （这里曾有 LiveActivityBridge.endAll() 与 SharedStore.clear()：清掉锁屏实时活动
+        //  与小组件快照。两者随小组件体系一并删除，现在 App 不再往外写任何快照。）
         // 趋势曲线同样是这个账号的车端数据：不清理会留给下一个登录的账号
         HistoryStore.shared.clear()
         isOfflineMode = false
         offlineMessage = ""
         parkingLocation = nil
         lastParkingTime = nil
-        lastCheckInDate = nil
-        checkInCount = 0
         UserDefaults.standard.removeObject(forKey: Self.lastServiceMileageKey)
-        UserDefaults.standard.removeObject(forKey: "carkeeper_last_checkin")
-        UserDefaults.standard.removeObject(forKey: "carkeeper_checkin_count")
         UserDefaults.standard.removeObject(forKey: "carkeeper_parking_time")
         // 家庭成员 / 临时钥匙 / 里程账本 / 保险费 / Siri 使用统计 —— 全是跟账号绑定的数据
         FamilyManager.shared.resetAll()
         TempKeyManager.shared.resetAll()
         UserDefaults.standard.removeObject(forKey: "carkeeper_mileage_entries")
         UserDefaults.standard.removeObject(forKey: "carkeeper_insurance_policies")
-        UserDefaults.standard.removeObject(forKey: "carkeeper_siri_usage")
         NotificationCenter.default.post(name: .didLogout, object: nil)
     }
 
@@ -1073,7 +953,7 @@ final class AppStore: @unchecked Sendable {
         }
     }
 
-    // 总里程（写入点是 recordHistory；读的人有 syncSharedDefaults → 小组件 / 表盘）
+    // 总里程（写入点是 recordHistory；读到它的有车辆页的保养计划与行程统计）
     var totalMileage: Int {
         get { UserDefaults.standard.integer(forKey: "carkeeper_total_mileage") }
         set { UserDefaults.standard.set(newValue, forKey: "carkeeper_total_mileage") }

@@ -34,8 +34,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # ---- 允许出现字面量的文件：这是「令牌定义处」，不是「例外」 -------------------
 TOKEN_FILES = {
     "CarKeeper/CarKeeper/Design/Tokens.swift": "设计令牌的唯一来源（字号/间距/圆角/字距）",
-    "CarKeeper/Shared/WidgetTokens.swift": "小组件与实时活动的世界面令牌（App 也从这里取值，避免漂移）",
     "CarKeeper/CarKeeper/Design/ArtTheme.swift": "艺术主题的取值表：换主题就是换这里的值",
+    # 这里曾列出 "CarKeeper/Shared/WidgetTokens.swift"（小组件与实时活动那份世界面令牌）。
+    # 那份文件随小组件 / 表盘扩展一起删除，不再存在 —— 留着它会让这条清单看起来
+    # 覆盖了一个其实没有的文件。
 }
 
 # ---- 显式豁免：必须写出理由，输出成 ⚠️ 而不是 ✅ -----------------------------
@@ -45,13 +47,9 @@ EXEMPT = {
         "主题样张页：它的**职责**就是把主题的真实取值显示给人看（用眼睛挑主题），"
         "所以它必须打印原始数值，而不是引用令牌 —— 引用令牌会让样张与真机看起来一样，"
         "而它的用途恰恰是「核对样张与真机是否一致」。",
-    "CarKeeper/WatchApp/WatchApp.swift":
-        "watchOS 上的字号是按 155pt 画布另定的一套，而且它**不能**共享 WT 那份令牌："
-        "`WT.Palette` 里的系统语义色在 watchOS 上不存在 —— 已对 Apple 文档 JSON 核实"
-        "（secondarySystemGroupedBackground 的 platforms = iOS / iPadOS / Mac Catalyst / visionOS，"
-        "无 watchOS），所以手表这一份只能是自己的阶梯。",
-    "CarKeeper/WatchApp/WatchApp/Sources/WatchApp.swift":
-        "同上（这是 Watch 扩展 target 的那一份副本，由 paths.py 保证两份一字不差）。",
+    # 这里曾有 WatchApp.swift 两条豁免：watchOS 上的字号是按 155pt 画布另定的一套，
+    # 且它不能共享 WT 那份令牌（系统语义色在 watchOS 上不存在）。
+    # 手表那两个 target 已随免费账号清理整体删除，豁免也随之作废。
 }
 
 # ---- 规则 -------------------------------------------------------------------

@@ -92,7 +92,7 @@ struct RawDataSection: View {
     /// 和它当页面导航栏标题时长得一样，只是现在它在内容里。
     private var sectionBar: some View {
         HStack(spacing: TokensSpacing.lg) {
-            DSSectionHeader(title: "车端原始字段")
+            DSSectionHeader(title: "车端原始读数")
             kindMenu
             Button { copyAll() } label: { Image(safeSymbol: "doc.on.doc", fallback: "doc.on.doc") }
                 .accessibilityLabel(Text("复制全部数据"))
@@ -157,7 +157,7 @@ struct RawDataSection: View {
 
     private var footerText: String {
         let fields = blocks.reduce(0) { $0 + $1.rows.count }
-        var s = "共 \(blocks.count) 组 · \(fields) 个字段"
+        var s = "共 \(blocks.count) 组 · \(fields) 项"
         let t = VM.nowText()
         if !t.isEmpty { s += " · \(t)" }
         return s
@@ -244,24 +244,19 @@ struct RawDataSection: View {
     private func loadIfNeeded() {
         guard !store.carId.isEmpty else { loading = false; return }
         guard loadTask == nil || loadTask!.isCancelled else { return }
-        let needsFetch = switch kind {
-        case .status: store.needsRefresh("control")
-        case .charge: store.needsRefresh("charge")
-        case .location: store.needsRefresh("location")
-        case .env: store.needsRefresh("pm25")
-        case .check: store.needsRefresh("check")
-        default: false
-        }
-        if needsFetch {
+        // 五个源每次进入都真取一次：不再看 TTL，也不再因为「手上有值」就跳过。
+        // `.analysis` / `.user` / `.car` 不是独立数据源（由现有响应与登录态派生），不触发请求。
+        switch kind {
+        case .status, .charge, .location, .env, .check:
             loadTask = Task { await load() }
-        } else {
+        default:
             blocks = reloadBlocks()
             errText = ""
             loading = false
         }
     }
 
-    // kind 切换时优先用缓存，缓存为空才拉取
+    // kind 切换：先渲染手上这份响应，空则取一次
     private func onKindChange() {
         loadTask?.cancel()
         loadTask = nil
@@ -310,10 +305,12 @@ struct RawDataSection: View {
             if newBlocks.isEmpty { err = "暂无车辆档案" }
         }
 
-        // 缓存为空时尝试拉取
-        if newBlocks.isEmpty && kind != .analysis && kind != .user && kind != .car && !carId.isEmpty {
+        // 该源这次没取到（或还没取过）就真取一次；取回来了就把「暂无…」那句撤掉。
+        // 早先这里是「缓存为空时才拉取」，而「缓存」本身正是这一轮去掉的东西。
+        if kind != .analysis && kind != .user && kind != .car && !carId.isEmpty {
             await fetchMissing()
             newBlocks = reloadBlocks()
+            if !newBlocks.isEmpty { err = "" }
         }
 
         blocks = newBlocks

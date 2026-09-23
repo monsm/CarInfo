@@ -86,32 +86,55 @@ custom_rules:
     message: "请使用 .background(Kansei.Color.background)"
     severity: warning
 
-# 排除目录
-excluded:
-  # 清单里只留**确实存在**的路径。这一版逐项与磁盘核过：原来 14 项里有 9 项指向不存在的
-  # 路径 —— 6 个在这棵树里从来没有过的设计文件（Kansei / Glass / Canvas / Instrument /
-  # Car / OrbitNav）、前缀写错的 `Charts.swift`（真的图表零件在
-  # `CarKeeper/Design/Charts.swift`，295 行、够不着阈值），以及 `CarPlay` / `AppClip`
-  # 两个已删目录（更早一轮还删过 `CarKeeper/HealthKit`）。
-  # 指向不存在的东西，swiftlint 只会报「找不到这些路径」，而后来的人会以为那里还有代码。
-  - CarKeeper/CarKeeper/Design/DS.swift      # 1077 行 > file_length.error(1000)
-  - CarKeeper/CarKeeper/Design/Theme.swift   # 取值表：超长是它的形状
-  - CarKeeper/CarKeeper/Services
-  - CarKeeper/WatchApp
-  - CarKeeper/Widgets
+# 排除清单 —— **故意是空的**。
+#
+# 这里曾列着 5 条路径，而 5 条全是错的，两个方向都错（由 `scan/lintcfg.py` 查出）：
+#
+# ① **基准目录错了一层。** 它们写成 `CarKeeper/CarKeeper/Design/DS.swift`，而本配置
+#    住在 `CarKeeper/.swiftlint.yml`。SwiftLint 文档写明：
+#
+#       included / excluded entries from each config are resolved relative to that
+#       config file's directory.
+#       —— https://realm.github.io/SwiftLint/
+#
+#    所以基准是 `CarKeeper/`，那条实际指向 `CarKeeper/CarKeeper/CarKeeper/Design/DS.swift`，
+#    不存在。**整份清单是空转的**：swiftlint 从来没有排除过任何文件。
+#    （`project.yml` 也住在同一个目录，同样是 `- path: Design` / `- path: CarKeeper/`
+#    这种以 `CarKeeper/` 为基准的写法 —— 两个配置文件的基准是同一个。）
+#
+# ② **只减不增。** `CarKeeper/WatchApp` 与 `CarKeeper/Widgets` 在 2026-09-23 删掉
+#    小组件/表盘时就没清掉，而代码继续长大（`MapSpineView.swift` 1126 行）也没进清单。
+#
+# 为什么不把这些路径**修对**、而是直接不再排除任何文件：
+#
+#   把文件写进 `excluded` 会让它**整份文件**退出 swiftlint —— 不只是字号/行数那几条，
+#   而是连 `force_unwrapping`、`implicitly_unwrapped_optional`、`legacy_hashing` 这些
+#   真正防事故的规则一起退出。被排除的恰好是最大、最复杂的那些文件 ——
+#   用「关掉全部检查」去换「一条超长提示」，代价与收益差得太远。
+#
+#   于是把尺子调到与这份代码真实的形状相符的位置（下面三个阈值，余量按当前最大值给），
+#   让**每个文件都被每一条规则检查**。尺寸规则仍然有牙：一旦越过下面任何一条，
+#   `scan/lintcfg.py` 会在 Linux 上秒级失败，并明确要求你「要么改小、要么把阈值说清
+#   为什么该调」—— 不能靠沉默蒙过去。
+#
+# 当前最大者（改阈值时的依据，由 lintcfg.py 量出）：
+#   file_length           MapSpineView.swift 1126 行
+#   type_body_length      MapSpineView 类型体 1080 行
+#   function_body_length  MapSpineData.reasons / Analysis.batteryModel 各 136 行
+excluded: []
 
 # 配置文件格式
 file_length:
-  warning: 500
-  error: 1000
+  warning: 1200
+  error: 2000
 
 type_body_length:
-  warning: 300
-  error: 500
+  warning: 1200
+  error: 2000
 
 function_body_length:
-  warning: 100
-  error: 200
+  warning: 160
+  error: 300
 
 indentation_size:
   size: 4

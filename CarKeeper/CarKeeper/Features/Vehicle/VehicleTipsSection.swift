@@ -11,8 +11,14 @@ import SwiftUI
 struct VehicleTipsSection: View {
     private let store = AppStore.shared
     @State private var selectedCategory: TipCategory = .all
-    @State private var dismissedTips: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "dismissed_tips")
- ?? [])
+    /// 已忽略的提示。
+    ///
+    /// ⚠️ 它以前会写进 `UserDefaults("dismissed_tips")` —— 2026-09-23 按用户要求
+    /// 去掉了**持久化**（那一组「本机小记录」里的最后一项）。现在「忽略」与
+    /// 「全部已读」只在本次运行内生效，重启后提示会重新出现。
+    /// 这与「主题 / 地图图层」那类偏好不同：那些改变的是 App 的行为，
+    /// 而这一份只是「我看过了」的记账 —— 它就属于这一轮要清的东西。
+    @State private var dismissedTips: Set<String> = []
 
     // 智能提示引擎
     var tips: [VehicleTip] {
@@ -211,16 +217,10 @@ struct VehicleTipsSection: View {
     // MARK: - 操作
     private func dismiss(_ tip: VehicleTip) {
         dismissedTips.insert(tip.id)
-        persistDismissed()
     }
 
     private func dismissAll() {
         for tip in filteredTips { dismissedTips.insert(tip.id) }
-        persistDismissed()
-    }
-
-    private func persistDismissed() {
-        UserDefaults.standard.set(Array(dismissedTips), forKey: "dismissed_tips")
     }
 
     private func handleAction(_ tip: VehicleTip) {

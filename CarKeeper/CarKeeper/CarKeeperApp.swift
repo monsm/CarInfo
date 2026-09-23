@@ -144,8 +144,7 @@ struct CarKeeperApp: App {
     private func openDeeplink(_ url: URL) {
         guard let link = Deeplink(url: url) else { return }
         guard store.isLoggedIn else { return }   // 未登录时先让用户完成登录，登录后可从界面进入
-        // 深链也不准开出「第二份页面」：能对应到某一档的就拨模式条，
-        // 对应不到的（隐私 / OTA / 家庭 / 钥匙）才 push。
+        // 深链也不准开出「第二份页面」：一律拨到对应档位（+ 档内段）。
         // 此前写的是 `nav.path = [link]` —— 于是 `carkeeper://vehicle` 会开出一份
         // 与「车辆」那一档内容完全相同的跳入式页面，两种返回行为、两套排版。
         nav.openMode(for: link)
@@ -203,9 +202,9 @@ struct CarKeeperApp: App {
             if let c = store.currentLocation?.coordinate {
                 Task { await WeatherService.shared.refreshIfNeeded(coordinate: c) }
             }
-            // #N38 崩溃上报初始化
-            CrashReporter.shared.setup()
-            // #N39 内存监控启动
+            // #N38 崩溃上报（CrashReporter）已删：它把崩溃历史写进 UserDefaults
+            // 只为给「诊断」页看，用户明确要求把这类本机统计一并去掉。
+            // #N39 内存监控启动（不落盘，只是此刻的读数）
             MemoryMonitor.shared.startMonitoring(interval: 10)
             // #N37 网络质量监控
             _ = NetworkQualityMonitor.shared
@@ -226,8 +225,8 @@ struct CarKeeperApp: App {
             // #NEW-120 Siri/快捷指令：真正的 AppIntent 在 Features/SiriShortcuts.swift。
             // 旧的那份 `AppIntentsManager`（空桩）已删；旧的 INIntent 子类也没有
             // Intent Extension target 去注册，永远不可能被唤起。
-            // E17-E18 触觉反馈 + E47 性能监控启动
-            _ = PerformanceTracker.shared
+            // E47 性能监控（PerformanceTracker）已删：页面耗时与接口成功率两项
+            // 都是写进 UserDefaults 给「诊断」页看的本机统计，属这一轮要删的东西。
             // E38 专注模式监听
             _ = FocusModeManager.shared
             // E40 充电状态监控（此前只写了 `_ = ChargingStatusMonitor.shared`，
@@ -257,17 +256,15 @@ final class NavState: ObservableObject, @unchecked Sendable {
     @Published var currentToast: (text: String, icon: String)? = nil
     /// 全局搜索是否展开（地图工具栏与「车与账号」都能把它打开）
     @Published var showSearch = false
+    /// 档内段落的提示（深链用，如 `carkeeper://health` = 车辆档的健康段）。
+    /// hub 页消费它之后置 nil —— 消费掉是必须的，否则会反复被拉回那一段。
+    @Published var homeSub: HomeSub? = nil
 
     private init() {}
 
+    /// 回栈顶。现在栈**永远是空的**（见 `path` 上的说明），保留它是因为
+    /// 「回到地图」这个动作在几处收尾逻辑里仍然要表达一次。
     func popToRoot() { path = [] }
-
-    /// 统一导航：从任意位置 push 深潜页。
-    ///
-    /// 旧的 `targetTab:` 参数已删 —— 没有 Tab 可切，导航只有一个栈。
-    func pushNavigation(_ link: Deeplink) {
-        path.append(link)
-    }
 
     /// 进入某一档功能界面 —— **去功能只有这一种走法**。
     ///
@@ -277,15 +274,21 @@ final class NavState: ObservableObject, @unchecked Sendable {
     ///
     /// 只做两件事：写 `HomeMode` 的持久化键（`MapSpineView` 用 `@AppStorage`
     /// 订阅它，条子会自己滑过去）+ 清空栈回到地图。
-    func openMode(_ mode: HomeMode) {
+    /// `sub` 是档内段落（车辆：档案/健康/保养；我的：设置/应急/诊断）。
+    func openMode(_ mode: HomeMode, sub: HomeSub? = nil) {
         UserDefaults.standard.set(mode.rawValue, forKey: HomeMode.storageKey)
+        homeSub = sub
         path = []
     }
 
-    /// 按深链进：能对应到某一档就拨条子，对应不到（隐私 / OTA / 家庭 / 钥匙……
-    /// 这些不是档位，是档案与设置）就照原样 push。
+    /// 按深链进：**每个深链都落到某一档**（`HomeMode.destination(for:)`）。
+    ///
+    /// 这里曾有一个 push 分支（「对应不到的：隐私 / OTA / 家庭 / 钥匙」）。
+    /// 那些页面现在都住在「我的」档里，而功能界面只有模式条这一种存在方式 ——
+    /// 于是全库再没有任何地方 push 页面，栈永远是空的。
     func openMode(for link: Deeplink) {
-        if let mode = HomeMode(link: link) { openMode(mode) } else { pushNavigation(link) }
+        let to = HomeMode.destination(for: link)
+        openMode(to.mode, sub: to.sub)
     }
 }
 
@@ -307,37 +310,9 @@ struct MapShellView: View {
     @State private var lowBatteryArmed = true
     private let networkMonitorTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
-    /// 深潜页目标视图（独立函数避免巨型 switch 拖慢类型检查）
-    @ViewBuilder
-    private func deeplinkDestination(_ link: Deeplink) -> some View {
-        switch link {
-        case .vehicle: VehicleView().environmentObject(nav)
-        case .health: HealthDataView().environmentObject(nav)
-        case .battery: BatteryView().environmentObject(nav)
-        case .dev: DevView().environmentObject(nav)
-        case .control: ControlView().environmentObject(nav)
-        // 仪表盘（DashboardView）已删除：它的三块内容（SOC 曲线 / 三个指标块 /
-        // 评分环）分别由电池页的趋势、地图主屏的「现在」层和评分页承接，
-        // 而它那三个子分数是用总分做算术编出来的（score / 3、+10、+20）。
-        // `.dashboard` / `.score` 都是**别名**：驾驶评分现在是出行页里的一节
-        // （`ScoreSection`），深链指到那一页，不再有单独的评分页。
-        case .dashboard: TripsEventsView().environmentObject(nav)
-        case .trips: TripsEventsView().environmentObject(nav)
-        case .service: MaintenanceMoneyView().environmentObject(nav)
-        // .parking 已并入行程时间轴（同一份停车史：时间轴列旅程，地图「停车」层
-        // 画常停圈，两处同源）。深链指向时间轴，不再指向已删除的页面。
-        case .parking: TripsEventsView().environmentObject(nav)
-        // .export（导出数据页）已并入保养与钱（ExportDataSection）——
-        // 导出的就是那几类记录，它和钱/保养在同一屏里更短一步。
-        case .emergency: EmergencyPanel().environmentObject(nav)
-        // .tips（车辆提示页）已并入车辆档案 —— 见 `Deeplink` 枚举上的注释。
-        case .score: TripsEventsView().environmentObject(nav)
-        // 「车与账号」（原「我的」Tab 的根页）。**它必须在这里有一个 case** ——
-        // 它就是设置类内容的唯一去处（批 3 已完成：27 个磁贴的功能目录已改成设置分组，
-        // 功能目录只剩底部模式条一份）。
-        case .mine: MineView().environmentObject(nav)
-        }
-    }
+    // 这里原有 `deeplinkDestination(_:)`（深链 → push 一份页面）。已删：
+    // 现在每个深链都落到模式条上的某一档 + 档内某一段（`HomeMode.destination`），
+    // 所以「深潜页」这件事不再存在 —— 功能界面只有一种存在方式。
 
     /// 唯一的栈：根是地图主屏（Features/Map/MapSpineView.swift）。
     /// 车的一切都发生在某个地方，所以导航长在地方上；
@@ -345,9 +320,8 @@ struct MapShellView: View {
     private var mapStack: some View {
         NavigationStack(path: $nav.path) {
             MapSpineView()
-                .navigationDestination(for: Deeplink.self) { link in
-                    deeplinkDestination(link)
-                }
+                // 没有 `.navigationDestination`：栈里不放任何页面 ——
+                // 功能界面是模式条上的一档，不是 push 出来的第二份内容。
                 // 导航栏材质交给系统：iOS 26/27 会在内容滚动到其下方时自动给出材质。
                 // 手写 .toolbarBackground 反而会把系统行为覆盖掉。
         }

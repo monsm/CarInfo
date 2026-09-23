@@ -74,15 +74,10 @@ struct HomeModeHead: View {
             }
             return Hero(value: s?.plate ?? "--", caption: "里程还没上报",
                         size: 44, tint: TokensPalette.secondary)
-        case .battery:
+        case .charge:
             let e = VM.energy(store.caches, store.car)
             return Hero(value: "\(e.socPct)", unit: "%",
                         caption: Self.line([e.range.isEmpty ? nil : "续航 \(e.range)", e.carName]))
-        case .health:
-            guard let h = VM.healthModel(ciVal(store.caches, "check")) else {
-                return Hero(value: "--", caption: "还没有体检记录", size: 44, tint: TokensPalette.secondary)
-            }
-            return Hero(value: "\(h.scorePct)", unit: "分", caption: Self.line(["体检 \(h.time)"]))
         case .control:
             let c = VM.comfortStatus(store.caches)
             return Hero(value: c.cabinTemp, unit: "°C",
@@ -92,15 +87,6 @@ struct HomeModeHead: View {
             let km = today.reduce(0.0) { $0 + $1.distanceKm }
             return Hero(value: String(format: "%.1f", km), unit: "km",
                         caption: today.isEmpty ? "今天还没有行程" : "今天 · \(today.count) 段")
-        case .service:
-            guard let p = VM.maintenancePlan(store.car, store.controlCache) else {
-                return Hero(value: "--", unit: "km",
-                            caption: "先在保养页登记上次保养",
-                            size: 44, tint: TokensPalette.secondary)
-            }
-            return Hero(value: "\(max(0, p.remaining))", unit: "km",
-                        caption: p.fromServer ? "距下次保养 · 服务端" : "距下次保养 · 本机",
-                        tint: p.remaining <= 0 ? TokensPalette.error : TokensPalette.primary)
         case .mine:
             let plate = VM.vehicleSummary(store.car, store.controlCache)?.plate
             if let u = VM.userModel(store.user) {
@@ -109,15 +95,6 @@ struct HomeModeHead: View {
                             caption: Self.line([plate, u.mobile]), size: 44)
             }
             return Hero(value: "--", caption: "还没取到账号信息", size: 44, tint: TokensPalette.secondary)
-        case .emergency:
-            // 应急的「主角」是那个要拨出去的号码（可改，存在紧急联系人里）。
-            // 它是这一页唯一一个“先看一眼再按”的数值，所以它归巨字。
-            let contact = UserDefaults.standard.string(forKey: "emergency_contact") ?? "110"
-            return Hero(value: contact.isEmpty ? "110" : contact,
-                        size: 54, tint: TokensPalette.error)
-        case .dev:
-            return Hero(value: "\(store.caches.count)", unit: "项缓存",
-                        caption: store.carId.isEmpty ? "carId 还没取到" : "carId 已取到", size: 44)
         }
     }
 
@@ -136,16 +113,13 @@ struct HomeModeHead: View {
                 Fact(key: "保险", value: Self.line([s.insuranceEnd,
                                                     s.insuranceDays.map { "\($0) 天后" }]))
             ]
-        case .battery:
+        case .charge:
             let e = VM.energy(store.caches, store.car)
             return [
                 Fact(key: "充电", value: e.chargeText, cls: e.chargeCls),
                 Fact(key: "电压电流", value: e.voltAmp),
                 Fact(key: "电池温度", value: e.battTemp)
             ]
-        case .health:
-            guard let h = VM.healthModel(ciVal(store.caches, "check")) else { return [] }
-            return h.counts.prefix(3).map { Fact(key: $0.key, value: $0.n, cls: $0.cls) }
         case .control:
             // 车锁 / 车窗 / 后备箱这类「开还是关」的事实：直接用车况芯片，
             // 它们本来就是从 `control` 报文里读出来的同一批值。
@@ -157,13 +131,6 @@ struct HomeModeHead: View {
                 Fact(key: t.startTime.formatted(date: .abbreviated, time: .shortened),
                      value: String(format: "%.1f km", t.distanceKm))
             }
-        case .service:
-            guard let p = VM.maintenancePlan(store.car, store.controlCache) else { return [] }
-            return [
-                Fact(key: "当前里程", value: "\(p.current) km"),
-                Fact(key: "上次保养", value: "\(p.last) km"),
-                Fact(key: "间隔", value: "\(p.interval) km")
-            ]
         case .mine:
             let u = VM.userModel(store.user)
             let authed = u?.authed == true
@@ -172,25 +139,6 @@ struct HomeModeHead: View {
                      cls: authed ? "ok" : "warn"),
                 Fact(key: "车辆", value: "\(store.cars.count) 辆"),
                 Fact(key: "上次登录", value: Self.line([u?.lastLoginTime, nil]))
-            ]
-        case .emergency:
-            let s = VM.vehicleSummary(store.car, store.controlCache)
-            return [
-                Fact(key: "位置", value: store.currentLocation == nil ? "还没取到" : "已取到",
-                     cls: store.currentLocation == nil ? "warn" : "ok"),
-                Fact(key: "车辆", value: Self.line([s?.plate, s?.model])),
-                Fact(key: "保险", value: Self.line([s?.insuranceEnd,
-                                                    s?.insuranceDays.map { "\($0) 天后" }]))
-            ]
-        case .dev:
-            // 消息缓存是**数组**（`MessagesSection` 存的就是 `[[String: Any]]`），
-            // 不能用 `ciVal` —— 它只返回 `[String: Any]?`，`as? [[String: Any]]` 恒失败，
-            // 结果是这一行永远显示 0 条（看起来像「消息拉不到」，其实只是取错了形状）。
-            let msgs = (store.caches["messages"] as? [[String: Any]])?.count ?? 0
-            return [
-                Fact(key: "车辆列表", value: "\(store.cars.count) 辆"),
-                Fact(key: "消息缓存", value: "\(msgs) 条"),
-                Fact(key: "行程记录", value: "\(store.tripHistory.count) 段")
             ]
         }
     }

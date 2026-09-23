@@ -2,9 +2,13 @@
 """跨 target 符号可见性检查。
 
 project.yml 里各 target 的源文件是分开的：
-  · 扩展/小组件/watch target **不能** 使用 App target 里的类型（无法 import App 模块）
-  · 同一个文件被两个 target 同时编译时（Shared/），其引用必须两个 target 都能满足
+  · 测试 target 不能使用 App target 里没有的类型
+  · 同一个文件被两个 target 同时编译时，其引用必须两个 target 都能满足
 每个 target 只声明了自己那批文件里的类型 —— 这里找出「引用了别处才有的项目内符号」。
+
+⚠️ 2026-09-23：WidgetBundle / WatchApp / WatchKitApp 三个 target 已随小组件体系整体删除
+（免费账号拿不到 App Group，那套东西没有一条可用路径）。这里曾列着它们与 Shared/ ——
+留着只会让门禁去追一批不存在的目录。
 """
 import re
 import sys
@@ -13,11 +17,9 @@ from scan import (read, target_files, DECL, EXT, TYPE_REF, CALL_REF, MEMBER_REF,
 
 # target -> project.yml 里的 sources
 TARGETS = {
-    "CarKeeper": ["CarKeeper", "Design", "Services", "Models", "HealthKit", "Shared"],
-    "WidgetBundle": ["Widgets", "Shared"],
-    "WatchApp": ["WatchApp/WatchApp.swift", "WatchApp/ComplicationController.swift"],
-    "WatchKitApp": ["WatchApp/WatchApp/Sources"],
-    # CarPlay 与 AppClip 两个 target 已删（免费账号无法配置所需能力）——
+    "CarKeeper": ["CarKeeper", "Design", "Services", "Models"],
+    # CarPlay / AppClip / WidgetBundle / WatchApp / WatchKitApp 四个 target 与
+    # HealthKit 目录都已删（免费账号无法配置所需能力，或代码早已不存在）——
     # 这里不保留“幽灵 target”，否则门禁会去追一批不存在的目录。
 }
 EXTS = {"swiftui", "uikit", "foundation", "combine", "widgetkit", "watchkit",

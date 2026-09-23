@@ -22,7 +22,7 @@ import Combine
 //     ① 只发经纬度，**保留两位小数**（约 1.1 km 网格）—— 云量不需要比这更准；
 //     ② 只发 HTTPS，只发这一个域名，不带任何车辆标识 / 账号 / 设备号；
 //     ③ **不落盘**：快照只活在内存里，杀进程就没了。
-//   隐私面板里有一条对应的披露（PrivacyDashboardView）。
+//   隐私那一节里有一条对应的披露（PrivacySection）。
 //
 // 失败时怎么办：**保持沉默但诚实** —— 快照留在 nil，界面回到晴空模型并写明
 //「无天气数据」。绝不拿默认值冒充实况。
@@ -213,7 +213,7 @@ final class WeatherService: ObservableObject {
                                           latitude: coordinate.latitude,
                                           longitude: coordinate.longitude,
                                           at: Date()) else {
-                status = .failed("响应里没有天气字段")
+                status = .failed("取不到天气")
                 return
             }
             current = parsed

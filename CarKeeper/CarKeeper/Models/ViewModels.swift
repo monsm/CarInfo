@@ -297,7 +297,10 @@ enum VM {
         // #1 充电倒计时：(100 - socPct) / power(kW) * 60 = 分钟
         var timeToFull: String? = nil
         if chargeSt == "1" || chargeSt == "2" {
-            if let powerKw = ciNumber(charge, ["ChargPower", "ChargingPower"]), powerKw > 0.1, socPct < 100 {
+            // ⚠️ 这里原来读 `ChargPower` / `ChargingPower` —— 报文里**没有**这两个键，
+            // 于是「预计充满」恒为空（电池页与小组件都写着它，却永远显示不出来）。
+            // 唯一算法在 `chargePowerKW`（totalVoltage × totalCurrent）。
+            if let powerKw = chargePowerKW(charge, control), powerKw > 0.1, socPct < 100 {
                 let minutes = Int(Double(100 - socPct) / powerKw * 60)
                 if minutes > 0 {
                     let h = minutes / 60

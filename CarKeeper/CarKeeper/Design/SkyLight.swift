@@ -236,7 +236,7 @@ struct SkyLight {
                             value: "\(Int(radiation.rounded())) W/m²",
                             note: weather == nil
                                 ? "晴空模型 1050×sin(高度角)，不是实测"
-                                : "晴空模型 × 云量衰减 (1 − 0.75 × 云量^3.4)"))
+                                : "晴空模型 × 云量衰减"))
         rows.append(SkyFact(id: "mode", label: "界面模式",
                             value: isDaylight ? "日光（纸）" : "夜行（深）",
                             note: "辐照度 > 150 W/m² 切日光模式"))

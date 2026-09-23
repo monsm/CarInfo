@@ -19,8 +19,17 @@ BASELINE = REPO / "scan" / "baseline"
 # 后静默 exit 0（「没检查」长得和「没问题」一模一样，是最危险的一种绿）。
 BASELINE_CACHE = REPO / "scan" / "baseline_cache.json"
 
-APP = ["CarKeeper", "Design", "Services", "Models", "HealthKit", "Shared"]
-WIDGET = ["Widgets", "Shared"]
+# App target 的源码根（相对 `CarKeeper/`，即 project.yml 所在目录）。
+# ⚠️ 这里曾列着 `HealthKit` 与 `Shared` —— 两个目录都已删除，而 `target_files`
+# 对不存在的目录是**静默跳过**的：「目录没了」与「目录里没东西」输出一样。
+# 现在少了目录就直接失败（见 target_files 的说明）。
+#
+# 2026-09-23：`WIDGET = ["Widgets", "Shared"]` 整个类别已删。小组件/表盘/实时活动
+# 随免费账号清理一起删除后，那两棵目录不存在了 —— WIDGET 那半边从此只会打印
+# 「重复声明: 0 / 幽灵构造: 0」。**一个恒为 0 的绿灯不算绿灯**：它让「检查过」与
+# 「没检查」无法区分。将来真重新引入扩展 target，要同时把 WIDGET 这类别加回来 ——
+# `scan/paidcap.py` 会拦住「悄悄把扩展加回来」这种做法。
+APP = ["CarKeeper", "Design", "Services", "Models"]
 
 KEYWORDS = {
     "func", "var", "let", "case", "if", "else", "static", "in", "for", "while",
@@ -74,13 +83,26 @@ def read(p):
 
 
 def target_files(roots, base=CK):
+    """roots 里每一项都必须真实存在 —— 目录不存在不报错，会让「检查范围」静默缩小。"""
     out = []
+    missing = []
     for r in roots:
         p = base / r
         if p.is_dir():
             out += sorted(p.rglob("*.swift"))
-        elif p.suffix == ".swift":
+        elif p.suffix == ".swift" and p.is_file():
             out.append(p)
+        else:
+            missing.append(str(p))
+    if missing:
+        print("❌ 声明了不存在的源码路径:")
+        for m in missing:
+            print(f"   {m}")
+        print("   目录已删就从清单里去掉；目录该在就把目录找回来。")
+        return None
+    if not out:
+        print("❌ 声明的源码路径里一个 .swift 都没有 —— 检查范围是空的。")
+        return None
     return out
 
 
@@ -495,9 +517,10 @@ def ghost_calls(label, paths, baseline_types, current_types, current_funcs):
 
 def main():
     app_paths = target_files(APP)
-    widget_paths = target_files(WIDGET)
+    if app_paths is None:
+        return 1
 
-    for label, paths in (("APP", app_paths), ("WIDGET", widget_paths)):
+    for label, paths in (("APP", app_paths),):
         seen = {}
         for p in paths:
             text = read(p)
@@ -548,11 +571,9 @@ def main():
     # 注意：基线信号只能用 **声明**（bt | bf）。第一版把 bcalls（基线代码里的调用）
     # 也算进来，结果 Text/VStack 这些 SDK 调用全成了"基线声明过的名字"，一次 164 个假阳性。
     app_types, _, app_funcs, _, _, _, _, _ = analyze(app_paths)
-    widget_types, _, widget_funcs, _, _, _, _, _ = analyze(widget_paths)
     base_decls = bt | bf
     found = report("APP", app_paths, (sdk_types, sdk_calls, sdk_methods))
     found["幽灵构造"] = ghost_calls("APP", app_paths, base_decls, app_types, app_funcs)
-    found["幽灵构造-widget"] = ghost_calls("WIDGET", widget_paths, base_decls, widget_types, widget_funcs)
     total = sum(found.values())
     if total:
         print("\n❌ 高嫌疑汇总: " + "  ".join(f"{k}={v}" for k, v in found.items() if v))

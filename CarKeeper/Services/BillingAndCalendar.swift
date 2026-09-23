@@ -1,105 +1,23 @@
 // =============================================================================
-// N32 充电历史账单 PDF + N33 车辆估值 + N34 年检日历
+// N33 车辆估值 + N34 年检日历
 // =============================================================================
+//
+// ⚠️ 这里曾有 N32「充电历史账单 PDF」：`ChargeRecord` + `ChargeBillGenerator`
+//    + 页面上的 `ChargeBillSection`。整块随**充电账本**一起删除（2026-09-23）。
+//
+//    为什么删：账本算的是「这几次充电花了多少钱」——它的两个输入一个是 App 自己
+//    采的功率、另一个是用户手填的电价，服务端**没有**任何账单接口。用户的要求是
+//    「全局删掉缓存机制，任何数据都是 api 数据」，账本正是「本机算出来的数」，
+//    于是整条链路（本机积分 → 折钱 → 出 PDF）一并去掉。
+//
+//    连带不见的：充电页的「充电账单」段与导出按钮、地图「充电」层的那块账、
+//    搜索里的「充电记录」、月报里的充电次数/度数两行，以及「电价」这个设置项
+//    （它唯一的用途就是折算账本上的钱）。`import PDFKit` 也随之删除 ——
+//    全库不再有任何 PDF 渲染。
 
 import Foundation
-import PDFKit
 import SwiftUI
 import UIKit
-
-// MARK: - N32 充电历史账单 PDF
-/// 账单里的一行。**数据来自 `ChargeLedger` 的真实会话**（功率采样积分出来的 kWh），
-/// 不是人工记账；SOC 取不到就是 nil —— 那一格在 PDF 里印 `--`，不编一个数字。
-struct ChargeRecord: Codable {
-    let date: Date
-    let kWh: Double
-    let cost: Double
-    let socStart: Int?
-    let socEnd: Int?
-}
-
-class ChargeBillGenerator {
-    static let shared = ChargeBillGenerator()
-
-    func generatePDF(records: [ChargeRecord], vehiclePlate: String) -> URL? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy年MM月"
-        let monthStr = formatter.string(from: Date())
-
-        let pdfRenderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))
-        let pdfData = pdfRenderer.pdfData { ctx in
-            ctx.beginPage()
-
-            // 标题
-            let titleAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 24, weight: .bold),
-                .foregroundColor: UIColor.label
-            ]
-            "充电账单".draw(at: CGPoint(x: 40, y: 60), withAttributes: titleAttrs)
-
-            // 月份
-            let subAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 14, weight: .regular),
-                .foregroundColor: UIColor.secondaryLabel
-            ]
-            "\(vehiclePlate) · \(monthStr)".draw(at: CGPoint(x: 40, y: 95), withAttributes: subAttrs)
-
-            // 汇总
-            let totalKWh = records.map { $0.kWh }.reduce(0, +)
-            let totalCost = records.map { $0.cost }.reduce(0, +)
-            let summary = "总计：\(String(format: "%.1f", totalKWh)) kWh · ¥\(String(format: "%.2f", totalCost))"
-            let sumAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 16, weight: .semibold),
-                .foregroundColor: UIColor.systemGreen
-            ]
-            summary.draw(at: CGPoint(x: 40, y: 130), withAttributes: sumAttrs)
-
-            // 表格头
-            let headerY: CGFloat = 170
-            let colX: [CGFloat] = [40, 180, 280, 380, 480]
-            let headers = ["日期", "SOC 起始", "SOC 结束", "度数", "费用"]
-            headers.enumerated().forEach { i, h in
-                h.draw(at: CGPoint(x: colX[i], y: headerY), withAttributes: subAttrs)
-            }
-
-            // 分割线
-            UIColor.separator.withAlphaComponent(0.3).setStroke()
-            let line = UIBezierPath(rect: CGRect(x: 40, y: headerY + 20, width: 515, height: 1))
-            line.stroke()
-
-            // 记录行
-            let rowAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 12),
-                .foregroundColor: UIColor.label
-            ]
-            records.prefix(20).enumerated().forEach { idx, record in
-                let rowY = headerY + 35 + CGFloat(idx) * 25
-                formatter.dateFormat = "MM/dd"
-                let dateStr = formatter.string(from: record.date)
-                let row = [dateStr,
-                           record.socStart.map { "\($0)%" } ?? "--",
-                           record.socEnd.map { "\($0)%" } ?? "--",
-                           String(format: "%.1f", record.kWh), String(format: "%.2f", record.cost)]
-                row.enumerated().forEach { i, text in
-                    text.draw(at: CGPoint(x: colX[i], y: rowY), withAttributes: rowAttrs)
-                }
-            }
-
-            // 底部说明：把「这些数字是怎么来的」印在纸上，而不是只写在代码里
-            let note = "度数由车端功率采样积分得出；费用 = 度数 × 你设的电价（非充电站实际价）。"
-            let noteAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 10),
-                .foregroundColor: UIColor.tertiaryLabel
-            ]
-            note.draw(at: CGPoint(x: 40, y: 790), withAttributes: noteAttrs)
-        }
-
-        let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = docsDir.appendingPathComponent("charge_bill_\(monthStr).pdf")
-        try? pdfData.write(to: fileURL)
-        return fileURL
-    }
-}
 
 // MARK: - N33 车辆估值
 class VehicleValuation {
@@ -227,7 +145,7 @@ struct InspectionSection: View {
 
                 // ② 年检
                 DSGroup(title: "年检",
-                        footer: "\u{201C}即将到期\u{201D}按 60 天算。过期的那条会标红。") {
+                        footer: "\u{201C}即将到期\u{201D}按 60 天算。") {
                     ForEach(calendar.inspections.sorted { $0.date < $1.date }) { inspection in
                         DSGroupRow {
                             DSRow(icon: "calendar",
@@ -247,7 +165,7 @@ struct InspectionSection: View {
 
                 // ③ 保险
                 DSGroup(title: "保险",
-                        footer: "只存你填的字段；保费合计 = 保单之和。") {
+                        footer: "只存你填的内容；保费合计 = 保单之和。") {
                     ForEach(policies) { p in
                         DSGroupRow {
                             DSKeyValueRow(key: "\(p.name) · \(p.type)",
@@ -411,7 +329,7 @@ struct VehicleValuationSection: View {
                 // 先把「这是什么」说在前面：它是**按一条固定规则算出来的估算**，
                 // 不是二手车市场价。把规则印在结果的上面，而不是藏在页脚。
                 DSNotice(kind: .info,
-                         text: "按下方折旧规则算的**估算**，不是市场价。")
+                         text: "按下方折旧规则算的估算值，不是市场价。")
 
                 DSGroup(title: "车的条件") {
                     DSGroupRow {
@@ -452,9 +370,10 @@ struct VehicleValuationSection: View {
                     }
                 }
 
-                DSGroup(title: "用的是什么规则",
-                        footer: "系数写在 `VehicleValuation.estimateValue` 里，"
-                              + "可直接改。") {
+                // 「系数写在 VehicleValuation.estimateValue 里，可直接改」这句页脚已删：
+                // 它是给改代码的人看的一句话，对车主没有意义 —— 而下面两行已经
+                // 把规则本身说清楚了。
+                DSGroup(title: "用的是什么规则") {
                     DSGroupRow { DSKeyValueRow(key: "年限折旧", value: "前 3 年每年 −15%，之后每年 −10%") }
                     DSGroupRow(showsSeparator: false) {
                         DSKeyValueRow(key: "里程折旧", value: "每 1 万公里 −2%，上限 −30%")
@@ -470,82 +389,8 @@ struct VehicleValuationSection: View {
     }
 }
 
-// MARK: - UI: 充电账单 Sheet
-/// 充电账单。
-///
-/// 同样从「车与账号」的弹层并进**保养与钱**（`ChargeBillSection`）。
-struct ChargeBillSection: View {
-    private let store = AppStore.shared
-    @State private var savedFile: URL? = nil
-
-    /// **真实充电记录**：来自 `ChargeLedger`（车端 1 分钟一个的功率采样积分出 kWh），
-    /// 费用 = 度数 × 用户自设电价。
-    /// 旧版这里写的是 `return []` —— 于是账单页永远显示「暂无充电记录」，
-    /// 而下面那句「完成首次充电后将自动生成月度账单」永远等不到。
-    private var records: [ChargeRecord] {
-        ChargeLedger.shared.sessions.map { s in
-            ChargeRecord(date: s.start,
-                         kWh: s.kWh,
-                         cost: ChargeLedger.shared.cost(s),
-                         socStart: s.socStart,
-                         socEnd: s.socEnd)
-        }
-    }
-
-    private var totalKWh: Double { records.map(\.kWh).reduce(0, +) }
-    private var totalCost: Double { records.map(\.cost).reduce(0, +) }
-
-    var body: some View {
-        Group {
-            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSSectionHeader(title: "充电账单")
-
-                if records.isEmpty {
-                    DSPlaceholder(icon: "bolt.slash",
-                                  title: "还没有充电记录",
-                                  message: "App 只在充电中采样，"
-                                         + "一次会话满 0.5 kWh 才会出现在这里。")
-                } else {
-                    DSGroup(title: "合计") {
-                        DSGroupRow {
-                            DSKeyValueRow(key: "充电次数", value: "\(records.count) 次")
-                        }
-                        DSGroupRow {
-                            DSKeyValueRow(key: "总度数", value: "\(ChargeLedger.kwhText(totalKWh)) kWh")
-                        }
-                        DSGroupRow(showsSeparator: false) {
-                            DSKeyValueRow(key: "总费用",
-                                          value: "¥\(ChargeLedger.moneyText(totalCost))（按你设的 \(ChargeLedger.rateText(ChargeLedger.shared.rate)) 元/度）")
-                        }
-                    }
-
-                    DSGroup(title: "每一次充电",
-                            footer: "度数 = ∫功率 dt（梯形法，每分钟一个采样）；"
-                                  + "费用按你设的电价算，不是充电站实际价。") {
-                        ForEach(Array(records.enumerated()), id: \.offset) { idx, r in
-                            DSGroupRow(showsSeparator: idx < records.count - 1) {
-                                DSKeyValueRow(key: r.date.formatted(date: .abbreviated, time: .shortened),
-                                              value: "\(ChargeLedger.kwhText(r.kWh)) kWh · ¥\(ChargeLedger.moneyText(r.cost))")
-                            }
-                        }
-                    }
-
-                    Button {
-                        savedFile = ChargeBillGenerator.shared.generatePDF(
-                            records: records,
-                            vehiclePlate: store.car?["plate"] as? String ?? "车辆")
-                    } label: {
-                        Label("导出 PDF 账单", systemImage: "doc.fill")
-                    }
-                    .buttonStyle(DSPrimaryButtonStyle())
-
-                    if let f = savedFile {
-                        // 说清文件到底去哪了（旧版写的是「已保存到文件 App」，而我们写的是沙盒）
-                        DSNotice(kind: .success,
-                                 text: "已生成 \(f.lastPathComponent)（在 App 的文稿目录里；从「文件」App → 我的 iPhone → 长安车管家 可以看到）。")
-                    }
-                }
-            }
-        }
-    }
-}
+// MARK: - UI: 充电账单
+//
+// ChargeBillSection 曾住在这里（充电页的「充电账单」段 + 导出 PDF 按钮）。
+// 整块随充电账本删除（2026-09-23）—— 理由见文件开头 N32 那段说明。
+// 删掉它之后，本文件只剩两件与**用户自己填的记录**有关的事：车辆估值与年检日历。

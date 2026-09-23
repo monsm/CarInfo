@@ -258,8 +258,8 @@ struct LoginView: View {
     private var footer: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             DSDivider()
-            Text("登录走长安车联网接口（changan.com.cn）；密码不会被保存，控制用的 PIN 存在本机 Keychain。"
-                 + "登录令牌存在本机，退出会清除。")
+            Text("登录走长安车联网；密码不保存，控制 PIN 存在本机。"
+                 + "退出登录会清除令牌。")
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

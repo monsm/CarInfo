@@ -1,74 +1,16 @@
 // =============================================================================
-// N38 崩溃日志上报 + N39 内存监控
+// N39 内存监控
 // =============================================================================
+//
+// ⚠️ 这里曾有 N38「崩溃日志捕获与上报」（`CrashReporter`）。2026-09-23 整块删除：
+//    它把最近 5 条崩溃写进 UserDefaults（`carkeeper_crash_log`），**只给「诊断」页
+//    看一个条数**。用户这一轮的要求是「全局删掉缓存机制，任何数据都是 api 数据」，
+//    而这是最典型的「本机攒出来的数」—— 写它的只有 App 自己，读它的只有一个界面。
+//    删掉它意味着再也拿不到自己 App 的崩溃堆栈（系统崩溃报告仍在
+//    「设置 → 隐私与安全性 → 分析与改进」里，那份才是权威的那份）。
+//    同时删掉的还有只为它存在的 `Date.iso8601` 扩展。
 
 import Foundation
-
-// MARK: - N38 崩溃日志捕获与上报
-
-/// 顶层 C 兼容异常处理回调（NSSetUncaughtExceptionHandler 需要函数指针）
-private func carkeeperUncaughtExceptionHandler(_ exception: NSException) {
-    CrashReporter.shared.logCrash(exception)
-}
-
-class CrashReporter : ObservableObject {
-    static let shared = CrashReporter()
-
-    private let logFileKey = "carkeeper_crash_log"
-
-    private init() {}
-
-    func setup() {
-        // 捕获 Swift 未处理异常（C 函数指针只能指向顶层函数）
-        NSSetUncaughtExceptionHandler(carkeeperUncaughtExceptionHandler)
-
-        // 捕获信号异常（SIGSEGV 等）
-        signal(SIGABRT) { sig in
-            CrashReporter.shared.logSignalCrash(signal: sig)
-            _exit(sig)
-        }
-        signal(SIGSEGV) { sig in
-            CrashReporter.shared.logSignalCrash(signal: sig)
-            _exit(sig)
-        }
-    }
-
-    fileprivate func logCrash(_ exception: NSException) {
-        let log = """
-        === Crash Report \(Date().iso8601) ===
-        Exception: \(exception.name.rawValue)
-        Reason: \(exception.reason ?? "nil")
-        Backtrace: \(exception.callStackReturnAddresses.map { String(format: "0x%016lx", $0) }.joined(separator: "\n"))
-        =======================================
-        """
-        appendCrashLog(log)
-    }
-
-    private func logSignalCrash(signal: Int32) {
-        let log = """
-        === Signal Crash \(Date().iso8601) ===
-        Signal: SIG\(signal)
-        Backtrace: \(Thread.callStackSymbols.joined(separator: "\n"))
-        =======================================
-        """
-        appendCrashLog(log)
-    }
-
-    private func appendCrashLog(_ log: String) {
-        var history = readCrashHistory()
-        history.append(log)
-        if history.count > 5 { history = Array(history.suffix(5)) }
-        UserDefaults.standard.set(history, forKey: logFileKey)
-    }
-
-    func readCrashHistory() -> [String] {
-        UserDefaults.standard.stringArray(forKey: logFileKey) ?? []
-    }
-
-    func clearCrashHistory() {
-        UserDefaults.standard.removeObject(forKey: logFileKey)
-    }
-}
 
 // MARK: - N39 内存监控
 class MemoryMonitor: ObservableObject {
@@ -101,22 +43,15 @@ class MemoryMonitor: ObservableObject {
 
         let bytes = Double(taskInfo.resident_size)
         let mb = bytes / 1024.0 / 1024.0
-        let oldWarning = warningLevel
         warningLevel = mb > 500 ? 2 : mb > 300 ? 1 : 0
 
         DispatchQueue.main.async {
             self.usedMemoryMB = mb
-            // 内存警告时自动清理缓存
-            if oldWarning < self.warningLevel && self.warningLevel >= 2 {
-                AppStore.shared.clearCache()
-            }
+            // 这里原来写着「内存警告时自动清理缓存」：`AppStore.shared.clearCache()`。
+            // 已删 —— `caches` 现在装的是**刚刚那一次响应**，不是可以随时丢掉的副本：
+            // 清掉它等于把用户正在看的数字清空成空态，而内存并不会因此明显下降
+            // （它只是几个 JSON 字典）。
         }
     }
 }
 
-// MARK: - Date 辅助
-extension Date {
-    var iso8601: String {
-        ISO8601DateFormatter().string(from: self)
-    }
-}

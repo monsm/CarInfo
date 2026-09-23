@@ -13,10 +13,14 @@ import re
 import sys
 from pathlib import Path
 
+from _roots import swift_files
+
 STRICT = "--strict" in sys.argv
 ARGV = [a for a in sys.argv[1:] if not a.startswith("--")]
 
-TK = ["CarKeeper", "Services", "Shared", "Widgets", "WatchApp", "Models", "Design", "HealthKit"]
+# 源码根目录，逐项必须存在（见 `_roots.py` 的说明）。
+TK = ["CarKeeper/CarKeeper", "CarKeeper/Services", "CarKeeper/Models",
+      "CarKeeper/Design", "CarKeeper/Tests"]
 
 # 已核实的「现存」SDK / 标准库类型名 —— 嵌套同名 = 真遮蔽（默认即报错）。
 # 核实方式：Apple 文档 JSON 端点存在性（例：/documentation/swiftui/link.json 200）。
@@ -83,7 +87,7 @@ if ARGV:
         p = Path(a)
         files += [str(p)] if p.is_file() else sorted(str(x) for x in p.rglob("*.swift"))
 else:
-    files = sorted({str(p) for tk in TK for p in Path(tk).rglob("*.swift")})
+    files = swift_files(TK)
 
 hits = [h for f in files for h in scan_file(f)]
 real = [h for h in hits if h[3] in SDK_NAMES]

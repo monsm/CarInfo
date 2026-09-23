@@ -32,6 +32,7 @@ struct HealthDataView: View {
             } else if let model {
                 scoreSection(model)
                 systemsSection(model)
+                faultsSection
                 infoSection(model)
             } else if let err = errText {
                 DSPlaceholder(icon: "exclamationmark.triangle",
@@ -124,7 +125,38 @@ struct HealthDataView: View {
         .accessibilityElement(children: .contain)
     }
 
-    // MARK: - ② 检测系统（inset-grouped，逐项可展开）
+    // MARK: - ②' 故障码（从「充电」页搬进来：车端故障是健康问题，不是电池读数）
+    /// 数据源是控制报文里的 DTC（`batteryModel(store.caches).faults`），
+    /// 与电池页读的是同一份响应 —— 只是归属换了。没有码就整节不出现。
+    @ViewBuilder
+    private var faultsSection: some View {
+        let b = batteryModel(store.caches)
+        let active = b.faults.filter { $0.count > 0 }
+        if b.hasCtrl {
+            DSSection(title: "故障码",
+                      trailing: b.faultTotal > 0 ? "共 \(b.faultTotal) 条" : "无故障",
+                      trailingCls: b.faultTotal > 0 ? "bad" : "ok") {
+                if active.isEmpty {
+                    DSGroupRow(showsSeparator: false) {
+                        Text("均无故障")
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.secondary)
+                    }
+                } else {
+                    ForEach(Array(active.enumerated()), id: \.element.id) { idx, f in
+                        DSGroupRow(showsSeparator: idx < active.count - 1) {
+                            DSKeyValueRow(key: f.name,
+                                          value: f.codes.isEmpty ? "\(f.count) 条"
+                                                                 : "\(f.count) 条 · \(f.codes)",
+                                          valueCls: "bad")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - ③ 检测系统（inset-grouped，逐项可展开）
 
     private func systemsSection(_ m: HealthModel) -> some View {
         DSGroup(title: "检测系统",
@@ -359,7 +391,7 @@ struct HealthDataView: View {
     // MARK: - 数据
 
     private func loadIfNeeded() {
-        guard model == nil || store.isCacheExpired("check") else { return }
+        // 每次进入都取一次自检报告：没有 TTL 复用，也不拿上一次的响应凑合。
         loadTask = Task { await load() }
     }
 

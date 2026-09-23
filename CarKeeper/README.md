@@ -29,15 +29,19 @@ CarKeeper/
 |---|---|
 | 云函数 changanProxy | **移除**，URLSession 直连（keep-alive 解决 CDN 节点绑定） |
 | 登录（手机/图形/短信） | `LoginView`（异步加载图形码 + 60s 倒计时 + 安全重试） |
-| 车况首页 | `HomeView`（SOC Hero + 8 域状态 + 30s/8s 轮询 + 快控） |
+| 车况首页 | `MapSpineView`（地图即主屏；「现在」档 + 四个地图图层） |
 | 车控 | `ControlView`（锁/解锁 + 指令 + PIN 数字键盘 + 温度 Stepper + 轮询） |
-| 消息 | `MessagesView`（日期分组 + 就地展开 + 分类标签） |
-| 我的 | `MineView`（用户卡 + 车辆卡 + 常用入口 + 退出登录） |
-| 车辆档案 | `VehicleView`（名片 + 分组行 + VIN 复制） |
-| 健康报告 | `HealthView`（评分圆环 + 系统手风琴） |
-| 电池与充电 | `BatteryView`（Swift Charts 柱图 + 充电会话 + 故障码 + 告警） |
-| 全量数据 | `DataView`（8 种 kind + 复制 + 刷新） |
-| 开发者工具 | `DevView`（网络通道 + 请求日志 + 排查指引 + 清缓存） |
+| 消息 | 并入出行档：`MessagesSection`（日期分组 + 就地展开 + 分类标签） |
+| 我的 | `MineHubView`（分段：账号 / 车辆 / 数据 / 关于 → `MineView`） |
+| 车辆档案 | `VehicleHubView`（分段：档案 / 健康 / 保养；`VehicleView` + `HealthDataView` + `MaintenanceMoneyView`） |
+| 健康报告 | 并入车辆档：`HealthDataView`（评分圆环 + 系统手风琴） |
+| 电池与充电 | `ChargeView`（充电 + 电池 + 趋势曲线；2026-09-23 从零重写，旧 `BatteryView` 已删） |
+| 全量数据 | 并入健康档：`RawDataSection`（8 种 kind + 复制 + 刷新） |
+| 开发者工具 | `DevView`（网络通道 + 请求日志 + 排查指引）；入口在我的档 |
+
+入口只有一条：底部那条**能手滑的模式条**（`HomeMode`，6 档：现在 / 车辆 / 充电 /
+车控 / 出行 / 我的）。上表每一页都是某一档里的内容，不再是能被独立 push 出来的页面 ——
+这条规则由 `scan/oneentry.py` 在 CI 上守着。
 
 ## 本地构建
 

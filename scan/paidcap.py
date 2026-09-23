@@ -7,11 +7,14 @@
   本项目由 **未付费** 的 Apple 个人账号（Personal Team）安装到真机：
   CI 出未签名 IPA → 侧载工具用个人账号重新签名 → 装到手机。
 
-  个人账号能签名，但**配不了一些能力**。我们已经因此删过四轮：
+  个人账号能签名，但**配不了一些能力**。我们已经因此删过五轮：
     · `CloudSyncManager`（iCloud/CloudKit）—— 构造容器就抛 ObjC 异常杀进程；
     · `BackgroundTaskManager`（BGTaskScheduler）—— 代码注释自己写着「从未生效」；
     · `CarPlay/` target —— 免费账号无法配置 CarPlay entitlement；
-    · `AppClip/` target —— 调用前提是 associated-domains（已删）＋只能走 App Store 分发。
+    · `AppClip/` target —— 调用前提是 associated-domains（已删）＋只能走 App Store 分发；
+    · `WidgetBundle` / `WatchApp` / `WatchKitApp` 三个 target 与整份 App Group
+      共享机制 —— 小组件 / 表盘 / 灵动岛的界面都住在嵌套扩展里，而它们读的
+      `group.com.you.CarKeeper` 正是免费账号拿不到的 entitlement。
 
   这类东西的特征很讨厌：**编译通过、门禁全绿、UI 上也看得见入口**，
   只是点下去永远拿不到东西（或直接崩）。它们是「缝合怪」的另一种来源：
@@ -24,23 +27,26 @@
   （所以 `MKDirections` 也在本检查器的黑名单里）。
 
 判据（四类，全部对着上面那份清单）：
-  ① `.entitlements` 里只准出现白名单键。目前只有一项合法的：
-     `com.apple.security.application-groups`（小组件/Watch/实时活动共用车况快照）。
+  ① **不允许有任何 `.entitlements` 文件**。此前唯一合法的一项是 App Group
+     （小组件 / 表盘 / 灵动岛共用车况快照）—— 那三个扩展已整体删除，App Group
+     也就没有读者了；留着一份「谁都不读」的 entitlements 只会让人以为还有共享。
      其余任何键（iCloud、aps-environment、healthkit、associated-domains、
      usernotifications.*、in-app-purchase、weatherkit、homekit、nfc、wallet……）
-     都是付费专属，或者是已删功能的残留。
+     本来是付费专属，现在连白名单项也一起没有。
   ② `Info.plist` 里不准出现付费能力 / 已删功能留下的键 —— 留着就是在说一件不存在的事。
-  ③ 源码里不准 import / 调用付费能力：CloudKit、HealthKit、WeatherKit、StoreKit、
-     PassKit、HomeKit、GameKit、NetworkExtension、SensorKit、MusicKit、CoreNFC、
-     Sign in with Apple、App Attest、Family Controls、APNs 注册、MKDirections、
-     BGTaskScheduler、critical/time-sensitive 通知……
-  ④ `project.yml` 的 target 清单只准是这四个 + 测试：CarKeeper / WidgetBundle /
-     WatchApp / WatchKitApp / CarKeeperTests。AppClip / CarPlay 不许回来。
+  ③ 源码里不准 import / 调用付费能力或已删体系：CloudKit、HealthKit、WeatherKit、
+     StoreKit、PassKit、HomeKit、GameKit、NetworkExtension、SensorKit、MusicKit、
+     CoreNFC、Sign in with Apple、App Attest、Family Controls、APNs 注册、
+     MKDirections、BGTaskScheduler、critical/time-sensitive 通知、**WidgetKit**、
+     **ActivityKit**（实时活动的界面必须住在小组件扩展里）。
+  ④ `project.yml` 的 target 清单只准是：`CarKeeper` / `CarKeeperTests`。
+     AppClip / CarPlay / WidgetBundle / WatchApp / WatchKitApp 都不许回来 ——
+     它们在免费账号下**没有一条可用链路**。
 
-  另外一条纪律（不是能力问题，但同一类）：**App Group 的读取点必须有兜底**。
-  免费账号的签名流程可能把这份 entitlement 摘掉 —— 那时 `UserDefaults(suiteName:)`
-  返回 nil。有兜底（`?? .standard` 或 `guard let ... else`）时只是小组件显示占位；
-  没有兜底就是崩溃。本项目的读取点全部带兜底，这条守住它。
+  另外两条纪律：
+    · **不许再出现 `UserDefaults(suiteName:)`**（App Group 读取）。这份能力拿不到，
+      而现在也不该再有读者；真要用共享容器，先让 `scan/paidcap.py` 这条规则先动。
+    · **本地通知必须是本地的**：远程推送（APNs）要 ADP，这条由 ③ 覆盖。
 
 退出码：0 = 没有付费专属能力；1 = 有（或扫描失败）。
 """
@@ -56,17 +62,12 @@ SCAN_DIRS = [
     "CarKeeper/Services",
     "CarKeeper/Models",
     "CarKeeper/Design",
-    "CarKeeper/Shared",
-    "CarKeeper/Widgets",
-    "CarKeeper/WatchApp",
 ]
 
-# 合法 entitlement：允许的键 -> 为什么它在这里
-ENTITLEMENT_ALLOWED = {
-    "com.apple.security.application-groups":
-        "小组件 / Watch / 实时活动共用车况快照；读取点全部有兜底，"
-        "签名流程摘掉它时只是显示占位，不会崩",
-}
+# ① 现在**一个 entitlements 键都不允许**。
+# 这里保留一个空字典而不是直接删掉结构：等将来真有免费账号也能用的能力要加时，
+# 应当往这里加一项并写明「为什么这一项免费账号拿得到」。
+ENTITLEMENT_ALLOWED = {}
 
 # Info.plist 里禁止的键 -> 为什么
 PLIST_BANNED = {
@@ -76,6 +77,7 @@ PLIST_BANNED = {
     "NSHealthUpdateUsageDescription": "HealthKit 用途说明（写健康数据的代码已删）",
     "CKCloudKitEnabled": "CloudKit 残留开关（同步那套代码已删）",
     "NSAppClip": "App Clip 已删",
+    "NSSupportsLiveActivities": "实时活动已删（界面必须住在小组件扩展里，而那个扩展不存在了）",
     "aps-environment": "远程推送（ADP 专属）",
     "com.apple.developer.weatherkit": "WeatherKit（ADP 专属；天气已改用 Open-Meteo）",
     "com.apple.developer.healthkit": "HealthKit（已删）",
@@ -102,6 +104,8 @@ BANNED_IMPORTS = {
     "managedsettings": "ManagedSettings（需单独申请）",
     "backgroundtasks": "BGTaskScheduler（已删）",
     "pushkit": "PushKit（ADP 专属）",
+    "widgetkit": "小组件扩展已删（App Group 是免费账号拿不到的能力）",
+    "activitykit": "实时活动已删（界面必须住在小组件扩展里，而那个扩展不存在了）",
 }
 
 # 源码里禁止的 API -> 为什么
@@ -118,12 +122,24 @@ BANNED_APIS = {
     r"NSUbiquitousKeyValueStore": "iCloud 键值存储（已删）",
     r"requestAlwaysAuthorization": "常驻定位（需要 background location 能力）",
     r"beginBackgroundTask": "后台执行申请（在侧载 + 免费账号下拿不到时间片）",
+    # 实时活动：唯一入口是 ActivityKit 的 Activity<…>.request(...)
+    r"\bActivity<[^>]*>\s*\.\s*request": "实时活动（随小组件体系整份删除）",
+    r"\bActivity<[^>]*>\s*\.\s*update": "实时活动（随小组件体系整份删除）",
 }
 
-ALLOWED_TARGETS = {"CarKeeper", "WidgetBundle", "WatchApp", "WatchKitApp", "CarKeeperTests"}
+ALLOWED_TARGETS = {"CarKeeper", "CarKeeperTests"}
 
-APP_GROUP = re.compile(r"UserDefaults\(suiteName:")
-APP_GROUP_FALLBACK = re.compile(r"\?\?|else")
+# 已删的 target —— 单独列出来，因为它们的"错误信息"和其它白名单外的不一样：
+# 不是「付费账号才能配」，而是「免费账号下没有一条可用链路」。
+REMOVED_TARGETS = {
+    "WidgetBundle": "小组件 / 实时活动的界面，读 App Group（免费账号拿不到）",
+    "WatchApp": "表盘扩展，读 App Group",
+    "WatchKitApp": "手表 App，读 App Group",
+    "AppClip": "调用前提是 associated-domains，且只能走 App Store 分发",
+    "CarPlay": "免费账号无法配置 CarPlay entitlement",
+}
+
+APP_GROUP = re.compile(r"UserDefaults\s*\(\s*suiteName\s*:")
 
 
 def read(path):
@@ -176,16 +192,24 @@ def all_files(suffixes):
 
 
 def scan_entitlements(problems):
+    """① 不允许有任何 entitlements 文件。
+
+    2026-09-23 之前这里是「只准出现 App Group 这一个键」；App Group 的最后三个读者
+    （小组件 / 表盘 / 灵动岛）被删除后，连这一项也没有存在理由了 ——
+    而**留着文件比留着键更危险**：`CODE_SIGN_ENTITLEMENTS` 会在签名时真正
+    要求那份能力，免费账号的签名流程可能因此直接失败。
+    """
     files = all_files([".entitlements"])
     keys = 0
     for rel in files:
         text = read(rel)
-        for m in re.finditer(r"<key>([^<]+)</key>", text):
-            key = m.group(1)
-            keys += 1
+        found = [m.group(1) for m in re.finditer(r"<key>([^<]+)</key>", text)]
+        keys += len(found)
+        for key in found:
             if key not in ENTITLEMENT_ALLOWED:
                 problems.append((rel, f"① entitlement `{key}` 不在白名单里",
-                                 "免费账号配置不了它；如果确实已不需要，删掉这一项"))
+                                 "免费账号配置不了它；这一轮已把 App Group 一并删掉，"
+                                 "所以现在任何 entitlement 键都该先问「免费账号拿得到吗」"))
     return files, keys
 
 
@@ -211,10 +235,10 @@ def scan_sources(problems):
             for pat, why in BANNED_APIS.items():
                 if re.search(pat, line):
                     problems.append((f"{rel}:{i}", f"③ `{pat}`", why))
-            if APP_GROUP.search(line) and not APP_GROUP_FALLBACK.search(line):
-                problems.append((f"{rel}:{i}", "④ App Group 读取没有兜底",
-                                 "签名流程可能摘掉这份 entitlement，那时 suiteName 返回 nil —— "
-                                 "写 `?? .standard` 或 `guard let … else`"))
+            if APP_GROUP.search(line):
+                problems.append((f"{rel}:{i}", "④ App Group 读取（`UserDefaults(suiteName:)`）",
+                                 "App Group 是免费账号拿不到的能力，而读它的三个扩展已删；"
+                                 "现在 App 不再与任何进程共享数据，这一行本该不存在"))
     return files
 
 
@@ -225,9 +249,13 @@ def scan_targets(problems):
         problems.append(("CarKeeper/project.yml", "找不到 targets: 段", "路径或写法变了？"))
         return set()
     names = set(re.findall(r"(?m)^  ([A-Za-z][A-Za-z0-9_]*):\s*$", block.group(1)))
-    for n in sorted(names - ALLOWED_TARGETS):
-        problems.append(("CarKeeper/project.yml", f"④ target `{n}` 不在白名单里",
-                         "免费账号配不了它需要的能力（AppClip / CarPlay 就是这么删的）"))
+    for n in sorted(names):
+        if n in REMOVED_TARGETS:
+            problems.append(("CarKeeper/project.yml", f"④ target `{n}` 又回来了",
+                             REMOVED_TARGETS[n] + " —— 不要再加回来"))
+        elif n not in ALLOWED_TARGETS:
+            problems.append(("CarKeeper/project.yml", f"④ target `{n}` 不在白名单里",
+                             "免费账号配不了它需要的能力（AppClip / CarPlay 就是这么删的）"))
     return names
 
 
