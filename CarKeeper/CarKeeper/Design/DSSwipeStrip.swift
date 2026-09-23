@@ -84,10 +84,9 @@ struct DSSwipeStrip: View {
     /// 相邻标签的最大间距
     private var gapMax: CGFloat { barHeight * 0.73 }
 
-    @State private var c: CGFloat = 0            // 条正中对应到行内的坐标
+    @State private var c: CGFloat = 0            // 行内坐标：条正中对应到行里的位置
     @State private var expand: Double = 0
     @State private var cBase: CGFloat?
-    @State private var pvBase: Double?
     @State private var moved = false
     /// 收回计时器的代号。松手 620ms 后收回，但**手指若已经回到条子上**就作废 ——
     /// 原型 `setTimeout(()=>{ if(!this.dragging) targetExpand = 0 }, 620)`。
@@ -140,12 +139,17 @@ struct DSSwipeStrip: View {
         return rest + (open - rest) * CGFloat(expand)
     }
 
-    /// 静止时的限位：首尾那两档的透镜不能被条边切掉，
-    /// 所以两端各留「透镜的呼吸位」而不是硬 0（否则首档一选上，左边就空出一大片）。
+    /// 拖动时 `c`（=条正中在行里的位置）的限位：**整行可达范围** ——
+    /// 第一档能拖到条正中，最后档也能。
+    ///
+    /// ⚠️ 这里**不是**「透镜不被条边切掉」的限位。第一版把两件事揉在一个限位里，
+    /// 结果：
+    ///   · 静止时首尾档的透镜压不准自己的字（用户报的第 1 条）；
+    ///   · 拖动时两端夹死在「呼吸位」，最左/最右档永远够不着（用户报的第 2 条）。
+    /// 原型（`stack.html`）里条正中的行程是全行程，两端没有这道钳制。
     private func limits(width: CGFloat, gap: CGFloat) -> ClosedRange<CGFloat> {
-        let half = restWidth(width: width, gap: gap) / 2
-        let lo = half - pillPad
-        let hi = max(lo, rowWidth(gap: gap) - half + pillPad)
+        let lo = ideal(0, gap: gap)
+        let hi = ideal(Double(max(0, items.count - 1)), gap: gap)
         return lo...hi
     }
 
@@ -154,11 +158,6 @@ struct DSSwipeStrip: View {
     /// （第一版用「条左边缘」当几何量，条一变宽窗口就单边向右长，拖 140px 跳了 4 档）。
     private func screenX(_ rowX: CGFloat, width: CGFloat, c: CGFloat) -> CGFloat {
         width / 2 + rowX - c
-    }
-
-    /// 透镜所在的连续档位
-    private func pvValue(c: CGFloat, gap: CGFloat) -> Double {
-        Double((c - slot / 2) / pitch(gap))
     }
 
     /// 越界阻尼：拖得动，但越拖越沉。两端各留 0.35 档。
@@ -211,25 +210,26 @@ struct DSSwipeStrip: View {
             .allowsHitTesting(false)
     }
 
-    /// 玻璃透镜。它是**连续**的：拖动时压在两个字之间，而不是先亮谁后亮谁。
+    /// 玻璃透镜。它**钉在条正中**，永远不动 —— 「选中谁」由 `c` 把哪个字送到正中决定。
+    /// 第一版在这里用 `pvValue(c)` 反算位置，那是一个恒等变换（ideal(pvValue(c)) == c），
+    /// 算出来的 x 永远等于 width/2；留着它只会让人以为透镜会动。
     private func capsule(gap: CGFloat, width: CGFloat, c: CGFloat) -> some View {
         let shape = RoundedRectangle(cornerRadius: barHeight * 0.85 * 0.33, style: .continuous)
-        let x = screenX(ideal(pvValue(c: c, gap: gap), gap: gap), width: width, c: c)
         return shape
             .fill(TokensPalette.glassHighlight)
             .overlay { shape.strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border) }
             .frame(width: slot + 2 * pillPad, height: barHeight * 0.85)
-            .position(x: x, y: barHeight / 2)
+            .position(x: width / 2, y: barHeight / 2)
             .allowsHitTesting(false)
     }
 
     private func labels(gap: CGFloat, width: CGFloat, c: CGFloat, barW: CGFloat) -> some View {
-        ZStack(alignment: .topLeading) {
+        ZStack {
             let mid = width / 2
             let half = barW / 2
             ForEach(Array(items.enumerated()), id: \.element.id) { i, item in
                 let x = screenX(ideal(Double(i), gap: gap), width: width, c: c)
-                // 只画窗口附近的两档：更远的字**直接不画**（条子自己有圆角裁切，
+                // 只画窗口附近的两档：更远的字**直接不画**（遮罩会裁掉它们，
                 // 但画出来再裁是白花的 GPU，而且远处的字会以半透明形式漏到条外）
                 if x > mid - half - slot && x < mid + half + slot {
                     Text(item.title)
@@ -244,12 +244,18 @@ struct DSSwipeStrip: View {
                 }
             }
         }
-        .frame(width: barW, height: barHeight)
+        // 标签与透镜、手势同处**全屏宽**坐标系 —— 第一版把标签装进「条宽」的容器
+        // 再居中，坐标却按全屏宽算，所有字整体右偏 (屏宽−条宽)/2，
+        // 透镜永远压不到当前档的文字（用户报的第 1 条的真正病根）。
+        .frame(width: width, height: barHeight)
         // 条自己把越界的那半格裁掉：原型 `.strip{overflow:hidden}`。
-        // 少了这一步，半压在条边上的那个字会**漏到条外** —— 而条是带圆角的，
-        // 露出去的那半截正好把「静止只露三档」这个形态破掉。
-        .clipShape(RoundedRectangle(cornerRadius: barHeight * 0.31, style: .continuous))
-        .frame(maxWidth: .infinity, alignment: .center)
+        // 遮罩居中对齐，正好罩住条身 —— 与条同一个圆角矩形。
+        // 少了这一步，半压在条边上的那个字会**漏到条外** ——
+        // 而条是带圆角的，露出去的那半截正好把「静止只露三档」这个形态破掉。
+        .mask {
+            RoundedRectangle(cornerRadius: barHeight * 0.31, style: .continuous)
+                .frame(width: barW, height: barHeight)
+        }
         .allowsHitTesting(false)
     }
 
@@ -266,7 +272,6 @@ struct DSSwipeStrip: View {
             .onChanged { v in
                 if cBase == nil {
                     cBase = c
-                    pvBase = pvValue(c: c, gap: gap)
                     moved = false
                     retractToken += 1          // 新触摸作废还没生效的收回
                     withAnimation(TokensMotion.fade) { expand = 1 }
@@ -275,9 +280,8 @@ struct DSSwipeStrip: View {
                 if abs(v.translation.width) > 8 { moved = true }
                 let dx = v.translation.width
                 if follow == .loupe {
-                    // 透镜跟手：字基本不动
-                    let from = pvBase ?? pvValue(c: c, gap: gap)
-                    setPV(from - Double(dx / pitch(gap)), lim: lim, gap: gap)
+                    // 透镜跟手：透镜从字上滑过去，整行基本不动（原型反向开关形态）
+                    setPV(pvValue(c: c, gap: gap) - Double(dx / pitch(gap)), lim: lim, gap: gap)
                 } else {
                     // 整行跟手：行跟着手指走，透镜钉在正中
                     let raw = (cBase ?? c) - dx
@@ -306,10 +310,11 @@ struct DSSwipeStrip: View {
                     onExpand?(false)
                 }
                 cBase = nil
-                pvBase = nil
             }
     }
 
+    /// 透镜跟手形态：把「透镜所在的连续档位」写进 `c`（透镜钉在正中，所以等于平移整行）。
+    /// 两端各留 0.35 档越界阻尼，与 `clampC` 同一条手感曲线。
     private func setPV(_ value: Double, lim: ClosedRange<CGFloat>, gap: CGFloat) {
         let last = Double(max(0, items.count - 1))
         let v = max(-0.35, min(last + 0.35, value))

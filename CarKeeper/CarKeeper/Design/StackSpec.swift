@@ -33,9 +33,10 @@ enum StackSpec {
     /// 不取正中：正中会浪费掉上面一半，一屏能读到的卡从 3 张变成 2 张。
     static let dockRatio = CGFloat(0.30)
 
-    /// 越界阻尼上限（档）：两端拖得动，但一次最多越界这么多，松手必回合法档位。
-    /// 它同时也是「到头了」的手感 —— 拖不动与能拖出去都不对。
-    static let overscroll = CGFloat(0.35)
+    /// 滚动的硬限位：到顶/到底就是**停**（用户 2026-09-23 的要求）。
+    /// 越界阻尼试过一版：两端拖得动但越拖越沉 —— 结果是到底时末卡被拖上阅读线、
+    /// 下面留一段空白，「时刻有卡可看」破了。硬停不会：卡停在阅读线上。
+    static let endStop = CGFloat(0)
 
     /// 吸附的判据来自原型 `startSettle`：
     ///   · 方向偏置 0.85 → 临界点约 47%（小于它退回原来那张，过了就往手指方向那张去）
@@ -134,9 +135,11 @@ enum StackVariant: String, CaseIterable, Identifiable {
     var metrics: StackMetrics {
         switch self {
         case .arc:
-            return StackMetrics(kind: .flow, padTop: 152, padBottom: 214, gap: 20,
-                                fadeTop: 150, fadeBottom: 170,
-                                tiltDeg: 9, shrink: 0.07, fadeOut: 0.16)
+            // tiltDeg = 0：用户 2026-09-23 明确要求「卡片显示保持正常，不要倾斜特效」。
+            // 叠叠乐的艺术感由消失带与间距扌，不靠把卡转个角度。
+            return StackMetrics(kind: .flow, padTop: 152, padBottom: 180, gap: 20,
+                                fadeTop: 150, fadeBottom: 140,
+                                tiltDeg: 0, shrink: 0.07, fadeOut: 0.16)
         case .sticky:
             // 卡片至少要有一屏高的六成才吸得住（太矮就永远滚不到贴顶那一步）
             return StackMetrics(kind: .flow, padTop: 16, padBottom: 90, gap: 14,
@@ -220,12 +223,9 @@ struct StackMetrics {
 
 enum StackMath {
 
-    /// 越界阻尼：把连续位置夹在 `[−0.35, 末档 + 0.35]`。
-    /// 两端不是「拖不动」也不是「能拖出去」—— 拖得动但越拖越沉，手指能感觉到「到头了」。
-    static func damped(_ p: CGFloat, last: CGFloat) -> CGFloat {
-        if p < 0 { return max(p, -StackSpec.overscroll) }
-        if p > last { return min(p, last + StackSpec.overscroll) }
-        return p
+    /// 滚动的硬限位：夹在 `[0, 末档]`。到顶/到底就是停（见 `endStop` 上的说明）。
+    static func clamped(_ p: CGFloat, last: CGFloat) -> CGFloat {
+        min(max(p, 0), max(0, last))
     }
 
     /// 连续的焦点序号：`2.0` = 第二张正停在阅读线，`1.4` = 正拖在一、二张之间。

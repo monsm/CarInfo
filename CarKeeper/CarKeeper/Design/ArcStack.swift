@@ -148,9 +148,10 @@ struct ArcStack: View {
             .scaleEffect(p.scale)
             .opacity(p.opacity)
             .zIndex(Double(-abs(tShape)))
-            // 被推出消失带的卡片**不再接受触摸**。不做这件事的话，
-            // 一块已经看不见的玻璃还在吃点击 —— 点哪儿都不对，且没有任何提示。
-            .allowsHitTesting(abs(tShape) < 0.85 && p.opacity > 0.25)
+            // 接近阅读线的卡**可点**，被推出消失带的卡不接触摸（点哪儿都不对，且没有任何提示）。
+            // 阈值跟玻璃阈值对齐（0.9）：玻璃一撤（看不太清的那段）才锁点击，
+            // 看得见的卡始终可点。
+            .allowsHitTesting(abs(tShape) < 0.9 && p.opacity > 0.25)
     }
 
     /// 每张卡相对阅读线的位移，换算成「一个 −1…1 的参数」：
@@ -251,7 +252,9 @@ struct ArcStack: View {
                 }
                 let raw = (dragBase ?? 0) - v.translation.height
                 sampleVelocity(scroll: raw)
-                scroll = StackMath.damped(raw, last: maxScroll)
+                // 硬停在 `[0, maxScroll]`（`endStop = 0`，见 `StackSpec` 的说明）：
+                // 到顶/到底就是停，末卡不会被拖上去留下空白。
+                scroll = StackMath.clamped(raw, last: maxScroll)
             }
             .onEnded { v in
                 sampleVelocity(scroll: (dragBase ?? 0) - v.translation.height)

@@ -90,9 +90,33 @@ struct TripsEventsView: View {
         return out
     }
 
-    /// 展示用的行程：本机记录的优先；如果本机还是空，从消息直接配出。
+    /// 展示用的行程：两个来源**合并**。
+    ///
+    /// 为什么必须合并而不是「本机非空就只看本机」：历史事件被 `ingestEvents`
+    /// 事后配对时，点火/熄火的里程都是**今天的读数**，差值恒为 0 —— 只看本机的
+    /// 话，用户看到的全是 0 km 行程，真正有意义的距离（GPS 直线）反被压住。
+    /// 用户 2026-09-23 报的第 4 条（「行程根据历史消息配对看不到」）病根就在这。
+    ///
+    /// 规则：**每个时刻只留一条**（按 `startTime` 对齐）；有里程的那条赢，
+    /// 两条都是 0 就留本机的（它带 `kmPerPercent` 等更多字段）。
+    /// 展示序：有里程的在前、全是 0 的在后；各按时间倒序（最近的在上面）。
     private var displayTrips: [AppStore.TripRecord] {
-        !trips.isEmpty ? trips : tripsFromMessages
+        let m = tripsFromMessages
+        guard !m.isEmpty else { return trips }
+        var byStart: [Date: AppStore.TripRecord] = [:]
+        for t in m { byStart[t.startTime] = t }
+        for t in trips {
+            guard let cand = byStart[t.startTime] else {
+                byStart[t.startTime] = t
+                continue
+            }
+            byStart[t.startTime] = (t.distanceKm > 0 && cand.distanceKm <= 0) ? t : cand
+        }
+        let all = Array(byStart.values)
+        return all.filter { $0.distanceKm > 0 }
+            .sorted { $0.startTime > $1.startTime }
+            + all.filter { $0.distanceKm == 0 }
+                .sorted { $0.startTime > $1.startTime }
     }
 
     /// 这一档的叠叠乐。**行程本身是「一组组」的** ——
