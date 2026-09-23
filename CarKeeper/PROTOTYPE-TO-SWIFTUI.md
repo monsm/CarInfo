@@ -84,9 +84,12 @@
 >    （`Animation.interpolatingSpring(mass:stiffness:damping:initialVelocity:)`）。
 >    原型里这段是我在 JS 里手算的（记手势峰值速度再决定翻不翻一张）。
 > 2. **边缘回弹**：拖到顶/底时的阻尼与回位。原型里靠 `scrollTop` 的钳位与弹簧。
-> 3. **无障碍**：没有 `ScrollView` 就没有三指滚动。必须给卡片栈加
->    `.accessibilityAction(.scrollUp/.scrollDown)`，否则 VoiceOver 用户**完全无法翻页**。
+> 3. **无障碍**：没有 `ScrollView` 就没有三指滚动。必须给卡片栈加两条动作 ——
+>    `.accessibilityAdjustableAction`（元素级：上下轻扫 = 上一张 / 下一张）与
+>    `.accessibilityScrollAction`（区域级：三指扫），否则 VoiceOver 用户**完全无法翻页**。
 >    这是自管手势最大的一笔隐形代价，也是我唯一担心会被漏掉的一条。
+>    （2026-09-23 已落地；当时写在这里的名字是 `.accessibilityAction(.scrollUp/.scrollDown)`，
+>    而那两个成员不存在 —— 教训是这一条：**计划里的 API 名字同样要对着文档核。**）
 > 4. **命中区域**：消失带里的卡片必须退出命中（原型里用 `pointer-events:none`）。
 > 5. **下拉刷新/系统手势冲突**：自定义手势要避开屏幕边缘的返回手势。
 > 6. **节流**：每帧要重算 N 张卡的 transform。用 `CADisplayLink` 或 `TimelineView`
@@ -198,7 +201,7 @@
 | 3 | 多张玻璃卡的性能 | 流畅度 | 只给可见卡挂 material |
 | 4 | 无数据态 | 真机第一印象 | 阶段 3 单独过一遍 |
 | 5 | `DSSwipeStrip` 重写牵连纸张布局 | 整屏都要动 | 和 `ArcStack` 一起定 |
-| 6 | **自管手势丢掉无障碍三指滚动** | VoiceOver 用户无法翻页 | 阶段 1 就给 `ArcStack` 加 `.accessibilityAction(.scrollUp/.scrollDown)`，并写进验收清单 |
+| 6 | **自管手势丢掉无障碍三指滚动** | VoiceOver 用户无法翻页 | 已落地：`ArcStack` 上挂 `.accessibilityAdjustableAction` + `.accessibilityScrollAction`（成员已对着文档核过） |
 
 ---
 

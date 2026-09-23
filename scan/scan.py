@@ -451,7 +451,16 @@ VERIFIED_SDK_ADDITIONS = {
     "clipped": "View.clipped(antialiased:)（iOS 13+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/clipped(antialiased:)）——叠叠乐是一个固定窗口，带外的卡必须先裁掉再谈渐隐",
     "highPriorityGesture": "View.highPriorityGesture(_:including:)（iOS 13+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/highPriorityGesture(_:including:)）——模式条要「按下就展开」，所以整条的拖动优先于标签自己的点选（点选由同一条手势里判断位移来做，见 DSSwipeStrip）",
     "textCase": "View.textCase(_:)（iOS 13+；decl: func textCase(_ textCase: Text.Case?) -> some View）——卡片小标题走 iOS 分组头的大写形态",
-    "accessibilityAction": "View.accessibilityAction(_:_:)（iOS 13+；decl: func accessibilityAction(_ actionKind: AccessibilityActionKind = .default, _ handler: @escaping () -> Void) -> ModifiedContent<Self, AccessibilityAttachmentModifier>；.scrollUp / .scrollDown 为 AccessibilityActionKind 的静态成员）——叠叠乐**没有 ScrollView**，也就没有系统给的三指滚动；不挂这两个动作，VoiceOver 用户完全无法翻页，而且不会有任何报错提醒你",
+    "accessibilityAction": "View.accessibilityAction(_:_:)（iOS 13+；decl: func accessibilityAction(_ actionKind: AccessibilityActionKind = .default, _ handler: @escaping () -> Void) -> ModifiedContent<Self, AccessibilityAttachmentModifier>）——给一个元素挂自定义动作。**它只用来挂命名动作**；翻页不用它，见下面两条。",
+    # ⚠️ 这两条以前是**一条错的**：上一版白名单里写着「`.scrollUp` / `.scrollDown` 为
+    # AccessibilityActionKind 的静态成员」，于是 ArcStack 照这个写，门禁全绿、
+    # CI 报 `type 'AccessibilityActionKind' has no member 'scrollUp'`。
+    # 教训不是「打错了一个名字」，而是：**白名单里的一句话也是断言**，
+    # 而当时的 scan.py 只检查「名字在不在白名单」，从不检查白名单里的说法对不对。
+    # 两个真实成员已对着 Apple 文档 JSON 核过（accessibilityactionkind 一页的
+    # topicSections 列出：default / delete / escape / magicTap / showMenu）。
+    "accessibilityAdjustableAction": "View.accessibilityAdjustableAction(_:)（iOS 13+；decl: func accessibilityAdjustableAction(_ handler: @escaping (AccessibilityAdjustmentDirection) -> Void) -> ModifiedContent<Self, AccessibilityAttachmentModifier>；externalID s:7SwiftUI4ViewPAAE29accessibilityAdjustableActionyAA15ModifiedContentVyxAA31AccessibilityAttachmentModifierVGyAA0I19AdjustmentDirectionOcF）——叠叠乐翻页的**元素级**手势：焦点落在这叠纸上时，VoiceOver 上下轻扫 = 上一张 / 下一张（方向枚举 AccessibilityAdjustmentDirection.increment 已核，externalID s:7SwiftUI32AccessibilityAdjustmentDirectionO9incrementyA2CmF）",
+    "accessibilityScrollAction": "View.accessibilityScrollAction(_:)（iOS 13+；decl: func accessibilityScrollAction(_ handler: @escaping (Edge) -> Void) -> ModifiedContent<Self, AccessibilityAttachmentModifier>；externalID s:7SwiftUI4ViewPAAE25accessibilityScrollActionyAA15ModifiedContentVyxAA31AccessibilityAttachmentModifierVGyAA4EdgeOcF）——叠叠乐翻页的**区域级**手势：三指上/下扫 = 朝那一边滚（Edge.bottom 即往下看，与系统 ScrollView 同向）。这条不是可选的：叠叠乐**没有 ScrollView**，不挂它，VoiceOver 用户完全无法翻页，而且不会有任何报错提醒你",
 }
 
 

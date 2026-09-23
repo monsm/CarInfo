@@ -32,8 +32,8 @@ CarKeeper/
 | 车况首页 | `MapSpineView`（地图即主屏；「现在」档 + 四个地图图层） |
 | 车控 | `ControlView`（锁/解锁 + 指令 + PIN 数字键盘 + 温度 Stepper + 轮询） |
 | 消息 | 并入出行档：`MessagesSection`（日期分组 + 就地展开 + 分类标签） |
-| 我的 | `MineHubView`（分段：账号 / 车辆 / 数据 / 关于 → `MineView`） |
-| 车辆档案 | `VehicleHubView`（分段：档案 / 健康 / 保养；`VehicleView` + `HealthDataView` + `MaintenanceMoneyView`） |
+| 我的 | `MineView`（分段：设置 / 应急 / 诊断） |
+| 车辆档案 | `VehicleView`（分段：档案 / 健康 / 保养；含 `HealthDataView` + `MaintenanceMoneyView`） |
 | 健康报告 | 并入车辆档：`HealthDataView`（评分圆环 + 系统手风琴） |
 | 电池与充电 | `ChargeView`（充电 + 电池 + 趋势曲线；2026-09-23 从零重写，旧 `BatteryView` 已删） |
 | 全量数据 | 并入健康档：`RawDataSection`（8 种 kind + 复制 + 刷新） |

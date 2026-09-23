@@ -11,8 +11,17 @@ import SwiftUI
 //  所以这里是**自管手势 + 自管弹簧**。
 //
 //  ⚠️ 代价必须写下来（不然下一个人会以为白拿了）：没有 `ScrollView` 就没有
-//  三指滚动 —— VoiceOver 用户会**完全无法翻页**。所以容器上挂了
-//  `.accessibilityAction(.scrollUp/.scrollDown)`。这类缺失不会有任何报错提醒你。
+//  三指滚动 —— VoiceOver 用户会**完全无法翻页**。所以容器上挂了两条动作，
+//  各管一种手势：`.accessibilityAdjustableAction`（焦点在这叠纸上时上下轻扫
+//  = 上一张 / 下一张）与 `.accessibilityScrollAction`（三指扫，区域级）。
+//  这类缺失不会有任何报错提醒你。
+//
+//  📌 2026-09-23：这里原本写的是 `.accessibilityAction(.scrollUp/.scrollDown)`——
+//  那两个成员**不存在**（`AccessibilityActionKind` 只有 default / delete /
+//  escape / magicTap / showMenu），而且当时 23 项门禁全绿，只有 CI 编译器报错。
+//  原因不是打错一个字：那份名字白名单只核对「名字在不在表里」，
+//  而白名单的**说明文字**自己就把那两个不存在的成员写成了事实。
+//  现在 `scan/enumguard.py` 会拿 Apple 文档 JSON 里的成员表去卡这一类简写。
 //
 //  几何只有一条式子：
 //      第 i 张卡相对阅读线的位移  d_i = targets[i] − scroll
@@ -82,8 +91,27 @@ struct ArcStack: View {
             .gesture(drag(maxScroll: maxScroll, targets: targets))
             .accessibilityElement(children: .contain)
             .accessibilityLabel(Text(label.isEmpty ? "卡片列表" : label))
-            .accessibilityAction(.scrollUp) { step(-1, targets: targets) }
-            .accessibilityAction(.scrollDown) { step(1, targets: targets) }
+            // 叠叠乐**没有 ScrollView**，系统因此不会替我们提供任何翻页方式。
+            // 下面两条各管一种手势，缺一不可：
+            //   ① 可调整动作 —— VoiceOver 焦点落在这叠纸上时，上下轻扫 = 上一张 / 下一张；
+            //   ② 滚动动作 —— 三指上下扫（区域级）＝ 朝那一边滚；扫向底边就是往下看，即下一张，
+            //      方向与系统 ScrollView 一致。
+            // 注：`AccessibilityActionKind` **没有** `.scrollUp` / `.scrollDown`
+            //（它只有 default / escape / magicTap / showMenu）—— 第一版按印象写了这两个
+            // 名字，同时又把它们写进了 scan.py 的白名单说明里，于是门禁放行、编译器拦下。
+            // scan/enumguard.py 现在专门盯这一类「SDK 枚举成员凭印象拼」的错。
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: step(1, targets: targets)
+                default: step(-1, targets: targets)
+                }
+            }
+            .accessibilityScrollAction { edge in
+                switch edge {
+                case .bottom: step(1, targets: targets)
+                default: step(-1, targets: targets)
+                }
+            }
         }
     }
 

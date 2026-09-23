@@ -72,7 +72,7 @@ jobs:
           #    按配置文件所在目录解析，于是那 5 条全部空转）；② 删扩展留下的
           #    WatchApp / Widgets 两条指向已删目录，而 1126 行的 MapSpineView 反倒没进清单。
           # 它不需要 swiftlint、不需要 macOS —— 能在 Linux 上秒级拦住「配置与代码各走各的」。
-          for s in paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps scopeguard paidcap copy lintcfg ternary; do
+          for s in paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps scopeguard paidcap copy lintcfg ternary enumguard; do
             echo "::group::$s.py"
             python3 scan/$s.py
             echo "::endgroup::"

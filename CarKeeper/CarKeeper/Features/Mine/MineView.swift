@@ -36,14 +36,51 @@ struct MineView: View {
     @EnvironmentObject var nav: NavState
     // #NEW-115 夜间模式管理
     @StateObject private var nightModeManager = NightModeManager.shared
+    /// 档内段落：设置 / 应急 / 诊断。它不是导航层级（见 `HomeSub`）。
+    @State private var tab: HomeSub = .settings
 
     // MARK: 生命周期
-    /// 「设置」这一段的卡（**不含巨字头** —— 头归 `MineHubView` 那一叠）。
+    /// 这一档的叠叠乐：巨字头 → 分段控件 → 当前那一段的卡。
+    ///
+    /// 与「车辆」同理（也是同一天修的同一个 bug）：分段控件与卡表必须和**状态**
+    /// 住在同一个视图里。此前它们住在外壳 `MineHubView`，而这一页的 OTA 状态、
+    /// 令牌、退出确认全在这里 —— 外壳调 `MineView.sectionCards` 直接编译不过
+    ///（instance member 不能当类型成员用），而绕过去也一样是错的：
+    /// 那些 `@State` 永远不会被安装，「检查更新」会变成点了没反应的按钮。
+    @MainActor
+    private var cards: [StackCard] {
+        var out = HomeMode.mine.headCards
+        out.append(StackCard(id: "tabs", content: AnyView(
+            DSSegmented(options: HomeSub.mineTabs.map { (value: $0, title: $0.title) },
+                        selection: $tab))))
+        switch tab {
+        case .emergency:
+            out.append(StackCard(id: "emergency", title: "应急",
+                                 content: AnyView(EmergencyPanel())))
+        case .dev:
+            out.append(StackCard(id: "dev", title: "诊断", content: AnyView(DevView())))
+        default:
+            out.append(contentsOf: sectionCards)
+        }
+        return out
+    }
+
+    /// 消费深链带来的段落提示（`carkeeper://emergency` → 「我的」档的「应急」段）。
+    /// 消费掉（置 nil）是必须的：否则从别的档切回来时会被同一条旧提示再拉回那一段。
+    private func consumeHint() {
+        guard let hint = nav.homeSub, HomeSub.mineTabs.contains(hint) else { return }
+        tab = hint
+        nav.homeSub = nil
+    }
+
+    /// 「设置」这一段的卡（**不含巨字头**，也不含分段控件 —— 那两张在 `cards` 里）。
     ///
     /// 拆卡按问题分：我是谁（账号）、我的车（车辆）、我能改什么（设置）、
     /// 这个 App 是什么（关于）。
+    ///
+    /// `private`：它按本页的实时状态现算，只有本视图的 `cards` 有权调它。
     @MainActor
-    var sectionCards: [StackCard] {
+    private var sectionCards: [StackCard] {
         var out: [StackCard] = [
             StackCard(id: "profile", title: "账号", content: AnyView(profileCard))
         ]
@@ -56,11 +93,13 @@ struct MineView: View {
     }
 
     var body: some View {
-        StackPageView(accent: HomeMode.mine.accent, label: "车与账号", cards: sectionCards)
+        StackPageView(accent: HomeMode.mine.accent, label: "车与账号", cards: cards)
         .pageBackground()
         .dsPageTitle("车与账号")
             .accessibilityLabel(Text("车与账号"))
             .accessibilityHint(Text("账号、车辆、数据、关于"))
+        .onAppear { consumeHint() }
+        .onChange(of: nav.homeSub) { _, _ in consumeHint() }
         .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
             // 其他 Tab 退出登录时，重置 OTA 状态，避免残留下载进度
             updateBusy = false

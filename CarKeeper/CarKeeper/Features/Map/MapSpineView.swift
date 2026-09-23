@@ -514,12 +514,14 @@ struct MapSpineView: View {
         case .now: EmptyView()              // 「现在」不走这条路：它就是地图那张纸本身
         // 车辆档自带三段（档案 / 健康 / 保养）—— 它们回答的是同一个问题，
         // 所以是同一张纸里的三段，不是条子上的三格。
-        case .vehicle: VehicleHubView()
+        // 注意：分段控件与那一叠卡就住在下面这个视图里，没有外壳 ——
+        // 分段的**状态**（照片、OTA…）在它内部，卡表就必须在同一个视图里。
+        case .vehicle: VehicleView()
         case .charge: ChargeView()
         case .control: ControlView()
         case .trips: TripsEventsView()
         // 「我的」同理：设置 / 应急 / 诊断。
-        case .mine: MineHubView()
+        case .mine: MineView()
         }
     }
     // 主框架 = **Apple Maps 的一张全屏地图 + 一张贴着底边的纸**，

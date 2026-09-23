@@ -119,11 +119,11 @@ MapShellView（唯一的屏）
 | 档 | 页面 | 深链 | 说明 |
 |---|---|---|---|
 | `now` 现在 | 地图本身（4 图层） | —（无独立页） | 默认档；`MapSpineLayer` 是它的二级选择 |
-| `vehicle` 车辆 | `VehicleHubView` → 档案 / 健康 / 保养 | `.vehicle` / `.health` / `.service` | 三段回答同一个问题：这辆车怎么了 |
+| `vehicle` 车辆 | `VehicleView` → 档案 / 健康 / 保养 | `.vehicle` / `.health` / `.service` | 三段回答同一个问题：这辆车怎么了 |
 | `charge` 充电 | `ChargeView`（含目的地计算器） | `.battery` | 充电 + 电池 + 趋势 |
 | `control` 车控 | `ControlView` | `.control` | 指令、车身明细、PIN、历史 |
 | `trips` 出行 | `TripsEventsView`（时间轴 + 评分 + 消息） | `.trips`（别名 `.score` / `.dashboard` / `.parking`） | |
-| `mine` 我的 | `MineHubView` → 设置 / 应急 / 诊断 | `.mine` / `.emergency` / `.dev` | |
+| `mine` 我的 | `MineView` → 设置 / 应急 / 诊断 | `.mine` / `.emergency` / `.dev` | |
 
 - 顺序按**使用频率**排，不按功能分类。
 - `HomeMode.storageKey = "carkeeper_home_mode"`（`@AppStorage`）→ 重启回到上次那一档。
@@ -273,9 +273,11 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 - 异常**没有发现地点** → 只能挂在车当前位置，文案写「发现时车在这儿」。
 - 充电站**没有功率/价格**（那是第三方数据源的事）。
 
-### 4.2 车辆档 —— `VehicleHubView`（档案 / 健康 / 保养）
+### 4.2 车辆档 —— `VehicleView`（档案 / 健康 / 保养）
 
 三段共用一个分段控件，**不是三个页面**（此前它们是条子上的三格，而三格回答的是同一个问题）。
+分段控件与那一叠卡表就住在 `VehicleView` 里（无外壳）：分段的**状态**在页面里，
+卡表就必须在同一个视图里 —— 拆到外壳里过，代价是编译错 + 页内的 `@State` 永不被安装。
 
 - **档案 `VehicleView`**：身份区（车牌/VIN/车型，点字段可复制）+ 档案分组 + 维保照片（`PhotoPickerSheet`）
   + **车辆提示 `VehicleTipsSection`**（从这辆车的读数推出的提示，按 `TipCategory` 过滤）
@@ -328,7 +330,7 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 
 `.parking` / `.score` / `.dashboard` 都是别名 → 落到同一页。
 
-### 4.6 我的档 —— `MineHubView`（设置 / 应急 / 诊断）
+### 4.6 我的档 —— `MineView`（设置 / 应急 / 诊断）
 
 - **设置 `MineView`**：Apple Profile 风格身份卡 + 车辆卡（切车 `selectCar`）+ 设置分组（退出登录、
   检查更新） + **家庭管理 `FamilyManagementView`**、**临时钥匙 `TempKeyListView`**、
@@ -584,7 +586,8 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 1. `HomeMode` 加一个 `case`，填 `title` / `deeplink`；
 2. `HomeMode.destination(for:)` 里给新档相关深链加分支（**每一个 `Deeplink` 都必须落到某一档，不许落空**）；
 3. `MapSpineView.pageContent(_:)` 加一个 `case`（这是**唯一**列全功能界面的地方）；
-4. 若要档内分段：加 `HomeSub` case，并放进 `vehicleTabs` / `mineTabs` 之一 + 对应 hub 的 `switch`；
+4. 若要档内分段：加 `HomeSub` case，并放进 `vehicleTabs` / `mineTabs` 之一 + 对应页面
+   （`VehicleView` / `MineView`）`cards` 里的 `switch`；
 5. `GlobalSearchHUD` 的搜索项里加新档入口；
 6. 跑门禁（`oneentry.py` 会检查入口唯一性）。
 
@@ -695,9 +698,12 @@ var body: some View { StackPageView(accent: mode.accent, label: "…", cards: ca
   另写了一遍间距。
 - **条子的几何全部由 `width` 参数推出来，没有一处存起来。** 把它存成 @State 那版
   在非 390pt 的机器上首帧会停在错的地方（而且只在第一帧，很容易被当成“闪一下”）。
-- **卡片栈没有 `ScrollView`，也就没有系统给的三指滚动。** 翻页靠容器上的
-  `.accessibilityAction(.scrollUp/.scrollDown)`。改 `ArcStack` 的手势层时
-  不要顺手把它删了 —— 它不会报错，只会让 VoiceOver 用户完全翻不了页。
+- **卡片栈没有 `ScrollView`，也就没有系统给的三指滚动。** 翻页靠容器上的两条动作：
+  `.accessibilityAdjustableAction`（元素级上下轻扫 = 上一张 / 下一张）与
+  `.accessibilityScrollAction`（区域级三指扫）。改 `ArcStack` 的手势层时不要顺手
+  删掉 —— 它不会报错，只会让 VoiceOver 用户完全翻不了页。
+  （这里原本写的是 `.accessibilityAction(.scrollUp/.scrollDown)` —— 那两个成员不存在，
+  见 `REDESIGN-STATUS` 的「CI 报回来的三处」一节。）
 
 ### ④ 怎么挑叠法
 

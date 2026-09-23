@@ -1203,6 +1203,8 @@ macOS runner。判据只有一条：某个类型的 `static` 成员被跨类型�
 - `HomeMode` 就是 6 档（现在 / 车辆 / 充电 / 车控 / 出行 / 我的），
   `destination(for:)` 把**每一个** `Deeplink` 都映射到「档 + 档内分段」，没有落空的分支。
 - 合并页在磁盘上都在：`VehicleHubView` / `MineHubView` / `ChargeView` / `DestinationCalculatorView`。
+  （2026-09-23 修正：前两个已在同一天被并掉 —— 见本文最后的「CI 报回来的三处」；
+  当时这一行是真的，后来结构变了。）
 - 小组件 / 表盘 / 实时活动三棵树、`Shared/`、三份 entitlements、`project.yml` 里的对应 target
   均已删除；`scan/targets.py` 与 `scan/paidcap.py` 都在守它们不回来。
 
@@ -1304,8 +1306,11 @@ Swift 把 `isEmpty?` 读成**可选链**，于是这一行成了「对 `Bool` �
 **① 放弃 `ScrollView`，代价写在代码里。** 系统吸附以「卡片的边」为对齐基准，
 与「卡顶停在消失带下沿」这条自定义阅读线对不上，所以改成自管手势。
 **代价是没有三指滚动 —— VoiceOver 用户会完全无法翻页。**
-因此容器上挂了 `.accessibilityAction(.scrollUp/.scrollDown)`。
-这类缺失不会有任何报错提醒你，所以它写进了 `scan.py` 白名单条目的理由里。
+因此容器上挂了两条动作：`.accessibilityAdjustableAction`（元素级上下轻扫）与
+`.accessibilityScrollAction`（区域级三指扫）。这类缺失不会有任何报错提醒你，
+所以它写进了 `scan.py` 白名单条目的理由里。
+（修正：本节先前写的是 `.accessibilityAction(.scrollUp/.scrollDown)` —— 那两个成员
+不存在，是 CI 报回来的第一处；详见本文最后的「CI 报回来的三处」。）
 
 **② 条子静止只露三档是「条宽」造成的，不是屏幕不够宽。**
 截图里第 4 档的头一个字母是被**条自己的圆角边**裁掉的。所以「手一滑就全显示」的
@@ -1383,4 +1388,100 @@ Swift 把 `isEmpty?` 读成**可选链**，于是这一行成了「对 `Bool` �
 最后一帧算出来恒为 0，于是「甩出去再翻一张」这条规则永远不会触发。
 
 这一轮没有新增门禁，也没有新增 SDK 符号（用的都是已登记的 API）。
+
+---
+
+## CI 报回来的三处（2026-09-23，`6606a43` 的构建日志）
+
+第一次拿到编译器的判决：**门禁全绿，CI 报三处错**。逐条说完 ——
+三处都不是「手滑」，而是三种不同的机制失效。
+
+### ① `AccessibilityActionKind` 没有 `.scrollUp` / `.scrollDown`
+
+```
+ArcStack.swift:85:35: error: type 'AccessibilityActionKind' has no member 'scrollUp'
+```
+
+这两个成员不存在：`AccessibilityActionKind` 只有
+`default / delete / escape / magicTap / showMenu`（Apple 文档 JSON 的 topicSections）。
+
+**真正的原因不是打错一个名字，而是白名单里的一句话被当成了证据。**
+当时 `scan.py` 的 `VERIFIED_SDK_ADDITIONS` 里写着
+「`.scrollUp / .scrollDown` 为 `AccessibilityActionKind` 的静态成员」——
+那句话是上一轮写进去的，而**门禁的判据只有「名字在不在表里」**
+（`accessibilityAction` 确实存在 → 整条调用放行），从没有任何东西去检查
+**白名单里的说法对不对**。于是那份说明反过来成了「已经核实过」的证据。
+
+修法两层：
+
+- 代码改用两条真 API，每条都对着 Apple 文档 JSON 核过 decl 与 externalID：
+  `.accessibilityAdjustableAction`（元素级：焦点在这叠纸上时上下轻扫 = 上一张 / 下一张）+
+  `.accessibilityScrollAction`（区域级三指扫，收 `Edge`，扫向底边即下一张）。
+- 白名单那条说明重写，并**把这次事故写进条目的理由里**：
+  白名单里的一句话也是断言，它得自己带着出处。
+
+### ② 新增 `scan/enumguard.py`：SDK 枚举成员不许凭印象拼
+
+`scan.py` 的「未知成员」判据只看**项目自己声明的类型**（`Foo.bar`），
+点号前缀的枚举简写（`.scrollUp`）从头到尾没人看过 —— 这类错只有编译器看得见，
+而编译器在 macOS runner 上，一轮 3 分钟（额度按 10 倍计）。
+
+新门禁是**表驱动**的，只认两种写法 ——「`(` 后面紧跟 `.成员`」与「表里声明了标签的
+`标签: .成员`」（命名动作、传变量、传 `nil`、无实参一律放行），
+表里每一行都必须带 Apple 文档 URL：
+
+| 调用族 | 参数类型 | 已核成员（出处见文件内） |
+|---|---|---|
+| `accessibilityAction` | `AccessibilityActionKind` | default / delete / escape / magicTap / showMenu |
+| `textCase` | `Text.Case` | lowercase / uppercase |
+| `accessibilityElement(children:)` | `AccessibilityChildBehavior` | combine / contain / ignore |
+| `scrollBounceBehavior` | `ScrollBounceBehavior` | automatic / always / basedOnSize |
+
+带标签那一族的标签本身也在表里（`arg: "children"`）—— 不限制标签的话，
+`.foo(title: .bar)` 这种到处都有的写法会被大量误判。
+
+它**自己也能失败**（门禁不能只是一段日志）：拿 `.scrollUp`、`.CamelCase`、
+`children: .everything`、`.sometimes` 试过，四处都抓到；合法成员、无实参形态、
+注释里写的 `.scrollUp` 都不误报（先抹掉注释与字符串再扫）；
+空表直接按失败退出（「范围为零」与「没问题」不能长得一样）。
+已加进工作流的门禁清单，现共 24 项。
+
+顺便把这一轮新写的代码里**所有** SDK 枚举简写逐条过了一遍（98 种，
+含 `GraphicsContext.Filter.blur`、`GridItem(.flexible())`、`ScrollBounceBehavior` 等）——
+除已修的那一处外没有第二个凭印象拼的名字。
+
+### ③ `instance member 'sectionCards' cannot be used on type 'VehicleView'`
+
+```
+VehicleHubView.swift:51: error: instance member 'sectionCards' cannot be used on type 'VehicleView'
+MineHubView.swift:40:  error: instance member 'sectionCards' cannot be used on type 'MineView'
+```
+
+这一处比前两处重，因为它不只是编译错 —— **那个结构从第一天起就是错的**：
+分段的控件与卡表住在外壳（`VehicleHubView` / `MineHubView`），
+而这一段的**状态**（维保照片与照片选择器、OTA 状态与令牌）住在页面里。
+外壳想拿页面的卡表，只能当类型成员调（编译不过）；就算绕过去，
+那些 `@State` 也**永远不会被安装**（页面根本没被渲染）——
+「维保照片」会变成一个点了没反应的按钮。一个页面只能有一个所有者。
+
+修法是**把外壳并掉**，而不是给外壳开后门：
+
+- `VehicleView` / `MineView` 自己拥有巨字头 → 分段控件 → 本段卡表这一叠，
+  并自己消费深链的段落提示（`consumeHint()`）；
+- `MapSpineView.pageContent(_:)` 的两个 case 改成页面本身；
+- `VehicleHubView.swift` / `MineHubView.swift` 删除（两个文件各 62 / 50 行，
+  合并后没有第二处卡表，也没有第二处 `switch tab`）；
+- `sectionCards` 收成 `private` —— 它按当下的读数现算，外部**调不到**
+  （让「instance member 当类型成员用」这一类错在结构上不可能再发生）。
+
+### 这一轮之后仍然只能靠 CI 回答的
+
+编译。这台机器上没有 Xcode、也没有任何 Swift 工具链，所以：
+
+- `scan.py`（含新登记的两个 SDK 方法名）、风格检查、工作流内联 shell 的 `bash -n`
+  与改动文件的括号配平都已全绿；
+- 但**新写的两只闭包**（`accessibilityAdjustableAction` / `accessibilityScrollAction`
+  的闭包形状）与**删掉两个视图文件后的引用**只有编译器能盖章。
+  这一轮的改动面比上一轮小得多（三个错误点 + 一次结构合并），
+  所以「一次就绿」的概率比上一轮高 —— 但那是概率，不是保证。
 

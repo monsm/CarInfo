@@ -257,7 +257,8 @@ final class NavState: ObservableObject, @unchecked Sendable {
     /// 全局搜索是否展开（地图工具栏与「车与账号」都能把它打开）
     @Published var showSearch = false
     /// 档内段落的提示（深链用，如 `carkeeper://health` = 车辆档的健康段）。
-    /// hub 页消费它之后置 nil —— 消费掉是必须的，否则会反复被拉回那一段。
+    /// 那一档的页面（`VehicleView` / `MineView`）消费它之后置 nil ——
+    /// 消费掉是必须的，否则会反复被拉回那一段。
     @Published var homeSub: HomeSub? = nil
 
     private init() {}

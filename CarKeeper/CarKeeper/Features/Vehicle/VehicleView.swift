@@ -16,10 +16,14 @@ import Photos
 
 struct VehicleView: View {
     private let store = AppStore.shared
+    /// 深链（`carkeeper://health`）落到「车辆」这一档时，由它把段落提示带进来。
+    @EnvironmentObject private var nav: NavState
 
     @State private var maintenancePhotos: [String] = []   // Base64 图片
     @State private var showPhotoPicker = false
     @State private var selectedPhoto: UIImage? = nil
+    /// 档内段落：档案 / 健康 / 保养。它不是导航层级（见 `HomeSub`）。
+    @State private var tab: HomeSub = .profile
 
     private var isLoading: Bool { store.carId.isEmpty }
     private var isEmpty:   Bool { !store.carId.isEmpty && store.car == nil }
@@ -64,7 +68,12 @@ struct VehicleView: View {
         .refreshable {
             await store.fetchVehicleData()
         }
-        .onAppear { loadMaintenancePhotos() }
+        .onAppear {
+            loadMaintenancePhotos()
+            consumeHint()
+        }
+        // 从别处（搜索、Siri、深链）拨到「车辆」时，落点是哪一段由提示决定。
+        .onChange(of: nav.homeSub) { _, _ in consumeHint() }
         .sheet(isPresented: $showPhotoPicker) {
             PhotoPickerSheet(selectedImage: $selectedPhoto) {
                 guard let img = selectedPhoto,
@@ -80,17 +89,60 @@ struct VehicleView: View {
     // MARK: - 内容
 
     private func content() -> some View {
-        StackPageView(accent: HomeMode.vehicle.accent, label: "车辆档案",
-                      cards: sectionCards)
+        StackPageView(accent: HomeMode.vehicle.accent, label: "车辆", cards: cards)
     }
 
-    /// 档案这一段的卡（**不含巨字头** —— 头归 `VehicleHubView` 那一叠）。
+    /// 这一档的叠叠乐：巨字头 → 分段控件 → 当前那一段的卡。
     ///
-    /// 只有这一处决定「档案分几张卡」：hub 与自己两条路径都调它。
-    /// 拆卡的分法是按**问题**分的 —— 这辆车是谁（身份）、它有什么毛病（提示）、
-    /// 它经历过什么（档案/照片/记账），而不是按控件类型。
+    /// 三段（档案 / 健康 / 保养）共用**同一叠**，而不是各自一叠：
+    /// 换段时巨字头与分段控件停在原地（它们是同一张卡），下面那一叠只换一个成员 ——
+    /// 这样「换段」看起来是「下面那张卡换了」，而不是「又翻了一页」。
+    ///
+    /// **它住在这里，不住在外壳里**（2026-09-23 修）：此前分段控件与卡表住在
+    /// `VehicleHubView`，而这一段的**状态**（照片选择器、维保照片）住在本视图里 ——
+    /// 外壳只能把 `sectionCards` 当类型成员调（编译不过，CI 报
+    /// `instance member 'sectionCards' cannot be used on type 'VehicleView'`）；
+    /// 就算绕过去，那些 `@State` 也永远不会安装（视图根本没被渲染），
+    /// 「维保照片」会变成一个点了没反应的按钮。一个页面只能有一个所有者。
     @MainActor
-    var sectionCards: [StackCard] {
+    private var cards: [StackCard] {
+        var out = HomeMode.vehicle.headCards
+        out.append(StackCard(id: "tabs", content: AnyView(
+            DSSegmented(options: HomeSub.vehicleTabs.map { (value: $0, title: $0.title) },
+                        selection: $tab))))
+        switch tab {
+        case .health:
+            // 体检与保养是两张整表，拆不开 —— 包成一张卡。
+            // 它们与「档案」的区别只是卡有多高，不是两套排版。
+            out.append(StackCard(id: "health", title: "体检",
+                                 content: AnyView(HealthDataView())))
+        case .service:
+            out.append(StackCard(id: "service", title: "保养",
+                                 content: AnyView(MaintenanceMoneyView())))
+        default:
+            out.append(contentsOf: sectionCards)
+        }
+        return out
+    }
+
+    /// 消费深链带来的段落提示。消费掉（置 nil）是必须的：否则从别的档切回来时，
+    /// 会被同一条旧提示再拉回那一段。
+    private func consumeHint() {
+        guard let hint = nav.homeSub, HomeSub.vehicleTabs.contains(hint) else { return }
+        tab = hint
+        nav.homeSub = nil
+    }
+
+    /// 档案这一段的卡（**不含巨字头**，也不含分段控件 —— 那两张在 `cards` 里）。
+    ///
+    /// 只有这一处决定「档案分几张卡」。拆卡的分法是按**问题**分的 ——
+    /// 这辆车是谁（身份）、它有什么毛病（提示）、它经历过什么（档案/照片/记账），
+    /// 而不是按控件类型。
+    ///
+    /// `private` 是刻意的：它按当下这辆车的读数现算，只有本视图的 `cards` 有权调它。
+    /// 之前它是 internal，为的是让外壳也能调 —— 而那个入口正是上面那个 bug 的来源。
+    @MainActor
+    private var sectionCards: [StackCard] {
         guard let sum = VM.vehicleSummary(store.car, store.controlCache) else {
             return [StackCard(id: "empty", content: AnyView(
                 GlassCardEmpty(text: "车辆数据不完整", icon: "exclamationmark.triangle")))]
