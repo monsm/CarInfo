@@ -103,10 +103,10 @@ struct ThemeGalleryView: View {
 
     private var intro: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-            Text("点一下换一套，全 App 立刻跟着变")
+            Text("点一下，全 App 立刻换装")
                 .font(TokensTypo.headline)
                 .foregroundStyle(TokensPalette.primary)
-            Text("下面每块样张都是用那套主题自己的令牌真渲染的，不是截图。对照现状就切回「原生」——它的取值与切换前逐值相同。")
+            Text("样张用各主题自己的令牌真渲染，不是截图。切回「原生」就是切换前的取值。")
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -146,8 +146,8 @@ struct ThemeGalleryView: View {
     private var footnotes: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             DSSectionHeader(title: "没做的部分")
-            Text("① App 里仍有约 130 处写死的系统颜色（Color(uiColor:) / .white / .black）不跟随主题；"
-                 + "② 小组件与实时活动仍走 WT.Palette（刻意不跟随，否则会跟着临时主题漂移）；"
+            Text("① 约 130 处写死的系统颜色（Color(uiColor:) 等）不跟随主题；"
+                 + "② 小组件与实时活动仍走 WT.Palette（刻意不跟随）；"
                  + "③ 主题只换取值，不改信息架构。")
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.tertiary)

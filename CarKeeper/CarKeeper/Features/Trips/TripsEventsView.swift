@@ -98,7 +98,7 @@ struct TripsEventsView: View {
     var body: some View {
         // 出行只有一张画布：行程在上、常停之地在中间、车的事件在下。
         DSPaperPage {
-            DSPageTitle(title: "出行", subtitle: "每一次出行、常停的地方，以及车发来的事件")
+            DSPageTitle(title: "出行")
 
             if displayTrips.isEmpty {
                 emptyState
@@ -135,7 +135,7 @@ struct TripsEventsView: View {
             Text("还没有行程记录")
                 .font(TokensTypo.headline)
                 .foregroundStyle(TokensPalette.primary)
-            Text("开始行驶后，每一次出行都会落在这条时间轴上。")
+            Text("还没有出行记录")
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.secondary)
                 .multilineTextAlignment(.center)
@@ -237,7 +237,7 @@ struct TripsEventsView: View {
                     .font(TokensTypo.caption)
                     .foregroundStyle(TokensPalette.tertiary)
             } else if let kmPerPct = trip.kmPerPercent {
-                Text(String(format: "每 1%% 电量 %.1f km", kmPerPct))
+                Text(String(format: "%.1f km / 1%% 电量", kmPerPct))
                     .font(TokensTypo.caption)
                     .foregroundStyle(TokensPalette.tertiary)
             }
@@ -262,7 +262,7 @@ struct TripsEventsView: View {
                         .foregroundStyle(TokensPalette.tertiary)
                 }
             }
-            Text("从停车记录聚类得出（±80 米算同一处）；地图「停车」层上画着它们的圈。")
+            Text("停车史聚类（±80 米算同一处）")
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -367,7 +367,7 @@ struct MapSpineView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text("此刻的光：\(sky.phase.title)，"
                                              + "太阳高度 \(Int(sky.altitude.rounded())) 度。"
-                                             + "点开看它是怎么算出来的"))
+                                             + "点开看算法"))
                 }
             }
         }
@@ -494,7 +494,7 @@ struct MapSpineView: View {
                 panelTitle(d)
                 if d.hasLocation == false {
                     // 没有位置时，**不摆一堆 -- 占位**，只说清为什么
-                    emptyNotice("还没收到车的位置上报。连上车之后这张图才会有东西可看。")
+                    emptyNotice("还没收到位置上报")
                 } else {
                     switch layer {
                     case .now: nowContent(d)
@@ -759,7 +759,7 @@ struct MapSpineView: View {
             emptyNotice(MapSpineLayer.trips.emptyNote)
         } else {
             // 把话说在前面：线是起终点，不是轨迹
-            Text("图上的线是**起点到终点**的连接 —— 这次行程没有记录逐点轨迹。")
+            Text("起点到终点（没有逐点轨迹）")
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -813,7 +813,7 @@ struct MapSpineView: View {
                         .foregroundStyle(TokensPalette.tertiary)
                 }
             }
-            Button("去行程时间轴看全部停车与旅程") { nav.openMode(.trips) }
+            Button("全部停车与旅程") { nav.openMode(.trips) }
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.accent)
                 .buttonStyle(.plain)
@@ -865,10 +865,10 @@ struct MapSpineView: View {
                         .foregroundStyle(TokensPalette.tertiary)
                 }
             }
-            Text("来自按车的位置做的实时搜索（MKLocalSearch），不是写死的列表。")
+            Text("按车的位置实时搜索")
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.tertiary)
-            Text("行程的“回放”做不了：TripRecord 只存起终点，没有逐点轨迹 —— 这是现状，不是缺陷。")
+            Text("只存起终点，做不了回放")
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.tertiary)
         }
@@ -974,7 +974,7 @@ struct MapSpineView: View {
                             Slider(value: $skyHour, in: 0...23)
                                 .tint(TokensPalette.accent)
                                 .onChange(of: skyHour) { _, _ in skyLive = false }
-                            Text("按你所在时区的钟点；光由**车的经纬度**与这个时刻算出，所以拖到哪一格，光就真的算到哪一格。")
+                            Text("按你所在时区。")
                                 .font(TokensTypo.caption)
                                 .foregroundStyle(TokensPalette.tertiary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -984,17 +984,17 @@ struct MapSpineView: View {
 
                         if case .failed(let msg) = weather.status {
                             DSNotice(kind: .warning,
-                                     text: "天气没取到（\(msg)）—— 上面那几行是晴空模型的算法值，不是实测。")
+                                     text: "天气没取到（\(msg)），上面是晴空模型的算法值。")
                         }
 
-                        Text("太阳的高度角与方位角，由车所在的经纬度与此刻算出（NOAA 简化算法，纯数学，不联网），可以复算。"
-                             + "云量 / 降水 / 天气码来自 Open-Meteo 实况，辐照度 = 晴空模型 × 云量衰减（式子印在上面那行的说明里）。"
-                             + "没有取到实况时（离线、取数失败、或还没取到）退回晴空模型，并在那一行写明「没有天气数据」。")
+                        Text("太阳高度角与方位角由车的位置算出（NOAA，不联网）。"
+                             + "云量、降水来自 Open-Meteo 实况。"
+                             + "没有实况就退回晴空模型。")
                             .font(TokensTypo.footnote)
                             .foregroundStyle(TokensPalette.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     } else {
-                        emptyNotice("不知道车在哪儿，就没有这一刻的光 —— 光是从车的位置算出来的。")
+                        emptyNotice("不知道车在哪儿")
                     }
                 }
                 .padding(.top, TokensSpacing.sm)
@@ -1109,7 +1109,7 @@ struct MapSpineView: View {
                 HStack(spacing: TokensSpacing.sm) {
                     Image(safeSymbol: "chart.xyaxis.line", fallback: "chart.xyaxis.line")
                         .font(TokensTypo.fixed(13, weight: .medium))
-                    Text("看这次充电的功率曲线")
+                    Text("看功率曲线")
                         .font(TokensTypo.footnote)
                     Spacer(minLength: 0)
                     Text(ChargeLedger.kwhText(latest.kWh) + " kWh")

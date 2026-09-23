@@ -108,7 +108,7 @@ final class CommandCenter: ObservableObject {
                 guard let d = r.data else {
                     running?.progress = "查询异常，重试中…（\(i)/12"
                     if i >= 12 {
-                        finish(run, ok: false, text: "结果待确认", desc: "60秒未收到车辆终态",
+                        finish(run, ok: false, text: "结果待确认", desc: "60 秒无终态",
                                neutral: true)
                         return
                     }
@@ -140,7 +140,7 @@ final class CommandCenter: ObservableObject {
                 }
                 running?.progress = "第 \(i) 次查询 · 车辆处理中"
                 if i >= 12 {
-                    finish(run, ok: false, text: "结果待确认", desc: "60秒未收到车辆终态",
+                    finish(run, ok: false, text: "结果待确认", desc: "60 秒无终态",
                            neutral: true)
                     return
                 }

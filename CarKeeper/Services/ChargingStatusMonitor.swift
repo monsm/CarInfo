@@ -82,7 +82,7 @@ final class ChargingStatusMonitor: ObservableObject {
             if charging {
                 sessionStartSOC = nil
                 sessionStartAt = Date()
-                mark("已连接到充电桩（本次起点未知，App 是中途启动的）")
+                mark("已连接到充电桩（中途启动）")
             }
             return
         }

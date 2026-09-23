@@ -47,7 +47,7 @@ struct MapQuickBar: View {
         Group {
             if store.carId.isEmpty {
                 // 没选车时不摆四个按不动的灰块 —— 说清为什么现在不能用
-                Text("还没选择车辆，快捷操作要等选好车之后才能用。")
+                Text("还没选择车辆")
                     .font(TokensTypo.caption)
                     .foregroundStyle(TokensPalette.tertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -93,7 +93,7 @@ struct MapQuickBar: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text(item.title))
-                .accessibilityHint(Text("在地图上直接下发指令，不会离开地图"))
+                .accessibilityHint(Text("在地图上直接下发指令"))
             }
         }
     }
@@ -109,7 +109,7 @@ struct MapQuickBar: View {
             Text(run.name)
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.primary)
-            Text(run.progress.isEmpty ? "已发出，等车辆回执" : run.progress)
+            Text(run.progress.isEmpty ? "等车辆回执" : run.progress)
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.secondary)
                 .lineLimit(1)

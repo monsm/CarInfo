@@ -43,7 +43,7 @@ struct MineView: View {
     // MARK: 生命周期
     var body: some View {
         DSPaperPage {
-            DSPageTitle(title: "车与账号", subtitle: "账号、车辆切换、数据与隐私、关于")
+            DSPageTitle(title: "车与账号", subtitle: "账号、车辆、数据、关于")
             profileCard
             if let car = store.car { carCard(car) }
             settingsGroups
@@ -52,7 +52,7 @@ struct MineView: View {
         .pageBackground()
         .dsPageTitle("车与账号")
             .accessibilityLabel(Text("车与账号"))
-            .accessibilityHint(Text("账号设置、车辆切换、数据与隐私、关于"))
+            .accessibilityHint(Text("账号、车辆、数据、关于"))
         .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
             // 其他 Tab 退出登录时，重置 OTA 状态，避免残留下载进度
             updateBusy = false
@@ -90,7 +90,7 @@ struct MineView: View {
         .sheet(isPresented: $showOTAChangelog) {
             NavigationStack {
                 OTAChangelogView()
-                    .navigationTitle("OTA 版本日志")
+                    .navigationTitle("版本日志")
                     .dsSheetCanvas()
                     .navigationBarTitleDisplayMode(.inline)
             }
@@ -123,7 +123,7 @@ struct MineView: View {
             Button("退出", role: .destructive) { logout() }
             Button("取消", role: .cancel) { }
         } message: {
-            Text("退出后需要用手机号重新登录。本机的行程、充电与记账记录不会被删除。")
+            Text("退出后需要重新登录，本机记录不会删除。")
         }
     }
 
@@ -263,7 +263,7 @@ struct MineView: View {
             }
 
             DSGroup(title: "设备与模式",
-                    footer: "摇一摇锁车默认关闭 —— 它会真的发一条锁车指令。") {
+                    footer: "摇一摇会真的发锁车指令。") {
                 customRow { shakeToggle }
                 // #31 省电模式
                 customRow { PowerSavingToggle() }
@@ -340,7 +340,7 @@ struct MineView: View {
                 Text("摇一摇锁车")
                     .font(TokensTypo.body)
                     .foregroundStyle(TokensPalette.primary)
-                Text("摇一下手机，发一条锁车指令（需 PIN）")
+                Text("摇一下手机，发锁车指令（需 PIN）")
                     .font(TokensTypo.footnote)
                     .foregroundStyle(TokensPalette.secondary)
             }
@@ -394,7 +394,7 @@ struct MineView: View {
         DSGroup(title: "检查更新") {
             customRow(last: true) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("下载最新 GitHub 构建的 ipa，分享后用自签工具安装")
+                    Text("下载最新 ipa，分享后用自签工具安装")
                         .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
                     // OTA 检查中：骨架旋转指示器
                     if isChecking {

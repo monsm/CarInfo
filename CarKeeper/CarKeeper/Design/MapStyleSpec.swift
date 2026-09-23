@@ -70,7 +70,7 @@ extension ArtTheme {
                 cameraHeading: 7,
                 pinStyle: .ring,
                 allowsGlow: true,
-                note: "系统瓦片压到 .muted 再盖 55% 暗色 —— 黑底承担信息量，光只给车"
+                note: "系统瓦片压到 .muted 再盖 55% 暗色"
             )
         // ---------------------------------------------------------------------
         case .paper:
@@ -86,7 +86,7 @@ extension ArtTheme {
                 cameraHeading: 0,
                 pinStyle: .ink,
                 allowsGlow: false,
-                note: "MapKit 只能压暗 + 纸色蒙版 —— 真机上它仍然是现代地图，不是纸"
+                note: "压暗 + 纸色蒙版；真机上仍是现代地图"
             )
         // ---------------------------------------------------------------------
         case .typographic:
@@ -100,7 +100,7 @@ extension ArtTheme {
                 cameraHeading: 0,
                 pinStyle: .rule,
                 allowsGlow: false,
-                note: "地图退成极淡的一层（78% 蒙版）—— 版面和字距才是主角"
+                note: "地图退成 78% 蒙版"
             )
         // ---------------------------------------------------------------------
         case .native:
@@ -114,7 +114,7 @@ extension ArtTheme {
                 cameraHeading: 0,
                 pinStyle: .ring,
                 allowsGlow: true,
-                note: "系统地图原样：默认样式 + 我们自己的钉与折线"
+                note: "系统地图原样"
             )
         }
     }

@@ -90,8 +90,8 @@ struct SiriCarController {
     nonisolated static func dialog(_ outcome: Outcome, action: String) -> String {
         switch outcome {
         case .sent: return "已\(action)"
-        case .notLoggedIn: return "请先在长安车管家里登录并绑定车辆。"
-        case .noPin: return "车控需要 PIN，请先在 App 里设置。"
+        case .notLoggedIn: return "请先登录并绑定车辆。"
+        case .noPin: return "请先在 App 里设置 PIN。"
         case .failed(let message): return "\(action)失败：\(message)"
         }
     }
@@ -218,7 +218,7 @@ struct SiriShortcutsCard: View {
     private var footer: String {
         let total = Self.shortcuts.reduce(0) { $0 + (store.siriUsageCount[$1.key] ?? 0) }
         return total == 0
-            ? "还没有用过语音指令 —— 这条短语已注册进系统「快捷指令」，直接对 Siri 说即可。"
+            ? "还没有用过。短语已注册进「快捷指令」，直接对 Siri 说即可。"
             : "共 \(total) 次语音指令。"
     }
 }

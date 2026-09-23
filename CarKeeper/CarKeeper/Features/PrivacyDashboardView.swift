@@ -56,14 +56,14 @@ struct PrivacyDashboardView: View {
         // 再套一层就会出现两条导航栏、标题说两遍（而且两个栈各自记一份返回路径）。
         ScrollView {
             LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "隐私与数据", subtitle: "本机存了什么，全部列在下边")
+                DSPageTitle(title: "隐私与数据", subtitle: "本机存了什么")
 
                 // 汇总：一个数字，不靠一张卡来证明自己重要
                 DSGroup {
                     DSGroupRow {
                         DSBigNumber(value: "\(totalRecords)",
                                     unit: "条",
-                                    caption: "本机存储的记录总数",
+                                    caption: "本机记录总数",
                                     size: 56)
                             .padding(.vertical, TokensSpacing.xs)
                     }
@@ -77,16 +77,15 @@ struct PrivacyDashboardView: View {
                 // 离开本机的数据：「数据去了哪」是隐私披露里最该说清、也最容易被含糊过去的一节。
                 // 三处都是代码里真实存在的域名（APIConfig / WeatherService.host / UpdateService）。
                 DSGroup(title: "离开本机的数据",
-                        footer: "三处都只发该功能需要的最小信息。天气那次只给经纬度，且**保留两位小数**"
-                              + "（约 1.1 km 网格）—— 云量不需要比这更准，而精度的每一次增加都是隐私的每一次减少。"
-                              + "三个请求都不带车辆标识 / 账号 / 设备号；天气快照只在内存里，不落盘。") {
+                        footer: "三处都只发该功能需要的最小信息。天气只给**两位小数**的经纬度；"
+                              + "都不带车辆标识、账号、设备号，天气快照不落盘。") {
                     DSGroupRow {
                         DSRow(icon: "car.fill", title: "长安车联网",
-                              subtitle: "车辆状态、控制指令、登录 —— 只在你用这些功能时")
+                              subtitle: "只在你用这些功能时")
                     }
                     DSGroupRow {
                         DSRow(icon: "cloud.sun.fill", title: "Open-Meteo（天气实况）",
-                              subtitle: "车的位置（两位小数）；每 \(Int(WeatherService.refreshMinutes)) 分钟最多一次 —— 用来算云量对光的影响")
+                              subtitle: "车的位置（两位小数），每 \(Int(WeatherService.refreshMinutes)) 分钟最多一次")
                     }
                     DSGroupRow(showsSeparator: false) {
                         DSRow(icon: "arrow.down.circle", title: "GitHub（版本检查）",
@@ -96,7 +95,7 @@ struct PrivacyDashboardView: View {
 
                 // 清除：后果写在按钮旁边，不藏在确认框里
                 DSGroup(title: "清除",
-                        footer: "清除后无法恢复：这些记录只在本机，没有云端副本。") {
+                        footer: "清除后无法恢复，本机没有云端副本。") {
                     DSGroupRow {
                         Button(role: .destructive) {
                             showClearConfirm = true
@@ -134,7 +133,7 @@ struct PrivacyDashboardView: View {
             }
             Button("取消", role: .cancel) {}
         } message: {
-            Text("这将清除所有本地记录，包括行程、能耗和控制历史。此操作不可撤销。")
+            Text("将清除行程、能耗、控制历史，不可撤销。")
         }
     }
 }

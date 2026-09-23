@@ -57,7 +57,7 @@ struct MaintenanceMoneyView: View {
 
     var body: some View {
         DSPaperPage {
-            DSPageTitle(title: "保养与钱", subtitle: "保养、年检保险、充电账单、估值与导出")
+            DSPageTitle(title: "保养与钱", subtitle: "保养、保险、账单、估值、导出")
 
             // ① 即将到期（保养按里程、年检/保险按日期 —— 两套口径各自一组）
             if !upcomingServices.isEmpty {
@@ -207,7 +207,7 @@ struct MaintenanceMoneyView: View {
             if filtered.isEmpty {
                 DSPlaceholder(icon: "calendar.badge.minus",
                               title: "还没有维保记录",
-                              message: "记录一次保养之后，这里会排成一条时间线。")
+                              message: "还没有保养记录。")
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(filtered.enumerated()), id: \.element.id) { idx, entry in

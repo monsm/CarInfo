@@ -86,7 +86,7 @@ class ChargeBillGenerator {
             }
 
             // 底部说明：把「这些数字是怎么来的」印在纸上，而不是只写在代码里
-            let note = "度数由车端充电功率采样积分得出；费用 = 度数 × 你在 App 里设的电价（非充电站实际价）。"
+            let note = "度数由车端功率采样积分得出；费用 = 度数 × 你设的电价（非充电站实际价）。"
             let noteAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 10),
                 .foregroundColor: UIColor.tertiaryLabel
@@ -207,10 +207,10 @@ struct InspectionSection: View {
 
                 // ① 最近要到的（年检 + 保险合在一个时间轴上）
                 DSGroup(title: "最近到期",
-                        footer: "到期前 30 天与 7 天会各提醒一次（需允许通知）。") {
+                        footer: "到期前 30 天、7 天各提醒一次。") {
                     if dueItems.isEmpty {
                         DSGroupRow(showsSeparator: false) {
-                            Text("还没有记录。下面添一条，它就会出现在这里。")
+                            Text("还没有记录，下面添一条。")
                                 .font(TokensTypo.footnote)
                                 .foregroundStyle(TokensPalette.secondary)
                         }
@@ -247,7 +247,7 @@ struct InspectionSection: View {
 
                 // ③ 保险
                 DSGroup(title: "保险",
-                        footer: "只存你填的这些字段；保费合计 = 已记录的保单之和（不是任何接口读到的值）。") {
+                        footer: "只存你填的字段；保费合计 = 保单之和。") {
                     ForEach(policies) { p in
                         DSGroupRow {
                             DSKeyValueRow(key: "\(p.name) · \(p.type)",
@@ -411,7 +411,7 @@ struct VehicleValuationSection: View {
                 // 先把「这是什么」说在前面：它是**按一条固定规则算出来的估算**，
                 // 不是二手车市场价。把规则印在结果的上面，而不是藏在页脚。
                 DSNotice(kind: .info,
-                         text: "这是按下方那条固定折旧规则算的**估算**，不是二手车市场价（App 拿不到交易数据）。")
+                         text: "按下方折旧规则算的**估算**，不是市场价。")
 
                 DSGroup(title: "车的条件") {
                     DSGroupRow {
@@ -453,8 +453,8 @@ struct VehicleValuationSection: View {
                 }
 
                 DSGroup(title: "用的是什么规则",
-                        footer: "想换一套系数？这条规则就写在 `VehicleValuation.estimateValue` 里，"
-                              + "改它等于改结果 —— 这就是把它写出来的意义。") {
+                        footer: "系数写在 `VehicleValuation.estimateValue` 里，"
+                              + "可直接改。") {
                     DSGroupRow { DSKeyValueRow(key: "年限折旧", value: "前 3 年每年 −15%，之后每年 −10%") }
                     DSGroupRow(showsSeparator: false) {
                         DSKeyValueRow(key: "里程折旧", value: "每 1 万公里 −2%，上限 −30%")
@@ -503,8 +503,8 @@ struct ChargeBillSection: View {
                 if records.isEmpty {
                     DSPlaceholder(icon: "bolt.slash",
                                   title: "还没有充电记录",
-                                  message: "App 只在充电中采样：车端每上报一次功率就留一个点，"
-                                         + "凑够一次会话（≥0.5 kWh）才会出现在这里。")
+                                  message: "App 只在充电中采样，"
+                                         + "一次会话满 0.5 kWh 才会出现在这里。")
                 } else {
                     DSGroup(title: "合计") {
                         DSGroupRow {
@@ -520,8 +520,8 @@ struct ChargeBillSection: View {
                     }
 
                     DSGroup(title: "每一次充电",
-                            footer: "度数 = ∫功率 dt（梯形法，采样 1 分钟一个）；"
-                                  + "费用 = 度数 × 你在设置里填的电价 —— 它**不是**充电站的实际价。") {
+                            footer: "度数 = ∫功率 dt（梯形法，每分钟一个采样）；"
+                                  + "费用按你设的电价算，不是充电站实际价。") {
                         ForEach(Array(records.enumerated()), id: \.offset) { idx, r in
                             DSGroupRow(showsSeparator: idx < records.count - 1) {
                                 DSKeyValueRow(key: r.date.formatted(date: .abbreviated, time: .shortened),

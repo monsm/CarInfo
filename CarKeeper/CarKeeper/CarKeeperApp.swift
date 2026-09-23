@@ -383,7 +383,7 @@ struct MapShellView: View {
         .task { await store.bootstrap() }
         // VoiceOver：这是一个「地图 + 底部模式条」的外壳，不再是一条 Tab 栏
         .accessibilityLabel(Text("地图主屏"))
-        .accessibilityHint(Text("地图是主屏，底部的模式条可以到达每一个功能界面"))
+        .accessibilityHint(Text("底部的模式条可以到达每个功能界面"))
         .accessibilitySortPriority(0)
         // #4 网络状态指示器 + #NEW-3 离线模式提示
         .overlay(alignment: .top) {

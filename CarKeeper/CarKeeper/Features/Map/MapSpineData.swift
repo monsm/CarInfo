@@ -61,10 +61,10 @@ enum MapSpineLayer: String, CaseIterable, Identifiable {
     /// 这一层没有数据时**照实说**（空不是缺陷，是真实读数）
     var emptyNote: String {
         switch self {
-        case .now: return "还没有收到车的位置上报。"
-        case .trips: return "还没有记录到行程。里程日记开始记录后，这里会出现起终点连线。"
-        case .holds: return "还没有保存过停车位置。"
-        case .charge: return "正在按车的位置搜索附近充电站。"
+        case .now: return "还没收到位置上报"
+        case .trips: return "还没有行程记录"
+        case .holds: return "还没有停车记录"
+        case .charge: return "正在搜索附近充电站"
         }
     }
 }
@@ -316,7 +316,7 @@ struct MapSpineData {
                     id: chip.id,
                     coordinate: c.coordinate,
                     title: "\(chip.label)\(chip.text.isEmpty ? "" : " · \(chip.text)")",
-                    detail: "你说不清它在哪儿出的 —— 只记得最后一次上报时车在这儿",
+                    detail: "最后一次上报时车在这儿",
                     cls: chip.cls
                 ))
             }
@@ -424,7 +424,7 @@ struct MapSpineData {
             // 能效只用**算得出来**的那个口径：kWh/100km 需要电池容量（null），
             // 所以实际显示的是「每 1% SOC 跑多少 km」。
             let eff = t.efficiency.map { String(format: "，%.1f kWh/100km", $0) }
-                ?? t.kmPerPercent.map { String(format: "，每 1%% SOC 跑 %.1f km", $0) }
+                ?? t.kmPerPercent.map { String(format: " · %.1f km / 1%% SOC", $0) }
                 ?? ""
             let km = String(format: "%.1f", t.distanceKm)
             out.append(MapReason(
@@ -479,7 +479,7 @@ struct MapSpineData {
             if let lv = alarmLevel { parts.append("服务端最高等级 \(Int(lv))") }
             out.append(MapReason(
                 id: "alarm",
-                text: parts.joined(separator: "；") + " —— 这是车端自己置的位，不是我们拿阈值猜的",
+                text: parts.joined(separator: "；") + "（车端自报）",
                 cls: alarms.isEmpty ? "warn" : "bad"
             ))
         }

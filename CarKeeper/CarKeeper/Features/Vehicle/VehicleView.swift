@@ -46,21 +46,21 @@ struct VehicleView: View {
             } else if isEmpty {
                 DSPlaceholder(icon: "car",
                               title: "未绑定车辆",
-                              message: "请先在「车与账号」里绑定车辆后重试",
+                              message: "请先绑定车辆",
                               actionTitle: "重新加载") { reloadVehicle() }
             } else if let sum = VM.vehicleSummary(store.car, store.controlCache) {
                 content(sum)
             } else {
                 DSPlaceholder(icon: "exclamationmark.triangle",
                               title: "档案解析失败",
-                              message: "车辆数据已返回，但缺少可识别的字段",
+                              message: "车辆数据缺少可识别字段",
                               actionTitle: "重新加载",
                               cls: "warn") { reloadVehicle() }
             }
         }
                 .dsPageTitle("车辆档案")
         .accessibilityLabel(Text("车辆档案"))
-        .accessibilityHint(Text("车牌、VIN、车型配置、用车提示与里程记账，点任意字段可复制"))
+        .accessibilityHint(Text("点字段可复制"))
         .refreshable {
             await store.fetchVehicleData()
         }
@@ -81,7 +81,7 @@ struct VehicleView: View {
 
     private func content(_ sum: VehicleSummary) -> some View {
         DSPaperPage {
-            DSPageTitle(title: "车辆档案", subtitle: "车牌、VIN、车型配置与保险保养")
+            DSPageTitle(title: "车辆档案")
             identitySection(sum)
             // 用车提示：由这辆车的读数推出来的提醒（原 `车辆提示` 页）
             VehicleTipsSection()
@@ -97,7 +97,7 @@ struct VehicleView: View {
         VStack(alignment: .leading, spacing: TokensSpacing.md) {
             HStack(spacing: TokensSpacing.sm) {
                 ProgressView().controlSize(.small)
-                Text("正在加载车辆档案…")
+                Text("加载中…")
                     .font(TokensTypo.footnote)
                     .foregroundStyle(TokensPalette.secondary)
             }
@@ -217,7 +217,7 @@ struct VehicleView: View {
         return ForEach(Array(gs.enumerated()), id: \.element.name) { _, group in
             DSGroup(title: group.name,
                     trailing: "\(group.rows.count)",
-                    footer: "点任意一行可复制该字段") {
+                    footer: "点一行可复制") {
                 ForEach(Array(group.rows.enumerated()), id: \.element.k) { idx, r in
                     DSGroupRow(showsSeparator: idx < group.rows.count - 1) {
                         DSRow(title: r.k, value: r.v) { copy(r.v, label: r.k) }
@@ -232,7 +232,7 @@ struct VehicleView: View {
     private var photoSection: some View {
         DSGroup(title: "维保照片",
                 trailing: maintenancePhotos.isEmpty ? nil : "\(maintenancePhotos.count) 张",
-                footer: "照片只保存在本机，不会上传服务器") {
+                footer: "只存本机") {
             DSGroupRow(showsSeparator: false) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: TokensSpacing.sm) {
@@ -404,7 +404,7 @@ struct PhotoPickerSheet: View {
                             DSRow(icon: "photo.on.rectangle", title: "从相册选择") { present(.photoLibrary, "相册") }
                         }
                     }
-                    Text("照片会以压缩后的形式保存在本机，用于维修与保养记录。")
+                    Text("压缩后只存本机")
                         .font(TokensTypo.footnote)
                         .foregroundStyle(TokensPalette.secondary)
                         .fixedSize(horizontal: false, vertical: true)

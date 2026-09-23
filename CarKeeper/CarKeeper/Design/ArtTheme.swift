@@ -148,20 +148,20 @@ enum ArtTheme: String, CaseIterable, Identifiable {
     /// 一句话说明这套方向的**美从哪来**（不是形容词，是机制）
     var mechanism: String {
         switch self {
-        case .nocturne: return "美来自光：黑底承担全部信息量，光只出现在车上与城市的光池里"
-        case .paper: return "美来自印刷：纸面、墨线、红笔。红只给品牌与危险"
-        case .typographic: return "美来自尺度：极细巨字对极小标注，网格即版面"
-        case .native: return "美来自系统：语义色、分组表面、发丝线 —— iOS 原生语言"
+        case .nocturne: return "美来自光：黑底承担信息量，光只给车"
+        case .paper: return "美来自印刷：纸面、墨线、红笔"
+        case .typographic: return "美来自尺度：极细巨字对极小标注"
+        case .native: return "美来自系统：语义色、分组表面、发丝线"
         }
     }
 
     /// 这套方向在真 MapKit 上的处境（与 MAPKIT-FEASIBILITY.md 逐条对应）
     var mapKitVerdict: String {
         switch self {
-        case .nocturne: return "最能落地：MapKit 压暗（emphasis .muted + 关 POI）+ 我们叠光层"
-        case .paper: return "最贵：MapKit 没有任何 API 能画出纸与墨，要么自建地图样式，要么整层重画"
-        case .typographic: return "最省：地图退成极淡网格，几乎不依赖地图 —— 但也最不像地图"
-        case .native: return "现状：系统地图原样 + 我们自己的标注与折线"
+        case .nocturne: return "最能落地：压暗 MapKit + 我们叠光层"
+        case .paper: return "最贵：MapKit 画不出纸与墨，得自建地图样式"
+        case .typographic: return "最省：地图退成极淡网格"
+        case .native: return "现状：系统地图原样"
         }
     }
 

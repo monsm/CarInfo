@@ -42,7 +42,7 @@ struct BatteryView: View {
         .pageBackground()
         .dsPageTitle("充电")
             .accessibilityLabel(Text("充电"))
-            .accessibilityHint(Text("电池状态、充电历史与诊断报告"))
+            .accessibilityHint(Text("电池状态与充电"))
         .onAppear { loadIfNeeded(); startSocAnimation() }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
         .refreshable { isRefreshing = true; await load(); isRefreshing = false }
@@ -72,7 +72,7 @@ struct BatteryView: View {
                 VStack(alignment: .leading, spacing: TokensSpacing.md) {
                     HStack(spacing: TokensSpacing.sm) {
                         ProgressView().controlSize(.small)
-                        Text("正在同步电池数据…")
+                        Text("加载中…")
                             .font(TokensTypo.footnote)
                             .foregroundStyle(TokensPalette.secondary)
                     }
@@ -385,7 +385,7 @@ struct BatteryView: View {
             let active = b.faults.filter { $0.count > 0 }
             if active.isEmpty {
                 DSGroupRow(showsSeparator: false) {
-                    Text("驱动电机 / 储能 / 发动机均无故障")
+                    Text("均无故障")
                         .font(TokensTypo.footnote)
                         .foregroundStyle(TokensPalette.secondary)
                 }
@@ -468,7 +468,7 @@ struct BatteryView: View {
         if c.heating != "--" { rows.append(R(k: "电池加热", v: c.heating)) }
         if c.reservation != "--" { rows.append(R(k: "预约充电", v: c.reservation)) }
         if c.reserveTime != "--" { rows.append(R(k: "预约用车", v: c.reserveTime)) }
-        if rows.isEmpty { rows.append(R(k: "充电", v: "暂无充电会话数据")) }
+        if rows.isEmpty { rows.append(R(k: "充电", v: "暂无充电数据")) }
         return rows
     }
 
@@ -498,7 +498,7 @@ struct BatteryView: View {
         let powerMinutes = Int(HistoryStore.powerInterval / 60)
 
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            DSSectionHeader(title: "趋势", trailing: "采样自车端实时数据")
+            DSSectionHeader(title: "趋势", trailing: "车端实时采样")
 
             Picker("周期", selection: $trendPeriod) {
                 ForEach(TrendPeriod.allCases) { p in
@@ -528,7 +528,7 @@ struct BatteryView: View {
                 } else {
                     DSTrendEmpty(
                         icon: "chart.xyaxis.line",
-                        title: "正在积累 SOC 数据",
+                        title: "正在积累数据",
                         message: "服务端没有历史接口，这条曲线由 App 每 \(socMinutes) " +
                                  "分钟采一次（电量变化 ≥ \(Int(HistoryStore.socJump))% 也会立刻留一个点）。"
                                  + "已记录 \(socPoints.count) 个点。"
@@ -632,7 +632,7 @@ struct DestinationCalculatorView: View {
     var body: some View {
         VStack(spacing: 20) {
             Text("目的地续航计算").font(TokensTypo.title3).foregroundStyle(TokensPalette.primary)
-            Text("输入目的地距离，估算当前电量是否足够到达")
+            Text("估算能否到达")
                 .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
                 .multilineTextAlignment(.center)
 
@@ -649,7 +649,7 @@ struct DestinationCalculatorView: View {
                             fallback: reach ? "checkmark.circle.fill" : "xmark.circle.fill")
                         .font(TokensTypo.title2)
                         .foregroundStyle(reach ? TokensPalette.success : TokensPalette.error)
-                    Text(reach ? "电量足够到达" : "电量不足，建议充电")
+                    Text(reach ? "足够到达" : "电量不足")
                         .font(TokensTypo.body.weight(.semibold))
                         .foregroundStyle(reach ? TokensPalette.success : TokensPalette.error)
                 }

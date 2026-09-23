@@ -216,7 +216,7 @@ struct ChargeMoneyBlock: View {
                 }
                 Button("取消", role: .cancel) { }
             } message: {
-                Text("这个数字是你自己填的，不是从车端接口读来的 —— 账本上的每处花费都按它折算。电量的度数则是车端功率采样积分出来的真值。")
+                Text("电价是你自己填的；账本上的花费都按它折算，度数来自车端功率采样。")
             }
         }
     }
@@ -286,12 +286,12 @@ struct ChargeReplaySheet: View {
     @ViewBuilder
     private var curveSection: some View {
         if curve.count < 2 {
-            Text("这次充电的功率采样还不足两个点，画不出曲线 —— 按实情说明，不补假数据。")
+            Text("采样点不足两个，画不出曲线。")
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.secondary)
         } else {
             VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-                Text("功率（kW）· 1 分钟一个采样点")
+                Text("功率（kW）· 每分钟一个点")
                     .font(TokensTypo.caption)
                     .foregroundStyle(TokensPalette.tertiary)
                 ReplayChart(points: curve,
@@ -327,7 +327,7 @@ struct ChargeReplaySheet: View {
     }
 
     private var note: some View {
-        Text("曲线的每个点都是车报上来的真实功率；积分方式和账本同源 —— 你看到的度数和曲线说的是同一件事。")
+        Text("每个点都是车报上来的真实功率，与账本同源。")
             .font(TokensTypo.caption)
             .foregroundStyle(TokensPalette.tertiary)
             .fixedSize(horizontal: false, vertical: true)

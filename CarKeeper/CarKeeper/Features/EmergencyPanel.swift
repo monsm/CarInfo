@@ -14,7 +14,7 @@ struct EmergencyPanel: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "紧急求助", subtitle: "SOS 拨打紧急电话，其余是常用动作")
+                DSPageTitle(title: "紧急求助", subtitle: "SOS 拨打紧急电话")
 
                 // SOS 紧急呼叫
                 sosButton

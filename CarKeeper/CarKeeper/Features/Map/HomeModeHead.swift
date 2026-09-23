@@ -72,7 +72,7 @@ struct HomeModeHead: View {
                 return Hero(value: "\(km)", unit: "km",
                             caption: Self.line([s?.plate, s?.model]))
             }
-            return Hero(value: s?.plate ?? "--", caption: "里程还没上报（它只在车控报文里）",
+            return Hero(value: s?.plate ?? "--", caption: "里程还没上报",
                         size: 44, tint: TokensPalette.secondary)
         case .battery:
             let e = VM.energy(store.caches, store.car)
@@ -91,15 +91,15 @@ struct HomeModeHead: View {
             let today = store.tripHistory.filter { Calendar.current.isDateInToday($0.startTime) }
             let km = today.reduce(0.0) { $0 + $1.distanceKm }
             return Hero(value: String(format: "%.1f", km), unit: "km",
-                        caption: today.isEmpty ? "今天还没有记录到行程" : "今天 · \(today.count) 段")
+                        caption: today.isEmpty ? "今天还没有行程" : "今天 · \(today.count) 段")
         case .service:
             guard let p = VM.maintenancePlan(store.car, store.controlCache) else {
                 return Hero(value: "--", unit: "km",
-                            caption: "还没有保养里程记录，先在保养页登记上次保养",
+                            caption: "先在保养页登记上次保养",
                             size: 44, tint: TokensPalette.secondary)
             }
             return Hero(value: "\(max(0, p.remaining))", unit: "km",
-                        caption: p.fromServer ? "距下次保养（服务端里程）" : "距下次保养（本机记录）",
+                        caption: p.fromServer ? "距下次保养 · 服务端" : "距下次保养 · 本机",
                         tint: p.remaining <= 0 ? TokensPalette.error : TokensPalette.primary)
         case .mine:
             let plate = VM.vehicleSummary(store.car, store.controlCache)?.plate
@@ -113,7 +113,7 @@ struct HomeModeHead: View {
             // 应急的「主角」是那个要拨出去的号码（可改，存在紧急联系人里）。
             // 它是这一页唯一一个“先看一眼再按”的数值，所以它归巨字。
             let contact = UserDefaults.standard.string(forKey: "emergency_contact") ?? "110"
-            return Hero(value: contact.isEmpty ? "110" : contact, caption: "点下面的圆钮才会拨出去",
+            return Hero(value: contact.isEmpty ? "110" : contact,
                         size: 54, tint: TokensPalette.error)
         case .dev:
             return Hero(value: "\(store.caches.count)", unit: "项缓存",

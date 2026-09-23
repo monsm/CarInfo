@@ -26,7 +26,7 @@ struct HealthDataView: View {
 
     var body: some View {
         DSPaperPage {
-            DSPageTitle(title: "体检与数据", subtitle: "车端自检的结论，以及它依据的原始字段")
+            DSPageTitle(title: "体检与数据")
             if loading {
                 loadingState
             } else if let model {
@@ -42,7 +42,7 @@ struct HealthDataView: View {
             } else {
                 DSPlaceholder(icon: "checkmark.shield",
                               title: "暂无检测报告",
-                              message: "车辆完成一次全车检测后，这里会显示评分与逐系统明细",
+                              message: "完成一次全车检测后显示",
                               actionTitle: "重新加载") { Task { await load() } }
             }
             // 依据：同一次 carcheck 的原文（原「全量数据」页）。
@@ -68,7 +68,7 @@ struct HealthDataView: View {
         VStack(alignment: .leading, spacing: TokensSpacing.md) {
             HStack(spacing: TokensSpacing.sm) {
                 ProgressView().controlSize(.small)
-                Text("正在读取健康报告…")
+                Text("加载中…")
                     .font(TokensTypo.footnote)
                     .foregroundStyle(TokensPalette.secondary)
             }
@@ -129,7 +129,7 @@ struct HealthDataView: View {
     private func systemsSection(_ m: HealthModel) -> some View {
         DSGroup(title: "检测系统",
                 trailing: "\(m.systems.count) 项",
-                footer: m.systems.isEmpty ? "本次检测没有返回分系统数据" : nil) {
+                footer: m.systems.isEmpty ? "没有分系统数据" : nil) {
             ForEach(Array(m.systems.enumerated()), id: \.element.id) { idx, sys in
                 systemRow(sys, showsSeparator: idx < m.systems.count - 1)
             }
@@ -235,7 +235,7 @@ struct HealthDataView: View {
     private func infoSection(_ m: HealthModel) -> some View {
         let hasMeta = (m.checkId?.isEmpty == false) || (m.endTime?.isEmpty == false) || !m.time.isEmpty
         return DSGroup(title: "检测信息",
-                       footer: hasMeta ? nil : "本次检测未返回检测 ID 与时间戳") {
+                       footer: hasMeta ? nil : "没有检测 ID 与时间戳") {
             if let cid = m.checkId, !cid.isEmpty { checkIdRow(cid) }
             if let et = m.endTime, !et.isEmpty {
                 DSGroupRow {
@@ -297,18 +297,18 @@ struct HealthDataView: View {
 
     private func verdict(_ pct: Int) -> String {
         switch pct {
-        case 0...39:  return "存在故障，建议尽快检修"
-        case 40...69: return "多项需要关注，建议安排检查"
-        case 70...89: return "车况正常，有少量项目需留意"
+        case 0...39:  return "建议尽快检修"
+        case 40...69: return "建议安排检查"
+        case 70...89: return "有少量项目需留意"
         default:      return "车况良好，无需处理"
         }
     }
 
     private func vehicleText(_ raw: String) -> String {
         switch raw {
-        case "normal":  return "车辆状态正常"
-        case "fault":   return "车辆状态故障"
-        case "warning": return "车辆状态预警"
+        case "normal":  return "正常"
+        case "fault":   return "故障"
+        case "warning": return "预警"
         default:        return raw
         }
     }

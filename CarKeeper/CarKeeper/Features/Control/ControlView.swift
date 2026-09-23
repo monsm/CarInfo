@@ -55,10 +55,10 @@ struct ControlView: View {
     private let presetScenes: [PresetScene] = [
         PresetScene(key: "winterPreheat", name: "冬天预热", symbol: "snowflake",
                     commands: ["OpenAir"], temp: 26,
-                    note: "发一条「开启空调」，温度 26℃"),
+                    note: "开启空调 26℃"),
         PresetScene(key: "summerCool", name: "夏天降温", symbol: "sun.max.fill",
                     commands: ["OpenAir"], temp: 18,
-                    note: "发一条「开启空调」，温度 18℃"),
+                    note: "开启空调 18℃"),
         PresetScene(key: "lockAll", name: "一键锁车", symbol: "lock.fill",
                     commands: ["LockDoor"], temp: nil,
                     note: "发一条「锁车」")
@@ -251,7 +251,7 @@ struct ControlView: View {
             // → 做过什么**。旧版是一条平铺的卡片堆，从上到下没有顺序可言 ——
             // 状态、动作、记录混在同一层里，读的人得自己找。
             DSPageTitle(title: "车控",
-                        subtitle: "指令先验身份，发出后等车辆回执 —— 回执到了才算完成")
+                        subtitle: nil)
 
             // ① 车现在是什么样：姿态图 + 一句话状态 + 逐字段明细（同一块，不拆开）
             VStack(alignment: .leading, spacing: TokensSpacing.md) {
@@ -283,7 +283,7 @@ struct ControlView: View {
         }
         .dsPageTitle("车控")
             .accessibilityLabel(Text("车控"))
-            .accessibilityHint(Text("远程控制车辆：锁车、解锁、空调、座椅加热"))
+            .accessibilityHint(Text("锁车、解锁、空调、座椅加热"))
         // #35 语音播报入口
         .toolbar {
             if !UIAccessibility.isSpeakScreenEnabled {
@@ -421,7 +421,7 @@ struct ControlView: View {
                 onPresetScene(scene)
             }
         } label: {
-            Text(issue ? "一键锁车并关窗" : "极速降温 · 18℃ 强冷")
+            Text(issue ? "锁车关窗" : "极速降温 18℃")
         }
         .buttonStyle(DSPrimaryButtonStyle())
         .accessibilityHint(Text(issue ? "锁车、关窗并折叠后视镜" : "空调设为 18℃ 最强风"))
@@ -459,7 +459,7 @@ struct ControlView: View {
         DSGroup(title: "一键场景",
                 trailing: busy || running != nil ? "执行中" : nil,
                 trailingCls: "acc",
-                footer: "每个场景只发一条指令；温度是场景自己带的值，不走上次的设置。与其他指令一样，先验证身份再发。") {
+                footer: "每个场景一条指令，先验身份再发") {
             ForEach(Array(presetScenes.enumerated()), id: \.element.key) { idx, scene in
                 DSGroupRow(showsSeparator: idx < presetScenes.count - 1) {
                     DSRow(icon: scene.symbol, title: scene.name, subtitle: scene.note,
@@ -507,7 +507,7 @@ struct ControlView: View {
                 .tint(TokensPalette.ambient)
             VStack(alignment: .leading, spacing: 3) {
                 Text(run.name).font(TokensTypo.headline)
-                Text(run.progress.isEmpty ? "正在等待车辆响应…" : run.progress)
+                Text(run.progress.isEmpty ? "等待车辆响应…" : run.progress)
                     .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
             }
             Spacer()
@@ -520,7 +520,7 @@ struct ControlView: View {
         DSGroup(title: "还能做什么",
                 trailing: busy || running != nil ? "执行中" : nil,
                 trailingCls: "acc",
-                footer: "指令发出去后等车辆回执：12 次查询（约 60 秒）仍没有终态时会标成「结果待确认」，不算成功。") {
+                footer: "超时标为「待确认」") {
             // 高频指令（默认展示）
             ForEach(Array(mainCommands.enumerated()), id: \.offset) { idx, item in
                 DSGroupRow(showsSeparator: idx < mainCommands.count - 1 || showMoreCommands) {
@@ -616,12 +616,12 @@ struct ControlView: View {
     private var historyCard: some View {
         DSExpandGroup(title: "做过什么",
                       trailing: allRuns.isEmpty ? "还没有" : "\(allRuns.count) 条",
-                      footer: "App / Siri / 摇一摇 发出的指令都记在这里（最近 50 条，仅本机）。点一条看它的开始、结束与耗时。") {
+                      footer: "本机最近 50 条") {
             if allRuns.isEmpty {
                 DSGroupRow(showsSeparator: false) {
                     DSPlaceholder(icon: "list.bullet.clipboard",
                                   title: "还没有指令记录",
-                                  message: "上面按一次「锁车」，这里就会留下那一次的结果。")
+                                  message: "还没有指令记录")
                 }
             } else {
                 // 筛选用系统的分段控件语法，不自造一排药丸
@@ -967,7 +967,7 @@ struct PINKeypadView: View {
             Capsule().fill(TokensPalette.secondary.opacity(0.4)).frame(width: 40, height: 5)
             VStack(spacing: 4) {
                 Text("输入控车码").font(TokensTypo.title)
-                Text("6 位数字 · 输满后自动执行").font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
+                Text("6 位数字，输满自动执行").font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
             }
             HStack(spacing: 10) {
                 ForEach(0..<6, id: \.self) { i in
@@ -1042,7 +1042,7 @@ struct ACStepperView: View {
             Capsule().fill(TokensPalette.secondary.opacity(0.4)).frame(width: 40, height: 5)
             VStack(spacing: 4) {
                 Text("空调温度").font(TokensTypo.title)
-                Text("设置范围 17 – 33 ℃").font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
+                Text("17 – 33 ℃").font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
             }
             HStack(spacing: 32) {
                 tempButton("minus", canDo: temp > 17) { temp -= 1 }
@@ -1060,7 +1060,7 @@ struct ACStepperView: View {
                 NotificationCenter.default.post(name: .tempConfirmed, object: temp)
                 dismiss()
             } label: {
-                Text("下一步 · 输入控车码")
+                Text("输入控车码")
                     .font(TokensTypo.title3)
                     .foregroundStyle(TokensPalette.labelOnTint)
                     .frame(maxWidth: .infinity)

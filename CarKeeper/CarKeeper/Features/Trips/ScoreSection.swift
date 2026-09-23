@@ -184,7 +184,7 @@ struct ScoreSection: View {
             // 口径写清楚：这句以前写死「基准 15 kWh/100km」，而那个口径需要电池容量，
             // 而报文里的 `capacity` 是 null —— 于是评分永远算不出来，这句话也就永远不该出现。
             Text(usesPercent
-                 ? "口径：每 1% SOC 跑多少 km · 基准是自己最近行程的中位数（只与自己比）"
+                 ? "每 1% SOC 的续航，基准是自己的中位数"
                  : "基准 \(Int(Self.baselineEfficiency)) kWh/100km · 每高出 1 度扣 4 分")
                 .font(TokensTypo.caption2)
                 .foregroundStyle(TokensPalette.tertiary)
@@ -196,15 +196,15 @@ struct ScoreSection: View {
         VStack(alignment: .leading, spacing: TokensSpacing.md) {
             DSSectionHeader(title: "三项来源")
             dimRow(usesPercent ? "续航" : "能耗", "bolt.fill", energyScore, TokensPalette.info,
-                   note: usesPercent ? "各段平均每 1% SOC 的续航与自己的中位数比"
-                                    : "各段平均电耗与基准的差")
+                   note: usesPercent ? "平均续航 vs 自己的中位数"
+                                    : "平均电耗 vs 基准")
             dimRow("平稳", "waveform.path.ecg", steadyScore, TokensPalette.success,
                    note: metric.count >= 3
-                       ? "各段读数的一致程度（越一致越平顺）"
-                       : "需要至少 3 段有读数的行程才算得出")
+                       ? "读数一致程度"
+                       : "至少 3 段有读数")
             dimRow("达标", "checkmark.seal.fill", hitScore, TokensPalette.accent,
-                   note: usesPercent ? "不低于自己中位数九成的行程占比"
-                                    : "电耗不高于基准的行程占比")
+                   note: usesPercent ? "达中位数九成的占比"
+                                    : "电耗不超基准的占比")
         }
     }
 
@@ -268,7 +268,7 @@ struct ScoreSection: View {
         if points.count >= 2 {
             VStack(alignment: .leading, spacing: TokensSpacing.sm) {
                 DSSectionHeader(title: "逐段得分",
-                                trailing: usesPercent ? "只看每一段的续航" : "只看每一段自己的电耗")
+                                trailing: usesPercent ? "只看续航" : "只看电耗")
                 Chart {
                     ForEach(points) { p in
                         LineMark(x: .value("第几段", p.id), y: .value("得分", p.v))
@@ -281,7 +281,7 @@ struct ScoreSection: View {
                 .frame(height: 130)
             }
         } else {
-            emptyNotice("有读数的行程还不够画出趋势 —— 两段以上才连得成线。")
+            emptyNotice("至少两段才连得成线")
         }
     }
 
@@ -289,9 +289,8 @@ struct ScoreSection: View {
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             DSSectionHeader(title: "还没有评分")
-            emptyNotice("评分只用行程里真有的事实算：每 1% SOC 的续航（或已知容量时的电耗）与各段读数的一致程度。"
-                        + "到目前为止还没有一段行程留下读数 —— 所以这里不给分。")
-            emptyNotice("行程由点火/熄火事件自动生成：跑一段路、熄火，再回来看这里。")
+            emptyNotice("还没有一段行程留下读数。")
+            emptyNotice("跑一段路、熄火，就会自动生成行程")
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -309,8 +308,7 @@ struct ScoreSection: View {
             Text("为什么只有三项")
                 .font(TokensTypo.caption.weight(.semibold))
                 .foregroundStyle(TokensPalette.secondary)
-            Text("车端接口不给加速度、踏板开度或转向角，所以急加速、急刹车、舒适度这类维度在这里无法测量 —— "
-                 + "它们以前是写死的常量（恒等于 100 分），现在被去掉了，而不是继续假装有。")
+            Text("车端不提供加速度、踏板、转向角。")
                 .font(TokensTypo.caption2)
                 .foregroundStyle(TokensPalette.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

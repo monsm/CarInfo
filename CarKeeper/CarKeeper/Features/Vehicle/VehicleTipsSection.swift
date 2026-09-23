@@ -55,7 +55,7 @@ struct VehicleTipsSection: View {
                 category: .safety,
                 icon: "lock.open.fill",
                 title: "门窗未关",
-                body: "检测到车门或车窗未关闭，请及时处理",
+                body: "车门或车窗未关",
                 action: "远程关闭",
                 severity: .warning
             ))
@@ -95,7 +95,7 @@ struct VehicleTipsSection: View {
             category: .weather,
             icon: "cloud.sun.fill",
             title: "出行提示",
-            body: "今日天气晴，适合出行",
+            body: "今天天气晴",
             action: nil,
             severity: .info
         ))
@@ -106,7 +106,7 @@ struct VehicleTipsSection: View {
                 category: .efficiency,
                 icon: "leaf.fill",
                 title: "节能技巧",
-                body: "保持匀速行驶可降低能耗约10%",
+                body: "匀速行驶省电约 10%",
                 action: nil,
                 severity: .info
             ))
@@ -204,7 +204,7 @@ struct VehicleTipsSection: View {
     private var emptyState: some View {
         DSPlaceholder(icon: "checkmark.seal.fill",
                       title: "一切正常",
-                      message: "车辆状态良好，暂无新提示。",
+                      message: "暂无新提示",
                       cls: "ok")
     }
 

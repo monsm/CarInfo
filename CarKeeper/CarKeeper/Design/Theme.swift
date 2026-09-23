@@ -377,8 +377,7 @@ struct MonthlyReportView: View {
 
                 if !data.hasAnyRecord {
                     DSNotice(kind: .info,
-                             text: "本月还没有记录：行程由点火/熄火事件自动生成，充电统计来自本机的功率采样。"
-                                 + "跑一段路、充一次电，这里就有数了。")
+                             text: "本月还没有记录。跑一段路、充一次电，这里就有数了。")
                 }
 
                 DSGroup(title: "行驶统计") {
@@ -477,7 +476,7 @@ struct PowerSavingToggle: View {
         .frame(minHeight: TokensSpacing.row)
         .onChange(of: enabled) { _, newValue in
             if newValue {
-                ToastManager.shared.show("省电模式已开启，动画和后台刷新已关闭", icon: "battery.25")
+                ToastManager.shared.show("省电模式已开启", icon: "battery.25")
             } else {
                 ToastManager.shared.show("省电模式已关闭", icon: "battery.100")
             }

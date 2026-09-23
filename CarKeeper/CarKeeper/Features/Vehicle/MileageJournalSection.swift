@@ -117,7 +117,7 @@ struct MileageJournalSection: View {
                         selection: $currentPeriod)
 
             // 统计：一组键值行，不是一个彩色方块矩阵（口径跟着上面的分段走）
-            DSGroup(footer: "口径与上面的分段一致：本月 / 上月 / 全部。") {
+            DSGroup(footer: "与上面同口径") {
                 ForEach(Array(TripCostType.allCases.prefix(4)), id: \.self) { type in
                     DSGroupRow {
                         DSKeyValueRow(key: type.displayName,
@@ -157,7 +157,7 @@ struct MileageJournalSection: View {
             }
             Button("取消", role: .cancel) { }
         } message: {
-            Text("这些记录只存在本机，清空后无法恢复。")
+            Text("只存本机，清空不可恢复")
         }
     }
 
@@ -203,7 +203,7 @@ struct MileageJournalSection: View {
     private var entriesSection: some View {
         DSGroup(title: "明细",
                 trailing: "\(periodEntries.count)",
-                footer: periodEntries.isEmpty ? "这一口径下还没有记录。" : "长按一条记录可以删除。") {
+                footer: periodEntries.isEmpty ? "还没有记录" : "长按可删除") {
             ForEach(periodEntries) { entry in
                 DSGroupRow {
                     CostEntryRow(entry: entry)

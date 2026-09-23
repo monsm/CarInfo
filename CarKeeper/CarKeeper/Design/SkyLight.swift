@@ -221,7 +221,7 @@ struct SkyLight {
                     value: String(format: "%.1f°", altitude),
                     note: "由车的经纬度与此刻算出的天文事实"),
             SkyFact(id: "az", label: "方位", value: bearingText,
-                    note: "光从这个方向来 —— 图上光池的位置就是它")
+                    note: "光从这个方向来")
         ]
         if let w = weather {
             rows.append(SkyFact(id: "sky", label: "云量",
@@ -235,14 +235,14 @@ struct SkyLight {
                             label: weather == nil ? "晴空辐照度" : "全天空辐照度",
                             value: "\(Int(radiation.rounded())) W/m²",
                             note: weather == nil
-                                ? "晴空模型 1050×sin(高度角)；没有天气数据，这不是实测"
-                                : "晴空模型 × 云量衰减 (1 − 0.75 × 云量^3.4)；云量来自实况"))
+                                ? "晴空模型 1050×sin(高度角)，不是实测"
+                                : "晴空模型 × 云量衰减 (1 − 0.75 × 云量^3.4)"))
         rows.append(SkyFact(id: "mode", label: "界面模式",
                             value: isDaylight ? "日光（纸）" : "夜行（深）",
-                            note: "辐照度 > 150 W/m² 切日光模式，95–205 之间完成"))
+                            note: "辐照度 > 150 W/m² 切日光模式"))
         rows.append(SkyFact(id: "lamp", label: "车灯亮度",
                             value: "\(Int((lamp * 100).rounded()))%",
-                            note: "规则：1 − 辐照度/220 —— 日照下不该开车灯"))
+                            note: "规则：1 − 辐照度/220"))
         return rows
     }
 

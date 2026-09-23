@@ -51,7 +51,7 @@ struct DevView: View {
                 swatchGroup(title: "画布与表面", footer: "内容层不透明：玻璃只允许出现在导航栏、Tab 栏与弹层。", items: surfaceTokens)
                 swatchGroup(title: "语义色", footer: "颜色只来自系统，且只表达状态；界面里没有装饰性彩色。", items: semanticTokens)
                 typographyGroup
-                kvGroup("几何", geometry, footer: "页面边距 20pt、分组圆角 12pt、发丝线 0.5pt 是全 App 的定值。")
+                kvGroup("几何", geometry, footer: "页边距 20pt、分组圆角 12pt、发丝线 0.5pt 是全 App 定值。")
                 kvGroup("动效", motion, footer: "只有两类：状态变化的弹簧，以及一次性绘制。")
                 kvGroup("运行状态", runtime)
                 capabilityGroups
@@ -73,7 +73,7 @@ struct DevView: View {
             }
             Button("取消", role: .cancel) { }
         } message: {
-            Text("只清空内存中的车况 / 充电 / 定位 / 环境 / 检测 / 消息缓存，不会退出登录。")
+            Text("只清空车况、充电、定位、环境、检测、消息缓存，不会退出登录。")
         }
     }
 
@@ -340,7 +340,7 @@ struct DevView: View {
     }
 
     private var actionsGroup: some View {
-        DSGroup(title: "操作", footer: "诊断信息包含版本、车辆 ID、缓存与网络状态，用于报障时贴给开发。") {
+        DSGroup(title: "操作", footer: "诊断信息包含版本、车辆 ID、缓存与网络状态，用于报障。") {
             DSGroupRow {
                 DSRow(icon: "doc.on.doc", title: "复制诊断信息") {
                     UIPasteboard.general.string = diagnostics

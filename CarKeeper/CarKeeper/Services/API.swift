@@ -281,7 +281,7 @@ final class APIClient: @unchecked Sendable {
             let codeMismatch = !noRecord && res.text.range(of: #"\"code\"\s*:\s*500"#, options: .regularExpression) != nil
             let m: String
             if codeMismatch {
-                m = "图形验证码不正确或已失效：请刷新验证码图片后立即重新输入发送"
+                m = "验证码不正确或已失效，请刷新后重新发送"
             } else if !msg.isEmpty {
                 m = msg
             } else {

@@ -83,9 +83,8 @@ struct GlobalSearchHUD: View {
                     if searchResults.isEmpty {
                         DSPlaceholder(icon: searchText.isEmpty ? "magnifyingglass" : "questionmark.circle",
                                       title: searchText.isEmpty ? "搜什么？" : "没有匹配的项",
-                                      message: searchText.isEmpty
-                                        ? "可以搜页面（如「胎压」「维保」）、车牌、行程、指令名、充电记录。"
-                                        : "换一个词试试。这里只搜本机已有的数据，不会去猜。")
+                                      message: searchText.isEmpty? "搜页面、车牌、行程、指令、充电记录。"
+                        : "换个词试试。只搜本机已有数据。")
                             .padding(.horizontal, TokensSpacing.page)
                             .padding(.top, TokensSpacing.lg)
                     } else {
@@ -236,14 +235,14 @@ struct GlobalSearchHUD: View {
     /// 一档的一句话与图标。穷举（无 default），理由同上。
     private static func pageMeta(for mode: HomeMode) -> (hint: String, icon: String) {
         switch mode {
-        case .now: return ("车在哪、现在什么状态", "location.fill")
-        case .vehicle: return ("车牌、车型、保险与保养到期", "doc.text.fill")
-        case .health: return ("车端自检的结论与它依据的原始字段", "shield.lefthalf.filled")
-        case .battery: return ("SOC、充电曲线、充电账单", "battery.100")
+        case .now: return ("位置与当前状态", "location.fill")
+        case .vehicle: return ("车牌、保险、保养", "doc.text.fill")
+        case .health: return ("车端自检结论", "shield.lefthalf.filled")
+        case .battery: return ("SOC、充电、账单", "battery.100")
         case .control: return ("锁车、空调、寻车", "dot.radiowaves.left.and.right")
-        case .trips: return ("行程、常停的地方与车的事件", "chart.bar.fill")
-        case .service: return ("保养、年检保险、充电账单、估值与导出", "wrench.and.screwdriver.fill")
-        case .mine: return ("车辆、账号、隐私与关于", "person.fill")
+        case .trips: return ("行程与事件", "chart.bar.fill")
+        case .service: return ("保养、保险、账单、估值", "wrench.and.screwdriver.fill")
+        case .mine: return ("车辆、账号、隐私", "person.fill")
         case .emergency: return ("拖车、保险、救援电话", "exclamationmark.octagon.fill")
         case .dev: return ("设计令牌、运行状态、诊断", "wrench.adjustable")
         }

@@ -94,7 +94,7 @@ struct LoginView: View {
                 .font(TokensTypo.caption)
                 .tracking(TokensTracking.label)
                 .foregroundStyle(TokensPalette.tertiary)
-            Text("登录后可以看车在哪、还剩多少电、还能跑多远。")
+            Text("登录后可以看位置、电量和续航。")
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -259,7 +259,7 @@ struct LoginView: View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             DSDivider()
             Text("登录走长安车联网接口（changan.com.cn）；密码不会被保存，控制用的 PIN 存在本机 Keychain。"
-                 + "登录令牌在本机存储，退出登录会一并清除。")
+                 + "登录令牌存在本机，退出会清除。")
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -319,7 +319,7 @@ struct LoginView: View {
             } else if r.noRecord {
                 loadCaptcha()
                 picCode = ""
-                showStatus("验证码已刷新，请重新输入图形验证码后重试", isErr: false)
+                showStatus("验证码已刷新，请重新输入", isErr: false)
             } else {
                 showStatus(r.msg, isErr: true)
             }
@@ -330,7 +330,7 @@ struct LoginView: View {
     private func performLogin() {
         let trimmedPhone = phone.trimmingCharacters(in: .whitespaces)
         guard !trimmedPhone.isEmpty, !smsCode.isEmpty, !picCode.isEmpty else {
-            showStatus("请填写手机号、图形验证码与短信验证码", isErr: true)
+            showStatus("请填写手机号与两个验证码", isErr: true)
             return
         }
         busy = true
@@ -367,7 +367,7 @@ struct LoginView: View {
             AppStore.shared.isLoggedIn = true
             await AppStore.shared.bootstrap()
         } else {
-            showStatus("生物识别验证失败，请使用短信验证码登录", isErr: true)
+            showStatus("验证失败，请用短信验证码登录", isErr: true)
         }
     }
 }
