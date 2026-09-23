@@ -119,6 +119,65 @@ jobs:
           zip -qr "CarKeeper-unsigned.zip" "CarKeeper-unsigned.ipa"
           ls -la
 
+          # ------------------------------------------------------------------
+          # IPA 内容体检：**小组件 / 手表 / 灵动岛的界面都住在嵌套扩展里**，
+          # 它们不在包里就永远不会出现在系统里 —— 而这件事以前在日志里是看不见的
+          # （2026-09-23：用户报「手机桌面上压根没得选、小组件没出现」，
+          #   而当前日志无法区分两种完全相反的原因：
+          #     ① 包里有未签名的 .appex，是侧载工具没把它签进去；
+          #     ② 包里根本没有 .appex（XcodeGen 的 embed 没生效）。
+          #   两种情况的修法完全相反 —— 所以先把它变成看得见的事实。）
+          #
+          # 全程 `|| true`：这是体检，不是门禁；任何一行都不允许把构建弄红。
+          # ------------------------------------------------------------------
+          echo "::group::IPA 内容体检（扩展是否随包分发）"
+          APP_NAME=$(basename "$APP_PATH")
+          echo "App bundle: Payload/$APP_NAME"
+          echo
+          echo "顶层（PlugIns 就是嵌套扩展的位置）："
+          ls -1 "Payload/$APP_NAME" | sed 's/^/  /' || true
+          echo
+          if [ -d "Payload/$APP_NAME/PlugIns" ]; then
+            echo "PlugIns 里的扩展："
+            # 刻意用 `find | while read` 而不是「按清单逐项迭代」的那种 for 循环：
+            # `scan/paths.py` 会把「某个 for 循环、变量 in 清单」当成**编译 target 清单**
+            # 读（那条规则是防「加了 target 却忘了加进编译体检」的）。两种迭代写法等价，
+            # 但写成那个形式会被它当成一个叫 `Payload/$APP_NAME"/PlugIns/*` 的 target，
+            # 当场把这一轮拦下来 —— 就是本段第一次提交时的真实遭遇。
+            find "Payload/$APP_NAME/PlugIns" -mindepth 1 -maxdepth 1 | while read -r x; do
+              echo "  · $(basename "$x")"
+              echo -n "      扩展点: "; \
+                /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPointIdentifier' "$x/Info.plist" 2>/dev/null || echo "（没有 NSExtension 声明）"
+              echo -n "      bundle id: "; \
+                /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$x/Info.plist" 2>/dev/null || echo "（读不到）"
+              echo -n "      版本: "; \
+                /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$x/Info.plist" 2>/dev/null || echo "（读不到）"
+              if codesign -dv "$x" >/dev/null 2>&1; then
+                echo "      签名: 已签名"
+              else
+                echo "      签名: 未签名 —— 侧载工具必须自己把它签进去，否则系统不会注册它"
+              fi
+            done
+          else
+            echo "⚠️  .app 里没有 PlugIns 目录。小组件 / 手表 / 灵动岛的界面都住在扩展里，"
+            echo "    所以它们不会出现在系统里 —— 这与网络、数据、免费账号都无关。"
+          fi
+          echo
+          if codesign -dv "Payload/$APP_NAME" >/dev/null 2>&1; then
+            echo "App 自身签名: 已签名"
+            codesign -d --entitlements - "Payload/$APP_NAME" 2>/dev/null | sed 's/^/  /' || true
+          else
+            echo "App 自身签名: 未签名（未签名 IPA —— 侧载时由工具重新签名并注入 entitlements；"
+            echo "  所以「App Group 到底有没有」取决于那一步，不取决于仓库里的 entitlements 文件）"
+          fi
+          echo
+          echo "版本号（扩展必须与 App 一致，否则系统不注册）："
+          echo -n "  App: "; /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "Payload/$APP_NAME/Info.plist" 2>/dev/null || echo "（读不到）"
+          echo
+          echo "IPA 里与扩展/手表相关的条目："
+          unzip -l CarKeeper-unsigned.ipa 2>/dev/null | grep -E "PlugIns|appex|Watch" | head -20 || echo "  （一个都没有）"
+          echo "::endgroup::"
+
       - name: Upload artifacts (best-effort)
         continue-on-error: true
         uses: actions/upload-artifact@v4

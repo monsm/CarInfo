@@ -56,6 +56,20 @@ LOOP_HEAD = re.compile(r"for\s+(\w+)\s+in\s+([^;\n]+);\s*do", re.M)
 LOOP_BODY = re.compile(r"scan/\$(\w+)\.py")
 
 
+def strip_yaml_comments(text):
+    """删掉整行的 `#` 注释，再做正则扫描。
+
+    为什么必须删（真实遭遇，2026-09-23）：给打包步骤加 IPA 内容体检时，我在注释里
+    写了一句话解释「为什么不用某种 for 写法」，而那句话本身长成了那个写法 ——
+    于是一个**注释**被当成编译 target 清单读，报出一个叫 `...` 的 target：
+        ❌ CI 点名编译 ...，但 project.yml 里没有这个 target
+    门禁没错，只是它不该读注释。注意：只删**整行**以 `#` 开头的行，
+    行尾注释（`ls -la  # 看包内容`）里不会放清单，保留不影响。
+    """
+    return "\n".join(line for line in text.split("\n")
+                     if not line.lstrip().startswith("#"))
+
+
 def declared_paths(spec_path):
     """project.yml 里声明过的所有路径（保持出现顺序，去掉重复）"""
     with open(spec_path, encoding="utf-8") as f:
@@ -219,7 +233,7 @@ def workflow_build_targets(workflow_dir):
         if not name.endswith(('.yml', '.yaml')):
             continue
         with open(os.path.join(workflow_dir, name), encoding='utf-8') as f:
-            text = f.read()
+            text = strip_yaml_comments(f.read())
         for var, items in LOOP_HEAD.findall(text):
             if var == 's':          # `for s in scan logic ...` 是检查器列表，不是 target
                 continue
@@ -290,7 +304,7 @@ def workflow_checkers(workflow_dir):
         if not name.endswith((".yml", ".yaml")):
             continue
         with open(os.path.join(workflow_dir, name), encoding="utf-8") as f:
-            text = f.read()
+            text = strip_yaml_comments(f.read())
         for call in CHECKER_CALL.findall(text):
             if call not in out:
                 out.append(call)
@@ -317,10 +331,34 @@ def workflow_schemes(workflow_dir):
         if not name.endswith((".yml", ".yaml")):
             continue
         with open(os.path.join(workflow_dir, name), encoding="utf-8") as f:
-            for s in re.findall(r"-scheme\s+([A-Za-z0-9_.-]+)", f.read()):
+            for s in re.findall(r"-scheme\s+([A-Za-z0-9_.-]+)", strip_yaml_comments(f.read())):
                 if s not in out:
                     out.append(s)
     return out
+
+
+def workflow_package_diagnostic(workflow_dir):
+    """工作流是否在打包后**打印了包内容**（扩展有没有随包分发）
+
+    为什么这一条要守：小组件 / 手表 / 灵动岛的界面都住在嵌套扩展（.appex）里。
+    2026-09-23 用户报「手机桌面上压根没得选、小组件没出现」，而那时的 CI 日志
+    **无法区分两种完全相反的原因**：
+      · 包里有未签名的 .appex（侧载工具没签它）—— 换/配置工具就能有小组件；
+      · 包里根本没有 .appex（XcodeGen 的 embed 没生效）—— 那要改工程。
+    两者修法完全相反，而「包里到底有什么」本来是打包步骤一句话就能说清的事实。
+
+    判据用一个**只可能来自那段诊断**的标记字符串，不去猜别的 `ls`。
+    """
+    marker = "IPA 内容体检"
+    if not os.path.isdir(workflow_dir):
+        return False
+    for name in sorted(os.listdir(workflow_dir)):
+        if not name.endswith((".yml", ".yaml")):
+            continue
+        with open(os.path.join(workflow_dir, name), encoding="utf-8") as f:
+            if marker in f.read():
+                return True
+    return False
 
 
 def main(argv):
@@ -350,6 +388,16 @@ def main(argv):
             print(("  ✅ " if ok else "  ❌ ") + c)
             if not ok:
                 problems.append(f"CI 工作流调用了不存在的脚本：{c}")
+
+    if spec == SPEC:
+        has_diag = workflow_package_diagnostic(WORKFLOW_DIR)
+        print("\n打包步骤是否打印包内容（扩展是否随包分发）")
+        print("  " + ("✅ 会打印" if has_diag else "❌ 不打印"))
+        if not has_diag:
+            problems.append(
+                "工作流打包后没有打印包内容 —— 小组件/手表/灵动岛是否随包分发就又变成"
+                "看不见的事实，而它的两种原因需要完全相反的修法"
+                "（侧载工具没签扩展 vs 包里根本没有扩展）")
 
     # 工作流里 `-scheme X` 用到的名字必须在 spec 里有交代，而且规则比想象的严：
     #
