@@ -67,6 +67,12 @@ struct DSSwipeStrip: View {
     /// 连续位置：`2.0` = 停在第三档，`1.4` = 正拖在第二、三档之间。
     /// 宿主用它做内容的交叉过渡 —— 换模式是渐变，不是闪一下。
     var onPosition: ((Double) -> Void)?
+    /// 条子是否正在展开（手指按下 → 展开；松手 → 收回）。宿主据此让两臂让位。
+    ///
+    /// 展开的**时机与收回的节奏是条子自己的行为**（原型 `pointerdown → targetExpand = 1`、
+    /// 拖过就 620ms 后收回、纯点按立即收回），宿主只消费这个状态 —— 所以它是一条
+    /// 单向通知，而不是宿主反过来指挥条子的参数。
+    var onExpand: ((Bool) -> Void)? = nil
 
     // ---- 几何（全部由条高推出来，见文件头）----
     /// 条高。HIG 最小触控目标是 44，这里是 46 —— 截图量出来的比例全部以它为基准。
@@ -83,6 +89,10 @@ struct DSSwipeStrip: View {
     @State private var cBase: CGFloat?
     @State private var pvBase: Double?
     @State private var moved = false
+    /// 收回计时器的代号。松手 620ms 后收回，但**手指若已经回到条子上**就作废 ——
+    /// 原型 `setTimeout(()=>{ if(!this.dragging) targetExpand = 0 }, 620)`。
+    /// 没有这一步，快速连按两下会被旧计时器把第二次展开收走。
+    @State private var retractToken = 0
 
     private var index: Int { items.firstIndex { $0.id == selectedID } ?? 0 }
 
@@ -258,7 +268,9 @@ struct DSSwipeStrip: View {
                     cBase = c
                     pvBase = pvValue(c: c, gap: gap)
                     moved = false
+                    retractToken += 1          // 新触摸作废还没生效的收回
                     withAnimation(TokensMotion.fade) { expand = 1 }
+                    onExpand?(true)
                 }
                 if abs(v.translation.width) > 8 { moved = true }
                 let dx = v.translation.width
@@ -279,8 +291,20 @@ struct DSSwipeStrip: View {
                 } else {
                     snap(gap: gap, lim: lim)
                 }
-                // 松手 620ms 后再收回：给眼睛一点时间看清刚才划过哪些档
-                withAnimation(TokensMotion.fade.delay(0.62)) { expand = 0 }
+                // 松手后再收回，节奏照原型：**拖过**的等 620ms（给眼睛时间看清
+                // 刚才划过哪些档），**没动过**（纯点按）立即收回。
+                // 计时器带代号：生效前若手指已回到条子上，这次收回作废。
+                if moved {
+                    let token = retractToken
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.62) {
+                        guard token == retractToken else { return }
+                        withAnimation(TokensMotion.fade) { expand = 0 }
+                        onExpand?(false)
+                    }
+                } else {
+                    withAnimation(TokensMotion.fade) { expand = 0 }
+                    onExpand?(false)
+                }
                 cBase = nil
                 pvBase = nil
             }

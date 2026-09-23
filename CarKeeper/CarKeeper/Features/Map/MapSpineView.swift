@@ -398,11 +398,17 @@ struct MapSpineView: View {
             arm(text: plateShort) { nav.openMode(.vehicle) }
                 .accessibilityLabel(Text("车辆"))
 
-            DSSwipeStrip(items: HomeMode.stripItems, selectedID: $homeModeRaw) { pos in
-                modePosition = pos
-            } onExpand: { open in
-                withAnimation(TokensMotion.fade) { barOpen = open }
-            }
+            DSSwipeStrip(items: HomeMode.stripItems,
+                         selectedID: $homeModeRaw,
+                         // 两个闭包都写显式标签：尾随闭包在两个函数参数之间靠扫描规则匹配，
+                         // 读的人得翻定义才知道 `{ pos in }` 落在哪个参数上 —— 这正是
+                         // `2f088df` 那次 CI 红掉的形态（当时 onExpand 还不存在）。
+                         onPosition: { pos in
+                             modePosition = pos
+                         },
+                         onExpand: { open in
+                             withAnimation(TokensMotion.fade) { barOpen = open }
+                         })
 
             arm(icon: "magnifyingglass") { nav.showSearch = true }
                 .accessibilityLabel(Text("搜索"))
