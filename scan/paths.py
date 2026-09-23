@@ -41,6 +41,24 @@ WORKFLOW_DIR = os.path.join(ROOT, ".github", "workflows")
 #
 # 默认值是「每个 target 都要被编到」—— 因为「写了但没人编」就是「改了等于没改，
 # 而且没有报错」。豁免只能显式给，而且必须写出理由：靠沉默蒙过去是不行的。
+# scan/ 下**故意不参与 CI 门禁**的脚本。
+#
+# 为什么需要这份名单：`workflow_checkers()` 只回答一个方向 ——
+# 「CI 点名的脚本在磁盘上存在吗」。反方向（脚本在磁盘上、CI 从不跑它）当时没有任何人管，
+# 而那个方向真的漏过：2026-09-23 写好的 `copy.py`（1668 条文案判据）忘了加进工作流的
+# `for s in ...` 循环，整整一轮里它等于不存在 —— 而那一轮的所有输出都是绿的。
+# 「没跑」和「跑了没问题」在日志上长得一模一样。
+#
+# 所以现在反过来要求：scan/ 下每个 .py（`_` 前缀的共享模块除外）必须
+# **要么出现在 CI 的检查器清单里，要么在这里写明不跑的理由**。
+CI_UNCOVERED_CHECKERS = {
+    "scan/verify_eol.py": "提交前的人工比对工具，不是门禁：它逐文件对比「工作区 vs HEAD」"
+                          "并把差异列出来让人判断「这些改动是不是本轮有意改的」。"
+                          "工作区与 HEAD 本来就该不一样，所以它没有通过/失败的判据 ——"
+                          "放进 CI 只会永远绿或永远红，两种都没有信息量。"
+                          "（字节级的行尾检查由 `eol.py` 负责，那个是门禁。）",
+}
+
 CI_UNCOVERED_TARGETS = {
     "CarKeeperTests": "纯函数测试 target。它在 CI 上要占一整个 macOS runner"
                       "（额度按 10 倍计费），2026-09-22 按用户要求停跑。"
@@ -361,6 +379,20 @@ def workflow_package_diagnostic(workflow_dir):
     return False
 
 
+def scan_scripts():
+    """scan/ 下的检查器脚本清单（相对仓库根），供「反方向」体检使用
+
+    只收 .py：
+      · `_` 前缀的是共享模块（`_roots` / `_fields` / `_msgs`），不是检查器，不算漏跑；
+      · `extract_baseline.sh` 与 `baseline/` 是基线生成物，由人工在更新冻结提交时跑。
+    """
+    d = os.path.join(ROOT, "scan")
+    if not os.path.isdir(d):
+        return []
+    return [f"scan/{n}" for n in sorted(os.listdir(d))
+            if n.endswith(".py") and not n.startswith("_")]
+
+
 def main(argv):
     spec = argv[1] if len(argv) > 1 else SPEC
     if not os.path.isfile(spec):
@@ -388,6 +420,27 @@ def main(argv):
             print(("  ✅ " if ok else "  ❌ ") + c)
             if not ok:
                 problems.append(f"CI 工作流调用了不存在的脚本：{c}")
+
+    # ---- 反方向：scan/ 下的脚本有没有被 CI 真的跑到 --------------------------
+    # 这一条是补的，因为上面那个方向**只查存在性**。2026-09-23 的 `copy.py` 就是从这个缝里
+    # 漏掉的：文件在、判据写好了、所有门禁都是绿的 —— 因为它根本不在那个 for 循环里。
+    # 检查范围少一项是「越改越安全」的反面，而它在输出上与「这一项没问题」完全一样。
+    if spec == SPEC:
+        scripts = scan_scripts()
+        print(f"\nscan/ 下的检查器脚本 {len(scripts)} 个（CI 清单 {len(checkers)} 个）")
+        for s in scripts:
+            if s in checkers:
+                print("  ✅ " + s)
+            elif s in CI_UNCOVERED_CHECKERS:
+                print(f"  ⚠️  {s}（已显式豁免）—— {CI_UNCOVERED_CHECKERS[s]}")
+            else:
+                print("  ❌ " + s)
+                problems.append(
+                    f"{s} 在磁盘上，但 CI 从不运行它（检查范围悄悄少一项，"
+                    "而输出依旧全绿）。要么加进工作流的检查器清单，"
+                    "要么写进 paths.py 的 CI_UNCOVERED_CHECKERS 并说明理由。")
+        for s in sorted(set(CI_UNCOVERED_CHECKERS) - set(scripts)):
+            print(f"  ⚠️  豁免名单里的 {s} 已不存在 —— 这条豁免该删了")
 
     if spec == SPEC:
         has_diag = workflow_package_diagnostic(WORKFLOW_DIR)
