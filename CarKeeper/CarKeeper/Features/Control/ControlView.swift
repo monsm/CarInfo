@@ -253,7 +253,9 @@ struct ControlView: View {
     private var cards: [StackCard] {
         var out = HomeMode.control.headCards
         // ① 车现在是什么样：姿态图 + 一句话状态 + 逐字段明细（同一张卡，不拆开）
-        out.append(StackCard(id: "body", title: "车身", content: AnyView(
+        out.append(StackCard(id: "body", title: "车身",
+                             at: store.cacheTime("control"),
+                             content: AnyView(
             VStack(alignment: .leading, spacing: TokensSpacing.md) {
                 controlHeader
                 if let bd = bodyDetail { bodyDetailCard(bd) }

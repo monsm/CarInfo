@@ -22,8 +22,12 @@ struct ArcStack: View {
 
     /// 叠法（原型 A~G）。默认 `.arc` —— 用户 2026-09-23 选中的那一种。
     var variant: StackVariant = .arc
-    /// 卡片，按显示顺序
-    var cards: [AnyView]
+    /// 卡片，按显示顺序。
+    ///
+    /// 这里收的是**未包装**的 `StackCard`，不是 `AnyView` —— 因为「这张卡要不要挂
+    /// 系统玻璃」取决于它此刻离阅读线多远，而那个距离只有本类型知道。
+    /// 提前在页面里包成 AnyView 的话，玻璃的开关就变成一个常量了。
+    var cards: [StackCard]
     /// 这一页的个性色（卡片左上角那一抹）
     var accent: Color = TokensPalette.accent
     /// 无障碍里这一叠叫什么（"充电"…）
@@ -88,7 +92,7 @@ struct ArcStack: View {
     // =========================================================================
 
     @ViewBuilder
-    private func cardView(_ i: Int, card: AnyView, targets: [CGFloat],
+    private func cardView(_ i: Int, card: StackCard, targets: [CGFloat],
                           m: StackMetrics, vh: CGFloat) -> some View {
         // 位置用**真实位移**，形变用**带滞后那一条**。
         // 两者混用会让卡片一边走一边被自己的滞后拖着，看起来像卡顿。
@@ -96,7 +100,10 @@ struct ArcStack: View {
         let tShape = shapeT(target(targets, i) - shapeScroll, m: m, vh: vh)
         let p = placement(i: i, dPos: dPos, tShape: tShape, m: m)
 
-        card
+        // 只给靠近阅读线的卡挂系统玻璃：多张 material 同时重绘很贵，
+        // 而消失带里的卡已经被遮罩淡到看不清了 —— 给它们用纯色底看不出区别。
+        // 阈值取 0.9：那里正好是遮罩开始明显变淡的位置，所以材质切换看不见。
+        card.render(accent: accent, glassy: abs(tShape) < 0.9)
             .background {
                 // 高度必须自己量：卡片高度是**内容撑出来的**（不写死），
                 // 所以「下一张在哪儿」只能靠这一帧的真实高度。
@@ -226,7 +233,11 @@ struct ArcStack: View {
                                               velocity: peakVelocity)
                 current = idx
                 TokensHaptic.select()
-                withAnimation(StackSpec.settle) { scroll = targets[idx] }
+                // 把手指速度交给弹簧：`initialVelocity` 要的是「占剩余路程的倍数/秒」，
+                // 所以除以剩余距离。剩余距离接近 0 时不给（否则会放大成无穷）。
+                let dist = targets[idx] - scroll
+                let v = abs(dist) > 1 ? peakVelocity / dist : 0
+                withAnimation(StackSpec.settle(velocity: v)) { scroll = targets[idx] }
                 dragBase = nil
                 lastSample = nil
                 peakVelocity = 0
@@ -328,10 +339,7 @@ struct StackPageView: View {
     var cards: [StackCard]
 
     var body: some View {
-        ArcStack(variant: variant,
-                 cards: cards.map { $0.render(accent: accent) },
-                 accent: accent,
-                 label: label)
+        ArcStack(variant: variant, cards: cards, accent: accent, label: label)
     }
 }
 
@@ -344,9 +352,10 @@ struct StackCard: Identifiable {
     var at: Date? = nil
     var content: AnyView
 
-    func render(accent: Color) -> AnyView {
+    /// `glassy` 由 `ArcStack` 按「离阅读线多远」决定（见那里关于性能的说明）。
+    func render(accent: Color, glassy: Bool = true) -> AnyView {
         AnyView(
-            GlassCard(accent: accent) {
+            GlassCard(accent: accent, glassy: glassy) {
                 VStack(alignment: .leading, spacing: TokensSpacing.md) {
                     if !title.isEmpty {
                         GlassCardHead(title: title, value: value, cls: cls, at: at)

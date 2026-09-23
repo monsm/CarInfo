@@ -68,6 +68,18 @@ enum StackSpec {
     /// 用 `interpolatingSpring` 而不是 `easeOutBack` 是因为前者能被手指打断
     /// （原地重开一个 withAnimation 就接管了），后者是个不可打断的自动播放。
     static let settle = Animation.interpolatingSpring(mass: 1, stiffness: 180, damping: 18)
+
+    /// 回落弹簧，带**手指那一瞬的速度**。
+    ///
+    /// `initialVelocity` 的单位是「剩余距离的倍数 / 秒」—— 所以传来的值要先除以
+    /// 剩余距离（见 `ArcStack.drag`）。不接这个参数也能吸到位，但那样无论快甩还是
+    /// 轻推都是同一条曲线：差别只剩「落在哪一张」，手上没有「顺着惯性冲过去」那一下。
+    /// 上限 ±8：手势里那一帧的峰值速度可能极大，不封顶会甩到天上。
+    static func settle(velocity: CGFloat) -> Animation {
+        let v = Double(min(max(velocity, -8), 8))
+        return Animation.interpolatingSpring(mass: 1, stiffness: 180, damping: 18,
+                                             initialVelocity: v)
+    }
 }
 
 // =============================================================================

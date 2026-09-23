@@ -370,6 +370,16 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
   `MonthlyReportSection`、`PowerSavingToggle`。
 - **`Design/Charts.swift`**：`DSTrendChart`（单序列，SOC / 功率共用）、`DSTyreTrendChart`（四条曲线）、
   `DSTrendEmpty`（数据不够时的说明，不是灰块）。
+- **`Design/StackSpec.swift`**：叠叠乐的全部手感数字（七种叠法 → `StackMetrics`）
+  + 纯几何（`StackMath`，不碰视图，可单独对）。**手感要调就只改这里**，
+  不要到页面里改一个局部数字。
+- **`Design/StackLabView.swift`**：七种叠法的对照页（`DevView` → 叠叠乐），
+  挑中哪一种写进 `UserDefaults`（`StackSpec.variantKey`），六页立刻跟着换。
+- **五个功能界面共用的三个原语**（阶段 1 的产物，职责分得很硬）：
+  `GlassCard`（一张卡的材质与内边距） → `ArcStack`（几何 / 手势 / 消失带 / 无障碍翻页）
+  → `StackPageView`（巨字头 + 那一叠） → `DSSwipeStrip`（底部那条相机式模式条，已重写）。
+  `ArcStack` 收的是**未包装的 `StackCard`** 而不是 `AnyView` —— 因为
+  「这张卡要不要挂系统玻璃」取决于它此刻离阅读线多远，而那个距离只有 `ArcStack` 知道。
 
 **铁律（`scan/design.py` 在 CI 上拦）**：字号与颜色分量只允许出现在令牌定义文件里。
 不许在页面里写 `.font(.system(size: 14))` 或 `Color(red:...)`。
@@ -557,6 +567,14 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 静态门禁能覆盖结构、符号、键名、文案、行尾、作用域，**覆盖不了类型检查与语法细节**——
 最近一次真实事故就是一个空格（§11）。接手后第一件事建议先跑一遍 CI 建立基线。
 
+**只能等真机的四件事**（不是没做，是这台机器上量不出来）：
+
+1. 卡片栈自己的竖向拖动与屏幕左缘的返回手势会不会打架。
+2. 手工传给弹簧的 `initialVelocity`（`StackSpec.settle(velocity:)`）转得对不对。
+3. 底部条在真实 390pt 下「三个字露出来多少」看着顺不顺。
+4. 八张卡全在画面里时的帧率（性能策略是只给 `abs(tShape) < 0.9` 的卡挂系统玻璃，
+   其余走主题表面色；若卡，下一步是调阈值而不是换材质）。
+
 ---
 
 ## 10. 常见改动怎么做（配方）
@@ -574,6 +592,8 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 
 1. `APIClient` 加方法（POST + `token=` 查询参数；有副作用就 `retryable: false`）；
 2. 决定它进哪个 cache 键（新键要同时改 `AppStore.caches` 初始化、`clearCache`、`gather`）；
+   数据时刻不用另外接线： `cacheTime(键)` 由 `saveCache` 自己盖，
+   你只要在**带读数的那张卡**上写 `at: store.cacheTime("你的键")`；
 3. 读字段一律用 `ci*` 家族，先查 `API-FIELD-MAP.md` 确认键名与类型；
 4. 在模型层（`ApiModels` / `ViewModels`）翻译成可渲染结构，**不要在 View 里读报文**。
 

@@ -90,16 +90,25 @@ struct ChargeView: View {
     private var cards: [StackCard] {
         let e = VM.energy(store.caches, store.car)
         let b = batteryModel(store.caches)
+        // 「此刻 / 明细 / 电池 / 趋势」是**同一份读数**的四种读法，所以时间戳同源：
+        // 四个不同时间只会让读者以为它们不是一回事。
+        let chargeAt = store.cacheTime("charge")
         return HomeMode.charge.headCards + [
             StackCard(id: "state", title: "此刻",
                       value: e.chargeText, cls: e.chargeCls,
+                      at: chargeAt,
                       content: AnyView(chargeHero(e))),
             StackCard(id: "detail", title: "明细",
+                      at: chargeAt,
                       content: AnyView(chargeDetail(b))),
+            // `at` 不是装饰：它回答「这个 68% 是什么时候的」。
+            // 没拿到过就是 nil（那会走空态），所以这里不会摆一个假时间。
             StackCard(id: "battery", title: "电池",
                       value: "\(e.socPct)%", cls: "ok",
+                      at: chargeAt,
                       content: AnyView(batterySection(b, e))),
             StackCard(id: "trend", title: "趋势",
+                      at: chargeAt,
                       content: AnyView(trendSection(e))),
             StackCard(id: "plan", title: "长途",
                       content: AnyView(DestinationCalculatorSection()))

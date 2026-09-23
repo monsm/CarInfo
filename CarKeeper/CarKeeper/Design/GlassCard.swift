@@ -24,6 +24,12 @@ struct GlassCard<Content: View>: View {
     var accent: Color = TokensPalette.accent
     /// 个性色的浓度。0 = 完全不要那一抹（纯玻璃）
     var accentWash: Double = 0.16
+    /// 要不要挂系统玻璃。
+    ///
+    /// 它是**性能开关**，不是风格开关：多张 glass 同时重绘很贵，而消失带里的卡
+    /// 已经被遮罩淡到看不清了。关掉时用主题的不透明表面色 —— 在那些位置上
+    /// 两者看不出区别（阈值由 `ArcStack` 给，见那里的说明）。
+    var glassy: Bool = true
     @ViewBuilder var content: Content
 
     private var shape: RoundedRectangle {
@@ -36,9 +42,7 @@ struct GlassCard<Content: View>: View {
             .padding(.top, StackSpec.Card.padTop)
             .padding(.bottom, StackSpec.Card.padBottom)
             .frame(maxWidth: .infinity, alignment: .leading)
-            // 一层系统玻璃。`.regular` 是标准厚度：够透（看得见下的内容），
-            // 也够实（正文读得清）。`.clear` 在浅色底图上会把字洗掉。
-            .glassEffect(.regular, in: shape)
+            .modifier(CardSurface(glassy: glassy, shape: shape))
             .overlay { accentWashOverlay }
             .overlay { shape.strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border) }
             .clipShape(shape)
@@ -53,6 +57,25 @@ struct GlassCard<Content: View>: View {
                        center: .topLeading, startRadius: 0, endRadius: 260)
             .allowsHitTesting(false)
             .clipShape(shape)
+    }
+}
+
+/// 卡的底：要么一层系统玻璃，要么主题的不透明表面色。
+///
+/// 两层共用**同一个 shape**，所以开关时轮廓不会变 —— 变的只有后面那层材质。
+/// （`.regular` 是标准厚度：够透（看得见下一张卡），也够实（正文读得清）。
+/// `.clear` 在浅色底图上会把字洗掉。）
+private struct CardSurface: ViewModifier {
+    let glassy: Bool
+    let shape: RoundedRectangle
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if glassy {
+            content.glassEffect(.regular, in: shape)
+        } else {
+            content.background(TokensPalette.surface, in: shape)
+        }
     }
 }
 

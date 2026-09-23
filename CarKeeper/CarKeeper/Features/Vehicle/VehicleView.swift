@@ -101,7 +101,11 @@ struct VehicleView: View {
                       content: AnyView(identitySection(sum))),
             // 用车提示：由这辆车的读数推出来的提醒（原 `车辆提示` 页）
             StackCard(id: "tips", title: "用车提示", content: AnyView(VehicleTipsSection())),
-            StackCard(id: "archive", title: "档案", content: AnyView(archiveGroups)),
+            // 档案里的里程与车架号来自车控报文（`control`）—— 时间戳跟的是那个源，
+            // 不是「这一页什么时候画出来的」。
+            StackCard(id: "archive", title: "档案",
+                      at: store.cacheTime("control"),
+                      content: AnyView(archiveGroups)),
             StackCard(id: "photos", title: "维保照片", content: AnyView(photoSection)),
             // 里程记账：花在车上的每一笔（原「我的」里的独立页 + sheet）
             StackCard(id: "journal", title: "里程记账", content: AnyView(MileageJournalSection()))

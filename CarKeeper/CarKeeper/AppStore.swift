@@ -36,6 +36,17 @@ final class AppStore: @unchecked Sendable {
         "control": nil, "check": nil, "messages": nil
     ]
 
+    /// 每个数据源**最后那次真的拿到了**的时刻。键与 `caches` 相同。
+    ///
+    /// 它回答的是界面上一句很容易说错的话：「这个 68% 是什么时候的？」
+    /// 不记这个时刻，卡片就只能显示“有读数”，读者无法判断它是不是几分钟前那一份。
+    /// （它**不是 TTL**：不过期、不落盘、不拦请求 —— 只用来在卡头上标一个时间。）
+    /// 唯一的写入点是 `saveCache`，它也是 `caches` 唯一的写入点。
+    private var cacheTimes: [String: Date] = [:]
+
+    /// 某个数据源最后一次真拿到值的时刻。没拿到过就是 nil。
+    func cacheTime(_ key: String) -> Date? { cacheTimes[key] }
+
     // 上一次已经喊过「位置变了」的坐标（`.locationUpdated` 的去重门槛）。
     // 初始是 NaN，所以第一条定位报文一定会被判为「动了」—— 第一次总要喊。
     private var lastPostedLat = Double.nan
@@ -705,6 +716,10 @@ final class AppStore: @unchecked Sendable {
             // nil = 这个源本次没取到：清空它。界面自己会说「没取到」，
             // 而不是继续显示上一次的读数（不保留旧值是刻意的 —— 见 caches 上的说明）。
             caches[k] = v
+            // 同一时刻记下「这份读数是什么时候拿到的」。清空时也清掉时刻 ——
+            // 留着一个时间戳而值是空的，会让卡片显示“有数据但很久没更新”，
+            // 而真实情况是「这次没取到」，那是两种不同的状态。
+            if v == nil { cacheTimes[k] = nil } else { cacheTimes[k] = Date() }
         }
         // 事件 → 行程：消息缓存是**唯一**的入口（网络与缓存共用同一条路径，
         // 所以「上次打开时拿到的那些事件」也会被补上，不会只算新来的）。

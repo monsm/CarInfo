@@ -105,7 +105,10 @@ struct TripsEventsView: View {
         if list.isEmpty {
             out.append(StackCard(id: "empty", content: AnyView(emptyState)))
         } else {
+            // 时间戳跟「消息」那个源：行程是从点火/熄火事件配出来的，
+            // 所以「这份汇总是什么时候的」等于「消息最后一次到手是什么时候」。
             out.append(StackCard(id: "summary", title: "总览",
+                                 at: store.cacheTime("messages"),
                                  content: AnyView(summaryHeader(list))))
             for (idx, trip) in list.enumerated() {
                 out.append(StackCard(id: "trip-\(idx)", title: "行程",
