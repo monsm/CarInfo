@@ -820,3 +820,59 @@ secondarySystemGroupedBackground
 「停车位置」→ `.parking`，两者都开出行页），其中「驾驶总览」这个名字来自早已删除的
 `DashboardView` —— 搜索里承诺一个不存在的总览页，是界面在说谎。
 现在搜索列表 = 索引页的 9 项，一对一；别名只作为深链存在，不再作为「第二条入口」。
+
+---
+
+## 地毯式对拗式复查（2026-09-23）
+
+一次把「还没做完的」找出来的复查。结论：代码级门禁（16 项）干净，但**漏在门禁看不见的地方**。
+
+### 1. 入口只统一了一半（已补）
+
+模式条立起来之后，仍有 **10 处绕过它 direct push 页面**：地图卡片里的三个动作块、
+三个「看全部…」按钮、索引页行、「我的」的车辆卡与链接行、全局搜索的六组结果。
+同一个功能因此仍然有两种存在方式（卡片里一份、push 出来一份）。
+
+现在只有一种：`NavState.openMode(_:)` —— 写档位键 + 清栈回到地图，
+由 `HomeMode.init?(link:)` 做深链→档位的翻译；不是档位的子页面（隐私 / OTA /
+家庭 / 钥匙）才 push。我上一轮加的「长按纸面 push 整屏版」也删了 ——
+它正是“同一页两种存在方式”的又一个例子。
+
+### 2. 五个「有名字、没发射」的通知（已删）
+
+`.navToVehicle` / `.navToHealth` / `.navToBattery` / `.navToDev` / `.navHome`：
+每个都只有一个观察者（根视图里写 `nav.path = [...]`），而**全项目零 post** ——
+既是从未生效的死线，又是与模式条并行的第二条导航路径。
+
+反过来，`.locationUpdated` 是**三个观察者、零 post**（地图跟车走 / 重取天气 /
+低电量提示三条行为从未生效过）。这一条不是删，是**补发射点**：
+`AppStore.saveCache`（location 缓存的唯一写入点），带 ≈5.5 米的变动门槛。
+
+### 3. 消息列表永远空 —— 根因是 carId 闸，不是解析
+
+`MessagesSection` 用 `guard !store.carId.isEmpty` 挡在加载前，而消息接口 URL 里
+**没有 carId**，小程序也只检查 token。`carId` 要等 bootstrap 的 `getCars` 回来才有值，
+`getCars` 一失败就是空串 → 消息永远空，看上去像「解析不对」。
+现在只看 token；解析出 0 条会 NSLog 打顶层键与响应长度；空状态区分「真没消息」
+与「拉取失败（带真实错误）」；已读判据回到小程序的 `readStatus`。
+
+### 4. 图标：两份并存，其中一份还缺 iPad 76×76 1x（已对齐）
+
+CI 一直在报 `AppIcon has 2 unassigned children`。原因：出包的
+`Assets.xcassets/AppIcon.appiconset` 只有 9 个槽位，缺 iPad 76×76 **1x**，
+使那两个 iPad @2x 槽位变成未分配。仓库根目录另有一份 `AppIcon/`（12 个 PNG，
+文档里的旧命令写进去的）—— 而 Xcode 只认 appiconset。
+已把 76×76 补进 appiconset（补槽位 + 拷文件，两侧一致已校验），删掉根目录那份，
+并把 `AppIcon-SPEC.md` 的生成命令改成唯一的 `generate_appicon.sh`。
+
+### 5. 删掉的死代码
+
+`DSIconButtonStyle`、`EmptyStateView`（两个全项目零引用）、三个空目录（`b/`、`state/`）。
+
+### 6. 刻意没动（它们不是垃圾）
+
+`clogs*.txt` / `clogs.zip`：`.gitignore` 里的本地拓包日志，是分析报文的证据，不进仓也不删。
+`design-preview/*.html`（8 份设计预览）：设计决策的凭据，每份内容都不同、无重复；
+其中 `fusion.html`（底部模式条 10 套融合）已随本轮入库。
+根目录 `README.md` 只有一行 `# CarInfo` —— 仓库门户页，留着。
+

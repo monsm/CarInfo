@@ -681,21 +681,6 @@ struct DSSecondaryButtonStyle: ButtonStyle {
     }
 }
 
-/// 图标按钮（导航栏、行尾）
-struct DSIconButtonStyle: ButtonStyle {
-    var size: CGFloat = TokensSize.tap
-    var tint: Color = TokensPalette.primary
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: TokensSize.iconLg))
-            .foregroundStyle(tint)
-            .frame(width: size, height: size)
-            .background(Circle().fill(configuration.isPressed ? TokensPalette.glassLight : Color.clear))
-            .contentShape(Circle())
-            .animation(TokensMotion.press, value: configuration.isPressed)
-    }
-}
 
 /// 分段控件：系统分段控件的观感（填充底 + 白色滑块），不自造圆角
 struct DSSegmented<T: Hashable>: View {

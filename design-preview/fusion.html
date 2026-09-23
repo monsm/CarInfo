@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>融合 · 十种 —— 地图是载体，底部手滑模式条切功能</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&family=Noto+Serif+SC:wght@300;400;600&display=swap">
+<style>
+/* ==========================================================================
+   骨架（十套完全一样，一个字都不改）
+     · 系统地图 ＝ 取景框，永远在
+     · 底部一条**能手滑的模式条** ＝ iOS 27 相机的那个特效
+     · 一个位置永不变的主按钮 ＝ 相机的快门：按钮永远在那儿，
+       按下去**干什么**由当前模式决定（这就是「真的切换不同功能」）
+
+   一个模式 = 一套完整的功能界面（找车 / 锁车 / 空调 / 充电 / 记录），
+   不是换几个数字。切换时整套界面跟着手指交叉过渡。
+
+   十套的差异 = 功能界面与地图的**十种融合方式**（不是颜色、不是换切换器）：
+     ① 底部面板   ② 底部大卡   ③ 悬浮卡     ④ 右侧栏    ⑤ 中央圆环
+     ⑥ 分屏       ⑦ 顶部抽屉   ⑧ 地图内标注  ⑨ 角落地图  ⑩ 水印
+   ========================================================================== */
+
+:root{
+  --bg:#131216;--fg:#F2EFE9;--dim:#9F99A6;--dim2:#6F6A77;--line:#262530;
+  --acc:#4C9BFF;--ease:cubic-bezier(.32,.72,0,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);padding-bottom:80px;
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+/* ---------- 顶部索引（挑选用，不属于设计本身） ---------- */
+#idx{position:sticky;top:0;z-index:99;background:var(--bg);border-bottom:1px solid var(--line);
+  display:flex;gap:6px;overflow-x:auto;padding:10px 16px;scrollbar-width:none}
+#idx::-webkit-scrollbar{display:none}
+.chip{flex:none;display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:transparent;
+  color:var(--dim);border-radius:999px;padding:7px 13px;font-size:12px;cursor:pointer;
+  font-family:inherit;letter-spacing:.02em;transition:.18s}
+.chip b{font-weight:600;color:var(--dim2);font-variant-numeric:tabular-nums}
+.chip:hover{color:var(--fg);border-color:#3B3844}
+.chip.on{background:var(--fg);color:#131216;border-color:var(--fg)}
+.chip.on b{color:#131216}
+
+/* ---------- 说明 ---------- */
+header{max-width:1260px;margin:0 auto;padding:32px 24px 0}
+header .eb{font-size:10.5px;letter-spacing:.2em;color:var(--dim2)}
+header h1{margin:9px 0 0;font-size:28px;font-weight:250;letter-spacing:-.8px;line-height:1.28}
+header h1 b{font-weight:600}
+header p{margin:14px 0 0;font-size:13px;line-height:1.9;color:var(--dim);max-width:920px}
+header p b{color:var(--fg);font-weight:600}
+header p em{font-style:normal;color:#C9C3D0}
+header .axes{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:9px;margin-top:20px}
+header .axes div{background:#1A191F;border-radius:12px;padding:12px 14px;font-size:11.5px;line-height:1.8;color:var(--dim)}
+header .axes b{display:block;color:var(--fg);font-weight:600;margin-bottom:4px;font-size:12px}
+header .axes i{font-style:normal;color:var(--acc)}
+
+/* ---------- 板 ---------- */
+#board{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;
+  scrollbar-width:none;margin-top:22px}
+#board::-webkit-scrollbar{display:none}
+.slide{flex:0 0 100%;scroll-snap-align:center;scroll-snap-stop:always;
+  display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px 0 30px}
+
+.meta{width:520px;flex:none}
+.meta .no{font-size:10.5px;letter-spacing:.2em;color:var(--dim2)}
+.meta .nm{font-size:17px;font-weight:600;margin:5px 0 5px;letter-spacing:.01em}
+.meta .th{font-size:12.5px;line-height:1.72;color:var(--dim)}
+.meta .mech{margin-top:10px;font-size:11.5px;line-height:1.72;color:#BCB6C3;
+  border-left:2px solid #3A3744;padding-left:10px}
+.meta .mech b{color:var(--acc);font-weight:600}
+.meta .cap{margin-top:10px;font-size:12px;line-height:1.72;color:#8E8896;min-height:44px}
+.meta .cap em{font-style:normal;color:#D6D0DD;font-weight:500}
+.meta .hint{margin-top:7px;font-size:11px;color:#5E5966}
+
+/* ---------- 设备 ---------- */
+.dev{width:390px;height:844px;flex:none;border-radius:46px;position:relative;overflow:hidden;
+  background:var(--m-bg);color:var(--text);
+  box-shadow:0 0 0 1px #3A3844,0 34px 66px -38px #000}
+@media (max-height:1180px){.dev{zoom:.92}}
+@media (max-height:1060px){.dev{zoom:.84}}
+@media (max-height:960px){.dev{zoom:.76}.meta{width:480px}}
+@media (max-height:860px){.dev{zoom:.68}.meta{width:440px}}
+@media (max-height:780px){.dev{zoom:.6}.meta{width:400px}}
+@media (max-width:560px){.dev{zoom:.74}.meta{width:100%}}
+
+.scr{position:absolute;inset:0;overflow:hidden;
+  --m-bg:#EDECEA;--m-block:#E2E0DC;--m-park:#DCE3D7;--m-water:#D2DCE6;--m-road:#FFFFFF;
+  --m-roadedge:#D8D6D2;--m-lbl:#9A968F;--m-lbl2:#B4B0A9;--m-vig:transparent;
+  --text:#14131A;--rule:rgba(0,0,0,.15);--rule-soft:rgba(0,0,0,.075);
+  --ok:#0F7C52;--bad:#D7373F;--warn:#C0761A;--accent:#0A84FF;--veil:#EDECEA;
+  --paper:rgba(255,255,255,.92);--hair:rgba(0,0,0,.085)}
+
+/* 地图窗口（十套唯一允许变形的固定件：它占多大，由融合方式决定） */
+.mapwin{position:absolute;inset:0;overflow:hidden}
+.bm{position:absolute;inset:0;width:100%;height:100%;display:block}
+.ovs{position:absolute;inset:0}
+.ov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;will-change:opacity}
+
+/* 状态条 */
+.sb{position:absolute;top:0;left:0;right:0;height:54px;z-index:60;display:flex;align-items:flex-end;
+  justify-content:space-between;padding:0 26px 8px;font-size:12.5px;font-weight:600;
+  font-variant-numeric:tabular-nums;color:var(--text)}
+.sb .ri{display:flex;align-items:center;gap:5px;opacity:.9}
+.sb svg{display:block}
+
+/* 顶部药丸（按融合方式决定要不要） */
+.huds{position:absolute;left:15px;right:15px;top:60px;z-index:40;pointer-events:none}
+.hud{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:7px;will-change:opacity}
+.pill{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:500;padding:8px 12px;
+  border-radius:999px;background:var(--paper);border:1px solid var(--hair);color:var(--text);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);white-space:nowrap}
+.pill i{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:none;box-shadow:0 0 7px var(--ok)}
+.pill.warn i{background:var(--bad);box-shadow:0 0 7px var(--bad)}
+
+/* 功能界面层（每套的融合方式在这里分叉） */
+.panels{position:absolute;inset:0;z-index:45;pointer-events:none}
+.pnl{position:absolute;will-change:opacity,transform}
+
+/* 通用内容件 */
+.ph{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px}
+.rows{display:flex;flex-direction:column}
+.row{display:flex;align-items:baseline;gap:10px;padding:6px 0;border-top:1px solid var(--hair)}
+.row:first-child{border-top:0}
+.row .k{font-size:12px;color:var(--text);opacity:.55;flex:none}
+.row .v{margin-left:auto;font-size:13px;font-weight:600;color:var(--text);
+  font-variant-numeric:tabular-nums;text-align:right}
+.row .v em{font-style:normal;font-weight:400;opacity:.5;margin-left:6px;font-size:11px}
+.row .v.bad{color:var(--bad)}
+.hero{display:flex;align-items:baseline;gap:8px}
+.hero b{font-size:46px;font-weight:250;letter-spacing:-.03em;line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--text)}
+.hero i{font-style:normal;font-size:13px;font-weight:500;color:var(--text);opacity:.6}
+.sub{font-size:11.5px;line-height:1.5;color:var(--text);opacity:.55;margin-top:6px}
+
+/* ================= 底部手滑模式条（骨架件，十套一致） ================= */
+.stripWrap{position:absolute;left:0;right:0;bottom:0;height:84px;z-index:80;
+  background:linear-gradient(to top,var(--veil) 46%,transparent 100%);
+  touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+.stripWrap.drag{cursor:grabbing}
+.sPill{position:absolute;left:50%;top:46px;width:82px;height:40px;margin:-20px 0 0 -41px;
+  border-radius:20px;background:var(--paper);border:1px solid var(--hair);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+  box-shadow:0 8px 20px -12px rgba(0,0,0,.55);will-change:transform}
+.sItem{position:absolute;left:50%;top:46px;width:88px;margin:-20px 0 0 -44px;height:40px;
+  line-height:40px;text-align:center;
+  font-size:12.5px;font-weight:600;letter-spacing:.02em;color:var(--text);white-space:nowrap;
+  will-change:transform,opacity;cursor:pointer}
+.sItem.on{color:var(--accent)}
+
+/* 主按钮：位置永不变，功能随模式变（相机的快门） */
+.fabs{position:absolute;right:16px;bottom:96px;z-index:82;pointer-events:none}
+.fab{position:absolute;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;
+  gap:6px;will-change:opacity;pointer-events:auto}
+.fabBtn{width:62px;height:62px;border:0;border-radius:50%;cursor:pointer;
+  background:var(--text);color:var(--m-bg);display:flex;align-items:center;justify-content:center;
+  box-shadow:0 12px 26px -12px rgba(0,0,0,.6);transition:transform .16s}
+.fabBtn:active{transform:scale(.94)}
+.fabBtn.hot{background:var(--bad);color:#fff}
+.fabLb{font-size:10.5px;font-weight:600;color:var(--text);
+  text-shadow:0 1px 2px var(--veil),0 0 10px var(--veil),0 0 10px var(--veil)}
+
+/* ---------- 融合方式各自的皮 ---------- */
+/* ① 底部面板 */
+.fSheet{left:0;right:0;bottom:84px;background:var(--paper);border-top:1px solid var(--hair);
+  border-radius:24px 24px 0 0;-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
+  padding:12px 18px 18px;pointer-events:auto}
+.grab{width:34px;height:4px;border-radius:2px;background:var(--rule);margin:0 auto 10px}
+/* ② 底部大卡 */
+.fBig{left:14px;right:14px;bottom:96px;background:var(--paper);border:1px solid var(--hair);
+  border-radius:22px;-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
+  padding:16px 18px 18px;box-shadow:0 18px 40px -22px rgba(0,0,0,.5);pointer-events:auto}
+/* ③ 悬浮卡 */
+.fFloat{left:34px;right:34px;bottom:104px;background:var(--paper);border:1px solid var(--hair);
+  border-radius:20px;-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
+  padding:14px 16px;box-shadow:0 24px 50px -26px rgba(0,0,0,.6);pointer-events:auto}
+/* ④ 右侧栏 */
+.fSide{right:0;top:0;bottom:0;width:172px;background:var(--paper);border-left:1px solid var(--hair);
+  -webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
+  padding:104px 15px 0;pointer-events:auto}
+/* ⑤ 中央圆环 */
+.fRing{left:50%;width:250px;bottom:104px;margin-left:-125px;display:flex;flex-direction:column;
+  align-items:center;pointer-events:auto}
+.fRing .cap{font-size:12.5px;font-weight:600;color:var(--text);
+  text-shadow:0 1px 3px var(--veil),0 0 10px var(--veil),0 0 10px var(--veil);margin-bottom:8px}
+/* ⑥ 分屏 */
+.fSplit{left:0;right:0;bottom:84px;background:var(--paper);border-top:1px solid var(--hair);
+  padding:14px 18px 18px;pointer-events:auto}
+/* ⑦ 顶部抽屉 */
+.fTop{left:0;right:0;top:0;background:var(--paper);border-bottom:1px solid var(--hair);
+  border-radius:0 0 24px 24px;-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
+  padding:66px 18px 16px;pointer-events:auto}
+/* ⑧ 地图内标注：没有面板 */
+/* ⑨ 角落地图 */
+.fFull{left:0;right:0;top:0;bottom:0;background:var(--paper);padding:280px 20px 0;pointer-events:auto}
+/* ⑩ 水印 */
+.fMark{left:0;right:0;bottom:84px;padding:0 22px 14px;pointer-events:none}
+.fMark .in{pointer-events:auto}
+.fMark .t1{font-size:15px;font-weight:600;color:#fff;letter-spacing:.01em}
+.fMark .hero b{font-size:76px;color:#fff}
+.fMark .hero i{color:#fff;opacity:.7}
+.fMark .sub{color:#fff;opacity:.62}
+.fMark .row{border-top-color:rgba(255,255,255,.2)}
+.fMark .row .k{color:#fff;opacity:.6}
+.fMark .row .v{color:#fff}
+.fMark .ph{color:#fff}
+
+/* 拖拽提示（只在第一屏显示） */
+.dragHint{position:absolute;left:0;right:0;bottom:190px;text-align:center;z-index:79;
+  font-size:10.5px;font-weight:500;color:var(--text);opacity:.5;pointer-events:none;
+  text-shadow:0 1px 3px var(--veil),0 0 10px var(--veil)}
+.footCap{position:absolute;left:0;right:0;bottom:0;z-index:83;padding:0 18px 6px;
+  font-size:9.5px;line-height:1.4;color:var(--text);opacity:.36;text-align:center;pointer-events:none}
+</style>
+</head>
+<body>
+
+<!-- 系统地图底图（骨架件：地图是取景框，十套共用） -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="bm" viewBox="0 0 390 844">
+      <rect width="390" height="844" style="fill:var(--m-bg)"/>
+      <path d="M-10 792 C 92 758, 168 826, 266 786 C 322 762, 360 790, 400 770 L400 856 L-10 856 Z"
+        style="fill:var(--m-water)"/>
+      <path d="M-10 792 C 92 758, 168 826, 266 786 C 322 762, 360 790, 400 770"
+        style="fill:none;stroke:var(--m-lbl2);stroke-width:1"/>
+      <rect x="240" y="244" width="52" height="108" rx="6" style="fill:var(--m-park)"/>
+      <rect x="16" y="618" width="64" height="82" rx="6" style="fill:var(--m-park)"/>
+      <g style="fill:var(--m-block)">
+        <rect x="16" y="60" width="64" height="164" rx="6"/><rect x="96" y="60" width="44" height="164" rx="6"/>
+        <rect x="160" y="60" width="60" height="164" rx="6"/><rect x="240" y="60" width="52" height="164" rx="6"/>
+        <rect x="312" y="60" width="78" height="164" rx="8"/>
+        <rect x="16" y="244" width="64" height="108" rx="6"/><rect x="96" y="244" width="44" height="108" rx="6"/>
+        <rect x="160" y="244" width="60" height="108" rx="6"/>
+        <rect x="16" y="372" width="64" height="106" rx="6"/><rect x="96" y="372" width="44" height="106" rx="6"/>
+        <rect x="160" y="372" width="60" height="106" rx="6"/><rect x="240" y="372" width="52" height="106" rx="6"/>
+        <rect x="312" y="372" width="62" height="106" rx="6"/>
+        <rect x="16" y="498" width="64" height="100" rx="6"/><rect x="96" y="498" width="44" height="100" rx="6"/>
+        <rect x="160" y="498" width="60" height="100" rx="6"/><rect x="240" y="498" width="52" height="100" rx="6"/>
+        <rect x="312" y="498" width="62" height="100" rx="6"/>
+        <rect x="96" y="618" width="44" height="82" rx="6"/><rect x="160" y="618" width="60" height="82" rx="6"/>
+        <rect x="240" y="618" width="52" height="82" rx="6"/>
+      </g>
+      <g style="stroke:var(--m-lbl2);stroke-width:2.5;stroke-dasharray:7 5;fill:none">
+        <path d="M330 76 V208"/><path d="M366 76 V208"/>
+      </g>
+      <g style="stroke:var(--m-roadedge);stroke-width:7;stroke-linecap:round;fill:none">
+        <path d="M0 360 H390"/><path d="M0 606 H390"/><path d="M88 52 V712"/><path d="M228 52 V712"/>
+      </g>
+      <g style="stroke:var(--m-road);stroke-width:4;stroke-linecap:round;fill:none">
+        <path d="M0 360 H390"/><path d="M0 606 H390"/><path d="M88 52 V712"/><path d="M228 52 V712"/>
+      </g>
+      <g style="stroke:var(--m-roadedge);stroke-width:10.5;stroke-linecap:round;fill:none">
+        <path d="M0 232 H390"/><path d="M0 486 H390"/><path d="M148 40 V724"/><path d="M300 40 V724"/>
+      </g>
+      <g style="stroke:var(--m-road);stroke-width:6.5;stroke-linecap:round;fill:none">
+        <path d="M0 232 H390"/><path d="M0 486 H390"/><path d="M148 40 V724"/><path d="M300 40 V724"/>
+      </g>
+      <g style="stroke:var(--m-lbl2);stroke-width:1;stroke-dasharray:9 11;fill:none">
+        <path d="M0 232 H390"/><path d="M0 486 H390"/>
+      </g>
+      <path d="M-10 700 C 120 670, 250 630, 400 600" style="stroke:var(--m-roadedge);stroke-width:14;fill:none"/>
+      <path d="M-10 700 C 120 670, 250 630, 400 600" style="stroke:var(--m-road);stroke-width:9;fill:none"/>
+      <path d="M-10 700 C 120 670, 250 630, 400 600"
+        style="stroke:var(--m-lbl);stroke-width:1.2;stroke-dasharray:11 12;fill:none"/>
+      <g style="fill:var(--m-lbl);font-family:'Noto Serif SC',serif;font-size:10.5px;letter-spacing:3.4px">
+        <text x="16" y="224">北 四 环</text><text x="16" y="478">京 密 路</text>
+        <text x="152" y="304">中 关 村</text><text x="306" y="262">望 京</text>
+        <text x="318" y="100">T 3</text><text x="150" y="812">通 惠 河</text>
+      </g>
+      <g style="fill:var(--m-lbl2);font-family:'Noto Serif SC',serif;font-size:8.5px;letter-spacing:2.6px">
+        <text x="96" y="140">北 苑</text><text x="238" y="192">酒 仙 桥</text><text x="34" y="412">安 贞</text>
+        <text x="176" y="412">三 里 屯</text><text x="216" y="526">十 里 堡</text>
+      </g>
+      <rect width="390" height="844" style="fill:var(--m-vig)"/>
+    </symbol>
+    <radialGradient id="halo">
+      <stop offset="0" style="stop-color:var(--accent);stop-opacity:.2"/>
+      <stop offset="60%" style="stop-color:var(--accent);stop-opacity:.06"/>
+      <stop offset="100%" style="stop-color:var(--accent);stop-opacity:0"/>
+    </radialGradient>
+    <radialGradient id="heat">
+      <stop offset="0" style="stop-color:var(--bad);stop-opacity:.42"/>
+      <stop offset="60%" style="stop-color:var(--warn);stop-opacity:.18"/>
+      <stop offset="100%" style="stop-color:var(--warn);stop-opacity:0"/>
+    </radialGradient>
+    <filter id="blur6"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="blur11"><feGaussianBlur stdDeviation="11"/></filter>
+  </defs>
+</svg>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="st-signal" viewBox="0 0 18 12"><rect x="0" y="7.5" width="3" height="4.5" rx="1" fill="currentColor"/><rect x="4.7" y="5" width="3" height="7" rx="1" fill="currentColor"/><rect x="9.4" y="2.6" width="3" height="9.4" rx="1" fill="currentColor"/><rect x="14.1" y="0" width="3" height="12" rx="1" fill="currentColor"/></symbol>
+    <symbol id="st-wifi" viewBox="0 0 16 12"><path d="M1 4.3a10.5 10.5 0 0114 0" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M3.6 7.1a6.7 6.7 0 018.8 0" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><circle cx="8" cy="10.2" r="1.5" fill="currentColor"/></symbol>
+    <symbol id="st-batt" viewBox="0 0 27 12"><rect x=".6" y=".6" width="22" height="10.8" rx="3.2" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".5"/><rect x="2.4" y="2.4" width="18.4" height="7.2" rx="2" fill="currentColor"/><path d="M24.2 4.2v3.6a2 2 0 000-3.6z" fill="currentColor" opacity=".55"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><g class="bt"><rect x="5" y="10.5" width="14" height="9" rx="2.6"/><path d="M8.4 10.5V8a3.6 3.6 0 0 1 7.2 0v2.5"/></g></symbol>
+    <symbol id="i-locate" viewBox="0 0 24 24"><g class="bt"><circle cx="12" cy="12" r="6.4"/><path d="M12 2.4v3M12 18.6v3M2.4 12h3M18.6 12h3"/></g><circle cx="12" cy="12" r="1.7" fill="currentColor"/></symbol>
+    <symbol id="i-route" viewBox="0 0 24 24"><g class="bt"><path d="M4.4 17.4l4.4-5.2 3.3 3 7.1-8.2"/><circle cx="4.4" cy="17.4" r="1.5"/><circle cx="19.2" cy="7" r="1.5"/></g></symbol>
+    <symbol id="i-ac" viewBox="0 0 24 24"><g class="bt"><path d="M12 3.5v17M4.6 7.75l14.8 8.5M19.4 7.75l-14.8 8.5"/></g></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.6 3 6.6 13h4.3l-1 8 7.1-10.4h-4.3L13.6 3Z" fill="currentColor"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><g class="bt"><path d="M4.4 7h15M4.4 12h15M4.4 17h9"/></g></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><g class="bt"><path d="M2.6 12s3.6-6.2 9.4-6.2S21.4 12 21.4 12s-3.6 6.2-9.4 6.2S2.6 12 2.6 12Z"/><circle cx="12" cy="12" r="2.6"/></g></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><g class="bt"><path d="M12 3.4 5 6v6.2c0 4 2.8 6.8 7 8.4 4.2-1.6 7-4.4 7-8.4V6z"/></g></symbol>
+  </defs>
+</svg>
+
+<header>
+  <div class="eb">融合 · 十种 · 都能手滑</div>
+  <h1>地图是载体，底部那条<b>手滑模式条</b>切的是<b>功能</b></h1>
+  <p>
+    骨架十套完全一样，一个字都不改：<b>系统地图当取景框永远在</b> + <b>底部一条能手滑的模式条</b>
+    （iOS 27 相机那个特效：手指拖着走、中间的放大变亮、两侧缩下去、松手吸附到最近一格）+
+    <b>一个位置永不变的主按钮</b> —— 那是相机的快门：按钮永远在同一个地方，
+    <em>按下去干什么，由当前模式决定</em>。
+  </p>
+  <p>
+    一个模式 = <b>一整套不同的功能界面</b>，不是换几个数字：找车是一套、锁车是一套、空调是一套、
+    充电是一套、记录是一套。手滑过去的时候，整套界面连同地图上的图层一起交叉过渡 ——
+    这就是「切换不同的功能」。
+  </p>
+  <p>
+    十套的差别在<b>功能界面与地图的融合方式</b>（不是颜色，也不是换切换器）：
+    底部面板 / 底部大卡 / 悬浮卡 / 右侧栏 / 中央圆环 / 分屏 / 顶部抽屉 / 地图内标注 / 角落地图 / 水印。
+  </p>
+  <div class="axes">
+    <div><b>固定件（十套一致）</b>① 系统地图 ＝ 取景框　② 底部手滑模式条（可拖 · 缩放 · 吸附）　③ 位置不变的主按钮（功能随模式变）</div>
+    <div><b>变的部分</b>功能界面与地图怎么摆：面板 / 大卡 / 悬浮 / 侧栏 / 圆环 / 分屏 / 顶抽屉 / 地图内标注 / 角落地图 / 水印</div>
+    <div><b>怎么试</b>按住手机底部那条模式条左右拖 —— 中间的会放大变亮、地图图层交叉淡入、松手吸附；也可以直接点某个模式名</div>
+  </div>
+</header>
+
+<div id="idx"></div>
+<main id="board"></main>
+
+<script>
+(function(){
+'use strict';
+
+/* ==========================================================================
+   共用元件
+   ========================================================================== */
+var C = { car:[300,360], chg:[228,232], bad:[148,232], home:[46,300],
+          work:[300,120], mall:[120,560], svc:[352,700], me:[300,606] };
+
+function MAP(){ return '<svg class="bm" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice"><use href="#bm"/></svg>'; }
+function OV(inner){ return '<svg class="ov" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice" fill="none">' + inner + '</svg>'; }
+
+function carPin(x, y, pct, r, zoom){
+  r = r || 44; zoom = zoom || 1;
+  var L = 2 * Math.PI * r;
+  return '<g transform="translate(' + x + ',' + y + ') scale(' + zoom + ')">' +
+    '<circle r="62" fill="url(#halo)"/>' +
+    '<circle r="' + r + '" fill="none" style="stroke:var(--rule-soft)" stroke-width="8" stroke-dasharray="1.6 22.5"/>' +
+    '<circle r="' + r + '" fill="none" style="stroke:var(--accent);stroke-width:4;stroke-linecap:round" ' +
+      'stroke-dasharray="' + (L*pct/100).toFixed(1) + ' ' + L.toFixed(1) + '" transform="rotate(-90)"/>' +
+    '<circle r="' + (r*0.66).toFixed(1) + '" style="fill:var(--m-bg);stroke:var(--rule)" stroke-width="1"/>' +
+    '<path d="M-15 8 L-11.5 -2 Q-10.5 -5 -7 -5 L7 -5 Q10.5 -5 11.5 -2 L15 8" ' +
+      'style="stroke:var(--text)" stroke-width="1.7" stroke-linejoin="round"/>' +
+    '<path d="M-17 8 H17" style="stroke:var(--text);stroke-width:1.7;stroke-linecap:round"/>' +
+    '<circle cx="-7" cy="9" r="4.2" fill="none" style="stroke:var(--text)" stroke-width="1.5"/>' +
+    '<circle cx="7" cy="9" r="4.2" fill="none" style="stroke:var(--text)" stroke-width="1.5"/>' +
+  '</g>';
+}
+function ring(x, y, r, pct, col, w){
+  col = col || 'var(--accent)'; w = w || 4;
+  var L = 2 * Math.PI * r;
+  return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="none" style="stroke:var(--rule-soft)" stroke-width="' + w + '"/>' +
+         '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="none" style="stroke:' + col +
+         ';stroke-width:' + w + ';stroke-linecap:round" stroke-dasharray="' + (L*pct/100).toFixed(1) + ' ' + L.toFixed(1) +
+         '" transform="rotate(-90 ' + x + ' ' + y + ')"/>';
+}
+function trail(d, o){
+  o = o || {};
+  return '<path d="' + d + '" fill="none" style="stroke:' + (o.c || 'var(--accent)') + ';stroke-width:' + (o.w || 2.6) +
+    ';stroke-linejoin:round;stroke-linecap:round;opacity:' + (o.o === undefined ? .92 : o.o) + '"' +
+    (o.dash ? ' stroke-dasharray="' + o.dash + '"' : '') + (o.blur ? ' filter="url(#' + o.blur + ')"' : '') + '/>';
+}
+function pin(x, y, kind, label, lx, ly){
+  var col = { ok:'var(--ok)', bad:'var(--bad)', chg:'var(--ok)', warn:'var(--warn)',
+              dim:'var(--m-lbl)', acc:'var(--accent)' }[kind] || 'var(--accent)';
+  var g;
+  if (kind === 'bad'){
+    g = '<circle r="17" style="fill:var(--bad);opacity:.15"/><circle r="9.5" style="fill:var(--bad)"/>' +
+        '<path d="M0 -4.4 V1.4 M0 4.4 V3.1" style="stroke:var(--m-bg);stroke-width:2.1;stroke-linecap:round"/>';
+  } else if (kind === 'chg'){
+    g = '<circle r="11" style="fill:var(--m-bg);stroke:var(--ok);stroke-width:1.7"/>' +
+        '<path d="M2.4 -6.2 L-3.6 1.4 H0 L-1.2 7 L4.8 -.6 H1.2 Z" style="fill:var(--ok)"/>';
+  } else {
+    g = '<circle r="8" style="fill:' + col + '"/><circle r="8" fill="none" style="stroke:var(--veil);stroke-width:1.6"/>';
+  }
+  return '<g><g transform="translate(' + x + ',' + y + ')">' + g + '</g>' +
+    (label ? '<text class="lbl ' + (kind === 'bad' ? 'bad' : kind === 'chg' ? 'ok' : '') +
+      '" x="' + (lx||0) + '" y="' + (ly||0) + '">' + label + '</text>' : '') + '</g>';
+}
+function lbl(x, y, t, cls, an){
+  return '<text class="lbl ' + (cls || '') + '" x="' + x + '" y="' + y + '"' +
+    (an ? ' text-anchor="' + an + '"' : '') + '>' + t + '</text>';
+}
+function zone(x, y, r){
+  return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" style="fill:var(--accent);opacity:.07"/>' +
+    '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" style="fill:none;stroke:var(--accent);stroke-width:1;opacity:.45;stroke-dasharray:5 6"/>';
+}
+function SB(){
+  return '<div class="sb"><span>21:40</span><div class="ri">' +
+    '<svg width="17" height="12"><use href="#st-signal"/></svg>' +
+    '<svg width="15" height="12"><use href="#st-wifi"/></svg>' +
+    '<svg width="26" height="12"><use href="#st-batt"/></svg></div></div>';
+}
+function ico(id, s){ s = s || 22; return '<svg width="' + s + '" height="' + s + '" style="display:block"><use href="#' + id + '"/></svg>'; }
+function rows(list){
+  return '<div class="rows">' + list.map(function(r){
+    return '<div class="row"><span class="k">' + r[0] + '</span>' +
+      '<span class="v' + (r[2] ? ' ' + r[2] : '') + '">' + r[1] +
+      (r[3] ? '<em>' + r[3] + '</em>' : '') + '</span></div>';
+  }).join('') + '</div>';
+}
+function hero(h, cls){
+  return '<div class="hero' + (cls ? ' ' + cls : '') + '"><b>' + h.v + '</b><i>' + h.u + '</i></div>' +
+    '<div class="sub">' + h.lbl + '</div>';
+}
+
+/* ==========================================================================
+   五个功能 —— 内容只写一遍，十种融合方式拿去摆
+   ========================================================================== */
+var FN = [
+  { n:'找车', head:'车在这儿',
+    hero:{ v:'1.8', u:'km 外', lbl:'步行约 22 分 · 望京地库 B2 · 21:40 起静置' },
+    rows:[['位置','望京 · 地库 B2'],['停多久','3 小时 12 分'],['步行','1.4 km · 约 22 分']],
+    btn:'导航到车', btnIcon:'i-route',
+    ov:function(){
+      return zone(C.car[0], C.car[1], 88) +
+        trail('M300 606 L300 486 L228 486 L228 360 L300 360', { w:2.6, o:.55, dash:'7 8' }) +
+        pin(C.me[0], C.me[1], 'acc', '你', -6, 30) +
+        carPin(C.car[0], C.car[1], 78) +
+        lbl(150, 328, '步行 1.4 km · 约 22 分', 'big');
+    }
+  },
+  { n:'锁车', head:'车是锁着的',
+    hero:{ v:'4/4', u:'车门已关', lbl:'车窗已关 · 后备箱未关闭（14:20）' },
+    rows:[['车门','4 / 4 已关'],['车窗','已关闭'],['后备箱','未关闭','bad','14:20']],
+    btn:'锁车', btnIcon:'i-lock', btnHot:true,
+    ov:function(){
+      return carPin(C.car[0], C.car[1], 78) +
+        pin(272, 409, 'ok') + pin(328, 409, 'ok') + pin(272, 311, 'ok') + pin(328, 311, 'ok') +
+        lbl(220, 436, '四门已关', 'ok') +
+        pin(C.bad[0], C.bad[1], 'bad', '后备箱未关 · 14:20', 22, -14);
+    }
+  },
+  { n:'空调', head:'车内 24℃',
+    hero:{ v:'24', u:'℃ 车内', lbl:'设定 22℃ · 风量 3 档 · 车外 12℃' },
+    rows:[['车内 / 车外','24℃ / 12℃'],['设定','22℃ · 自动'],['出发前预调','06:30']],
+    btn:'开启空调', btnIcon:'i-ac',
+    ov:function(){
+      return '<circle cx="318" cy="336" r="58" fill="url(#heat)"/>' +
+        '<circle cx="292" cy="392" r="44" fill="url(#heat)"/>' +
+        carPin(C.car[0], C.car[1], 62, 40) +
+        lbl(334, 300, '出风 26℃', 'warn') + lbl(334, 316, '设定 24℃', 'dim') +
+        lbl(196, 452, '车外 12℃ · 座舱预热中', 'dim');
+    }
+  },
+  { n:'充电', head:'还能跑 412 km',
+    hero:{ v:'78', u:'% 电量', lbl:'6.8 kW · 谷电价 ¥0.68 / 度 · 预计 01:10 充满' },
+    rows:[['电量','78%','','412 km'],['充电功率','6.8 kW · 12A'],['电价','¥0.68 / 度 · 谷电']],
+    btn:'开始充电', btnIcon:'i-bolt',
+    ov:function(){
+      return zone(C.chg[0], C.chg[1], 74) +
+        trail('M300 360 L300 232 L250 232', { w:2.4, o:.4, dash:'6 7' }) +
+        carPin(C.car[0], C.car[1], 78, 38) +
+        ring(C.chg[0], C.chg[1], 30, 78, 'var(--ok)', 3.4) +
+        pin(C.chg[0], C.chg[1], 'chg') +
+        lbl(266, 226, '¥0.68 / 度 · 6.8 kW', 'ok') +
+        lbl(266, 242, '谷电 · 01:10 充满', 'dim');
+    }
+  },
+  { n:'记录', head:'今天 52.9 km',
+    hero:{ v:'3', u:'笔记录', lbl:'合计 ¥14.60 · 7 段行程 · 1 小时 12 分' },
+    rows:[['行程','52.9 km','','7 段'],['记录','3 笔','','充电 2 · 停车 1'],['花费','¥14.60']],
+    btn:'记一笔', btnIcon:'i-list',
+    ov:function(){
+      return trail('M46 300 L88 300 L88 232 L228 232', { w:3 }) +
+        trail('M228 232 L228 140 L300 140', { w:3, o:.55 }) +
+        trail('M300 140 L300 360', { w:3, o:.3 }) +
+        lbl(96, 214, '¥4.20 充电', 'acc') + lbl(238, 126, '¥6.80 充电', 'acc') +
+        lbl(312, 292, '¥3.60 停车', 'acc') +
+        carPin(C.car[0], C.car[1], 62, 34);
+    }
+  }
+];
+
+/* ==========================================================================
+   十种融合方式 —— 同一个功能，摆法完全不同
+   每一套：mapCss（地图占多大）· panel(fn)（功能界面摆哪儿、长什么样）
+   ========================================================================== */
+var LAY = [
+  /* ① 底部面板 —— 最标准的那一版 */
+  { no:'01', nm:'底部面板 Sheet',
+    th:'地图满屏，功能够薄，从底部推上来一张纸。最像原生、最省事的一版，也是其余九套的基准。',
+    mech:'<b>地图</b> 满屏　<b>功能界面</b> 底部纸张（head + 三行）　<b>主按钮</b> 右下悬浮',
+    mapCss:'position:absolute;inset:0',
+    hud:function(f){ return '<div class="pill"><i></i>已上锁 · 望京</div><div class="pill">' + f.n + '</div>'; },
+    panel:function(f){
+      return '<div class="pnl fSheet"><div class="grab"></div><div class="ph">' + f.head + '</div>' + rows(f.rows) + '</div>';
+    }
+  },
+
+  /* ② 底部大卡 —— 一个巨字压住下半屏 */
+  { no:'02', nm:'底部大卡 Big Card',
+    th:'功能界面变成一张独立的大卡：一个巨大的数字当主角，三行数据退成脚注。下半屏是卡的，上半屏是地图的。',
+    mech:'<b>地图</b> 上半屏　<b>功能界面</b> 一张独立大卡（巨字 + 脚注行）　<b>主按钮</b> 卡内右侧',
+    mapCss:'position:absolute;inset:0',
+    hud:function(f){ return '<div class="pill"><i></i>望京 · 地库 B2</div>'; },
+    panel:function(f){
+      return '<div class="pnl fBig">' + hero(f.hero) +
+        '<div style="height:1px;background:var(--hair);margin:14px 0 2px"></div>' +
+        rows(f.rows) + '</div>';
+    }
+  },
+
+  /* ③ 悬浮卡 —— 地图看得见四周 */
+  { no:'03', nm:'悬浮卡 Floating',
+    th:'卡片不贴边：四周留出地图，卡像一块浮在地图上的玻璃。卡片缩到最小，只留一句结论。',
+    mech:'<b>地图</b> 满屏（卡四周可见）　<b>功能界面</b> 一块悬浮玻璃卡（一句结论 + 两行）　<b>主按钮</b> 右下悬浮',
+    mapCss:'position:absolute;inset:0',
+    hud:function(f){ return '<div class="pill"><i></i>已上锁</div><div class="pill">' + f.n + '</div>'; },
+    panel:function(f){
+      return '<div class="pnl fFloat"><div class="ph">' + f.head + '</div>' +
+        '<div class="sub" style="margin:0 0 8px">' + f.hero.lbl + '</div>' +
+        rows(f.rows.slice(0, 2)) + '</div>';
+    }
+  },
+
+  /* ④ 右侧栏 —— 地图让出右边 */
+  { no:'04', nm:'右侧栏 Side Rail',
+    th:'地图往左让出右边一条，功能竖着排在右侧栏里 —— 拇指够得着，地图也没丢。',
+    mech:'<b>地图</b> 左侧 55%　<b>功能界面</b> 右侧竖栏（三行 + 主按钮）　<b>主按钮</b> 栏内底部',
+    mapCss:'position:absolute;left:0;top:0;bottom:0;right:172px',
+    hud:function(f){ return '<div class="pill"><i></i>' + f.n + '</div>'; },
+    panel:function(f){
+      return '<div class="pnl fSide"><div class="ph">' + f.head + '</div>' +
+        hero(f.hero) +
+        '<div style="height:1px;background:var(--hair);margin:14px 0 2px"></div>' +
+        rows(f.rows) + '</div>';
+    }
+  },
+
+  /* ⑤ 中央圆环 —— 功能做成一个环 */
+  { no:'05', nm:'中央圆环 Ring',
+    th:'功能不是一张纸，是一个环：进度绕成一圈，数在中间。地图围着它转。',
+    mech:'<b>地图</b> 满屏　<b>功能界面</b> 中央一个环（环 = 进度，数在圆心）　<b>主按钮</b> 环的右下',
+    mapCss:'position:absolute;inset:0',
+    hud:function(f){ return '<div class="pill"><i></i>已上锁 · 望京</div>'; },
+    panel:function(f){
+      var pct = { '找车':72, '锁车':100, '空调':40, '充电':78, '记录':60 }[f.n] || 60;
+      return '<div class="pnl fRing"><div class="cap">' + f.head + '</div>' +
+        '<svg width="188" height="188" viewBox="0 0 188 188">' +
+          '<circle cx="94" cy="94" r="82" fill="none" stroke="rgba(255,255,255,.75)" stroke-width="10"/>' +
+          ring(94, 94, 82, pct, 'var(--accent)', 10) +
+        '</svg>' +
+        '<div style="margin-top:-130px;text-align:center;width:100%">' +
+          '<div style="font-size:40px;font-weight:250;letter-spacing:-.03em;color:var(--text);' +
+            'text-shadow:0 1px 4px var(--veil),0 0 12px var(--veil)">' + f.hero.v +
+            '<span style="font-size:15px;font-weight:500;margin-left:4px;opacity:.7">' + f.hero.u + '</span></div>' +
+          '<div class="sub" style="text-shadow:0 1px 3px var(--veil),0 0 10px var(--veil)">' + f.hero.lbl + '</div>' +
+        '</div></div>';
+    }
+  },
+
+  /* ⑥ 分屏 —— 硬边，上下各一半 */
+  { no:'06', nm:'分屏 Split',
+    th:'上半地图、下半功能，中间一条硬边。功能那一半可以放得下更多东西，是最「工作台」的一版。',
+    mech:'<b>地图</b> 上半 46%　<b>功能界面</b> 下半 54%（head + 三行 + 说明）　<b>主按钮</b> 右下悬浮',
+    mapCss:'position:absolute;left:0;right:0;top:0;height:388px',
+    hud:function(f){ return '<div class="pill"><i></i>' + f.n + '</div>'; },
+    panel:function(f){
+      return '<div class="pnl fSplit" style="top:388px"><div class="ph">' + f.head + '</div>' +
+        hero(f.hero) +
+        '<div style="height:1px;background:var(--hair);margin:14px 0 2px"></div>' +
+        rows(f.rows) + '</div>';
+    }
+  },
+
+  /* ⑦ 顶部抽屉 —— 功能在上面 */
+  { no:'07', nm:'顶部抽屉 Top Drawer',
+    th:'倒过来：功能从顶部拉下来，地图沉到下面。前挡风支架上手机时，上半屏更近眼。',
+    mech:'<b>地图</b> 下半（抽屉下方）　<b>功能界面</b> 顶部抽屉（head + 三行）　<b>主按钮</b> 右下悬浮',
+    mapCss:'position:absolute;left:0;right:0;top:0;bottom:0',
+    hud:function(f){ return '<div class="pill"><i></i>已上锁 · 望京</div>'; },
+    panel:function(f){
+      return '<div class="pnl fTop">' +
+        '<div style="display:flex;align-items:baseline;gap:10px">' +
+          '<div class="ph" style="margin:0;flex:1">' + f.head + '</div>' +
+          '<div style="font-size:19px;font-weight:300;color:var(--text);font-variant-numeric:tabular-nums">' +
+            f.hero.v + '<span style="font-size:11px;opacity:.6;margin-left:3px">' + f.hero.u + '</span></div>' +
+        '</div><div class="sub" style="margin-bottom:8px">' + f.hero.lbl + '</div>' +
+        rows(f.rows) + '</div>';
+    }
+  },
+
+  /* ⑧ 地图内标注 —— 干脆没有面板 */
+  { no:'08', nm:'地图内标注 On-Map',
+    th:'最激进的一版：没有面板。功能的数据直接写在地图上的那几个点上，只留一个主按钮。地图一点不被遮。',
+    mech:'<b>地图</b> 满屏（一点不遮）　<b>功能界面</b> 数据画在图上（钉 + 引线 + 注释）　<b>主按钮</b> 右下悬浮',
+    mapCss:'position:absolute;inset:0',
+    hud:function(){ return ''; },
+    ovAdd:function(f){
+      var A = { '找车':'1.8 km · 步行 22 分', '锁车':'四门已关 · 后备箱未关',
+                '空调':'车内 24℃ · 设定 22℃', '充电':'78% · 6.8 kW · ¥0.68',
+                '记录':'今天 52.9 km · 3 笔' }[f.n];
+      return '<g><rect x="18" y="196" width="212" height="30" rx="9" style="fill:var(--paper);stroke:var(--hair)"/>' +
+        lbl(32, 216, f.n + ' · ' + A, '') +
+        '</g>';
+    },
+    panel:function(){ return ''; }
+  },
+
+  /* ⑨ 角落地图 —— 地图缩成一格 */
+  { no:'09', nm:'角落地图 Corner',
+    th:'反过来：功能占满整屏，地图缩成左上角一格窗口。适合功能本身比位置更重要的时刻。',
+    mech:'<b>地图</b> 左上角一格（150×200 圆角窗）　<b>功能界面</b> 整屏（巨字 + 三行）　<b>主按钮</b> 右下悬浮',
+    mapCss:'position:absolute;left:16px;top:60px;width:150px;height:200px;border-radius:16px;overflow:hidden;box-shadow:0 10px 26px -14px rgba(0,0,0,.6),0 0 0 1px var(--hair);z-index:50',
+    hud:function(f){ return '<div class="pill" style="margin-left:166px"><i></i>' + f.n + '</div>'; },
+    panel:function(f){
+      return '<div class="pnl fFull"><div class="ph" style="font-size:20px">' + f.head + '</div>' +
+        hero(f.hero) +
+        '<div style="height:1px;background:var(--hair);margin:20px 0 2px"></div>' +
+        rows(f.rows) + '</div>';
+    }
+  },
+
+  /* ⑩ 水印 —— 地图当背景 */
+  { no:'10', nm:'水印 Watermark',
+    th:'地图退成全屏背景（压暗），功能以大字浮在水印上。最不像「工具」、最像「海报」的一版。',
+    mech:'<b>地图</b> 满屏但压暗成水印　<b>功能界面</b> 大字浮层（巨字 + 一行 + 一行）　<b>主按钮</b> 右下悬浮',
+    mapCss:'position:absolute;inset:0',
+    veil:true,
+    hud:function(){ return ''; },
+    panel:function(f){
+      return '<div class="pnl fMark"><div class="in">' +
+        '<div class="t1">' + f.head + '</div>' + hero(f.hero) +
+        rows(f.rows.slice(0, 2)) + '</div></div>';
+    }
+  }
+];
+
+/* ==========================================================================
+   手滑模式条引擎 —— 十套共用这一套代码
+   拖动时：中心项放大变亮、两侧缩小淡出；地图图层按距离交叉淡入；
+           功能界面横向视差 + 交叉淡入；松手吸附到最近一格。
+   ========================================================================== */
+var W = 88;                       /* 一个模式的槽宽 */
+
+function build(d, fnAll){
+  var n = fnAll.length, ov = '', hd = '', pn = '', it = '', fb = '';
+  for (var k = 0; k < n; k++){
+    var f = fnAll[k];
+    var extra = d.ovAdd ? d.ovAdd(f) : '';
+    ov += OV(f.ov() + extra);
+    hd += '<div class="hud">' + (d.hud ? d.hud(f) : '') + '</div>';
+    pn += d.panel(f);
+    it += '<div class="sItem">' + f.n + '</div>';
+    fb += '<div class="fab"><button class="fabBtn' + (f.btnHot ? ' hot' : '') + '">' +
+          ico(f.btnIcon) + '</button><div class="fabLb">' + f.btn + '</div></div>';
+  }
+  var veil = d.veil
+    ? '<div style="position:absolute;inset:0;z-index:20;background:linear-gradient(180deg,' +
+      'color-mix(in srgb,var(--veil) 62%,transparent),color-mix(in srgb,var(--veil) 88%,transparent))"></div>'
+    : '';
+  return '<div class="scr">' +
+    '<div class="mapwin" style="' + d.mapCss + '">' + MAP() + '<div class="ovs">' + ov + '</div></div>' +
+    veil + SB() +
+    '<div class="huds" style="' + (d.veil ? 'display:none' : '') + '">' + hd + '</div>' +
+    '<div class="panels" style="' + (d.veil ? 'z-index:46' : '') + '">' + pn + '</div>' +
+    '<div class="fabs" style="' + (d.veil ? 'z-index:84' : '') + '">' + fb + '</div>' +
+    '<div class="dragHint">按住这条模式条左右拖 → 松手吸附</div>' +
+    '<div class="stripWrap"><div class="sPill"></div>' + it + '</div>' +
+    '<div class="footCap">地图是载体 · 模式条换的是功能 · 主按钮的位置永不变</div>' +
+  '</div>';
+}
+
+function zoomOf(dev){
+  var r = dev.getBoundingClientRect();
+  return (r.height || 844) / 844;
+}
+
+function drive(dev, d, st, fnAll, onMode){
+  var scr = dev.firstChild;
+  var n = fnAll.length;
+  var ovs = [].slice.call(scr.querySelectorAll('.ovs .ov'));
+  var hds = [].slice.call(scr.querySelectorAll('.huds .hud'));
+  var pns = [].slice.call(scr.querySelectorAll('.panels .pnl'));
+  var fbs = [].slice.call(scr.querySelectorAll('.fabs .fab'));
+  var sit = [].slice.call(scr.querySelectorAll('.sItem'));
+  var pill = scr.querySelector('.sPill');
+  var wrap = scr.querySelector('.stripWrap');
+  var hint = scr.querySelector('.dragHint');
+  var pos = st.pos === undefined ? 0 : st.pos;
+  var moved = false, dragEndAt = 0;
+
+  function apply(){
+    var k, dist;
+    for (k = 0; k < n; k++){
+      dist = Math.abs(k - pos);
+      ovs[k].style.opacity = Math.max(0, 1 - dist);
+      if (hds[k]) hds[k].style.opacity = Math.max(0, 1 - dist * 1.8);
+      if (pns[k]){
+        pns[k].style.opacity = Math.max(0, 1 - dist * 1.5);
+        pns[k].style.transform = 'translateX(' + ((k - pos) * -34).toFixed(1) + 'px)';
+      }
+      if (fbs[k]) fbs[k].style.opacity = Math.max(0, 1 - dist * 1.8);
+      var dd = k - pos, ad = Math.abs(dd);
+      sit[k].style.transform = 'translateX(' + (dd * W).toFixed(1) + 'px) scale(' +
+        (1 - Math.min(ad, 2.2) * 0.13).toFixed(3) + ')';
+      sit[k].style.opacity = Math.max(0, 1 - Math.min(ad, 2.6) * 0.36).toFixed(3);
+      sit[k].className = 'sItem' + (ad < 0.5 ? ' on' : '');
+    }
+    if (pill) pill.style.transform = 'translateX(' + (pos * W).toFixed(1) + 'px)';
+    if (hint) hint.style.opacity = (pos > 0.2 ? 0 : 0.5);
+    var cur = Math.round(pos);
+    if (cur !== st._cur){ st._cur = cur; if (onMode) onMode(cur); }
+  }
+  /* 动画令牌：新的动画一开始，旧的循环立刻退出 ——
+     否则「点模式名」时 settle 与 slideTo 两个循环会互相抢 pos，抖一下才落位。 */
+  function slideTo(target){
+    var from = pos, t0 = performance.now(), dur = 300, id = ++st._anim;
+    (function step(now){
+      if (st._anim !== id) return;
+      var t = Math.min(1, (now - t0) / dur);
+      pos = from + (target - from) * (1 - Math.pow(1 - t, 3));
+      apply();
+      if (t < 1) requestAnimationFrame(step);
+      else { pos = target; st.pos = target; apply(); }
+    })(t0);
+  }
+  function settle(){ slideTo(Math.max(0, Math.min(n - 1, Math.round(pos)))); }
+
+  var drag = false, x0 = 0, p0 = 0;
+  wrap.addEventListener('pointerdown', function(e){
+    drag = true; moved = false; x0 = e.clientX; p0 = pos;
+    wrap.classList.add('drag');
+    try { wrap.setPointerCapture(e.pointerId); } catch(err){}
+  });
+  wrap.addEventListener('pointermove', function(e){
+    if (!drag) return;
+    var dx = e.clientX - x0;
+    if (Math.abs(dx) > 6) moved = true;
+    pos = p0 - dx / zoomOf(dev) / W;
+    pos = Math.max(-0.5, Math.min(n - 0.5, pos));
+    apply();
+  });
+  function end(e){
+    if (!drag) return;
+    drag = false; wrap.classList.remove('drag');
+    try { wrap.releasePointerCapture(e.pointerId); } catch(err){}
+    if (moved){ settle(); dragEndAt = performance.now(); }
+    else { ++st._anim; st.pos = Math.round(pos); apply(); }  /* 纯点击：交给 click 去滑 */
+    moved = false;
+  }
+  wrap.addEventListener('pointerup', end);
+  wrap.addEventListener('pointercancel', end);
+  /* 直接点某个模式：滑过去 */
+  sit.forEach(function(el, k){
+    el.addEventListener('click', function(){
+      /* 刚拖完那一下 click 是拖出来的，别当成点击；用时间戳而不是 moved ——
+         moved 在 pointerup 里已经清掉，靠它会把「拖完之后的下一次真点击」也吃掉。 */
+      if (performance.now() - dragEndAt < 400) return;
+      slideTo(k);
+    });
+  });
+  /* 桌面预览：滚轮也能切 */
+  wrap.addEventListener('wheel', function(e){
+    e.preventDefault();
+    slideTo(Math.max(0, Math.min(n - 1, Math.round(pos) + ((e.deltaX || e.deltaY) > 0 ? 1 : -1))));
+  }, { passive: false });
+
+  apply();
+}
+
+/* ==========================================================================
+   建十屏
+   ========================================================================== */
+var board = document.getElementById('board');
+var idx = document.getElementById('idx');
+var chips = [];
+
+LAY.forEach(function(d, n){
+  var sec = document.createElement('section');
+  sec.className = 'slide';
+
+  /* _anim 必须初始化为 0：undefined 自增会得到 NaN，而 NaN !== NaN 恒为真，
+     那样每一个吸附动画都会在第一帧就退出（看着像「松手不吸附」）。 */
+  var st = { pos: 0, _anim: 0 };
+  var capEl;
+
+  var meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.innerHTML =
+    '<div class="no">' + d.no + ' / 10</div>' +
+    '<div class="nm">' + d.nm + '</div>' +
+    '<div class="th">' + d.th + '</div>' +
+    '<div class="mech">' + d.mech + '</div>' +
+    '<div class="cap" id="cap-' + n + '"></div>' +
+    '<div class="hint">↑ 按住手机底部那条模式条左右拖，松手会吸附；点模式名也可以</div>';
+
+  var dev = document.createElement('div');
+  dev.className = 'dev';
+  dev.innerHTML = build(d, FN);
+  dev.firstChild._st = st;
+
+  sec.appendChild(meta);
+  sec.appendChild(dev);
+  board.appendChild(sec);
+
+  var b = document.createElement('button');
+  b.className = 'chip' + (n === 0 ? ' on' : '');
+  b.innerHTML = '<b>' + d.no + '</b>' + d.nm;
+  b.addEventListener('click', function(){ go(n); });
+  idx.appendChild(b);
+  chips.push(b);
+
+  capEl = document.getElementById('cap-' + n);
+  drive(dev, d, st, FN, function(cur){
+    var f = FN[cur];
+    capEl.innerHTML = '当前功能：<em>' + f.n + '</em> —— ' + f.head + '。' +
+      '主按钮此刻是「<em>' + f.btn + '</em>」。';
+    mark(curSlide());
+  });
+});
+
+/* —— 横向翻选 —— */
+function mark(i){
+  chips.forEach(function(c, k){ c.classList.toggle('on', k === i); });
+  if (chips[i] && chips[i].scrollIntoView){
+    try { chips[i].scrollIntoView({ block:'nearest', inline:'center' }); } catch(e){}
+  }
+}
+function curSlide(){
+  return Math.round(board.scrollLeft / (board.clientWidth || 1));
+}
+function go(i){
+  var sl = board.children[i];
+  if (sl) board.scrollTo({ left: sl.offsetLeft, behavior:'auto' });
+  mark(i);
+}
+var t = null;
+board.addEventListener('scroll', function(){
+  if (t) clearTimeout(t);
+  t = setTimeout(function(){ mark(curSlide()); }, 90);
+});
+document.addEventListener('keydown', function(e){
+  if (e.key === 'ArrowRight') go(Math.min(LAY.length - 1, curSlide() + 1));
+  if (e.key === 'ArrowLeft')  go(Math.max(0, curSlide() - 1));
+});
+})();
+</script>
+</body>
+</html>

@@ -443,15 +443,6 @@ struct MapSpineView: View {
             .opacity(cardOpacity)
             // 视差只给 26pt（±13pt），位移落在卡片自己的内边距里，不会潦到地图上。
             .offset(x: cardShift)
-            // 长按纸面 → 把这一档**推入整屏**。
-            // 卡片是固定高度的窗口，长页面在窗口里滚；想看整屏就读整屏。
-            // 每个档位与它那个深链的对应关系（`HomeMode.deeplink`）就落在这一行 ——
-            // 不写在这里，它就是一个没人用的映射表。
-            .onLongPressGesture {
-                guard let link = homeMode.deeplink else { return }
-                TokensHaptic.tap()
-                nav.pushNavigation(link)
-            }
         }
         .padding(.horizontal, TokensSpacing.md)
         .padding(.top, TokensSpacing.md)
@@ -705,21 +696,23 @@ struct MapSpineView: View {
         }
     }
 
-    /// 控制长在对象上：不新写一套车控，直接进已有的车控 / 电池页
+    /// 控制长在对象上：不新写一套车控，而是**拨到那一档**。
+    /// 这里用的是 `nav.openMode`：把模式条拨到车控/电池/出行，而不是 push 出
+    /// 一份同样内容的第二页面 —— 同一功能两种存在方式就是「缝合怪」。
     private func actionRow(_ d: MapSpineData) -> some View {
         HStack(spacing: TokensSpacing.sm) {
             // 主操作只有一个，其余三个是并列的 —— 四个都一样重要 = 没有重要的
             action("车控", "slider.horizontal.3", hot: true) {
-                nav.pushNavigation(.control)
+                nav.openMode(.control)
             }
             // 叫「回到车」而不是「找车」：它做的是把镜头移回车所在位置。
             // 「找车」是另一件事（下发 RemoteSearchCar 让车鸣笛闪灯），
             // 那一个在地图下方的常驻操作条里。两个都叫「找车」= 用户分不清点哪个。
             action("回到车", "location.circle") { centerOnCar(force: true) }
-            action("充电", "bolt.fill") { nav.pushNavigation(.battery) }
+            action("充电", "bolt.fill") { nav.openMode(.battery) }
             // 「事件」而不是「异常」：这一列里多数是点火/熄火这类**正常事件**，
             // 叫「异常」等于把正常行驶也标成故障。它并进出行页了（`MessagesSection`）。
-            action("事件", "exclamationmark.triangle") { nav.pushNavigation(.trips) }
+            action("事件", "exclamationmark.triangle") { nav.openMode(.trips) }
         }
     }
 
@@ -783,7 +776,7 @@ struct MapSpineView: View {
                     }
                 }
             }
-            Button("全部行程") { nav.pushNavigation(.trips) }
+            Button("全部行程") { nav.openMode(.trips) }
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.accent)
                 .buttonStyle(.plain)
@@ -812,7 +805,7 @@ struct MapSpineView: View {
                         .foregroundStyle(TokensPalette.tertiary)
                 }
             }
-            Button("去行程时间轴看全部停车与旅程") { nav.pushNavigation(.trips) }
+            Button("去行程时间轴看全部停车与旅程") { nav.openMode(.trips) }
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.accent)
                 .buttonStyle(.plain)
@@ -871,7 +864,7 @@ struct MapSpineView: View {
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.tertiary)
         }
-        Button("充电与账单") { nav.pushNavigation(.battery) }
+        Button("充电与账单") { nav.openMode(.battery) }
             .font(TokensTypo.footnote)
             .foregroundStyle(TokensPalette.accent)
             .buttonStyle(.plain)
@@ -1124,7 +1117,8 @@ struct MapSpineView: View {
             ForEach(links, id: \.self) { link in
                 indexRow(deeplinkTitle(link), "chevron.right", "") {
                     showIndex = false
-                    nav.pushNavigation(link)
+                    // 是档位的就拨条子，不是档位的（档案 / 设置）才 push
+                    nav.openMode(for: link)
                 }
             }
         }

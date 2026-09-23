@@ -129,7 +129,8 @@ struct GlobalSearchHUD: View {
         for page in Self.pages {
             if page.title.lowercased().contains(q) || page.hint.lowercased().contains(q) {
                 out.append(SearchResult(title: page.title, subtitle: page.hint, icon: page.icon) { [nav] in
-                    nav.pushNavigation(page.link)
+                    // 是档位的就拨模式条（不要 push 第二份页面），档案/设置才 push
+                    nav.openMode(for: page.link)
                 })
             }
         }
@@ -147,7 +148,7 @@ struct GlobalSearchHUD: View {
                     out.append(SearchResult(title: "\(f.0) \(f.1)",
                                             subtitle: "车辆档案",
                                             icon: "car.fill") { [nav] in
-                        nav.pushNavigation(.vehicle)
+                        nav.openMode(.vehicle)
                     })
                 }
             }
@@ -164,7 +165,7 @@ struct GlobalSearchHUD: View {
         ]
         for r in readings where r.0.contains(q) || q.contains(r.0) {
             out.append(SearchResult(title: "\(r.0)：\(r.1)", subtitle: "实时车况", icon: r.2) { [nav] in
-                nav.pushNavigation(r.3)
+                nav.openMode(for: r.3)
             })
         }
 
@@ -177,7 +178,7 @@ struct GlobalSearchHUD: View {
                 out.append(SearchResult(title: "行程 \(dist)",
                                         subtitle: "\(when) · \(soc)",
                                         icon: "point.topleft.down.curvedto.point.bottomright.up") { [nav] in
-                    nav.pushNavigation(.trips)
+                    nav.openMode(.trips)
                 })
             }
         }
@@ -190,8 +191,8 @@ struct GlobalSearchHUD: View {
                 out.append(SearchResult(title: "指令 \(entry.name)",
                                         subtitle: "\(when) · \(state) · 用时 \(entry.durationText)",
                                         icon: entry.iconName) { [nav] in
-                    // 指令记录现在住在车控页的「做过什么」里，所以搜到指令 → 去车控页
-                    nav.pushNavigation(.control)
+                    // 指令记录现在住在车控页的「做过什么」里，所以搜到指令 → 去车控档
+                    nav.openMode(.control)
                 })
             }
         }
@@ -204,7 +205,7 @@ struct GlobalSearchHUD: View {
                 out.append(SearchResult(title: "充电 \(kwh)",
                                         subtitle: "\(when) · ¥\(ChargeLedger.moneyText(ChargeLedger.shared.cost(s)))",
                                         icon: "bolt.fill") { [nav] in
-                    nav.pushNavigation(.battery)
+                    nav.openMode(.battery)
                 })
             }
         }

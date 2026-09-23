@@ -21,6 +21,13 @@
       "size" : "60x60"
     },
     {
+      "filename" : "AppIcon-76x76.png",
+      "idiom" : "ipad",
+      "platform" : "ios",
+      "scale" : "1x",
+      "size" : "76x76"
+    },
+    {
       "filename" : "AppIcon-76x76@2x.png",
       "idiom" : "ipad",
       "platform" : "ios",

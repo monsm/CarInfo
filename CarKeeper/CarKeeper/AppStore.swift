@@ -34,6 +34,11 @@ final class AppStore: @unchecked Sendable {
     private var cacheTimestamps: [String: Date] = [:]
     static let cacheTTL: TimeInterval = 180
 
+    // 上一次已经喊过「位置变了」的坐标（`.locationUpdated` 的去重门槛）。
+    // 初始是 NaN，所以第一条定位报文一定会被判为「动了」—— 第一次总要喊。
+    private var lastPostedLat = Double.nan
+    private var lastPostedLng = Double.nan
+
     // #9 控制命令历史记录
     var commandHistory: [HistoryEntry] = []
     struct HistoryEntry: Identifiable {
@@ -757,6 +762,23 @@ final class AppStore: @unchecked Sendable {
         } else if !patch.isEmpty && isLoggedIn {
             isOfflineMode = true
             offlineMessage = "网络异常，显示缓存数据"
+        }
+        // 「车的位置变了」必须真有人喊出来。
+        //
+        // 此前 `.locationUpdated` 有 **3 个观察者**（地图镜头跟着车走、重取天气、
+        // 低电量提示）却**一个 post 都没有** —— 那三条行为从未生效过。
+        // 发射点放在这里：location 缓存只从 `saveCache` 进来（`currentLocation`
+        // 是计算属性，没有别的写入点）。
+        // 带「动了才喊」的门槛（≈5.5 米）：车停着不动时每次刷新都重定位，
+        // 会把用户手动拖开的镜头一次次拉回去。
+        if let loc = patch["location"] as? [String: Any],
+           let lat = ciNumber(loc, ["Lat"]), let lng = ciNumber(loc, ["Lng"]) {
+            let moved = !(abs(lat - lastPostedLat) < 0.00005 && abs(lng - lastPostedLng) < 0.00005)
+            if moved {
+                lastPostedLat = lat
+                lastPostedLng = lng
+                NotificationCenter.default.post(name: .locationUpdated, object: nil)
+            }
         }
         // 把最新车况同步到 App Group（小组件 / 表盘 / 灵动岛的数据源）
         syncSharedDefaults()

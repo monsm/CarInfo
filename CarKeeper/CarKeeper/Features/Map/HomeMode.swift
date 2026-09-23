@@ -58,6 +58,19 @@ enum HomeMode: String, CaseIterable, Identifiable {
         }
     }
 
+    /// 由深链反查档位。
+    ///
+    /// 它是「去某件事」这个动作的**唯一翻译层**：全 App 其他地方（搜索、
+    /// 卡片里的快捷入口、「我的」里的行）只要想「去看车辆」，写出的都是一个
+    /// `Deeplink`，而这里决定它该不该换成拨模式条。
+    ///
+    /// 为什么不让它们直接 push 一个页面：那样同一个功能就会有两种存在方式
+    /// ——卡片里一份、push 出来一份，各有各的返回行为。那就是「缝合怪」。
+    init?(link: Deeplink) {
+        guard let hit = Self.allCases.first(where: { $0.deeplink == link }) else { return nil }
+        self = hit
+    }
+
     /// 记住上次停在哪一档：地图主屏的「当前位置」应当被记住，
     /// 每次冷启动都跳回第一档等于让用户每天重新选一次。
     static let storageKey = "carkeeper_home_mode"

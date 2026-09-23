@@ -13,15 +13,18 @@ import UIKit
 // （Tab / 地图图层 / 索引页 / 「我的」的 27 个磁贴）—— 那就是「缝合怪」的来源。
 // `MainTab`、`selectedTab`、每 Tab 一个 path、Tab 角标与切 Tab 朗读都已整体删除。
 
+// 只有**真的有人 post、也真的有人听**的通知才配留在这里。
+//
+// 2026-09-23 清掉了五个「有名字、没发射」的：`.navToVehicle` / `.navToHealth` /
+// `.navToBattery` / `.navToDev` / `.navHome`。它们各自只有一个观察者（在根视图里
+// 写 `nav.path = [...]`），而**全项目没有任何地方 post** —— 既是从未生效的死线，
+// 又是与底部模式条并行的第二条导航路径（同一个功能能顺着模式条走，也能顺着通知走）。
+// 去功能只有一个走法：`NavState.openMode(_:)`。
 extension Notification.Name {
-    static let navToVehicle = Notification.Name("navToVehicle")
     static let pinConfirmed = Notification.Name("car_pin_confirmed")
     static let tempConfirmed = Notification.Name("car_temp_confirmed")
-    static let navToDev = Notification.Name("navToDev")
-    static let navToHealth = Notification.Name("navToHealth")
-    static let navToBattery = Notification.Name("navToBattery")
-    static let navHome = Notification.Name("navHome")
     static let didLogout = Notification.Name("didLogout")
+    /// 车的位置变了。**发射点只有一个**：`AppStore.saveCache`（location 缓存的唯一写入点）。
     static let locationUpdated = Notification.Name("locationUpdated")
 }
 
@@ -159,10 +162,6 @@ struct CarKeeperApp: App {
             } else if store.isLoggedIn {
                 MapShellView()
                     .environmentObject(nav)
-                    .onReceive(NotificationCenter.default.publisher(for: .navToVehicle)) { _ in nav.path = [.vehicle] }
-                    .onReceive(NotificationCenter.default.publisher(for: .navToHealth)) { _ in nav.path = [.health] }
-                    .onReceive(NotificationCenter.default.publisher(for: .navToBattery)) { _ in nav.path = [.battery] }
-                    .onReceive(NotificationCenter.default.publisher(for: .navToDev)) { _ in nav.path = [.dev] }
                     .onReceive(ToastManager.shared.$currentItem) { item in
                         nav.currentToast = item
                     }
@@ -262,6 +261,25 @@ final class NavState: ObservableObject, @unchecked Sendable {
     /// 旧的 `targetTab:` 参数已删 —— 没有 Tab 可切，导航只有一个栈。
     func pushNavigation(_ link: Deeplink) {
         path.append(link)
+    }
+
+    /// 进入某一档功能界面 —— **去功能只有这一种走法**。
+    ///
+    /// 功能界面不是一个「页面」，而是底部模式条上的一档（`HomeMode`）：
+    /// 地图是载体，模式条决定纸里装什么。所以「去看车辆」的正确做法是
+    /// **拨到那一档**，而不是 push 出第二份同样内容的页面。
+    ///
+    /// 只做两件事：写 `HomeMode` 的持久化键（`MapSpineView` 用 `@AppStorage`
+    /// 订阅它，条子会自己滑过去）+ 清空栈回到地图。
+    func openMode(_ mode: HomeMode) {
+        UserDefaults.standard.set(mode.rawValue, forKey: HomeMode.storageKey)
+        path = []
+    }
+
+    /// 按深链进：能对应到某一档就拨条子，对应不到（隐私 / OTA / 家庭 / 钥匙……
+    /// 这些不是档位，是档案与设置）就照原样 push。
+    func openMode(for link: Deeplink) {
+        if let mode = HomeMode(link: link) { openMode(mode) } else { pushNavigation(link) }
     }
 }
 

@@ -44,6 +44,7 @@
 | AppIcon-1024x1024.png | 1024×1024 | App Store 提交 |
 | AppIcon-60x60@2x.png | 120×120 | iPhone 主屏幕 |
 | AppIcon-60x60@3x.png | 180×180 | iPhone 主屏幕 (Retina) |
+| AppIcon-76x76.png | 76×76 | iPad 主屏幕（**必须有**：缺它 actool 会报 “AppIcon has 2 unassigned children”，iPad 那两个 @2x 槽位会变成未分配） |
 | AppIcon-76x76.png | 76×76 | iPad 主屏幕 |
 | AppIcon-76x76@2x.png | 152×152 | iPad 主屏幕 (Retina) |
 | AppIcon-83.5x83.5@2x.png | 167×167 | iPad Pro 主屏幕 |
@@ -64,9 +65,15 @@
 # 安装依赖
 pip3 install cairosvg
 
-# 生成所有尺寸
-python3 generate_appicon.py AppIcon.svg ./AppIcon
+# 生成所有尺寸 —— **直接写进出包的那份 appiconset**
+bash generate_appicon.sh
 ```
+
+> 上一版这里写的是 `python3 generate_appicon.py AppIcon.svg ./AppIcon`，
+> 它会在仓库根目录另建一份 `AppIcon/`（13 个 PNG）—— 而 Xcode 实际打的包
+> 只认 `CarKeeper/CarKeeper/Resources/Assets.xcassets/AppIcon.appiconset/`。
+> 两份图标并存时，改了 A 却在真机上看到 B，是最难查的一类“图标没换”。
+> 那份根目录副本已删；`generate_appicon.sh` 是唯一的生成入口。
 
 ### 方法二：使用 Figma/Sketch
 
