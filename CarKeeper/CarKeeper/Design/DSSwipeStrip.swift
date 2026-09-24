@@ -27,10 +27,22 @@ import SwiftUI
 //  同一次拖动在不同档之间走过的距离就不同，吸附会飘 —— 这是相机那条等距模式条的
 //  物理前提，不是审美选择。（本 App 六个档名**都是两个汉字**，定宽恰好也是真实宽度。）
 //
-//  ⚠️ 几何全部由 `width` 参数推出来，**没有一处存起来**。
+//  ⚠️ 几何全部由 `availableWidth` 参数推出来，**没有一处存起来**。
 //  第一版把「可用宽度」存成 @State，于是它只会被测量那一次写对：
 //  在非 390pt 的机器上，首帧的档位位置是按默认宽度算的，要等用户碰一下才归位。
-//  派生量不会有陈旧值 —— 这是这一版与上一版的唯一结构性差别。
+//  派生量不会有陈旧值 —— 这是「宽度只当参数」的全部意思。
+//
+//  ⚠️ 2026-09-23 第二次修正：`availableWidth` 必须是**容器给的**宽度。
+//  上一版让条子自己去量（`GeometryReader`），量到的是「HStack 分给它的那一份」——
+//  两侧圆钮各占 50 + 中缝 9×2 之后只剩 256。
+//  于是 `gap(for:)` 认为「展开装不下六档」，把间距压到 6：
+//    · 静止条宽算出 148（应为 190），三档挤成一团 →「静止时对不上」；
+//    · 节距 40 < 透镜宽 68 → **透镜压住左右两档的字**。
+//  现在宽度由外壳量一整行得出（见 `MapSpineView.bottomBar` 的 `barRowWidth`），
+//  条子自己的 frame 就等于算出来的条宽 —— 它不再是被挤压的弹性视图，
+//  几何与渲染因此不可能两套。
+//  透镜宽度也一并按**节距**封顶（`pillWidth`）：屏幕窄到要压间距时，
+//  透镜跟着缩，而不是压到邻居的字上。
 struct DSSwipeStrip: View {
 
     /// 一档。`id` 同时是持久化的键（存在 UserDefaults 里，重启回到上次那一档）。
@@ -64,6 +76,11 @@ struct DSSwipeStrip: View {
     @Binding var selectedID: String
     /// 默认整行跟手（iOS 26 的默认；`.loupe` 是它那个反向开关的形态）
     var follow: Follow = .row
+    /// 这一行**可用的横向宽度**（屏宽 − 两侧留白）。
+    ///
+    /// ⚠️ 它必须是「容器给的宽度」，**不能**是条子自己被布局分到的宽度（见文件头）。
+    /// 兜底 374 = 390 的屏宽减去两侧各 8 的留白 —— 开发页（`StackLabView`）不量也成立。
+    var availableWidth: CGFloat = 374
     /// 连续位置：`2.0` = 停在第三档，`1.4` = 正拖在第二、三档之间。
     /// 宿主用它做内容的交叉过渡 —— 换模式是渐变，不是闪一下。
     var onPosition: ((Double) -> Void)?
@@ -83,6 +100,14 @@ struct DSSwipeStrip: View {
     private var pillPad: CGFloat { barHeight * 0.37 }
     /// 相邻标签的最大间距
     private var gapMax: CGFloat { barHeight * 0.73 }
+
+    /// 透镜的宽度：档宽 + 左右呼吸位，但**不超过一档的节距**。
+    /// 相机里这两个数几乎相等（透镜 68 ≈ 节距 67.6，两枚透镜刚好挨着）。
+    /// 屏幕窄到必须压间距时节距会小于 68 —— 不封顶透镜就会压在左右两档的字上
+    ///（用户 2026-09-23 报的「选中的边框压住其他俩边一部分」）。少 2 是留一条缝。
+    private func pillWidth(gap: CGFloat) -> CGFloat {
+        min(slot + 2 * pillPad, pitch(gap) - 2)
+    }
 
     @State private var c: CGFloat = 0            // 行内坐标：条正中对应到行里的位置
     @State private var expand: Double = 0
@@ -153,11 +178,11 @@ struct DSSwipeStrip: View {
         return lo...hi
     }
 
-    /// 行内坐标 → 条内屏幕坐标。**只差一个 `c`**：
+    /// 行内坐标 → **条内**坐标（条的正中对应到行里的 `c`）。**只差一个 `c`**：
     /// 条宽变化不影响这个式子，所以展开时字不会自己往前跳
     /// （第一版用「条左边缘」当几何量，条一变宽窗口就单边向右长，拖 140px 跳了 4 档）。
-    private func screenX(_ rowX: CGFloat, width: CGFloat, c: CGFloat) -> CGFloat {
-        width / 2 + rowX - c
+    private func screenX(_ rowX: CGFloat, barW: CGFloat, c: CGFloat) -> CGFloat {
+        barW / 2 + rowX - c
     }
 
     /// 透镜所在的连续档位：`c` 反算成「第几档」（可带小数）。
@@ -177,28 +202,30 @@ struct DSSwipeStrip: View {
     // =========================================================================
 
     var body: some View {
-        GeometryReader { geo in
-            let width = max(120, geo.size.width)
-            let gap = gap(for: width)
-            let lim = limits(width: width, gap: gap)
-            // 显示用的位置：即使 `c` 是上一次几何下的值，也先夹到合法范围再画 ——
-            // 于是「宽度变了」只会表现为吸一下，而不是首帧停在错的地方。
-            let cShown = clampC(c, lim: lim, gap: gap)
-            ZStack(alignment: .leading) {
-                bar(width: barWidth(width: width, gap: gap))
-                capsule(gap: gap, width: width, c: cShown)
-                labels(gap: gap, width: width, c: cShown,
-                       barW: barWidth(width: width, gap: gap))
-            }
-            .frame(width: geo.size.width, height: barHeight, alignment: .center)
-            .contentShape(Rectangle())
-            .highPriorityGesture(swipe(gap: gap, lim: lim, width: width))
-            .onAppear { settle(animated: false, gap: gap, lim: lim) }
-            .onChange(of: selectedID) { _, _ in settle(animated: true, gap: gap, lim: lim) }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(Text("功能"))
+        let width = max(120, availableWidth)
+        let gap = gap(for: width)
+        let lim = limits(width: width, gap: gap)
+        let barW = barWidth(width: width, gap: gap)
+        // 显示用的位置：即使 `c` 是上一次几何下的值，也先夹到合法范围再画 ——
+        // 于是「宽度变了」只会表现为吸一下，而不是首帧停在错的地方。
+        let cShown = clampC(c, lim: lim, gap: gap)
+        ZStack(alignment: .leading) {
+            bar(width: barW)
+            capsule(gap: gap, barW: barW)
+            labels(gap: gap, barW: barW, c: cShown)
         }
-        .frame(height: barHeight)
+        // 条子**自己就是这个宽度**：它不再是「HStack 挤压出来的弹性视图」，
+        // 所以「几何用的宽度」与「渲染出来的宽度」不可能两套（见文件头）。
+        .frame(width: barW, height: barHeight)
+        .contentShape(Rectangle())
+        .highPriorityGesture(swipe(gap: gap, lim: lim, barW: barW))
+        .onAppear { settle(animated: false, gap: gap, lim: lim) }
+        .onChange(of: selectedID) { _, _ in settle(animated: true, gap: gap, lim: lim) }
+        // 容器宽度变了（旋转 / iPad 分栏 / 首帧量到宽度）→ 按新间距重新落位。
+        // 少了这一步，条子会按旧间距停在旧位置，直到用户碰它一下才归位。
+        .onChange(of: availableWidth) { _, _ in settle(animated: false, gap: gap, lim: lim) }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("功能"))
     }
 
     // =========================================================================
@@ -212,32 +239,29 @@ struct DSSwipeStrip: View {
             .glassEffect(.regular, in: shape)
             .overlay { shape.strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border) }
             .frame(width: width, height: barHeight)
-            .frame(maxWidth: .infinity, alignment: .center)
             .allowsHitTesting(false)
     }
 
     /// 玻璃透镜。它**钉在条正中**，永远不动 —— 「选中谁」由 `c` 把哪个字送到正中决定。
     /// 第一版在这里用 `pvValue(c)` 反算位置，那是一个恒等变换（ideal(pvValue(c)) == c），
     /// 算出来的 x 永远等于 width/2；留着它只会让人以为透镜会动。
-    private func capsule(gap: CGFloat, width: CGFloat, c: CGFloat) -> some View {
+    private func capsule(gap: CGFloat, barW: CGFloat) -> some View {
         let shape = RoundedRectangle(cornerRadius: barHeight * 0.85 * 0.33, style: .continuous)
         return shape
             .fill(TokensPalette.glassHighlight)
             .overlay { shape.strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border) }
-            .frame(width: slot + 2 * pillPad, height: barHeight * 0.85)
-            .position(x: width / 2, y: barHeight / 2)
+            .frame(width: pillWidth(gap: gap), height: barHeight * 0.85)
+            .position(x: barW / 2, y: barHeight / 2)
             .allowsHitTesting(false)
     }
 
-    private func labels(gap: CGFloat, width: CGFloat, c: CGFloat, barW: CGFloat) -> some View {
+    private func labels(gap: CGFloat, barW: CGFloat, c: CGFloat) -> some View {
         ZStack {
-            let mid = width / 2
-            let half = barW / 2
             ForEach(Array(items.enumerated()), id: \.element.id) { i, item in
-                let x = screenX(ideal(Double(i), gap: gap), width: width, c: c)
-                // 只画窗口附近的两档：更远的字**直接不画**（遮罩会裁掉它们，
+                let x = screenX(ideal(Double(i), gap: gap), barW: barW, c: c)
+                // 只画条附近的两档：更远的字**直接不画**（遮罩会裁掉它们，
                 // 但画出来再裁是白花的 GPU，而且远处的字会以半透明形式漏到条外）
-                if x > mid - half - slot && x < mid + half + slot {
+                if x > -slot && x < barW + slot {
                     Text(item.title)
                         .font(TokensTypo.fixed(15, weight: .semibold))
                         .tracking(TokensTracking.label)
@@ -250,10 +274,10 @@ struct DSSwipeStrip: View {
                 }
             }
         }
-        // 标签与透镜、手势同处**全屏宽**坐标系 —— 第一版把标签装进「条宽」的容器
-        // 再居中，坐标却按全屏宽算，所有字整体右偏 (屏宽−条宽)/2，
-        // 透镜永远压不到当前档的文字（用户报的第 1 条的真正病根）。
-        .frame(width: width, height: barHeight)
+        // 标签、透镜、手势同处**条内**坐标系（原点 = 条的左边缘，正中 = barW/2）——
+        // 此前把标签装进「全屏宽」的容器再居中，坐标却按条宽算，所有字整体偏
+        // (屏宽−条宽)/2，透镜永远压不到当前档的文字。
+        .frame(width: barW, height: barHeight)
         // 条自己把越界的那半格裁掉：原型 `.strip{overflow:hidden}`。
         // 遮罩居中对齐，正好罩住条身 —— 与条同一个圆角矩形。
         // 少了这一步，半压在条边上的那个字会**漏到条外** ——
@@ -273,7 +297,7 @@ struct DSSwipeStrip: View {
     /// 代价是点选要自己做 —— 位移小于 8pt 就当成「点了最近的那一档」，
     /// 而不是让每个标签各挂一个 Button（那样按下展开会晚半拍，而且按下时的
     /// 展开与点选会打架）。
-    private func swipe(gap: CGFloat, lim: ClosedRange<CGFloat>, width: CGFloat) -> some Gesture {
+    private func swipe(gap: CGFloat, lim: ClosedRange<CGFloat>, barW: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { v in
                 if cBase == nil {
@@ -297,7 +321,7 @@ struct DSSwipeStrip: View {
             }
             .onEnded { v in
                 if !moved {
-                    pick(nearest(to: v.location.x, gap: gap, width: width))
+                    pick(nearest(to: v.location.x, gap: gap, barW: barW))
                 } else {
                     snap(gap: gap, lim: lim)
                 }
@@ -328,8 +352,8 @@ struct DSSwipeStrip: View {
         onPosition?(v)
     }
 
-    private func nearest(to x: CGFloat, gap: CGFloat, width: CGFloat) -> Int {
-        let rowX = x - width / 2 + c
+    private func nearest(to x: CGFloat, gap: CGFloat, barW: CGFloat) -> Int {
+        let rowX = x - barW / 2 + c
         let raw = (rowX - slot / 2) / pitch(gap)
         return min(max(Int(raw.rounded()), 0), max(0, items.count - 1))
     }

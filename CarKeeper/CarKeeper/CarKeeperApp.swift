@@ -254,8 +254,9 @@ final class NavState: ObservableObject, @unchecked Sendable {
     /// **唯一**的导航路径。地图主屏与所有深潜页共用它 —— 没有第二个栈。
     @Published var path: [Deeplink] = []
     @Published var currentToast: (text: String, icon: String)? = nil
-    /// 全局搜索是否展开（地图工具栏与「车与账号」都能把它打开）
-    @Published var showSearch = false
+    // `showSearch`（全局搜索是否展开）已删：全局搜索本身已从项目移除（用户 2026-09-23），
+    // 三个入口（地图右臂 / 「我的」那一行 / 这里的状态）一起走 —— 留一个状态量
+    // 只会变成一个「点了什么也不发生」的按钮。
     /// 档内段落的提示（深链用，如 `carkeeper://health` = 车辆档的健康段）。
     /// 那一档的页面（`VehicleView` / `MineView`）消费它之后置 nil ——
     /// 消费掉是必须的，否则会反复被拉回那一段。
@@ -375,12 +376,10 @@ struct MapShellView: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: nav.currentToast?.text)
-        // 全局搜索：用 fullScreenCover 而不是 sheet —— 它本来就是一个盖住全程的 HUD，
-        // 半屏 sheet 会把那个压暗背景拆成两段。
-        .fullScreenCover(isPresented: $nav.showSearch) {
-            GlobalSearchHUD(isPresented: $nav.showSearch)
-                .environmentObject(nav)
-        }
+        // 全局搜索（`GlobalSearchHUD` + 它的 fullScreenCover）已整体删除：
+        // 用户 2026-09-23「右下角的搜索功能从项目移除」。
+        // 这个 HUD 的两层东西都被更直接的东西接走了：一层是「去找某个功能」——
+        // 那是底部模式条的活；一层是把背景压暗的「暗层」——本轮的规则是不再加。
     }
 }
 

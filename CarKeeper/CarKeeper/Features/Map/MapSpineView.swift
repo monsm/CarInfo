@@ -62,6 +62,24 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
+/// 底条上那两枚圆钮的「让位」。
+///
+/// 展开时**宽度真的收掉**，不是「看不见但还占着 50pt」——后者会把条子压到装不下六档，
+/// 于是条子只能压间距，而压间距正是原型明确否掉的那一件事。
+/// （原型 `.bottom.open .arm{opacity:0;transform:scale(.86)}`。）
+private struct ArmSlot: ViewModifier {
+    let open: Bool
+    let size: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .frame(width: open ? 0 : size, height: size)
+            .opacity(open ? 0 : 1)
+            .scaleEffect(open ? 0.86 : 1)
+            .clipped()
+    }
+}
+
 struct MapSpineView: View {
     private let store = AppStore.shared
     /// 不是 `private`：`MapSpineLayers.swift` 里那几个图层内容要用它换档。
@@ -140,6 +158,17 @@ struct MapSpineView: View {
     private static let barGap: CGFloat = 26
     /// 两侧圆钮的直径（原型 `.arm{width:calc(var(--H) + 4px)}`，H = 46）
     private static let armSize: CGFloat = 50
+    /// 底条两侧留白（原型 `.bottom{padding:0 8px}`）
+    private static let barPad: CGFloat = 8
+    /// 这一行能分到多宽（由 `bottomBar` 的背景量出；0 = 还没量到）。
+    ///
+    /// 它是**条子几何的唯一来源**：`DSSwipeStrip` 自己量不到这个数 ——
+    /// 它量到的是「两侧圆钮分剩的那一份」（390 的屏上只有 256）。
+    @State private var containerWidth: CGFloat = 0
+    /// 条子的可用宽度 = 整行宽度 − 两侧留白（兜底 374 = 390 屏宽 − 16）
+    private var barRowWidth: CGFloat {
+        containerWidth > 0 ? max(160, containerWidth - 2 * Self.barPad) : 374
+    }
 
     var body: some View {
         let d = data
@@ -389,17 +418,22 @@ struct MapSpineView: View {
     // MARK: 底条（两臂 + 模式条）
     // =========================================================================
 
-    /// 相机 App 的那一行：左臂（车牌）｜模式条｜右臂（搜索）。
+    /// 相机 App 的那一行：左臂（车牌）｜模式条｜右臂（快捷车控）。
     ///
     /// 为什么两臂必须在这里：原型那条子**不是**孤零零一根——两边各有一枚玻璃圆钮，
-    /// 左边是车、右边是搜索。它让「模式条」看起来是相机的那排控件，而不是一根付出代价的浮条。
+    /// 左边是车、右边是动作。它让「模式条」看起来是相机的那排控件，而不是一根付出代价的浮条。
     private var bottomBar: some View {
-        HStack(spacing: 9) {
+        // 展开时中缝归零：条子展开后要占满整行（374），两侧各留 9 的中缝就装不下，
+        // 而「压间距」正是原型明确否掉的那一件事（同 `ArmSlot` 的说明）。
+        HStack(spacing: barOpen ? 0 : 9) {
             arm(text: plateShort) { nav.openMode(.vehicle) }
                 .accessibilityLabel(Text("车辆"))
 
             DSSwipeStrip(items: HomeMode.stripItems,
                          selectedID: $homeModeRaw,
+                         // 条子的几何只用「这一行有多宽」这一个输入 ——
+                         // 它自己量到的是两侧圆钮分剩的那份（见 `barRowWidth`）。
+                         availableWidth: barRowWidth,
                          // 两个闭包都写显式标签：尾随闭包在两个函数参数之间靠扫描规则匹配，
                          // 读的人得翻定义才知道 `{ pos in }` 落在哪个参数上 —— 这正是
                          // `2f088df` 那次 CI 红掉的形态（当时 onExpand 还不存在）。
@@ -410,48 +444,105 @@ struct MapSpineView: View {
                              withAnimation(TokensMotion.fade) { barOpen = open }
                          })
 
-            arm(icon: "magnifyingglass") { nav.showSearch = true }
-                .accessibilityLabel(Text("搜索"))
+            quickArm
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Self.barPad)
         .padding(.bottom, Self.barGap)
         .frame(maxWidth: .infinity)
+        // 量这一行（未加留白的宽度）—— 条子的可用宽度从这里来。
+        // 用背景量而不是用 GeometryReader 包住整行：背景不参与布局，
+        // 所以量宽度不会反过来改变底条的位置（那正是条子上一次的错法）。
+        .background {
+            GeometryReader { g in
+                Color.clear
+                    .onAppear { containerWidth = g.size.width }
+                    .onChange(of: g.size.width) { _, w in containerWidth = w }
+            }
+        }
     }
 
-    /// 一枚圆钮。展开时**宽度让给条子**（原型里它们是被挤到屏外的），
-    /// 不是“看不见但还占着 50pt” —— 后者会把条子压到装不下六档，
-    /// 于是条子只能压间距，而压间距正是原型明确否掉的那一件事。
+    /// 一枚圆钮（有行为的那两枚用它）。
     private func arm(text: String? = nil, icon: String? = nil,
                      _ run: @escaping () -> Void) -> some View {
         Button {
             TokensHaptic.tap()
             run()
         } label: {
-            ZStack {
-                Circle()
-                    .fill(TokensPalette.glassHighlight)
-                    .glassEffect(.regular, in: Circle())
-                    .overlay {
-                        Circle().strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border)
-                    }
-                if let text {
-                    Text(text)
-                        .font(TokensTypo.fixed(11, weight: .bold))
-                        .foregroundStyle(TokensPalette.secondary)
-                } else if let icon {
-                    Image(safeSymbol: icon, fallback: icon)
-                        .font(TokensTypo.fixed(17, weight: .medium))
-                        .foregroundStyle(TokensPalette.primary)
-                }
-            }
-            .frame(width: Self.armSize, height: Self.armSize)
-            .contentShape(Circle())
+            armLabel(text: text, icon: icon)
         }
         .buttonStyle(.plain)
-        .frame(width: barOpen ? 0 : Self.armSize, height: Self.armSize)
-        .opacity(barOpen ? 0 : 1)
-        .scaleEffect(barOpen ? 0.86 : 1)
-        .clipped()
+        .modifier(ArmSlot(open: barOpen, size: Self.armSize))
+    }
+
+    /// 圆钮的**外观**（不含行为）：`Menu` 要的是 label 视图，不是 Button。
+    private func armLabel(text: String? = nil, icon: String? = nil) -> some View {
+        ZStack {
+            Circle()
+                .fill(TokensPalette.glassHighlight)
+                .glassEffect(.regular, in: Circle())
+                .overlay {
+                    Circle().strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border)
+                }
+            if let text {
+                Text(text)
+                    .font(TokensTypo.fixed(11, weight: .bold))
+                    .foregroundStyle(TokensPalette.secondary)
+            } else if let icon {
+                Image(safeSymbol: icon, fallback: icon)
+                    .font(TokensTypo.fixed(17, weight: .medium))
+                    .foregroundStyle(TokensPalette.primary)
+            }
+        }
+        .frame(width: Self.armSize, height: Self.armSize)
+        .contentShape(Circle())
+    }
+
+    /// 右臂：**快捷车控**（一键发指令，不离开地图）。
+    ///
+    /// 它此前是「搜索」——搜索已整体从项目移除（用户 2026-09-23：右下角的搜索功能从项目移除）。
+    /// 这一格不该空着，也不该再放一个「去别处」的入口：相机那条右臂本来就是**动作**
+    /// （切换镜头），所以这里接的也是动作 —— 而且必须是最高频的那一个。
+    /// 指令名取自 `ControlView` 里那几条真指令（同一个 key，不另造一套简写）：
+    /// 车控页发什么，这里就发什么。
+    private var quickArm: some View {
+        Menu {
+            ForEach(Self.quickCommands, id: \.key) { c in
+                Button {
+                    TokensHaptic.tap()
+                    Task { await sendQuick(c) }
+                } label: {
+                    Label(c.name, systemImage: c.symbol)
+                }
+            }
+        } label: {
+            armLabel(icon: "key.fill")
+        }
+        .buttonStyle(.plain)
+        .modifier(ArmSlot(open: barOpen, size: Self.armSize))
+        .accessibilityLabel(Text("快捷车控"))
+        .accessibilityHint(Text("锁车、解锁、闪灯、鸣笛、远程寻车"))
+    }
+
+    /// 一条快捷指令（key = 真实指令名，与车控页的 `hero` / `moreCommands` 同一套）
+    private struct QuickCommand {
+        let key: String
+        let name: String
+        let symbol: String
+    }
+
+    private static let quickCommands: [QuickCommand] = [
+        QuickCommand(key: "LockDoor", name: "锁车", symbol: "lock.fill"),
+        QuickCommand(key: "UnLockDoor", name: "解锁", symbol: "lock.open.fill"),
+        QuickCommand(key: "FlashLight", name: "闪灯", symbol: "lightbulb.fill"),
+        QuickCommand(key: "Whistle", name: "鸣笛", symbol: "speaker.wave.2.fill"),
+        QuickCommand(key: "RemoteSearchCar", name: "远程寻车", symbol: "location.fill")
+    ]
+
+    /// 发一条车控指令。成功与失败都照实说一句 —— 遥控制的提示不能只报喜。
+    private func sendQuick(_ c: QuickCommand) async {
+        let ok = await store.sendControlCommand(c.key)
+        EnhancedToastManager.shared.show(ok ? "\(c.name)指令已发送" : "\(c.name)发送失败",
+                                         icon: ok ? c.symbol : "exclamationmark.triangle.fill")
     }
 
     /// 左臂上的字：车牌的前两个字（原型是「鄂A」）。取不到就退回「车」。
@@ -526,12 +617,10 @@ struct MapSpineView: View {
             // 而不是「别的页浮在一张活地图上」（那样两页交界处会露出地图）。
             mapCanvas(d)
 
-            // 原型这一页在底图之上还有**两层压暗**，两层各有各的用处：
-            //   `.maptop{height:240px}`  —— 顶上那层是给车牌与状态行铺读得出来的底。
-            //     不铺的话，浅色底图上白字会直接淹掉（车牌是这一屏唯一的身份）。
-            //   `.mapvig{inset:0}`       —— 四角压暗，把视线收到中间的车上。
-            // 两者都取 `TokensPalette.scrim` 而不是纯黑：令牌的说明里写着它「也用于
-            // 光照不到的暗角」，纸主题下这块遮罩是**墨**，不是黑。
+            // 底图之上只剩**一层**压暗（原型 `.maptop`），它的唯一用处是让车牌与
+            // 状态行在浅色底图上读得出来。原型还有第二层 `.mapvig`（四角压暗）——
+            // 已按「全局不要加暗层」去掉，见 `mapDims`。
+            // 遮罩取 `TokensPalette.scrim` 而不是纯黑：纸主题下它是**墨**。
             mapDims
 
             // `.float{left:16;right:16;bottom:98;gap:12}`：底边离屏底 98
@@ -552,35 +641,25 @@ struct MapSpineView: View {
         }
     }
 
-    /// 底图之上的两层压暗（原型 `.maptop` + `.mapvig`）。
-    /// 它们**不跟着艺术主题消失**：底图是系统瓦片（改不了颜色），
-    /// 而「车牌读得出来」与「视线收在车上」是任何底图上都要成立的两件事。
+    /// 底图之上**唯一**还留着的压暗：顶上那一层。
+    ///
+    /// 它只服务一件事 —— 车牌与状态行压在浅色底图上也要读得出来（车牌是这一屏
+    /// 唯一的身份，读不出来这一屏就白画了）。所以它**只盖顶上那一段**，而且很淡。
+    ///
+    /// 原型这里还有第二层 `.mapvig`（四角压暗、把视线收到车上），已按用户
+    /// 2026-09-23 的要求去掉：**全局不要加暗层** —— 暗角是纯亮度损失，
+    /// 不回答任何问题，而系统瓦片本来就自带层次。
     private var mapDims: some View {
-        ZStack {
-            LinearGradient(
-                stops: [
-                    .init(color: TokensPalette.scrim.opacity(0.72), location: 0),
-                    .init(color: TokensPalette.scrim.opacity(0.32), location: 0.52),
-                    .init(color: TokensPalette.scrim.opacity(0), location: 1)
-                ],
-                startPoint: .top, endPoint: .bottom)
-                .frame(height: 240)
-                .frame(maxHeight: .infinity, alignment: .top)
-
-            GeometryReader { g in
-                RadialGradient(
-                    stops: [
-                        .init(color: TokensPalette.scrim.opacity(0), location: 0),
-                        .init(color: TokensPalette.scrim.opacity(0), location: 0.38),
-                        .init(color: TokensPalette.scrim.opacity(0.38), location: 0.80),
-                        .init(color: TokensPalette.scrim.opacity(0.58), location: 1)
-                    ],
-                    center: UnitPoint(x: 0.5, y: 0.44),
-                    startRadius: 0,
-                    endRadius: max(g.size.width, g.size.height) * 0.76)
-            }
-        }
-        .allowsHitTesting(false)
+        LinearGradient(
+            stops: [
+                .init(color: TokensPalette.scrim.opacity(0.38), location: 0),
+                .init(color: TokensPalette.scrim.opacity(0.14), location: 0.55),
+                .init(color: TokensPalette.scrim.opacity(0), location: 1)
+            ],
+            startPoint: .top, endPoint: .bottom)
+            .frame(height: 200)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .allowsHitTesting(false)
     }
 
     /// 车牌徽标：车牌 + 状态点 + 一句真话。

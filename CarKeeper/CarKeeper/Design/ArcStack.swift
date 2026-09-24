@@ -51,8 +51,16 @@ struct ArcStack: View {
     private let fallbackHeight: CGFloat = 120
 
     @State private var scroll: CGFloat = 0
-    /// 形变用的位移，比 `scroll` 慢一点点（跟手滞后）
-    @State private var shapeScroll: CGFloat = 0
+    /// 形变用的位移：同一个 `scroll` 的**慢半拍版本**（原型 `_smO += (origin-_smO)*0.16`）。
+    ///
+    /// 它只喂旋转 / 缩放 / 淡出 / 玻璃 / 可否点击，不喂位置 —— 卡片是「追上来再贴合」，
+    /// 而不是硬贴在滚动上。
+    ///
+    /// ⚠️ 2026-09-23：它从第一版起就没被赋过值（恒为 0），于是形变读的其实是
+    /// `targets[i] − 0` = 「这张卡离第一张多远」，而不是「它此刻离阅读线多远」：
+    /// 滚到第四张时，**停在阅读线上的那张卡**透明度只有 0.68、缩到 0.9、
+    /// 而且因为 0.9 那个阈值**点不动**。用户看到的「卡在两端不对」就是这个
+    ///（用户 2026-09-23 的第 3 条）。现在它由 `dragTo` / `settleTo` 跟着一起更新。
     @State private var heights: [Int: CGFloat] = [:]
     @State private var dragBase: CGFloat?
     @State private var peakVelocity: CGFloat = 0
@@ -69,7 +77,12 @@ struct ArcStack: View {
             // 排版：flow 按真实高度排队；deck/wheel 的卡片不排队（tops 只用来定第一张在哪）
             let tops = topCoords(hs: hs, m: m)
             let targets = scrollTargets(tops: tops, m: m)
-            let maxScroll = targets.last ?? 0
+            // 可滚范围的**末端**：「最后一张的底边停在可见区下沿」（见 `endScroll`）。
+            // 它不是 `targets.last` —— 末卡短的时候它更靠前（末卡因此不会被钉在阅读线上、
+            // 底下空一大片），末卡高的时候它更靠后（下半截也读得到）。
+            let maxScroll = endScroll(dock: targets, hs: hs, m: m, vh: vh)
+            // 松手能停住的位置（每一张的阅读线 + 末端那一个）
+            let rests = restPoints(dock: targets, maxScroll: maxScroll)
             let focusTop = m.fadeTop + focusInset
             let base = focusTop - (tops.first ?? 0)
 
@@ -88,7 +101,7 @@ struct ArcStack: View {
             .clipped()
             .mask { fadeMask(vh: vh, m: m) }
             .contentShape(Rectangle())
-            .gesture(drag(maxScroll: maxScroll, targets: targets))
+            .gesture(drag(maxScroll: maxScroll, rests: rests))
             .accessibilityElement(children: .contain)
             .accessibilityLabel(Text(label.isEmpty ? "卡片列表" : label))
             // 叠叠乐**没有 ScrollView**，系统因此不会替我们提供任何翻页方式。
@@ -102,14 +115,14 @@ struct ArcStack: View {
             // scan/enumguard.py 现在专门盯这一类「SDK 枚举成员凭印象拼」的错。
             .accessibilityAdjustableAction { direction in
                 switch direction {
-                case .increment: step(1, targets: targets)
-                default: step(-1, targets: targets)
+                case .increment: step(1, rests: rests)
+                default: step(-1, rests: rests)
                 }
             }
             .accessibilityScrollAction { edge in
                 switch edge {
-                case .bottom: step(1, targets: targets)
-                default: step(-1, targets: targets)
+                case .bottom: step(1, rests: rests)
+                default: step(-1, rests: rests)
                 }
             }
         }
@@ -124,6 +137,11 @@ struct ArcStack: View {
                           m: StackMetrics, vh: CGFloat) -> some View {
         // 位置用**真实位移**，形变用**带滞后那一条**。
         // 两者混用会让卡片一边走一边被自己的滞后拖着，看起来像卡顿。
+        //
+        // ⚠️ 两个量都不是「这张卡离第一张多远」，而是「它此刻离阅读线多远」：
+        // `targets[i] − scroll` 正好等于「这张卡的顶边到阅读线的距离」
+        //（屏幕 y = 阅读线 + 这个差值）。形变一旦读成前者，停在阅读线上的那张卡
+        // 也会被当成「在消失带里」——淡出、缩小、不可点。见 `shapeScroll` 的说明。
         let dPos = target(targets, i) - scroll
         let tShape = shapeT(target(targets, i) - shapeScroll, m: m, vh: vh)
         let p = placement(i: i, dPos: dPos, tShape: tShape, m: m)
@@ -242,7 +260,7 @@ struct ArcStack: View {
     // MARK: 手势
     // =========================================================================
 
-    private func drag(maxScroll: CGFloat, targets: [CGFloat]) -> some Gesture {
+    private func drag(maxScroll: CGFloat, rests: [CGFloat]) -> some Gesture {
         DragGesture(minimumDistance: 6)
             .onChanged { v in
                 if dragBase == nil {
@@ -252,27 +270,44 @@ struct ArcStack: View {
                 }
                 let raw = (dragBase ?? 0) - v.translation.height
                 sampleVelocity(scroll: raw)
-                // 硬停在 `[0, maxScroll]`（`endStop = 0`，见 `StackSpec` 的说明）：
-                // 到顶/到底就是停，末卡不会被拖上去留下空白。
-                scroll = StackMath.clamped(raw, last: maxScroll)
+                // 硬停在 `[0, maxScroll]`：到顶/到底就是停，两端都不会被拖出去留下空白。
+                dragTo(StackMath.clamped(raw, last: maxScroll))
             }
             .onEnded { v in
                 sampleVelocity(scroll: (dragBase ?? 0) - v.translation.height)
                 // 甩出去的判据用的是**这一段手势的峰值速度**，不是松手那一帧：
                 // 收尾时最后几帧本来就几乎不动，取最后一帧算出来恒为 0，甩永远不触发。
-                let idx = StackMath.snapIndex(targets: targets, scroll: scroll,
+                let idx = StackMath.snapIndex(targets: rests, scroll: scroll,
                                               velocity: peakVelocity)
                 current = idx
                 TokensHaptic.select()
                 // 把手指速度交给弹簧：`initialVelocity` 要的是「占剩余路程的倍数/秒」，
                 // 所以除以剩余距离。剩余距离接近 0 时不给（否则会放大成无穷）。
-                let dist = targets[idx] - scroll
-                let v = abs(dist) > 1 ? peakVelocity / dist : 0
-                withAnimation(StackSpec.settle(velocity: v)) { scroll = targets[idx] }
+                if rests.indices.contains(idx) {
+                    let dist = rests[idx] - scroll
+                    settleTo(rests[idx], velocity: abs(dist) > 1 ? peakVelocity / dist : 0)
+                }
                 dragBase = nil
                 lastSample = nil
                 peakVelocity = 0
             }
+    }
+
+    /// 拖动中：位置立刻跟手，形变慢半拍（原型 `_smO += (origin − _smO) * 0.16`）。
+    private func dragTo(_ v: CGFloat) {
+        scroll = v
+        withAnimation(StackSpec.shapeLag) { shapeScroll = v }
+    }
+
+    /// 落点：位置与形变用**同一条弹簧**一起到位。
+    ///
+    /// 原型在回弹时把滞后系数从 0.16 提到 0.34 —— 意思是「回来的时候跟得紧一点」。
+    /// 这里让两者共用同一条曲线：落点因此不可能出现「位置已经到了、形变还在后面追」。
+    private func settleTo(_ v: CGFloat, velocity: CGFloat) {
+        withAnimation(StackSpec.settle(velocity: velocity)) {
+            scroll = v
+            shapeScroll = v
+        }
     }
 
     /// 记**峰值**而不是最后一次：峰值是这一段手势里最快的那个瞬间。
@@ -292,14 +327,15 @@ struct ArcStack: View {
         lastSample = (now, s)
     }
 
-    /// 点「下一张 / 上一张」（无障碍与深链都用它）
-    private func step(_ delta: Int, targets: [CGFloat]) {
-        guard !targets.isEmpty else { return }
-        let next = min(max(current + delta, 0), targets.count - 1)
+    /// 点「下一张 / 上一张」（无障碍与深链都用它）。
+    /// 走的是**落点清单**而不是卡片序号：末尾那个「末卡停到底」也是一个落点。
+    private func step(_ delta: Int, rests: [CGFloat]) {
+        guard !rests.isEmpty else { return }
+        let next = min(max(current + delta, 0), rests.count - 1)
         guard next != current else { return }
         current = next
         TokensHaptic.select()
-        withAnimation(StackSpec.settle) { scroll = targets[next] }
+        settleTo(rests[next], velocity: 0)
     }
 
     // =========================================================================
@@ -340,6 +376,35 @@ struct ArcStack: View {
         case .wheel:
             return tops.indices.map { CGFloat($0) * StackMetrics.wheelPitch }
         }
+    }
+
+    /// 可滚范围的末端：**最后一张的底边停在可见区下沿**（淡出带上沿）。
+    ///
+    /// 两端是对称的（用户 2026-09-23 的第 3 条）：
+    ///   · 首端：`scroll = 0` 时首卡的顶边正好落在可见区上沿（`padTop` 就是按
+    ///     `focusTop` 定的）——「往下滑到底，第一张不离开顶」；
+    ///   · 末端：末卡的底边落在可见区下沿 ——「往上滑到底，最后一张不离开底」。
+    ///     它意味着末卡**不停在阅读线上**（比它低），底下不留一大片空白；
+    ///     而末卡比可见区还高的时候，这个值会**大于**「它吸在阅读线上」的位置 ——
+    ///     多出来的那一段就是为了把它的下半截也读得到，而不是永远被淡出带吃掉。
+    private func endScroll(dock: [CGFloat], hs: [CGFloat], m: StackMetrics, vh: CGFloat) -> CGFloat {
+        guard let lastDock = dock.last else { return 0 }
+        let h = hs.last ?? fallbackHeight
+        let bottom = m.fadeTop + focusInset + h          // 末卡吸住时，它的底边离屏顶多远
+        let crispBottom = vh - max(0.5, m.fadeBottom)    // 可见区的下沿（淡出带之上）
+        return max(0, lastDock + bottom - crispBottom)
+    }
+
+    /// 松手能停住的位置。
+    ///
+    /// 它是两份清单的组合：每一张卡吸在阅读线上的位置 + 末端那一个；
+    /// **超出可滚范围的那些不再算数** —— 末卡很短时，「吸住」比「停到底」还靠下，
+    /// 那一段根本走不到，留在清单里就会让松手往一个够不着的地方弹。
+    private func restPoints(dock: [CGFloat], maxScroll: CGFloat) -> [CGFloat] {
+        var out = dock.filter { $0 <= maxScroll + 0.5 }
+        if out.isEmpty { out = [maxScroll] }
+        if let last = out.last, maxScroll - last > 1 { out.append(maxScroll) }
+        return out
     }
 
     private func target(_ targets: [CGFloat], _ i: Int) -> CGFloat {

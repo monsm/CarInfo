@@ -46,20 +46,15 @@ struct SkyOverlay: View {
             ZStack {
                 lightPools
                 haze
-                vignette
                 grain
             }
         case .paperGrain:
             ZStack {
                 haze
-                vignette
                 grain
             }
         case .hairlineGrid:
-            ZStack {
-                hairlineGrid
-                vignette
-            }
+            hairlineGrid
         }
     }
 
@@ -146,33 +141,18 @@ struct SkyOverlay: View {
     }
 
     // -------------------------------------------------------------------------
-    // MARK: 暗角
+    // MARK: 暗角（已删）
     // -------------------------------------------------------------------------
-    /// 强度来自真实环境光：白天几乎看不见，夜里 0.62。
-    private var vignette: some View {
-        GeometryReader { geo in
-            let maxDim = max(geo.size.width, geo.size.height)
-            RadialGradient(
-                // 暗角 = 光照不到的那一块。它和遮罩同源：纸主题里是墨，不是黑。
-                colors: [TokensPalette.scrim.opacity(0), TokensPalette.scrim.opacity(light.vignette * vignetteScale)],
-                center: UnitPoint(x: 0.5 + light.dirX / (geo.size.width * 2),
-                                  y: 0.42 + light.dirY / (geo.size.height * 2)),
-                startRadius: maxDim * 0.34,
-                endRadius: maxDim * 0.78
-            )
-        }
-        .allowsHitTesting(false)
-    }
-
-    /// 「纸上」不压得那么狠 —— 纸是亮的，压重了就像脏了。
-    private var vignetteScale: Double {
-        switch decor {
-        case .lightPool: return 1.0
-        case .paperGrain: return 0.42
-        case .hairlineGrid: return 0.55
-        default: return 0
-        }
-    }
+    //  这里本来是第三层：一圈径向暗角，强度取自真实环境光（白天 0.14、夜里 0.62），
+    //  四套主题下各有自己的比例。用户 2026-09-23 明确要求：**全局不要加暗层**。
+    //
+    //  删得掉的理由不是「它不好看」，而是它**不回答任何问题**：
+    //    · 光池回答「光从哪来」、颗粒回答「雾/雨/湿」、雾回答「气濛濛」—— 都有对应读数；
+    //    · 暗角只把画面四角压黑，而这一层出现在**每一屏**（根画布）与地图上，
+    //      等于给全 App 预先罩了一层。
+    //  它也不是「光」：光池是按太阳方位角画的，暗角只是同一束光被当成变暗的理由。
+    //  `SkyLight.vignette` 这个读数留在光模型里（它是算出来的物理量，供将来核对），
+    //  但界面不再把它画出来 —— 一个没人看的层不值得占一次全屏重绘。
 
     // -------------------------------------------------------------------------
     // MARK: 颗粒

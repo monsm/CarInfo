@@ -307,11 +307,9 @@ struct MineView: View {
             }
 
             DSGroup(title: "应用") {
-                customRow {
-                    DSRow(icon: "magnifyingglass", title: "全局搜索", showsChevron: true) {
-                        nav.showSearch = true
-                    }
-                }
+                // 「全局搜索」那一行已删：全局搜索从项目移除（用户 2026-09-23，
+                // 与地图右臂一起）。要找一个功能，走底部模式条 —— 那是**唯一**的目录；
+                // 搜索页本身是第二份目录，而且没有任何一条只能从它到达的功能。
                 // 此前是空操作（VoiceBroadcastManager 自动启动，点这里什么都不发生）。
                 // 现在是真能用的开关：翻转 VoiceBroadcastManager 读取的 UserDefaults 键。
                 customRow {

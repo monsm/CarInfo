@@ -104,12 +104,16 @@ xcodebuild build \
 ```
 MapShellView（唯一的屏）
   └ NavigationStack(path: $nav.path)     ← path 永远是空的（全库不再 push 功能页）
-      └ MapSpineView                     ← 全屏 MapKit + 贴底的一张「纸」
-          ├ 顶部：图层胶囊 + 同步状态 + 工具栏（搜索 / 图层 / 定位 / 分屏）
-          └ 底部纸：抓柄 + modeBar（DSSwipeStrip）+ 内容
-                ├ homeMode == .now → nowPanel：layerStrip（4 个地图图层）+ 图层内容
-                └ 其它档         → HomeModeHead（巨字头，固定）+ 分隔线 + pageContent(档)
+      └ MapSpineView                     ← 六页同屏（pageDeck）+ 一条底条
+          ├ 「现在」那一页：地图铺满全屏（画到屏幕最上沿）+ 车牌徽标（点开是菜单：
+          │                 图层 / 重取数据 / 此刻的光 / 回到车）+ 浮动两卡
+          ├ 其余五档：整屏的不透明页，卡片窗停在条子上沿（ArcStack 叠叠乐）
+          └ 底部一行：左臂（车牌前两字）｜模式条（DSSwipeStrip）｜右臂（快捷车控）
 ```
+
+（这一格曾经写的是「顶部：图层胶囊 + 工具栏（搜索 / 图层 / 定位 / 分屏）」+
+「贴底的一张纸」——那张纸已按原型拆成整屏的六页，顶栏也已收进车牌徽标的菜单；
+全局搜索整体删除，右臂现在一键发车控指令。）
 
 **换档不换屏**：地图与纸的位置、高度、底色在 6 档之间完全不变，变的只有纸里装的内容。
 这条是从相机 App 的模式条学来的，`DSSwipeStrip` 就是那条条子（可手拖、跟手、吸附、中心项放大）。
@@ -607,8 +611,11 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 3. `MapSpineView.pageContent(_:)` 加一个 `case`（这是**唯一**列全功能界面的地方）；
 4. 若要档内分段：加 `HomeSub` case，并放进 `vehicleTabs` / `mineTabs` 之一 + 对应页面
    （`VehicleView` / `MineView`）`cards` 里的 `switch`；
-5. `GlobalSearchHUD` 的搜索项里加新档入口；
-6. 跑门禁（`oneentry.py` 会检查入口唯一性）。
+5. 跑门禁（`oneentry.py` 会检查入口唯一性）。
+
+档位清单由 `HomeMode.allCases` 生成，条子与页面同源 —— **不需要在别处再登记一次**。
+（曾经有这样一处：`GlobalSearchHUD` 的搜索项。那个页面已随「右下角的搜索从项目移除」
+一起删除，而它当时漏登记的代价正是「搜索里静默地少一档」。）
 
 ### 10.2 加一个网络接口
 
