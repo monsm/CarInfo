@@ -189,12 +189,15 @@ struct MessagesSection: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// 空的时候要说清是**哪一种空**。「暂无消息」把三件事糊成了一句：
+    /// 服务端真的没给 / 我们没解析到 / 抓的这段区间里就是没有事件。
+    /// 最后那一种现在能说清：窗口是 `APIClient.messageWeeks` 周（不是「永远」）。
     private var emptyHint: String {
         if store.carId.isEmpty { return "请先绑定车辆" }
         if !searchText.isEmpty { return "没有找到匹配「\(searchText)」的消息" }
         if showUnreadOnly { return "所有消息都已读" }
         if let tag = filterTag { return "「\(tag)」标签下没有消息" }
-        return "暂无消息"
+        return "近 \(APIClient.messageWeeks) 周没有事件"
     }
 
     // MARK: - 消息行
@@ -409,7 +412,14 @@ struct MessagesSection: View {
         //   ③ 而 carId 要等 bootstrap 的 getCars 回来才有值，getCars 一失败就永远是空串。
         // 于是只要 bootstrap 没跑完或失败过，这一节就永远停在空状态，
         // 哪怕服务端其实返回了 55 条事件。判断加载与否只看「缓存 + TTL」。
-        guard !TokenStore.currentToken().isEmpty else { loading = false; return }
+        // 没有 token 时**要说出来**：原先只把 loading 关掉，界面就停在「暂无消息」，
+        // 而真实情况是「请求根本没发」。这两件事在屏幕上长得一模一样 ——
+        // 用户 2026-09-24「消息接口拿不到数据」那一轮，这一支就是可能的凶手之一。
+        guard !TokenStore.currentToken().isEmpty else {
+            lastError = "未登录（没有 token），消息接口没有被调用"
+            loading = false
+            return
+        }
         guard loadTask == nil || loadTask!.isCancelled else { return }
         // 先把手上这份响应渲染出来（它就是最近一次真实响应），再无条件取一次 ——
         // 没有 TTL 那一层，也不再因为「刚取过」就跳过。
@@ -422,12 +432,16 @@ struct MessagesSection: View {
     @MainActor
     private func load() async {
         // 同样不设 carId 闸（理由见 loadIfNeeded）。
-        guard !TokenStore.currentToken().isEmpty else { loading = false; return }
+        guard !TokenStore.currentToken().isEmpty else {
+            lastError = "未登录（没有 token），消息接口没有被调用"
+            loading = false
+            return
+        }
         loading = true
         do {
             let list = try await APIClient.shared.getMessages()
             apply(list)
-            lastError = list.isEmpty ? "服务端返回 0 条（已解析）" : ""
+            lastError = list.isEmpty ? "已解析成功，但近 \(APIClient.messageWeeks) 周没有事件" : ""
             // 只缓存非空列表：空列表可能是网络抖动或权限问题，缓存它会
             // 让后续所有访问都命中空缓存而永远不再重试。
             // 非空列表才是「有真实消息」的确认信号。

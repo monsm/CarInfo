@@ -210,7 +210,7 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 | `getControl` | `/api/car/getControlStatus` | 车身状态（门/窗/锁/胎压/里程） | `control` |
 | `getControlInfo` | `/api/car/getControlInfo?carId&id=taskId` | 指令执行结果（轮询） | — |
 | `getLocation` | `/appserver/api/cardata/getCarLocation?mapType=GCJ02` | 位置（Lat/Lng/Heading） | `location` |
-| `getMessages` | `/appserver/api/information/pageReceiverInfoByTime?actionType=2&limit=2000` | 事件流 | `messages` |
+| `getMessages` | `/appserver/api/information/pageReceiverInfoByTime?actionType=2&limit=2000`（**4 个连续的 7 天窗口**，见 §4.5） | 事件流 | `messages` |
 | `sendControlCommand` | `/api/car/control?pin&cmd&carId`（**不重试**） | 指令受理 | — |
 | refresh | `…/auth/cac/refresh` | 新 access_token | —（写 Keychain） |
 
@@ -367,6 +367,15 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 
 **一屏三节**（此前是三个独立页面/深链）：
 
+**消息窗口是 4 周，不是 7 天**（2026-09-24 修）：`APIClient.messageWeeks = 4`，
+实现是「往回切四段 7 天的请求再合并」—— 不是发一个 28 天的窗口，因为我们
+**只验证过 7 天这一个请求形状**（见 `API-FIELD-MAP` §4.7 那段说明）。
+原先只要最近 7 天，于是车三周没开 → 「车的事件」与「由消息配出来的行程」同时为空，
+看起来就像「消息接口拿不到数据」（用户 2026-09-24 报的就是这个）。
+空态现在会写明窗口（「近 4 周没有事件」），而**没有 token** 时也会明说
+（原先那一支只是把 loading 关掉，屏幕上与「真的没消息」一模一样）。
+要核对真实报文：**我的 → 诊断 → 原始日志**（`RawLogStore`，已打码，可一键复制）。
+
 - **行程时间轴**：`store.tripHistory`，每段带 `MiniTripMap`（起终点小图）+ 里程/时长/能耗
   （能效用**每 1% SOC 多少 km**，因为 `capacity` 是 null，kWh/100km 算不出来）。
 - **驾驶评分 `ScoreSection`**：三个维度（续航达成 / 读数一致 / 稳定），**算不出来就是 nil**，
@@ -384,7 +393,11 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 - **应急 `EmergencyPanel`**：SOS 按钮 + 快捷操作 + 紧急联系人 + 位置共享 + 紧急叠加层。
   代价说明：从「1 次拖动」变成「1 次拖动 + 1 次点击」，但 SOS 也仍然在地图操作条上。
 - **诊断 `DevView`**：色板 / 字体 / 令牌数值 / 运行状态 / 能力位图（`car.funCode`）+
-  **艺术主题入口 `ThemeGallerySection`**（主题画廊住在这里，不占档位）。
+  **艺术主题入口 `ThemeGallerySection`**（主题画廊住在这里，不占档位）+
+  **原始日志**（`RawLogStore`：最近 60 条请求/响应，已打码，可一键复制）。
+  最后一组是 2026-09-24 新接上的：那份日志**一直在写，却没有任何界面在读它** ——
+  于是每次「消息拿不到数据」都只能猜（分不清「服务端真没给」与「我们没解析到」）。
+  下次再报接口拿不到东西，先看这一组里那条请求的 status 与响应长度。
 
 ### 4.7 不是档位的屏（各有一处入口，不再重复）
 

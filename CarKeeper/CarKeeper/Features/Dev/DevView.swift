@@ -17,6 +17,8 @@ import UIKit
 struct DevView: View {
     private let store = AppStore.shared
     @State private var showClearConfirm = false
+    /// 「原始日志」那一组的重读代号（`RawLogStore` 不是 ObservableObject）
+    @State private var logTick = 0
     /// 叠法对照页（`Features/Dev/StackLabView.swift`）
     @State private var showStackLab = false
 
@@ -56,6 +58,7 @@ struct DevView: View {
                 kvGroup("动效", motion, footer: "只有两类：状态变化的弹簧，以及一次性绘制。")
                 kvGroup("运行状态", runtime)
                 capabilityGroups
+                rawLogGroup
                 actionsGroup
                 kvGroup("关于", about)
             }
@@ -339,6 +342,61 @@ struct DevView: View {
                 }
             }
         }
+    }
+
+    /// 原始请求 / 响应日志（`RawLogStore`：内存环形 60 条，已打码）。
+    ///
+    /// 它一直存在 —— 每个请求都写一行 —— 而**没有任何界面在读它**。
+    /// 代价在 2026-09-24 那次「消息接口拿不到数据」里看得很清楚：
+    /// 「服务端真的没给」与「我们没解析到」在界面上长得一模一样，
+    /// 只能靠猜与来回问。这一组就是那台仪器：最近几条直接列出来，全部可一键复制。
+    /// 复制的是一份可核对的报文（status + 响应长度 + 正文形状）。
+    private var rawLogGroup: some View {
+        let entries = RawLogStore.shared.allEntries()
+        return DSGroup(title: "原始日志", trailing: "\(entries.count) 条",
+                       footer: "最近 60 条，内存里；token / 控车码 / 车牌 / 坐标已打码。" +
+                               "报「消息拿不到」时，先看 pageReceiverInfoByTime 那条的 status 与长度。") {
+            DSGroupRow {
+                DSRow(icon: "arrow.clockwise", title: "重新读取") { logTick += 1 }
+            }
+            DSGroupRow {
+                DSRow(icon: "doc.on.doc", title: "复制全部日志") {
+                    UIPasteboard.general.string = RawLogStore.shared.joined()
+                    TokensHaptic.result(true)
+                    ToastManager.shared.show("原始日志已复制", icon: "doc.on.doc.fill")
+                }
+            }
+            if entries.isEmpty {
+                DSGroupRow(showsSeparator: false) {
+                    Text("还没有请求记录")
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.secondary)
+                }
+            } else {
+                ForEach(Array(entries.prefix(8).enumerated()), id: \.offset) { idx, e in
+                    DSGroupRow(showsSeparator: idx < min(8, entries.count) - 1) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(Self.logHeadline(e))
+                                .font(TokensTypo.fixed(11, weight: .regular).monospacedDigit())
+                                .foregroundStyle(TokensPalette.primary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Text("\(e.count) 字符")
+                                .font(TokensTypo.caption2)
+                                .foregroundStyle(TokensPalette.tertiary)
+                        }
+                    }
+                }
+            }
+        }
+        // `RawLogStore` 是普通单例（不是 ObservableObject）：不动一下状态，
+        // 这份列表就不会重画 —— 「重新读取」因此靠 `logTick` 重建这一组。
+        .id(logTick)
+    }
+
+    /// 一条日志的**第一行**（`[时间] REQ/RES 路径`）—— 列表里只读这一行就够定位。
+    private static func logHeadline(_ entry: String) -> String {
+        entry.split(separator: "\n").first.map(String.init) ?? entry
     }
 
     private var actionsGroup: some View {

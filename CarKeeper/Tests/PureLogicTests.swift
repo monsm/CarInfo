@@ -300,3 +300,72 @@ final class ChargerClusterTests: XCTestCase {
         XCTAssertEqual(out.map(\.count).sorted(), [1, 2])
     }
 }
+
+// MARK: - 消息窗口（7 天一段，往回切）
+
+/// 消息接口的**窗口**是 2026-09-24 那次「拿不到数据」的根因：原先只要最近 7 天，
+/// 而车三周没开就一条都不剩（抓包证明服务端手里有货）。
+/// 这一组测的就是那段切分与合并 —— 它们不碰网络、不碰界面，只看算术。
+final class MessageWindowTests: XCTestCase {
+
+    private func at(_ s: String) -> Date {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return f.date(from: s)!
+    }
+
+    /// 4 周 = 4 段，每段正好 7 天，而且**首尾相接** —— 中间不能漏掉一段时间，
+    /// 否则那几天的行程会无声无息地消失（比「一条都没有」更难被发现）。
+    func testWindowsTileBackwardsWithoutGaps() {
+        let now = at("2026-09-24 12:00:00")
+        let w = APIClient.messageWindows(weeks: 4, now: now)
+        XCTAssertEqual(w.count, 4)
+        XCTAssertEqual(w[0].end, now)
+        for (i, seg) in w.enumerated() {
+            XCTAssertEqual(seg.end.timeIntervalSince(seg.start), 7 * 24 * 3600, accuracy: 0.5)
+            if i > 0 { XCTAssertEqual(seg.end, w[i - 1].start) }
+        }
+        // 最老那一段的起点 = now − 28 天：窗口宽度就是 messageWeeks × 7 天
+        XCTAssertEqual(w[3].start, now.addingTimeInterval(-28 * 24 * 3600))
+    }
+
+    /// 一段也没有时不能返回空表：`getMessages` 把「一段都没成功」当成全部失败，
+    /// 那会把「参数写错」报成「网络故障」。
+    func testZeroOrNegativeWeeksStillReturnsOneWindow() {
+        XCTAssertEqual(APIClient.messageWindows(weeks: 0, now: Date()).count, 1)
+        XCTAssertEqual(APIClient.messageWindows(weeks: -3, now: Date()).count, 1)
+    }
+
+    /// 合并：按 `stubId` 去重、按 `createdAt` 新 → 旧 —— 与「哪一段先回来」无关
+    func testMergeDedupesAndSortsNewestFirst() {
+        let old: [String: Any] = ["stubId": "1:a", "createdAt": "2026-09-04 07:01:55"]
+        let new: [String: Any] = ["stubId": "1:b", "createdAt": "2026-09-10 08:00:00"]
+        let dupe: [String: Any] = ["stubId": "1:a", "createdAt": "2026-09-04 07:01:55"]
+        let merged = APIClient.mergeMessages([[old], [new, dupe]])
+        XCTAssertEqual(merged.count, 2)
+        XCTAssertEqual(merged.first?["stubId"] as? String, "1:b")
+    }
+
+    /// 缺 `stubId` 的行**照收**（去重靠 id，缺 id 不等于这条不存在）；
+    /// 缺 `createdAt` 的排到最后（它没有时间可用，但也不是“没有”）。
+    func testMergeKeepsRowsWithoutIdsAndSortsUndatedLast() {
+        let undated: [String: Any] = ["title": "无 id 无时间"]
+        let dated: [String: Any] = ["title": "有 id", "id": "77",
+                                    "createdAt": "2026-09-01 00:00:00"]
+        let merged = APIClient.mergeMessages([[undated, dated]])
+        XCTAssertEqual(merged.count, 2)
+        XCTAssertEqual(merged.first?["title"] as? String, "有 id")
+        XCTAssertEqual(merged.last?["title"] as? String, "无 id 无时间")
+    }
+
+    /// 上限：四周可能上千条，而「车的事件」那一节不是惰性列表
+    func testMergeCapsTheResult() {
+        let many: [[String: Any]] = (0..<(APIClient.messageCap + 50)).map {
+            ["stubId": "s\($0)",
+             "createdAt": String(format: "2026-09-%02d 00:00:00", ($0 % 28) + 1)]
+        }
+        XCTAssertEqual(APIClient.mergeMessages([many]).count, APIClient.messageCap)
+    }
+}

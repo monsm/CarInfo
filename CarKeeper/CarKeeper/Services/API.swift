@@ -416,34 +416,130 @@ final class APIClient: @unchecked Sendable {
         }
     }
 
+    /// 消息取多少周。
+    ///
+    /// 用户 2026-09-24 的原话：「为什么消息接口拿不到数据，这是完全可以拿到数据啊」
+    ///（他贴的抓包里，一个 7 天窗口就有 55 条事件）。
+    ///
+    /// 根因就在窗口上：原先**只要最近 7 天**，而 7 天窗口与抓包时的那个区间一样小 ——
+    /// 车两天没开还能看到东西，三周没开就一条都不剩。而「车的事件」与「行程」
+    /// 恰恰是**历史**视图（出行页还专门有「更早」那一档分组）。
+    ///
+    /// 为什么是「几个连续的 7 天窗口」而不是一个「28 天窗口」：
+    /// 我们**只验证过一种请求形状**，就是抓包里那一次（`startTime` 到 `endTime` 相隔 7 天）。
+    /// 服务端能不能接受更长的区间，没有任何证据 —— 它完全可能对超长区间返回空
+    ///（那就会让「拿不到数据」从「窗口太小」变成「窗口太大」，界面上长得一模一样）。
+    /// 所以这里把时间往回切成同样形状的几段，逐段请求再合并：
+    /// 每一段的形状与那一次验证过的请求逐字相同。
+    static let messageWeeks = 4
+
+    /// 合并后的条数上限。
+    ///
+    /// 四周可能有上千条事件，而它们全都要渲染成「车的事件」那一段里的行
+    ///（那一节不是惰性列表）。留一个上限是防「列表没有上限」这件事，
+    /// 不是防数据量：报文里的顺序是新 → 旧，所以截掉的是最老的那一段。
+    static let messageCap = 300
+
     func getMessages() async throws -> [[String: Any]] {
         // AppStore 是 @MainActor；parseMessages 会在协作线程跑，不能在那里假设主线程。
         // 在 getMessages（主线程入口）先取 cars 快照，再传给 parseMessages。
         let cars = await MainActor.run { AppStore.shared.cars }
         return try await withRefresh { [self] in
-            // ⚠️ 必须同时传 token 参数：messagesURL() 里内嵌的 URL 参数只是 URL 级的认证，
-            // request() 还需要 token 来设置 Authorization: Bearer 头。
-            // 缺了这行，服务端返回 200 但 data.content 为空（不报 token expired），
-            // 导致消息永远解析成空数组且 withRefresh 不会触发重试——这就是消息一直空的根因。
-            let res = try await request(url: messagesURL(), method: "POST", body: [:],
-                                        token: TokenStore.currentToken())
-            return Self.parseMessages(res.text, cars: cars)
+            let api = APIClient.shared
+            let windows = Self.messageWindows(weeks: Self.messageWeeks)
+
+            // 每一周一个请求（与抓包验证过的形状一致），并行发出。
+            // 并行而不是顺序：四周的数据彼此不依赖，而界面在等第一份。
+            var texts: [String] = []
+            var firstError: APIError?
+            await withTaskGroup(of: Result<String, APIError>.self) { group in
+                for w in windows {
+                    group.addTask {
+                        do { return .success(try await api.messagesText(from: w.start, to: w.end)) }
+                        catch let e as APIError { return .failure(e) }
+                        catch { return .failure(APIError(message: error.localizedDescription)) }
+                    }
+                }
+                for await r in group {
+                    switch r {
+                    case .success(let t): texts.append(t)
+                    // token 过期必须往上传：`withRefresh` 靠这个标记刷新后重试。
+                    // 其余失败可以容忍 —— 一段拿不到不该让整份历史变空。
+                    case .failure(let e):
+                        if firstError == nil || (e.expired && !(firstError?.expired ?? false)) {
+                            firstError = e
+                        }
+                    }
+                }
+            }
+            if texts.isEmpty, let e = firstError { throw e }
+            let batches = texts.map { Self.parseMessages($0, cars: cars) }
+            return Self.mergeMessages(batches)
         }
     }
 
-    private func messagesURL() -> String {
-        let now = Date()
-        let past = now.addingTimeInterval(-7 * 24 * 3600)
+    /// 从「现在」往回切成 `weeks` 个**连续的 7 天窗口**（新 → 旧）。
+    ///
+    /// 纯函数（`now` 可传）——所以它可以被测试逐段核对，不需要真机也不需要网络：
+    /// 见 `PureLogicTests.MessageWindowTests`。
+    static func messageWindows(weeks: Int, now: Date = Date()) -> [(start: Date, end: Date)] {
+        var out: [(start: Date, end: Date)] = []
+        var end = now
+        for _ in 0..<max(1, weeks) {
+            let start = end.addingTimeInterval(-7 * 24 * 3600)
+            out.append((start, end))
+            end = start
+        }
+        return out
+    }
+
+    /// 一个窗口的原始响应正文。
+    ///
+    /// ⚠️ 必须同时传 token 参数：`messagesURL` 里内嵌的 URL 参数只是 URL 级的认证，
+    /// `request()` 还需要 token 来设置 Authorization: Bearer 头。
+    /// 缺了这行，服务端返回 200 但 `data.content` 为空（不报 token expired），
+    /// 导致消息永远解析成空数组且 `withRefresh` 不会触发重试 —— 那是上一个根因。
+    private func messagesText(from start: Date, to end: Date) async throws -> String {
+        let res = try await request(url: messagesURL(from: start, to: end), method: "POST", body: [:],
+                                    token: TokenStore.currentToken())
+        return res.text
+    }
+
+    private func messagesURL(from start: Date, to end: Date) -> String {
         let f: (Date) -> String = { d in
             let f = DateFormatter()
+            // ⚠️ 必须钉住 locale：没有它，设备若用非公历（佛历 / 和历 / 民国纪年），
+            // 这里会打出「2569-09-24」这样的年份 —— 服务端收到一个不存在的区间，
+            // 回 0 条，而界面只会说「暂无消息」。这类错不报错、不崩，只是永远空。
+            f.locale = Locale(identifier: "en_US_POSIX")
             f.dateFormat = "yyyy-MM-dd HH:mm:ss"
             return f.string(from: d)
         }
         let enc: (String) -> String = { s in s.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? s }
-        // limit=2000 + 7 天窗口：与小程序对齐，服务端最多返回 ~200 条
-        // 日志实测 7 天消息约 64 条/次（log_20260917），2000 完全覆盖，无性能风险。
-        // 进而卡 UI（日志 17:19:17 messages 响应 99287 字符已印证风险）。
-        return "\(APIConfig.baseURL)/appserver/api/information/pageReceiverInfoByTime?actionType=2&page=&limit=2000&startTime=\(enc(f(past)))&endTime=\(enc(f(now)))&token=\(TokenStore.currentToken())"
+        // limit=2000 + 7 天一段：与抓包对齐。日志实测 7 天约 55~64 条，2000 完全覆盖，
+        // 无性能风险（那条 99287 字符的响应就是 55 条，约 100KB）。
+        return "\(APIConfig.baseURL)/appserver/api/information/pageReceiverInfoByTime?actionType=2&page=&limit=2000&startTime=\(enc(f(start)))&endTime=\(enc(f(end)))&token=\(TokenStore.currentToken())"
+    }
+
+    /// 把几段窗口的响应合成一份列表：按 `stubId`（退回 `id`）去重，按时间新 → 旧。
+    ///
+    /// `createdAt` 是 `yyyy-MM-dd HH:mm:ss`，**字典序就是时间序**，所以直接比字符串 ——
+    /// 不引入第二个日期解析器（多一个解析器就多一处「两边解释不一样」）。
+    /// 同样纯函数，同样可测（`PureLogicTests.MessageWindowTests`）。
+    static func mergeMessages(_ batches: [[[String: Any]]]) -> [[String: Any]] {
+        var seen = Set<String>()
+        var out: [[String: Any]] = []
+        for batch in batches {
+            for m in batch {
+                let id = ciString(m, ["StubId", "stubId"]) ?? ciString(m, ["Id", "id"]) ?? ""
+                // 没有 id 的行照收：去重靠 id，缺 id 不等于这条不存在。
+                if !id.isEmpty, !seen.insert(id).inserted { continue }
+                out.append(m)
+            }
+        }
+        out.sort { (ciString($0, ["CreatedAt", "createdAt"]) ?? "") >
+                   (ciString($1, ["CreatedAt", "createdAt"]) ?? "") }
+        return out.count > messageCap ? Array(out.prefix(messageCap)) : out
     }
 
     static func parseMessages(_ text: String, cars: [[String: Any]] = []) -> [[String: Any]] {
