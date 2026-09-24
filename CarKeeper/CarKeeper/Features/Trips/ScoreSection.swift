@@ -139,8 +139,10 @@ struct ScoreSection: View {
 
     var body: some View {
         Group {
+            //  正文里原来有一行 `DSSectionHeader(title: "驾驶评分")`，而这张卡叫「评分」
+            //  —— 卡头已经写了名字，正文的第一行就是主角（那个分数）。
+            //  （用户 2026-09-24：「全部页面检查精致度」）
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSSectionHeader(title: "驾驶评分")
                 hero
 
                 if overallScore == nil {

@@ -567,6 +567,14 @@ struct MapSpineView: View {
     @ViewBuilder
     private func pageDeck() -> some View {
         ZStack {
+            // 换档的交叉过渡底下必须有**一层不透明的画布**。
+            //
+            // 出去与进来的两页各自淡一会儿（原型 `opacity = 1 − 1.6a` 同时作用在两者上），
+            // 合成的透明度加起来不到 1；底下若是地图，过渡期间就会从卡片之间透出一层
+            // 灰黑（用户 2026-09-24：「其他页面的暗层也删除」—— 非地图页上最容易看到的就是这一层）。
+            // 铺上它之后，过渡的底是画布色，而不是「上一页 / 地图的鬼影」。
+            // 它在最底层，地图那一页（`.now`）盖在它上面，所以地图页一点不变。
+            TokensPalette.canvas.ignoresSafeArea()
             ForEach(HomeMode.allCases.indices, id: \.self) { i in
                 let a = fade(i)
                 pageBody(HomeMode.allCases[i])
@@ -620,11 +628,13 @@ struct MapSpineView: View {
             // 而不是「别的页浮在一张活地图上」（那样两页交界处会露出地图）。
             mapCanvas(d)
 
-            // 底图之上只剩**一层**压暗（原型 `.maptop`），它的唯一用处是让车牌与
-            // 状态行在浅色底图上读得出来。原型还有第二层 `.mapvig`（四角压暗）——
-            // 已按「全局不要加暗层」去掉，见 `mapDims`。
-            // 遮罩取 `TokensPalette.scrim` 而不是纯黑：纸主题下它是**墨**。
-            mapDims
+            // 底图之上**没有任何压暗层**（原型这里有 `.maptop` + `.mapvig` 两层，都已删）。
+            //
+            // 用户 2026-09-24：「全局不要加暗层」+「地图页顶部的信息挪到下面的玻璃卡片」——
+            // 这两条是同一件事的两面：`.maptop` 存在的唯一理由是「车牌徽标压在瓦片上要读得出」，
+            // 而徽标已经搬进下面那张玻璃卡（见 `nowHead`）。理由消失，层就跟着走。
+            // 删干净之后地图上只剩两样不是瓦片的东西：地名（自带 textShadow，不吃整屏亮度）
+            // 与地图自己的仪表（罗盘 / 比例尺）。
 
             // `.float{left:16;right:16;bottom:98;gap:12}`：底边离屏底 98
             //（条子占 86 + 12 的呼吸位），两卡之间 12。
@@ -637,43 +647,28 @@ struct MapSpineView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         // `.plate{left:20;top:62}`：车牌徽标挂在安全区下的左上角（62 ≈ 54 + 8）。
-        .overlay(alignment: .topLeading) {
-            plateBadge(d)
-                .padding(.leading, 20)
-                .padding(.top, 8)
-        }
+        // 原来这里挂着**车牌徽标**（车牌 + 状态 + 上报时间 + 菜单），压在安全区下 8pt。
+        // 它已搬进下面那张玻璃卡的头（用户 2026-09-24：「顶部的信息挪动到下面的玻璃卡片」）：
+        // 地图上只留地名与自己的仪表（罗盘 / 比例尺），不再有一行浮字。
+        // 菜单也跟着进去了（卡头上的图层胶囊）—— 它是**控件**，不是信息。
     }
 
-    /// 底图之上**唯一**还留着的压暗：顶上那一层。
+    //  这里原本有 `mapDims`：底图上唯一留的一条顶部压暗（原型 `.maptop`，
+    //  0.38 → 0，200pt 高）。它的两个先辈（`.mapvig` 四角压暗、根画布上的暗角）
+    //  已按「全局不要加暗层」删掉，而它自己服务的那件事 —— 车牌徽标压在瓦片上
+    //  读得出来 —— 也随徽标搬进玻璃卡而消失（用户 2026-09-24）。
+    //
+    //  留着它只有一个后果：整屏顶部被压掉 38% 亮度，而顶上已经没有字了。
+    //  地图自己的仪表（罗盘 / 比例尺）是**系统控件**，它们自带底、不靠这层压暗。
+    /// 卡头上的**图层胶囊**：写着当前在看哪一层，点开是这张地图的那几件事。
     ///
-    /// 它只服务一件事 —— 车牌与状态行压在浅色底图上也要读得出来（车牌是这一屏
-    /// 唯一的身份，读不出来这一屏就白画了）。所以它**只盖顶上那一段**，而且很淡。
-    ///
-    /// 原型这里还有第二层 `.mapvig`（四角压暗、把视线收到车上），已按用户
-    /// 2026-09-23 的要求去掉：**全局不要加暗层** —— 暗角是纯亮度损失，
-    /// 不回答任何问题，而系统瓦片本来就自带层次。
-    private var mapDims: some View {
-        LinearGradient(
-            stops: [
-                .init(color: TokensPalette.scrim.opacity(0.38), location: 0),
-                .init(color: TokensPalette.scrim.opacity(0.14), location: 0.55),
-                .init(color: TokensPalette.scrim.opacity(0), location: 1)
-            ],
-            startPoint: .top, endPoint: .bottom)
-            .frame(height: 200)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .allowsHitTesting(false)
-    }
-
-    /// 车牌徽标：车牌 + 状态点 + 一句真话。
-    ///
-    /// 它同时是这一屏的**菜单**。原型这个位置只有一个静态徽标，而这一版把
-    /// 「不常按但必须能到」的几件事收进它：看哪一层（图上四个图层）、重取数据、
-    /// 此刻的光、回到车（iPad 上再加一个新车况窗口）。
-    /// 收进来是**结构决定**，不是图省事：首页每多一枚钮，它就不再是原型那张图；
-    /// 而这几件事原来各占一枚 —— 图层一张卡、光一枚药丸、回到车一枚浮钮、
-    /// 顶栏三枚（刷新 / 搜索 / 回到车，而且它们当时长在**六页每一页**上）。
-    private func plateBadge(_ d: MapSpineData) -> some View {
+    /// 它原来是屏幕左上角的车牌徽标（车牌 + 状态 + 上报时间的那个控件），
+    /// 徽标的信息已拆进卡头（车牌一行、状态与上报时间一行），菜单留在这里。
+    /// 菜单里那几件事都是**不常按但必须能到**的：看哪一层（图上四个图层）、
+    /// 重取数据、此刻的光、回到车（iPad 上再加一个新车况窗口）。
+    /// 收进一个菜单是**结构决定**：它们原来各占一枚 —— 图层一张卡、光一枚药丸、
+    /// 回到车一枚浮钮、顶栏三枚（刷新 / 搜索 / 回到车，而且长在**六页每一页**上）。
+    private func layerMenu(_ d: MapSpineData) -> some View {
         Menu {
             ForEach(MapSpineLayer.allCases) { l in
                 Button {
@@ -712,22 +707,25 @@ struct MapSpineView: View {
                 }
             }
         } label: {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(plateText(d))
-                    .font(TokensTypo.digits(20))
-                    .tracking(1.5)
-                    .foregroundStyle(TokensPalette.primary)
-                    .shadow(color: TokensPalette.scrim, radius: 6, y: 1)
-                HStack(spacing: 6) {
-                    statusDot(d.online)
-                    Text("\(d.online.text) · 上报 \(d.updatedText)")
-                        .font(TokensTypo.caption)
-                        .foregroundStyle(TokensPalette.secondary)
-                }
-                .shadow(color: TokensPalette.scrim, radius: 6, y: 1)
+            // 胶囊：当前图层名 + 上下箭头。它比一只齿轮图标好认 ——
+            // 「这张卡在回答哪个问题」就写在上面，而不是变成一个要背的图标。
+            HStack(spacing: 4) {
+                Text(layer.title)
+                    .font(TokensTypo.caption)
+                    .tracking(TokensTracking.label)
+                Image(safeSymbol: "chevron.up.chevron.down", fallback: "chevron.down")
+                    .font(TokensTypo.micro)
             }
+            .foregroundStyle(TokensPalette.secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background { Capsule().fill(TokensPalette.fillSubtle) }
+            .overlay {
+                Capsule().strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border)
+            }
+            .contentShape(Capsule())
         }
-        .accessibilityLabel(Text("车牌 \(plateText(d))，\(d.online.text)"))
+        .accessibilityLabel(Text("图层：\(layer.title)"))
         .accessibilityHint(Text("点开：看哪一层、重取数据、此刻的光、回到车"))
     }
 
@@ -774,20 +772,34 @@ struct MapSpineView: View {
         }
     }
 
-    /// 卡头：左边「在看什么」，右边「这份读数有多新」——原型的 `.hd .ct` 与 `.hd .away`。
-    /// 图层不是「现在」时，左边就写那一层的名字（行程 / 停车 / 充电），
-    /// 于是这一行永远是「这张卡在回答哪个问题」。
+    /// 卡头两行：**身份**（车牌）与**新鲜度**（状态 + 上报时间）。
+    ///
+    /// 这两行原来长在地图左上角的车牌徽标上（用户 2026-09-24：顶部信息挪进卡）。
+    /// 搬进来之后它比在图上更准：徽标浮在瓦片上，只能用重阴影把字从底图里抬出来；
+    /// 卡里它就是正文，遮罩与对比度全部由玻璃负责。
+    /// 右侧那枚胶囊是图层菜单（原徽标菜单，见 `layerMenu`）。
     private func nowHead(_ d: MapSpineData) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-            Text(layer == .now ? "当前位置" : layer.title)
-                .font(TokensTypo.caption)
-                .tracking(TokensTracking.label)
-                .foregroundStyle(TokensPalette.secondary)
-            Spacer(minLength: 0)
-            Text(d.updatedText)
-                .font(TokensTypo.digits(11))
-                .foregroundStyle(TokensPalette.tertiary)
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+                Text(plateText(d))
+                    .font(TokensTypo.digits(15))
+                    .tracking(1.2)
+                    .foregroundStyle(TokensPalette.primary)
+                Spacer(minLength: 0)
+                layerMenu(d)
+            }
+            HStack(spacing: 6) {
+                statusDot(d.online)
+                Text("\(d.online.text) · 上报 \(d.updatedText)")
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.secondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(Text("\(d.online.text)，上报 \(d.updatedText)"))
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("车牌 \(plateText(d))") +
+                            Text("，\(d.online.text)，上报 \(d.updatedText)"))
     }
 
     /// 现状卡的读数：地址 → 巨字续航 → 副行 → 光带 → 四轮胎压。
@@ -840,9 +852,13 @@ struct MapSpineView: View {
 
     // ---- 四格读数 ----
     //
-    //  原型 `.card.chips`：车速 / 电量 / 胎压 / 车门，四格，
-    //  而且**奇偶上下错开 7px**（`.chip:nth-child(odd){translateY(-7px)}`）——
-    //  那是这一页的「错位」手感，不是排版事故，照搬。
+    //  原型 `.card.chips`：车速 / 电量 / 胎压 / 车门，四格一行。
+    //
+    //  原型还带一手 `.chip:nth-child(odd){translateY(-7px)}`（奇偶上下错开 7px）。
+    //  上一版照搬了它，用户 2026-09-24 的回应是：「下面 4 个按钮要规整，不要歪歪扭扭」
+    //  —— 样品期的「错位手感」在真机上读出来只是「没对齐」，已删。
+    //  四格现在是**同高同宽、同一基线**的一行，排版权全部交给 `HStack`。
+    //
     //  四格是**读数**，不是按钮：车控那一档已经有一整排真控件了，
     //  同一个动作在首页再摆一遍就是第二个入口。
 
@@ -858,15 +874,20 @@ struct MapSpineView: View {
     private func readoutChips(_ d: MapSpineData) -> some View {
         let cells = readouts(d)
         return GlassCard(accent: HomeMode.now.accent) {
+            // 四格等分：`readoutCell` 自己 `maxWidth: .infinity`，行里不摆任何偏移。
             HStack(spacing: 9) {
-                ForEach(Array(cells.enumerated()), id: \.element.id) { i, c in
-                    readoutCell(c, offset: i % 2 == 0 ? -7 : 7)
+                ForEach(cells) { c in
+                    readoutCell(c)
                 }
             }
         }
     }
 
     /// 四格的值。取不到的那一格**照实说「无数据」**：不摆 `--`、也不拿别的数顶上。
+    ///
+    /// 四格**同一行、同一基线**（用户 2026-09-24：「下面 4 个按钮要规整，不要歪歪扭扭」）。
+    /// 原型里有一手 `nth-child(odd){translateY(-7px)}` 的奇偶错位 —— 它是样品期的排版游戏，
+    /// 在真机上只会读成「没对齐」，于是这一版明确去掉（`readoutCell` 不再收偏移）。
     @MainActor
     private func readouts(_ d: MapSpineData) -> [Readout] {
         let speed = VM.driveStatus(store.caches).speed
@@ -889,8 +910,9 @@ struct MapSpineView: View {
         ]
     }
 
-    /// 一格：上面是键（小字），下面是值（数字体）。`offset` 就是原型的奇偶错位。
-    private func readoutCell(_ r: Readout, offset: CGFloat) -> some View {
+    /// 一格：上面是键（小字），下面是值（数字体）。四格完全同高同宽 ——
+    /// 行里没有一格带额外偏移，所以「一行四个」就是它们的**全部排版**。
+    private func readoutCell(_ r: Readout) -> some View {
         VStack(spacing: 5) {
             Text(r.key)
                 .font(TokensTypo.caption2)
@@ -907,6 +929,8 @@ struct MapSpineView: View {
                 }
             }
         }
+        // 同宽：`.frame(maxWidth: .infinity)` 让四格平分行宽；
+        // 同高：两行文字 + 同一个 9pt 内边距，没有哪一格多一行。
         .frame(maxWidth: .infinity)
         .padding(.vertical, 9)
         .background {
@@ -917,7 +941,6 @@ struct MapSpineView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border)
         }
-        .offset(y: offset)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(r.unit.map { "\(r.key) \(r.value) \($0)" } ?? "\(r.key) \(r.value)"))
     }

@@ -14,6 +14,16 @@ import SwiftUI
 //    ② 取不到就照实说（"还没有体检记录"），不摆 `--` 占位冒充数据。
 //    ③ 「现在」那一档没有头：那张纸本身就是地图的面板（车名 + 地址 + 状态行），
 //       再叠一个巨字就是两层标题。
+//
+//  **它只给一个事实，不给依据行**（用户 2026-09-24：「全部页面检查精致度」）。
+//  依据行曾经长在这里：三行键值（车牌 / 车架号 / 保险 之类），而它们逐条又在
+//  下面那张卡里再说一遍 —— 车辆档的头写「车牌 / 车架号 / 保险」，紧跟的「身份」
+//  卡就是这三样；充电档写「充电 / 电压电流 / 电池温度」，紧跟的「此刻」卡里
+//  正好是同一组读数。同一页上同一句话说两遍，读起来就是没做完。
+//
+//  删掉之后每条事实只剩**一个出处**，而头卡剩下的事说得更清：
+//  它是这一页的**标题**（巨字 + 一行小字），依据在下面每一张卡里。
+//  `StackCard.title` 也已经写着这一档的名字，所以连「这是什么」都不必再重复。
 struct HomeModeHead: View {
     let mode: HomeMode
 
@@ -29,31 +39,16 @@ struct HomeModeHead: View {
         var tint: Color = TokensPalette.primary
     }
 
-    /// 巨字下面的依据行
-    private struct Fact {
-        let key: String
-        let value: String
-        var cls: String = "na"
-    }
-
     var body: some View {
         if mode == .now {
             // 见文件头第 ③ 条
             EmptyView()
         } else {
-            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-                DSBigNumber(value: hero.value, unit: hero.unit,
-                            caption: hero.caption, size: hero.size, tint: hero.tint)
-                if !facts.isEmpty {
-                    VStack(spacing: TokensSpacing.sm) {
-                        ForEach(Array(facts.enumerated()), id: \.offset) { _, f in
-                            DSKeyValueRow(key: f.key, value: f.value, valueCls: f.cls)
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .contain)
+            let h = hero
+            DSBigNumber(value: h.value, unit: h.unit,
+                        caption: h.caption, size: h.size, tint: h.tint)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
         }
     }
 
@@ -95,51 +90,6 @@ struct HomeModeHead: View {
                             caption: Self.line([plate, u.mobile]), size: 44)
             }
             return Hero(value: "--", caption: "还没取到账号信息", size: 44, tint: TokensPalette.secondary)
-        }
-    }
-
-    // MARK: - 依据行
-
-    @MainActor
-    private var facts: [Fact] {
-        switch mode {
-        case .now:
-            return []
-        case .vehicle:
-            guard let s = VM.vehicleSummary(store.car, store.controlCache) else { return [] }
-            return [
-                Fact(key: "车牌", value: s.plate),
-                Fact(key: "车架号", value: s.vin.isEmpty ? "未登记" : s.vin),
-                Fact(key: "保险", value: Self.line([s.insuranceEnd,
-                                                    s.insuranceDays.map { "\($0) 天后" }]))
-            ]
-        case .charge:
-            let e = VM.energy(store.caches, store.car)
-            return [
-                Fact(key: "充电", value: e.chargeText, cls: e.chargeCls),
-                Fact(key: "电压电流", value: e.voltAmp),
-                Fact(key: "电池温度", value: e.battTemp)
-            ]
-        case .control:
-            // 车锁 / 车窗 / 后备箱这类「开还是关」的事实：直接用车况芯片，
-            // 它们本来就是从 `control` 报文里读出来的同一批值。
-            return VM.bodyStatus(store.caches).prefix(3).map {
-                Fact(key: $0.label, value: $0.text, cls: $0.cls)
-            }
-        case .trips:
-            return store.tripHistory.prefix(3).map { t in
-                Fact(key: t.startTime.formatted(date: .abbreviated, time: .shortened),
-                     value: String(format: "%.1f km", t.distanceKm))
-            }
-        case .mine:
-            let u = VM.userModel(store.user)
-            let authed = u?.authed == true
-            return [
-                Fact(key: "实名认证", value: authed ? "已认证" : "未认证",
-                     cls: authed ? "ok" : "warn"),
-                Fact(key: "车辆", value: "\(store.cars.count) 辆"),
-                Fact(key: "上次登录", value: Self.line([u?.lastLoginTime, nil]))
-            ]
         }
     }
 

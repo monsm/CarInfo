@@ -280,8 +280,10 @@ struct TripsEventsView: View {
 
     /// 常停热区与地图主屏是**同一套聚类** —— 两处必须是同一个答案
     private func hotspotsBand(_ spots: [MapHotspot]) -> some View {
+        //  正文里原来有一行 `DSSectionHeader(title: "常来之地")`，而这张卡叫「常停之地」
+        //  —— 同一个东西两个名字（用户 2026-09-24：「全部页面检查精致度」）。
+        //  卡头已经给它起过名，正文直接从第一条开始。
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-            DSSectionHeader(title: "常来之地")
             ForEach(spots.prefix(3)) { s in
                 HStack(alignment: .firstTextBaseline) {
                     Image(safeSymbol: "mappin.circle.fill", fallback: "mappin.circle.fill")

@@ -107,7 +107,7 @@ struct ChargeView: View {
                       value: "\(e.socPct)%", cls: "ok",
                       at: chargeAt,
                       content: AnyView(batterySection(b, e))),
-            StackCard(id: "trend", title: "趋势",
+            StackCard(id: "trend", title: "趋势", value: "车端采样",
                       at: chargeAt,
                       content: AnyView(trendSection(e))),
             StackCard(id: "plan", title: "长途",
@@ -123,29 +123,25 @@ struct ChargeView: View {
         let power = chargePowerText
 
         return VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-                Text(e.chargeText)
+            //  这张卡**不再写巨字电量**（用户 2026-09-24：「全部页面检查精致度」）。
+            //  它上面那张头卡（`HomeModeHead`）的主角就是同一个数，而且更大（116pt）：
+            //  一页上两个 `68%` —— 一个当标题、一个当内容 —— 读起来是同一句说了两遍。
+            //  一个数只该有一个出处：电量归头卡，这张卡回答的是「此刻在发生什么」。
+            //
+            //  充电状态也不在这里再说一遍：它就是**卡头值**（`StackCard.value` = 充电中 / 已充满），
+            //  同一行字在卡头上方已经出现过一次。这里只留上面都没有的：告警。
+            if !e.socWarn.isEmpty {
+                Text(e.socWarn)
                     .font(TokensTypo.footnote)
-                    .foregroundStyle(e.chargeCls == "ok" || e.chargeCls == "charge"
-                                     ? TokensPalette.info : TokensPalette.secondary)
-                Spacer(minLength: TokensSpacing.sm)
-                if !e.socWarn.isEmpty {
-                    Text(e.socWarn)
-                        .font(TokensTypo.footnote)
-                        .foregroundStyle(TokensPalette.statusColor(e.socCls))
-                }
+                    .foregroundStyle(TokensPalette.statusColor(e.socCls))
             }
-
-            DSBigNumber(value: e.soc == "--" ? "--" : "\(e.socPct)", unit: "%",
-                        caption: "电池电量", size: 116, tint: tint)
-                .padding(.top, TokensSpacing.md)
 
             DSLightBar(
                 progress: fraction,
                 tint: LinearGradient(colors: [TokensPalette.lightSource, tint.opacity(0.75), tint],
                                      startPoint: .leading, endPoint: .trailing)
             )
-            .padding(.top, TokensSpacing.xl)
+            .padding(.top, e.socWarn.isEmpty ? 0 : TokensSpacing.lg)
 
             HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                 Text(e.range == "--" ? "续航 --" : "续航 \(e.range) km")
@@ -441,9 +437,11 @@ struct ChargeView: View {
         let socMinutes = Int(HistoryStore.socInterval / 60)
         let powerMinutes = Int(HistoryStore.powerInterval / 60)
 
+        //  正文里原来还有一行 `DSSectionHeader(title: "趋势", trailing: "车端采样")` ——
+        //  卡头已经写着「趋势」，同一张卡上再说一遍就是没做完（用户 2026-09-24）。
+        //  「车端采样」是**这份曲线的性质**（谁给了这些点），所以它搬到卡头值上，
+        //  而不是作为第二个标题留在正文里。
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            DSSectionHeader(title: "趋势", trailing: "车端采样")
-
             Picker("周期", selection: $trendPeriod) {
                 ForEach(TrendPeriod.allCases) { p in
                     Text(p.rawValue).tag(p)

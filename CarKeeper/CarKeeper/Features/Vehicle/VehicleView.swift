@@ -185,9 +185,10 @@ struct VehicleView: View {
     // MARK: - ① 身份区
 
     private func identitySection(_ sum: VehicleSummary) -> some View {
+        //  正文里原来还有一行 `DSSectionHeader(title: "车辆")`（用户 2026-09-24：
+        //  「全部页面检查精致度」）。卡头写着「身份」，紧接着的车牌（34pt，全页最大的字）
+        //  自己就是这一块的标题 —— 同一张卡上三个标签，读起来像没对齐的两份文案。
         VStack(alignment: .leading, spacing: 0) {
-            DSSectionHeader(title: "车辆")
-
             HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                 Text(sum.plate.isEmpty ? "未绑定车牌" : sum.plate)
                     // 车牌是**全屏最大的字**，也是这一页的标题：走 metric（等宽数字家族的定尺字）

@@ -212,7 +212,7 @@ App 一棵树、一份 `Tokens.swift`。上面那段「为什么小组件不直�
    全部改走 `nav.openMode`：**拨条子，不 push 第二份页面**。
 
 加页面 = 在 `HomeMode` 加一档 + `pageContent` 加一个 case + `HomeModeHead` 加一个 case
-（巨字 + 依据行）。别处不再有入口清单，而且这条现在由 `scan/oneentry.py` 逐条守着 ——
+（巨字 + 一行小字；依据行 2026-09-24 已删 —— 它们逐条与下一张卡重复）。别处不再有入口清单，而且这条现在由 `scan/oneentry.py` 逐条守着 ——
 它会在 CI 上把「又长出第二个入口」的改动拦下来。
 
 ### 一条刻意**没有**照搬的
