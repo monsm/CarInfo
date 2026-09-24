@@ -31,6 +31,16 @@ import UIKit
 //
 //  它记录的内存水位同时也是 jetsam 的证据：如果轨迹停在某个阶段、水位接近上限，
 //  那就是内存被杀；如果水位很平，就要去看别的（看门狗 / 被拒 / 系统策略）。
+//
+//  ⚠️ 追加（同日第二轮）：上面那套**在 2–12 秒之间是瞎的**。打点全落在启动的头一两秒
+//  （根视图出现 / 首页外壳出现），之后到第 12 秒的收尾标记之间一行都没有 ——
+//  而用户报的正是「地图出现之后几秒」自己退出，那恰好落在盲区里：事后打开文件，
+//  最后一行是两秒前的某个阶段，既说不出「死在第几秒」，也看不出死的时候主线程在不在动。
+//  所以补两样，判据因此变成两条：
+//    · **心跳**：每 1 秒一行，写在**后台队列**上 —— 最后一行离死亡时刻不超过 1 秒；
+//    · **主线程有没有卡住**：每次心跳让主线程回一句话。心跳还在写、主线程却已经
+//      N 秒没回话 = **卡死**（看门狗那种）；心跳自己也停了 = **进程被直接处决**
+//      （jetsam 那种）。这两种终止在系统里都没有日志，但在轨迹里长得完全不一样。
 // =============================================================================
 
 final class StartupJournal: @unchecked Sendable {
@@ -54,6 +64,13 @@ final class StartupJournal: @unchecked Sendable {
     private var startedAt = Date()
     private var started = false
     private var stopped = false
+
+    /// 心跳看门狗。它必须在**后台队列**上跑：否则「主线程卡住」时它自己也停了，
+    /// 而「卡住」与「被杀」就分不出来了 —— 那正是它唯一要分辨的那件事。
+    private var beat: DispatchSourceTimer?
+    private static let beatQueue = DispatchQueue(label: "carkeeper.startup.journal.beat")
+    /// 主线程最后一次回话的时刻（与心跳对时用）。
+    private var lastMainReply = Date()
 
     private init() {}
 
@@ -95,6 +112,7 @@ final class StartupJournal: @unchecked Sendable {
         }
         add("＝ 这一次启动 \(Self.stamp()) ＝ \(Self.versionLine())")
         flush()
+        startHeartbeat()
     }
 
     /// 一个可命名的启动阶段。
@@ -120,6 +138,49 @@ final class StartupJournal: @unchecked Sendable {
         guard started, !stopped else { return }
         stopped = true
         add(String(format: "%6.2fs  ✅ 启动阶段完成", Date().timeIntervalSince(startedAt)))
+        flush()
+        stopHeartbeat()
+    }
+
+    // MARK: - 心跳
+
+    /// 启动阶段内每 1 秒一行。走完启动阶段（`finish`）就停 —— 之后死掉不再是
+    /// 「启动阶段的问题」，而「✅」那一行已经把这条边界写在文件里了。
+    private func startHeartbeat() {
+        stopHeartbeat()
+        let timer = DispatchSource.makeTimerSource(queue: Self.beatQueue)
+        timer.schedule(deadline: .now() + 1, repeating: 1)
+        timer.setEventHandler { [weak self] in self?.tick() }
+        beat = timer
+        timer.resume()
+    }
+
+    private func stopHeartbeat() {
+        beat?.cancel()
+        beat = nil
+    }
+
+    /// 一次心跳：先问主线程一句话（回话极轻，回不上来才是信息），再落一行。
+    private func tick() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            self.lastMainReply = Date()
+            self.lock.unlock()
+        }
+        lock.lock()
+        defer { lock.unlock() }
+        guard started, !stopped else { return }
+        let now = Date()
+        var line = String(format: "%6.2fs  · 心跳  内存 %.0f MB",
+                          now.timeIntervalSince(startedAt), Self.residentMB())
+        // 2.5 秒：正常的一次布局卡顿不该被判成卡死（1 秒的窗口太松，5 秒太迟）。
+        // 连续几次心跳都带上这句话 = 主线程一直没回来；中间某一次没有了 = 它回来了。
+        let stalled = now.timeIntervalSince(lastMainReply)
+        if stalled > 2.5 {
+            line += String(format: "  ⚠️ 主线程 %.1f 秒没回话", stalled)
+        }
+        add(line)
         flush()
     }
 

@@ -466,6 +466,16 @@ VERIFIED_SDK_ADDITIONS = {
     "GeometryProxy": "SwiftUI.GeometryProxy（iOS 13+；externalID s:7SwiftUI13GeometryProxyV；doc://com.apple.SwiftUI/documentation/SwiftUI/GeometryProxy）——拿到容器尺寸的那个结构体。**注意它与 MapCompass 一起被登记，但两者缘由不同**：GeometryProxy 一直都在用（`pageLayer(_ geo:)`），而 scan.py 的「未声明的类型」判据是拿**冻结提交的缓存**比 —— 基线里那一个只出现在 `members` / `calls` 里、没进 `refs`，于是本机跑（有 scan/baseline/ 目录）与 CI 跑（用提交进仓库的 baseline_cache.json）结果不一样。这一条就是把「到底认不认它」写成一个显式名字，两种跑法都对得上",
     "MapCompass": "MapKit.MapCompass（iOS 17+；decl: struct MapCompass；externalID s:15_MapKit_SwiftUI0A7CompassV；doc://com.apple.mapkit/documentation/MapKit/MapCompass，relatedModules: SwiftUI，abstract: A view that reflects the current orientation of the associated map）——原型 `.compass`（右上角那枚罗盘）的真机对应物：它是地图自己的仪器（回答「哪边是北」），不是我们摆上去的控件。放在 `.mapControls { }` 里",
     "toolbar": "View.toolbar(_:for:)（iOS 16+；decl: func toolbar(_ visibility: Visibility, for bars: ToolbarPlacement...) -> some View；externalID s:7SwiftUI4ViewPAAE7toolbar_3forQrAA10VisibilityO_AA16ToolbarPlacementVdtF；doc://com.apple.SwiftUI/documentation/SwiftUI/View/toolbar(_:for:)）——按可见性控制某一条栏。首页用它把导航栏收掉（`.toolbar(.hidden, for: .navigationBar)`）：原型里**首页根本没有顶栏**，地图一直画到屏幕最上沿。⚠️ 这个名字在 **iOS 27.2 起被改名为 `toolbarVisibility(_:for:)`**（文档 JSON 里 `renamed: toolbarVisibility(_:for:)`、`deprecatedAt: 27.2`）—— 本项目的部署目标是 iOS 26.0、用 iPhoneOS26.5 SDK 编译，所以现在不产生弃用警告；等 SDK 升到 27.2 之后要改用它",
+    # 启动轨迹的心跳（Services/StartupJournal.swift，2026-09-24 第二轮）。
+    # 背景：轨迹原本在 2–12 秒之间是瞎的（打点全在头一两秒），而用户报的
+    # 「地图出来以后几秒就退」正落在盲区里。补心跳时选了 GCD 的定时器，
+    # 而不用 `Timer.scheduledTimer`：后者跑在调用它的 run loop 上，
+    # 主线程一卡它自己也停了 —— 于是「卡死」与「被处决」又分不开了。
+    # 三个名字都对着 Apple 文档核过（dispatchsourcetimer 一页列出
+    # `schedule(deadline:repeating:leeway:)`，makeTimerSource(queue:) 返回它）：
+    "DispatchSourceTimer": "Dispatch.DispatchSourceTimer（iOS 8+；doc://com.apple.dispatch/documentation/Dispatch/DispatchSourceTimer；由 DispatchSource.makeTimerSource(queue:) 返回）",
+    "makeTimerSource": "DispatchSource.makeTimerSource(queue:)（iOS 8+；doc://com.apple.dispatch/documentation/Dispatch/DispatchSource/makeTimerSource(queue:flags:)）",
+    "schedule": "DispatchSourceTimer.schedule(deadline:repeating:leeway:)（iOS 8+；doc://com.apple.dispatch/documentation/Dispatch/DispatchSourceTimer/schedule(deadline:repeating:leeway:)）——心跳的 1 秒节拍",
 }
 
 

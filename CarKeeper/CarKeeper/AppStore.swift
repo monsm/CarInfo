@@ -600,6 +600,9 @@ final class AppStore: @unchecked Sendable {
     // #21 冷启动预加载：App 启动时异步预取核心数据
     private var preloadTask: Task<Void, Never>? = nil
 
+    /// 正在飞的那一趟 `bootstrap()`（合并并发调用用，见下）。
+    private var bootstrapTask: Task<Void, Never>? = nil
+
     // #28 Dynamic Island / Live Activity 状态
     var isCharging: Bool {
         guard let charge = caches["charge"] as? [String: Any] else { return false }
@@ -613,7 +616,28 @@ final class AppStore: @unchecked Sendable {
         return min(1.0, max(0.0, soc / 100.0))
     }
 
+    /// 启动取数（车辆列表 + 用户）。**同时飞的那几趟合并成一趟**。
+    ///
+    /// 启动时有三个地方会调它：根视图 `onAppear` 里两处（一处主取、一处兑底提示）
+    /// 加上地图外壳的 `.task`。它们问的是**同一件事**，而在合并之前那是三份真实的
+    /// `getCars` + `getUser`，外加三次 `cancel`/重启预加载（每次预加载都是 6 个请求）——
+    /// 冷启动头几秒本来就在抢 CPU 与网络，这一下是白白多出来的。
+    ///
+    /// 合并的边界：只合并**同时**在飞的那几趟。串行的重复调用照旧各取一次 ——
+    /// 退出登录后重新登录、以及用户下拉刷新，都应当真的重新问一次服务端。
     func bootstrap() async {
+        if let running = bootstrapTask {
+            await running.value
+            return
+        }
+        let task = Task { await runBootstrap() }
+        bootstrapTask = task
+        await task.value
+        bootstrapTask = nil
+    }
+
+    /// 一趟真正的启动取数（`bootstrap` 只负责让并发调用共用它）。
+    private func runBootstrap() async {
         let api = APIClient.shared
         do {
             let carsRes = try await api.getCars()
@@ -871,6 +895,10 @@ final class AppStore: @unchecked Sendable {
 
     func logout() {
         cancelPreload()
+        // 退出登录后新账号那一趟取数**必须另起**，不能搭上退出前还在飞的那一趟 ——
+        // 搭上了就等于用前一个账号的请求给新账号结账（拿到空列表、或者更糟）。
+        // 这里只丢掉句柄：飞行中的请求由它自己的超时结束，不去假装取消得掉。
+        bootstrapTask = nil
         // 令牌在 Keychain 里 —— 只删 UserDefaults 那个旧键等于没退出登录。
         TokenStore.clear()
         UserDefaults.standard.removeObject(forKey: cacheStorageKey)

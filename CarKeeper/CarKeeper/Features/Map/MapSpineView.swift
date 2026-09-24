@@ -205,10 +205,15 @@ struct MapSpineView: View {
         // 不把用户推到车控页（一条锁车指令不该让人离开地图）。
         .controlCommandFlow($quickRequest)
         .task {
+            // 地图出现之后的这几步是启动轨迹里原本的盲区（见 StartupJournal 头注）：
+            // 用户报的「地图出来以后几秒就退」正落在这里，所以每一步都留个路标。
+            StartupJournal.shared.mark("地图页开始取数")
             await refresh()
+            StartupJournal.shared.mark("地图页取数结束")
             centerOnCar(force: true)
             if layer == .charge { await searchChargersIfNeeded() }
             await refreshWeatherIfNeeded()
+            StartupJournal.shared.mark("地图页就绪")
         }
         .onChange(of: layer) { _, new in
             TokensHaptic.select()
@@ -1079,10 +1084,15 @@ struct MapSpineView: View {
     /// 按**车的位置**搜附近充电站（搜索中心不再是写死的北京坐标）
     @MainActor
     private func searchChargersIfNeeded(force: Bool = false) async {
-        guard let car = store.currentLocation else { return }
+        guard let car = store.currentLocation else {
+            // 「没有车的位置」不是「搜到 0 个」：两者在界面上都是空的，只有轨迹分得开。
+            StartupJournal.shared.mark("充电站搜索：还没有车的位置")
+            return
+        }
         let key = String(format: "%.4f,%.4f", car.coordinate.latitude, car.coordinate.longitude)
         if !force, key == chargerCenterKey, !chargers.isEmpty { return }
         chargerCenterKey = key
+        StartupJournal.shared.mark("充电站搜索开始")
 
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = "充电站"
@@ -1092,7 +1102,10 @@ struct MapSpineView: View {
         let search = MKLocalSearch(request: request)
         // 用 async 重载（SDK 26 起有，返回类型与回调版一致）——
         // 我们本来就在 async 上下文里，少一层完成回调，也少一次绕回主线程的往返。
-        guard let response = try? await search.start() else { return }
+        guard let response = try? await search.start() else {
+            StartupJournal.shared.mark("充电站搜索失败")
+            return
+        }
         let found: [MapCharger] = response.mapItems.enumerated().map { idx, item in
             MapCharger(
                 id: "c\(idx)-\(item.name ?? "")",
@@ -1106,5 +1119,6 @@ struct MapSpineView: View {
         // 不再只取最近 12 个：那是权宜之计（画不全、也说不清为什么是 12）。
         // 取回全部（上限 60 = 一次搜索的实际返回量），由聚合决定画成一个圈还是几个圈。
         chargers = Array(sorted.prefix(60))
+        StartupJournal.shared.mark("充电站搜索结束 \(chargers.count) 个")
     }
 }
