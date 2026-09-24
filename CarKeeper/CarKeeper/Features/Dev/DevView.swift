@@ -384,14 +384,13 @@ struct DevView: View {
                 // 末尾十几行是「死前那几步」。两段都要在：轨迹一长，只取末尾会把
                 // 「是不是我们自己的代码崩的」与「这一次是哪个实验」一并切掉 ——
                 // 而那两样正是复制出去之后别人先看的东西。中间的清单省掉。
-                // 写成 if/else 而不是三元：本仓库在三元的类型推断上丢过 CI 轮次
-                //（见 4203c67 / 2f088bd），这里不值得再赌一次。
-                let head = Array(prev.lines.prefix(3))
-                let tail = Array(prev.lines.suffix(12))
-                var shown = prev.lines
-                if prev.lines.count > head.count + tail.count {
-                    shown = head + ["⋯（中间略）"] + tail
-                }
+                //
+                // 拼接在 `shortenedStartupLines` 里做，**不能**就地写在 `DSGroup { }` 里：
+                // ViewBuilder 只把表达式当视图，而 `shown = …` 这种赋值语句的类型是 `()`，
+                // 于是编译器去问它「你 conform to View 吗」—— 2026-09-24 那轮 CI
+                //（`DevView.swift:393: error: type '()' cannot conform to 'View'`）
+                // 就是这一行。函数调用是一个值，放在任何位置都成立。
+                let shown = Self.shortenedStartupLines(prev.lines)
                 ForEach(Array(shown.enumerated()), id: \.offset) { idx, line in
                     DSGroupRow(showsSeparator: idx < shown.count - 1) {
                         Text(line)
@@ -457,6 +456,23 @@ struct DevView: View {
     /// 一条日志的**第一行**（`[时间] REQ/RES 路径`）—— 列表里只读这一行就够定位。
     private static func logHeadline(_ entry: String) -> String {
         entry.split(separator: "\n").first.map(String.init) ?? entry
+    }
+
+    /// 启动轨迹的展示形态：够短就整条照给，够长就留头三行 + 尾十二行，中间折成一行。
+    ///
+    /// 它必须是个函数。上一版把它写在 `startupGroup` 的 `DSGroup { }` 里，用的是
+    /// `var shown` + `if … { shown = … }` —— 而 ViewBuilder 只接受表达式，赋值语句
+    /// 的类型是 `()`，于是那一行在 macOS runner 上炸成
+    /// `type '()' cannot conform to 'View'`（2026-09-24，白烧一整轮 10 倍计费的机器）。
+    /// 判据是「这个值是不是视图」，而拼接取值从来不是视图 —— 它就该待在函数里。
+    ///
+    /// 用 `guard` 而不是三元：本仓库在三元的类型推断上丢过 CI 轮次
+    ///（见 4203c67 / 2f088bd），这里不值得再赌一次。
+    private static func shortenedStartupLines(_ lines: [String],
+                                             headCount: Int = 3,
+                                             tailCount: Int = 12) -> [String] {
+        guard lines.count > headCount + tailCount else { return lines }
+        return Array(lines.prefix(headCount)) + ["⋯（中间略）"] + Array(lines.suffix(tailCount))
     }
 
     private var actionsGroup: some View {

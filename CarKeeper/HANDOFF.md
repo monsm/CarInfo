@@ -80,13 +80,36 @@ xcodebuild build \
 
 ### 1.3 CI（`.github/workflows/ios-build.yml`）
 
-两个 job，顺序依赖：
+三个 job：前两个顺序依赖，第三个等构建结束（红绿都跑）。
 
 1. **`static-gate`**（ubuntu，秒级）：`check_style.js` + 24 项 `scan/*.py`。**任一红即整体失败**。
    （它的 checkout 要 `fetch-depth: 2` —— CI 上工作区干净，`delguard.py` 要拿 `HEAD~1`
    才比得出「这次提交改掉了什么」。）
 2. **`build-unsigned-ipa`**（macos，约 3 分钟，额度按 10 倍计费）：XcodeGen → xcodebuild → 打 `Payload/` zip 成 ipa
    → **IPA 内容体检**（只打印顶层结构，`|| true` 不阻断）→ 上传 artifact → 覆盖发布到 tag `latest` 的 Release（App 内「检查更新」从这里下载）。
+3. **`make-private`**（ubuntu，几秒，1 倍额度）：构建一结束（`if: always()`，红绿都跑）就把仓库转成私有
+   （`PATCH /repos/{owner}/{repo}`）。
+
+> **它为什么不能用 `GITHUB_TOKEN`**：改可见性要求**仓库级 Administration 写权限**，而 `GITHUB_TOKEN`
+> 的 `permissions:` 清单里根本没有 `administration` 这一项（actions / contents / issues / … 里没有它）——
+> 拿它去调只会是 403。所以这一步读 secret `REPO_ADMIN_TOKEN`（classic PAT 勾 `repo`，
+> 或 fine-grained PAT 勾 Administration: Read and write）；secret 缺席时打一条 `::warning::`
+> 写明「本次**没有**改动可见性」，不静默跳过（「没做」与「做了」在日志上不能长得一样）。
+> 已经是私有则直接退出 —— 这一条每次 push 都跑，没有必要每次都写一遍。
+>
+> 单独占一个 ubuntu job 的理由是额度：它整件事就是一次 API 调用，挂在 macOS job 末尾要按 10 倍计费。
+>
+> ⚠️ 转私有之后，Actions 额度就从「公有仓库免费」变成「免费 2000 分钟/月，macOS 按 10 倍扣」，
+> 而本仓库每 push 一轮 ≈ 3 分钟 macOS + 秒级 ubuntu；同时 tag `latest` 的 Release 附件下载
+> 也变成必须带 token（App 内「检查更新」本来就是按私库写的，见 `UpdateService`）。
+
+**为额度加的三条（2026-09-24，与 `make-private` 同一轮）：**
+
+| 措施 | 省下的是什么 | 代价（写在明处） |
+|---|---|---|
+| `concurrency: cancel-in-progress` | 被下一次 push 取代的那一轮，剩下的时间不再结算 —— 本仓库一天推几十次，这是最大的一条 | 它会在**任意一步**杀 job，包括 `gh release upload --clobber`；被砍在中间时 tag `latest` 可能短暂没有 .ipa，下一次成功的运行补回来 |
+| `paths-ignore: ["**.md"]` | 只改文档的提交完全不跑（已逐条核实：没有任何一条门禁读 .md） | 拿不到那一次的 CI 记录；名单故意只写 .md，其余一律照跑 |
+| `timeout-minutes: 10 / 20 / 5` | 挂死那一次的尾巴：job 默认超时 360 分钟，macOS 按 10 倍扣 = 3600 配额分钟，一次就能吃掉近两个月的免费额度 | 正常 3~4 分钟的构建封在 20 分钟，慢网络下留了 5 倍余量 |
 
 > 为什么静态门禁值得这么重：一个编译错误要花掉一整轮 macOS runner。**每一条能搬进静态检查的判据，
 > 都把 3 分钟 + 10 倍额度换成一次秒级检查**。§8 的表里每一条都标注了它是哪次真实事故的产物。

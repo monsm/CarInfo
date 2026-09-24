@@ -3,7 +3,37 @@ name: iOS Build (Unsigned)
 on:
   push:
     branches: [ main ]
+    # 只改文档的提交不跑 CI（2026-09-24 加，为转私有后的额度）。
+    #
+    # 判据是「这次提交里有没有东西会影响构建或门禁」。仓库里没有任何一条门禁读 .md：
+    # check_style.js 只走 Design / Features 下的 .swift，24 项 scan/*.py 里没有一条
+    # 打开过文档（这一条是当场核过的，不是猜的）。所以文档改动编译不出任何结果，
+    # 而它此前每推一次要花掉一整轮 10 倍计费的 macOS runner。
+    #
+    # 名单**故意只有 .md**：project.yml / .swiftlint.yml / scan/*.py / check_style.js /
+    # CarKeeper/Design 与 AppIcon.svg 都会影响构建或门禁，一律照跑。将来加新判据时，
+    # 只有「它读的文件全部落在下面这几条里」才允许把它加进这个名单。
+    paths-ignore:
+      - '**.md'
   workflow_dispatch: {}
+
+# 同一个 ref 上只留最新的一轮（2026-09-24 加，为转私有后的额度）。
+#
+# 理由就是钱：转私有之后 macOS 按 10 倍扣，而本仓库一天能推几十次 —— 被下一次 push
+# 取代的那一轮，剩下的每一分钟都是白烧的（取消后只结算真正跑掉的那几分钟）。
+#
+# 代价写在明处：`cancel-in-progress` 会在**任意一步**杀掉正在跑的 job，包括
+# `gh release upload --clobber`。`--clobber` 是先删旧附件再传新的，所以被砍在中间的那一瞬，
+# tag `latest` 上可能短暂没有 .ipa（App 内「检查更新」会失败一次，下一次成功的运行会补回来）。
+# 要完全避开这个窗口就得把 main 排除掉：
+#     cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+# 但 main 正是最需要取消的那一条，所以这里选择接受它。
+#
+# workflow_dispatch 与 push 共用同一个组：手动跑一轮会把正在跑的 push 轮次取代掉 ——
+# 这是故意的，两个 macOS runner 同时跑同一份代码，正是要消掉的那种浪费。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -20,6 +50,10 @@ jobs:
   static-gate:
     name: Static gate (seconds, no Xcode)
     runs-on: ubuntu-latest
+    # 正常 20~40 秒。封顶不是为了省钱（ubuntu 是 1 倍），而是因为一个卡住的门禁
+    # （死锁 / 等网络）默认能跑满 6 小时 —— 而它是 `build-unsigned-ipa` 的前置，
+    # 等于把后面那个 10 倍计费的 job 一起按在地上。
+    timeout-minutes: 10
     env:
       PYTHONUTF8: "1"
       PYTHONIOENCODING: utf-8
@@ -92,6 +126,11 @@ jobs:
     name: Build unsigned IPA
     needs: static-gate
     runs-on: macos-latest
+    # ⚠️ 这一条是本文件里最值钱的一行。正常一轮 3~4 分钟，但 GitHub 的 job 默认超时是
+    # **360 分钟** —— 万一 xcodebuild 挂死（等锁、等签名、等网络），一轮就是 360×10 =
+    # 3600 配额分钟，比下面所有「少跑一轮」的优化加起来还多，一次就能吃掉近两个月的
+    # 免费额度。20 分钟是正常用时的 5 倍，够慢网络与冷缓存，不够挂死。
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -215,6 +254,69 @@ jobs:
           echo "  1. Xcode 版本与 XcodeGen 生成工程不兼容"
           echo "  2. Swift 编译错误（查看 build 日志）"
           echo "  3. 资源缺失"
+
+  # ---------------------------------------------------------------------------
+  # 构建跑完就把仓库转成私有（用户 2026-09-24 的要求）。
+  #
+  # 为什么这件事必须用 PAT、不能用 GITHUB_TOKEN：
+  #   改可见性走的是 `PATCH /repos/{owner}/{repo}`，它要求**仓库级
+  #   Administration 写权限**；而 GITHUB_TOKEN 的 permissions 清单里根本没有
+  #   administration 这一项（actions / contents / issues / … 里没有它），
+  #   拿它去调只会拿到 403。所以这里读 secret：
+  #
+  #     REPO_ADMIN_TOKEN —— classic PAT（勾 `repo`）
+  #                        或 fine-grained PAT（Administration: Read and write）
+  #
+  #   没配这个 secret 时**不静默跳过**：打一条 ::warning:: 写明「本次没有改动可见性」。
+  #   本仓库最忌讳的就是「没做」与「做了」在日志上长得一样。
+  #
+  # 为什么是 always()：构建红不红，与「这个仓是不是还开着」是两件事。
+  #   构建失败时更不该把源码留在公有状态下 —— 那才是真损失。
+  #
+  # 为什么单独占一个 ubuntu job：它整件事就是一次 API 调用（几秒），
+  #   挂在 macOS job 末尾要按 10 倍额度计费；ubuntu 是 1 倍，且它碰不到构建产物。
+  # ---------------------------------------------------------------------------
+  make-private:
+    name: Make repository private
+    needs: build-unsigned-ipa
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    # 正常 5 秒（一次 API 调用）。封顶只为防「等一个不回话的服务端」把一轮挂很久。
+    timeout-minutes: 5
+    steps:
+      - name: 转为私有库
+        env:
+          ADMIN_TOKEN: ${{ secrets.REPO_ADMIN_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "${ADMIN_TOKEN:-}" ]; then
+            echo "::warning::仓库**没有**被转成私有：缺少 secret REPO_ADMIN_TOKEN。"
+            echo "  做法：建一个 classic PAT（勾 repo）或 fine-grained PAT（Administration = Read and write），"
+            echo "        存进 Settings → Secrets and variables → Actions，名字用 REPO_ADMIN_TOKEN。"
+            echo "  注意 GITHUB_TOKEN 不行 —— 它没有 administration 权限，调这个接口只会是 403。"
+            exit 0
+          fi
+
+          export GH_TOKEN="$ADMIN_TOKEN"
+
+          # 已经是私有就不再调 PATCH：这一条每次 push 都会跑，没有必要每次都写一遍。
+          current=$(gh api "repos/$REPO" --jq .visibility 2>/dev/null) || current="取不到"
+          echo "当前可见性：$current"
+          if [ "$current" = "private" ]; then
+            echo "已经是私有库，无需改动。"
+            exit 0
+          fi
+
+          # 用 --input 送一段字面 JSON，而不是 `-f private=true`：
+          #   `-f` 送的是字符串 "true"，而这个字段是布尔 —— 服务端会以 422 拒绝；
+          #   `-F` 会做类型转换，但「转换规则」不该由一个 PATCH 的成败来验。
+          result=$(printf '{"private": true}' \
+                   | gh api --method PATCH "repos/$REPO" --input - --jq '.visibility') || {
+            echo "::error::转私有失败 —— 多半是 REPO_ADMIN_TOKEN 权限不足（需要 Administration 写权限）。"
+            echo "        服务端的原话在上面那几行 gh 输出里。"
+            exit 1
+          }
+          echo "已转私有：visibility=$result"
 
   # 单元测试 job 已删除（2026-09-22，按用户要求）。
   #
