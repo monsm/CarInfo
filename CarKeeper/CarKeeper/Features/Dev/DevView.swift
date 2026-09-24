@@ -348,8 +348,48 @@ struct DevView: View {
     /// 它们回答的是同一个问题的两半，所以同处一行 —— 同一个问题只该有一个地方看。
     private var diagnosticsGroups: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+            startupGroup
             MessageProbeSection()
             rawLogGroup
+        }
+    }
+
+    /// 上一次启动的轨迹 —— 「上一次为什么没走完」的**唯一**证据来源。
+    ///
+    /// 系统级处决（内存回收 / 看门狗）不调用 App 里任何一行代码，所以系统可能什么
+    /// 都不留（用户 2026-09-24 报的就是「闪退、而且没有日志」）。这一组读的是启动时
+    /// 一路写下来的路标（`StartupJournal`）：**没有收尾标记 = 上一次没走完**，
+    /// 最后一行就是它死前到达的那一步，括号里那个内存水位就是 jetsam 与否的分界。
+    private var startupGroup: some View {
+        let prev = StartupJournal.shared.previousRun()
+        return DSGroup(title: "上一次启动",
+                       trailing: prev.exists ? (prev.finished ? "走完" : "没走完") : nil,
+                       trailingCls: prev.finished ? "ok" : "bad",
+                       footer: "只留上一次与这一次两回，每回上限 4 KB。") {
+            DSGroupRow {
+                DSRow(icon: "doc.on.doc", title: "复制轨迹") {
+                    UIPasteboard.general.string = prev.lines.joined(separator: "\n")
+                    TokensHaptic.result(true)
+                    ToastManager.shared.show("启动轨迹已复制", icon: "doc.on.doc.fill")
+                }
+            }
+            if prev.lines.isEmpty {
+                DSGroupRow(showsSeparator: false) {
+                    Text("还没有更早的启动记录")
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.secondary)
+                }
+            } else {
+                let tail = Array(prev.lines.suffix(12))
+                ForEach(Array(tail.enumerated()), id: \.offset) { idx, line in
+                    DSGroupRow(showsSeparator: idx < tail.count - 1) {
+                        Text(line)
+                            .font(TokensTypo.fixed(11, weight: .regular).monospacedDigit())
+                            .foregroundStyle(TokensPalette.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
         }
     }
 

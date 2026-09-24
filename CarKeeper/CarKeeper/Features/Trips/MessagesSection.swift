@@ -444,9 +444,14 @@ struct MessagesSection: View {
             return
         }
         loading = true
+        // 启动轨迹：消息取数是启动后**最晚**回来的那一段（五段窗口并行），
+        // 而用户报的闪退就发生在“载入不到 10 秒”。这一前一后两行路标，
+        // 下一次它再死时就能分清「死在取数中」还是「死在取数之后」。
+        StartupJournal.shared.mark("消息取数开始")
         do {
             let list = try await APIClient.shared.getMessages()
             apply(list)
+            StartupJournal.shared.mark("消息取数结束 \(list.count) 条")
             lastError = list.isEmpty ? "已解析成功，但近 \(APIClient.messageDays) 天没有事件" : ""
             // 只缓存非空列表：空列表可能是网络抖动或权限问题，缓存它会
             // 让后续所有访问都命中空缓存而永远不再重试。
@@ -458,6 +463,7 @@ struct MessagesSection: View {
             // 失败时保留已渲染的缓存内容（与小程序一致），并明确告知，而不是悄悄清空。
             // 把真实错误留在页面上：只弹一个 2 秒的 Toast，用户回头看到的还是空页，
             // 分不清「没消息」和「没拉到」——这正是之前反复误判的原因。
+            StartupJournal.shared.mark("消息取数失败")
             lastError = error.localizedDescription
             NSLog("loadMessages: \(error.localizedDescription)")
             ToastManager.shared.show("消息获取失败", icon: "wifi.exclamationmark")

@@ -104,6 +104,10 @@ struct CarKeeperApp: App {
     init() {
         // 后台刷新（BGTask）已删：免费开发者账号没有 BGTaskScheduler 权限，
         // 调用 register 会抛 ObjC 异常直接杀进程。若将来升级付费账号再恢复。
+        //
+        // 启动轨迹：**最早的一步**就在这里。用户 2026-09-24 报「载入不到 10 秒就闪退、
+        // 系统里没有日志」—— 那类终止不会调用 App 的任何代码，所以路标要在死之前写好。
+        StartupJournal.shared.begin()
     }
 
     var body: some Scene {
@@ -160,6 +164,7 @@ struct CarKeeperApp: App {
                         // 模拟加载延迟后显示主界面
                         try? await Task.sleep(nanoseconds: 1_500_000_000)
                         showSplash = false
+                        StartupJournal.shared.mark("启动动画结束")
                     }
             } else if !onboardingSeen && !store.isLoggedIn {
                 // #NEW-113 Onboarding 引导
@@ -181,10 +186,18 @@ struct CarKeeperApp: App {
         // 全 App 每一屏共用同一束由车所在地算出的光。逐屏去加，一定会有屏幕漏掉。
         .background { AppCanvas() }
         .onAppear {
+            StartupJournal.shared.mark("根视图出现")
+            // 启动阶段 = 12 秒：走完才在轨迹里写收尾标记。
+            // 没有收尾标记 = 上一次没走完 —— 那一条会显示在「我的 → 诊断 → 上一次启动」。
+            StartupJournal.shared.scheduleFinish()
             // 启动时若已登录但数据未加载，异步拉取一次数据。
             // ⚠️ 不阻塞 UI：用户可以先看到地图壳，数据在后头悄悄补上。
             if store.isLoggedIn && store.cars.isEmpty {
-                Task { await store.bootstrap() }
+                Task {
+                    StartupJournal.shared.mark("取车辆列表开始")
+                    await store.bootstrap()
+                    StartupJournal.shared.mark(store.cars.isEmpty ? "取车辆列表没拿到" : "车辆就绪")
+                }
                 // bootstrap 是异步的：如果它因 token 过期失败了（已处理 logout），
                 // 或者因为网络慢还没完成，用户可能先进入了出行页看到空白消息。
                 // 这里再加一层兜底：bootstrap 完成后如果 cars 仍然为空，提示用户。
@@ -200,7 +213,11 @@ struct CarKeeperApp: App {
             // 天气实况（光需要云量）：有车的位置就取一次。
             // 取不到就退回「晴空模型」，界面上照实写明 —— 不拿默认值冒充实况。
             if let c = store.currentLocation?.coordinate {
-                Task { await WeatherService.shared.refreshIfNeeded(coordinate: c) }
+                Task {
+                    StartupJournal.shared.mark("取天气开始")
+                    await WeatherService.shared.refreshIfNeeded(coordinate: c)
+                    StartupJournal.shared.mark("取天气结束")
+                }
             }
             // #N38 崩溃上报（CrashReporter）已删：它把崩溃历史写进 UserDefaults
             // 只为给「诊断」页看，用户明确要求把这类本机统计一并去掉。
@@ -356,7 +373,11 @@ struct MapShellView: View {
         // 情感化配色：时间感知主色调（系统控件的主色调）
         mapStack
         .tint(TokensPalette.ambient)
-        .task { await store.bootstrap() }
+        .task {
+            StartupJournal.shared.mark("首页外壳出现")
+            await store.bootstrap()
+            StartupJournal.shared.mark(store.cars.isEmpty ? "首页：车辆列表为空" : "首页：车辆就绪")
+        }
         // VoiceOver：这是一个「地图 + 底部模式条」的外壳，不再是一条 Tab 栏
         .accessibilityLabel(Text("地图主屏"))
         .accessibilityHint(Text("底部的模式条可以到达每个功能界面"))
