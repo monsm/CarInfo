@@ -2269,3 +2269,58 @@ HANDOFF §1.1 一直写着本地该跑的那个 `for s in ...` 循环，清单**
 通道是现成的；那才是「既能留几十段行程、又只养两三张地图」的那一刀。
 在此之前，上限由 `shownTrips` 守着。
 
+---
+
+## 暗层全删 + 子页面铺壁纸（2026-09-24 同日第六轮）
+
+用户确认闪退已修（「不闪退了」），接着原话：**「每个子界面的暗层都去掉，
+不要！除了地图页，其他页面的背景全部设为当前桌面的背景」**。
+
+两个动词，两件事：
+
+### ① 暗层：其实是三层叠的，全部删
+
+此前只删过「地图页上的压暗层」（`.maptop` / `.mapvig`，见 2026-09-24 早些
+条目），而**子界面底下那三层不透明画布一直留着**：
+
+· `MapSpineView.body` 根部 `.background(TokensPalette.canvas)` —— 把 App 根上
+  的 AppCanvas（画布 + 实时光）整个盖死；
+· `pageDeck()` 六层同屏底下垫的那层 `TokensPalette.canvas.ignoresSafeArea()`
+  （当初为「换档过渡不能透出地图的灰黑」加的）；
+· `pageBody` 每张非地图子页各自的 `.background(TokensPalette.canvas.ignoresSafeArea())`。
+
+三层全删。过渡期间透出的不再是「上一页的鬼影」：非地图页自己铺了壁纸图
+（见 ②），地图页是瓦片本身（不透明），所以那个理由随之消失。
+
+### ② 「当前桌面的背景」：iOS 读不到壁纸，铺一张在线风景图顶上去
+
+先确认了事实：iOS **没有读取主屏壁纸的公开 API**（壁纸归 SpringBoard 进程管，
+App 进程拿不到；刚查过 2025–2026 的资料也没有新 API）。能给用户的只有替代物，
+问清楚之后用户选了「**从在线 API 拿一张**」（不是相册自选，也不是系统磨砂）。
+
+实现（`Services/WallpaperService.swift` + 两处调用）：
+
+· **图源**：Unsplash 官方直链（`images.unsplash.com/photo-…?w=900&q=60&fit=crop`）。
+  没有走 `source.unsplash.com`（那个域名已弃用、返回 503）；
+  也没有引入任何 API key（Unsplash 直链是公开 CDN，免费、不需要 key）。
+· **状态**：一个 `ObservableObject` 单例（与 `StartupJournal` 同款 NSLock +
+  `@unchecked Sendable`）。`index`（哪一张，UserDefaults 持久化）+ `image`
+  （取到的图，幂等：已有同张早退不重发；取到旧图而索引已改，不写进来）。
+· **取图失败静默**：背景回落到 AppCanvas 的画布色，不弹错、不留白屏。
+· **三处消费**：
+  - 五张非地图子页的 `.background(wallpaperLayer())`（`MapSpineView`，
+    `@ObservedObject` 订阅同一个单例 —— 不订阅的话「换一张」要等下次换档才生效）；
+  - `MineView`「应用」组里新增一行壁纸小卡：缩略图 + 「换一张」（循环）
+    + 「不铺」（回落到画布色）。放在「应用」组（改 App 自己），
+    不放在「设备与模式」组（改系统的）；
+  - 根部的 `AppCanvas` 不动 —— 它是全 App 唯一的一束光，铺壁纸只发生在
+    子页这一层。
+· **门禁**：两个 SDK 名（`URLSession` / `UIImage`）登记进
+  `VERIFIED_SDK_ADDITIONS`；本地 `python3 scan/all.py` **25/25 通过**，
+  `node CarKeeper/check_style.js` **0 个问题**。编译仍只有 CI 能验。
+
+观感上的代价要照实说：在线图要**联网**才有，断网/未取到时是画布底色
+（和删暗层之前那层 `TokensPalette.canvas` 观感相同，只是不再是「暗层」而是
+App 自己的画布）；玻璃卡压在照片上时，卡片自身的材质负责可读性
+（iOS 26 的 Liquid Glass 自带折射，这是选玻璃卡而不是白卡的理由）。
+

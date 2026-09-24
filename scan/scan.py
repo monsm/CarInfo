@@ -484,6 +484,12 @@ VERIFIED_SDK_ADDITIONS = {
     # `metadata.externalID` / `platforms` 四项都打印出来看过）：
     "os_proc_available_memory": "os 框架（iOS 13+；decl: extern size_t os_proc_available_memory(void)；externalID c:@F@os_proc_available_memory；doc://com.apple.os/documentation/os/os_proc_available_memory；abstract: Determines the amount of memory available to the current app）——系统还可给本进程多少字节。它是「距被处决还剩多远」的**唯一**读数（RSS 单独看回答不了「这算不算高」），也是轨迹里 `距上限 X MB` 那一栏的来源。它返回 0 时按「没测到」处理（写成 `—`），不能当成「一兆不剩」",
     "didReceiveMemoryWarningNotification": "UIApplication.didReceiveMemoryWarningNotification（UIKit；externalID c:@UIApplicationDidReceiveMemoryWarningNotification；doc://com.apple.uikit/documentation/UIKit/UIApplication/didReceiveMemoryWarningNotification；abstract: A notification that posts when the app receives a warning from the operating system about low memory availability）——被内存处决之前通常会先响这一声；有与没有指向的不是同一件事，所以它随轨迹一起出去（`内存警告 N 次`）",
+    # 壁纸（Services/WallpaperService.swift，2026-09-24 第六轮：子页面背景）。
+    # 背景：iOS 没有读取主屏壁纸的公开 API（壁纸归 SpringBoard 进程管，App 拿不到），
+    # 能做到的最接近「当前桌面的背景」的一版是：铺一张在线风景图（Unsplash 官方直链），
+    # 用户可以在「我的 → 设置」里换一张 / 不铺。两个 SDK 名对着文档核过：
+    "URLSession": "Foundation.URLSession（iOS 8+；externalID c:objc(cs)URLSession；doc://com.apple.foundation/documentation/foundation/urlsession）——取在线壁纸图的唯一网络入口（`shared.data(from:)`）",
+    "UIImage": "UIKit.UIImage（iOS 2+；externalID c:objc(cs)UIImage；doc://com.apple.uikit/documentation/UIKit/UIImage）——壁纸图本体（`UIImage(data:)` 构造、`Image(uiImage:)` 上屏）",
 }
 
 

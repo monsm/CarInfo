@@ -123,6 +123,11 @@ struct MapSpineView: View {
     @State private var skyLive = true
     @State private var skyHour: Double = 12
 
+    /// 壁纸状态（非地图子页铺的底）。**必须订阅它**：图是异步到达的，
+    /// 不订阅的话 `换一张 / 不铺` 要等到下一次换档才生效（body 才重新求值）。
+    /// 与 MineView 那行订阅的是同一个单例，两处的更新永远同步。
+    @ObservedObject private var wallpaper = WallpaperService.shared
+
     /// 算光用的时刻（实时就是现在）
     private var skyDate: Date {
         SkyLight.date(hour: skyLive ? nil : Int(skyHour.rounded()), from: Date())
@@ -190,7 +195,12 @@ struct MapSpineView: View {
         // （`.bottom{bottom:26}` / `.stack{bottom:86}`）。安全区底那 34pt 若不排除，
         // 条子会凭空抬高一截 —— 与原型差出一个手指的宽度。
         .ignoresSafeArea(edges: .bottom)
-        .background(TokensPalette.canvas)
+        // 暗层全删（用户 2026-09-24：「每个子界面的暗层都去掉」）：
+        // 根上**不再铺** `TokensPalette.canvas` —— 让 AppCanvas（画布+实时光）透出来。
+        // 五张子页各自铺**壁纸图**（见 `wallpaperLayer`）；地图那一档铺自己的瓦片。
+        // 之前那层的理由是「换档过渡时底下不能透出地图」—— 现在的解法：
+        // 五张子页各自铺图（铺图的下面就是 AppCanvas，不是地图），
+        // 所以过渡期间透出的不再是地图的灰黑，而是壁纸/画布。
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         // 原型里**六页都没有顶栏**：地图画到屏幕最上沿，其余五页的第一张卡是巨字头，
@@ -596,14 +606,11 @@ struct MapSpineView: View {
     @ViewBuilder
     private func pageDeck() -> some View {
         ZStack {
-            // 换档的交叉过渡底下必须有**一层不透明的画布**。
-            //
-            // 出去与进来的两页各自淡一会儿（原型 `opacity = 1 − 1.6a` 同时作用在两者上），
-            // 合成的透明度加起来不到 1；底下若是地图，过渡期间就会从卡片之间透出一层
-            // 灰黑（用户 2026-09-24：「其他页面的暗层也删除」—— 非地图页上最容易看到的就是这一层）。
-            // 铺上它之后，过渡的底是画布色，而不是「上一页 / 地图的鬼影」。
-            // 它在最底层，地图那一页（`.now`）盖在它上面，所以地图页一点不变。
-            TokensPalette.canvas.ignoresSafeArea()
+            // 最底层 = AppCanvas（画布+光）。它**不是暗层**：
+            // 它是 App 根上的同一束光（见 `Design/Theme.swift` 的 AppCanvas），
+            // 换主题/换光方向都跟着 AppCanvas 走，不会自己又写一套。
+            // 之前这里铺过 `TokensPalette.canvas`（用户 2026-09-24：「其他页面的暗层也删除」）
+            // 已删 —— 现在过渡期间透出的是画布+光（AppCanvas），不是「上一页的鬼影」。
             ForEach(HomeMode.allCases.indices, id: \.self) { i in
                 let a = fade(i)
                 // 围栏（见 LaunchFence）：六页同屏是启动时最大的一笔开销 ——
@@ -641,9 +648,19 @@ struct MapSpineView: View {
             pageContent(mode)
                 .padding(.bottom, Self.barTotal)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                // 不透明：六层同屏时它必须盖住底下的地图（原型那五页各有自己的底）。
-                .background(TokensPalette.canvas.ignoresSafeArea())
-                .onAppear { StartupJournal.shared.mark("亮出屏幕：\(mode.title)") }
+                // 五张子页的底色 = 壁纸图（在线取，失败回退画布）。
+                // 之前这里是 `TokensPalette.canvas`（暗层，用户 2026-09-24 删）；
+                // 现在按「其他页面的背景全部设为当前桌面的背景」的要求：
+                // iOS 没有读壁纸的公开 API（壁纸归 SpringBoard 管），
+                // 所以铺一张在线风景图当壁纸（Unsplash 官方直链）。
+                // 不铺图时（`clear()`）回落到画布底色（`TokensPalette.canvas`），
+                // 观感上和删暗层之前一样 —— 只是从「暗层」变成「App 自己的画布」。
+                .background(wallpaperLayer())
+                .onAppear {
+                    // 子页出现就取一次壁纸（幂等：MineView 那行取过就早退，不重发）。
+                    wallpaper.loadImage()
+                    StartupJournal.shared.mark("亮出屏幕：\(mode.title)")
+                }
         }
     }
 
@@ -912,6 +929,33 @@ struct MapSpineView: View {
         case .mine: MineView()
         }
     }
+    /// 五张子页（非地图）铺的底色：壁纸图（在线取，失败回退画布）。
+    ///
+    /// 为什么是壁纸图而不是 `TokensPalette.canvas`（用户 2026-09-24：「其他页面的背景全部
+    /// 设为当前桌面的背景」）：iOS 没有读主屏壁纸的公开 API（壁纸归 SpringBoard 管，App
+    /// 进程拿不到）。能做到的最接近的一版是铺一张在线风景图当壁纸（Unsplash 官方直链）。
+    ///
+    /// 观感：图片 `resizable + aspectRatio(.fill)` 铺满全屏，`ignoresSafeArea()`；
+    /// 取图失败（或用户点了「不铺」）就回落到 `TokensPalette.canvas`，观感上等于删暗层之前
+    /// 那层 `TokensPalette.canvas`，只是现在它是 AppCanvas 透出来的画布，不再是「暗层」。
+    @ViewBuilder
+    private func wallpaperLayer() -> some View {
+        ZStack {
+            // 底色兜底：没有图（失败 / 还没取到 / 点了「不铺」）就铺画布（AppCanvas 的颜色），
+            // 观感上和删暗层之前一样 —— 只是不再是「暗层」而是 App 自己的画布。
+            TokensPalette.canvas
+            // 图（在线取，幂等）：铺满全屏，`aspectRatio(.fill)` 让图裁满；失败时这里不画。
+            // 取图触发：子页 `pageBody` 的 `onAppear` 与 MineView 壁纸行的 `onAppear` 各调一次
+            // `loadImage()`（幂等，已有图就早退，不重发网络请求）。
+            if let img = wallpaper.image {
+                Image(uiImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .ignoresSafeArea()
+            }
+        }
+    }
+
     //  这里原本有一条 `tyreRow`：四轮胎压逐轮排在卡里（标签 + kPa + 报警色）。
     //  它把下面四格里的「胎压」说了第二遍 —— 四格里那一格取的是**最低的那一条**
     //  （报警时同样是 error 色），所以挪走它并不丢掉「哪一轮危险」这件事。

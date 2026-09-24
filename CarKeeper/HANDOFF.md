@@ -313,6 +313,17 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 「其他页面的暗层」就是它）。删得掉的理由是同一条：`.maptop` 当初只为给车牌徽标铺底，
 而顶栏早在它之前就变成了玻璃 —— 一条占半屏的压暗去服务一个已经有底的控件，是纯亮度损失。
 
+**子页面的暗层也全删了（2026-09-24 同日第六轮：「每个子界面的暗层都去掉，不要！」）**：
+此前还有三层不透明画布叠在子页面底下 —— ① `MapSpineView.body` 根部的
+`.background(TokensPalette.canvas)`；② `pageDeck()` 六层同屏底下垫的那层
+`TokensPalette.canvas.ignoresSafeArea()`；③ `pageBody` 每张非地图子页各自的
+`.background(TokensPalette.canvas.ignoresSafeArea())`。三层全删：非地图子页现在铺的是
+**壁纸图**（`wallpaperLayer()`，来自 `Services/WallpaperService.swift` —— iOS 读不到
+主屏壁纸（无公开 API，壁纸归 SpringBoard 管），所以铺一张在线风景图当壁纸），
+地图页是瓦片本身（不透明），换档过渡期间透出的不再是「上一页的鬼影」，而是
+壁纸 / 瓦片。不铺图（「不铺」钮，或断网没取到）时回落到 AppCanvas 的画布色，
+观感与删之前那层画布相同，但它是 App 自己的画布，不再是「暗层」。
+
 **浮动两卡**（顺序就是读的顺序）：
 
 | 卡 | 头 | 内容 |
@@ -449,7 +460,11 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 
 - **设置 `MineView`**：Apple Profile 风格身份卡 + 车辆卡（切车 `selectCar`）+ 设置分组（退出登录、
   检查更新） + **家庭管理 `FamilyManagementView`**、**临时钥匙 `TempKeyListView`**、
-  **隐私面板 `PrivacySection`**、**月报 `MonthlyReportSection`**、Siri 卡片入口、真开关（低电量省电 / 夜间模式）。
+  **隐私面板 `PrivacySection`**、**月报 `MonthlyReportSection`**、Siri 卡片入口、真开关（低电量省电 / 夜间模式）、
+  **壁纸小卡（`wallpaperRow`，2026-09-24 第六轮：非地图子页的背景图）** —— 「应用」组里一行，
+  缩略图 + 「换一张」（Unsplash 直链循环，`WallpaperService.next()`）+ 「不铺」（回落画布色）。
+  它改的是 App 自己的背景，不是系统的（iOS 没有读主屏壁纸的公开 API），所以与
+  「设备与模式」组（改系统的：夜间 / 省电 / 专注）不并列。
 - **应急 `EmergencyPanel`**：SOS 按钮 + 快捷操作 + 紧急联系人 + 位置共享 + 紧急叠加层。
   代价说明：从「1 次拖动」变成「1 次拖动 + 1 次点击」，但 SOS 也仍然在地图操作条上。
 - **诊断 `DevView`**：色板 / 字体 / 令牌数值 / 运行状态 / 能力位图（`car.funCode`）+
@@ -577,7 +592,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 |---|---|---|
 | 账号与凭据 | `car_token_config`（**Keychain**）、`carkeeper_encryption_key`、`carkeeper_key`（PIN）、`carkeeper_biometric_setup` | ✅ |
 | 选择与导航 | `carkeeper_selected_car_id`、`carkeeper_home_mode`、`carkeeper_map_layer` | 部分 |
-| 外观与提示 | `carkeeper_art_theme`、`carkeeper_force_dark_mode` / `_light_mode`、`carkeeper_night_start_hour` / `_end_hour`、`carkeeper_voice_enabled`、`carkeeper_home_card_order`、`carkeeper_power_saving` | ❌（属于本机偏好） |
+| 外观与提示 | `carkeeper_art_theme`、`carkeeper_force_dark_mode` / `_light_mode`、`carkeeper_night_start_hour` / `_end_hour`、`carkeeper_voice_enabled`、`carkeeper_home_card_order`、`carkeeper_power_saving`、`carkeeper_wallpaper_index` | ❌（属于本机偏好） |
 | **本机累积**（服务端无历史接口） | `carkeeper_hist_soc_v1` / `_power_v1` / `_tyre_v1`（三条曲线）、`carkeeper_processed_event_ids`（行程生成）、`carkeeper_parking_loc` / `_time` / `_points`（停车史） | ✅ |
 | 手填记录 | `carkeeper_last_service_mileage`、`carkeeper_service_reminders`、`carkeeper_mileage_entries`、`carkeeper_maintenance_photos`、`carkeeper_insurance_policies`、`carkeeper_inspections`、`carkeeper_current_mileage` / `_total_mileage` | ✅ |
 | 提醒与勿扰 | `carkeeper_dnd_mode`、`carkeeper_charge_notify`、`carkeeper_charge_complete_notify`、`carkeeper_next_service_date`、`carkeeper_last_charge_alert` | 部分 |
@@ -616,6 +631,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 | `MaintenanceReminderScheduler` / `InsuranceReminderScheduler` | 保养 / 年检提醒排程 | 里程变化 / 启动 |
 | `ServiceReminderManager` | 保养项定义与进度 | 车辆档 |
 | `WeatherService` | open-meteo 实况（TTL 内且没走远不发请求） | 位置变化 / 启动 |
+| `WallpaperService` | 子页面壁纸图（Unsplash 直链轮换，在线取，失败静默回落画布） | 「我的→设置」换/不铺；子页出现时取一次 |
 | `Retrier` / `NetworkEnhancements` | 退避重试 / 网络质量监控 / 离线模式 | 请求层 |
 | `Monitoring` | 内存读数（**不落盘**） | 启动后每 10s |
 | `DataEncryption` / `SecureStorage` | AES-GCM + Keychain | 车牌等敏感字段 |
