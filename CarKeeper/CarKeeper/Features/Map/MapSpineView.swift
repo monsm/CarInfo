@@ -520,7 +520,7 @@ struct MapSpineView: View {
         .buttonStyle(.plain)
         .modifier(ArmSlot(open: barOpen, size: Self.armSize))
         .accessibilityLabel(Text("快捷车控"))
-        .accessibilityHint(Text("锁车、解锁、闪灯、鸣笛、远程寻车"))
+        .accessibilityHint(Text("锁车、解锁、闪灯、鸣笛、远程寻车、刷新车况"))
     }
 
     /// 一条快捷指令（key = 真实指令名，与车控页的 `hero` / `moreCommands` 同一套）
@@ -535,7 +535,10 @@ struct MapSpineView: View {
         QuickCommand(key: "UnLockDoor", name: "解锁", symbol: "lock.open.fill"),
         QuickCommand(key: "FlashLight", name: "闪灯", symbol: "lightbulb.fill"),
         QuickCommand(key: "Whistle", name: "鸣笛", symbol: "speaker.wave.2.fill"),
-        QuickCommand(key: "RemoteSearchCar", name: "远程寻车", symbol: "location.fill")
+        QuickCommand(key: "RemoteSearchCar", name: "远程寻车", symbol: "location.fill"),
+        // 它不是「再拉一次接口」：服务端只会回放同一份快照（API-FIELD-MAP §4.9），
+        // 想把数字变新只能把车端叫醒 —— 而这是全项目唯一能叫醒车端的那条指令。
+        QuickCommand(key: "UpCarCondition", name: "刷新车况", symbol: "arrow.clockwise")
     ]
 
     /// 发一条车控指令。成功与失败都照实说一句 —— 遥控制的提示不能只报喜。
