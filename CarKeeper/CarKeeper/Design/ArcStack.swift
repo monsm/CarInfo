@@ -61,6 +61,7 @@ struct ArcStack: View {
     /// 滚到第四张时，**停在阅读线上的那张卡**透明度只有 0.68、缩到 0.9、
     /// 而且因为 0.9 那个阈值**点不动**。用户看到的「卡在两端不对」就是这个
     ///（用户 2026-09-23 的第 3 条）。现在它由 `dragTo` / `settleTo` 跟着一起更新。
+    @State private var shapeScroll: CGFloat = 0
     @State private var heights: [Int: CGFloat] = [:]
     @State private var dragBase: CGFloat?
     @State private var peakVelocity: CGFloat = 0
