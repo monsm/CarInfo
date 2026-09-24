@@ -359,7 +359,11 @@ struct DevView: View {
     /// 系统级处决（内存回收 / 看门狗）不调用 App 里任何一行代码，所以系统可能什么
     /// 都不留（用户 2026-09-24 报的就是「闪退、而且没有日志」）。这一组读的是启动时
     /// 一路写下来的路标（`StartupJournal`）：**没有收尾标记 = 上一次没走完**，
-    /// 最后一行就是它死前到达的那一步，括号里那个内存水位就是 jetsam 与否的分界。
+    /// 最后一行就是它死前到达的那一步，而那一行里的「距上限」就是被杀与否的判据。
+    ///
+    /// 第一行给的是**结论**（`prev.verdict`）：这张表本来是要人自己读的
+    ///（「心跳停在高水位就是被杀」），而用户回来的是「我感觉是因为内存占用太多
+    /// 被系统杀了」—— 一句猜测。能算的不该让人猜。
     private var startupGroup: some View {
         let prev = StartupJournal.shared.previousRun()
         return DSGroup(title: "上一次启动",
@@ -372,6 +376,12 @@ struct DevView: View {
                     TokensHaptic.result(true)
                     ToastManager.shared.show("启动轨迹已复制", icon: "doc.on.doc.fill")
                 }
+            }
+            DSGroupRow {
+                Text(prev.verdict)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(prev.finished ? TokensPalette.secondary : TokensPalette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if prev.lines.isEmpty {
                 DSGroupRow(showsSeparator: false) {

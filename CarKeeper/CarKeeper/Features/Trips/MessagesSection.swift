@@ -15,6 +15,9 @@ import Foundation
 //     阅读状态不再只靠颜色：未读有圆点，标题字重也不同（颜色 + 字重双通道）。
 // =============================================================================
 
+/// 消息列表一次画几天（见 `MessagesSection.shownDays` 的说明）。
+private let messageDayStep: Int = 3
+
 struct MessagesSection: View {
     private let store = AppStore.shared
     @State private var items: [MessageItem] = []
@@ -26,6 +29,15 @@ struct MessagesSection: View {
     @State private var searchText = ""
     @State private var filterTag: String? = nil
     @State private var showUnreadOnly = false
+
+    /// 一次画几天的消息 —— **这不是分页，是防处决**。
+    ///
+    /// 这一节的列表是普通 `VStack` + `DSGroup`，不在懒容器里，而它住在
+    /// `ArcStack` 的一张卡里（卡高必须先量出来，所以换懒容器也不会真的懒）——
+    /// 227 行于是是一次性全建出来的。真机轨迹（2026-09-24 第五轮）：
+    /// 0.97s 消息到手 → 2.01s 673 MB → 4.01s 1720 MB → 5.3s 被系统收走，
+    /// 而同一份数据在别的档上一点事都没有。用户的原话：「点到出行界面就闪退」。
+    @State private var shownDays = messageDayStep
 
     // 本地已读持久化（无服务端 mark-read 接口，用 UserDefaults 记已读消息 ID）。
     private static let readKey = "changan_read_message_ids"
@@ -88,11 +100,35 @@ struct MessagesSection: View {
                                   message: lastError.isEmpty ? emptyHint : lastError,
                                   actionTitle: "重新加载") { reload() }
                 } else {
-                    ForEach(filteredGrouped) { group in
+                    ForEach(visibleGrouped) { group in
                         DSGroup(title: group.label,
                                 trailing: group.unread > 0 ? "\(group.unread) 未读" : "\(group.items.count) 条") {
                             ForEach(Array(group.items.enumerated()), id: \.element.id) { idx, item in
                                 messageRow(item, showsSeparator: idx < group.items.count - 1)
+                                    // 这一节是全部页面里最重的一张卡：它不在懒容器里，
+                                    // 于是 227 行是**一次性全建出来**的。真机轨迹
+                                    //（2026-09-24 第五轮）里，内存正是在消息到手之后开始
+                                    // 以每秒半 GB 的速度涨的。所以要在轨迹里留下
+                                    // 「最后一行到底画到了没有」—— 它重复出现也同样是信息
+                                    //（重复 = 这一卡被反复重建，而不是一次性的开销）。
+                                    .onAppear {
+                                        if item.id == filteredItems.last?.id {
+                                            StartupJournal.shared.mark("消息列表画到最后一行")
+                                        }
+                                    }
+                            }
+                        }
+                    }
+                    if visibleGrouped.count < filteredGrouped.count {
+                        // 最近的那几天在上面；早的由人点开。理由同 `shownDays`：
+                        // 每一行都要在真机上建出来，而这一页就是这么被处决的。
+                        DSGroup {
+                            DSGroupRow(showsSeparator: false) {
+                                DSRow(icon: "arrow.down.circle",
+                                      title: "再看早 \(messageDayStep) 天") {
+                                    shownDays += messageDayStep
+                                    TokensHaptic.select()
+                                }
                             }
                         }
                     }
@@ -359,8 +395,11 @@ struct MessagesSection: View {
     private var filteredGrouped: [DayGroup] {
         let map: [String: [MessageItem]] = Dictionary(grouping: filteredItems) { dayKey($0.time) }
         let all = map.map { key, its in
-            DayGroup(label: dayLabel(key),
-                     items: its,
+            // 一天之内也是**新的在上**：`time` 是 "yyyy-MM-dd HH:mm:ss"，字符串序即时序。
+            // 不分的话顺序听服务端的（可能是正序），于是最近的一条会落在一天的最下面。
+            let newestFirst = its.sorted { $0.time > $1.time }
+            return DayGroup(label: dayLabel(key),
+                     items: newestFirst,
                      unread: its.filter { !$0.read }.count,
                      sortKey: its.first?.time ?? "")
         }
@@ -376,6 +415,12 @@ struct MessagesSection: View {
         for i in items.indices { items[i].read = true }
         TokensHaptic.result(true)
         ToastManager.shared.show("已全部标为已读", icon: "checkmark.circle.fill")
+    }
+
+    /// 真正交给界面去建的那些天：`filteredGrouped` 已经排成「最近的一天在最前」，
+    /// 取前 N 组就是「最近的 N 天」。
+    private var visibleGrouped: [DayGroup] {
+        Array(filteredGrouped.prefix(shownDays))
     }
 
     private func dayKey(_ t: String) -> String {

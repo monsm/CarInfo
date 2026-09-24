@@ -15,12 +15,26 @@
 import SwiftUI
 import MapKit
 
+/// 出行页一次建几张行程卡（见 `TripsEventsView.shownTrips` 的说明）。
+private let tripCardStep: Int = 5
+
 /// 出行 —— 每一次出行的时间轴 + 常停的地方 + 车发来的事件。
 ///
 /// 原为「行程」页（`TripsTimelineView`）。批 7 把「消息」吸收进来：
 /// 消息流里的 IGNITION / FLAMEOUT 事件本来就是行程的骨架，两页读的是同一件事。
 struct TripsEventsView: View {
     private let store = AppStore.shared
+
+    /// 一次建几张行程卡 —— **这不是分页，是防处决**。
+    ///
+    /// 每张行程卡里是一张真的 `Map`（`MiniTripMap`：132pt 高，带折线与两个标点），
+    /// 而这一页的卡由 `ArcStack` **一次全建出来**。227 条消息配出来的行程动辄几十段，
+    /// 于是「点开出行」等于同时初始化几十个 MapKit 视图与它们各自的资源。
+    ///
+    /// 真机轨迹（2026-09-24 第五轮）：0.97s 消息到手 → 2.01s 673 MB →
+    /// 4.01s 1720 MB → 5.3s 被系统收走；而同一份数据在**其他档一点事都没有**
+    /// （主屏上也有一张地图，但它只有一张）。用户的原话就是「点到出行界面就闪退」。
+    @State private var shownTrips = tripCardStep
 
     private var trips: [AppStore.TripRecord] {
         store.tripHistory.sorted { $0.startTime > $1.startTime }
@@ -119,6 +133,15 @@ struct TripsEventsView: View {
                 .sorted { $0.startTime > $1.startTime }
     }
 
+    /// 「再放 N 段出来」。它与 `shownTrips` 是一件事的两半：
+    /// 上限由人决定，而不是由「消息里配出了多少行程」决定。
+    private var moreTripsRow: some View {
+        DSRow(icon: "arrow.down.circle", title: "再放 \(tripCardStep) 段出来") {
+            shownTrips += tripCardStep
+            TokensHaptic.select()
+        }
+    }
+
     /// 这一档的叠叠乐。**行程本身是「一组组」的** ——
     /// 每一段行程单独占一张玻璃卡，而不是一张长列表：上下滑过的是一程一程，
     /// 每程自己一个可读的块（这正是「行程叠叠乐」想要的速度感）。
@@ -126,6 +149,9 @@ struct TripsEventsView: View {
     private var cards: [StackCard] {
         var out = HomeMode.trips.headCards
         let list = displayTrips
+        // 只把最近的一段交给界面去建（见 `shownTrips`）。汇总仍用整份 list ——
+        // 数字要是全部的，卡片才是按需的。
+        let visible = Array(list.prefix(shownTrips))
         if list.isEmpty {
             out.append(StackCard(id: "empty", content: AnyView(emptyState)))
         } else {
@@ -134,10 +160,17 @@ struct TripsEventsView: View {
             out.append(StackCard(id: "summary", title: "总览",
                                  at: store.cacheTime("messages"),
                                  content: AnyView(summaryHeader(list))))
-            for (idx, trip) in list.enumerated() {
+            for (idx, trip) in visible.enumerated() {
+                // 时间轴那根竖线只在这一段确实是最后一段（没有更多行程藏着）时才断。
+                let isLast = idx == visible.count - 1 && visible.count == list.count
                 out.append(StackCard(id: "trip-\(idx)", title: "行程",
                                      value: String(format: "%.1f km", trip.distanceKm), cls: "ok",
-                                     content: AnyView(timelineRow(trip, isLast: idx == list.count - 1))))
+                                     content: AnyView(timelineRow(trip, isLast: isLast))))
+            }
+            if visible.count < list.count {
+                // 每多建一段就多一张地图 —— 所以它必须由人点，而不是一次建完。
+                out.append(StackCard(id: "more-trips", title: "还有 \(list.count - visible.count) 段",
+                                     content: AnyView(moreTripsRow)))
             }
             if !hotspots.isEmpty {
                 out.append(StackCard(id: "hotspots", title: "常停之地",

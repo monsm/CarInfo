@@ -256,25 +256,34 @@ jobs:
           echo "  3. 资源缺失"
 
   # ---------------------------------------------------------------------------
-  # 构建跑完就把仓库转成私有（用户 2026-09-24 的要求）。
+  # 构建跑完就**保证仓库是私有的**（用户 2026-09-24 的要求）。
   #
-  # 为什么这件事必须用 PAT、不能用 GITHUB_TOKEN：
-  #   改可见性走的是 `PATCH /repos/{owner}/{repo}`，它要求**仓库级
-  #   Administration 写权限**；而 GITHUB_TOKEN 的 permissions 清单里根本没有
-  #   administration 这一项（actions / contents / issues / … 里没有它），
-  #   拿它去调只会拿到 403。所以这里读 secret：
+  # 它判的是**终态**（仓库现在是不是私有），不是「我有没有做动作」：
+  #   · 已经是私有              → 绿，一步不做（所以手动转一次之后，这个 job 不需要任何 token）
+  #   · 读不到可见性              → 红（说不清 ≠ 没问题）
+  #   · 确实是公有、又没配 token  → 红，并把「怎么配」打在日志里
   #
-  #     REPO_ADMIN_TOKEN —— classic PAT（勾 `repo`）
-  #                        或 fine-grained PAT（Administration: Read and write）
+  # 2026-09-24 第一版写的是「缺 token 就打一条 ::warning:: 然后绿」，实况证明不够：
+  # 用户是等到自己翻日志才发现仓库还开着（“并没有变成私有库”）。
+  # 一个 **绿着的、什么都没做**的 job，正是本仓库最忌讳的那件事。
   #
-  #   没配这个 secret 时**不静默跳过**：打一条 ::warning:: 写明「本次没有改动可见性」。
-  #   本仓库最忌讳的就是「没做」与「做了」在日志上长得一样。
+  # 两个 token 分工（不混用）：
+  #   · 读可见性：GITHUB_TOKEN 就够（它带 metadata: read）—— 所以「是不是私有」这个判据
+  #     与「有没有配 PAT」无关。
+  #   · 转可见性：必须用 PAT。`PATCH /repos/{owner}/{repo}` 要求**仓库级 Administration
+  #     写权限**，而 GITHUB_TOKEN 的 permissions 清单里根本没有 administration 这一项
+  #     （actions / contents / issues / … 里没有它），拿它去调只会拿到 403。
+  #
+  #     配法（值以隐藏输入读入，不经过 shell 历史，也不进仓库）：
+  #         gh secret set REPO_ADMIN_TOKEN --repo monsm/CarInfo
+  #     token 需要 classic PAT 勾 `repo`，或 fine-grained PAT 勾 Administration: Read and write。
   #
   # 为什么是 always()：构建红不红，与「这个仓是不是还开着」是两件事。
   #   构建失败时更不该把源码留在公有状态下 —— 那才是真损失。
   #
-  # 为什么单独占一个 ubuntu job：它整件事就是一次 API 调用（几秒），
+  # 为什么单独占一个 ubuntu job：它整件事就是一两次 API 调用（几秒），
   #   挂在 macOS job 末尾要按 10 倍额度计费；ubuntu 是 1 倍，且它碰不到构建产物。
+  #   它也不需要 checkout（gh api 不读工作区）。
   # ---------------------------------------------------------------------------
   make-private:
     name: Make repository private
@@ -284,38 +293,68 @@ jobs:
     # 正常 5 秒（一次 API 调用）。封顶只为防「等一个不回话的服务端」把一轮挂很久。
     timeout-minutes: 5
     steps:
-      - name: 转为私有库
+      - name: 保证仓库是私有
         env:
+          # 读用它（metadata: read），写用下面那个 PAT —— 一行一职。
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ADMIN_TOKEN: ${{ secrets.REPO_ADMIN_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
-          if [ -z "${ADMIN_TOKEN:-}" ]; then
-            echo "::warning::仓库**没有**被转成私有：缺少 secret REPO_ADMIN_TOKEN。"
-            echo "  做法：建一个 classic PAT（勾 repo）或 fine-grained PAT（Administration = Read and write），"
-            echo "        存进 Settings → Secrets and variables → Actions，名字用 REPO_ADMIN_TOKEN。"
-            echo "  注意 GITHUB_TOKEN 不行 —— 它没有 administration 权限，调这个接口只会是 403。"
-            exit 0
-          fi
+          # ① 先看现在是什么，这一步不碰 PAT。
+          current=$(gh api "repos/$REPO" --jq .visibility 2>/dev/null) || current=""
 
-          export GH_TOKEN="$ADMIN_TOKEN"
-
-          # 已经是私有就不再调 PATCH：这一条每次 push 都会跑，没有必要每次都写一遍。
-          current=$(gh api "repos/$REPO" --jq .visibility 2>/dev/null) || current="取不到"
-          echo "当前可见性：$current"
           if [ "$current" = "private" ]; then
-            echo "已经是私有库，无需改动。"
+            echo "已经是私有库，无需改动（这条每次 push 都跑，就是为了保证这一点）。"
             exit 0
           fi
 
-          # 用 --input 送一段字面 JSON，而不是 `-f private=true`：
-          #   `-f` 送的是字符串 "true"，而这个字段是布尔 —— 服务端会以 422 拒绝；
-          #   `-F` 会做类型转换，但「转换规则」不该由一个 PATCH 的成败来验。
+          # 读不到就说不清。这里**不能**把「读不到」当成「公有」—— 那正是本仓库反复踩的
+          # 那一类：「没测到」与「测出来是坏的」在输出上长得一样。
+          if [ -z "$current" ]; then
+            echo "::error::读不到 $REPO 的可见性（gh api 失败）—— 无法判断它是不是私有。"
+            echo "        本轮**没有**保证仓库是私有的，去看上面 gh 的报错。"
+            exit 1
+          fi
+
+          echo "当前可见性：$current"
+
+          # ② 走到这里说明：仓库现在是**公有**，而这一轮的要求是「构建跑完它就是私有」。
+          #    做不到就红（不是 warning）—— 绿一个「没做」的 job，就是 2026-09-24 那次
+          #    用户看到的实况：他是等自己翻日志才知道仓库还开着。
+          if [ -z "${ADMIN_TOKEN:-}" ]; then
+            echo "::error::仓库现在是【公有】，而 secret REPO_ADMIN_TOKEN 没配 —— 这次没能把它转私有。"
+            echo "  一行搞定（token 以隐藏输入读入，不经过 shell 历史，也不进仓库）："
+            echo "      gh secret set REPO_ADMIN_TOKEN --repo $REPO"
+            echo "  token 需要：classic PAT 勾 repo，或 fine-grained PAT 勾 Administration: Read and write。"
+            echo "  GITHUB_TOKEN 不行 —— 它没有 administration 权限，调 PATCH 只会拿到 403。"
+            echo "  急用也可以先手动转，转完之后这个 job 每次都直接绿 ——"
+            echo "  它判的是「仓库是不是私有」，不是「我有没有做动作」："
+            echo "      gh repo edit $REPO --visibility private --accept-visibility-change-consequences"
+            exit 1
+          fi
+
+          # ③ 用 --input 送一段字面 JSON，而不是 `-f private=true`：
+          #    `-f` 送的是字符串 "true"，而这个字段是布尔 —— 服务端会以 422 拒绝；
+          #    `-F` 会做类型转换，但「转换规则」不该由一个 PATCH 的成败来验。
+          #    额外说明：这个 PAT **不做**全局 export，只在这一行生效。
           result=$(printf '{"private": true}' \
-                   | gh api --method PATCH "repos/$REPO" --input - --jq '.visibility') || {
-            echo "::error::转私有失败 —— 多半是 REPO_ADMIN_TOKEN 权限不足（需要 Administration 写权限）。"
-            echo "        服务端的原话在上面那几行 gh 输出里。"
+                   | GH_TOKEN="$ADMIN_TOKEN" gh api --method PATCH "repos/$REPO" --input - --jq '.visibility') || {
+            echo "::error::转私有失败 —— REPO_ADMIN_TOKEN 认得出身份，但没权限（403 Resource not accessible）。"
+            echo "  GitHub 对「Update a repository」要求的就是 Administration 写权限，按你的 token 类型对一条："
+            echo "   · fine-grained PAT：Permissions → Repository permissions → Administration = Read and write；"
+            echo "     并且 Repository access 必须包含这个仓（只勾了别的仓会是同一个 403）"
+            echo "   · classic PAT：Scopes 里必须勾 repo（「管理仓库」那一档在它里面）"
+            echo "  权限是改在 token 上的，secret 里那串字符不变 —— 改完直接重跑这个 job 即可。"
+            echo "  不想到处点：手动转一次，之后这个 job 每次都直接绿（它判的是终态）："
+            echo "      gh repo edit $REPO --visibility private --accept-visibility-change-consequences"
             exit 1
           }
+
+          # ④ 不信「状态码 200」：读回来的那个字段才是判据。
+          if [ "$result" != "private" ]; then
+            echo "::error::PATCH 没有报错，但读回来的 visibility 是「$result」—— 仓库没变成私有。"
+            exit 1
+          fi
           echo "已转私有：visibility=$result"
 
   # 单元测试 job 已删除（2026-09-22，按用户要求）。

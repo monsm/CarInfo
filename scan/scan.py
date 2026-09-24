@@ -476,6 +476,14 @@ VERIFIED_SDK_ADDITIONS = {
     "DispatchSourceTimer": "Dispatch.DispatchSourceTimer（iOS 8+；doc://com.apple.dispatch/documentation/Dispatch/DispatchSourceTimer；由 DispatchSource.makeTimerSource(queue:) 返回）",
     "makeTimerSource": "DispatchSource.makeTimerSource(queue:)（iOS 8+；doc://com.apple.dispatch/documentation/Dispatch/DispatchSource/makeTimerSource(queue:flags:)）",
     "schedule": "DispatchSourceTimer.schedule(deadline:repeating:leeway:)（iOS 8+；doc://com.apple.dispatch/documentation/Dispatch/DispatchSourceTimer/schedule(deadline:repeating:leeway:)）——心跳的 1 秒节拍",
+    # 启动轨迹的判据（Services/StartupJournal.swift，2026-09-24 第三轮）。
+    # 背景：轨迹原本只记**常驻内存**（320 MB），而那个数单独看没有判据 ——
+    # 4 GB 与 8 GB 的机器、前台与后台，额度完全不同。用户的反馈是一句猜测：
+    # 「没闪退，我感觉是因为内存占用太多被系统杀了」。补的就是那句猜测缺的数。
+    # 两个名字都对着 Apple 文档 JSON 核过（`abstract` / `metadata.modules` /
+    # `metadata.externalID` / `platforms` 四项都打印出来看过）：
+    "os_proc_available_memory": "os 框架（iOS 13+；decl: extern size_t os_proc_available_memory(void)；externalID c:@F@os_proc_available_memory；doc://com.apple.os/documentation/os/os_proc_available_memory；abstract: Determines the amount of memory available to the current app）——系统还可给本进程多少字节。它是「距被处决还剩多远」的**唯一**读数（RSS 单独看回答不了「这算不算高」），也是轨迹里 `距上限 X MB` 那一栏的来源。它返回 0 时按「没测到」处理（写成 `—`），不能当成「一兆不剩」",
+    "didReceiveMemoryWarningNotification": "UIApplication.didReceiveMemoryWarningNotification（UIKit；externalID c:@UIApplicationDidReceiveMemoryWarningNotification；doc://com.apple.uikit/documentation/UIKit/UIApplication/didReceiveMemoryWarningNotification；abstract: A notification that posts when the app receives a warning from the operating system about low memory availability）——被内存处决之前通常会先响这一声；有与没有指向的不是同一件事，所以它随轨迹一起出去（`内存警告 N 次`）",
 }
 
 

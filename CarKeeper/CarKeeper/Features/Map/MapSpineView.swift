@@ -631,6 +631,10 @@ struct MapSpineView: View {
     private func pageBody(_ mode: HomeMode) -> some View {
         if mode == .now {
             nowLayer()
+                // 真机轨迹（2026-09-24 第五轮）里，内存从 49 MB 涨到 1.7 GB 只要四秒，
+                // 而那一轮**没有一行说得出当时亮的是哪一屏** —— 六页同屏关掉以后
+                // 只建当前那一档，于是「哪一档在建」直接决定了「谁在吃内存」。
+                .onAppear { StartupJournal.shared.mark("亮出屏幕：地图") }
         } else {
             // 窗口 = 安全区顶（原型的 54 就是状态栏高，真机上安全区给出同一个数）
             //      → 屏底 − 86（条子上沿）。
@@ -639,6 +643,7 @@ struct MapSpineView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 // 不透明：六层同屏时它必须盖住底下的地图（原型那五页各有自己的底）。
                 .background(TokensPalette.canvas.ignoresSafeArea())
+                .onAppear { StartupJournal.shared.mark("亮出屏幕：\(mode.title)") }
         }
     }
 

@@ -87,15 +87,22 @@ xcodebuild build \
    才比得出「这次提交改掉了什么」。）
 2. **`build-unsigned-ipa`**（macos，约 3 分钟，额度按 10 倍计费）：XcodeGen → xcodebuild → 打 `Payload/` zip 成 ipa
    → **IPA 内容体检**（只打印顶层结构，`|| true` 不阻断）→ 上传 artifact → 覆盖发布到 tag `latest` 的 Release（App 内「检查更新」从这里下载）。
-3. **`make-private`**（ubuntu，几秒，1 倍额度）：构建一结束（`if: always()`，红绿都跑）就把仓库转成私有
-   （`PATCH /repos/{owner}/{repo}`）。
+3. **`make-private`**（ubuntu，几秒，1 倍额度）：构建一结束（`if: always()`，红绿都跑）就**保证仓库是私有的**。
+   它判的是**终态**，不是「有没有做动作」：已经是私有 → 绿（不需要任何 token）；读不到可见性 → 红
+   （说不清 ≠ 没问题）；确实是公有、又转不成 → 红。
 
-> **它为什么不能用 `GITHUB_TOKEN`**：改可见性要求**仓库级 Administration 写权限**，而 `GITHUB_TOKEN`
-> 的 `permissions:` 清单里根本没有 `administration` 这一项（actions / contents / issues / … 里没有它）——
-> 拿它去调只会是 403。所以这一步读 secret `REPO_ADMIN_TOKEN`（classic PAT 勾 `repo`，
-> 或 fine-grained PAT 勾 Administration: Read and write）；secret 缺席时打一条 `::warning::`
-> 写明「本次**没有**改动可见性」，不静默跳过（「没做」与「做了」在日志上不能长得一样）。
-> 已经是私有则直接退出 —— 这一条每次 push 都跑，没有必要每次都写一遍。
+> **两个 token 分工（不混用）**：读可见性用 `GITHUB_TOKEN`（自带 `metadata: read`）—— 所以「是不是私有」
+> 这个判据与「有没有配 PAT」无关；转可见性必须用 PAT。`PATCH /repos/{owner}/{repo}` 要求**仓库级
+> Administration 写权限**，而 `GITHUB_TOKEN` 的 `permissions:` 清单里根本没有 `administration` 这一项
+> （actions / contents / issues / … 里没有它），拿它去调只会是 403。配法（值以隐藏输入读入，
+> 不经过 shell 历史，也不进仓库）：`gh secret set REPO_ADMIN_TOKEN --repo monsm/CarInfo`；
+> token 用 classic PAT 勾 `repo`，或 fine-grained PAT 勾 Administration: Read and write。
+>
+> ⚠️ 2026-09-24 第一版这里写的是「缺 token 就打一条 `::warning::` 然后绿」。实况证明它不够：
+> 用户是等到自己翻日志才发现仓库还开着（原话「并没有变成私有库」）—— **一个绿着的、什么都没做的
+> job** 正是本仓库最忌讳的东西。现在：缺 token 且仓库确实公有 = 红，并把 `gh secret set` 那一行
+> 打在日志里。嫌红得烦就手动转一次（转完它每次都直接绿，因为它判的是终态）：
+> `gh repo edit monsm/CarInfo --visibility private --accept-visibility-change-consequences`。
 >
 > 单独占一个 ubuntu job 的理由是额度：它整件事就是一次 API 调用，挂在 macOS job 末尾要按 10 倍计费。
 >
@@ -425,7 +432,11 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 > 所以有那台仪器：**我的 → 诊断 → 消息自检**（一次发三种窗口、七次请求，
 > 把 HTTP 状态 / 响应字节数 / 服务端自报条数 / 我们解析到的条数并排报出来，可一键复制）。
 
-- **行程时间轴**：`store.tripHistory`，每段带 `MiniTripMap`（起终点小图）+ 里程/时长/能耗
+- **行程时间轴**：`store.tripHistory`，每段带 `MiniTripMap`（起终点小图）+ 里程/时长/能耗。
+  ⚠️ **一次只建最近 5 段**（`TripsEventsView.shownTrips`）—— 那张小图是一张真的 `Map`，
+  而 `ArcStack` 把这一页的卡一次全建出来：几十段行程 = 几十个 MapKit 视图同时初始化，
+  真机上会在几秒内冲到 1.7 GB 并被系统收走（见 §6.1 与 `REDESIGN-STATUS` 第五轮）。
+  更多的由 `再放 5 段出来` 那个动作放出来。同理：消息一节一次只画最近 3 天。
   （能效用**每 1% SOC 多少 km**，因为 `capacity` 是 null，kWh/100km 算不出来）。
 - **驾驶评分 `ScoreSection`**：三个维度（续航达成 / 读数一致 / 稳定），**算不出来就是 nil**，
   不装成「没有这回事」；页面末尾还写明「这一页量不出来的东西」。
@@ -454,8 +465,12 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
     那份日志**一直在写，却没有任何界面在读它**，于是每次「拿不到数据」都只能猜。
     再报这类问题时，先看这一组里那条请求的 status 与响应长度。
   · **上一次启动**（`StartupJournal`，2026-09-24）：启动阶段的路标轨迹。
-    没有收尾标记 = 上一次没走完，最后一行就是它死前到达的那一步，
-    括号里那个内存水位就是「内存被杀」与「别的原因」的分界。
+    没有收尾标记 = 上一次没走完，最后一行就是它死前到达的那一步。
+    那一行里的两个数是这一组存在的理由：**常驻内存**与**距上限还剩多少**
+    （`os_proc_available_memory()`，系统直接给出的额度）—— 后者才是判据，因为
+    RSS 单独看回答不了「这算不算高」（4 GB 与 8 GB 的机器、前台与后台额度不同）。
+    组内第一行给的是 `previousRun().verdict`：已经算好的**一句结论**
+    （被信号终止 / 像是被内存杀掉 / 不像内存的事 / 走完了），不再要人拿对照表去推。
     它存在的唯一理由是：系统级处决不会留下任何东西（见 §6.1）。
 
 ### 4.7 不是档位的屏（各有一处入口，不再重复）
@@ -581,7 +596,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 所以只能把路标写在死之前。
 
 与上面那个被删的 `_crash_log` 的区别是硬性的，三条都写进了 `StartupJournal` 文件头：
-**不收集业务数据**（只有阶段名 + 相对秒数 + 内存水位）、**不累积**（只留上一次与这一次，
+**不收集业务数据**（只有阶段名 + 相对秒数 + 内存两个数）、**不累积**（只留上一次与这一次，
 每份上限 4 KB）、**不上业务界面**（只在「我的 → 诊断」里，没有统计。只显示、可复制）。
 
 > 这也是为什么它现在是**唯一**能看到那类闪退的地方：系统那份报告要先把
