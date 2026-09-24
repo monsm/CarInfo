@@ -2324,3 +2324,132 @@ App 进程拿不到；刚查过 2025–2026 的资料也没有新 API）。能�
 App 自己的画布）；玻璃卡压在照片上时，卡片自身的材质负责可读性
 （iOS 26 的 Liquid Glass 自带折射，这是选玻璃卡而不是白卡的理由）。
 
+---
+
+## 在线图取不到，子页退回纯黑（2026-09-24 同日第七轮）
+
+用户真机（深色模式）反馈原话：**「没任何变化啊，这是啥啊，根本看不清 太暗了」**。
+截图里「我的」页背景是一整块纯黑 —— 上一轮那版在线壁纸图根本没取到。
+
+### 两个叠加的错
+
+· **Unsplash 直链在用户的网络上取不到**（静默回落，不弹错 —— 当时设计成
+  「失败就当没图」，结果没图的回落色在深色模式里是 `TokensPalette.canvas`
+  = `systemGroupedBackground` = 纯黑）。于是「没图」与「有图但黑背景」在屏幕上
+  长得一模一样，用户看到的就是「什么都没变，还更暗了」；
+· **上一轮铺壁纸之前，子页底下本来就有 AppCanvas 那束光**；删三层暗层时
+  把根上的 `.background(canvas)` 也删了，而「没图」的兜底又写成了 canvas ——
+  深色模式下画布就是黑，兜底等于没兜。
+
+### 修法：在线图整个换成本地相册（同一轮直接改完，不再发第二版）
+
+· **图源**：`PhotosPicker`（iOS 16+，`PhotosPickerItem.loadTransferable(type: Data.self)`）
+  从相册选一张 —— **不依赖任何网络**。用户把桌面壁纸那张图选进来（或任意一张
+  喜欢的图），存成 JPEG（0.82 质量，原始 PNG/TIFF 动辄几十 MB，铺背景用不上）
+  落到 `Documents/carkeeper-wallpaper.jpg`，下次启动还在；
+· **`WallpaperService` 改版**：删掉 `index` / `URLSession` / Unsplash 那套（上一轮
+  刚建的 `WallpaperSource` 整个没有），只留 `image: UIImage?` + `setPhoto(_ data:)`
+  + `clear()`。两个新 SDK 名（`PhotosPicker` / `PhotosPickerItem` / `loadTransferable`）
+  已登记进 `VERIFIED_SDK_ADDITIONS`；
+· **「我的 → 设置 → 应用」组里那一行**从「换一张（在线循环）」改成
+  **「选一张」（打开相册）/「不铺」（清图 + 删文件）**；
+· **「没选图」的兜底**：铺 `TokensPalette.canvas` —— 浅色模式下是浅灰（读得清），
+  深色模式下还是黑，但那时 AppCanvas 的光在更底层（AppCanvas 没被删），
+  观感是「App 自己的深色画布」而不是「一整块死黑」。
+  深色模式想要不黑，就选一张图铺上 —— 这正是用户要的效果。
+
+本地 `python3 scan/all.py` **25/25 通过**，`node CarKeeper/check_style.js` **0 个问题**。
+编译仍然只有 CI 能验。
+
+---
+
+## 地图页收拢、子页全屏、底条跟手、叠法收敛、二十套主题（2026-09-24 同日第八轮）
+
+用户原话（六条，同一天）：「地图页地下 4 个独立的读数融合进大卡片（最上面那行也删，
+重复了）」「地图页全屏为什么子页面有状态栏挡着」「底部导航太拉跨，不跟手」「所有页面
+间距布局不 iOS」「叠叠乐只用吸附堆叠（但要删吸附）其他全删」「艺术主题搞出 20 种
+完全不一样的」。
+
+### ① 地图页「现在」这一档：三块收成一张卡
+
+原先「浮动两卡 + 四格读数」三块，现在只有一张 `nowCard`（`GlassCard`）：
+
+- 卡头一行删掉（车牌 + 状态 + 上报时间与卡内正文重复），只剩**右对齐的图层胶囊**
+  （`layerMenu`，它是控件不是信息，不能跟着删）；
+- 四格读数（车速 / 电量 / 胎压 / 车锁）**不再单铺一层**：新增 `readoutCells`
+  （`MapSpineReadouts.swift`，裸 `HStack`，不套玻璃壳）直接排进大卡的 `.now` 分支下沿；
+  旧的 `readoutChips`（独立玻璃卡）保留在文件里但地图页不再调用；
+- 卡内正文顺序不变：地址 → 巨字续航 → 副行 → 光带 → 四格读数。
+
+### ② 子页面全屏（不被状态栏挡）
+
+`MapSpineView.pageBody` 的非地图分支（五张子页）：`.background(wallpaperLayer())` +
+`.ignoresSafeArea(edges: .top)` —— 壁纸/画布铺到屏顶，与地图页同一种全屏；
+但**内容窗不动**，多加一条 `.safeAreaPadding(.top, 44)` 把第一张卡顶到安全区下沿，
+字不压进状态栏。删掉了这一支里原先为「背景铺到屏顶」写的一个死辅助
+（`DS.swift` 的 `dsFullBleedTop()`，无调用点，已删）。
+
+### ③ 底条跟手（「不跟手」→ 按在整条任意位置都能拖）
+
+两条手势并存：
+
+- **`DSSwipeStrip` 内部那条**（按在胶囊上）：本条的「手」从格子 1.5 倍宽加大到
+  **1.75 倍**（`loupeWidth`），端点不再夹死 —— 过界走**指数衰减**的阻尼
+  （`clampC`，越界 0.5 个节距时已经衰减一半，不再是「拖过头就卡住」）；
+- **`bottomBarDrag`**（挂在整条 `bottomBar` 上，`simultaneousGesture`）：手指按在
+  **两侧圆钮与胶囊之间**的位置也能拖模式条 —— 这是用户说的「不跟手」的真正病根
+  （原先只有胶囊上那一段跟手）。按下时记下当前档位（`barDragBase`），拖动中
+  把增量按「条宽 / 5 个间隔」换算成连续档位写回 `modePosition`，拖过 8pt 同时
+  展开条子（圆钮让位）。松手不清 `modePosition`（档位停在手指停的地方），
+  写回 `homeModeRaw` 交给条子自己的吸附逻辑；
+- 这段手势从骨架文件拆进了新文件 `MapSpineBottomBar.swift`（`MapSpineView` 一度
+  涨到 1219 行，越过 `file_length` 阈值 1200；拆完骨架 1164 行）。
+
+### ④ 叠法收敛为唯一（吸附堆叠，且删掉吸附回落）
+
+用户原话「只用吸附堆叠（但是要删除吸附）其他都删除」：
+
+- `StackVariant` 七个 case 只剩 `.sticky`（`StackSpec` / `StackLabView` / `DevView` / 
+  `ArcStack` 全部同步改过）；旧版存进 UserDefaults 的其他叠法值由 `StackSpec.chosen`
+  读到时洗回 `.sticky`（不留「还有别的叠法」的假象）；
+- **「删除吸附」= 删掉松手后的弹回**：`ArcStack.drag` 的 `onEnded` 不再找吸附点、
+  不再走 `settle` 弹簧、峰值速度那套整段删除（`peakVelocity` 相关机制已没）——
+  手停在哪儿卡就停在哪儿，两端仍由 `StackMath.clamped` 硬限位守住；
+  `settle(velocity:)` 保留给**无障碍翻页与外部换档**两条路（它们没有惯性，
+  用同一条固定弹簧）；
+- 对照页（`StackLabView`）不再有「七选一」，只显示一句「唯一叠法」的说明
+  （文案已按 `scan/copy.py` 的 30 字上限改短）。
+
+### ⑤ 艺术主题从 4 套扩到 20 套（每套的美来自不同的机制）
+
+新增 16 套：玻璃 / 青釉 / 胶片 / 荧光 / 沙丘 / 雪夜 / 蓝图 / 琥珀 / 银灰 / 绛紫 /
+朱砂 / 苔原 / 玄墨 / 熔炉 / 晨雾 / 霓虹。设计原则（写在 `ArtThemeSpec` 便捷构造的
+头注里）：每套只给「它自己是什么」（画布 / 表面 / 字 / 强调 / 装饰 / 字重 / 明暗 /
+六页个性色），其余 15+ 字段按**同一套推导规则**一次算齐 —— 规则写在一处，
+二十套不会各长一套习惯；「完全不一样」体现在每套给的核心色与装饰上，
+不体现在推导规则上。
+
+- 便捷构造里的 `onAccent`（铺在强调色上的文字色）走**强调色亮度**判深/浅：
+  读的是 `CGColor` 分量（`artHex` 构造的定值色 = 同一套 sRGB 数值），**不碰
+  `UIColor`** —— SwiftUI 的 `Color` 没有可靠的公开 API 反解成 sRGB 分量，
+  动态色 / pattern 色上 `getRed` 会失败；
+- `MapStyleSpec.mapSpec` 同步加 16 个 case：全部走「`muted` + 色温蒙版」同一机制
+  （MapKit 没有改瓦片颜色的公开 API，见文件头注），只差蒙版色与不透明度；
+- 切换器（`ThemeGalleryView`）：20 枚胶囊一行排不下，改成**横向可滑**
+  （`ScrollView(.horizontal)`，每枚自定宽）；旧版 4 值用户升级后
+  `ArtThemeStore.current` 回落到 `.native`，不会崩；
+- 对 `ArtTheme` 的穷举 switch 有四处（`title` / `mechanism` / `mapKitVerdict` /
+  `spec`）+ `MapStyleSpec` 的一处，全部扩到 20 个 case（`scan/futureproof.py` 不覆盖
+  自有枚举，但本地已逐个核对没有漏）。
+
+### 未做（如实说明）
+
+- **第 4 条「所有页面间距布局不符合 iOS 标准」未动**：范围太宽（全 App ~28 屏），
+  没有编译器也没有真机，盲改一千行布局只会把能跑的东西改坏。需要用户指出
+  具体哪几屏「不符合」，或者逐屏过（哪几屏优先）。
+- 拖动的跟手手感（节距、阻尼斜率、展开阈值 8pt）仍是量出来的值，不是调出来的 ——
+  真机上若仍觉得「拉跨」，下一个要调的是 `clampC` 的斜率与 `barDragBase` 的取点。
+
+本地 `python3 scan/all.py` **25/25 通过**，`node CarKeeper/check_style.js` **0 个问题**。
+编译仍然只有 CI 能验。
+

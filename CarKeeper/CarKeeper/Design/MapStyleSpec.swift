@@ -116,8 +116,80 @@ extension ArtTheme {
                 allowsGlow: true,
                 note: "系统地图原样"
             )
+        // -----------------------------------------------------------------
+        // 2026-09-24 第八轮新增 16 套。全部是「`muted` + 色温蒙版」的同一机制，
+        // 只差蒙版色与不透明度（MapKit 没有改瓦片颜色的公开 API，见文件头注）。
+        case .frost:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0xE8F1F2),
+                                scrimOpacity: 0.20, cameraHeading: 0, pinStyle: .ring,
+                                allowsGlow: true, note: "瓦片盖 20% 冷白雾")
+        case .celadon:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0xC8D4CC),
+                                scrimOpacity: 0.30, cameraHeading: 0, pinStyle: .ink,
+                                allowsGlow: false, note: "瓦片盖 30% 青灰（釉色）")
+        case .darkroom:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0x2A0E06),
+                                scrimOpacity: 0.75, cameraHeading: 0, pinStyle: .ring,
+                                allowsGlow: true, note: "瓦片压 75% 暗 + 暖红罩")
+        case .phosphor:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0x061A0C),
+                                scrimOpacity: 0.80, cameraHeading: 0, pinStyle: .ring,
+                                allowsGlow: true, note: "瓦片压 80% 暗 + 深绿罩")
+        case .dune:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0xC89A5A),
+                                scrimOpacity: 0.25, cameraHeading: 0, pinStyle: .ink,
+                                allowsGlow: false, note: "瓦片盖 25% 暖沙")
+        case .snowfield:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0x0B1830),
+                                scrimOpacity: 0.70, cameraHeading: 0, pinStyle: .ring,
+                                allowsGlow: true, note: "瓦片压 70% 冷蓝黑")
+        case .blueprint:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0x10284A),
+                                scrimOpacity: 0.45, cameraHeading: 0, pinStyle: .rule,
+                                allowsGlow: false, note: "瓦片盖 45% 深蓝")
+        case .amber:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0x3A2608),
+                                scrimOpacity: 0.35, cameraHeading: 0, pinStyle: .ring,
+                                allowsGlow: true, note: "瓦片盖 35% 暖橙")
+        case .brushed:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0x8A8A90),
+                                scrimOpacity: 0.30, cameraHeading: 0, pinStyle: .rule,
+                                allowsGlow: false, note: "瓦片盖 30% 中性灰")
+        case .cellar:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0x1E0E20),
+                                scrimOpacity: 0.75, cameraHeading: 0, pinStyle: .ring,
+                                allowsGlow: true, note: "瓦片压 75% 暗 + 深绛紫罩")
+        case .cinnabar:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0xF6F1E6),
+                                scrimOpacity: 0.20, cameraHeading: 0, pinStyle: .ink,
+                                allowsGlow: false, note: "瓦片盖 20% 暖白")
+        case .tundra:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0x6E8A82),
+                                scrimOpacity: 0.40, cameraHeading: 0, pinStyle: .rule,
+                                allowsGlow: false, note: "瓦片盖 40% 青灰绿")
+        case .inkwash:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0xF4F4F0),
+                                scrimOpacity: 0.30, cameraHeading: 0, pinStyle: .ink,
+                                allowsGlow: false, note: "瓦片盖 30% 近白（留白）")
+        case .forge:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0x0C0808),
+                                scrimOpacity: 0.85, cameraHeading: 0, pinStyle: .ring,
+                                allowsGlow: true, note: "瓦片压 85% 暗（铸铁）")
+        case .mist:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0x9AAAB4),
+                                scrimOpacity: 0.45, cameraHeading: 0, pinStyle: .rule,
+                                allowsGlow: false, note: "瓦片盖 45% 灰蓝")
+        case .neon:
+            return MapStyleSpec(style: mutedSpec, scrim: artMapHex(0x140A24),
+                                scrimOpacity: 0.80, cameraHeading: 0, pinStyle: .ring,
+                                allowsGlow: true, note: "瓦片压 80% 暗 + 深紫黑罩")
         }
     }
+
+    /// 「`muted` + 关 POI + 关路况 + 平海拔」：新增 16 套共用的那个地图族
+    ///（它们要的都是「瓦片退到背景、我们罩色温」，与夜光同一机制）。
+    private static let mutedSpec: MapStyle = MapStyle.standard(
+        elevation: .flat, emphasis: .muted, pointsOfInterest: .excludingAll, showsTraffic: false)
 }
 
 

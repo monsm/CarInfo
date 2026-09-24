@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 // 我的：用户卡 + 车辆卡 + 常用入口 + 退出登录
 struct MineView: View {
@@ -38,9 +39,12 @@ struct MineView: View {
     @StateObject private var nightModeManager = NightModeManager.shared
     /// 档内段落：设置 / 应急 / 诊断。它不是导航层级（见 `HomeSub`）。
     @State private var tab: HomeSub = .settings
-    /// 壁纸状态（在线风景图，子页面铺底；用户 2026-09-24「其他页面的背景全部设为当前桌面的背景」）。
-    /// 它改的是 App 自己的背景，不是系统的（iOS 没有读主屏壁纸的公开 API）。
+    /// 壁纸状态（相册里选的一张图，子页面铺底；用户 2026-09-24「其他页面的背景全部
+    /// 设为当前桌面的背景」）。它改的是 App 自己的背景，不是系统的（iOS 没有读
+    /// 主屏壁纸的公开 API）。未选图时铺画布（跟随深浅色），不会黑屏。
     @ObservedObject private var wallpaper = WallpaperService.shared
+    /// 相册选择器（PhotosPicker）：从相册选一张图铺底（本地，不依赖网络）。
+    @State private var wallpaperPickItem: PhotosPickerItem?
 
     // MARK: 生命周期
     /// 这一档的叠叠乐：巨字头 → 分段控件 → 当前那一段的卡。
@@ -320,7 +324,8 @@ struct MineView: View {
                           value: voiceOn ? "已开启" : "已关闭") { toggleVoice() }
                 }
                 // 壁纸（非地图子页的背景图，用户 2026-09-24「其他页面的背景全部设为
-                // 当前桌面的背景」→ iOS 没有读壁纸的公开 API，所以铺一张在线风景图）。
+                // 当前桌面的背景」→ iOS 没有读主屏壁纸的公开 API，只能从相册选一张
+                // 本地图铺底 —— 不依赖网络，选完落盘，下次启动还在）。
                 // 它是一张小卡（不是 DSRow）：上面是缩略图，下面两个小钮（换一张 / 不铺）。
                 customRow { wallpaperRow }
                 // 「诊断」是「我的」这一档里的第三段（不是另一个页面，也不再是条子上一格）。
@@ -403,16 +408,16 @@ struct MineView: View {
 
     /// 壁纸小卡：缩略图（当前那张）+ 两个小钮（换一张 / 不铺）。
     ///
-    /// 取图触发：`.onAppear` 调 `WallpaperService.shared.loadImage()`（幂等，已有图就早退）。
-    /// 换一张 = `next()`（循环到下一张，重取）；不铺 = `clear()`（回落到画布底色）。
+    /// 选图：`PhotosPicker`（系统相册，本地取，不依赖网络）→ 选中后
+    /// 异步加载 `Data` → `wallpaper.setPhoto(data)` 落盘（JPEG 0.82）并立即可见。
+    /// 换一张 = 重新选一次；不铺 = `clear()`（清图 + 删文件，回落到画布底色）。
     ///
     /// 为什么放在「应用」组（而不是「设备与模式」）：它改的是 **App 自己的背景**，
     /// 不是系统的（壁纸归 SpringBoard 管，iOS 没有读它的公开 API）—— 所以与
     /// 「夜间模式 / 省电模式」那一组（改系统的）不并列，与「语音播报」这组（改 App 行为）并列。
     private var wallpaperRow: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-            // 缩略图：取到就画，没取到（失败 / 未取 / 点了「不铺」）就画一个占位。
-            // 占位里写一句「没有图」，与真机「没图」观感一致（不留白屏、不谎报有图）。
+            // 缩略图：选了就画，没选（或点了「不铺」）就画占位（铺画布，不是黑屏）。
             Group {
                 if let img = wallpaper.image {
                     Image(uiImage: img)
@@ -428,18 +433,18 @@ struct MineView: View {
                         .frame(maxWidth: .infinity)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay {
-                            Text("没有图（还没取到）")
+                            Text("没有选图（铺画布底色）")
                                 .font(TokensTypo.caption)
                                 .foregroundStyle(TokensPalette.tertiary)
                         }
                 }
             }
-            .onAppear { wallpaper.loadImage() }
-            // 两个小钮：左边「换一张」（循环），右边「不铺」（回落到画布底色）。
+            // 两个小钮：左边「选一张」（打开相册），右边「不铺」（清图 + 删文件）。
+            // 深色模式下选图偏暗会把玻璃卡底下的底也拖暗，所以选图行旁边多给
+            // 一句提示：选偏亮、留白多的图（HIG：背景色应当服务于前景可读性）。
             HStack(spacing: TokensSpacing.sm) {
-                Button("换一张") {
-                    TokensHaptic.tap()
-                    wallpaper.next()
+                PhotosPicker(selection: $wallpaperPickItem, matching: .images) {
+                    Text("选一张")
                 }
                 .buttonStyle(.plain)
                 .font(TokensTypo.footnote)
@@ -455,9 +460,25 @@ struct MineView: View {
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.secondary)
             }
+            Text("建议选偏亮、留白多的图（深色模式下玻璃卡压在暗图上读不清）")
+                .font(TokensTypo.caption2)
+                .foregroundStyle(TokensPalette.tertiary)
         }
         .padding(.horizontal, TokensSpacing.sm)
         .padding(.vertical, TokensSpacing.sm)
+        // 相册选中的是 `PhotosPickerItem`，要异步加载成 `Data` 才能存盘（项目照片
+        // 入口的既定走法，见 Theme.swift 头注）：加载完立刻交给壁纸服务，缩略图与
+        // 子页背景同时换过来。
+        .onChange(of: wallpaperPickItem) { _, item in
+            Task {
+                guard let item else { return }
+                if let data = try await item.loadTransferable(type: Data.self) {
+                    wallpaper.setPhoto(data)
+                    TokensHaptic.select()
+                }
+                wallpaperPickItem = nil
+            }
+        }
     }
 
     /// 退出登录。`logout()` 一直存在，但**没有任何按钮调它** —— 它是一段到不了的代码。

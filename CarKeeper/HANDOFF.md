@@ -318,18 +318,30 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 `.background(TokensPalette.canvas)`；② `pageDeck()` 六层同屏底下垫的那层
 `TokensPalette.canvas.ignoresSafeArea()`；③ `pageBody` 每张非地图子页各自的
 `.background(TokensPalette.canvas.ignoresSafeArea())`。三层全删：非地图子页现在铺的是
-**壁纸图**（`wallpaperLayer()`，来自 `Services/WallpaperService.swift` —— iOS 读不到
-主屏壁纸（无公开 API，壁纸归 SpringBoard 管），所以铺一张在线风景图当壁纸），
-地图页是瓦片本身（不透明），换档过渡期间透出的不再是「上一页的鬼影」，而是
-壁纸 / 瓦片。不铺图（「不铺」钮，或断网没取到）时回落到 AppCanvas 的画布色，
-观感与删之前那层画布相同，但它是 App 自己的画布，不再是「暗层」。
+**壁纸图**（`wallpaperLayer()`，来自 `Services/WallpaperService.swift`）。
+ iOS 读不到主屏壁纸（无公开 API，壁纸归 SpringBoard 管），所以壁纸图是用户在
+「我的 → 设置 → 应用 → 选一张」里**从相册选的一张本地图**（JPEG 落盘到
+`Documents/carkeeper-wallpaper.jpg`，不依赖网络 —— 2026-09-24 第七轮把最初那版
+ Unsplash 在线图废了，因为用户在网络上取不到，深色模式下静默回落的画布就是纯黑，
+ 用户原话「没任何变化啊，根本看不清 太暗了」）。没选图（或点了「不铺」）时
+ 回落到 `TokensPalette.canvas`（浅色模式浅灰 / 深色模式近黑，随 AppCanvas 的光），
+ 观感与删暗层之前相同，但不再是「暗层」。
 
-**浮动两卡**（顺序就是读的顺序）：
+**只有一张大卡**（2026-09-24 第八轮：用户「地图页地下 4 个独立的读数融合进大卡片，
+最上面那行也删掉——和下面重复」）：这一档原本「浮动两卡 + 四格读数」三块，
+现在收成**一张** `nowCard`（`GlassCard`）：
 
-| 卡 | 头 | 内容 |
-|---|---|---|
-| 现状卡 `nowCard` | 车牌 + 状态 · 上报多久了（原先挂在图上的徽标）+ 图层胶囊菜单 | 地址（大字）→ 巨字**续航**（`DSBigNumber`）→ 副行（表显 · 充不充电）→ 光带 |
-| 四格读数 `readoutChips` | 无 | 车速 / 电量 / 胎压（取四轮里**最低**那条）/ 车锁，**同一行、同一基线**（原型 `.chip:nth-child(odd)` 的 ±7px 错位已删 —— 用户 2026-09-24：「下面 4 个按钮要规整，不要歪歪扭扭」） |
+- 卡头一行只剩**一枚图层胶囊**（`layerMenu`）—— 右对齐。原先那行还写着车牌 + 状态
+  + 上报时间，与卡内正文说的是同一件事，已删（重复）。
+- `.now` 分支的正文：地址（大字）→ 巨字**续航**（`DSBigNumber`）→ 副行（表显 · 充不充电）
+  → 光带（`nowMetrics`）→ **四格读数**（`readoutCells`，`MapSpineReadouts.swift`：
+  车速 / 电量 / 胎压（取四轮最低那条）/ 车锁，同一行同一基线，裸 HStack 不另套玻璃壳，
+  直接排在大卡下沿）。
+- `readoutChips`（旧版独立玻璃卡）仍在 `MapSpineReadouts.swift` 里，但地图页不再调用 ——
+  保留只为对照页 / 未来复用，不占屏幕。
+
+**图层胶囊同时是这一屏的菜单**（`layerMenu`，`Menu`）：四个地图图层（当前那层带勾）、重取数据、
+此刻的光（`skySheet`）、回到车；iPad 上多一项「新车况窗口」。
 
 **卡头那枚图层胶囊同时是这一屏的菜单**（`layerMenu`，`Menu`）：四个地图图层（当前那层带勾）、重取数据、
 此刻的光（`skySheet`）、回到车；iPad 上多一项「新车况窗口」。
@@ -353,8 +365,9 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 **换层时首卡里的内容**：`tripsContent` / `holdsContent` / `chargeContent`，都在 `MapSpineView` 内，
 各自有 `emptyNotice`（取不到就说取不到，不摆占位）。
 
-**车钉（`MapCarPin`）**：四种画法对四个艺术方向 —— 夜光（刻度盘 + 弧形 + 发光 + 接地阴影）、
-纸上（墨线圈，无发光无阴影）、巨字（发丝环 + 十字准线）、原生。车头朝向由 `Heading` 驱动。
+**车钉（`MapCarPin`）**：三种钉法对三种钉风格 —— `MapPinStyle` 的 `.ring`（发光环，
+默认给夜光与原生）/ `.ink`（墨线圈，纸上）/ `.rule`（发丝环 + 十字准线，巨字）。新增 16 套
+主题各自取这三种之一（见 `MapStyleSpec.swift`）。车头朝向由 `Heading` 驱动。
 
 **那个常驻操作条已经不在了**（`MapQuickBar.swift` 已删，2026-09-23）：它那 4 个动作
 （锁车 `LockDoor` / 解锁 `UnLockDoor` / 空调 `OpenAir` / 寻车 `RemoteSearchCar`）与验 PIN / FaceID
@@ -461,8 +474,8 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 - **设置 `MineView`**：Apple Profile 风格身份卡 + 车辆卡（切车 `selectCar`）+ 设置分组（退出登录、
   检查更新） + **家庭管理 `FamilyManagementView`**、**临时钥匙 `TempKeyListView`**、
   **隐私面板 `PrivacySection`**、**月报 `MonthlyReportSection`**、Siri 卡片入口、真开关（低电量省电 / 夜间模式）、
-  **壁纸小卡（`wallpaperRow`，2026-09-24 第六轮：非地图子页的背景图）** —— 「应用」组里一行，
-  缩略图 + 「换一张」（Unsplash 直链循环，`WallpaperService.next()`）+ 「不铺」（回落画布色）。
+  **壁纸小卡（`wallpaperRow`，2026-09-24 第六/七轮：非地图子页的背景图）** —— 「应用」组里一行，
+  缩略图 + 「选一张」（`PhotosPicker` 从相册选，本地不联网，JPEG 落盘）+ 「不铺」（清图 + 删文件，回落画布色）。
   它改的是 App 自己的背景，不是系统的（iOS 没有读主屏壁纸的公开 API），所以与
   「设备与模式」组（改系统的：夜间 / 省电 / 专注）不并列。
 - **应急 `EmergencyPanel`**：SOS 按钮 + 快捷操作 + 紧急联系人 + 位置共享 + 紧急叠加层。
@@ -507,7 +520,7 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 ### 5.1 四层，严格单向
 
 ```
-Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套取值） → DS 原语（唯一容器/分组形态） → 页面
+Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套取值） → DS 原语（唯一容器/分组形态） → 页面
 ```
 
 - **`Design/Tokens.swift`**：`TokensPalette`（颜色）/ `TokensSpacing`（4 的倍数，页面边距 20）/ `TokensRadius` /
@@ -542,7 +555,9 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 **颜色从哪来**：`TokensPalette` 是**主题相关**的静态计算值，所以切主题靠
 `CarKeeperApp` 上的 `.id(artThemeRaw)` **重建整棵树**才生效（令牌不产生 SwiftUI 依赖）。
 
-### 5.2 四个艺术方向（`ArtTheme`）
+### 5.2 二十个艺术方向（`ArtTheme`）
+
+**四套完整定制**（每套 15+ 字段逐一手工取过值，各自带对比度注释与实测依据）：
 
 | 方向 | 信条 | 落地难度 | 明暗 | 画布装饰 |
 |---|---|---|---|---|
@@ -551,9 +566,25 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 | `typographic` 巨字 | 美来自尺度：极细巨字对极小标注 | 最省 | — | 发丝网格（0.08） |
 | `native` 原生 | 美来自系统：语义色、分组表面、发丝线（跟随系统外观） | 现状 | nil | 无 |
 
+**十六套第八轮新增**（用户 2026-09-24：「艺术主题有点欠缺，头脑风暴搞出 20 种
+完全不一样的」）：`frost` 玻璃 / `celadon` 青釉 / `darkroom` 胶片 / `phosphor` 荧光 /
+`dune` 沙丘 / `snowfield` 雪夜 / `blueprint` 蓝图 / `amber` 琥珀 / `brushed` 银灰 /
+`cellar` 绛紫 / `cinnabar` 朱砂 / `tundra` 苔原 / `inkwash` 玄墨 / `forge` 熔炉 /
+`mist` 晨雾 / `neon` 霓虹。每套的美来自**一个不同的机制**（材质 / 印刷 / 摄影 /
+玻璃 / 版画 / 仪表盘 / 胶片），不来自配色微调。它们全走 `ArtThemeSpec` 的
+**便捷构造**（`ArtTheme.swift`）：每个主题只给「它自己是什么」（画布 / 表面 /
+字 / 强调 / 装饰 / 字重 / 明暗 / 六页个性色），其余 15+ 字段按**同一套推导规则**
+一次算齐（发丝线 = 字色×12%、轨道 = ×15%、填充 = ×6%、高光 = ×15%、遮罩 = 画布、
+光条 = 亮→中→强调三段、语义色 = 明暗两套定值、onAccent = 按强调色亮度取深/浅 ——
+读 `CGColor` 分量，不碰 `UIColor`）。规则写在一处 = 二十套不会各长一套习惯。
+
+切换器（`ThemeGalleryView.swift`）：20 枚胶囊一行排不下，已改成**横向可滑**
+（`ScrollView(.horizontal)`，每枚自定宽不强行均分）。旧版 4 值用户在升级后
+`ArtThemeStore.current` 回落到 `.native`，不会崩。
+
 ### 5.3 地图样式（`Design/MapStyleSpec.swift`）
 
-`ArtTheme.mapSpec` 把主题翻译成 MapKit 旋钮。**四套用的都是 `.standard`**，差别只在参数与蒙版上
+`ArtTheme.mapSpec` 把主题翻译成 MapKit 旋钮。**二十套都用 `.standard`**，差别只在参数与蒙版上
 （实测值，`Design/MapStyleSpec.swift`）：
 
 | 主题 | MapStyle | 蒙版 scrim | 不透明度 | cameraHeading | 车钉 | 发光 |
@@ -562,8 +593,9 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 | `paper` | 同上 | `0xF2E9D8` | 0.30 | 0° | `.ink` | ❌ |
 | `typographic` | 同上 | `0x0A0A0C` | 0.78 | 0° | `.rule` | ❌ |
 | `native` | `.standard`（不传参 = 系统默认） | 无 | 0 | 0° | `.ring` | ✅ |
+| 新增 16 套 | `mutedSpec`（= 夜光那行同参数） | 各主题自己的蒙版色 | 0.20~0.85 | 0° | `.ring`/`.ink`/`.rule` | 按主题 | 见 `MapStyleSpec.swift` |
 
-`cameraDistance` 固定 1400。四套共同点：**压暗系统瓦片 + 排除全部 POI + 关路况**，
+`cameraDistance` 固定 1400。二十套共同点：**压暗系统瓦片 + 排除全部 POI + 关路况**，
 再用蒙版层把色彩拉向主题方向。`paper` 在代码注释里被诚实标注为「打折方案」——
 纸与墨需要整层自建地图（MapLibre + 自有样式），代价见 `MAPKIT-FEASIBILITY.md` §3.2。
 
@@ -592,7 +624,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 |---|---|---|
 | 账号与凭据 | `car_token_config`（**Keychain**）、`carkeeper_encryption_key`、`carkeeper_key`（PIN）、`carkeeper_biometric_setup` | ✅ |
 | 选择与导航 | `carkeeper_selected_car_id`、`carkeeper_home_mode`、`carkeeper_map_layer` | 部分 |
-| 外观与提示 | `carkeeper_art_theme`、`carkeeper_force_dark_mode` / `_light_mode`、`carkeeper_night_start_hour` / `_end_hour`、`carkeeper_voice_enabled`、`carkeeper_home_card_order`、`carkeeper_power_saving`、`carkeeper_wallpaper_index` | ❌（属于本机偏好） |
+| 外观与提示 | `carkeeper_art_theme`、`carkeeper_force_dark_mode` / `_light_mode`、`carkeeper_night_start_hour` / `_end_hour`、`carkeeper_voice_enabled`、`carkeeper_home_card_order`、`carkeeper_power_saving` | ❌（属于本机偏好） |
 | **本机累积**（服务端无历史接口） | `carkeeper_hist_soc_v1` / `_power_v1` / `_tyre_v1`（三条曲线）、`carkeeper_processed_event_ids`（行程生成）、`carkeeper_parking_loc` / `_time` / `_points`（停车史） | ✅ |
 | 手填记录 | `carkeeper_last_service_mileage`、`carkeeper_service_reminders`、`carkeeper_mileage_entries`、`carkeeper_maintenance_photos`、`carkeeper_insurance_policies`、`carkeeper_inspections`、`carkeeper_current_mileage` / `_total_mileage` | ✅ |
 | 提醒与勿扰 | `carkeeper_dnd_mode`、`carkeeper_charge_notify`、`carkeeper_charge_complete_notify`、`carkeeper_next_service_date`、`carkeeper_last_charge_alert` | 部分 |
@@ -602,21 +634,24 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 **已删除、不要加回来的**：`carkeeper_api_stats` / `_page_metrics` / `_home_load_time` / `_version_logs` / `_crash_log`
 （诊断统计，用户明确要求删）、充电账本、以及 App Group 里的 `widget_*` / `watch_*` 共享快照。
 
-### 6.1 两个例外文件（不是 UserDefaults，也不是业务数据）
+### 6.1 三个例外文件（不是 UserDefaults，也不是业务数据）
 
-`Documents/carkeeper-startup-journal.txt` 与 `-prev.txt`（`Services/StartupJournal.swift`）。
-它们是 2026-09-24 新增的：用户报「App 载入不到 10 秒就闪退，而**系统里没有日志**」。
-没有日志这件事本身就是诊断信息 —— 应用层错误通常会留一份 `.ips`；什么都没有，
-通常意味着**系统级处决**（内存回收 / 看门狗），而那种终止**不调用 App 里任何一行代码**，
-所以只能把路标写在死之前。
+· `Documents/carkeeper-startup-journal.txt` 与 `-prev.txt`（`Services/StartupJournal.swift`）。
+  2026-09-24 新增：用户报「App 载入不到 10 秒就闪退，而**系统里没有日志**」。
+  没有日志本身就是诊断信息 —— 应用层错误通常会留一份 `.ips`；什么都没有，
+  通常意味着**系统级处决**（内存回收 / 看门狗），而那种终止**不调用 App 里任何一行代码**，
+  所以只能把路标写在死之前。
 
-与上面那个被删的 `_crash_log` 的区别是硬性的，三条都写进了 `StartupJournal` 文件头：
-**不收集业务数据**（只有阶段名 + 相对秒数 + 内存两个数）、**不累积**（只留上一次与这一次，
-每份上限 4 KB）、**不上业务界面**（只在「我的 → 诊断」里，没有统计。只显示、可复制）。
+  与上面那个被删的 `_crash_log` 的区别是硬性的，三条都写进了 `StartupJournal` 文件头：
+  **不收集业务数据**（只有阶段名 + 相对秒数 + 内存两个数）、**不累积**（只留上一次与这一次，
+  每份上限 4 KB）、**不上业务界面**（只在「我的 → 诊断」里，没有统计。只显示、可复制）。
 
-> 这也是为什么它现在是**唯一**能看到那类闪退的地方：系统那份报告要先把
-> 「设置 → 隐私与安全性 → 分析与改进 → 共享 iPhone 分析」打开（关着时 iOS 不保留报告），
-> 打开的盘以后再复现，才能拿到 jetsam / watchdog 的权威记录。在有它之前，我们有轨迹。
+  > 这也是为什么它现在是**唯一**能看到那类闪退的地方：系统那份报告要先把
+  > 「设置 → 隐私与安全性 → 分析与改进 → 共享 iPhone 分析」打开（关着时 iOS 不保留报告），
+  > 打开的盘以后再复现，才能拿到 jetsam / watchdog 的权威记录。在有它之前，我们有轨迹。
+· `Documents/carkeeper-wallpaper.jpg`（`Services/WallpaperService.swift`，2026-09-24 第七轮）：
+  相册选的一张壁纸图（JPEG 0.82），子页面铺底用。「不铺」钮删它；不是业务数据、
+  不跨启动累积（每次选都整张替换）。
 
 ---
 
@@ -631,7 +666,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 | `MaintenanceReminderScheduler` / `InsuranceReminderScheduler` | 保养 / 年检提醒排程 | 里程变化 / 启动 |
 | `ServiceReminderManager` | 保养项定义与进度 | 车辆档 |
 | `WeatherService` | open-meteo 实况（TTL 内且没走远不发请求） | 位置变化 / 启动 |
-| `WallpaperService` | 子页面壁纸图（Unsplash 直链轮换，在线取，失败静默回落画布） | 「我的→设置」换/不铺；子页出现时取一次 |
+| `WallpaperService` | 子页面壁纸图（相册选的一张 JPEG，本地存 `Documents/carkeeper-wallpaper.jpg`，不依赖网络） | 「我的→设置」选一张/不铺；启动时读回 |
 | `Retrier` / `NetworkEnhancements` | 退避重试 / 网络质量监控 / 离线模式 | 请求层 |
 | `Monitoring` | 内存读数（**不落盘**） | 启动后每 10s |
 | `DataEncryption` / `SecureStorage` | AES-GCM + Keychain | 车牌等敏感字段 |

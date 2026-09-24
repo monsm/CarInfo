@@ -41,25 +41,31 @@ struct ThemeGallerySection: View {
     // MARK: - 常驻切换器
 
     private var switcher: some View {
-        HStack(spacing: TokensSpacing.xs) {
-            ForEach(ArtTheme.allCases) { theme in
-                Button {
-                    apply(theme)
-                } label: {
-                    Text(theme.title)
-                        .font(TokensTypo.subheadline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, TokensSpacing.sm)
-                        .background {
-                            RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
-                                .fill(theme == current ? TokensPalette.accent : TokensPalette.surface)
-                        }
-                        .foregroundStyle(theme == current ? TokensPalette.labelOnTint : TokensPalette.primary)
+        // 二十套全在一行排不下（4 套那会儿排得下）：整行做成横向可滑的，
+        // 每枚胶囊**保持自定宽**（不 `maxWidth: .infinity` 均分 —— 滑条上的均分会
+        // 把一枚宽到读不完标题），滑到底才看见全部。
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: TokensSpacing.xs) {
+                ForEach(ArtTheme.allCases) { theme in
+                    Button {
+                        apply(theme)
+                    } label: {
+                        Text(theme.title)
+                            .font(TokensTypo.subheadline)
+                            .padding(.horizontal, TokensSpacing.sm)
+                            .padding(.vertical, TokensSpacing.sm)
+                            .background {
+                                RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
+                                    .fill(theme == current ? TokensPalette.accent : TokensPalette.surface)
+                            }
+                            .foregroundStyle(theme == current ? TokensPalette.labelOnTint : TokensPalette.primary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("切换到\(theme.title)主题")
+                    .accessibilityAddTraits(theme == current ? [.isSelected] : [])
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("切换到\(theme.title)主题")
-                .accessibilityAddTraits(theme == current ? [.isSelected] : [])
             }
+            .padding(.trailing, TokensSpacing.xs)
         }
     }
 
@@ -69,7 +75,7 @@ struct ThemeGallerySection: View {
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
             intro
 
-            DSSectionHeader(title: "四个方向")
+            DSSectionHeader(title: "\(ArtTheme.allCases.count) 套方向")
             VStack(spacing: TokensSpacing.md) {
                 ForEach(ArtTheme.allCases) { theme in
                     ThemeTile(theme: theme, isActive: theme == current) {

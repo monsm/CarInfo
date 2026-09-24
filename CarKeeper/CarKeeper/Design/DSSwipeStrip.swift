@@ -116,9 +116,9 @@ struct DSSwipeStrip: View {
     /// 于是透镜被封顶成 38：几乎就是字的宽度，看起来「没有玻璃」。
     /// 用户 2026-09-24：「首页 选中的玻璃体太小了，大 50%」。
     ///
-    /// 现在按**格宽**定宽（一格 ×1.5），按**条高**定高（0.94 × 条高）：
+    /// 现在按**格宽**定宽（一格 ×1.75，即 2026-09-24 又放大了一档），按**条高**定高（0.94 × 条高）：
     /// 高度不能再往上，是因为外轨只有 46 —— 透镜比轨还高就是「逞出来」而不是「更大」。
-    private var loupeWidth: CGFloat { slot * 1.5 }
+    private var loupeWidth: CGFloat { slot * 1.75 }
     private var loupeHeight: CGFloat { barHeight * 0.94 }
 
     @State private var c: CGFloat = 0            // 行内坐标：条正中对应到行里的位置
@@ -207,10 +207,26 @@ struct DSSwipeStrip: View {
         Double((c - slot / 2) / pitch(gap))
     }
 
-    /// 越界阻尼：拖得动，但越拖越沉。两端各留 0.35 档。
+    /// 越界阻尼：拖得动，但越拖越沉（拖出端 0.5 档后阻力逐点变大，松手被拉回）。
+    ///
+    /// 用户 2026-09-24：「不跟手」的另一面 —— 此前 `c` 被夹在整行行程内，
+    /// 拖到两端是「撞到墙」，手指还在动而条子已经不动了。现在改成**拖得动、但越拖越沉**：
+    /// 端点外 0.5 档内是 1:1 跟手，再往外每多 0.5 档阻尼加 1 倍，
+    /// 松手时 `snap` 把「弹回端点」和「吸附最近档」一起算进去（见 `snap` 的说明）。
     private func clampC(_ raw: CGFloat, lim: ClosedRange<CGFloat>, gap: CGFloat) -> CGFloat {
-        let slack = pitch(gap) * 0.35
-        return min(max(raw, lim.lowerBound - slack), lim.upperBound + slack)
+        let slack = pitch(gap) * 0.5
+        // 越出端的「软」段：把超出量按指数衰减，越拖越沉（阻力 1 → 2 → 3 …）。
+        // 正常行程内（lim 范围）1:1 跟手，端点外才衰减。
+        func soften(_ v: CGFloat, _ bound: CGFloat, _ direction: CGFloat) -> CGFloat {
+            let over = (v - bound) * direction
+            if over <= 0 { return v }  // 还没出端，1:1
+            // 指数衰减：0.5 档内几乎 1:1，1.5 档后只剩 1/8 跟手（「越拖越沉」）
+            let damped = 0.5 * (1 - pow(0.5, over / slack))
+            return bound + damped * direction
+        }
+        if raw > lim.upperBound { return soften(raw, lim.upperBound, 1) }
+        if raw < lim.lowerBound { return soften(raw, lim.lowerBound, -1) }
+        return raw
     }
 
     // =========================================================================

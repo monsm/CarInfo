@@ -58,41 +58,34 @@ enum StackSpec {
     /// 拖动的跟手滞后：形变（弧度/缩放）比位移晚一点点，所以是「追上来再贴合」。
     static let shapeLag = Animation.spring(response: 0.16, dampingFraction: 0.92)
 
-    /// 用户在叠法对照页（`StackLabView`）里挑中的那一种存在这里。
-    /// 六页的 `StackPageView` 默认读它 —— 于是「挑一种」是立刻生效的，
-    /// 而不是「告诉我，我再改代码」。
+    /// 叠法现在是**唯一的**（用户 2026-09-24：只用吸附堆叠，其他全删）。
+    /// 这个键留着是为了把旧版存下来的七选一值洗掉：读出来不是 `sticky`
+    /// 就写回 `sticky`（旧值不再有效，留着会误导「还有别的叠法」）。
     static let variantKey = "carkeeper_stack_variant"
 
-    /// 当前生效的叠法。**默认弧出**（没挑过就是它）。
+    /// 当前生效的叠法：永远 `.sticky`（唯一的叠法）。
     static var chosen: StackVariant {
-        guard let raw = UserDefaults.standard.string(forKey: variantKey),
-              let v = StackVariant(rawValue: raw) else { return .arc }
-        return v
+        if let raw = UserDefaults.standard.string(forKey: variantKey),
+           raw != StackVariant.sticky.rawValue {
+            UserDefaults.standard.set(StackVariant.sticky.rawValue, forKey: variantKey)
+        }
+        return .sticky
     }
 
-    /// 记下挑中的那一种。
+    /// 叠法已固定（唯一的叠法），这个入口保留给旧的对照页调用，现在写恒等于。
     static func remember(_ v: StackVariant) {
-        UserDefaults.standard.set(v.rawValue, forKey: variantKey)
+        UserDefaults.standard.set(StackVariant.sticky.rawValue, forKey: variantKey)
     }
 
-    /// 回落用的弹簧。阻尼比 ≈ 0.7 → 过冲约 5%，那一下就是「吸住」。
-    /// 用 `interpolatingSpring` 而不是 `easeOutBack` 是因为前者能被手指打断
-    /// （原地重开一个 withAnimation 就接管了），后者是个不可打断的自动播放。
-    ///
-    /// 刚度 180 → 130（用户 2026-09-24「减弱吸附效果」）：180 是「被吸过去」，
-    /// 130 是「滑过去」。阻尼比同时从 0.67 收到 0.7，过冲跟原来一样。
+    /// 回落用的弹簧（用户 2026-09-24「删除吸附」后，只剩无障碍翻页与外部换档
+    /// 两条路用它 —— 手势松手不再走它，见 `ArcStack.drag` 的说明）。
+    /// 刚度 130 / 阻尼 16：被手指打断的「滑过去」那一下。
     static let settle = Animation.interpolatingSpring(mass: 1, stiffness: 130, damping: 16)
 
-    /// 回落弹簧，带**手指那一瞬的速度**。
-    ///
-    /// `initialVelocity` 的单位是「剩余距离的倍数 / 秒」—— 所以传来的值要先除以
-    /// 剩余距离（见 `ArcStack.drag`）。不接这个参数也能吸到位，但那样无论快甩还是
-    /// 轻推都是同一条曲线：差别只剩「落在哪一张」，手上没有「顺着惯性冲过去」那一下。
-    /// 上限 ±8：手势里那一帧的峰值速度可能极大，不封顶会甩到天上。
-    static func settle(velocity: CGFloat) -> Animation {
-        let v = Double(min(max(velocity, -5), 5))
-        return Animation.interpolatingSpring(mass: 1, stiffness: 130, damping: 16,
-                                             initialVelocity: v)
+    /// 无障碍翻页 / 外部换档的弹簧：没有惯性，固定一条曲线（`settle`）。
+    /// 手势层不再调用它 —— 用户 2026-09-24 把「松手弹回」整段删了（见 `ArcStack.drag`）。
+    static func settle(velocity: CGFloat = 0) -> Animation {
+        Self.settle
     }
 }
 
@@ -100,94 +93,41 @@ enum StackSpec {
 //  MARK: - 七种叠法
 // =============================================================================
 
-/// 叠法。rawValue 即持久化的键：在对照页里挑中哪个，下次进来还是它。
+/// 叠法。用户 2026-09-24 要求：「叠叠乐只用吸附堆叠（但是要删除吸附），其他都删除」。
+/// 于是七种只留这一种 —— 它不再是「七选一」，而是一个固定值：全站只有一种叠法。
+/// 保留这个类型而不是直接删掉 `StackVariant`：`StackSpec.chosen` / `StackLabView`
+/// 还在引用它的名字，留着这一个 case 比把整套引用删干净改动小，且语义不变。
 enum StackVariant: String, CaseIterable, Identifiable {
-    /// A 弧出：等距排开 + 上下消失带 + 一点弧度转出去（**默认**）
-    case arc
-    /// B 吸附堆叠：每张滚到顶部就贴住不动，下一张从下面盖上来
+    /// 吸附堆叠（**唯一**）：每张滚到顶部就贴住不动，下一张从下面盖上来。
+    /// 「删除吸附」= 去掉松手后的弹跳回落（见 `StackSpec.settle` 与 `StackMath.snapIndex`
+    /// 的使用处：手势直接跟手，到端硬停，**不再自动吸回**）。
     case sticky
-    /// C 压层叠：所有卡重合，靠「往下错 74」让每层都露出来一条
-    case deck
-    /// D 纵深叠：同上，但错位小（26）、缩放更明显，看起来是一条隧道
-    case depth
-    /// E 错位叠：每张留在自己的排版位，只左右交替错开
-    case offset
-    /// F 钱夹叠：往上错（−30），像一叠卡从下面抽出来
-    case wallet
-    /// G 滚轮：卡片绕一个圆柱面转，转到背面就看不见
-    case wheel
 
     var id: String { rawValue }
 
     /// 对照页上的名字
     var title: String {
         switch self {
-        case .arc: return "弧出"
         case .sticky: return "吸附堆叠"
-        case .deck: return "压层叠"
-        case .depth: return "纵深叠"
-        case .offset: return "错位叠"
-        case .wallet: return "钱夹叠"
-        case .wheel: return "滚轮"
         }
     }
 
-    /// 一句话说清它和别的有什么不同（对照页的第二行）
+    /// 一句话说清它是什么（对照页的第二行）
     var note: String {
         switch self {
-        case .arc: return "等距排开，贴边淡出并转出画面"
-        case .sticky: return "滚到顶部贴住，下一张盖上来"
-        case .deck: return "重合叠放，每层露出一条"
-        case .depth: return "重合叠放，近大远小"
-        case .offset: return "各自就位，左右交错"
-        case .wallet: return "向上错开，像抽卡"
-        case .wheel: return "绕圆柱面转动"
+        case .sticky: return "滚到顶部贴住，下一张盖上来（无吸附回落）"
         }
     }
 
     var metrics: StackMetrics {
         switch self {
-        case .arc:
-            // tiltDeg = 0：用户 2026-09-23 明确要求「卡片显示保持正常，不要倾斜特效」。
-            // 叠叠乐的艺术感由消失带与间距支撑，不靠把卡转个角度。
-            //
-            // fadeBottom 140 → 44（用户 2026-09-24：「最后一个卡片的底部不能离开页面
-            // 底部太多」）：可滚范围的末端就是这条消失带的上沿（见 `ArcStack.endScroll`），
-            // 所以 140 意味着「滑到底时，末卡底边距卡片窗底沿 140pt」—— 一个手掌高的空白。
-            // 44 是「留一条呼吸位，但看得见它贴着底」。
-            //
-            // shrink 0.07 → 0.03（同一条：「滚动过程中的卡片大小差异有点大，减弱下」）：
-            // 0.07 时两张之外就缩到 0.895，读起来像「远的那张是另一个东西」；
-            // 0.03 时最远只缩到 0.955 —— 大小差异还在（它标出哪张在阅读线上），
-            // 但不再像两个尺寸。
-            return StackMetrics(kind: .flow, padTop: 152, padBottom: 180, gap: 20,
-                                fadeTop: 150, fadeBottom: 44,
-                                tiltDeg: 0, shrink: 0.03, fadeOut: 0.16)
         case .sticky:
-            // 卡片至少要有一屏高的六成才吸得住（太矮就永远滚不到贴顶那一步）
+            // 卡片至少要有一屏高的六成才贴得住（太矮就永远滚不到贴顶那一步）。
+            // 用户 2026-09-24「删除吸附」：这里的贴住是**滚动到位就停**（位置贴合），
+            // 不是「弹回去」的吸附 —— 弹跳由 `ArcStack` 的手势层关闭（见那里的说明）。
             return StackMetrics(kind: .flow, padTop: 16, padBottom: 90, gap: 14,
                                 tiltDeg: 0, shrink: 0, fadeOut: 0.10,
                                 stickLine: 10, minCardHeight: 300)
-        case .deck:
-            return StackMetrics(kind: .deck, gap: 0,
-                                tiltDeg: 0, shrink: 0.02, fadeOut: 0.10,
-                                deckStep: 74)
-        case .depth:
-            return StackMetrics(kind: .deck, gap: 0,
-                                tiltDeg: 0, shrink: 0.05, fadeOut: 0.14,
-                                deckStep: 26)
-        case .offset:
-            return StackMetrics(kind: .flow, padTop: 24, padBottom: 90, gap: 12,
-                                tiltDeg: 0, shrink: 0, fadeOut: 0,
-                                sideStep: 26)
-        case .wallet:
-            return StackMetrics(kind: .deck, gap: 0,
-                                tiltDeg: 0, shrink: 0.03, fadeOut: 0.10,
-                                deckStep: -30)
-        case .wheel:
-            return StackMetrics(kind: .wheel, gap: 0, fadeTop: 40, fadeBottom: 80,
-                                tiltDeg: 30, shrink: 0, fadeOut: 0,
-                                wheelRadius: 520, wheelFOV: 74)
         }
     }
 }

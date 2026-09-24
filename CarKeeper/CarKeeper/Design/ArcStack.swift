@@ -29,8 +29,8 @@ import SwiftUI
 //  把 d_i 换成不同的东西**。参数在 `StackSpec`，判定在 `StackMath`，这里只画和收手势。
 struct ArcStack: View {
 
-    /// 叠法（原型 A~G）。默认 `.arc` —— 用户 2026-09-23 选中的那一种。
-    var variant: StackVariant = .arc
+    /// 叠法。用户 2026-09-24：只用吸附堆叠（其他叠法全删），所以唯一的叠法。
+    var variant: StackVariant = .sticky
     /// 卡片，按显示顺序。
     ///
     /// 这里收的是**未包装**的 `StackCard`，不是 `AnyView` —— 因为「这张卡要不要挂
@@ -64,8 +64,6 @@ struct ArcStack: View {
     @State private var shapeScroll: CGFloat = 0
     @State private var heights: [Int: CGFloat] = [:]
     @State private var dragBase: CGFloat?
-    @State private var peakVelocity: CGFloat = 0
-    @State private var lastSample: (at: Date, scroll: CGFloat)?
     @State private var current = 0
 
     private var spec: StackMetrics { variant.metrics }
@@ -261,36 +259,24 @@ struct ArcStack: View {
     // MARK: 手势
     // =========================================================================
 
+    /// 跟手：位置立刻跟手指（`dragTo` 不做位移上的任何「聪明事」），形变慢半拍。
+    ///
+    /// 用户 2026-09-24：「叠叠乐只用吸附堆叠（但是要删除吸附）」—— 于是松手**不再**：
+    ///   · 找吸附点（`StackMath.snapIndex` 已不再调用），
+    ///   · 弹回（`settleTo` 的弹簧只给无障碍翻页与外部换档用，手势松手不走它），
+    ///   · 甩出去（`peakVelocity` 那一套峰值速度整段已删）。
+    /// 手停在哪儿，卡就停在哪儿；两端的「到顶/到底」由 `clamped` 硬限位守住。
     private func drag(maxScroll: CGFloat, rests: [CGFloat]) -> some Gesture {
         DragGesture(minimumDistance: 6)
             .onChanged { v in
-                if dragBase == nil {
-                    dragBase = scroll
-                    peakVelocity = 0
-                    lastSample = nil
-                }
+                if dragBase == nil { dragBase = scroll }
                 let raw = (dragBase ?? 0) - v.translation.height
-                sampleVelocity(scroll: raw)
                 // 硬停在 `[0, maxScroll]`：到顶/到底就是停，两端都不会被拖出去留下空白。
                 dragTo(StackMath.clamped(raw, last: maxScroll))
             }
-            .onEnded { v in
-                sampleVelocity(scroll: (dragBase ?? 0) - v.translation.height)
-                // 甩出去的判据用的是**这一段手势的峰值速度**，不是松手那一帧：
-                // 收尾时最后几帧本来就几乎不动，取最后一帧算出来恒为 0，甩永远不触发。
-                let idx = StackMath.snapIndex(targets: rests, scroll: scroll,
-                                              velocity: peakVelocity)
-                current = idx
-                TokensHaptic.select()
-                // 把手指速度交给弹簧：`initialVelocity` 要的是「占剩余路程的倍数/秒」，
-                // 所以除以剩余距离。剩余距离接近 0 时不给（否则会放大成无穷）。
-                if rests.indices.contains(idx) {
-                    let dist = rests[idx] - scroll
-                    settleTo(rests[idx], velocity: abs(dist) > 1 ? peakVelocity / dist : 0)
-                }
+            .onEnded { _ in
+                // 清掉临时量：位移已经在 `onChanged` 里跟手到位，这里没有任何「落点」。
                 dragBase = nil
-                lastSample = nil
-                peakVelocity = 0
             }
     }
 
@@ -309,23 +295,6 @@ struct ArcStack: View {
             scroll = v
             shapeScroll = v
         }
-    }
-
-    /// 记**峰值**而不是最后一次：峰值是这一段手势里最快的那个瞬间。
-    /// 隔 200ms 没有新样本就当作新手势重新开始记 —— 否则上一次的快甩会一直挂在
-    /// 身上，让后面每一次轻推都变成「甩出去」。
-    private func sampleVelocity(scroll s: CGFloat) {
-        let now = Date()
-        if let last = lastSample {
-            let dt = now.timeIntervalSince(last.at)
-            if dt >= 0.2 {
-                peakVelocity = 0
-            } else if dt > 0.001 {
-                let v = (s - last.scroll) / CGFloat(dt)
-                if abs(v) > abs(peakVelocity) { peakVelocity = v }
-            }
-        }
-        lastSample = (now, s)
     }
 
     /// 点「下一张 / 上一张」（无障碍与深链都用它）。
@@ -428,9 +397,8 @@ struct ArcStack: View {
 //  一张是图表、一张是列表），而顺序是**运行时可变的**（分段控件换段、行程条数
 //  随数据变）。泛型元组表达不了这件事，硬撑的代价是每页写一套自定义 ViewBuilder。
 struct StackPageView: View {
-    /// 不传就是用户挑的那一种（见 `StackSpec.chosen`，默认弧出）。
-    /// 六页都不传 —— 于是「在对照页里挑一种」是立刻全站生效的。
-    var variant: StackVariant = StackSpec.chosen
+    /// 叠法已固定为唯一的吸附堆叠（用户 2026-09-24）。六页不传 = 全用那一种。
+    var variant: StackVariant = .sticky
     var accent: Color = TokensPalette.accent
     var label: String = ""
     var cards: [StackCard]

@@ -129,6 +129,83 @@ struct ArtThemeSpec {
     /// 四套艺术主题下就都是同一套颜色 —— 而这一整套视觉的前提恰恰是「换主题 = 换值」。
     /// 它是**卡片左上角那一抹**与页内光晕的色，不是文字色，所以不参与对比度约定。
     var pageAccents: [Color]
+
+    // MARK: - 便捷构造（20 套主题，2026-09-24 第八轮）
+    ///
+    /// 二十套主题全走这一个入口：每个主题**只给「它自己是什么」**（画布 / 表面 /
+    /// 字 / 强调 / 装饰 / 字重 / 明暗 / 六页个性色），其余字段按**同一套规则推导**
+    /// （发丝线 = 字色 ×12%、轨道 = 字色 ×15%、填充 = 字色 ×6%、高光 = 字色 ×15%、
+    /// 遮罩 = 画布、光条 = 亮→中→强调 三段、语义色 = 四套固定取值、onAccent = 按
+    /// 强调色亮度取深/浅）。规则写在一处 = 二十套主题不会各长一套习惯；
+    /// 「完全不一样」体现在每个主题给的**核心色与装饰**上，不体现在推导规则上。
+    init(canvas: Color,
+         surface: Color,
+         label: Color,
+         accent: Color,
+         decor: CanvasDecor = .none,
+         allowsGlow: Bool = true,
+         usesSerifTitles: Bool = false,
+         displayWeight: Font.Weight = .ultraLight,
+         displayTracking: CGFloat = -0.3,
+         preferredScheme: ColorScheme? = nil,
+         pageAccents: [Color]? = nil) {
+        // 推导规则（全部是「同一个决定做一次」）：
+        self.canvas = canvas
+        self.surface = surface
+        self.raised = surface
+        self.hairline = label.opacity(0.12)
+        self.track = label.opacity(0.15)
+        self.label = label
+        self.labelSecondary = label.opacity(0.62)   // 中间档：比正文淡，但要读得清
+        self.labelTertiary = label.opacity(0.48)    // 第三档：说明文字（≥4.5:1 靠调用点字号兜）
+        self.accent = accent
+        // 语义色：四套固定取值（亮底用深一档，暗底用亮一档；跟着 preferredScheme 走）
+        let dark = (preferredScheme ?? .dark) == .dark
+        self.success = dark ? artHex(0x7FE0A0) : artHex(0x2E7D4F)
+        self.warning = dark ? artHex(0xF0B24A) : artHex(0x9A6B15)
+        self.error = dark ? artHex(0xFF6A55) : artHex(0xC0392B)
+        self.info = dark ? artHex(0x78C8FF) : artHex(0x2F6B8F)
+        self.onAccent = Self.onAccentText(for: accent, on: canvas)
+        self.lightBar = [artHex(0xFFF6E8, alpha: dark ? 0.9 : 0.7),
+                         accent.opacity(0.55), accent]
+        self.lightSource = dark ? artHex(0xFFF6E8) : accent
+        self.fillSubtle = label.opacity(0.06)
+        self.glassHighlight = label.opacity(0.14)
+        self.scrim = canvas
+        self.decor = decor
+        self.allowsGlow = allowsGlow
+        self.usesSerifTitles = usesSerifTitles
+        self.displayWeight = displayWeight
+        self.displayTracking = displayTracking
+        self.preferredScheme = preferredScheme
+        self.pageAccents = pageAccents ?? Self.defaultPageAccents(dark: dark)
+    }
+
+    /// 六页默认个性色（不显式给的那一套）：暗底走六道冷光，亮底走六种墨。
+    private static func defaultPageAccents(dark: Bool) -> [Color] {
+        dark ? [artHex(0xB9A6FF), artHex(0x78C8FF), artHex(0x6FA8FF),
+                artHex(0x5FD08A), artHex(0xA7C8EA), artHex(0xD9D2FF)]
+             : [artHex(0x6A5F92), artHex(0x3F6E9E), artHex(0x2F5B8A),
+                artHex(0x3F7A5A), artHex(0x4A6B87), artHex(0x5F5A80)]
+    }
+
+    /// 铺在强调色**之上**的文字色：强调色亮就铺深字，暗就铺浅字。
+    /// 判据走 sRGB 分量（每个主题给的强调色都是 `artHex` 的定值，不可能是动态色）。
+    ///
+    /// 取分量不走 `UIColor`（SwiftUI 的 `Color` 没有可靠的公开 API 反解成 sRGB 分量；
+    /// `getRed` 在动态色 / pattern 色上会失败）。`artHex` 构造的定值色直接读它的
+    /// `CGColor` 分量 —— 同一套 sRGB 数值（`Color(.sRGB, ...)` 构造时就是这三个分量），
+    /// 确定性成立；取不到（理论上不会发生）就铺白字。
+    private static func onAccentText(for accent: Color, on canvas: Color) -> Color {
+        guard let c = accent.cgColor, let comps = c.components, comps.count >= 3 else {
+            return .white
+        }
+        // 分量顺序按 `colorSpace` 定：sRGB 是 [r,g,b,a]，但少数 CGColorSpace
+        // 是 [gray,alpha]（只有 2 个分量）—— 定值色走 `Color(.sRGB,...)` 不会出现这种。
+        let v: [Double] = Array(comps.prefix(3)).map { Double($0) }
+        let l = 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]
+        return l > 0.6 ? artHex(0x1A1614) : .white
+    }
 }
 
 // MARK: - 四个方向
@@ -141,6 +218,41 @@ enum ArtTheme: String, CaseIterable, Identifiable {
     case typographic
     /// 原生 —— 切换前的 v4 语言（系统语义色）。默认值，切回来完全等于现状。
     case native
+    // ---- 2026-09-24 第八轮新增 16 套（用户：「艺术主题有点欠缺，头脑风暴搞出 20 种
+    //      完全不一样的」）：每套的美都来自**一个不同的机制**（材质 / 印刷 / 摄影 /
+    //      玻璃 / 版画 / 仪表盘 / 胶片 …），不来自配色微调 —— 调色相不叫「完全不一样」。
+    /// 玻璃 —— 一块起雾的玻璃窗。冷白、透明感、所有色都隔着一层水汽。
+    case frost
+    /// 青釉 —— 宋代瓷的青。低温青灰釉面，色温偏冷，光不发光、只折射。
+    case celadon
+    /// 胶片 —— 暗房里的红。冲印灯箱：暖红 + 黑，只有车那一颗星是亮的。
+    case darkroom
+    /// 墨绿 —— 军用的墨。旧仪器面板：深绿面、荧光绿读数，黑底上只有两个色。
+    case phosphor
+    /// 沙丘 —— 正午的沙漠。高对比暖沙色，字是晒干的赭墨，光是白得发烫的。
+    case dune
+    /// 雪夜 —— 雪地里的月光。深蓝黑底 + 冷白，只有车灯那一圈是暖的。
+    case snowfield
+    /// 蓝图 —— 工程蓝图。深蓝 + 白线，色温与「纸上」相反：那是暖纸，这是冷墨。
+    case blueprint
+    /// 琥珀 —— 树脂里封住的一帧。暖橙透明，光在色层里弯。
+    case amber
+    /// 银灰 —— 仪表盘的磨砂钢。中性灰阶，强调色只给「异常」那一格。
+    case brushed
+    /// 绛紫 —— 酒窖里的紫。深绛紫面 + 葡萄紫高光，光从瓶底透上来。
+    case cellar
+    /// 朱砂 —— 批红的印。暖白宣纸 + 朱砂一点，全 App 只有一个色是红的。
+    case cinnabar
+    /// 苔原 —— 冻土带。低饱和的青灰绿，光永远在雾后面。
+    case tundra
+    /// 玄墨 —— 水墨画留白。大面积近白，只有字是浓墨，装饰是极淡的墨晕。
+    case inkwash
+    /// 熔炉 —— 铸铁车间。近黑 + 铁橙，光像从缝隙里漏出来的。
+    case forge
+    /// 晨雾 —— 湖面的清晨。极淡的灰蓝渐变，字是雾前的远山色。
+    case mist
+    /// 赛博 —— 霓虹雨夜。深紫黑 + 品红与青的两道霓虹，只给车钉发光。
+    case neon
 
     var id: String { rawValue }
 
@@ -150,6 +262,22 @@ enum ArtTheme: String, CaseIterable, Identifiable {
         case .paper: return "纸上"
         case .typographic: return "巨字"
         case .native: return "原生"
+        case .frost: return "玻璃"
+        case .celadon: return "青釉"
+        case .darkroom: return "胶片"
+        case .phosphor: return "荧光"
+        case .dune: return "沙丘"
+        case .snowfield: return "雪夜"
+        case .blueprint: return "蓝图"
+        case .amber: return "琥珀"
+        case .brushed: return "银灰"
+        case .cellar: return "绛紫"
+        case .cinnabar: return "朱砂"
+        case .tundra: return "苔原"
+        case .inkwash: return "玄墨"
+        case .forge: return "熔炉"
+        case .mist: return "晨雾"
+        case .neon: return "霓虹"
         }
     }
 
@@ -160,6 +288,22 @@ enum ArtTheme: String, CaseIterable, Identifiable {
         case .paper: return "美来自印刷：纸面、墨线、红笔"
         case .typographic: return "美来自尺度：极细巨字对极小标注"
         case .native: return "美来自系统：语义色、分组表面、发丝线"
+        case .frost: return "美来自水汽：所有色隔着起雾的玻璃"
+        case .celadon: return "美来自釉：低温青灰，光只折不发"
+        case .darkroom: return "美来自暗房：暖红灯箱，黑里一颗亮点"
+        case .phosphor: return "美来自旧仪器：深绿面板、荧光读数"
+        case .dune: return "美来自晒过：高对比暖沙色，墨是赭的"
+        case .snowfield: return "美来自冷白：深蓝黑底，只留车灯暖圈"
+        case .blueprint: return "美来自工程线：深蓝底、白线、冷墨"
+        case .amber: return "美来自树脂：暖橙透明，光在色层里弯"
+        case .brushed: return "美来自磨砂钢：中性灰阶，异常才用色"
+        case .cellar: return "美来自瓶底透光：深绛紫面、葡萄紫高光"
+        case .cinnabar: return "美来自钤印：暖白宣纸，只有红是朱砂"
+        case .tundra: return "美来自冻土：低饱和青灰绿，光在雾后"
+        case .inkwash: return "美来自留白：大面积近白，字是浓墨"
+        case .forge: return "美来自缝隙透光：近黑底、铁橙从缝里漏出"
+        case .mist: return "美来自远山：灰蓝渐变，字是雾前的色"
+        case .neon: return "美来自雨夜霓虹：深紫黑，品红与青各一道"
         }
     }
 
@@ -170,6 +314,22 @@ enum ArtTheme: String, CaseIterable, Identifiable {
         case .paper: return "最贵：MapKit 画不出纸与墨，得自建地图样式"
         case .typographic: return "最省：地图退成极淡网格"
         case .native: return "现状：系统地图原样"
+        case .frost: return "系统瓦片盖 20% 冷白雾（磨砂玻璃感）"
+        case .celadon: return "瓦片盖 30% 青灰（釉色蒙版）"
+        case .darkroom: return "瓦片压到 75% 暗 + 暖红罩（暗房灯箱）"
+        case .phosphor: return "瓦片压到 80% 暗 + 深绿罩（旧仪器）"
+        case .dune: return "瓦片盖 25% 暖沙（晒过色温）"
+        case .snowfield: return "瓦片压到 70% 冷蓝黑（雪夜）"
+        case .blueprint: return "瓦片盖 45% 深蓝（蓝图蒙版）"
+        case .amber: return "瓦片盖 35% 暖橙（树脂色层）"
+        case .brushed: return "瓦片盖 30% 中性灰（磨砂钢）"
+        case .cellar: return "瓦片压到 75% 暗 + 深绛紫罩（瓶底光）"
+        case .cinnabar: return "瓦片盖 20% 暖白（宣纸色温）"
+        case .tundra: return "瓦片盖 40% 青灰绿（冻土雾）"
+        case .inkwash: return "瓦片盖 30% 近白（留白）"
+        case .forge: return "瓦片压到 85% 暗（铸铁车间）"
+        case .mist: return "瓦片盖 45% 灰蓝（晨雾）"
+        case .neon: return "瓦片压到 80% 暗 + 深紫黑罩（雨夜）"
         }
     }
 
@@ -281,6 +441,80 @@ enum ArtTheme: String, CaseIterable, Identifiable {
         // ---------------------------------------------------------------------
         case .native:
             return ArtTheme.nativeSpec
+        // -----------------------------------------------------------------
+        // 2026-09-24 第八轮新增 16 套：全部走 `ArtThemeSpec` 的便捷构造
+        //（只给核心色 + 装饰，其余字段按同一套规则推导 —— 见构造器头注）。
+        case .frost:
+            return ArtThemeSpec(canvas: artHex(0xE8F1F2), surface: artHex(0xF4F8F8),
+                                label: artHex(0x3A4A4C), accent: artHex(0x3E8C95),
+                                allowsGlow: true, displayWeight: .light,
+                                preferredScheme: .light)
+        case .celadon:
+            return ArtThemeSpec(canvas: artHex(0xE6E8E2), surface: artHex(0xF2F1EC),
+                                label: artHex(0x3C4A42), accent: artHex(0x4F7A68),
+                                decor: .paperGrain, allowsGlow: false, usesSerifTitles: true,
+                                displayWeight: .light, preferredScheme: .light)
+        case .darkroom:
+            return ArtThemeSpec(canvas: artHex(0x140806), surface: artHex(0x1E0E0A),
+                                label: artHex(0xF0C8A8), accent: artHex(0xE85A3A),
+                                decor: .lightPool, allowsGlow: true, preferredScheme: .dark)
+        case .phosphor:
+            return ArtThemeSpec(canvas: artHex(0x071008), surface: artHex(0x0D1A10),
+                                label: artHex(0x8CE8A8), accent: artHex(0x5AE87A),
+                                displayWeight: .light, preferredScheme: .dark)
+        case .dune:
+            return ArtThemeSpec(canvas: artHex(0xEDE3CE), surface: artHex(0xF6EEDC),
+                                label: artHex(0x5A4A30), accent: artHex(0xB5651D),
+                                usesSerifTitles: true, displayWeight: .light,
+                                preferredScheme: .light)
+        case .snowfield:
+            return ArtThemeSpec(canvas: artHex(0x0B1220), surface: artHex(0x111B2E),
+                                label: artHex(0xE8EEF6), accent: artHex(0x9FC8FF),
+                                decor: .lightPool, allowsGlow: true, preferredScheme: .dark)
+        case .blueprint:
+            return ArtThemeSpec(canvas: artHex(0x10284A), surface: artHex(0x16325C),
+                                label: artHex(0xDCE8F8), accent: artHex(0x7FB4E8),
+                                decor: .hairlineGrid, allowsGlow: false, preferredScheme: .dark)
+        case .amber:
+            return ArtThemeSpec(canvas: artHex(0x1A1206), surface: artHex(0x241808),
+                                label: artHex(0xF6E4C0), accent: artHex(0xE8A83A),
+                                decor: .lightPool, allowsGlow: true, preferredScheme: .dark)
+        case .brushed:
+            return ArtThemeSpec(canvas: artHex(0xE4E4E6), surface: artHex(0xF2F2F4),
+                                label: artHex(0x3A3A3E), accent: artHex(0x6A6A72),
+                                displayWeight: .semibold, preferredScheme: .light)
+        case .cellar:
+            return ArtThemeSpec(canvas: artHex(0x180E18), surface: artHex(0x221424),
+                                label: artHex(0xE8D8E8), accent: artHex(0x9A4E9A),
+                                decor: .lightPool, allowsGlow: true, preferredScheme: .dark)
+        case .cinnabar:
+            return ArtThemeSpec(canvas: artHex(0xF6F1E6), surface: artHex(0xFBF7EE),
+                                label: artHex(0x2A241C), accent: artHex(0xC0392B),
+                                usesSerifTitles: true, displayWeight: .light,
+                                preferredScheme: .light)
+        case .tundra:
+            return ArtThemeSpec(canvas: artHex(0xDDE4E2), surface: artHex(0xEAF0EE),
+                                label: artHex(0x44524E), accent: artHex(0x5E7A70),
+                                allowsGlow: false, preferredScheme: .light)
+        case .inkwash:
+            return ArtThemeSpec(canvas: artHex(0xF4F4F0), surface: artHex(0xFAFAF6),
+                                label: artHex(0x242420), accent: artHex(0x30302C),
+                                usesSerifTitles: true, displayWeight: .light,
+                                preferredScheme: .light)
+        case .forge:
+            return ArtThemeSpec(canvas: artHex(0x0C0A0A), surface: artHex(0x161212),
+                                label: artHex(0xE8DED4), accent: artHex(0xE86A2A),
+                                decor: .lightPool, allowsGlow: true, preferredScheme: .dark)
+        case .mist:
+            return ArtThemeSpec(canvas: artHex(0xE8EDEF), surface: artHex(0xF2F5F6),
+                                label: artHex(0x4A5A62), accent: artHex(0x6A8A94),
+                                allowsGlow: false, preferredScheme: .light)
+        case .neon:
+            return ArtThemeSpec(canvas: artHex(0x0E0A1A), surface: artHex(0x161026),
+                                label: artHex(0xE0D8F0), accent: artHex(0xE84AC8),
+                                decor: .lightPool, allowsGlow: true, preferredScheme: .dark,
+                                pageAccents: [artHex(0xE84AC8), artHex(0x4AE8C8), artHex(0x4A8AE8),
+                                              artHex(0x5AE87A), artHex(0xB44AE8), artHex(0xE84A5A)])
         }
     }
 
@@ -369,9 +603,10 @@ enum ArtThemeStore {
 }
 
 // MARK: - 颜色构造
-/// 顶层私有工具：0xRRGGBB + alpha → Color。
+/// 顶层工具：0xRRGGBB + alpha → Color。
 /// 用 `Color(.sRGB, ...)` 而不是 UIColor，是为了让取值在任何外观下都精确。
-private func artHex(_ hex: UInt32, alpha: Double = 1) -> Color {
+/// （2026-09-24 第八轮起不再 `private`：ArtThemeSpec 的便捷构造要用它。）
+func artHex(_ hex: UInt32, alpha: Double = 1) -> Color {
     Color(
         .sRGB,
         red: Double((hex >> 16) & 0xFF) / 255,

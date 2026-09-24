@@ -490,6 +490,10 @@ VERIFIED_SDK_ADDITIONS = {
     # 用户可以在「我的 → 设置」里换一张 / 不铺。两个 SDK 名对着文档核过：
     "URLSession": "Foundation.URLSession（iOS 8+；externalID c:objc(cs)URLSession；doc://com.apple.foundation/documentation/foundation/urlsession）——取在线壁纸图的唯一网络入口（`shared.data(from:)`）",
     "UIImage": "UIKit.UIImage（iOS 2+；externalID c:objc(cs)UIImage；doc://com.apple.uikit/documentation/UIKit/UIImage）——壁纸图本体（`UIImage(data:)` 构造、`Image(uiImage:)` 上屏）",
+    # 壁纸改版（同日，Unsplash 在线图不可靠改为相册本地选）：PhotosUI 三个名字对着文档核过：
+    "PhotosPicker": "PhotosUI.PhotosPicker（iOS 16+；decl: struct PhotosPicker<Selection, InvalidSelectionError, PhotosItem>；externalID doc://com.apple.photosui/documentation/PhotosUI/PhotosPicker）——系统相册选择器（本地取，不依赖网络）",
+    "PhotosPickerItem": "PhotosUI.PhotosPickerItem（iOS 16+；externalID doc://com.apple.photosui/documentation/PhotosUI/PhotosPickerItem）——相册选中的那一项（异步加载成 Data）",
+    "loadTransferable": "PhotosPickerItem.loadTransferable(type:)（iOS 16+；decl: func loadTransferable<T>(type: T.Type) async throws -> T?，T: Transferable；externalID doc://com.apple.photosui/documentation/PhotosUI/PhotosPickerItem/loadTransferable(type:)）——把选中的相册项异步读成 Data",
 }
 
 

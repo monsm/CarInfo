@@ -40,14 +40,16 @@ extension MapSpineView {
         var cls: String = "na"
     }
 
-    func readoutChips(_ d: MapSpineData) -> some View {
+    /// 4 格读数（裸的一行，不含玻璃壳）：排进 `nowCard` 大卡的下沿。
+    ///
+    /// 它和 `readoutChips`（独立玻璃卡）的区别：这里没有自己的 `GlassCard` 包裹 ——
+    /// 用户 2026-09-24 要求把 4 格「融合进大卡片」，于是大卡内部直接排这一行。
+    /// 排版权不变：四格同高同宽、同一基线（`readoutCell` 自己 `maxWidth: .infinity`）。
+    func readoutCells(_ d: MapSpineData) -> some View {
         let cells = readouts(d)
-        return GlassCard(accent: HomeMode.now.accent) {
-            // 四格等分：`readoutCell` 自己 `maxWidth: .infinity`，行里不摆任何偏移。
-            HStack(spacing: 9) {
-                ForEach(cells) { c in
-                    readoutCell(c)
-                }
+        return HStack(spacing: 9) {
+            ForEach(cells) { c in
+                readoutCell(c)
             }
         }
     }

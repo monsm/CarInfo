@@ -66,49 +66,19 @@ struct StackLabView: View {
         .padding(.bottom, TokensSpacing.sm)
     }
 
+    /// 叠法现在是唯一的（用户 2026-09-24：只用吸附堆叠，其他全删），
+    /// 所以对照页不再有「七选一」—— 这里显示一句固定说明。
     private var variants: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: TokensSpacing.sm) {
-                ForEach(StackVariant.allCases) { v in
-                    Button {
-                        variant = v
-                        StackSpec.remember(v)
-                        saved = v
-                        TokensHaptic.select()
-                    } label: {
-                        VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
-                            HStack(spacing: TokensSpacing.xs) {
-                                Text(v.title)
-                                    .font(TokensTypo.footnote)
-                                    .foregroundStyle(v == variant ? TokensPalette.labelOnTint
-                                                                  : TokensPalette.primary)
-                                if v == saved {
-                                    Image(safeSymbol: "checkmark", fallback: "checkmark")
-                                        .font(TokensTypo.micro)
-                                        .foregroundStyle(v == variant ? TokensPalette.labelOnTint
-                                                                      : TokensPalette.success)
-                                }
-                            }
-                            Text(v.note)
-                                .font(TokensTypo.micro)
-                                .foregroundStyle(v == variant ? TokensPalette.labelOnTint
-                                                              : TokensPalette.secondary)
-                                .lineLimit(1)
-                        }
-                        .padding(.horizontal, TokensSpacing.sm)
-                        .padding(.vertical, TokensSpacing.xs)
-                        .background {
-                            RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
-                                .fill(v == variant ? TokensPalette.accent : TokensPalette.fillSubtle)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text("\(v.title)，\(v.note)"))
-                    .accessibilityAddTraits(v == variant ? [.isSelected] : [])
-                }
-            }
-            .padding(.horizontal, TokensSpacing.md)
+        VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
+            Text("叠法：吸附堆叠（唯一）")
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.primary)
+            Text("松手停在哪儿就算哪儿 —— 不回弹、不自动吸到档位")
+                .font(TokensTypo.micro)
+                .foregroundStyle(TokensPalette.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, TokensSpacing.md)
     }
 
     private var followRow: some View {

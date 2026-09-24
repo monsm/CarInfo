@@ -475,6 +475,12 @@ struct MapSpineView: View {
         .padding(.horizontal, Self.barPad)
         .padding(.bottom, Self.barGap)
         .frame(maxWidth: .infinity)
+        // 跟手手势挂整条底条（用户 2026-09-24：「不跟手」）：手指按在**整条**上
+        //（不只是胶囊条上）就能拖。挂在容器上（而不是 `DSSwipeStrip` 内部）是因为
+        // 两侧圆钮是 `Button`，挂条子内部的 `highPriorityGesture` 会被圆钮的 tap 吃掉。
+        // 用 `simultaneousGesture` 让条子自己的拖拽与两侧的 tap 同时生效：
+        // 位移 < 8pt = 点按（圆钮 / 条子），位移 > 8pt = 拖（条子展开跟手）。
+        .simultaneousGesture(bottomBarDrag)
         // 量这一行（未加留白的宽度）—— 条子的可用宽度从这里来。
         // 用背景量而不是用 GeometryReader 包住整行：背景不参与布局，
         // 所以量宽度不会反过来改变底条的位置（那正是条子上一次的错法）。
@@ -643,24 +649,25 @@ struct MapSpineView: View {
                 // 只建当前那一档，于是「哪一档在建」直接决定了「谁在吃内存」。
                 .onAppear { StartupJournal.shared.mark("亮出屏幕：地图") }
         } else {
-            // 窗口 = 安全区顶（原型的 54 就是状态栏高，真机上安全区给出同一个数）
-            //      → 屏底 − 86（条子上沿）。
+            // 全屏：与地图页（`.now`）一样忽略顶部安全区 —— 状态栏不再「挡着」子页。
+            // 用户 2026-09-24：「地图页可以全屏没有状态栏，为什么子页面有时间信号
+            // 的状态栏挡着」。壁纸 / 画布铺到屏顶，内容窗仍停在安全区下（第一张卡是
+            // 巨字头，顶到安全区下沿即可），背景与地图页一样画到屏幕最上沿。
             pageContent(mode)
                 .padding(.bottom, Self.barTotal)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                // 五张子页的底色 = 壁纸图（在线取，失败回退画布）。
+                // 五张子页的底色 = 壁纸图（相册选的一张本地图，不依赖网络）。
                 // 之前这里是 `TokensPalette.canvas`（暗层，用户 2026-09-24 删）；
-                // 现在按「其他页面的背景全部设为当前桌面的背景」的要求：
-                // iOS 没有读壁纸的公开 API（壁纸归 SpringBoard 管），
-                // 所以铺一张在线风景图当壁纸（Unsplash 官方直链）。
-                // 不铺图时（`clear()`）回落到画布底色（`TokensPalette.canvas`），
+                // 现在按「其他页面的背景全部设为当前桌面的背景」的要求：iOS 读不到
+                // 主屏壁纸（无公开 API），只能从相册选一张本地图铺底（见 WallpaperService）。
+                // 没选图时（或点了「不铺」）回落到画布底色（`TokensPalette.canvas`），
                 // 观感上和删暗层之前一样 —— 只是从「暗层」变成「App 自己的画布」。
                 .background(wallpaperLayer())
-                .onAppear {
-                    // 子页出现就取一次壁纸（幂等：MineView 那行取过就早退，不重发）。
-                    wallpaper.loadImage()
-                    StartupJournal.shared.mark("亮出屏幕：\(mode.title)")
-                }
+                .ignoresSafeArea(edges: .top)
+                // 背景画到屏顶之后，内容窗仍停在安全区下沿（用户 2026-09-24：
+                // 子页不被状态栏挡，但字也不该压进状态栏底下）。
+                .safeAreaPadding(.top, 44)
+                .onAppear { StartupJournal.shared.mark("亮出屏幕：\(mode.title)") }
         }
     }
 
@@ -691,15 +698,16 @@ struct MapSpineView: View {
             // 删干净之后地图上只剩两样不是瓦片的东西：地名（自带 textShadow，不吃整屏亮度）
             // 与地图自己的仪表（罗盘 / 比例尺）。
 
-            // `.float{left:16;right:16;bottom:98;gap:12}`：底边离屏底 98
-            //（条子占 86 + 12 的呼吸位），两卡之间 12。
-            VStack(alignment: .leading, spacing: 12) {
-                nowCard(d)
-                readoutChips(d)
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, Self.barTotal + 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // `.float{left:16;right:16;bottom:98}`：底边离屏底 98（条子占 86 + 12 呼吸位）。
+            // 用户 2026-09-24：「地图页地下 4 个独立的车速/电量/胎压/车锁 融合进大卡片，
+            // 最上面的位置也删掉（和下面重复）」—— 于是这一档现在**只有一张大卡**：
+            // `nowCard` 内部自己把 4 格读数排进卡片下沿（见 `nowMetrics`），
+            // 卡头那行（车牌 + 图层胶囊 + 状态 + 上报时间）也删掉了 ——
+            // 它说的事（车牌、状态、新鲜度）都在大卡的正文里再说一遍，是重复。
+            nowCard(d)
+                .padding(.horizontal, 16)
+                .padding(.bottom, Self.barTotal + 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         // `.plate{left:20;top:62}`：车牌徽标挂在安全区下的左上角（62 ≈ 54 + 8）。
         // 原来这里挂着**车牌徽标**（车牌 + 状态 + 上报时间 + 菜单），压在安全区下 8pt。
@@ -814,8 +822,13 @@ struct MapSpineView: View {
     @ViewBuilder
     private func nowCard(_ d: MapSpineData) -> some View {
         GlassCard(accent: HomeMode.now.accent) {
-            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-                nowHead(d)
+            VStack(alignment: .leading, spacing: TokensSpacing.md) {
+                // 卡头一行（用户 2026-09-24：最上面那行与大卡内容重复，删掉；
+                // 只留一枚图层胶囊 —— 它是**控件**不是信息，不能跟着走）。
+                HStack(alignment: .firstTextBaseline) {
+                    Spacer(minLength: 0)
+                    layerMenu(d)
+                }
                 switch layer {
                 case .now:
                     if d.hasLocation == false {
@@ -824,41 +837,14 @@ struct MapSpineView: View {
                     } else {
                         nowMetrics(d)
                     }
+                    // 4 格读数（车速/电量/胎压/车锁）融进这张大卡的下沿（不再单铺一层）。
+                    readoutCells(d)
                 case .trips: tripsContent(d)
                 case .holds: holdsContent(d)
                 case .charge: chargeContent(d)
                 }
             }
         }
-    }
-
-    /// 卡头两行：**身份**（车牌）与**新鲜度**（状态 + 上报时间）。
-    ///
-    /// 这两行原来长在地图左上角的车牌徽标上（用户 2026-09-24：顶部信息挪进卡）。
-    /// 搬进来之后它比在图上更准：徽标浮在瓦片上，只能用重阴影把字从底图里抬出来；
-    /// 卡里它就是正文，遮罩与对比度全部由玻璃负责。
-    /// 右侧那枚胶囊是图层菜单（原徽标菜单，见 `layerMenu`）。
-    private func nowHead(_ d: MapSpineData) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-                Text(plateText(d))
-                    .font(TokensTypo.digits(15))
-                    .tracking(1.2)
-                    .foregroundStyle(TokensPalette.primary)
-                Spacer(minLength: 0)
-                layerMenu(d)
-            }
-            HStack(spacing: 6) {
-                statusDot(d.online)
-                Text("\(d.online.text) · 上报 \(d.updatedText)")
-                    .font(TokensTypo.caption)
-                    .foregroundStyle(TokensPalette.secondary)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(Text("\(d.online.text)，上报 \(d.updatedText)"))
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text("车牌 \(plateText(d))，\(d.online.text)，上报 \(d.updatedText)"))
     }
 
     /// 现状卡的读数：地址 → 巨字续航 → 副行 → 光带。
@@ -941,12 +927,10 @@ struct MapSpineView: View {
     @ViewBuilder
     private func wallpaperLayer() -> some View {
         ZStack {
-            // 底色兜底：没有图（失败 / 还没取到 / 点了「不铺」）就铺画布（AppCanvas 的颜色），
-            // 观感上和删暗层之前一样 —— 只是不再是「暗层」而是 App 自己的画布。
+            // 底色兜底：没选图（或点了「不铺」）就铺画布（跟随系统深浅色 ——
+            // 浅色模式浅灰、深色模式近黑，但那是 AppCanvas 的颜色，不再是「暗层」）。
             TokensPalette.canvas
-            // 图（在线取，幂等）：铺满全屏，`aspectRatio(.fill)` 让图裁满；失败时这里不画。
-            // 取图触发：子页 `pageBody` 的 `onAppear` 与 MineView 壁纸行的 `onAppear` 各调一次
-            // `loadImage()`（幂等，已有图就早退，不重发网络请求）。
+            // 选中的那张（相册本地取，不依赖网络）：铺满全屏，`aspectRatio(.fill)` 裁满。
             if let img = wallpaper.image {
                 Image(uiImage: img)
                     .resizable()
