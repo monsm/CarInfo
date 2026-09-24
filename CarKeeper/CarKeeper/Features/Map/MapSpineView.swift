@@ -824,8 +824,7 @@ struct MapSpineView: View {
             .accessibilityLabel(Text("\(d.online.text)，上报 \(d.updatedText)"))
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text("车牌 \(plateText(d))") +
-                            Text("，\(d.online.text)，上报 \(d.updatedText)"))
+        .accessibilityLabel(Text("车牌 \(plateText(d))，\(d.online.text)，上报 \(d.updatedText)"))
     }
 
     /// 现状卡的读数：地址 → 巨字续航 → 副行 → 光带。
@@ -1091,22 +1090,21 @@ struct MapSpineView: View {
                                             latitudinalMeters: 8000,
                                             longitudinalMeters: 8000)
         let search = MKLocalSearch(request: request)
-        // 用完成回调版（项目里已有同样写法，编译过）；回调里再回主线程写状态。
-        search.start { response, _ in
-            guard let response else { return }
-            let found: [MapCharger] = response.mapItems.enumerated().map { idx, item in
-                MapCharger(
-                    id: "c\(idx)-\(item.name ?? "")",
-                    coordinate: item.location.coordinate,
-                    name: item.name ?? "充电站",
-                    distanceMeters: item.location.distance(from: car),
-                    isEVCharger: item.pointOfInterestCategory == .evCharger
-                )
-            }
-            let sorted = found.sorted { $0.distanceMeters < $1.distanceMeters }
-            // 不再只取最近 12 个：那是权宜之计（画不全、也说不清为什么是 12）。
-            // 取回全部（上限 60 = 一次搜索的实际返回量），由聚合决定画成一个圈还是几个圈。
-            Task { @MainActor in chargers = Array(sorted.prefix(60)) }
+        // 用 async 重载（SDK 26 起有，返回类型与回调版一致）——
+        // 我们本来就在 async 上下文里，少一层完成回调，也少一次绕回主线程的往返。
+        guard let response = try? await search.start() else { return }
+        let found: [MapCharger] = response.mapItems.enumerated().map { idx, item in
+            MapCharger(
+                id: "c\(idx)-\(item.name ?? "")",
+                coordinate: item.location.coordinate,
+                name: item.name ?? "充电站",
+                distanceMeters: item.location.distance(from: car),
+                isEVCharger: item.pointOfInterestCategory == .evCharger
+            )
         }
+        let sorted = found.sorted { $0.distanceMeters < $1.distanceMeters }
+        // 不再只取最近 12 个：那是权宜之计（画不全、也说不清为什么是 12）。
+        // 取回全部（上限 60 = 一次搜索的实际返回量），由聚合决定画成一个圈还是几个圈。
+        chargers = Array(sorted.prefix(60))
     }
 }

@@ -84,11 +84,13 @@ final class StartupJournal: @unchecked Sendable {
         lines = []
         bytes = 0
 
-        let cur = url(currentName)
-        let prev = url(previousName)
-        if let text = Self.read(cur), let prev {
-            try? FileManager.default.removeItem(at: prev)
-            try? text.write(to: prev, atomically: true, encoding: .utf8)
+        // 路径取不到（沙盒目录缺失）时**不静默放过**：那样「上一次」永远是空的，
+        // 而空轨迹会被读成「上一次启动是好的」—— 正好反了。所以先取新迹，再留档。
+        if let cur = url(currentName), let text = Self.read(cur) {
+            if let prev = url(previousName) {
+                try? FileManager.default.removeItem(at: prev)
+                try? text.write(to: prev, atomically: true, encoding: .utf8)
+            }
             try? FileManager.default.removeItem(at: cur)
         }
         add("＝ 这一次启动 \(Self.stamp()) ＝ \(Self.versionLine())")

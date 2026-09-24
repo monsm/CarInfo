@@ -2049,3 +2049,35 @@ HANDOFF §1.1 一直写着本地该跑的那个 `for s in ...` 循环，清单**
 不为它多开 SDK 名字）；`atomically` 是故意的 —— 进程被处决也不会留下半份文件，
 而半份文件的「最后一行」会骗人。
 
+---
+
+## 编译修复：`URL?` 与三条警告（2026-09-24 第八轮）
+
+`beff2b5`（玻璃胶囊放大）在 CI 上编译失败，只有一条错误：
+`StartupJournal.swift:92` —— `begin()` 留档上一次轨迹时，
+`if let text = Self.read(cur), let prev` 只解开了「上一次」，
+而下面 `removeItem(at: cur)` 里的 `cur` 还是 `URL?`。
+**本机没有 Swift 工具链，这条错误只有 CI 能看见** —— 而它就长在这一轮新写的文件里。
+
+改法是拆成两段（而不是把 `cur` 塞进同一个 `if let`）：
+拿不到新迹的路径时**不能静默放过** —— 那样「上一次」永远是空的，
+而空轨迹会被 `previousRun()` 读成「上一次启动是好的」，正好反了。
+
+同一次构建还报出三条警告，一并清掉：
+· `API.swift` 的 `withRefresh { [self] in }` —— 这个捕获从头到尾没被用过（编译器原话）；
+· `MapSpineView.swift` 的 `Text(…​) + Text(…)` —— iOS 26 起 `+` 已弃用，合成一个插值 `Text`；
+· `MapSpineView.swift` 的 `MKLocalSearch.start { }` —— 换 SDK 26 的 async 重载，
+  那层「回调里再 `Task { @MainActor in … }` 跳回主线程」也随之去掉
+  （函数本来就是 `@MainActor` 的 async）。
+
+### 顺带：`scan/all.py` 在 Windows 上因为「打不出对勾」而崩
+
+同一轮本地验证里当场发现的：这台机器的控制台是 GBK，`print("  ✅ …")` 直接
+`UnicodeEncodeError` —— 一个用来保证「本地全跑」的脚本，自己先崩了。
+两处改：① `stdout.reconfigure(errors="replace")`（**只改 errors，不换 encoding**：
+中文在 GBK 里是能打的，打不出的只有 ✅/❌）；② 符号显式降级为 `[通过]` / `[红]` ——
+若只做①，✅ 与 ❌ 会同时变成 `?`，那正是本仓库最忌讳的「红绿长得一样」。
+子进程再给 `PYTHONIOENCODING=utf-8`：否则它们会因为同一件事崩，
+而「子进程崩了」会被误读成「门禁红了」。
+探针：临时移走 `check_style.js` → 红行打出 `[红]`、其余打出 `[通过]`，文件当场还原。
+

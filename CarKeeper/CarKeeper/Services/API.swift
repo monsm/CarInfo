@@ -446,7 +446,7 @@ final class APIClient: @unchecked Sendable {
         // AppStore 是 @MainActor；parseMessages 会在协作线程跑，不能在那里假设主线程。
         // 在 getMessages（主线程入口）先取 cars 快照，再传给 parseMessages。
         let cars = await MainActor.run { AppStore.shared.cars }
-        return try await withRefresh { [self] in
+        return try await withRefresh {
             let api = APIClient.shared
             let windows = Self.messageWindows(days: Self.messageDays,
                                               sliceDays: Self.messageSliceDays)

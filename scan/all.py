@@ -58,23 +58,60 @@ def gates_from_workflow(text):
     return names
 
 
+def _safe(text, fallback):
+    """控制台打不出这个符号就用 ASCII 退路 —— 绿行与红行**不能长得一样**。
+
+    只改 `errors` 的话，✅ 与 ❌ 会同时变成 `?`：那正是本仓库最忌讳的
+    「没跑」与「跑了没问题」难分。所以符号在这里显式降级。
+    """
+    try:
+        text.encode(sys.stdout.encoding or "utf-8")
+        return text
+    except (UnicodeEncodeError, LookupError, AttributeError):
+        return fallback
+
+
+def use_console_safe_output():
+    """让本脚本在 Windows 控制台上**打不出字也不会崩**。
+
+    2026-09-24 实测：这一台机器的控制台是 GBK，`print("  ✅ …")` 当场
+    `UnicodeEncodeError` —— 于是「一键跑齐全部门禁」在最需要它的那台机器上，
+    以「打不出对勾」为理由崩掉。这里只改 `errors`（不换 encoding）：
+    中文在 GBK 里是能打的，打不出的只有 ✅/❌ 这类符号，替换成 `?` 即可。
+
+    子进程则显式给 `PYTHONIOENCODING=utf-8`（见 `run`）：一来子进程不会因为
+    同一件事崩（那会被误读成「门禁红了」），二来我们按 utf-8 解出来的中文是准的。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def run(cmd):
     """跑一条，返回 (rc, 合并输出)。"""
-    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "utf-8"
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
     out = p.stdout.decode("utf-8", "replace")
     return p.returncode, out
 
 
 def main():
+    use_console_safe_output()
+    ok = _safe("✅", "[通过]")
+    bad = _safe("❌", "[红]")
+    cross = _safe("✗", "[红]")
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     os.chdir(root)
 
     if not os.path.exists(WORKFLOW):
-        print(f"❌ 找不到 {WORKFLOW} —— 清单只能从这里读")
+        print(f"{bad} 找不到 {WORKFLOW} —— 清单只能从这里读")
         return 1
     names = gates_from_workflow(read(WORKFLOW))
     if names is None:
-        print(f"❌ 没能从 {WORKFLOW} 里解析出检查器清单。")
+        print(f"{bad} 没能从 {WORKFLOW} 里解析出检查器清单。")
         print("   它应当是 `for s in <名字列表>; do python3 scan/$s.py; done` 这一段。")
         print("   工作流改了写法就要同步改这里 —— 绝不能在这份脚本里另抄一份清单：")
         print("   抄一份的后果是 CI 加了门禁、本地却不知道，于是本地永远绿。")
@@ -89,31 +126,31 @@ def main():
     if rc != 0:
         failed.append("check_style.js")
         print("=" * 72)
-        print("✗ check_style.js")
+        print(f"{cross} check_style.js")
         print("=" * 72)
         print(out.rstrip())
     else:
-        print(f"  ✅ {'check_style.js':<16} {out.strip().splitlines()[-1][:60] if out.strip() else ''}")
+        print(f"  {ok} {'check_style.js':<16} {out.strip().splitlines()[-1][:60] if out.strip() else ''}")
 
     for name in names:
         rc, out = run([sys.executable, os.path.join("scan", name + ".py")])
         if rc != 0:
             failed.append(name + ".py")
             print("=" * 72)
-            print(f"✗ scan/{name}.py")
+            print(f"{cross} scan/{name}.py")
             print("=" * 72)
             print(out.rstrip())
         else:
             tail = out.strip().splitlines()[-1] if out.strip() else ""
-            print(f"  ✅ {name + '.py':<16} {tail[:60]}")
+            print(f"  {ok} {name + '.py':<16} {tail[:60]}")
 
     print()
     if failed:
-        print(f"❌ {len(failed)} / {len(names) + 1} 条红：" + "、".join(failed))
+        print(f"{bad} {len(failed)} / {len(names) + 1} 条红：" + "、".join(failed))
         print("   逐条修掉再提交 —— CI 的静态门用的是同一份清单，本地红它一定红。")
         return 1
 
-    print(f"✅ 全部 {len(names) + 1} 条通过（本地能验的就是这些）。")
+    print(f"{ok} 全部 {len(names) + 1} 条通过（本地能验的就是这些）。")
     print("   编译仍然只有 CI 能验：Swift 工具链不在这台机器上。")
     return 0
 
