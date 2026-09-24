@@ -8,9 +8,12 @@ import SwiftUI
 //  在回答哪个问题。它不是「导航」，因为它**不换屏** —— 换的是同一块画布上
 //  同一张纸里的内容。
 //
-//  形态是量出来的（用户 2026-09-23 提供的 iOS 27 相机截图，按像素量过再按比例落成）：
-//    · 横条是**圆角矩形**，圆角 0.31 × 条高（不是胶囊形）
-//    · 选中指示是一枚**玻璃透镜**，高 0.85 × 条高，左右各留 0.37 × 条高
+//  形态是量出来的（用户 2026-09-23 / 2026-09-24 两次提供相机截图，按像素量过再落成）：
+//    · 横条是**胶囊**（两端半圆），不是圆角矩形 —— 2026-09-24 的三张截图里，
+//      外轨与选中格都是胶囊（`.bottom` 那条 3 格轨道最清楚：半圆的头尾各一个）
+//    · 选中指示是一枚**胶囊**，高 0.85 × 条高，左右各留 0.37 × 条高
+//    · 选中那一档的字是**主题强调色**（相机里是黄），其余是正文色 —— 相机用「颜色」
+//      而不是「加粗」标出当前那一档，玻璃胶囊已经把「位置」说清楚了
 //    · 相邻标签间距恒定 0.73 × 条高（所以静止只露得下三档）
 //    · 静止时第 4 档的**头一个字母被条自己的圆角边硬裁**掉 ——
 //      这一条决定了整个做法：**静止只露三档是「条宽」造成的，不是屏幕不够宽**。
@@ -233,7 +236,8 @@ struct DSSwipeStrip: View {
     // =========================================================================
 
     private func bar(width: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: barHeight * 0.31, style: .continuous)
+        // 胶囊（不是圆角矩形）：相机那条外轨的两端是**半圆**。
+        let shape = Capsule()
         return shape
             .fill(TokensPalette.fillSubtle)
             .glassEffect(.regular, in: shape)
@@ -242,11 +246,12 @@ struct DSSwipeStrip: View {
             .allowsHitTesting(false)
     }
 
-    /// 玻璃透镜。它**钉在条正中**，永远不动 —— 「选中谁」由 `c` 把哪个字送到正中决定。
+    /// 选中格（胶囊）。它**钉在条正中**，永远不动 —— 「选中谁」由 `c` 把哪个字送到正中决定。
     /// 第一版在这里用 `pvValue(c)` 反算位置，那是一个恒等变换（ideal(pvValue(c)) == c），
     /// 算出来的 x 永远等于 width/2；留着它只会让人以为透镜会动。
     private func capsule(gap: CGFloat, barW: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: barHeight * 0.85 * 0.33, style: .continuous)
+        // 选中格同样是胶囊 —— 相机里「选中」就是一枚住在轨道里的胶囊。
+        let shape = Capsule()
         return shape
             .fill(TokensPalette.glassHighlight)
             .overlay { shape.strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border) }
@@ -265,7 +270,10 @@ struct DSSwipeStrip: View {
                     Text(item.title)
                         .font(TokensTypo.fixed(15, weight: .semibold))
                         .tracking(TokensTracking.label)
-                        .foregroundStyle(i == index ? TokensPalette.primary : TokensPalette.secondary)
+                        // 选中 = 主题强调色（相机里那一档是黄），其余 = 正文色。
+                        // 两档字的字重与字号**一样** —— 相机也是用颜色而不是加粗区分，
+                        // 而比较粗的字会让相邻两档的行宽不一致，条子会跟着抖一下。
+                        .foregroundStyle(i == index ? TokensPalette.accent : TokensPalette.primary)
                         .frame(width: slot)
                         .position(x: x, y: barHeight / 2)
                         .accessibilityLabel(Text(item.title))
@@ -283,8 +291,9 @@ struct DSSwipeStrip: View {
         // 少了这一步，半压在条边上的那个字会**漏到条外** ——
         // 而条是带圆角的，露出去的那半截正好把「静止只露三档」这个形态破掉。
         .mask {
-            RoundedRectangle(cornerRadius: barHeight * 0.31, style: .continuous)
-                .frame(width: barW, height: barHeight)
+            // 遮罩必须与条子**同一个形状**：条是胶囊，遮罩也得是胶囊，
+            // 否则半压在条端的那个字会从圆角外面漏出来。
+            Capsule().frame(width: barW, height: barHeight)
         }
         .allowsHitTesting(false)
     }

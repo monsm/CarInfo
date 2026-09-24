@@ -42,12 +42,18 @@ enum StackSpec {
     //     于是「往下滑到底，第一张不离开顶；往上滑到底，最后一张不离开底」——
     //     两端都是贴边的，而不是留一条空带。
 
-    /// 吸附的判据来自原型 `startSettle`：
-    ///   · 方向偏置 0.85 → 临界点约 47%（小于它退回原来那张，过了就往手指方向那张去）
-    ///   · 峰值速度超过阈值 → 甩出去的直接再走一格
-    /// 原型里那个 0.55 的单位是 px/ms（500~600 px/s），换算过来就是这里这个数。
-    static let directionBias = CGFloat(0.85)
-    static let flingVelocity = CGFloat(550)
+    /// 吸附的判据来自原型 `startSettle`，但**强度已按用户 2026-09-24 的要求减弱**：
+    /// 「上下滚动的页面减弱吸附效果」。三个数各管一件事：
+    ///
+    ///   · `directionBias` 1 → 临界点**正好一半**（原型是 0.85，约 47%）。
+    ///     0.85 的含义是「往手指方向的那个落点便宜一成半」—— 轻推一下就会被吸过去；
+    ///     1 则是「拖过一半才换张」。这是「吸附感」最主要的来源。
+    ///   · `flingVelocity` 550 → 900 px/s：原型那个 0.55 px/ms 换算过来是 550，
+    ///     但那个值会让一次普通滑动就多跳一格（落点比手指想去的那张还远一张）。
+    ///     900 只在真的甩出去时才触发，落到「你确实想过一张」的地方。
+    ///   · `settle` 弹簧变软（见下）：同样落点，拉过去的那一下不再“嗖”地一下。
+    static let directionBias = CGFloat(1.0)
+    static let flingVelocity = CGFloat(900)
 
     /// 拖动的跟手滞后：形变（弧度/缩放）比位移晚一点点，所以是「追上来再贴合」。
     static let shapeLag = Animation.spring(response: 0.16, dampingFraction: 0.92)
@@ -69,10 +75,13 @@ enum StackSpec {
         UserDefaults.standard.set(v.rawValue, forKey: variantKey)
     }
 
-    /// 回落用的弹簧。阻尼比 ≈ 0.67 → 过冲约 5%，那一下就是「吸住」。
+    /// 回落用的弹簧。阻尼比 ≈ 0.7 → 过冲约 5%，那一下就是「吸住」。
     /// 用 `interpolatingSpring` 而不是 `easeOutBack` 是因为前者能被手指打断
     /// （原地重开一个 withAnimation 就接管了），后者是个不可打断的自动播放。
-    static let settle = Animation.interpolatingSpring(mass: 1, stiffness: 180, damping: 18)
+    ///
+    /// 刚度 180 → 130（用户 2026-09-24「减弱吸附效果」）：180 是「被吸过去」，
+    /// 130 是「滑过去」。阻尼比同时从 0.67 收到 0.7，过冲跟原来一样。
+    static let settle = Animation.interpolatingSpring(mass: 1, stiffness: 130, damping: 16)
 
     /// 回落弹簧，带**手指那一瞬的速度**。
     ///
@@ -81,8 +90,8 @@ enum StackSpec {
     /// 轻推都是同一条曲线：差别只剩「落在哪一张」，手上没有「顺着惯性冲过去」那一下。
     /// 上限 ±8：手势里那一帧的峰值速度可能极大，不封顶会甩到天上。
     static func settle(velocity: CGFloat) -> Animation {
-        let v = Double(min(max(velocity, -8), 8))
-        return Animation.interpolatingSpring(mass: 1, stiffness: 180, damping: 18,
+        let v = Double(min(max(velocity, -5), 5))
+        return Animation.interpolatingSpring(mass: 1, stiffness: 130, damping: 16,
                                              initialVelocity: v)
     }
 }
@@ -141,9 +150,19 @@ enum StackVariant: String, CaseIterable, Identifiable {
         case .arc:
             // tiltDeg = 0：用户 2026-09-23 明确要求「卡片显示保持正常，不要倾斜特效」。
             // 叠叠乐的艺术感由消失带与间距支撑，不靠把卡转个角度。
+            //
+            // fadeBottom 140 → 44（用户 2026-09-24：「最后一个卡片的底部不能离开页面
+            // 底部太多」）：可滚范围的末端就是这条消失带的上沿（见 `ArcStack.endScroll`），
+            // 所以 140 意味着「滑到底时，末卡底边距卡片窗底沿 140pt」—— 一个手掌高的空白。
+            // 44 是「留一条呼吸位，但看得见它贴着底」。
+            //
+            // shrink 0.07 → 0.03（同一条：「滚动过程中的卡片大小差异有点大，减弱下」）：
+            // 0.07 时两张之外就缩到 0.895，读起来像「远的那张是另一个东西」；
+            // 0.03 时最远只缩到 0.955 —— 大小差异还在（它标出哪张在阅读线上），
+            // 但不再像两个尺寸。
             return StackMetrics(kind: .flow, padTop: 152, padBottom: 180, gap: 20,
-                                fadeTop: 150, fadeBottom: 140,
-                                tiltDeg: 0, shrink: 0.07, fadeOut: 0.16)
+                                fadeTop: 150, fadeBottom: 44,
+                                tiltDeg: 0, shrink: 0.03, fadeOut: 0.16)
         case .sticky:
             // 卡片至少要有一屏高的六成才吸得住（太矮就永远滚不到贴顶那一步）
             return StackMetrics(kind: .flow, padTop: 16, padBottom: 90, gap: 14,

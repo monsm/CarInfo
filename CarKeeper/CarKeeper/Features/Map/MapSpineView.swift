@@ -160,6 +160,9 @@ struct MapSpineView: View {
     private static let armSize: CGFloat = 50
     /// 底条两侧留白（原型 `.bottom{padding:0 8px}`）
     private static let barPad: CGFloat = 8
+    /// 右臂交出的一条车控请求。它由 `controlCommandFlow` 那道门消费 ——
+    /// 验证与温度都在门里，本页只负责把请求交出去（与车控档同一个 modifier）。
+    @State private var quickRequest: ControlRequest?
     /// 这一行能分到多宽（由 `bottomBar` 的背景量出；0 = 还没量到）。
     ///
     /// 它是**条子几何的唯一来源**：`DSSwipeStrip` 自己量不到这个数 ——
@@ -196,6 +199,10 @@ struct MapSpineView: View {
         // 保养的「添加记录」在那一张卡里（一个动作），见各自文件。
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showSky) { skySheet(d).dsSheetCanvas() }
+        // 右臂那几条会改车状态的快捷指令走**唯一那道门**：温度 → 生物识别 → 控车码。
+        // 它挂在“现在”这一档（右臂就在这里），sheet 盖在地图上 ——
+        // 不把用户推到车控页（一条锁车指令不该让人离开地图）。
+        .controlCommandFlow($quickRequest)
         .task {
             await refresh()
             centerOnCar(force: true)
@@ -509,7 +516,15 @@ struct MapSpineView: View {
             ForEach(Self.quickCommands, id: \.key) { c in
                 Button {
                     TokensHaptic.tap()
-                    Task { await sendQuick(c) }
+                    if c.changesState {
+                        // 会改车状态的那几条 → 交给**唯一那道门**（温度 → 生物识别 → 控车码）。
+                        // 用户 2026-09-24：「右下角的控车选了后不用输入密码？不用选温度？」
+                        // 之前这里直接调 `store.sendControlCommand`（拿 Keychain 里的旧码就发），
+                        // 而车控档要走三步 —— 同一个动作两套强度，安全的那条形同虚设。
+                        quickRequest = ControlRequest(key: c.key, name: c.name)
+                    } else {
+                        Task { await refreshCondition(c) }
+                    }
                 } label: {
                     Label(c.name, systemImage: c.symbol)
                 }
@@ -520,7 +535,7 @@ struct MapSpineView: View {
         .buttonStyle(.plain)
         .modifier(ArmSlot(open: barOpen, size: Self.armSize))
         .accessibilityLabel(Text("快捷车控"))
-        .accessibilityHint(Text("锁车、解锁、闪灯、鸣笛、远程寻车、刷新车况"))
+        .accessibilityHint(Text("锁车、解锁、闪灯、鸣笛、远程寻车（需控车码）、刷新车况"))
     }
 
     /// 一条快捷指令（key = 真实指令名，与车控页的 `hero` / `moreCommands` 同一套）
@@ -528,6 +543,9 @@ struct MapSpineView: View {
         let key: String
         let name: String
         let symbol: String
+        /// 会不会改变车的状态。false = 刷新类 —— 它不过那道门，
+        /// 因为门的成本是用户手输控车码，而这份成本只该收在「会改变车状态」的动作上。
+        var changesState: Bool = true
     }
 
     private static let quickCommands: [QuickCommand] = [
@@ -538,11 +556,13 @@ struct MapSpineView: View {
         QuickCommand(key: "RemoteSearchCar", name: "远程寻车", symbol: "location.fill"),
         // 它不是「再拉一次接口」：服务端只会回放同一份快照（API-FIELD-MAP §4.9），
         // 想把数字变新只能把车端叫醒 —— 而这是全项目唯一能叫醒车端的那条指令。
-        QuickCommand(key: "UpCarCondition", name: "刷新车况", symbol: "arrow.clockwise")
+        QuickCommand(key: "UpCarCondition", name: "刷新车况", symbol: "arrow.clockwise",
+                     changesState: false)
     ]
 
-    /// 发一条车控指令。成功与失败都照实说一句 —— 遥控制的提示不能只报喜。
-    private func sendQuick(_ c: QuickCommand) async {
+    /// **刷新车况**：不过那道门。它不改车的任何状态，只是把车端叫醒、让它上报一次。
+    /// 成功与失败都照实说一句 —— 遥控制的提示不能只报喜。
+    private func refreshCondition(_ c: QuickCommand) async {
         let ok = await store.sendControlCommand(c.key)
         EnhancedToastManager.shared.show(ok ? "\(c.name)指令已发送" : "\(c.name)发送失败",
                                          icon: ok ? c.symbol : "exclamationmark.triangle.fill")
@@ -744,11 +764,16 @@ struct MapSpineView: View {
     }
 
     /// 「现在」这一档的浮动首卡。形态与内容都照原型 `.float > .card`：
-    ///   头  `.hd`   =「当前位置」+「这份读数有多新」
+    ///   头  `.hd`   = 车牌 + 状态 · 上报时间（原图左上那枚徽标，2026-09-24 搬进卡）
     ///   地址 `.ch`  = 车端上报的那句地址（大字）
     ///   巨字 `.big` = **续航**（原型大字就是 412 km 续航，不是电量百分比）
-    ///   副行 `.sub` = 电量 · 表显里程 · 充不充电
+    ///   副行 `.sub` = 表显里程 · 充不充电
     ///   光带 `.gain`= 电量（全 App 唯一的形状）
+    ///
+    /// 一页之内一个事实只有一个出处（用户 2026-09-24：「地图页的信息有很多是重复的」）：
+    /// 电量与胎压都归下面那排四格读数 ── 卡里再说一遍「电量 68%」、
+    /// 再排一行四轮胎压，就是同一句话说两遍。
+    /// 四轮胎压的**逐轮细节**在「车辆 → 体检」里；首页只留一格「最低的那一条」。
     /// 换了图层（行程 / 停车 / 充电站）时换成那一层的内容 ——
     /// 于是「图上在看哪个问题」与「读它的数」是同一张卡，不必再多一张选择卡。
     @ViewBuilder
@@ -802,7 +827,7 @@ struct MapSpineView: View {
                             Text("，\(d.online.text)，上报 \(d.updatedText)"))
     }
 
-    /// 现状卡的读数：地址 → 巨字续航 → 副行 → 光带 → 四轮胎压。
+    /// 现状卡的读数：地址 → 巨字续航 → 副行 → 光带。
     @ViewBuilder
     private func nowMetrics(_ d: MapSpineData) -> some View {
         if !d.address.isEmpty {
@@ -825,16 +850,17 @@ struct MapSpineView: View {
                    height: 5,
                    showsGlow: spec.allowsGlow,
                    tint: TokensPalette.lightBar)
-        tyreRow(d)
     }
 
-    /// 副行。空段直接丢掉（不摆占位）—— 「电量 68% · 表显 53,766 km · 未充电」
-    /// 里任何一个字取不到，那一句就不出现，而不是留一个 `--`。
+    /// 副行。空段直接丢掉（不摆占位）—— 「表显 53,766 km · 未充电」里任何一个字
+    /// 取不到，那一句就不出现，而不是留一个 `--`。
+    ///
+    /// 它曾经从「电量 68%」开头 —— 那个数已经是下面四格里的「电量」那一格，
+    /// 而电量在这张卡里还有第三种说法（光带）。一个 68% 说三遍不是信息多，是没精简。
     @ViewBuilder
     private func nowSub(_ d: MapSpineData) -> some View {
         let mileage = VM.vehicleSummary(store.car, store.controlCache)?.mileage
-        let line = Self.join(["电量 \(d.socPct)%",
-                              mileage.map { "表显 \($0) km" },
+        let line = Self.join([mileage.map { "表显 \($0) km" },
                               d.chargeText])
         if !line.isEmpty {
             Text(line)
@@ -964,33 +990,10 @@ struct MapSpineView: View {
         case .mine: MineView()
         }
     }
-    /// 四轮胎压：一条安静的事实行。**任何一轮没真读到，整行就不出现** —— 不摆占位符。
-    /// 报警位是车端自己置的（LfPressureWarning），颜色取自主题的 error，不是写死的红。
-    @ViewBuilder
-    private func tyreRow(_ d: MapSpineData) -> some View {
-        if !d.tyres.isEmpty {
-            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.md) {
-                ForEach(d.tyres) { t in
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text(t.label)
-                            .font(TokensTypo.caption2)
-                            .foregroundStyle(TokensPalette.tertiary)
-                        Text(t.kpa)
-                            .font(TokensTypo.caption.monospacedDigit())
-                            .foregroundStyle(t.warn ? TokensPalette.error : TokensPalette.secondary)
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel(Text(t.warn
-                        ? "\(t.label)胎压 \(t.kpa) 千帕，报警"
-                        : "\(t.label)胎压 \(t.kpa) 千帕"))
-                }
-                Spacer(minLength: 0)
-                Text("kPa")
-                    .font(TokensTypo.caption2)
-                    .foregroundStyle(TokensPalette.tertiary)
-            }
-        }
-    }
+    //  这里原本有一条 `tyreRow`：四轮胎压逐轮排在卡里（标签 + kPa + 报警色）。
+    //  它把下面四格里的「胎压」说了第二遍 —— 四格里那一格取的是**最低的那一条**
+    //  （报警时同样是 error 色），所以挪走它并不丢掉「哪一轮危险」这件事。
+    //  逐轮的完整一行在「车辆 → 体检」；首页只做一瞥（用户 2026-09-24：精简重复信息）。
 
 
     // =========================================================================

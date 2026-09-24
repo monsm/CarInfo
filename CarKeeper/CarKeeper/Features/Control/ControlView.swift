@@ -82,15 +82,12 @@ struct ControlView: View {
     @State private var historyFilter = "all"
     @State private var expandedRuns: Set<UUID> = []
 
-    @State private var showPin = false
-    @State private var showBiometricLock = false  // #N13 生物识别二次验证
-    @State private var isAuthenticated = false
-    @State private var showTemp = false
     @State private var showMoreCommands = false
-    @State private var pendingCmd = ""
-    @State private var pendingTemp = 25
-    @State private var pinDigits = ""
-    @State private var tempDisplayCount: Int = 0   // HeroDisc 温度数字滚动计数（0→pendingTemp）
+    /// 一条车控请求。验证、温度、下发都在 `controlCommandFlow` 那道门里 ——
+    /// 这一页只负责把请求交出去。用户 2026-09-24 指出的两套强度就出在这里：
+    /// 地图右臂直接调 `AppStore.sendControlCommand`（拿 Keychain 里的旧码就发），
+    /// 而本页要走温度 → 生物识别 → 控车码。现在两边挂的是同一个 modifier。
+    @State private var request: ControlRequest?
     @State private var isRefreshing = false         // 下拉刷新进行中
     // 原先这里还有个 `@EnvironmentObject var nav` —— 全文件一次都没用过
     // （本页从不 push 别的页面），已删。留着的代价是：一旦这一屏改用 sheet 呈现，
@@ -283,13 +280,15 @@ struct ControlView: View {
     var body: some View {
         StackPageView(accent: HomeMode.control.accent, label: "车控", cards: cards)
         .pageBackground()
+        // 车控指令的**唯一**那道门：温度 → 生物识别 → 控车码 → 下发。
+        // 它原先长在这一页里（三个 sheet + 一个遮罩共 60 行），地图右臂就绕过去了；
+        // 现在它是一处 modifier，两处发起处挂同一个（见 `ControlCommandFlow`）。
+        .controlCommandFlow($request)
         .refreshable {
-            tempDisplayCount = 0
             // 数字归零
             Task {
                 await refreshControlCache()
             }
-            // 数据回来后自动重播计数动画（pendingTemp 不变，onChange 会触发）
         }
         .dsPageTitle("车控")
             .accessibilityLabel(Text("车控"))
@@ -307,38 +306,7 @@ struct ControlView: View {
                 }
             }
         }
-        .sheet(isPresented: $showPin) {
-            PINKeypadView()
-                .onReceive(NotificationCenter.default.publisher(for: .pinConfirmed)) { note in
-                    if let pin = note.object as? String {
-                        pinDigits = pin
-                        showPin = false
-                        // #8 首次输入PIN后保存到Keychain
-                        if store.readPin() == nil {
-                            store.savePin(pin)
-                            EnhancedToastManager.shared.show("PIN码已安全保存", icon: "key.fill")
-                        }
-                        // 与地图上的常驻操作条走**同一条**执行路径
-                        commands.send(cmd: pendingCmd,
-                                      temperature: pendingCmd == "OpenAir" ? pendingTemp : 17,
-                                      pin: pin,
-                                      displayName: nameOf(pendingCmd))
-                    }
-                }
-                .dsSheetCanvas()
-        }
-        .sheet(isPresented: $showTemp) {
-            ACStepperView(initialTemp: $pendingTemp)
-                .onReceive(NotificationCenter.default.publisher(for: .tempConfirmed)) { note in
-                    if let t = note.object as? Int {
-                        pendingTemp = t
-                        showTemp = false
-                        showPin = true
-                    }
-                }
-                .dsSheetCanvas()
-        }
-        // MARK: 车身明细（车门/窗/灯状态）
+        // MARK: 生命周期（车身明细、缓存）
 
         .onAppear {
             // 上一次执行若是在别的屏发起、又没人等它，这里的陈旧状态要清掉
@@ -357,19 +325,8 @@ struct ControlView: View {
                                     set: { commands.showResult = $0 })) {
             resultSheet.dsSheetCanvas()
         }
-        // #N13 生物识别验证覆盖层
-        .overlay {
-            if showBiometricLock {
-                BiometricLockOverlay(isAuthenticated: $isAuthenticated)
-                    .onAppear { isAuthenticated = false }
-                    .onChange(of: isAuthenticated) { _, auth in
-                        if auth {
-                            showBiometricLock = false
-                            showPin = true  // 验证通过后进入 PIN 输入
-                        }
-                    }
-            }
-        }
+        // #N13 生物识别验证覆盖层已随那道门一起搬到 `ControlCommandFlow`：
+        // 它在那边是「四步里的第②步」，而不是本页的一个开关。
     }
 
     // MARK: 头部（v4：读数就在车上 —— 一屏不堆卡片）
@@ -490,15 +447,10 @@ struct ControlView: View {
         // 旧版这里直接 `execute(pinDigits)`，而 **pendingCmd 与 pendingTemp 两样都没设** ——
         // pendingCmd 默认是空串（execute 开头就 return），温度用的是上一次残留值。
         // 也就是说「一键锁车」很可能什么都没发。现在场景自己带上要发的指令与温度。
-        pendingCmd = cmd
-        if let t = scene.temp { pendingTemp = t }
-        // 与单个指令走**同一道门**：敏感操作先验身份、再进 PIN 输入。
+        //
+        // 与单个指令走**同一道门**（`controlCommandFlow`）：敏感操作先验身份、再进控车码。
         // （省掉这道门的话，场景会拿着一个可能为空的 PIN 直接发指令。）
-        if store.canUseBiometric() && store.hasBiometricSetup {
-            showBiometricLock = true
-        } else {
-            showPin = true
-        }
+        request = ControlRequest(key: cmd, name: scene.name, temp: scene.temp)
     }
 
     // #35 语音播报车况
@@ -720,22 +672,16 @@ struct ControlView: View {
         .buttonStyle(DSRowButtonStyle())
     }
 
-    // MARK: 指令执行逻辑（不变）
+    // MARK: 指令执行逻辑（不在本文件）
+    /// 指令的**下发与轮询**在 `CommandCenter`（同目录）—— 那是唯一执行路径。
+    /// 而「发之前要先过哪几道门」在 `ControlCommandFlow`（同目录）——
+    /// 那是唯一验证路径。本页只做一件事：把请求交给那道门。
     private func onCmd(_ key: String) {
         guard !busy, running == nil else { return }
         guard !store.carId.isEmpty else {
-            print("请先选择车辆"); return
+            EnhancedToastManager.shared.show("请先选择车辆", icon: "car.fill"); return
         }
-        pendingCmd = key
-        if key == "OpenAir" { showTemp = true }
-        else {
-            // #N13 敏感操作先验证生物识别
-            if store.canUseBiometric() && store.hasBiometricSetup {
-                showBiometricLock = true
-            } else {
-                showPin = true
-            }
-        }
+        request = ControlRequest(key: key, name: nameOf(key))
     }
 
     // `execute` / `startPolling` / `finish` 三个函数整体搬到了 `CommandCenter`

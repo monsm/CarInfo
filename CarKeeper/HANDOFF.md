@@ -268,7 +268,7 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 
 | 卡 | 头 | 内容 |
 |---|---|---|
-| 现状卡 `nowCard` | 车牌 + 状态 · 上报多久了（原先挂在图上的徽标）+ 图层胶囊菜单 | 地址（大字）→ 巨字**续航**（`DSBigNumber`）→ 副行（电量 · 表显 · 充不充电）→ 光带 → 四轮胎压 |
+| 现状卡 `nowCard` | 车牌 + 状态 · 上报多久了（原先挂在图上的徽标）+ 图层胶囊菜单 | 地址（大字）→ 巨字**续航**（`DSBigNumber`）→ 副行（表显 · 充不充电）→ 光带 |
 | 四格读数 `readoutChips` | 无 | 车速 / 电量 / 胎压（取四轮里**最低**那条）/ 车锁，**同一行、同一基线**（原型 `.chip:nth-child(odd)` 的 ±7px 错位已删 —— 用户 2026-09-24：「下面 4 个按钮要规整，不要歪歪扭扭」） |
 
 **卡头那枚图层胶囊同时是这一屏的菜单**（`layerMenu`，`Menu`）：四个地图图层（当前那层带勾）、重取数据、
@@ -349,8 +349,19 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
   指令结果三态：成功 / 失败 / **未确认**（60 秒没等到终态，或服务端状态值不认识）——
   「未确认」不是「失败」，这是刻意的。
 - 交互：`PINKeypadView`（玻璃化数字键盘）、`ACStepperView`（温度弹层）、`SiriShortcutsCard`。
+- **验证那道门只有一处：`ControlCommandFlow`（`Features/Control/ControlCommandFlow.swift`）。**
+  一条指令要走完 温度 → 生物识别 → 控车码 → 下发 四步，而发起处只做一件事：
+  `request = ControlRequest(key:name:)`。
+  现在挂它的有两处：这一页（`onCmd` / `onPresetScene`）与**地图右臂的快捷车控**。
+  此前地图那条路直接调 `AppStore.sendControlCommand`（拿 Keychain 里存的旧码就发）——
+  同一个动作两套强度，安全的那条形同虚设（用户 2026-09-24 的原话：
+  「右下角的控车选了后不用输入密码？不用选温度？」）。
+  **加第三个车控入口时也要挂它**，不要另写一遍验证。
+  故意不过这道门的只有一条：`UpCarCondition`（刷新车况）—— 它不改车状态，
+  只是把车端叫醒一次；门的成本是用户手输控车码，只该收在会改变车状态的动作上。
 - 执行链路：`CommandCenter` 负责发起 → 轮询 `/api/car/getControlInfo` 到终态 → 收尾（写历史、提示）。
   视图生命周期绑定在 `CommandCenter` 上，避免「页面关了指令还在轮询」或相反。
+  在地图上发起的指令把它当**回执落地处**：地图只看 toast，详细结果留在车控页的结果 sheet。
 
 ### 4.5 出行档 —— `TripsEventsView`
 
@@ -410,6 +421,11 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 - **`Design/StackSpec.swift`**：叠叠乐的全部手感数字（七种叠法 → `StackMetrics`）
   + 纯几何（`StackMath`，不碰视图，可单独对）。**手感要调就只改这里**，
   不要到页面里改一个局部数字。
+  2026-09-24 按用户要求调过的三个数（都写在原处，连同「为什么」）：
+  `directionBias` 0.85 → 1.0（吸附临界点从 47% 移到正好一半）、
+  `flingVelocity` 550 → 900（普通滑动不再多跳一格）、
+  `.arc.shrink` 0.07 → 0.03（滚动中卡片的大小差异减半）、
+  `.arc.fadeBottom` 140 → 44（滑到底时末卡底边贴近卡片窗下沿，不留一个手掌高的空白）。
 - **`Design/StackLabView.swift`**：七种叠法的对照页（`DevView` → 叠叠乐），
   挑中哪一种写进 `UserDefaults`（`StackSpec.variantKey`），六页立刻跟着换。
 - **五个功能界面共用的三个原语**（阶段 1 的产物，职责分得很硬）：
@@ -713,7 +729,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 | `StackSpec` / `StackMath` | 全部数值与纯判定（焦点、吸附落点、两端硬停） | 不 import SwiftUI 之外的任何东西，不碰视图 |
 | `GlassCard` | 一张卡的外观（玻璃 + 一抹个性色 + 标题行） | 不决定卡在哪儿 |
 | `ArcStack` | 七种叠法的几何、手势、消失带、无障碍翻页 | 不知道卡里装的是什么 |
-| `DSSwipeStrip` | 底部那条：静止三档、按下展开、透镜连续跟手 | 不换屏（它只写回 `homeMode`） |
+| `DSSwipeStrip` | 底部那条：胶囊外轨 + 胶囊选中格，静止三档、按下展开、连续跟手，选中那档的字是主题强调色 | 不换屏（它只写回 `homeMode`） |
 
 ### ② 五页的写法已经统一，新加一页就照抄
 
