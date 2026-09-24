@@ -452,7 +452,16 @@ struct MessagesSection: View {
             let list = try await APIClient.shared.getMessages()
             apply(list)
             StartupJournal.shared.mark("消息取数结束 \(list.count) 条")
-            lastError = list.isEmpty ? "已解析成功，但近 \(APIClient.messageDays) 天没有事件" : ""
+            // 「成功，只是区间里没有事件」**不是错误**。这里原先把这句也写进 `lastError`，
+            // 于是空状态的标题显示成「消息获取失败」—— 与事实相反的一句话。
+            // 用户 2026-09-24「消息接口拿不到数据」那几次判断，就是照着这句话下的。
+            // ③（服务端给 0 条）与 ④（给了 55 条而我们解析成 0 条）的区分归
+            // 「我的 → 诊断 → 消息自检」那四个数；界面只说实话，不替服务端认错。
+            lastError = ""
+            if list.isEmpty {
+                // 留在日志里而不是界面上：同一个区间下次也能对上。
+                NSLog("loadMessages: 区间内 0 条（近 \(APIClient.messageDays) 天）")
+            }
             // 只缓存非空列表：空列表可能是网络抖动或权限问题，缓存它会
             // 让后续所有访问都命中空缓存而永远不再重试。
             // 非空列表才是「有真实消息」的确认信号。
