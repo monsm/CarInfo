@@ -41,11 +41,18 @@ import SwiftUI
 //  于是 `gap(for:)` 认为「展开装不下六档」，把间距压到 6：
 //    · 静止条宽算出 148（应为 190），三档挤成一团 →「静止时对不上」；
 //    · 节距 40 < 透镜宽 68 → **透镜压住左右两档的字**。
+//
+//  ⚠️ 2026-09-24 第三次修正（同一个病根的另一面）：间距应当按**当前露出几档**算。
+//  上一版只补了「宽度从哪儿来」，而 `gap` 仍然一律按六档算 —— 静止时只露三档，
+//  却用着为六档压出来的节距 40，于是那枚透镜被封顶成 38（≈ 字的宽度）。
+//  用户看到的是一颗几乎贴字的椭圆：「首页 选中的玻璃体太小了，大 50%」。
+//  现在：间距随展开插值（静止按三档算 → 宽裕；展开按全部算 → 不够才压），
+//  透镜尺寸改由**格宽 ×1.5** 与**条高 ×0.94** 推出，**不再与节距挂钩**。
 //  现在宽度由外壳量一整行得出（见 `MapSpineView.bottomBar` 的 `barRowWidth`），
 //  条子自己的 frame 就等于算出来的条宽 —— 它不再是被挤压的弹性视图，
 //  几何与渲染因此不可能两套。
-//  透镜宽度也一并按**节距**封顶（`pillWidth`）：屏幕窄到要压间距时，
-//  透镜跟着缩，而不是压到邻居的字上。
+//  （当年顺手加的「透镜宽度按节距封顶」已于 2026-09-24 撤掉 —— 它在静止时把透镜
+//   压成一条，而它原本要治的那个病（压住邻居）真正的成因是标签坐标系偏移，已修。）
 struct DSSwipeStrip: View {
 
     /// 一档。`id` 同时是持久化的键（存在 UserDefaults 里，重启回到上次那一档）。
@@ -104,13 +111,15 @@ struct DSSwipeStrip: View {
     /// 相邻标签的最大间距
     private var gapMax: CGFloat { barHeight * 0.73 }
 
-    /// 透镜的宽度：档宽 + 左右呼吸位，但**不超过一档的节距**。
-    /// 相机里这两个数几乎相等（透镜 68 ≈ 节距 67.6，两枚透镜刚好挨着）。
-    /// 屏幕窄到必须压间距时节距会小于 68 —— 不封顶透镜就会压在左右两档的字上
-    ///（用户 2026-09-23 报的「选中的边框压住其他俩边一部分」）。少 2 是留一条缝。
-    private func pillWidth(gap: CGFloat) -> CGFloat {
-        min(slot + 2 * pillPad, pitch(gap) - 2)
-    }
+    /// 选中格（透镜）的尺寸。**它不再由节距推出来** —— 那是上一版的病根：
+    /// 静止时整行只露三档、但 `gap` 是按「六档能不能装下」算的（节距只有 40），
+    /// 于是透镜被封顶成 38：几乎就是字的宽度，看起来「没有玻璃」。
+    /// 用户 2026-09-24：「首页 选中的玻璃体太小了，大 50%」。
+    ///
+    /// 现在按**格宽**定宽（一格 ×1.5），按**条高**定高（0.94 × 条高）：
+    /// 高度不能再往上，是因为外轨只有 46 —— 透镜比轨还高就是「逞出来」而不是「更大」。
+    private var loupeWidth: CGFloat { slot * 1.5 }
+    private var loupeHeight: CGFloat { barHeight * 0.94 }
 
     @State private var c: CGFloat = 0            // 行内坐标：条正中对应到行里的位置
     @State private var expand: Double = 0
@@ -135,10 +144,14 @@ struct DSSwipeStrip: View {
     /// 一档的节距
     private func pitch(_ gap: CGFloat) -> CGFloat { slot + gap }
 
-    /// 展开后必须装得下全部：装不下就把**间距**压到刚好（压间距，而不是让字互相盖住）。
-    private func gap(for width: CGFloat) -> CGFloat {
-        let n = max(1, items.count)
-        let fits = (width - 2 * pillPad - CGFloat(n) * slot) / CGFloat(max(1, n - 1))
+    /// 装下 `shown` 档需要的间距：装不下就把**间距**压到刚好（压间距，而不是让字互相盖住）。
+    ///
+    /// `shown` 是参数而不是「总是全部档位」—— 静止时整行只露三档，而按六档去算间距
+    /// 会把静止的那三档挤成一条（节距 40、透镜 38，就是 2026-09-24 那两句抱怨的同一个来源）。
+    private func gap(for width: CGFloat, shown: Int) -> CGFloat {
+        let n = max(1, shown)
+        if n == 1 { return gapMax }
+        let fits = (width - 2 * pillPad - CGFloat(n) * slot) / CGFloat(n - 1)
         return min(gapMax, max(6, fits))
     }
 
@@ -206,7 +219,11 @@ struct DSSwipeStrip: View {
 
     var body: some View {
         let width = max(120, availableWidth)
-        let gap = gap(for: width)
+        // 间距随展开插值：静止按「三档装得下」算（宽裕），展开按「全部档位装得下」算
+        //（不够才压）。两个字的名字不变、间距变 —— 于是展开是「散开」，不是「挤紧」。
+        let gapRest = gap(for: width, shown: min(3, items.count))
+        let gapOpen = gap(for: width, shown: items.count)
+        let gap = gapRest + (gapOpen - gapRest) * CGFloat(expand)
         let lim = limits(width: width, gap: gap)
         let barW = barWidth(width: width, gap: gap)
         // 显示用的位置：即使 `c` 是上一次几何下的值，也先夹到合法范围再画 ——
@@ -214,7 +231,7 @@ struct DSSwipeStrip: View {
         let cShown = clampC(c, lim: lim, gap: gap)
         ZStack(alignment: .leading) {
             bar(width: barW)
-            capsule(gap: gap, barW: barW)
+            capsule(barW: barW)
             labels(gap: gap, barW: barW, c: cShown)
         }
         // 条子**自己就是这个宽度**：它不再是「HStack 挤压出来的弹性视图」，
@@ -249,13 +266,15 @@ struct DSSwipeStrip: View {
     /// 选中格（胶囊）。它**钉在条正中**，永远不动 —— 「选中谁」由 `c` 把哪个字送到正中决定。
     /// 第一版在这里用 `pvValue(c)` 反算位置，那是一个恒等变换（ideal(pvValue(c)) == c），
     /// 算出来的 x 永远等于 width/2；留着它只会让人以为透镜会动。
-    private func capsule(gap: CGFloat, barW: CGFloat) -> some View {
+    private func capsule(barW: CGFloat) -> some View {
         // 选中格同样是胶囊 —— 相机里「选中」就是一枚住在轨道里的胶囊。
         let shape = Capsule()
+        // 宽度也不能比条身还宽（很窄的容器里）：留 6pt，否则它会盖住条的两端圆头。
+        let w = min(loupeWidth, max(slot, barW - 2 * TokensSpacing.xs))
         return shape
             .fill(TokensPalette.glassHighlight)
             .overlay { shape.strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border) }
-            .frame(width: pillWidth(gap: gap), height: barHeight * 0.85)
+            .frame(width: w, height: loupeHeight)
             .position(x: barW / 2, y: barHeight / 2)
             .allowsHitTesting(false)
     }
