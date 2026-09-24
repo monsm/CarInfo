@@ -416,22 +416,24 @@ final class APIClient: @unchecked Sendable {
         }
     }
 
-    /// 消息取多少周。
+    /// 历史窗口的**跨度**：往回 30 天（用户 2026-09-24：「是要最近 30 天的消息」）。
+    static let messageDays = 30
+
+    /// 每一段的**形状**：7 天一段。
     ///
-    /// 用户 2026-09-24 的原话：「为什么消息接口拿不到数据，这是完全可以拿到数据啊」
-    ///（他贴的抓包里，一个 7 天窗口就有 55 条事件）。
+    /// 「跨度」与「形状」是两件事，别混：
+    ///   · 形状 = 抓包里那一次请求的样子（`startTime` 到 `endTime` 相隔 7 天），**唯一被验证过**；
+    ///   · 跨度 = 界面要覆盖多少历史（用户要 30 天就 30 天），按需要拉长。
+    /// 于是 30 天的跨度 = 五段 7 天的请求（最后一段只有 2 天），跨越 30 天、形状逐段相同。
     ///
-    /// 根因就在窗口上：原先**只要最近 7 天**，而 7 天窗口与抓包时的那个区间一样小 ——
-    /// 车两天没开还能看到东西，三周没开就一条都不剩。而「车的事件」与「行程」
-    /// 恰恰是**历史**视图（出行页还专门有「更早」那一档分组）。
+    /// 为什么不发一个「30 天窗口」的请求：服务端能不能接受更长的区间，没有任何证据 ——
+    /// 它完全可能对超长区间返回空，而「窗口太小」与「窗口太大」在界面上长得一模一样（都是 0 条）。
+    /// 所以不赌：跨度照用户要的拉长，形状一个字不动。
     ///
-    /// 为什么是「几个连续的 7 天窗口」而不是一个「28 天窗口」：
-    /// 我们**只验证过一种请求形状**，就是抓包里那一次（`startTime` 到 `endTime` 相隔 7 天）。
-    /// 服务端能不能接受更长的区间，没有任何证据 —— 它完全可能对超长区间返回空
-    ///（那就会让「拿不到数据」从「窗口太小」变成「窗口太大」，界面上长得一模一样）。
-    /// 所以这里把时间往回切成同样形状的几段，逐段请求再合并：
-    /// 每一段的形状与那一次验证过的请求逐字相同。
-    static let messageWeeks = 4
+    /// ⚠️ 这条推论的另一半要写在明处：**如果 30 天里确实有事件而界面还是空的，那就不是跨度的问题**
+    /// —— 去「我的 → 诊断 → 消息自检」看那四个数（HTTP 状态 / 响应字节数 / 服务端自报条数 /
+    /// 我们解析到的条数）。那一页就是为「四种失败长得一模一样」造的仪器。
+    static let messageSliceDays = 7
 
     /// 合并后的条数上限。
     ///
@@ -446,7 +448,8 @@ final class APIClient: @unchecked Sendable {
         let cars = await MainActor.run { AppStore.shared.cars }
         return try await withRefresh { [self] in
             let api = APIClient.shared
-            let windows = Self.messageWindows(weeks: Self.messageWeeks)
+            let windows = Self.messageWindows(days: Self.messageDays,
+                                              sliceDays: Self.messageSliceDays)
 
             // 每一周一个请求（与抓包验证过的形状一致），并行发出。
             // 并行而不是顺序：四周的数据彼此不依赖，而界面在等第一份。
@@ -478,15 +481,24 @@ final class APIClient: @unchecked Sendable {
         }
     }
 
-    /// 从「现在」往回切成 `weeks` 个**连续的 7 天窗口**（新 → 旧）。
+    /// 从「现在」往回切成**连续的 7 天窗口**（新 → 旧），一共覆盖 `days` 天。
     ///
     /// 纯函数（`now` 可传）——所以它可以被测试逐段核对，不需要真机也不需要网络：
     /// 见 `PureLogicTests.MessageWindowTests`。
-    static func messageWindows(weeks: Int, now: Date = Date()) -> [(start: Date, end: Date)] {
+    ///
+    /// 最后一段通常短于 `sliceDays`：它顶到 `days` 那一天的边界就停 ——
+    /// 不为了凑整段而多要（多要一天不算错，但「跨度」这个词会开始说不清）。
+    static func messageWindows(days: Int, sliceDays: Int = 7,
+                               now: Date = Date()) -> [(start: Date, end: Date)] {
+        // 用 `Double` + 把单位写在名字里，而不是 `TimeInterval`：后者只是 `Double` 的别名，
+        // 而多一个 SDK 名字就要在 `scan/scan.py` 的白名单里登记一次（还得附 Apple 文档）。
+        let spanSeconds = Double(max(1, days)) * 24 * 3600
+        let sliceSeconds = Double(max(1, sliceDays)) * 24 * 3600
+        let floorDate = now.addingTimeInterval(-spanSeconds)
         var out: [(start: Date, end: Date)] = []
         var end = now
-        for _ in 0..<max(1, weeks) {
-            let start = end.addingTimeInterval(-7 * 24 * 3600)
+        while end > floorDate {
+            let start = max(end.addingTimeInterval(-sliceSeconds), floorDate)
             out.append((start, end))
             end = start
         }
@@ -519,6 +531,91 @@ final class APIClient: @unchecked Sendable {
         // limit=2000 + 7 天一段：与抓包对齐。日志实测 7 天约 55~64 条，2000 完全覆盖，
         // 无性能风险（那条 99287 字符的响应就是 55 条，约 100KB）。
         return "\(APIConfig.baseURL)/appserver/api/information/pageReceiverInfoByTime?actionType=2&page=&limit=2000&startTime=\(enc(f(start)))&endTime=\(enc(f(end)))&token=\(TokenStore.currentToken())"
+    }
+
+    // MARK: - 消息自检（诊断页的仪器）
+    //
+    //  存在的理由：这条接口的失败有四种**长得一模一样**的形态 ——
+    //    ① 请求根本没发出去（没登录 / URL 拼错 / 断网）
+    //    ② 发出去了但被拒（401 / 403 …）
+    //    ③ 200，服务端说这个区间 0 条
+    //    ④ 200，服务端给了 55 条，而**我们解析成 0 条**（解析没命中）
+    //  而它们界面上都是「暂无消息」。来回问与猜已经几轮了，所以换测量：
+    //  把一次原样请求的四个数并排放 —— HTTP 状态 / 响应字节数 / 服务端自报条数 /
+    //  我们解析到的条数。这四个数一分清，四种形态就分家了。
+
+    /// 一次「原样」请求的结果。
+    struct MessageProbe: Identifiable {
+        var id: String { title }
+        let title: String
+        /// **token 已打码**：这份结果会被人复制出去贴给我看。
+        let url: String
+        /// nil = 连响应都没拿到（请求没发出去）。
+        let status: Int?
+        let bytes: Int
+        /// JSON 顶层键 —— 「拿到的是不是我们以为的那份东西」靠它一眼判断。
+        let keys: [String]
+        /// 服务端自报的 `numberOfElements`（它认为它给了几条）。
+        let declared: Int?
+        let pages: Int?
+        /// 走**真实那条路**（`parseMessages`）数出来的条数。
+        /// 它与 `declared` 分开报，正是为了把形态 ③ 与形态 ④ 分开 ——
+        /// 只要有一个数不同，凶手就确定了。
+        let parsed: Int
+        let newest: String?
+        let oldest: String?
+        let note: String
+    }
+
+    /// 发一次原样请求并如实报告：**不合并、不兜底、不重试**。
+    /// 它不参与正常取数（正常那条路在 `getMessages`）—— 自检页要的正是「没有我们的加工」。
+    func probeMessageWindow(_ title: String, from start: Date, to end: Date) async -> MessageProbe {
+        let raw = messagesURL(from: start, to: end)
+        let safe = Self.maskedToken(raw)
+        do {
+            let res = try await request(url: raw, method: "POST", body: [:],
+                                        token: TokenStore.currentToken())
+            return Self.describeProbe(title: title, url: safe, status: res.status, body: res.text)
+        } catch let e as APIError {
+            // 被拒也是数据：状态码与它自己的话原样留着（别翻译成「网络错误」）。
+            return MessageProbe(title: title, url: safe, status: e.statusCode, bytes: 0, keys: [],
+                                declared: nil, pages: nil, parsed: 0, newest: nil, oldest: nil,
+                                note: e.message)
+        } catch {
+            return MessageProbe(title: title, url: safe, status: nil, bytes: 0, keys: [],
+                                declared: nil, pages: nil, parsed: 0, newest: nil, oldest: nil,
+                                note: error.localizedDescription)
+        }
+    }
+
+    /// 把一次响应读成事实（纯函数，不联网）。
+    private static func describeProbe(title: String, url: String,
+                                      status: Int, body: String) -> MessageProbe {
+        let dict = jsonToAny(body)
+        let shell = ciObject(dict, ["Data", "data"])
+        let rows = dict.map { messageArray($0) } ?? []
+        let times = rows.compactMap { ciString($0, ["CreatedAt", "createdAt"]) }.sorted()
+        var note = ""
+        if dict == nil, !body.isEmpty {
+            // 不是 JSON（服务端有时在 200 里回一页 HTML）：把开头照抄出来。
+            note = "不是 JSON：" + String(body.prefix(120))
+        }
+        return MessageProbe(title: title, url: url, status: status,
+                            bytes: body.utf8.count,
+                            keys: dict?.keys.sorted() ?? [],
+                            declared: ciNumberInt(shell, ["numberOfElements"]),
+                            pages: ciNumberInt(shell, ["totalPages"]),
+                            parsed: Self.parseMessages(body).count,
+                            newest: times.last, oldest: times.first,
+                            note: note)
+    }
+
+    /// 抹掉 URL 里的 token —— 这份结果是给人看、会被复制出去的。
+    /// 短于 8 位不动：`replacingOccurrences(of: "")` 会把替换串插进每个字符之间。
+    static func maskedToken(_ url: String) -> String {
+        let t = TokenStore.currentToken()
+        guard t.count >= 8 else { return url }
+        return url.replacingOccurrences(of: t, with: "***")
     }
 
     /// 把几段窗口的响应合成一份列表：按 `stubId`（退回 `id`）去重，按时间新 → 旧。

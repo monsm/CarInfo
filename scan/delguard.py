@@ -3,7 +3,8 @@
 """
 删声明守卫 —— 「声明被删掉/重写了，使用还在」
 
-为什么需要它（两次真实事故，都占了一整轮 macOS runner）：
+为什么需要它（三次真实事故；前两次各占了一整轮 macOS runner，第三次是在推上去之前
+被本文件当场拦下的）：
 
   ① `e78a344`（DSSwipeStrip）：撤掉 `pv` 状态时顺手把 `pvValue(_:gap:)` 函数本体也删了，
      5 处调用（透镜跟手、行跟手、吸附反算）还在 —— 3 条
@@ -11,8 +12,10 @@
   ② `55794c4`（ArcStack）：重写 `shapeScroll` 的注释时把**声明本身**写没了，
      3 处使用（形变阈值、拖动跟手、落点）还在 —— 同样 3 条
      `error: cannot find 'shapeScroll' in scope`。
+  ③ 2026-09-24（消息窗口）：`messageWeeks` 的声明在 `API.swift` 里被 `messageDays` /
+     `messageSliceDays` 替掉，而 `MessagesSection.swift` 里 3 处使用还在。
 
-  两次都不是拼错名字，也不是缺类型：名字在**旧版本**里明明声明过，只是这一轮的编辑
+  三次都不是拼错名字，也不是缺类型：名字在**旧版本**里明明声明过，只是这一轮的编辑
   把它连同注释一起重写掉了。既有的检查器全都看不见这一类：
     · `scan.py` 查「用了但项目里没声明」——它看的是**当前**这一份代码，
       而这一份里确实没有这个名字，于是它把「没有声明」当成「SDK 提供」；
@@ -33,16 +36,34 @@
   三条同时成立 = 「这条声明被删了，但还有人调用它」。Swift 里这是编译错误，
   没有例外 —— 所以这里直接失败，而不是警告。
 
+  ③ 的消息也在同一个文件里吗？不在 —— `messageWeeks` 声明在 `API.swift`、
+  使用在 `MessagesSection.swift`。所以「使用」那一半必须**跨文件**看，
+  否则本文件会从自己的盲区旁边走过去（2026-09-24 本地实测：三条判据全成立，
+  却因为只在同文件里找使用而报了绿）。它当场被补成了双向：
+    · 声明所在文件：无前缀的裸名字也算（同一类型 / 同文件的写法）；
+    · **其它**文件：只认带前缀的用法（`APIClient.messageWeeks` / `nav.openMode`）——
+      裸名字跨文件极易撞上局部量（另一个函数里的 `let`），而一条误报就会让人
+      开始绕过这个门禁。
+
   另加一道**降噪**：如果这个名字在新版本的**其它文件**里被成员级声明了，就不报。
   它对应真实的一类编辑：把几个成员从骨架文件挪进内容文件（`2f088df` 把三个图层内容
   从 `MapSpineView` 挪进 `MapSpineLayers`）——同一个类型的 extension 在另一个文件里，
   调用照旧编译得过。代价是「同名成员真的落在别的类型上」这种错会漏（宁可漏，不可噪：
   一条误报就会让人开始绕过这个门禁）。
 
-  为什么窗口是 `HEAD~1` 而不是「本次未提交的改动」：CI 上工作区**就是** HEAD，
-  拿未提交改动去比永远为空（一个恒为 0 的绿灯不算绿灯）。比 `HEAD~1` 则两种场合都成立：
-  CI 上它看的是**这次提交**改掉了什么，本地它同时覆盖「刚提交的那一笔」与「手上还在改的」。
-  代价是 CI 的 checkout 要 `fetch-depth: 2`（见 `.github/workflows/ios-build.yml`）。
+  旧版本取哪一个，看工作区干不干净（这一点是被一次**假绿**逼出来的）：
+
+    · 工作区干净（CI 上就是这样，工作区**就是** HEAD）→ 比 `HEAD~1`：
+      它看的是「这次提交改掉了什么」。代价是 checkout 要 `fetch-depth: 2`
+     （见 `.github/workflows/ios-build.yml`）。
+    · 工作区有改动（本地）→ 比 **`HEAD`**：手上这份改动就是**未来的那一笔**，
+      而它的父提交是 HEAD，所以「旧版本」正是 HEAD。
+
+  为什么后者非改不可：`messageWeeks` 在 `f6ff0e8`（= HEAD）里才引入，
+  下手把它的声明删了、三处使用还在 —— 而拿 `HEAD~1` 当旧版本时，
+  那个名字在 `HEAD~1` 里**根本不存在**，判据 ① 不成立，于是本地一片绿，
+  只有编译器看得见。这正是本文件要防的那一类错误，它却从本文件旁边走了过去。
+  两个模式都打印「旧版本取的是谁、为什么」，不让它默默退回去。
 
 自测（拿上面两次真事故当探针，两条都必须报出来）：
 
@@ -127,6 +148,24 @@ def uses_of(name, text):
     return out
 
 
+def qualified_uses_of(name, text):
+    """别的文件里**带前缀**的用法：`X.name` / `Self.name` / `foo().name`。
+
+    为什么跨文件另立一条：无前缀的裸名字极易撞上局部量（另一个函数里的 `let name`），
+    而本文件头的取舍是「宁可漏，不可噪」—— 一条误报会让整条门禁被绕过。
+    """
+    body = strip_comments(text)
+    hit = re.compile(r"(?:\b[A-Za-z_]\w*|\))\s*\.\s*%s\b" % re.escape(name))
+    binding = re.compile(LOCAL_BINDING % re.escape(name))
+    out = []
+    for i, line in enumerate(body.split("\n"), start=1):
+        if binding.search(line):
+            continue
+        if hit.search(line):
+            out.append((i, line.strip()))
+    return out
+
+
 def scope_files():
     """范围内的 .swift 文件（相对仓库根，用 / 分隔）。"""
     out = []
@@ -138,6 +177,18 @@ def scope_files():
                     full = os.path.join(dirpath, f)
                     out.append(os.path.relpath(full, PROJECT_ROOT).replace("\\", "/"))
     return sorted(out)
+
+
+def pick_base(args):
+    """→ (旧版本 rev, 为什么)。打印这个选择，不让它默默退回 HEAD~1。"""
+    if args.base:
+        return args.base, "--base 指定"
+    dirty = run_git(["status", "--porcelain", "--"] + SCOPE_DIRS) or ""
+    if dirty.strip():
+        return "HEAD", "工作区有改动 → 比 HEAD（手上这份的父提交）"
+    if run_git(["rev-parse", "--verify", "HEAD~1"]) is None:
+        return "HEAD", "没有 HEAD~1（浅克隆 / 首个提交）"
+    return "HEAD~1", "工作区干净 → 比 HEAD~1（就是 CI 的那一笔）"
 
 
 def all_member_names(rev=None):
@@ -182,11 +233,10 @@ def old_and_new(args):
                 pairs.append((rel, old, new))
         return pairs
 
-    # 默认：旧版本优先取 HEAD~1（那次提交改了什么），取不到退回 HEAD
-    #（浅克隆 / 第一个提交；此时它退化成「工作区与 HEAD 比」，本地仍然有用）
-    base = args.base or "HEAD~1"
+    base, why = pick_base(args)
     if run_git(["rev-parse", "--verify", base]) is None:
-        base = "HEAD"
+        base, why = "HEAD", "%s（但 %s 不存在，退回 HEAD）" % (why, base)
+    print("旧版本：%s — %s" % (base, why))
     for rel in scope_files():
         old = run_git(["show", "%s:%s" % (base, rel)])
         if old is None:
@@ -216,13 +266,29 @@ def main():
     # 新版本全项目的成员名（含被挪到别的文件的那些）—— 见文件头的「降噪」。
     global_new = all_member_names(args.rev_to if args.rev_to else None)
 
+    # 新版本的全部正文 —— **不只变了的那些文件**：一个名字可能在 A 里被删，
+    # 而使用它的地方在 B（`messageWeeks` 就是这样：声明在 `API.swift`、
+    # 用在 `MessagesSection.swift`）。「旧版本里声明过」与「现在还在用」本来就跨文件。
+    new_texts = {}
+    for rel in scope_files():
+        try:
+            with open(os.path.join(PROJECT_ROOT, rel), encoding="utf-8") as fh:
+                new_texts[rel] = fh.read()
+        except OSError:
+            continue
+
     bad = []
-    for rel, old, new in pairs:
+    for rel, old, _new in pairs:
         old_names = member_names(old)
         for name in sorted(old_names):
             if len(name) < MIN_NAME_LEN or name in global_new:
                 continue
-            hits = uses_of(name, new)
+            hits = [(rel, n, t) for n, t in uses_of(name, new_texts.get(rel, ""))]
+            for other, text in new_texts.items():
+                if other == rel:
+                    continue
+                for n, t in qualified_uses_of(name, text):
+                    hits.append((other, n, t))
             if hits:
                 bad.append((rel, name, hits))
 
@@ -232,9 +298,10 @@ def main():
         return 0
 
     for rel, name, hits in bad:
-        print("\n%s: `%s` 在旧版本里是成员级声明，新版本里没有声明了，但这些行还在用它：" % (rel, name))
-        for lineno, text in hits[:8]:
-            print("  %d: %s" % (lineno, text))
+        print("\n`%s`：旧版本里 %s 有它的成员级声明，新版本里项目内已经没有了，"
+              "但这些行还在用它：" % (name, rel))
+        for file, lineno, text in hits[:8]:
+            print("  %s:%d  %s" % (file, lineno, text))
         if len(hits) > 8:
             print("  …还有 %d 行" % (len(hits) - 8))
     print("\n❌ %d 个名字「声明没了、使用还在」—— 这是编译错误，不用等 macOS runner"

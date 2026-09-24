@@ -58,7 +58,7 @@ struct DevView: View {
                 kvGroup("动效", motion, footer: "只有两类：状态变化的弹簧，以及一次性绘制。")
                 kvGroup("运行状态", runtime)
                 capabilityGroups
-                rawLogGroup
+                diagnosticsGroups
                 actionsGroup
                 kvGroup("关于", about)
             }
@@ -341,6 +341,15 @@ struct DevView: View {
                     }
                 }
             }
+        }
+    }
+
+    /// 两台仪器放在一起：消息自检（「到底返回了啥」）与原始日志（每次请求的原文）。
+    /// 它们回答的是同一个问题的两半，所以同处一行 —— 同一个问题只该有一个地方看。
+    private var diagnosticsGroups: some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+            MessageProbeSection()
+            rawLogGroup
         }
     }
 

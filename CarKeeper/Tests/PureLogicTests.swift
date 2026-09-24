@@ -316,26 +316,32 @@ final class MessageWindowTests: XCTestCase {
         return f.date(from: s)!
     }
 
-    /// 4 周 = 4 段，每段正好 7 天，而且**首尾相接** —— 中间不能漏掉一段时间，
+    /// 30 天 = 五段（7+7+7+7+2），而且**首尾相接** —— 中间不能漏掉一段时间，
     /// 否则那几天的行程会无声无息地消失（比「一条都没有」更难被发现）。
+    /// 最后一段不足 7 天是**有意的**：跨度就停在 30 天，不为凑整段而多要。
     func testWindowsTileBackwardsWithoutGaps() {
         let now = at("2026-09-24 12:00:00")
-        let w = APIClient.messageWindows(weeks: 4, now: now)
-        XCTAssertEqual(w.count, 4)
+        let w = APIClient.messageWindows(days: 30, sliceDays: 7, now: now)
+        XCTAssertEqual(w.count, 5)
         XCTAssertEqual(w[0].end, now)
-        for (i, seg) in w.enumerated() {
+        for seg in w.prefix(4) {
             XCTAssertEqual(seg.end.timeIntervalSince(seg.start), 7 * 24 * 3600, accuracy: 0.5)
-            if i > 0 { XCTAssertEqual(seg.end, w[i - 1].start) }
         }
-        // 最老那一段的起点 = now − 28 天：窗口宽度就是 messageWeeks × 7 天
-        XCTAssertEqual(w[3].start, now.addingTimeInterval(-28 * 24 * 3600))
+        XCTAssertEqual(w[4].end.timeIntervalSince(w[4].start), 2 * 24 * 3600, accuracy: 0.5)
+        for i in 1..<w.count { XCTAssertEqual(w[i].end, w[i - 1].start) }
+        // 整段跨越 = 30 天：`days` 是跨度，`sliceDays` 只是形状
+        XCTAssertEqual(w[4].start, now.addingTimeInterval(-30 * 24 * 3600))
     }
 
-    /// 一段也没有时不能返回空表：`getMessages` 把「一段都没成功」当成全部失败，
-    /// 那会把「参数写错」报成「网络故障」。
-    func testZeroOrNegativeWeeksStillReturnsOneWindow() {
-        XCTAssertEqual(APIClient.messageWindows(weeks: 0, now: Date()).count, 1)
-        XCTAssertEqual(APIClient.messageWindows(weeks: -3, now: Date()).count, 1)
+    /// 跨度不足一段（甚至为负）时也只给一段，且不返回空表：
+    /// `getMessages` 把「一段都没成功」当成全部失败，那会把「参数写错」报成「网络故障」。
+    func testTinyOrNegativeSpanStillReturnsOneWindow() {
+        XCTAssertEqual(APIClient.messageWindows(days: 0, now: Date()).count, 1)
+        XCTAssertEqual(APIClient.messageWindows(days: -30, now: Date()).count, 1)
+        XCTAssertEqual(APIClient.messageWindows(days: 3, now: Date()).count, 1)
+        // 形状是一条两端都夹住的区间：起点不会跑到跨度外面去
+        let w = APIClient.messageWindows(days: 3, now: Date())
+        XCTAssertGreaterThanOrEqual(w[0].start, Date().addingTimeInterval(-3 * 24 * 3600 - 1))
     }
 
     /// 合并：按 `stubId` 去重、按 `createdAt` 新 → 旧 —— 与「哪一段先回来」无关

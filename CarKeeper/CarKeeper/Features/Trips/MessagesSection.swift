@@ -197,13 +197,13 @@ struct MessagesSection: View {
 
     /// 空的时候要说清是**哪一种空**。「暂无消息」把三件事糊成了一句：
     /// 服务端真的没给 / 我们没解析到 / 抓的这段区间里就是没有事件。
-    /// 最后那一种现在能说清：窗口是 `APIClient.messageWeeks` 周（不是「永远」）。
+    /// 最后那一种现在能说清：窗口是 `APIClient.messageDays` 天（不是「永远」）。
     private var emptyHint: String {
         if store.carId.isEmpty { return "请先绑定车辆" }
         if !searchText.isEmpty { return "没有找到匹配「\(searchText)」的消息" }
         if showUnreadOnly { return "所有消息都已读" }
         if let tag = filterTag { return "「\(tag)」标签下没有消息" }
-        return "近 \(APIClient.messageWeeks) 周没有事件"
+        return "近 \(APIClient.messageDays) 天没有事件"
     }
 
     // MARK: - 消息行
@@ -447,7 +447,7 @@ struct MessagesSection: View {
         do {
             let list = try await APIClient.shared.getMessages()
             apply(list)
-            lastError = list.isEmpty ? "已解析成功，但近 \(APIClient.messageWeeks) 周没有事件" : ""
+            lastError = list.isEmpty ? "已解析成功，但近 \(APIClient.messageDays) 天没有事件" : ""
             // 只缓存非空列表：空列表可能是网络抖动或权限问题，缓存它会
             // 让后续所有访问都命中空缓存而永远不再重试。
             // 非空列表才是「有真实消息」的确认信号。
