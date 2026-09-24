@@ -380,9 +380,20 @@ struct DevView: View {
                         .foregroundStyle(TokensPalette.secondary)
                 }
             } else {
+                // 头三行是「被信号杀死的纸条 / 这一次启动的标记 / 这一版装了哪几个围栏」，
+                // 末尾十几行是「死前那几步」。两段都要在：轨迹一长，只取末尾会把
+                // 「是不是我们自己的代码崩的」与「这一次是哪个实验」一并切掉 ——
+                // 而那两样正是复制出去之后别人先看的东西。中间的清单省掉。
+                // 写成 if/else 而不是三元：本仓库在三元的类型推断上丢过 CI 轮次
+                //（见 4203c67 / 2f088bd），这里不值得再赌一次。
+                let head = Array(prev.lines.prefix(3))
                 let tail = Array(prev.lines.suffix(12))
-                ForEach(Array(tail.enumerated()), id: \.offset) { idx, line in
-                    DSGroupRow(showsSeparator: idx < tail.count - 1) {
+                var shown = prev.lines
+                if prev.lines.count > head.count + tail.count {
+                    shown = head + ["⋯（中间略）"] + tail
+                }
+                ForEach(Array(shown.enumerated()), id: \.offset) { idx, line in
+                    DSGroupRow(showsSeparator: idx < shown.count - 1) {
                         Text(line)
                             .font(TokensTypo.fixed(11, weight: .regular).monospacedDigit())
                             .foregroundStyle(TokensPalette.primary)

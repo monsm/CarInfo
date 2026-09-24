@@ -208,16 +208,19 @@ struct MapSpineView: View {
             // 地图出现之后的这几步是启动轨迹里原本的盲区（见 StartupJournal 头注）：
             // 用户报的「地图出来以后几秒就退」正落在这里，所以每一步都留个路标。
             StartupJournal.shared.mark("地图页开始取数")
-            await refresh()
-            StartupJournal.shared.mark("地图页取数结束")
-            centerOnCar(force: true)
-            if layer == .charge { await searchChargersIfNeeded() }
-            await refreshWeatherIfNeeded()
+            // 围栏（见 LaunchFence）：地图页自己的三条取数（车况 / 充电桩 / 天气）。
+            if LaunchFence.mapFetches {
+                await refresh()
+                StartupJournal.shared.mark("地图页取数结束")
+                centerOnCar(force: true)
+                if layer == .charge { await searchChargersIfNeeded() }
+                await refreshWeatherIfNeeded()
+            }
             StartupJournal.shared.mark("地图页就绪")
         }
         .onChange(of: layer) { _, new in
             TokensHaptic.select()
-            if new == .charge { Task { await searchChargersIfNeeded() } }
+            if LaunchFence.mapFetches && new == .charge { Task { await searchChargersIfNeeded() } }
         }
         .onChange(of: d.carCoordinate?.latitude) { _, _ in centerOnCar(force: false) }
         .onChange(of: store.mapFocus) { _, f in if let f { focusOn(f) } }
@@ -603,16 +606,20 @@ struct MapSpineView: View {
             TokensPalette.canvas.ignoresSafeArea()
             ForEach(HomeMode.allCases.indices, id: \.self) { i in
                 let a = fade(i)
-                pageBody(HomeMode.allCases[i])
-                    // 原型 render()：`scale(1 − a*0.035)` —— 进来的从 96.5% 长出。
-                    .scaleEffect(1 - a * 0.035)
-                    // 原型 render()：`opacity = a ≥ 0.62 ? 0 : 1 − 1.6a`
-                    //（0.62 正是 `1 − 1.6a` 到 0 的位置，不夹会算出负数）。
-                    .opacity(a >= 0.62 ? 0 : 1 - a * 1.6)
-                    // 隐掉的层不吃事件、也不给读屏读：视觉上只有一页，
-                    // 读屏却读出六页内容，是六层同屏唯一真正的代价，必须自己挡住。
-                    .allowsHitTesting(i == modeIndex)
-                    .accessibilityHidden(i != modeIndex)
+                // 围栏（见 LaunchFence）：六页同屏是启动时最大的一笔开销 ——
+                // 关掉时只建当前那一档，其余五档连 body 都不跑（也就没有它们的取数）。
+                if LaunchFence.sixPageDeck || i == modeIndex {
+                    pageBody(HomeMode.allCases[i])
+                        // 原型 render()：`scale(1 − a*0.035)` —— 进来的从 96.5% 长出。
+                        .scaleEffect(1 - a * 0.035)
+                        // 原型 render()：`opacity = a ≥ 0.62 ? 0 : 1 − 1.6a`
+                        //（0.62 正是 `1 − 1.6a` 到 0 的位置，不夹会算出负数）。
+                        .opacity(a >= 0.62 ? 0 : 1 - a * 1.6)
+                        // 隐掉的层不吃事件、也不给读屏读：视觉上只有一页，
+                        // 读屏却读出六页内容，是六层同屏唯一真正的代价，必须自己挡住。
+                        .allowsHitTesting(i == modeIndex)
+                        .accessibilityHidden(i != modeIndex)
+                }
             }
         }
     }

@@ -56,6 +56,12 @@ final class StartupJournal: @unchecked Sendable {
     private let currentName = "carkeeper-startup-journal.txt"
     private let previousName = "carkeeper-startup-journal-prev.txt"
 
+    /// 被信号杀掉时留下的那张纸条（见 `catchSignalDeaths`）。
+    /// 它**单独一个文件**：写它的地方在信号处理里，那里不能碰轨迹这把锁 ——
+    /// 撞上锁就是死锁，而死锁留下的东西比没有更坏（心跳会停在同一秒，
+    /// 看起来与「被系统拿走」一模一样）。
+    static let fatalName = "carkeeper-fatal.txt"
+
     /// 打点会从网络回调与后台任务里调用（不只是主线程）——
     /// 与 `RawLogStore` 同一种做法：一把锁 + `@unchecked Sendable`。
     private let lock = NSLock()
@@ -64,6 +70,8 @@ final class StartupJournal: @unchecked Sendable {
     private var startedAt = Date()
     private var started = false
     private var stopped = false
+    /// 上一次那声「被信号杀死」的原文（`begin()` 时取走并删掉，见 `previousRun()`）
+    private var previousFatal = ""
 
     /// 心跳看门狗。它必须在**后台队列**上跑：否则「主线程卡住」时它自己也停了，
     /// 而「卡住」与「被杀」就分不出来了 —— 那正是它唯一要分辨的那件事。
@@ -110,7 +118,16 @@ final class StartupJournal: @unchecked Sendable {
             }
             try? FileManager.default.removeItem(at: cur)
         }
+        // 上一次若是被信号杀掉的，它留了一张纸条：取走、然后删掉 ——
+        // 留着会被读成「这一次也崩了」（本仓库最贵的那个坑：分不清「没记」与「没走到」）。
+        if let fatal = url(Self.fatalName) {
+            previousFatal = Self.read(fatal) ?? ""
+            try? FileManager.default.removeItem(at: fatal)
+        }
+        // 装了哪几个围栏，写进第一行之外的一行 —— 复制轨迹出来时，
+        // 「这一次是哪个实验」必须与数据在一起。
         add("＝ 这一次启动 \(Self.stamp()) ＝ \(Self.versionLine())")
+        add(LaunchFence.summary)
         flush()
         startHeartbeat()
     }
@@ -184,6 +201,39 @@ final class StartupJournal: @unchecked Sendable {
         flush()
     }
 
+    // MARK: - 信号捕获（临时仪器，见 LaunchFence）
+
+    /// 装上信号处理：SIGTRAP（Swift 自己踩到的 trap：越界 / 溢出 / 强解包失败）、
+    /// SIGSEGV / SIGBUS / SIGILL（内存与非法指令）、SIGABRT（运行时断言）。
+    ///
+    /// 为什么必要：1 秒心跳只能告诉你「进程在某一秒没了」，而**两种死法在轨迹里
+    /// 长得一样** —— 自己踩到 trap（会发一个信号）与被系统直接拿走
+    /// （jetsam / 看门狗，一个信号都不发）。有了这张纸条就分得开：
+    ///   · 纸条在 → 是我们自己的代码崩的，纸条里还带着当时的调用栈；
+    ///   · 纸条不在 → 进程被系统处决，去读心跳那一列（内存水位 / 主线程是否回话）。
+    func catchSignalDeaths() {
+        _ = signal(SIGTRAP) { sig in StartupJournal.recordSignalDeath("SIGTRAP", sig) }
+        _ = signal(SIGSEGV) { sig in StartupJournal.recordSignalDeath("SIGSEGV", sig) }
+        _ = signal(SIGBUS) { sig in StartupJournal.recordSignalDeath("SIGBUS", sig) }
+        _ = signal(SIGILL) { sig in StartupJournal.recordSignalDeath("SIGILL", sig) }
+        _ = signal(SIGABRT) { sig in StartupJournal.recordSignalDeath("SIGABRT", sig) }
+    }
+
+    /// 信号处理体：**不取锁、不碰轨迹**，只把纸条放好然后立刻退出。
+    /// 带着一个已经崩掉的运行环境继续跑，只会生出第二份说不清的东西。
+    /// （它必须是 `static` 且不捕获任何东西：`signal` 要的是 C 函数指针。）
+    static func recordSignalDeath(_ name: String, _ sig: Int32) {
+        let stack = Thread.callStackSymbols.joined(separator: "\n      ")
+        writeFatal("\(name)（信号 \(sig)）\n      \(stack)")
+        _exit(sig)
+    }
+
+    private static func writeFatal(_ text: String) {
+        guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
+            .appendingPathComponent(fatalName) else { return }
+        try? text.write(to: url, atomically: true, encoding: .utf8)
+    }
+
     // MARK: - 读上一次
 
     /// 上一次启动的轨迹与它是否走完。
@@ -194,13 +244,22 @@ final class StartupJournal: @unchecked Sendable {
     }
 
     func previousRun() -> PreviousRun {
-        guard let text = Self.read(url(previousName)) else {
-            return PreviousRun(exists: false, finished: true, lines: [])
+        var lines: [String] = []
+        var hadJournal = false
+        if let text = Self.read(url(previousName)) {
+            hadJournal = true
+            lines = text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
         }
-        let all = text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
-        return PreviousRun(exists: true,
-                           finished: all.contains { $0.contains("✅") },
-                           lines: all)
+        // 纸条排在最前面：它是「上一次怎么死的」最直接的那句话。
+        // 它与「✅」可以同时存在 —— 那表示启动那 12 秒走完了，是之后才崩的：
+        // 两件事都写着，不替对方下结论。
+        if !previousFatal.isEmpty { lines.insert("⚠️ 被信号终止：" + previousFatal, at: 0) }
+        // 三元里不放尾随闭包：本仓库在那一带上真出过 CI 编译错（见 4203c67 / 2f088bd），
+        // 先算成两个名字，读起来也不再要人替编译器断句。
+        let journalFinished = lines.contains { $0.contains("✅") }
+        // 什么都没有时按「走完了」报：空不能当证据（同 `add` 的说明）。
+        let finished = hadJournal ? journalFinished : previousFatal.isEmpty
+        return PreviousRun(exists: !lines.isEmpty, finished: finished, lines: lines)
     }
 
     // MARK: - 写

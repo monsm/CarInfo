@@ -108,6 +108,10 @@ struct CarKeeperApp: App {
         // 启动轨迹：**最早的一步**就在这里。用户 2026-09-24 报「载入不到 10 秒就闪退、
         // 系统里没有日志」—— 那类终止不会调用 App 的任何代码，所以路标要在死之前写好。
         StartupJournal.shared.begin()
+        // 信号捕获（临时仪器，见 LaunchFence）：与轨迹配套装在这里。
+        // 1 秒心跳只能说明「进程在某一秒没了」，纸条才能说明
+        // 「是我们自己的代码崩的（带调用栈）还是被系统拿走的（什么都没有）」。
+        StartupJournal.shared.catchSignalDeaths()
     }
 
     var body: some Scene {
@@ -133,7 +137,8 @@ struct CarKeeperApp: App {
     }
 
     // #NEW-112 启动画面控制
-    @State private var showSplash = true
+    // 围栏控制（见 LaunchFence）：关掉时直接进主界面，少一次整棵树重建。
+    @State private var showSplash = LaunchFence.splash
     @State private var isAppLoading = false
     // #NEW-113 Onboarding 引导状态
     @AppStorage("carkeeper_onboarding_seen") private var onboardingSeen = false
@@ -221,36 +226,38 @@ struct CarKeeperApp: App {
             }
             // #N38 崩溃上报（CrashReporter）已删：它把崩溃历史写进 UserDefaults
             // 只为给「诊断」页看，用户明确要求把这类本机统计一并去掉。
-            // #N39 内存监控启动（不落盘，只是此刻的读数）
-            MemoryMonitor.shared.startMonitoring(interval: 10)
-            // #N37 网络质量监控
-            _ = NetworkQualityMonitor.shared
-            // #N41 离线模式监听
-            _ = OfflineModeManager.shared
-            // #N15-N20 通知权限请求
-            Task { await SmartNotificationManager.shared.requestAuthorization() }
-            SmartNotificationManager.shared.registerCategories()
-            // #N14 远程锁定监听
-            RemoteLockManager.shared.startMonitoring()
-            // #N46 摇一摇锁车
-            // 锁车动作现在由 ShakeDetector 自己在触发时完成（验 PIN → 发 CentralLock）；
-            // 这里那层只弹提示的闭包已经去掉 —— 它让「摇一摇已触发」看起来像做了事。
-            ShakeDetector.shared.startMonitoring()
-            // #NEW-118/N119 维保+保险提醒调度器初始化
-            _ = MaintenanceReminderScheduler.shared
-            _ = InsuranceReminderScheduler.shared
-            // #NEW-120 Siri/快捷指令：真正的 AppIntent 在 Features/SiriShortcuts.swift。
-            // 旧的那份 `AppIntentsManager`（空桩）已删；旧的 INIntent 子类也没有
-            // Intent Extension target 去注册，永远不可能被唤起。
-            // E47 性能监控（PerformanceTracker）已删：页面耗时与接口成功率两项
-            // 都是写进 UserDefaults 给「诊断」页看的本机统计，属这一轮要删的东西。
-            // E38 专注模式监听
-            _ = FocusModeManager.shared
-            // E40 充电状态监控（此前只写了 `_ = ChargingStatusMonitor.shared`，
-            // 连 startMonitoring 都没调，而那个方法本身也是空的）
-            ChargingStatusMonitor.shared.startMonitoring()
-            // N10 车牌加密初始化
-            DataEncryption.ensureKey()
+            if LaunchFence.launchServices {
+                // #N39 内存监控启动（不落盘，只是此刻的读数）
+                MemoryMonitor.shared.startMonitoring(interval: 10)
+                // #N37 网络质量监控
+                _ = NetworkQualityMonitor.shared
+                // #N41 离线模式监听
+                _ = OfflineModeManager.shared
+                // #N15-N20 通知权限请求
+                Task { await SmartNotificationManager.shared.requestAuthorization() }
+                SmartNotificationManager.shared.registerCategories()
+                // #N14 远程锁定监听
+                RemoteLockManager.shared.startMonitoring()
+                // #N46 摇一摇锁车
+                // 锁车动作现在由 ShakeDetector 自己在触发时完成（验 PIN → 发 CentralLock）；
+                // 这里那层只弹提示的闭包已经去掉 —— 它让「摇一摇已触发」看起来像做了事。
+                ShakeDetector.shared.startMonitoring()
+                // #NEW-118/N119 维保+保险提醒调度器初始化
+                _ = MaintenanceReminderScheduler.shared
+                _ = InsuranceReminderScheduler.shared
+                // #NEW-120 Siri/快捷指令：真正的 AppIntent 在 Features/SiriShortcuts.swift。
+                // 旧的那份 `AppIntentsManager`（空桩）已删；旧的 INIntent 子类也没有
+                // Intent Extension target 去注册，永远不可能被唤起。
+                // E47 性能监控（PerformanceTracker）已删：页面耗时与接口成功率两项
+                // 都是写进 UserDefaults 给「诊断」页看的本机统计，属这一轮要删的东西。
+                // E38 专注模式监听
+                _ = FocusModeManager.shared
+                // E40 充电状态监控（此前只写了 `_ = ChargingStatusMonitor.shared`，
+                // 连 startMonitoring 都没调，而那个方法本身也是空的）
+                ChargingStatusMonitor.shared.startMonitoring()
+                // N10 车牌加密初始化
+                DataEncryption.ensureKey()
+            }
         }
         .onOpenURL { url in
             openDeeplink(url)
