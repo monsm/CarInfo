@@ -34,6 +34,12 @@ struct MessagesSection: View {
         set { UserDefaults.standard.set(Array(newValue), forKey: readKey) }
     }
 
+    /// 没有 token 时那一句真话。**只有一个出处**：原先 `loadIfNeeded` 与 `load`
+    /// 各写了一遍（同一句话两处各写一次，改一处必漏一处），而且两遍都含实现词
+    /// 「接口」，于是 `scan/copy.py` 同一个问题报了两次 —— 一句话写两遍，错也错两遍。
+    /// 界面话只描述用户的状态（没登录）与他能做的事（去登录），不描述我们怎么取数。
+    private static let needLogin = "请先登录，登录后才会收到车辆事件"
+
     private func markRead(_ id: String) {
         guard !id.isEmpty else { return }
         var s = Self.localRead
@@ -416,7 +422,7 @@ struct MessagesSection: View {
         // 而真实情况是「请求根本没发」。这两件事在屏幕上长得一模一样 ——
         // 用户 2026-09-24「消息接口拿不到数据」那一轮，这一支就是可能的凶手之一。
         guard !TokenStore.currentToken().isEmpty else {
-            lastError = "未登录（没有 token），消息接口没有被调用"
+            lastError = Self.needLogin
             loading = false
             return
         }
@@ -433,7 +439,7 @@ struct MessagesSection: View {
     private func load() async {
         // 同样不设 carId 闸（理由见 loadIfNeeded）。
         guard !TokenStore.currentToken().isEmpty else {
-            lastError = "未登录（没有 token），消息接口没有被调用"
+            lastError = Self.needLogin
             loading = false
             return
         }

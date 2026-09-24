@@ -19,9 +19,21 @@
      对应不到的（隐私 / OTA / 家庭 / 钥匙）由 `openMode(for:)` 自己 push。
   ② 档位与页面一一对应：`HomeMode` 的每个 case 都要在
      `MapSpineView.pageContent` 里有一个 case（`.now` 也在 —— 它是地图本身）。
-  ③ `homeMode` 的每一档都要在 `HomeModeHead` 里出现**两次**（巨字 + 依据行）——
-     防的是「加了档位、但 02 那张卡只有内容没有头」，那样加出来的档位
-     看起来就和其余档位不像一家人。
+  ③ `HomeMode` 的每一档在 `HomeModeHead` 里要出现**恰好一次**。
+     0 次：加了档位、但 02 那张卡只有内容没有头，那个档位看起来就和其余档位
+     不像一家人（原判据守的就是这一半）。
+     ≥2 次：同一档在头卡里有两处表述 —— 2026-09-24 之前的写照是「巨字 hero +
+     三行依据（车牌/车架号/保险）」，而那三行逐条又在紧下面那张卡里再说一遍
+     （车辆档的头写「车牌/车架号/保险」，紧跟的「身份」卡就是这三样）。
+     用户当天要求「精致度」，删的就是这个：**一个事实只留一个出处**。
+     判据跟着从「< 2 报错」翻成「≠ 1 报错」—— 否则门禁会一直拦着正确的写法，
+     而它拦下的恰好是本轮唯一一处真实事故（2026-09-24 CI 红在 785fb8c）。
+
+双向验证（本仓库的门禁写法约定 ⑤，探针结果留档）：
+  2026-09-24 在 `HomeModeHead` 里临时注入第二个 `switch mode`（让每一档再说一遍 ——
+  旧形态的等效写法），本判据报出 6 条「出现了 2 次」并退出 1；
+  撕掉探针后 `HomeModeHead.swift` 与 HEAD 逐字节一致
+  （`git hash-object` = 16dfdda…）且转绿。两个方向都确实出声过。
 
 退出码：0 = 只有一条入口；1 = 发现第二条（或扫描失败）。
 """
@@ -118,12 +130,15 @@ def main():
     for c in sorted(page_cases - set(modes)):
         problems.append(f"② pageContent 里的 `.{c}` 不是一个档位（HomeMode 里没有它）")
 
-    # ---- ③ 档位 ↔ 02 的卡头（巨字 + 依据行）----
+    # ---- ③ 档位 ↔ 02 的卡头（恰好一处：巨字）----
     for m in modes:
         n = len(re.findall(r"case\s+\.%s\s*:" % re.escape(m), head))
-        if n < 2:
-            problems.append(f"③ 档位 `{m}` 在 HomeModeHead 里只出现 {n} 次"
-                            f"（需要 2 次：巨字 hero + 依据行 facts）")
+        if n == 0:
+            problems.append(f"③ 档位 `{m}` 在 HomeModeHead 里一次都没出现"
+                            f"（每一档都要有卡头，否则它和其余档位不像一家人）")
+        elif n > 1:
+            problems.append(f"③ 档位 `{m}` 在 HomeModeHead 里出现了 {n} 次"
+                            f"（同一档只该有一处表述：卡头巨字；依据在下面每一张卡里）")
 
     # ---- ① 属于某一档的深链不准被 push（哪里都不行，深链也走 openMode）----
     banned = set(modes) | ALIASES

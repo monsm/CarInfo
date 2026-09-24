@@ -42,18 +42,24 @@
 **这台开发机上没有 Swift 工具链**（`swift` / `swiftc` / Xcode 都不存在）。因此：
 
 - **编译只在 CI 上发生**。本地唯一能做的验证是静态门禁 + 风格检查 + `bash -n`。
-- 改完必须看 CI 日志才能知道「编不编得过」。这也是仓库里为什么会有 23 项门禁（§8）。
+- 改完必须看 CI 日志才能知道「编不编得过」。这也是仓库里为什么会有 24 项门禁（§8）。
 
 ```bash
-# 本机可跑的全部验证（在仓库根）
+# 本机可跑的全部验证（在仓库根）—— 一条命令，别挑着跑
 export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
-node CarKeeper/check_style.js
-for s in delguard paths design keys access lexguard scan logic shadowguard scenes \
-         targets unreachable futureproof orphans deep eol oneentry traps \
-         scopeguard paidcap copy lintcfg ternary enumguard; do python3 scan/$s.py; done
+python3 scan/all.py
 ```
 
-> `delguard.py` 比的是「上一次提交 vs 现在」——它在本地看的是**你手上还没提交的改动**，
+> **为什么是「一条命令」而不是那个 `for s in ...` 循环**：循环的清单与 CI 逐字同序，
+> 但它是**给人抄的**，而 2026-09-24 就漏抄了 —— 改完只跑了清单里的一半，
+> 三条红全部由 CI 报出来（其中两条是本地跑一遍就会当场红的真 bug：
+> 界面文案里的实现词、`MapSpineView.swift` 越过 `file_length` 阈值）。
+> `scan/all.py` 干的就是那个循环：**清单从 `.github/workflows/ios-build.yml` 里解析出来**
+> （这里不另抄一份 —— 抄一份的后果是 CI 加了门禁而本地不知道，于是本地永远绿），
+> 逐条跑完**所有**条（CI 用 `bash -e`，红在第一条就停；本地要的是一次看到全部红）。
+> 它自己不判任何东西，所以登记在 `paths.py` 的豁免表里（连同理由）。
+
+> `delguard.py` 比的是「上一次提交 vs 现在」——它在本地看的是**你手上还没提交的改动**,
 > 在 CI 上看的是这次提交。它专门盯「声明被删/重写了、使用还在」（两次真实事故都是它）。
 
 ### 1.2 在 macOS 上构建（或照 CI 抄）
@@ -71,7 +77,7 @@ xcodebuild build \
 
 两个 job，顺序依赖：
 
-1. **`static-gate`**（ubuntu，秒级）：`check_style.js` + 23 项 `scan/*.py`。**任一红即整体失败**。
+1. **`static-gate`**（ubuntu，秒级）：`check_style.js` + 24 项 `scan/*.py`。**任一红即整体失败**。
    （它的 checkout 要 `fetch-depth: 2` —— `delguard.py` 需要 `HEAD~1` 才比得出「这次提交改掉了什么」。）
 2. **`build-unsigned-ipa`**（macos，约 3 分钟，额度按 10 倍计费）：XcodeGen → xcodebuild → 打 `Payload/` zip 成 ipa
    → **IPA 内容体检**（只打印顶层结构，`|| true` 不阻断）→ 上传 artifact → 覆盖发布到 tag `latest` 的 Release（App 内「检查更新」从这里下载）。
@@ -543,7 +549,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 
 ---
 
-## 8. 工程约束与门禁（22 项 + 风格检查）
+## 8. 工程约束与门禁（24 项 + 风格检查）
 
 ### 8.1 门禁表（每一项都是某次真实事故的产物）
 
@@ -564,7 +570,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 | 13 | `orphans.py` | 孤儿页面：「写了但没有任何地方能到达」 |
 | 14 | `deep.py` | 更深的结构问题：SDK 同名遮蔽、协议一致性、闭包参数、清洗保真度 |
 | 15 | `eol.py` | committed blob 的字节级行尾问题（字面量里裸换行 / 行中裸 CR / `\r\r\n`） |
-| 16 | `oneentry.py` | **入口唯一性**：同一件事只准有一条到达路径 |
+| 16 | `oneentry.py` | **入口唯一性**：同一件事只准有一条到达路径。判据 ③ 是「档位在 `HomeModeHead` 里出现**恰好一次**」——0 次 = 加了档位卡头没跟上；≥2 次 = 同一档有两处表述（原判据是「< 2 报错」，2026-09-24 定义反了，见 §11） |
 | 17 | `traps.py` | 编译得过但真机一走到就崩的构造（`hashValue` 参与算术、强解包、`try!` / `as!`） |
 | 18 | `scopeguard.py` | 名字在项目里、但在调用点不在作用域（跳类型调静态成员必须带前缀） |
 | 19 | `paidcap.py` | 免费账号用不了的能力（entitlements 白名单 / Info.plist 禁键 / 禁 import / target 白名单） |
@@ -572,7 +578,9 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 | 21 | `lintcfg.py` | `.swiftlint.yml` 的排除清单与阈值必须和真实文件树一致 |
 | 22 | `ternary.py` | 三元运算符的 `?` 不能贴住前一个 token（否则变可选链）—— 见 §11 事故记录 |
 | 23 | `delguard.py` | **删了声明、使用还在**：旧版本里成员级声明过、新版本里没有声明了、代码里还在用它（`pvValue` / `shapeScroll` 两次事故的两条根因） |
+| 24 | `enumguard.py` | 表驱动调用族的 SDK 枚举简写必须是已核成员（`accessibilityAction` / `textCase` / `accessibilityElement(children:)` / `scrollBounceBehavior`） |
 | + | `check_style.js`（node） | 风格与括号配平 |
+| + | `all.py`（**本地**执行器） | 不判任何东西：把上面这份清单（从工作流解析，不另抄）一次跑齐。CI 不跑它 —— 跑第二遍没有信息量 |
 
 **门禁的写法约定**（新加一项时照抄）：
 ① 文件头写清「为什么需要它」并引用真实事故；② 判据只认「不可能合法」的形态，不猜意图；
@@ -698,6 +706,8 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 | 09-23 | 门禁写了但没接 | `copy.py` 没加进 CI 的 `for s in ...` | `paths.py` 的反方向检查 |
 | 09-23 | CI 编译失败（3 条 `pvValue`） | 撤 `pv` 状态时把 `pvValue` 函数本体一起删了，5 处调用还在 | `delguard.py` |
 | 09-24 | CI 编译失败（3 条 `shapeScroll`） | 重写它的注释时把声明本身写没了，3 处使用还在 | `delguard.py` |
+| 09-24 | CI 静态门红 3 条（`copy` / `lintcfg` / `oneentry`） | 本地只跑了清单里的一半 —— 而三条里两条是真 bug（空态含实现词「接口」；`MapSpineView.swift` 涨到 1206 行越过阈值），本地全跑就会当场红 | `scan/all.py`（把「记得跑那个循环」变成一条命令，清单从工作流解析） |
+| 09-24 | 门禁拦住了正确的写法 | `oneentry.py` 判据 ③ 写的是「档位要出现**两次**（巨字 + 依据行）」，而当天的「精致度」设计恰好把依据行删了 —— 门禁坚持的是旧设计 | 判据翻成「**恰好一次**」，并在文件头写明为什么定义反了 |
 
 ---
 
