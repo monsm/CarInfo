@@ -42,16 +42,19 @@
 **这台开发机上没有 Swift 工具链**（`swift` / `swiftc` / Xcode 都不存在）。因此：
 
 - **编译只在 CI 上发生**。本地唯一能做的验证是静态门禁 + 风格检查 + `bash -n`。
-- 改完必须看 CI 日志才能知道「编不编得过」。这也是仓库里为什么会有 22 项门禁（§8）。
+- 改完必须看 CI 日志才能知道「编不编得过」。这也是仓库里为什么会有 23 项门禁（§8）。
 
 ```bash
 # 本机可跑的全部验证（在仓库根）
 export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
 node CarKeeper/check_style.js
-for s in paths design keys access lexguard scan logic shadowguard scenes targets \
-         unreachable futureproof orphans deep eol oneentry traps scopeguard \
-         paidcap copy lintcfg ternary; do python3 scan/$s.py; done
+for s in delguard paths design keys access lexguard scan logic shadowguard scenes \
+         targets unreachable futureproof orphans deep eol oneentry traps \
+         scopeguard paidcap copy lintcfg ternary enumguard; do python3 scan/$s.py; done
 ```
+
+> `delguard.py` 比的是「上一次提交 vs 现在」——它在本地看的是**你手上还没提交的改动**，
+> 在 CI 上看的是这次提交。它专门盯「声明被删/重写了、使用还在」（两次真实事故都是它）。
 
 ### 1.2 在 macOS 上构建（或照 CI 抄）
 
@@ -68,7 +71,8 @@ xcodebuild build \
 
 两个 job，顺序依赖：
 
-1. **`static-gate`**（ubuntu，秒级）：`check_style.js` + 22 项 `scan/*.py`。**任一红即整体失败**。
+1. **`static-gate`**（ubuntu，秒级）：`check_style.js` + 23 项 `scan/*.py`。**任一红即整体失败**。
+   （它的 checkout 要 `fetch-depth: 2` —— `delguard.py` 需要 `HEAD~1` 才比得出「这次提交改掉了什么」。）
 2. **`build-unsigned-ipa`**（macos，约 3 分钟，额度按 10 倍计费）：XcodeGen → xcodebuild → 打 `Payload/` zip 成 ipa
    → **IPA 内容体检**（只打印顶层结构，`|| true` 不阻断）→ 上传 artifact → 覆盖发布到 tag `latest` 的 Release（App 内「检查更新」从这里下载）。
 
@@ -529,6 +533,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 | 20 | `copy.py` | 界面文案三类判据：实现词（缓存/报文/字段/接口）不上界面、复述句式、超 30 字 |
 | 21 | `lintcfg.py` | `.swiftlint.yml` 的排除清单与阈值必须和真实文件树一致 |
 | 22 | `ternary.py` | 三元运算符的 `?` 不能贴住前一个 token（否则变可选链）—— 见 §11 事故记录 |
+| 23 | `delguard.py` | **删了声明、使用还在**：旧版本里成员级声明过、新版本里没有声明了、代码里还在用它（`pvValue` / `shapeScroll` 两次事故的两条根因） |
 | + | `check_style.js`（node） | 风格与括号配平 |
 
 **门禁的写法约定**（新加一项时照抄）：
@@ -653,6 +658,8 @@ Tokens（静态令牌，唯一来源） → ArtTheme（4 个方向 = 一整套�
 | 09-23 | CI 编译失败 | `searchText.isEmpty? "…"` 少一个空格 → 被读成可选链 | `ternary.py` |
 | 09-23 | 检查范围悄悄变小 | `rglob` 对不存在的目录不报错，白名单里留着已删目录 | `_roots.py`（根目录必须存在） |
 | 09-23 | 门禁写了但没接 | `copy.py` 没加进 CI 的 `for s in ...` | `paths.py` 的反方向检查 |
+| 09-23 | CI 编译失败（3 条 `pvValue`） | 撤 `pv` 状态时把 `pvValue` 函数本体一起删了，5 处调用还在 | `delguard.py` |
+| 09-24 | CI 编译失败（3 条 `shapeScroll`） | 重写它的注释时把声明本身写没了，3 处使用还在 | `delguard.py` |
 
 ---
 

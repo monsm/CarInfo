@@ -26,6 +26,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # delguard.py 要比「上一版本 vs 这一版本」，而它的旧版本是 HEAD~1 ——
+          # 默认的 depth 1 拿不到它（拿不到时会退回 HEAD，而 CI 的工作区就是 HEAD，
+          # 于是检查恒为空：「没检查」长得和「没问题」一模一样）。多拉一层是它的前提。
+          fetch-depth: 2
 
       - name: 静态检查器
         run: |
@@ -72,7 +77,12 @@ jobs:
           #    按配置文件所在目录解析，于是那 5 条全部空转）；② 删扩展留下的
           #    WatchApp / Widgets 两条指向已删目录，而 1126 行的 MapSpineView 反倒没进清单。
           # 它不需要 swiftlint、不需要 macOS —— 能在 Linux 上秒级拦住「配置与代码各走各的」。
-          for s in paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps scopeguard paidcap copy lintcfg ternary enumguard; do
+          # delguard.py：**删了声明、使用还在**。它只查一条（旧版本里成员级声明过、
+          # 新版本里没有声明了、但代码里还在用它），而这一条在 Swift 里必然是编译错误。
+          # 两次真实事故都是它（`pvValue` 与 `shapeScroll`，各三条 cannot find in scope），
+          # 两次都白烧了一整轮 10 倍计费的 macOS runner。
+          # 它比的是 HEAD~1（见上面 fetch-depth: 2），所以 CI 与本地是同一套判据。
+          for s in delguard paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps scopeguard paidcap copy lintcfg ternary enumguard; do
             echo "::group::$s.py"
             python3 scan/$s.py
             echo "::endgroup::"
