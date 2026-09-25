@@ -116,7 +116,7 @@ jobs:
           # 两次真实事故都是它（`pvValue` 与 `shapeScroll`，各三条 cannot find in scope），
           # 两次都白烧了一整轮 10 倍计费的 macOS runner。
           # 它比的是 HEAD~1（见上面 fetch-depth: 2），所以 CI 与本地是同一套判据。
-          for s in delguard paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps scopeguard paidcap copy lintcfg ternary enumguard spacing expand printguard glass; do
+          for s in delguard paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps scopeguard paidcap copy lintcfg ternary enumguard spacing expand printguard glass extguard; do
             echo "::group::$s.py"
             python3 scan/$s.py
             echo "::endgroup::"

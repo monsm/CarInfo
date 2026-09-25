@@ -554,7 +554,10 @@ struct ControlView: View {
     // 同一件事有两个界面、两套数据，正是「缝合」的典型。融合时取了更全的那个数据源。
     private var allRuns: [AppStore.HistoryEntry] { store.commandHistory }
 
-    private var filteredRuns: [AppStore.HistoryEntry] {
+    /// 不是 `private`：`ControlFit.swift`（同目录）要用它算「摊开之后占几屏」——
+    /// `private` 的作用域是**文件**，跨文件就是「名字在项目里、但调用点不在作用域」。
+    /// 2026-09-25 的 CI 红在这上面（同一个错在 `MapSpineBottomBar.swift` 里还犯了三条）。
+    var filteredRuns: [AppStore.HistoryEntry] {
         switch historyFilter {
         // 「成功」只算**已确认**的成功：一条「结果待确认」的指令不该出现在成功列表里，
         // 也不该被算成失败 —— 那两件事都是我们不知道的事。

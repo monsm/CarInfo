@@ -43,7 +43,7 @@
 
 - **编译只在 CI 上发生**。本地唯一能做的验证是静态门禁 + 风格检查 + `bash -n`。
 - 改完必须看 CI 日志才能知道「编不编得过」。这也是仓库里为什么会有 28 条静态门禁
-  （§8；加上 `check_style.js` 共 29 项，`scan/all.py` 一次跑齐）。
+  （§8；加上 `check_style.js` 共 30 项，`scan/all.py` 一次跑齐）。
 
 ```bash
 # 本机可跑的全部验证（在仓库根）—— 一条命令，别挑着跑
@@ -83,7 +83,7 @@ xcodebuild build \
 
 两个 job：第二个依赖第一个（**2026-09-25 起是两条** —— 原来还有第三个 `make-private`）。
 
-1. **`static-gate`**（ubuntu，秒级）：`check_style.js` + 28 项 `scan/*.py`。**任一红即整体失败**。
+1. **`static-gate`**（ubuntu，秒级）：`check_style.js` + 29 项 `scan/*.py`。**任一红即整体失败**。
    （它的 checkout 要 `fetch-depth: 2` —— CI 上工作区干净，`delguard.py` 要拿 `HEAD~1`
    才比得出「这次提交改掉了什么」。）
 2. **`build-unsigned-ipa`**（macos，约 3 分钟，额度按 10 倍计费）：XcodeGen → xcodebuild → 打 `Payload/` zip 成 ipa
@@ -307,9 +307,12 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 
 ## 4. 界面逐项
 
-### 4.1 地图主屏（「现在」档）—— 全 App 唯一的屏**文件**：`Features/Map/MapSpineView.swift`（**1111 行**，骨架：六页同屏 / 底条 / 浮动两卡 / 图层胶囊；
+### 4.1 地图主屏（「现在」档）—— 全 App 唯一的屏**文件**：`Features/Map/MapSpineView.swift`（**1178 行**，骨架：六页同屏 / 底条 / 浮动两卡 / 图层胶囊；
 2026-09-25 它到过 1201 行、越过了 `lintcfg.py` 的 1200 阈值，于是把「光」表拆成
-`MapSkySheet.swift`（含共用原语 `MapNotice`）—— 拆的是文件，界面一字未改）、
+`MapSkySheet.swift`（含共用原语 `MapNotice`）—— 拆的是文件，界面一字未改。
+**同一天「底条整行横拖」从 `MapSpineBottomBar.swift` 搬了回来**：那次拆分让一个
+从没编译过的文件进了仓库（见 §11 的 09-25 行），而它要用的四个成员都是 `private` ——
+搬回来之后它们各自保持 `private`，那一条手势与它的状态 `barDragBase` 又住在一起）、
 `MapSpineLayers.swift`（139 行，「现在」那一档四个图层各自的内容 —— 2026-09-23 拆出，
 理由见那里的文件头）、`MapSpineData.swift`（数据层）、`MapCarPin.swift`（车钉）、
 `HomeModeHead.swift`（巨字头：只给**一个**事实 + 一行小字，依据在下面每一张卡里）。
@@ -772,7 +775,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 
 ---
 
-## 8. 工程约束与门禁（28 项 + 风格检查）
+## 8. 工程约束与门禁（29 项 + 风格检查）
 
 ### 8.1 门禁表（每一项都是某次真实事故的产物）
 
@@ -810,6 +813,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | 26 | `expand.py` | **展开类内容不许写死高度**：界面代码里不得出现 `frame(height: 数字)`（只给高度、没给宽度的那种；`frame(width: 44, height: 44)` 是形状，不管）。例外表 11 条，键是「文件:值」，每条都写清「为什么这个高度是画出来的」（图表 / 指示线 / 样例色块 / 缩略图），**一条不再成立就报红**。它是 2026-09-25「展开后的拥挤程度要完全根据数据算」那一轮的守门人 |
 | 27 | `printguard.py` | App 与 Services 里不得出现 `print(`（例外只有设计令牌页）。它是 2026-09-25 那一轮的守门人：全仓仅有的两处 `print` 都是「提醒没发出去」——`print` 的问题不是吵，是**没有读者**（那条路径写进了「诊断」在读的日志） |
 | 28 | `glass.py` | **玻璃只有一个入口**：`.glassEffect` / `GlassEffectContainer` 只许出现在 `Design/DSGlass.swift`；玻璃底下不许垫不透明的面（同一条链里 `.fill(TokensPalette.…)` 出现在 `.dsGlass` 之前即报红）；不许再引入旧材质语言（`…Material`）。它是 2026-09-25「全局液态玻璃的质感全项目每个犄角旮旯方方面面都做到位了吗」那一轮的守门人：那一轮查出真玻璃只有 3 处，其余浮层用的都是「名字叫 glass、值等于 `fillSubtle`」的扁平令牌（该别名已删），另有两处把玻璃**垫在不透明的面底下** |
+| 29 | `extguard.py` | **extension 的三条铁律**：① 必须在文件层（不许嵌套）；② 直接成员层不许有实例存储属性（`static` 放行）；③ 跨文件不许碰别处的 `private` / `fileprivate` 成员。它是 2026-09-25 那次 CI 红的产物：`MapSpineBottomBar.swift` 一台戏犯了三条（嵌套的 `private extension Double`、`@State` 存储属性、读写四个 `private` 成员），而 29 条门禁一条都没拦住 —— 因为没有任何判据知道「extension 该长什么样」 |
 | + | `check_style.js`（node） | 风格与括号配平 |
 | + | `all.py`（**本地**执行器） | 不判任何东西：把上面这份清单（从工作流解析，不另抄）一次跑齐。CI 不跑它 —— 跑第二遍没有信息量 |
 
@@ -879,7 +883,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 - `DESIGN-SPEC.md` 的小节标题仍用旧页面名（如「行程页 (TripAnalyticsView)」），实际类型是 `TripsEventsView`。
 - `GlobalSearchHUD` 的空态提示曾写「搜页面、车牌、行程、指令、**充电记录**。」，而充电记录随
   充电账本一起删了（代码里的注释已注明），提示却还在承诺它 —— **已改**。
-  这一类「文案承诺了一个已删除的功能」的漂移，28 条静态门禁**查不到**：`copy.py` 只管词、长度与复述句式，
+  这一类「文案承诺了一个已删除的功能」的漂移，29 条静态门禁**查不到**：`copy.py` 只管词、长度与复述句式，
   不核对「这句话说的东西还在不在」。写文档时逐屏读才会碰到。
 
 ### 9.4 未验证的部分（必须如实交接）
@@ -957,6 +961,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | 09-24 | CI 编译失败（`StartupJournal.swift:92` 的 `URL?`） | 新写的 `begin()` 里，`if let text = Self.read(cur), let prev` 只解开了「上一次」的路径，下面 `removeItem(at: cur)` 里的 `cur` 仍是 `URL?` —— 本地看不见（没有 Swift 工具链） | 拆成两段解包（顺带把「拿不到路径时不静默放过」写进注释）；同一次构建的三条警告一并清掉 |
 | 09-24 | `scan/all.py` 在 Windows 上崩 | 控制台是 GBK，`print("  ✅ …")` 直接 `UnicodeEncodeError` —— 保证「本地全跑」的脚本自己先崩 | 只改 `errors` + 符号降级为 `[通过]`/`[红]`（红绿不可混同）；子进程 `PYTHONIOENCODING=utf-8` |
 | 09-24 | 真机闪退**仍然复现**，而且系统里没有日志 | 「没有日志」本身就是判据：应用层错误会留下一份 .ips 报告，什么都没有通常意味的是**系统级终止**（jetsam / 看门狗）—— 那类终止不调用 App 的任何一行代码。而它现在恰好最难看见：自建的崩溃上报已在 09-23 按用户要求删除，系统报告又只在「设置 → 隐私与安全性 → 分析与改进 → 共享 iPhone 分析」打开时才落盘 | 启动轨迹补三样：**心跳**（每秒一行，写在后台队列上，于是最后一行离死亡时刻不超过 1 秒）、**主线程卡住判据**（心跳还在写而主线程 N 秒没回话 = 卡死；心跳自己也停了 = 被处决）、**地图页各步打点**（原来的打点全落在头一两秒，而事故发生在「地图出现后几秒」，正好落在盲区里） |
+| 09-25 | **CI 连红两次：`MapSpineBottomBar.swift:71` 「declaration is only valid at file scope」** | 上一轮为了把 `MapSpineView.swift` 收回 1200 行以内，把「底条整行横拖」搬进新文件，而那个文件**一台戏犯了三个错**：① `private extension Double` 写在 `extension MapSpineView { … }` 体内（Swift 只允许文件层）；② `@State private var barDragBase` 是 extension 里的存储属性；③ 读写 `modePosition` / `barOpen` / `modeIndex` / `barRowWidth` —— 四个都是 `MapSpineView.swift` 里的 `private`（`private` 的作用域是**文件**）。而**29 条门禁全绿**：当时的判据里没有一条知道 extension 该长什么样 | 那个文件整体撤掉，手势与控制它的状态搬回同一个文件；`filteredRuns` 在 `ControlView.swift` 里去掉 `private`（它被 `ControlFit.swift` 用着 —— 同一个错的第二处）。新增第 29 条门禁 `extguard.py`（三条铁律），探针验过：判据 ①② 注入即报、撤掉转绿；判据 ③ 用真事故复现（把 `filteredRuns` 改回 `private`，当场报出 `ControlFit.swift:58/63`）。第一版探针把宿主与扩展写在同一个文件里，③ 因此不报 —— 而那是**对的**（`private` 的作用域是文件，同文件用私有成员合法）：探针不报可能是判据漏了，也可能是探针没造成那个形状，两者必须先分清。教训写进那条门禁的文件头：**「拆文件」不是免费的 —— 它会把「同一个作用域」拆成两个** |
 | 09-24 | 冷启动把同一件事问了三遍 | 根视图 `onAppear` 里两处 + 地图外壳 `.task` 各自调 `bootstrap()` —— 并发三份 `getCars` + `getUser`，并三次 `cancel` / 重启预加载（每次预加载都是 6 个请求）。冷启动头几秒本来就在抢 CPU 与网络 | `bootstrap()` 合并**同时**在飞的那几趟；串行重复调用（重新登录 / 下拉刷新）照旧各取一次；`logout()` 丢掉句柄，新账号必须另起一趟 |
 
 ---

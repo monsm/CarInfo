@@ -104,6 +104,12 @@ struct MapSpineView: View {
     /// 初值 `-1` 是**哨兵**：条子的回调要等 `onAppear`，而第一帧已经画了。
     /// 用 0 当初值会让冷启动先闪一帧第一档（「出行」）再到记住的那一档。
     @State private var modePosition: Double = -1
+
+    /// 整条底条上那次横拖的起点档位（`nil` = 手指还没按下）。
+    /// 它是 `bottomBarDrag` 的状态 —— 那两样东西必须住在同一个文件里：
+    /// Swift 的 `private` 作用域是**文件**，把状态拆到另一个文件里的扩展，
+    /// 要么看不见它、要么就得把它降级成模块级可见（2026-09-25 的 CI 就是这么红的）。
+    @State private var barDragBase: Double?
     /// 底条是否正在展开（手指按在条子上）。
     /// 它只服务一件事：展开时把两侧的两枚圆钮**让出宽度并淡出** ——
     /// 原型 `.bottom.open .arm{opacity:0;transform:scale(.86)}`，
@@ -532,6 +538,53 @@ struct MapSpineView: View {
     }
 
     /// 一枚圆钮（有行为的那两枚用它）。
+    /// 底条整行的横向拖（用户 2026-09-24：「不跟手」→ 手指按在条子**任意位置**
+    /// 都能拖，不只是胶囊上）。它不直接改条子的状态 —— 而是把「拖动的横向增量」
+    /// 换算成条子内部的连续档位（`modePosition`），让条子自己跟手展开。
+    ///
+    /// 几何：按下时记下条子当时的档位（`modePosition`，哨兵 -1 时按记住的那一档画），
+    /// 拖动中 = 档位起点 ± 增量 / 节距。节距 = 条宽 / 档数（5 个间隔分 `barRowWidth`，
+    /// 两端各一档 —— 与 `DSSwipeStrip` 展开后的全行程同一物理量）。
+    /// 手指往左拖 = 看左边的档（出行/车辆），往右拖 = 看右边的档（充电/车控/我的）。
+    ///
+    /// 为什么用 `simultaneousGesture` 而不是 `highPriorityGesture`：两侧圆钮是 `Button`，
+    /// 用 `highPriority` 会把圆钮的 tap 也吃掉（点不动了）。`simultaneous` 让两件事并存：
+    /// 轻点（位移 < 8pt）= 圆钮的 tap / 条子的点选；横拖（位移 > 8pt）= 条子展开跟手。
+    /// 圆钮的 tap 由 `Button` 自己消费，横拖由这条手势消费 —— 互不冲突。
+
+    var bottomBarDrag: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+            .onChanged { v in
+                guard barRowWidth > 0 else { return }
+                // 只有横拖才算（竖向 / 斜向让给地图）。
+                guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                if barDragBase == nil {
+                    // 按下时的档位：哨兵 -1（还没被条子回调过）就按记住的那一档画。
+                    barDragBase = modePosition >= 0 ? modePosition : Double(modeIndex)
+                }
+                guard let base = barDragBase else { return }
+                // 节距 = 条宽 / 5 个间隔（6 档）。拖 1 个节距 = 移动一档。
+                let n = max(1, HomeMode.allCases.count - 1)
+                let pitch = barRowWidth / CGFloat(n)
+                let pos = (base - Double(v.translation.width / pitch))
+                    .clamped(to: 0...Double(n))
+                modePosition = pos
+                // 拖过 8pt 才算「拖」：同时把条子展开（圆钮让位），与 DSSwipeStrip
+                // 自己的「按下就展开」是同一件事的两种触发（它管按在胶囊上，
+                // 这条管按在整条上）。
+                if abs(v.translation.width) > 8, !barOpen {
+                    withAnimation(TokensMotion.fade) { barOpen = true }
+                }
+            }
+            .onEnded { _ in
+                // 松手：档位停在手指停的地方（`modePosition` 已经跟手到位），
+                // 档位的**写回**（`homeModeRaw`）交给 `DSSwipeStrip` 自己的吸附
+                //（它每帧都在用 `pvValue` 读 `c`，而 `c` 由 `onPosition` 驱动 ——
+                //  两条手势改的是同一个连续量，不会打架）。
+                barDragBase = nil
+            }
+    }
+
     private func arm(text: String? = nil, icon: String? = nil,
                      _ run: @escaping () -> Void) -> some View {
         Button {
@@ -1107,5 +1160,19 @@ struct MapSpineView: View {
         // 取回全部（上限 60 = 一次搜索的实际返回量），由聚合决定画成一个圈还是几个圈。
         chargers = Array(sorted.prefix(60))
         StartupJournal.shared.mark("充电站搜索结束 \(chargers.count) 个")
+    }
+}
+
+// =============================================================================
+//  文件作用域的小工具：双向夹
+// =============================================================================
+//
+//  ⚠️ 它必须**在文件层**：`private extension Double` 曾经被写进 `extension MapSpineView`
+//  的体内，2026-09-25 的 CI 因此红在第一行 —— 「declaration is only valid at file scope」。
+//  Swift 不允许嵌套 extension，也不允许在 extension 里放实例存储属性。
+//  `scan/extguard.py` 现在两条都拦（那第 29 条门禁就是为这一课写的）。
+private extension Double {
+    func clamped(to range: ClosedRange<Double>) -> Double {
+        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }
