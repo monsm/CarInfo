@@ -320,7 +320,7 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 
 ## 4. 界面逐项
 
-### 4.1 地图主屏（「现在」档）—— 全 App 唯一的屏**文件**：`Features/Map/MapSpineView.swift`（**1169 行**，骨架：六页同屏 / 底条 / 镜头 / 图层 / 手势；2026-09-25 最后一轮又拆出 `MapNowCard.swift`（卡里三个数的排版）与 `MapQuickButtons.swift`（右侧两枚钮），都是在同一个阈值前拆的，界面一字未改；
+### 4.1 地图主屏（「现在」档）—— 全 App 唯一的屏**文件**：`Features/Map/MapSpineView.swift`（**1192 行**，离 1200 阈值只剩个位数行 —— 再加东西之前先拆文件；骨架：六页同屏 / 底条 / 镜头 / 图层 / 手势；2026-09-25 最后一轮又拆出 `MapNowCard.swift`（卡里三个数的排版）与 `MapQuickButtons.swift`（右侧两枚钮），都是在同一个阈值前拆的，界面一字未改；
 2026-09-25 它到过 1201 行、越过了 `lintcfg.py` 的 1200 阈值，于是把「光」表拆成
 `MapSkySheet.swift`（含共用原语 `MapNotice`）；同日再涨到 1212 行（托底要抬到条子之上 +
 子页顶部留白），于是把那张铺底的壁纸再拆成 `MapWallpaperLayer.swift` —— 两次拆的都是文件，

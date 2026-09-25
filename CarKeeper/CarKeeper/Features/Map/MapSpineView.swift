@@ -152,6 +152,14 @@ struct MapSpineView: View {
     /// 与 MineView 那行订阅的是同一个单例，两处的更新永远同步。
     @ObservedObject private var wallpaper = WallpaperService.shared
 
+    /// 手机自己的位置（右侧那枚钮的图形 + 后面那条 `onChange`）。
+    /// **必须订阅它**，理由与 `weather` / `wallpaper` 同一类：坐标与权限是
+    /// `CLLocationManager` **异步**回调送来的，不订阅这一屏就不会重画 ——
+    /// 于是「拿到点就把镜头移过去」那条 `onChange` 不会触发，而那枚钮的图形
+    ///（`location` → `location.fill`）也不会自己变。两者的实现分别在
+    /// `MapQuickButtons.swift` 与下面的 `onChange`。
+    @ObservedObject private var phone = PhoneLocation.shared
+
     /// 算光用的时刻（实时就是现在）
     private var skyDate: Date {
         SkyLight.date(hour: skyLive ? nil : Int(skyHour.rounded()), from: Date())
@@ -316,9 +324,13 @@ struct MapSpineView: View {
         .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
             centerOnCar(force: false)
         }
-        // 手机的位置取回来了 → 把镜头移过去（按了那枚钮、答应过权限之后自动完成；
-        // 实现见 `MapQuickButtons.swift`）。
-        .followPhoneOnce()
+        // 手机的位置取回来了 → 把镜头移过去（按了那枚钮、答应过权限之后自动完成）。
+        // 少了这一步，「按一下 → 弹权限 → 答应」之后那一按看起来什么也没发生
+        //（点还在路上）—— 而用户已经答应过一次了，不该再按第二次。
+        // 镜头那一动只有一处实现（`MapQuickButtons.swift` 的 `fly(to:)`）。
+        .onChange(of: PhoneLocation.shared.coordinate?.latitude) { _, _ in
+            fly(to: PhoneLocation.shared.coordinate)
+        }
     }
 
     /// 取一次天气（TTL 与「车没走远」两道护栏都在服务里）。

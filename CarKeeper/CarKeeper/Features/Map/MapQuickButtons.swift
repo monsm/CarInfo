@@ -111,7 +111,7 @@ extension MapSpineView {
     }
 
     /// 手机的位置。三种情形分开：
-    ///   · 还没权限 → 要权限（拿到点之后由 `followPhoneOnce` 把镜头移过去）
+    ///   · 还没权限 → 要权限（拿到点之后由地图页那条 `onChange` 把镜头移过去）
     ///   · 已经有点 → 直接移过去，并且**重新取一次**（用户可能已经开出去一段了）
     ///   · 拿不到 → 说清是哪一种（被拒 / 取不到），而不是让钮看起来没反应
     @MainActor
@@ -132,25 +132,18 @@ extension MapSpineView {
 
     /// 把镜头移到手机那里。**不跟**手机的方向 —— iOS 地图那枚钮在没有抬头时
     /// 是把镜头放过去（跟方向是另一次点按的事），这里只做前半件。
+    ///
+    /// **不是 `private`**：`MapSpineView` 的 `body` 里那条 `onChange`
+    ///（手机位置取回来就移镜头）要调它 —— 与 `camera` / `spec` 那两处同一个理由：
+    /// 一件事只有一处实现，跨文件时不复制第二份。
     @MainActor
-    private func fly(to coordinate: CLLocationCoordinate2D?) {
+    func fly(to coordinate: CLLocationCoordinate2D?) {
         guard let c = coordinate else { return }
         withAnimation(TokensMotion.value) {
             camera = .camera(MapCamera(centerCoordinate: c,
                                        distance: spec.cameraDistance,
                                        heading: 0,
                                        pitch: 0))
-        }
-    }
-
-    /// 权限框答应之后**自动**把镜头移过去一次。
-    /// 少了这一步，「按一下 → 弹权限 → 答应」之后那一按看起来什么也没发生
-    ///（点还在路上）—— 而用户已经答应过一次了，不该再按第二次。
-    /// `@MainActor`：`onChange` 的动作闭包里要调 `fly(to:)`（它改 `camera`）。
-    @MainActor
-    func followPhoneOnce() -> some View {
-        onChange(of: PhoneLocation.shared.coordinate?.latitude) { _, _ in
-            fly(to: PhoneLocation.shared.coordinate)
         }
     }
 

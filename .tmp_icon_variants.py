@@ -356,8 +356,13 @@ def sig(img):
     return list(img.convert("L").resize((32, 32), Image.BOX).tobytes())
 
 
-def data_uri(img, size):
+def data_uri(img, size, colors=None):
+    """缩到展示尺寸。**不量化**：试过 192 色，最大单通道偏差到 42 ——
+    那是给「挑外观」用的图，不该让用户在看一个带抖动的近似版。
+    靠尺寸控制体积就够（浅色 512 用于 200px 展示，深色只出现在 60px 位）。"""
     small = img.resize((size, size), Image.LANCZOS)
+    if colors:
+        small = small.quantize(colors=colors, method=Image.Quantize.MEDIANCUT)
     buf = io.BytesIO()
     small.save(buf, "PNG", optimize=True)
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
@@ -406,7 +411,8 @@ h2{font-size:16px;font-weight:600;margin:52px 0 6px;padding-top:22px;
           background:#2a2113;border-radius:7px;padding:2px 7px}
 .card .nm{font-size:15px;font-weight:600}
 .card .ds{color:#9aa4b4;font-size:12.5px;margin-top:10px;line-height:1.5}
-.big{border-radius:22.4%;overflow:hidden;display:block;width:100%}
+.big{border-radius:22.4%;overflow:hidden;display:block;width:200px;height:200px;
+     margin:0 auto}
 .strip{display:flex;gap:14px;align-items:center;margin-top:14px;
        background:linear-gradient(160deg,#161b26,#0d1016);border-radius:12px;
        padding:11px 13px}
@@ -427,14 +433,16 @@ code{font-family:ui-monospace,Consolas,monospace;color:#cfd8e6}
 
 
 def build_html(pairs, rows):
+    # 同一张图在页面上出现三次（大图 / 60pt 条 / 60pt 总览），但 base64 是**字面文本**
+    # —— 直接复用同一个 512 字符串会让整页重复三遍。所以每种用法各存一个够用的尺寸。
     cards = []
-    for i, ((name, desc, _fn), (light_uri, dark_uri)) in enumerate(pairs, 1):
+    for i, ((name, desc, _fn), (big, small, dsmall)) in enumerate(pairs, 1):
         cards.append(f"""  <div class="card">
     <div class="head"><span class="no">{i:02d}</span><span class="nm">{name}</span></div>
-    <img class="big" src="{light_uri}" alt="{name}">
+    <img class="big" src="{big}" alt="{name}">
     <div class="strip">
-      <img class="ic" style="width:60px;height:60px" src="{light_uri}">
-      <img class="ic" style="width:60px;height:60px" src="{dark_uri}">
+      <img class="ic" style="width:60px;height:60px" src="{small}">
+      <img class="ic" style="width:60px;height:60px" src="{dsmall}">
       <span>60pt 真实尺寸<br>左 浅色 / 右 深色</span>
     </div>
     <div class="ds">{desc}</div>
@@ -442,8 +450,8 @@ def build_html(pairs, rows):
 
     tiny = "\n".join(
         f'    <div class="t"><img class="ic" style="width:60px;height:60px" '
-        f'src="{light_uri}"><em>{i:02d}</em></div>'
-        for i, ((name, _d, _f), (light_uri, dark_uri)) in enumerate(pairs, 1))
+        f'src="{small}"><em>{i:02d}</em></div>'
+        for i, ((name, _d, _f), (big, small, dsmall)) in enumerate(pairs, 1))
 
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -504,7 +512,9 @@ def main():
         light, dark = render(fn, LIGHT), render(fn, DARK)
         main, _ = fn()
         cov = sum(main.tobytes()) / (W * W * 255) * 100
-        pairs.append(((name, desc, fn), (data_uri(light, 512), data_uri(dark, 512))))
+        pairs.append(((name, desc, fn), (data_uri(light, 384),   # 200px 展示
+                                         data_uri(light, 120),   # 60pt 条
+                                         data_uri(dark, 120))))  # 60pt 深色
         sigs.append(sig(light))
         stats.append((cov, ""))
 
