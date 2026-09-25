@@ -178,10 +178,13 @@ struct ChargeView: View {
                 .padding(.top, TokensSpacing.md)
             }
 
+            //  电压与电流**各占一行**（用户 2026-09-25：「电压/电流拥挤了」）：
+            //  它们原来是拼在一句里的（`398.2V / 12.4A`，12 个字符挤进约 75pt 的一格）。
+            //  都没拿到时不摆两个 `--`：一行 `--` 就已经是实话了。
             DSStatStrip(items: [
                 .init("充电功率", power),
                 .init("电池温度", e.battTemp),
-                .init("电压 / 电流", e.voltAmp)
+                .init("电压 / 电流", e.volt, second: e.amp == "--" ? nil : e.amp)
             ])
             .padding(.top, TokensSpacing.xl)
             .overlay(alignment: .top) { DSDivider() }

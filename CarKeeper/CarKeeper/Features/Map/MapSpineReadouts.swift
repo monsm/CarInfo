@@ -243,9 +243,10 @@ extension MapSpineView {
                             // 超细字重是这个原语的「仪器感」（见 `TokensTypo.display`），
                             // 但这一行压在通透玻璃上 —— 超细的笔画在瓦片/照片上会散掉。
                             weight: .bold)
-                    // 再叠一层轻微反色外发光（第 8 条那件「发光外壳」）：
-                    // 这三个数下面是什么颜色的瓦片不由我们决定，外发光也不改变字色。
-                    .dsInkGlow(strong: true)
+                    //  这三个数下面是什么颜色的瓦片不由我们决定 —— 而它们现在带的是
+                    //  **全局**那一层壳（用户第 2 条：`DSTextGlow` 挂在 App 根上，
+                    //  半径按行高自选，见 `Design/InkGlow.swift`）。这里不再逐处点名：
+                    //  名单是一份会漏的东西，而玻璃的代价是普遍的。
                     .frame(maxWidth: .infinity, alignment: .center)
             }
         }

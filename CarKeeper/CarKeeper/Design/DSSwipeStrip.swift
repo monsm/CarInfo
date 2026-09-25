@@ -58,6 +58,43 @@ import SwiftUI
 //  几何与渲染因此不可能两套。
 //  （当年顺手加的「透镜宽度按节距封顶」已于 2026-09-24 撤掉 —— 它在静止时把透镜
 //   压成一条，而它原本要治的那个病（压住邻居）真正的成因是标签坐标系偏移，已修。）
+
+/// 底条两端那两枚圆钮的「让位」——条子展开时要占满整行，所以两臂让位。
+///
+/// 2026-09-25 从 `MapSpineView.swift` 搬来这里：它是这个控件的**状态机上的一个后果**
+///（见下面 `onExpand` 的契约），而不是那一屏的布局细节。
+///
+/// 展开时两枚钮**不在场**，不是「看不见但还占着 58pt」——后者会把条子压到装不下全部档位，
+/// 于是条子只能压间距，而压间距正是原型明确否掉的那一件事。
+///
+/// 原型是 `.bottom.open .arm{opacity:0;transform:scale(.86)}`，而**那句 `scale` 不照搬**
+///（2026-09-25 删，用户第 2 条：「全部页面不需要颤抖放大特效，太耗性能」）。
+/// 理由不是「不好看」，是它每次触摸都在最贵的那一刻发生：手指一按下条子就开始展开，
+/// 而这条底条的三个形状同处一个 `GlassEffectContainer`、背后是一张活地图。
+///
+/// ⚠️ 2026-09-25（用户第 4 条）：「底部滑动选择时，左右的俩个胶囊应该消失下」。
+///  它此前是 `frame(width: open ? 0 : size)` + `opacity(...)` + `clipped()` —— 按那两个
+///  修饰符它确实不可见，而真机上仍看得见一点的根由是这些形状住在 `GlassEffectContainer` 里：
+///  那个容器的职责就是**把一块玻璃从一种尺寸变形到另一种**（容器文档原话是
+///  *“morph individual shapes into one another”*），于是「收到 0 宽」在它眼里是「变小」
+///  而不是消失。现在改成**不在场**（下面的 `if open`）：不存在的东西没法被变形，
+///  也进不了容器那一层合成（顺带少两枚玻璃的离屏合成 —— 与用户第 2 条同一件事）。
+struct ArmSlot: ViewModifier {
+    let open: Bool
+    let size: CGFloat
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if open {
+            // 宽高都是 0：HStack 的间距此时也已经是 0（见 `MapSpineView.bottomBar`），
+            // 所以「不在场」与「在场」的那一帧在排版上完全一致。
+            Color.clear.frame(width: 0, height: 0)
+        } else {
+            content.frame(width: size, height: size)
+        }
+    }
+}
+
 struct DSSwipeStrip: View {
 
     /// 一档。`id` 同时是持久化的键（存在 UserDefaults 里，重启回到上次那一档）。
@@ -161,7 +198,19 @@ struct DSSwipeStrip: View {
     /// 条外那次拖动是否已越过 8pt（决定松手后是「立即收回」还是「620ms 后收回」）
     @State private var rowMoved = false
 
-    private var index: Int { items.firstIndex { $0.id == selectedID } ?? 0 }
+    /// 当前档在条子上的位置。**可以是 `nil`** —— 那是「此刻在这一档，而它不在条子上」：
+    /// 用户 2026-09-25 把「车辆」从条子上删掉了，它的入口是左臂那枚车钮。
+    /// `nil` 的三种后果都是它该有的样子（见各自的注释）：不高亮任何一个字、不画透镜、
+    /// 条子停在离当前位置最近的那一档上（见 `settle`）。
+    private var index: Int? { items.firstIndex { $0.id == selectedID } }
+
+    /// 透镜（选中胶囊）画不画。
+    ///
+    /// 不画的那种情形只有一个：此刻那一档**不在条子上**。透镜钉在条子正中，
+    /// 它说的就是「你现在在这一档」—— 而那一档不在条子上时，它会把那句话说错
+    ///（用户对这件事的原话是「条子不选中任何一档」，见 `HomeMode.vehicle`）。
+    /// 手指一碰到条子就重新画出来（那时用户已经在挑下一档了，胶囊要跟着走）。
+    private var loupeVisible: Bool { index != nil || cBase != nil || rowBase != nil }
 
     // =========================================================================
     // MARK: 行几何（全部是纯函数，宽度是参数）
@@ -340,6 +389,9 @@ struct DSSwipeStrip: View {
     private func capsule(barW: CGFloat) -> some View {
         // 选中格同样是胶囊 —— 相机里「选中」就是一枚住在轨道里的胶囊。
         let shape = Capsule()
+        //  它随时可以被「不画」（见 `loupeVisible`）；那一下是状态的改变而不是手势，
+        //  所以要自己把那股过渡接上（下面的 `.animation(value:)`）。
+        //
         // 宽度也不能比条身还宽（很窄的容器里）：留 6pt，否则它会盖住条的两端圆头。
         let w = min(loupeWidth, max(slot, barW - 2 * TokensSpacing.xs))
         //  这枚胶囊现在是一块**真的玻璃**（用户 2026-09-25 第 4 条：
@@ -357,6 +409,8 @@ struct DSSwipeStrip: View {
         return Color.clear
             .frame(width: w, height: loupeHeight)
             .dsGlass(in: shape)
+            .opacity(loupeVisible ? 1 : 0)
+            .animation(TokensMotion.fade, value: loupeVisible)
             .position(x: barW / 2, y: barHeight / 2)
             .allowsHitTesting(false)
     }
@@ -382,12 +436,13 @@ struct DSSwipeStrip: View {
                         //  而对**导航**是坏事：这是全 App 唯一的入口，它必须第一眼看清。
                         //  所以这里回到实色标签（`TokensPalette.primary` = `.label`），
                         //  并用下面那层外发光补回「它坐在玻璃上」这个事实。
+                        //  `index` 是 `nil`（车辆）时五个字全部走正文色 —— 见它的说明。
                         .foregroundStyle(i == index ? TokensPalette.accent
                                                     : TokensPalette.primary)
-                        // 外发光外壳（用户第 8 条）：条子底下是地图与照片，
-                        // 同一行字有时压在亮瓦片上、有时压在暗水上 —— 外发光是反色的，
-                        // 两种底都不吃亏，而它不改变字本身的颜色与粗细。
-                        .dsInkGlow()
+                        //  这里原本挂着一层逐处的 `.dsInkGlow()`（用户第 8 条）。
+                        //  2026-09-25 第 2 条之后**文字不需要它了**：外壳现在是全局的
+                        //  （`DSTextGlow` 挂在 App 根上，见 `Design/InkGlow.swift`）——
+                        //  连这行字也在内。两处都挂等于同一圈壳画两遍，只会变浓。
                         .frame(width: slot)
                         .position(x: x, y: barHeight / 2)
                         .accessibilityLabel(Text(item.title))
@@ -483,10 +538,17 @@ struct DSSwipeStrip: View {
         }
         guard let e else {
             // 松手：按**预测落点**吸附（速度算进去），与条内拖动的松手同一条路。
+            //
+            //  ⚠️ 只有**真的拖过**（越过 8pt）才吸附：没拖过的那一下是「点」——
+            //  点在某枚圆钮上、或点在条子上下的空白带里。混进来的话，
+            //  点左臂那枚车钮会先换到车辆档，紧接着被这里按原地位置吸回某一档，
+            //  看起来就是「点车钮没用、一下子弹回去」。
             if let base = rowBase {
                 rowBase = nil
-                snap(gap: gap, lim: lim,
-                     projected: pvValue(c: base - rowPredicted, gap: gap))
+                if rowMoved {
+                    snap(gap: gap, lim: lim,
+                         projected: pvValue(c: base - rowPredicted, gap: gap))
+                }
             }
             guard rowMoved else { return }
             rowMoved = false
@@ -562,13 +624,21 @@ struct DSSwipeStrip: View {
     /// 否则「点」与「滑」到同一档看起来是两件事（这是上文那条「同一个量只有一份算法」
     /// 在动效上的另一半）。
     private func settle(animated: Bool, gap: CGFloat, lim: ClosedRange<CGFloat>) {
-        let target = clampC(ideal(Double(index), gap: gap), lim: lim, gap: gap)
+        //  当前档不在条子上（车辆）时，停到**离当前位置最近的那一档**上（不高亮它）：
+        //    · 平时（从某一档点车钮进来）：最近的那一档就是刚离开的那一档，
+        //      条子一动不动 —— 而那正是之后从条子往下拖时要接上的位置；
+        //    · 冷启动直接落在车辆档时：`c` 的初值 0 不是任何一档的中心
+        //     （见 `ideal`），那次归位把它收到第 0 档上 —— 否则整行会向右偏一截。
+        let nearest = min(max(Int(pvValue(c: c, gap: gap).rounded()), 0),
+                          max(0, items.count - 1))
+        let i = index ?? nearest
+        let target = clampC(ideal(Double(i), gap: gap), lim: lim, gap: gap)
         if animated {
             withAnimation(TokensMotion.settle) { c = target }
         } else {
             c = target
         }
-        onPosition?(Double(index))
+        onPosition?(Double(i))
     }
 
     private func pick(_ i: Int) {

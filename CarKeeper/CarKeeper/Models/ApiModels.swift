@@ -142,7 +142,10 @@ struct EnergyModel {
     var chargeCls: String
     var chargePct: String
     var charging: ChargingSession?
-    var voltAmp: String
+    /// 总电压与总电流：**两个读数、两个字段**（用户 2026-09-25：「电压/电流拥挤了」）。
+    /// 拼成一句（`398.2V / 12.4A`）要占那一排的三分之一宽，只能靠缩字号挤进去。
+    var volt: String
+    var amp: String
     var battTemp: String
     var insulate: String
     var online: OnlineState

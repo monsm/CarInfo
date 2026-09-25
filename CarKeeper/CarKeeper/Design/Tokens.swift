@@ -186,13 +186,18 @@ enum TokensPalette {
     }
 
     /// 每一页的个性色（顺序与 `HomeMode.allCases` 一致：
-    /// 出行 · 车辆 · 现在 · 充电 · 车控 · 我的）。
+    /// 出行 · 现在 · 充电 · 车控 · 我的 · 车辆）。
     /// 它用在：卡片左上角那一抹、巨字下面一行光晕。**不是文字色**，
     /// 所以不参与对比度约定；需要文字对比度的地方一律用 primary/secondary/tertiary。
-    /// 六个就是 iOS 系统调色板里那六个（紫 / 浅蓝 / 蓝 / 绿 / 青 / 靛）。
-    static let pageAccents: [Color] = [tokenColor(0xAF52DE), tokenColor(0x5AC8FA),
-                                       tokenColor(0x007AFF), tokenColor(0x34C759),
-                                       tokenColor(0x30B0C7), tokenColor(0x5856D6)]
+    /// 六个就是 iOS 系统调色板里那六个（紫 / 蓝 / 绿 / 青 / 靛 / 浅蓝）。
+    ///
+    /// ⚠️ 2026-09-25「车辆」从条子末尾删掉时（见 `HomeMode`），**这一排跟着换了位**：
+    /// 按下标取色的规矩没变，但五个排在条子上的页保持了各自原来的颜色 ——
+    /// 删一个入口不该把五页的配色也重排一遍（那是用户没要的一次改版）。
+    /// 于是「浅蓝」从第二位搬到最后一位（它原来就是车辆那一档的）。
+    static let pageAccents: [Color] = [tokenColor(0xAF52DE), tokenColor(0x007AFF),
+                                       tokenColor(0x34C759), tokenColor(0x30B0C7),
+                                       tokenColor(0x5856D6), tokenColor(0x5AC8FA)]
 }
 
 // MARK: - 玻璃上的文字（三档，自适应）

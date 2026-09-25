@@ -245,9 +245,13 @@ enum VM {
         let range = vnumOf(charge, ["RemainedPowerMile"]).map { String(Int($0.rounded())) }
             ?? vnumOf(control, ["RemainedPowerMile"]).map { String(Int($0.rounded())) }
             ?? "--"
-        let voltAmp = hasCtrl
-            ? "\(n1(ciPick(control, ["TotalVoltage"])) ?? "--")V / \(n1(ciPick(control, ["TotalCurrent"])) ?? "--")A"
-            : "--"
+        //  电压与电流是**两个读数**，所以是两个字段（用户 2026-09-25：「充电里面的电压/电流
+        //  拥挤了」）。上一版它们被拼成一句 `398.2V / 12.4A`（一个字段、12 个字符），
+        //  而它要坐的是「充电功率 / 电池温度 / 电压电流」那一排里的**三分之一宽** ——
+        //  只能靠缩小字号挤进去。拼句的代价就在这里：两个本来各自很短的读数，
+        //  拼在一起就超过了一格的宽度（一个事实一个出处：这里的「事实」是两个数）。
+        let volt = hasCtrl ? "\(n1(ciPick(control, ["TotalVoltage"])) ?? "--") V" : "--"
+        let amp = hasCtrl ? "\(n1(ciPick(control, ["TotalCurrent"])) ?? "--") A" : "--"
         let btLo = n0(ciPick(control, ["MinTemperatureValue"]))
         let btHi = n0(ciPick(control, ["MaxTemperatureValue"]))
         let battTemp = (hasCtrl && btLo != nil && btHi != nil) ? "\(btLo!) ~ \(btHi!)℃" : "--"
@@ -324,7 +328,7 @@ enum VM {
             socCls: socPct >= 15 ? "ok" : "bad", socWarn: (socPct < 30 && socPct >= 15) ? "low" : "",
             range: range, chargeText: chargeText, chargeCls: chargeCls,
             chargePct: socStr == "--" ? "--" : socStr,
-            charging: charging, voltAmp: voltAmp, battTemp: battTemp, insulate: insulate,
+            charging: charging, volt: volt, amp: amp, battTemp: battTemp, insulate: insulate,
             online: online, updated: updated, carName: carName,
             timeToFull: timeToFull,
             timeToEmpty: timeToEmpty,

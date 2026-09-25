@@ -72,6 +72,13 @@ ENTRY_MARKERS = [
 WHITELIST = {
     "CarKeeper/CarKeeper/Features/SiriShortcuts.swift":
         "AppIntent 由系统按定义发现（Siri/快捷指令），代码里不需要引用 —— 见该文件头部说明",
+    "CarKeeper/CarKeeper/Design/InkGlow.swift":
+        "玻璃上文字的外壳（`dsInkGlow` / `dsTextGlow`）。它对外只有两个 `View` 扩展方法，"
+        "跨文件用的是那两个方法 —— 而文件里唯一的类型 `DSTextGlow` 是 `TextRenderer`，"
+        "它只作为 `.textRenderer(_:)` 的参数在**本文件内**被构造（系统只给这一种接法，"
+        "没有「在别处引用它」这回事），所以判据看不见那个类型名。"
+        "代价说明白：以后这个文件里真冒出没人用的类型，这里也不会报 —— 接受它，"
+        "因为该文件只该放「玻璃上的字怎么画」（现在 180 行），且它的头注就是规则本身",
     "CarKeeper/CarKeeper/Design/DSGlass.swift":
         "玻璃的词汇表。它对外只有四个 `View` 扩展方法（`dsGlass` / `dsGlassCapsule` / "
         "`dsGlassRounded` / `dsGlassLayer`），跨文件用的是那几个方法 —— 而文件里的"

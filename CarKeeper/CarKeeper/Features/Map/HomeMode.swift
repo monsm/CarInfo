@@ -25,24 +25,43 @@ import SwiftUI
 //  状态，只能把卡表当类型成员调 —— 那是编译错，也是「开关点了不动」的来源。
 //
 //  顺序不是按功能分类排的，也不是按字母 —— 是**地图在正中**：
-//    出行 · 车辆 · 【现在】 · 充电 · 车控 · 我的
+//    出行 · 【现在】 · 充电 · 车控 · 我的 ·（车辆）
 //  地图主屏是默认档（每次上车先看的就是它），它必须停在条子的正中：
-//  静止只露三档时，左右各有一个邻居可以往两边拖 —— 而首页顶在最左边时，
-//  左边是空的，第一眼看上去像「到头了」。
-//  两翼按用的频率排：左侧「出行 / 车辆」是一天看一两次的，
-//  右侧「充电 / 车控 / 我的」是常按的与收尾的。
+//  静止只露三档时，左右各有一个邻居可以往两边拖。
+//  两翼按用的频率排：左侧「出行」是一天看一两次的，右侧「充电 / 车控 / 我的」
+//  是常按的与收尾的。
+//
+//  **2026-09-25：车辆从条子上删掉（6 → 5 档）。** 用户原话：「底部导航删除车辆，
+//  因为左下角已有入口」—— 那个入口就是底条左臂那枚车钮（它一直是「回到车辆那一档」
+//  这一个动作，车牌时代就如此，见 `MapSpineView.bottomBar`）。
+//  于是「车辆」是唯一**不在条子上**的档：它的层号（case 下标）排在末尾，
+//  而条子报的连续位置仍然直接当层号用（identity）—— 见 `vehicle` 那一段的说明。
 enum HomeMode: String, CaseIterable, Identifiable {
     case trips
-    case vehicle
     /// 车现在在哪、什么状态 —— 也就是地图主屏本来的那张纸（含四个地图图层）。
-    /// **它必须排在正中**（6 档里的第 3 档）：条子的静止形态、默认档、
-    /// 以及「左右各一个邻居」这三件事都从 case 顺序推出来，写错了不会有任何报错。
+    /// **它必须排在条子的正中**：条子的静止形态、默认档、以及「左右各一个邻居」
+    /// 这三件事都从 case 顺序推出来，写错了不会有任何报错。
+    ///
+    ///  2026-09-25「车辆」从条子上删掉之后（见下面 `vehicle` 那条），条子只剩五档，
+    ///  而它仍然是正中：静止时条子只露三档，排在第 2 个位的「现在」左右各有一个邻居
+    ///（出行 · **现在** · 充电）。
     case now
     /// 充电（含电池读数与趋势）。它原来叫「电池」，可这一页回答的是「现在充得怎么样」，
     /// 电池只是它的一个读数域。
     case charge
     case control
     case mine
+    /// 车辆（档案 / 体检 / 保养）。**它不在条子上**（用户 2026-09-25：「底部导航删除车辆，
+    /// 因为左下角已有入口」）：进它的入口是地图底条**左臂那枚车钮**
+    ///（`MapSpineView.bottomBar`，那里还有「进来了之后显示什么」的说明）。
+    ///
+    ///  ⚠️ 它必须排在**最后一个**，这不是审美：叠叠乐的层号就是条子报的连续位置
+    ///  （identity，见 `MapSpineView.deckPos`），而 `stripItems` 就是 `allCases` 去掉它 ——
+    ///  把它排在中游的话，条子上的第 2 档与叠叠乐的第 2 层就不是同一件事，
+    ///  拖动时整叠页面会错一位（而那一种错不会报错，只是看起来「页面换错了」）。
+    ///  排在末尾还有一件好处：它的层号恰好等于条子的长度，
+    ///  而那正是「条子上每一档都淡到 0」的位置。
+    case vehicle
 
     var id: String { rawValue }
 
@@ -93,9 +112,16 @@ enum HomeMode: String, CaseIterable, Identifiable {
     /// 每次冷启动都跳回第一档等于让用户每天重新选一次。
     static let storageKey = "carkeeper_home_mode"
 
-    /// 供 `DSSwipeStrip` 用的档位表
+    /// 供 `DSSwipeStrip` 用的档位表。
+    ///
+    /// 「车辆」**不在里面**（用户 2026-09-25：「底部导航删除车辆，因为左下角已有入口」）——
+    /// 它是唯一一条不经过条子的路（左臂那枚车钮）。
+    /// 它必须**恰好是 `allCases` 去掉最后一个**（而不是自己另写一份顺序）：
+    /// 叠叠乐拿条子报的连续位置当层号（identity），两份顺序一旦不一致，
+    /// 拖动时整叠页面会错一位 —— 而那一种错不报错，只看起来「页面换错了」。
     static var stripItems: [DSSwipeStrip.Item] {
-        allCases.map { DSSwipeStrip.Item(id: $0.rawValue, title: $0.title) }
+        allCases.filter { $0 != .vehicle }
+            .map { DSSwipeStrip.Item(id: $0.rawValue, title: $0.title) }
     }
 
     /// 这一档的个性色。
@@ -125,15 +151,22 @@ enum HomeMode: String, CaseIterable, Identifiable {
 }
 
 // =============================================================================
-//  HomeSub —— 档内的段落（只有车辆与「我的」两档用它）
+//  HomeSub —— 档内的段落（车辆 / 出行 / 「我的」三档用它）
 // =============================================================================
 //  它不是导航层级：没有第二层返回按钮、没有 push —— 只是同一张纸上的一段。
 //  深链（`carkeeper://health`）落到的是「车辆」这一档的「健康」那一段。
+//
+//  段落状态住在**页面视图内部**（`@State`，不是持久化的键）：它是一次看法的选择，
+//  不是「当前位置」—— 位置那一层是 `HomeMode`（它有 `storageKey`）。
+//  换句话说：离开出行页再回来，它应该回到第一段（如同车辆档本来那样）。
 enum HomeSub: String, CaseIterable, Identifiable {
     // 车辆档
     case profile
     case health
     case service
+    // 出行档
+    case journeys
+    case events
     // 我的档
     case settings
     case emergency
@@ -146,6 +179,8 @@ enum HomeSub: String, CaseIterable, Identifiable {
         case .profile: return "档案"
         case .health: return "健康"
         case .service: return "保养"
+        case .journeys: return "行程"
+        case .events: return "事件"
         case .settings: return "设置"
         case .emergency: return "应急"
         case .dev: return "诊断"
@@ -154,6 +189,10 @@ enum HomeSub: String, CaseIterable, Identifiable {
 
     /// 车辆档的三段（顺序即显示顺序）
     static let vehicleTabs: [HomeSub] = [.profile, .health, .service]
+    /// 出行档的两段：同一份数据（消息流里的点火 / 熄火配成行程）的两种读法。
+    /// 用户 2026-09-25：「出行里面行程卡和消息列表的上下布局改为 tab 页」——
+    /// 它们此前是同一叠里上下两张卡，滑到车的事件要越过 30 张地图卡。
+    static let tripsTabs: [HomeSub] = [.journeys, .events]
     /// 「我的」档的三段
     static let mineTabs: [HomeSub] = [.settings, .emergency, .dev]
 }

@@ -1,5 +1,6 @@
 // =============================================================================
-// TripsEventsView — 出行：一条时间轴，每一段都长在地图上，下面是常停之地与车的事件
+// TripsEventsView — 出行：两段（行程 / 事件）—— 行程是一张时间轴，每一段都长在地图上，
+// 常停之地与评分在它末尾；车的事件是另一段（2026-09-25 从上下两叠改成 tab，见 `cards`）
 // =============================================================================
 //
 // 取代旧 TripAnalyticsView（分段柱状图 + 汇总卡）之后，这一屏回答的问题变了：
@@ -26,8 +27,8 @@ private let tripCardStep: Int = 5
 /// 而 227 条消息能配出几十段。30 张已经是一次要点开四五次「再放」的量，
 /// 再往上加只会把这一页变成「滑动地图墙」。
 ///
-/// 超出的那些**不是丢掉**：点火 / 熄火事件本来就一条条列在下面那张
-/// 「车的事件」卡里（`MessagesSection` 读的是同一份消息），所以本页的规则是
+/// 超出的那些**不是丢掉**：点火 / 熄火事件本来就一条条列着
+///（`MessagesSection` 读的是同一份消息，现在是本页的另一段），所以本页的规则是
 /// **先按行程看最近 30 段，再往前的按事件看** —— 同一份数据，两种读法。
 private let tripCardCap: Int = 30
 
@@ -57,6 +58,14 @@ struct TripsEventsView: View {
     /// `nil` = 没有一张是翻过来的 —— 一开始是这个状态，面且**只有一张**能翻：
     /// 它是“我正在看这一段”的标记，不是每一张自己的开关。
     @State private var flippedTrip: Double? = nil
+
+    /// 档内段落：行程 / 事件。
+    ///
+    /// 用 `HomeSub`（车辆档那三段用的是同一个枚举）而不是另写一个局部枚举：
+    /// 「档内段落」这件事只能有一份词汇（同一个事实一个出处）。
+    /// 它是 `@State` 而不是持久化的键：段落是一次**看法的选择**，不是「当前位置」——
+    /// 后者是 `HomeMode`（它有 `storageKey`）。所以离开出行页再回来，它回到「行程」。
+    @State private var tab: HomeSub = .journeys
 
     private var trips: [AppStore.TripRecord] {
         store.tripHistory.sorted { $0.startTime > $1.startTime }
@@ -163,7 +172,7 @@ struct TripsEventsView: View {
     /// 而那个按钮还有一个更差的后果 —— 不点就永远看不到（列表看起来就到此为止了）。
     ///
     /// 上限仍然由人定（`tripCardCap` = 30，用户 2026-09-25：「最大行程控制在 30 条」）：
-    /// 到 30 就不再续，剩下的在下面「车的事件」里按时间列着（见 `restAsMessagesRow`）。
+    /// 到 30 就不再续，剩下的在「事件」那一段里按时间列着（见 `restAsMessagesRow`）。
     /// 夹在上限里而不是「过了上限就不再变」：真正的夹取只有这一处，
     /// 所以「续多少」不可能算出 35。
     private func loadMoreTrips() {
@@ -192,7 +201,9 @@ struct TripsEventsView: View {
     /// 是两件事，而用户只会把它读成前者。
     private func restAsMessagesRow(_ rest: Int) -> some View {
         VStack(alignment: .leading, spacing: TokensSpacing.xs) {
-            Text("再往前的 \(rest) 段在下面「车的事件」里，按时间列着。")
+            //  它此前写的是「在下面『车的事件』里」—— 而车的事件现在是**另一段**（tab），
+            //  不在下面。指示的是位置，位置换了，指示也得分着换。
+            Text("再往前的 \(rest) 段在「事件」那一段里，按时间列着。")
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -204,12 +215,46 @@ struct TripsEventsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// 这一档的叠叠乐。**行程本身是「一组组」的** ——
-    /// 每一段行程单独占一张玻璃卡，而不是一张长列表：上下滑过的是一程一程，
-    /// 每程自己一个可读的块（这正是「行程叠叠乐」想要的速度感）。
+    /// 这一档的叠叠乐：巨字头 → 分段控件（行程 / 事件）→ 当前那一段的卡。
+    ///
+    /// **为什么分成两段**（用户 2026-09-25：「出行里面行程卡和消息列表的上下布局改为 tab 页」）：
+    /// 它们此前是同一叠里一上一下两张卡，而中间还夹着常停之地与评分 ——
+    /// 想看一眼车的事件要滑过 30 张地图卡。同一份数据（消息流里的点火 / 熄火配成行程）
+    /// 的两种读法不该是一条长卷，而是两段。
+    ///
+    /// 分段控件的**做法照车辆档**（档案 / 健康 / 保养）：巨字头与分段控件停在原地
+    ///（它们是同一张卡），换段时下面那一叠只换一个成员 —— 看起来是「那张卡换了」，
+    /// 而不是「又翻了一页」。
+    ///
+    /// 常停之地与评分留在「行程」那一段里：它们是行程的另两个读数（聚类按停车点、
+    /// 评分按电耗，都由同一份行程算出来），不是第三种读法。
     @MainActor
     private var cards: [StackCard] {
         var out = HomeMode.trips.headCards
+        out.append(StackCard(id: "tabs", content: AnyView(
+            DSSegmented(options: HomeSub.tripsTabs.map { (value: $0, title: $0.title) },
+                        selection: $tab))))
+        switch tab {
+        case .events:
+            // 车的事件：点火 / 熄火 / 控制记录（原「消息」页）。
+            // 它单独占一段：这一条流是**按时间列的消息**，与下面那叠地图卡是两种排版，
+            // 混在一起时两边都不好看（用户看到的正是那一幕）。
+            out.append(StackCard(id: "events", title: "车的事件",
+                                 content: AnyView(MessagesSection())))
+        default:
+            out.append(contentsOf: journeyCards)
+        }
+        return out
+    }
+
+    /// 「行程」那一段的卡（**不含巨字头与分段控件** —— 那两张在 `cards` 里）。
+    ///
+    /// **行程本身是「一组组」的** ——
+    /// 每一段行程单独占一张玻璃卡，而不是一张长列表：上下滑过的是一程一程，
+    /// 每程自己一个可读的块（这正是「行程叠叠乐」想要的速度感）。
+    @MainActor
+    private var journeyCards: [StackCard] {
+        var out: [StackCard] = []
         let list = displayTrips
         // 只把最近的一段交给界面去建（见 `shownTrips`）。汇总仍用整份 list ——
         // 数字要是全部的，卡片才是按需的。
@@ -231,7 +276,7 @@ struct TripsEventsView: View {
             }
             // 没到上限：一句话说清「接着往下滑就出来」（真正的续在 `loadMoreTrips`，
             // 由 `ArcStack.onReachBottom` 那个滚动位置信号触发）。
-            // 到了上限：同一件事改成另一句陈述，而剩下的那些在「车的事件」里仍然读得到。
+            // 到了上限：同一件事改成另一句陈述，而剩下的那些在「事件」那一段里仍然读得到。
             if visible.count < min(list.count, tripCardCap) {
                 let rest = min(list.count, tripCardCap) - visible.count
                 out.append(StackCard(id: "more-trips", title: "还有 \(rest) 段",
@@ -247,16 +292,22 @@ struct TripsEventsView: View {
         }
         // 分数：完全由上面那些行程的电耗算出来（原「驾驶评分」页）
         out.append(StackCard(id: "score", title: "评分", content: AnyView(ScoreSection())))
-        // 车的事件：点火/熄火/控制记录（原「消息」页）
-        out.append(StackCard(id: "events", title: "车的事件", content: AnyView(MessagesSection())))
         return out
     }
 
+    /// 滑到底要不要继续放行程卡。
+    ///
+    /// 只有「行程」那一段有它（用户第 1 条：滑到底自动续 5 段）——
+    /// 事件那一段是一次列完的消息流，没有「还有更多」这回事，
+    /// 给它挂上这个回调只会让它无缘无故多放出几张卡。
+    private var reachBottom: (() -> Void)? {
+        tab == .journeys ? { loadMoreTrips() } : nil
+    }
+
     var body: some View {
-        // 出行只有一套卡：行程在上、常停之地在中间、车的事件在下。
-        // `onReachBottom` = 这一页的懒加载（用户第 1 条）：滑到底就续 5 段。
+        // 出行有两段（行程 / 事件），见 `cards`。
         StackPageView(accent: HomeMode.trips.accent, label: "出行", cards: cards,
-                      onReachBottom: { loadMoreTrips() })
+                      onReachBottom: reachBottom)
         .dsPageTitle("出行")
         .accessibilityLabel(Text("出行"))
     }
@@ -278,7 +329,7 @@ struct TripsEventsView: View {
                 .foregroundStyle(TokensPalette.secondary)
                 .multilineTextAlignment(.center)
         }
-        // 不再吃掉整屏高度：它下面还有「车的事件」这一节
+        // 不再吃掉整屏高度：它后面还有「评分」这一张卡
         .frame(maxWidth: .infinity)
         .padding(.vertical, TokensSpacing.xxl)
     }
@@ -344,14 +395,21 @@ struct TripsEventsView: View {
     private func tripFlip(_ trip: AppStore.TripRecord) -> some View {
         let key = trip.startTime.timeIntervalSince1970
         let flipped = flippedTrip == key
-        ZStack(alignment: .top) {
-            tripFront(trip)
-                .opacity(flipped ? 0 : 1)
-                .rotation3DEffect(.degrees(flipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
-            tripBack(trip)
-                .opacity(flipped ? 1 : 0)
-                .rotation3DEffect(.degrees(flipped ? 0 : -180), axis: (x: 0, y: 1, z: 0))
-        }
+        //  两面**不是 `ZStack` 的两个兄弟**（用户 2026-09-25：「行程卡片的高度没有被地图
+        //  占满 才一半」）。`ZStack` 会取两个孩子的**最大值**当自己的高度，而背面比正面高
+        //  一大截（背面是 6–9 行读数，正面是「头 + 地图 + 一行数字」）—— 于是正面被裁在
+        //  上半截、下半截空着，看起来就是「地图只占了一半」。
+        //  换成 `overlay`：**背面定高度、正面铺在它上面**（overlay 拿到的是被覆盖那一层的
+        //  尺寸）。正面里那张地图因此可以取弹性高度 —— 多出来的高度**归地图**，
+        //  而不是归一片空白。
+        tripBack(trip)
+            .opacity(flipped ? 1 : 0)
+            .rotation3DEffect(.degrees(flipped ? 0 : -180), axis: (x: 0, y: 1, z: 0))
+            .overlay {
+                tripFront(trip)
+                    .opacity(flipped ? 0 : 1)
+                    .rotation3DEffect(.degrees(flipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
+            }
         .contentShape(Rectangle())
         .onTapGesture {
             TokensHaptic.tap()
@@ -363,11 +421,15 @@ struct TripsEventsView: View {
     }
 
     /// 正面：地图 + 三个数（就是原来那一版，只是多了一个“可以翻”的提示）。
+    ///
+    /// 地图的高度**是弹性的**（`minHeight: 132` 是它的下限，也就是「这一段没有坐标」
+    /// 那种空面最矮的样子）：这一面铺在背面之上，多出来的高度全给地图。
     private func tripFront(_ trip: AppStore.TripRecord) -> some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             headerText(trip)
             MiniTripMap(from: trip.startLocation?.coordinate, to: trip.endLocation?.coordinate)
-                .frame(height: 132)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 132, maxHeight: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
@@ -375,6 +437,8 @@ struct TripsEventsView: View {
                 )
             statsRow(trip)
         }
+        // 头贴顶、数字贴底，中间那一段归地图（`alignment: .top` 写在里面就没这个效果了）。
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     /// 背面：这一段的其余事实（都是这一段行程自己的读数，没有新数据源）。

@@ -83,8 +83,10 @@ ALLOWED = {
         "评分条（一条 5pt 的走线）",
     key("Features/Trips/ScoreSection.swift") + ":130":
         "分段得分折线图（Swift Charts）",
-    key("Features/Trips/TripsEventsView.swift") + ":132":
-        "行程小地图缩略图（按宽度裁切）",
+    #  key("Features/Trips/TripsEventsView.swift") + ":132"（行程小地图缩略图）**已删**，
+    #  2026-09-25（用户：「行程卡片的高度没有被地图占满 才一半」）：那张地图不再写死高度，
+    #  它是 `minHeight: 132` + `maxHeight: .infinity`（上界不是写死的高度，本条判据本来就不管），
+    #  多出来的高度全归地图。理由不成立就得撤 —— 留着它会让下一个读的人以为那里还可以写死。
     key("Design/DS.swift") + ":32":
         "分段控件里那一枚药丸自己的高度（系统分段控件同量级）",
 }

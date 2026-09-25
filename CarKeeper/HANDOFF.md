@@ -2144,3 +2144,128 @@ Apple 自己的蓝点不偏，是因为它内部替我们换了；第三方 App 
   （真实定位一回来 `centerOnCar` 就把它移到正确位置）。
 - **`.realistic` 与俯仰角是一对**：只给俯仰角是「斜看一张平面图」，只给 `.realistic` 是
   「俯视一堆积木」；两者要一起才有 Apple 地图 3D 的样子。回退是两处，不是一处。
+
+## §25 第十四轮（2026-09-25）：五条手工，两条量出了数
+
+用户这一轮的五条：行程卡的高度没被地图占满、全局字体加一层发光阴影、底部导航删掉「车辆」、
+滑动选择时两端那两枚圆钮应该消失、充电页的「电压 / 电流」拥挤。
+
+### 25.1 行程卡只占了一半（`TripsEventsView`）
+
+**根因是 `ZStack` 的尺寸规则，不是地图。** 那张卡的两面（正面 = 地图 + 一行数字，
+背面 = 6–9 行读数）此前是 `ZStack` 的两个兄弟 —— `ZStack` 取**较大的那个孩子**当自己的高度，
+而背面高一截，于是正面被裁在上半截、下半截空着（看起来就是「地图只占了一半」）。
+改法是把**背面当底、正面当 `overlay`**（overlay 拿到的是被覆盖那一层的尺寸），
+地图取 `minHeight: 132` + `maxHeight: .infinity`：多出来的高度全归地图。
+同一次把 `expand.py` 里那条 `TripsEventsView.swift:132` 的例外删了 —— 那个高度不再是写死的。
+
+### 25.2 全局文字外壳（`Design/InkGlow.swift` 的 `DSTextGlow`）
+
+用户原话：「全局全部字体都加层发光阴影 看看能不能在液态玻璃中看清」。
+`TextRenderer` 是 SwiftUI 给「绘字这一步」留的钩子，而 `View.textRenderer(_:)` 的文档原文是
+*「any text views **within it** will use renderer to draw themselves」* —— 挂在 App 根上
+（`CarKeeperApp.root` 的 `.dsTextGlow()`）就是全局；挂在某一页上只有那一页（那正是
+第一版 `dsInkGlow()` 那四张名单没盖住其余几百行的原因）。三条实现细节：
+
+- 每一段 run 先画**只画影子**的那一遍（`options: .shadowOnly`），再原样画字 —— 少了这个选项
+  就得把字画两遍，而半透明的字画两遍会**变浓**（这一仓的正文大量用 `.opacity`）。
+- 半径按**这一段字自己的高度**选（`run.typographicBounds.rect.height >= 22` → `radiusWide`）：
+  13pt 正文与 96pt 巨字不能用同一圈壳（这是上一版那个 `strong:` 参数的全局版）。
+- `displayPadding` 报出去：文档给这个属性写的用途原文就是
+  *「when drawing the text with a shadow this may be used to extend the drawing bounds to avoid
+  clipping the shadow」*。
+
+两条后果如实记：① 三处**文字**上的逐处 `.dsInkGlow()` 因此删掉（两层壳叠在一起只是更浓），
+`dsInkGlow()` 保留给**图形**（SF Symbol 不是字，渲染器碰不到）；② 代价是**每条文字的 run
+都多一遍离屏模糊**，关掉它 = 删掉根上那一行。**未验证**（只有真机能答）：渲染器会不会绕过
+材质文字的 vibrancy（`TokensInk`），以及 `displayPadding` 会不会让文字盒变大。
+
+### 25.3 充电的「电压 / 电流」（拥挤的算术）
+
+它原来是一个字段拼出来的句子 `398.2V / 12.4A`（12 个字符），而那一格的可写宽度是
+**卡内宽 322 ÷ 3 − 两侧内边 32 ≈ 75pt**，`TokensTypo.data` 是 17pt 等宽数字 ——
+5 个数字 + 点 + 空格 + 单位 ≈ 67pt，两段就是 ~110pt：只能靠 `minimumScaleFactor` 缩到 0.7，
+于是同一排三个数一大一小（这正是用户看到的那一幕）。改法：`EnergyModel.voltAmp` 拆成
+`volt` / `amp` 两个字段，`DSStatStrip.Item` 多一个可选的第二行（`second:`），那一格写两行 ——
+每个数都是原尺寸。同一次把条子的 `HStack` 改成**顶对齐**：三格的标签仍在同一条基线上。
+
+### 25.4 条子上删掉「车辆」+ 两端圆钮的让位
+
+**「车辆」是唯一不在条子上的档**（用户：「因为左下角已有入口」——那枚入口就是左臂的车钮，
+它一直是「回到车辆那一档」这一个动作）。三件事必须一起改，否则坏掉的那一半不会报错：
+
+1. `HomeMode.vehicle` 挪到 **case 表的末尾**。叠叠乐的层号就是条子报的连续位置
+   （identity，见 `MapSpineView.deckPos`），而 `stripItems` = `allCases` 去掉末尾那一档 ——
+   排在中游的话，条子的第 2 档与叠叠乐的第 2 层不是同一件事，拖动时整叠页面错一位
+   （不报错，只是看起来「页面换错了」）。排在末尾之后，它的层号恰好等于条子的长度 5，
+   而那正是「五档全部淡到 0」的位置（`fade(i) = |i − 5| ≥ 1`）。
+   同一次把 `pageAccents` 那一排**跟着换了位**：按下标取色的规矩没变，但五个留在条子上的页
+   保持各自原来的颜色 —— 删一个入口不该把五页的配色也重排一遍。
+2. `DSSwipeStrip.index` 变成 `Int?`。`nil` 的三种表现就是这条要求本身：五个字都不取强调色、
+   **透镜淡出**（一枚钉在正中的玻璃胶囊，会让「我在车辆档」看起来像「我在条子的某一档上」）、
+   条子停在**离当前位置最近的那一档**上（平时就是刚离开的那一档 —— 之后从条子往下拖正好接得上）。
+   「此刻在哪」这个事实交给那枚车钮说（`arm(icon:current:)`，图形取强调色）。
+3. `MapSpineView.deckPos` 在「车辆 + 手指已经落到条子上（`barOpen`）」时把位置**交回条子管** ——
+   少了这一条，从车辆往条子上拖要等松手页面才动（拖动全过程停在车辆），而那正是「不跟手」。
+
+**两端圆钮的让位**（用户第 4 条）改成**不在场**（`ArmSlot` 的 `if open`），而不是
+`width: 0` + `opacity: 0` + `clipped()`：后者按那两个修饰符确实不可见，而这两个形状住在
+`dsGlassLayer` 的 `GlassEffectContainer` 里，那个容器的职责原文就是
+*「combines multiple Liquid Glass shapes into a single shape that can morph individual shapes
+into one another」* —— 在它眼里「收到 0 宽」是「变小」而不是消失，而旁边那条子正在同一时刻
+长到整行宽（两者还会互相折射）。顺带少两枚玻璃的离屏合成。
+`ArmSlot` 同时**从 `MapSpineView.swift` 搬进 `Design/DSSwipeStrip.swift`**：它本来就是那个控件
+状态机上的一个后果（见 `onExpand` 的契约），而 `MapSpineView.swift` 这一轮又撞到 1200 行 ——
+搬的是**一件事**，不是一坨代码（同一条规矩在 `MapNowCard` / `MapSpineReadouts` 那两次用过）。
+
+**顺手修掉一个真的会看到的 bug**：`rowDragChanged` 的松手分支此前**无条件吸附** —— 于是
+「点左臂那枚车钮」会先换到车辆档、紧接着被按原地位置吸回某一档（看起来是「点车钮没用」）。
+现在只有**真的拖过 8pt** 才吸附；没拖过的那一下是「点」，不是「拖条」。
+
+### 25.5 门禁这一轮的三处
+
+- `scan.py`：新登记 `TextRenderer` / `EdgeInsets`（都取过 Apple 文档 JSON：前者 iOS 17+，
+  而 `View.textRenderer(_:)` 这个**修饰符**是 iOS 18+；后者 iOS 13+，是 `displayPadding` 的类型）。
+  同时**删掉 `onMapCameraChange`** 那一条：全仓只剩注释里提到它（第十一、十二轮把两个读者都删了）。
+- `expand.py`：删掉 `TripsEventsView.swift:132` 那条例外（见 25.1）。
+- `orphans.py`：`InkGlow.swift` 进白名单 —— 文件里唯一的类型 `DSTextGlow` 只作为
+  `.textRenderer(_:)` 的参数在**本文件内**被构造（系统只给这一种接法），理由与 `DSGlass.swift` 同形。
+
+### 25.6 边界
+
+本机没有 Swift 工具链、也没有真机。编译风险最高的两处：`DSTextGlow`（`TextRenderer` /
+`.flattenedRuns` 的写法对着 WWDC24 的样例与文档 JSON 核过）与 `ArmSlot` 的
+`@ViewBuilder body(content:)`。观感风险最高的是**全局文字外壳**：它同时动了几百处文字的
+绘制路径（包括材质文字的 vibrancy 与 `displayPadding` 带来的盒尺寸变化），而这两件只有真机能答。
+
+## §26 出行页：行程 / 事件改成两段（tab）
+
+用户（同日，接 §25）：「出行里面行程卡和消息列表的上下布局改为 tab 页」。
+
+**改的是什么**：`TripsEventsView` 的叠叠乐从「一张长卷」（总览 → 30 张行程地图卡 → 常停之地 →
+评分 → **车的事件**）变成「巨字头 → 分段控件 → 当前那一段的卡」。两段是 **行程**（总览 /
+行程卡 / 常停之地 / 评分）与 **事件**（`MessagesSection`）。
+
+**为什么不是给行程卡与消息各自一叠**：分段控件与巨字头停在原地（它们是同一张卡），
+换段时下面那一叠只换成员 —— 这是车辆档（档案 / 健康 / 保养）已经定下的做法，
+同一件事只有一种做法。
+
+四处跟着改的（它们都是「一份事实一个出处」的直接后果）：
+
+- **段落词汇用现有的 `HomeSub`**，新增 `journeys` / `events` 两个 case 与 `tripsTabs`；
+  不另写一个页面局部的枚举 —— 「档内段落」这件事只能有一份词汇。段落状态是 `@State`
+  （不是持久化的键）：它是一次**看法的选择**，不是「当前位置」（后者是 `HomeMode`）。
+- **懒加载只挂在「行程」那一段**（`reachBottom`）：事件那一段是一次列完的消息流，
+  给它挂「到底就续 5 段」只会无缘无故多放出几张卡。
+- **「更早的 N 段」那张卡的文案改了**：它写的是「在下面「车的事件」里」—— 而车的事件
+  现在是另一段，不在下面。**指示的是位置，位置换了，指示也得分着换**。
+- 文档与注释里四处「在下面 / 下面那张」同步改成「那一段」（`tripCardCap` 的说明、文件头、
+  空态那句、`restAsMessagesRow`）。
+
+**没改的**：常停之地与评分留在「行程」那一段（聚类与评分都是按同一份行程算出来的，
+不是第三种读法）；`.trips / .parking / .score / .dashboard` 四个深链仍然落到「出行」档，
+而它们的落点默认就是第一段（`@State` 的初值）—— 所以这次不需要 `nav.homeSub` 提示那套机制。
+
+**边界**：切段时那一叠的滚动位置不重置（车辆 / 「我的」两档本来也是这样）——
+事件那一段只有 3 张卡、装不下一屏时偏移会被系统夹回 0，所以实际看不太出来；
+真机上若觉得挖挖瘩瘩，下一手是给 `ArcStack` 加一个「换卡表就回项」的输入。

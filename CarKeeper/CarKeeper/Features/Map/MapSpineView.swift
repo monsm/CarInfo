@@ -64,29 +64,10 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
-/// 底条上那两枚圆钮的「让位」。
-///
-/// 展开时**宽度真的收掉**，不是「看不见但还占着 50pt」——后者会把条子压到装不下六档，
-/// 于是条子只能压间距，而压间距正是原型明确否掉的那一件事。
-///
-/// 原型是 `.bottom.open .arm{opacity:0;transform:scale(.86)}`，而**那句 `scale` 不照搬**
-///（2026-09-25 删，用户第 2 条：「全部页面不需要颤抖放大特效，太耗性能」）。
-/// 理由不是「不好看」，是它每次触摸都在最贵的那一刻发生：手指一按下条子就开始展开，
-/// 而这条底条的三个形状同处一个 `GlassEffectContainer`、背后是一张活地图 ——
-/// 给两枚钮加一层非整数缩放，就是让系统在那几帧里多算两遍离屏合成，
-/// 换来的是一个 14% 的缩放，而它们同时还在往 0 宽收。宽度与透明度已经把它说完了。
-private struct ArmSlot: ViewModifier {
-    let open: Bool
-    let size: CGFloat
-
-    func body(content: Content) -> some View {
-        content
-            .frame(width: open ? 0 : size, height: size)
-            .opacity(open ? 0 : 1)
-            .clipped()
-    }
-}
-
+//  `ArmSlot`（底条两端那两枚圆钮的「让位」）2026-09-25 搬去了 `Design/DSSwipeStrip.swift`。
+//  搬的理由不是「本文件太长」这一句话，而是它本来就是那个控件的行为：条子展开时
+//  要占满整行，所以两臂让位 —— 这是模式条的状态机上的一件事（见 `DSSwipeStrip` 的
+//  `onExpand` 契约）。搬的是一件事，不是一坨代码。同一次：文件回到 1200 行以内。
 struct MapSpineView: View {
     /// 不是 `private`：`MapSpineReadouts.swift` 里的四格读数要用它取车速与车锁。
     let store = AppStore.shared
@@ -216,9 +197,23 @@ struct MapSpineView: View {
     var layer: MapSpineLayer { MapSpineLayer(rawValue: layerRaw) ?? .now }
     private var homeMode: HomeMode { HomeMode(rawValue: homeModeRaw) ?? .now }
 
-    /// 条子的连续位置。哨兵（-1）时按记住的那一档画 —— 见 `modePosition` 的说明。
+    /// 叠叠乐的连续位置（层号）。
+    ///
+    /// 两种情形：
+    ///   · 停在**条子上**的某一档 → 直接就是条子报的连续位置（拖动时每帧都在变，
+    ///     五页的交叉过渡由它推出来）。哨兵（-1）时按记住的那一档画 —— 见 `modePosition`。
+    ///   · 停在**条子之外**的那一档（车辆）→ 它没有连续位置可报：
+    ///     取它的 case 下标，而这个下标**恰好等于条子的长度**（见 `HomeMode` 的档序），
+    ///     于是条子上那五档全部淡到 0（`fade(i) = |i − 5| ≥ 1`），只剩车辆这一层。
+    ///
+    ///  ⚠️ `barOpen` 那个分支不是在修饰动效，是在修一个真会看到的东西：
+    ///  手指一旦落到条子上，位置就该归条子管 —— 少了这个分支，从车辆往条子上拖时
+    ///  页面要等松手才动（拖动全过程停在车辆），而那正是「不跟手」。
     private var deckPos: Double {
-        modePosition >= 0 ? modePosition : Double(modeIndex)
+        if homeMode == .vehicle {
+            return barOpen ? max(0, modePosition) : Double(modeIndex)
+        }
+        return modePosition >= 0 ? modePosition : Double(modeIndex)
     }
 
     /// 当前档在 `HomeMode.allCases` 里的下标 = 页面的层号。
@@ -552,8 +547,13 @@ struct MapSpineView: View {
             //（用户：「车牌名删除」）—— 它本来就是用“回到车辆那一档”这一个动作，
             //  而车牌的两个字既认不出来是按钮、又只在一半车上有意义（未绑定车牌时写的是“车”）。
             //  同一个动作、换个能认出来的图标；右臂那个搜索图标也是同一种做法。
-            arm(icon: "car.fill") { nav.openMode(.vehicle) }
-                .accessibilityLabel(Text("车辆"))
+            //  它是**唯一不在条子上的那一档**的入口（用户 2026-09-25：「底部导航删除车辆，
+            //  因为左下角已有入口」）。删掉那条链之后留下一个问题：从这枚钮进来时，
+            //  条子上该显示什么？答案是**不选中任何一档**（`DSSwipeStrip` 的 `index` 此时是
+            //  `nil`：透镜淡出、五个字都不高亮）—— 因为「此刻在哪」这个事实现在归这枚钮说，
+            //  它的图形因此换成强调色（`current:`）。屏幕上不出现一个在说谎的条子。
+            arm(icon: "car.fill", current: homeMode == .vehicle) { nav.openMode(.vehicle) }
+                .accessibilityLabel(Text(homeMode == .vehicle ? "车辆（当前所在）" : "车辆"))
 
             DSSwipeStrip(items: HomeMode.stripItems,
                          selectedID: $homeModeRaw,
@@ -643,19 +643,24 @@ struct MapSpineView: View {
     }
 
     private func arm(text: String? = nil, icon: String? = nil,
+                     current: Bool = false,
                      _ run: @escaping () -> Void) -> some View {
         Button {
             TokensHaptic.tap()
             run()
         } label: {
-            armLabel(text: text, icon: icon)
+            armLabel(text: text, icon: icon, current: current)
         }
         .buttonStyle(.plain)
         .modifier(ArmSlot(open: barOpen, size: Self.armSize))
     }
 
     /// 圆钮的**外观**（不含行为）：`Menu` 要的是 label 视图，不是 Button。
-    private func armLabel(text: String? = nil, icon: String? = nil) -> some View {
+    /// - Parameter current: 它是不是**此刻所在**的那一档。
+    ///   条子上的选中用「玻璃胶囊 + 强调色」说，而车辆不在条子上（见 `bottomBar`）——
+    ///   那个事实就只能由这枚钮自己说：图形取强调色，其余时候是材质自适应色。
+    private func armLabel(text: String? = nil, icon: String? = nil,
+                          current: Bool = false) -> some View {
         ZStack {
             // 2026-09-25 材质审核：原先这里先铺一层 `glassHighlight` 再挂玻璃 ——
             // 那是自己画的「高光」，而**真正的高光正是玻璃材质自己要产生的东西**：
@@ -673,7 +678,7 @@ struct MapSpineView: View {
             } else if let icon {
                 Image(safeSymbol: icon, fallback: icon)
                     .font(TokensTypo.fixed(17, weight: .medium))
-                    .foregroundStyle(TokensInk.primary)
+                    .foregroundStyle(current ? TokensPalette.accent : TokensInk.primary)
             }
         }
         .frame(width: Self.armSize, height: Self.armSize)
@@ -986,14 +991,16 @@ struct MapSpineView: View {
                 Text(layer.title)
                     .font(TokensTypo.caption)
                     .tracking(TokensTracking.label)
+                //  这一枚是**图形**，不是字：文字那层壳现在是全局的（`DSTextGlow`），
+                //  而渲染器只管 `Text`、碰不到 SF Symbol —— 所以它自己带一层。
+                //  用户 2026-09-25 第 8 条那个诉求（胶囊是 `.clear`，字底下直接是瓦片，
+                //  上一版实测它的名字被瓦片上的地名吃掉了）对字与图形都成立。
                 Image(safeSymbol: "chevron.up.chevron.down", fallback: "chevron.down")
                     .font(TokensTypo.micro)
+                    .dsInkGlow()
             }
             .foregroundStyle(TokensInk.secondary)
-            // 外发光外壳（用户 2026-09-25 第 8 条）：胶囊本身是 `.clear`（不磨砂），
-            // 字底下直接就是瓦片 —— 上一版的实测情况正是它的名字被瓦片上的地名吃掉了
-            //（截图：右上角胶囊里的字几乎读不出来）。
-            .dsInkGlow()
+            // 这里原本是整行一层 `.dsInkGlow()`（字与箭头共用）—— 现在只给箭头（上一行）。
             .padding(.horizontal, TokensSpacing.snug)
             .padding(.vertical, TokensSpacing.xs)
             // 图层胶囊浮在**地图**上（连续的画面）→ `.overMedia`（`.clear`）：

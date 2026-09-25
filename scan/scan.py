@@ -676,7 +676,20 @@ VERIFIED_SDK_ADDITIONS = {
     # 两个都取过文档 JSON（platforms / externalID / declarations 都看过）：
     "contentMargins": "View.contentMargins(_:_:for:)（iOS 17+；externalID s:7SwiftUI4ViewPAAE14contentMargins__3forQrAA4EdgeO3SetV_AA0G6InsetsVAA22ContentMarginPlacementVtF）——`ArcStack` 给滚动内容让出顶部内衬（第一张卡静止时让开状态栏、滑动时从时钟下连续穿过）",
     "scrollEdgeEffectStyle": "View.scrollEdgeEffectStyle(_:for:)（iOS 26+；externalID s:7SwiftUI4ViewPAAE21scrollEdgeEffectStyle_3forQrAA06ScrollefG0VSg_AA0E0O3SetVtF；decl: func scrollEdgeEffectStyle(_ style: ScrollEdgeEffectStyle?, for edges: Edge.Set) -> some View）——iOS 26 系统给滚动边缘的那层柔化延伸（`.soft` 就是系统默认的那一档）",
-    "onMapCameraChange": "View.onMapCameraChange(frequency:_:)（iOS 17+；MapKit 的 SwiftUI 扩展，externalID s:7SwiftUI4ViewP08_MapKit_aB0E02onD12CameraChange9frequency_QrAD0dG15UpdateFrequencyV_yyctF；frequency 默认 .onEnd，本页用 .continuous）——比例尺「地图动了就露一次」与罗盘朝向的唯一触发者",
+    #  `onMapCameraChange` 这个名字**已从白名单删除**（2026-09-25，与全局文字外壳同一轮）：
+    #  它唯一的两个读者（自画罗盘喂朝向、自己量那把尺子）都在第十一轮删掉了，
+    #  现在全仓只剩注释里提到它。白名单里留着一个没人用的名字 = 另一种清单失真
+    #（与上面 accessibilityAction / accessibilityScrollAction 两条同一条规矩）。
+    #
+    # 全局文字外壳（`Design/InkGlow.swift` 的 `DSTextGlow`，用户 2026-09-25 第 2 条）。
+    # 两个名字写进代码前都取过 Apple 文档 JSON（abstract / identifier.url / platforms）：
+    #   · TextRenderer   doc://com.apple.SwiftUI/documentation/SwiftUI/TextRenderer
+    #     「A value that can replace the default text view rendering behavior.」iOS 17.0+
+    #    （而 `View.textRenderer(_:)` 那个**修饰符**是 iOS 18.0+，本 App target 是 iOS 26）
+    #   · EdgeInsets     doc://com.apple.SwiftUI/documentation/SwiftUI/EdgeInsets
+    #     「The inset distances for the sides of a rectangle.」iOS 13.0+
+    "TextRenderer": "SwiftUI.TextRenderer 协议（iOS 17+；externalID s:7SwiftUI12TextRendererP；abstract「A value that can replace the default text view rendering behavior.」）——全局文字外壳的唯一挂点（`View.textRenderer(_:)` 是 iOS 18+ 的修饰符，而 `.dsTextGlow()` 就是它）",
+    "EdgeInsets": "SwiftUI.EdgeInsets（iOS 13+；externalID s:7SwiftUI10EdgeInsetsV；abstract「The inset distances for the sides of a rectangle.」）——`TextRenderer.displayPadding` 的返回类型（不报给 SwiftUI 的话，外发光会被裁掉）",
 }
 
 

@@ -460,11 +460,20 @@ struct DSStatStrip: View {
         let id = UUID()
         var label: String
         var value: String
+        /// 第二行读数（可选）。
+        ///
+        /// 用户 2026-09-25：「充电里面的电压/电流 拥挤了」。原因不是排版，是**拼句**：
+        /// 那一格原来写的是 `398.2V / 12.4A`（一个字段、12 个字符），而一格只有约 75pt
+        /// 可写（卡内宽 322 ÷ 3 − 两侧内边 32）—— 只能靠 `minimumScaleFactor` 缩到 0.7
+        /// 才装得下，于是三个格里的数一大一小。拆成两行时每个数都是原尺寸。
+        var second: String? = nil
         var cls: String = "na"
         var icon: String? = nil
-        init(_ label: String, _ value: String, cls: String = "na", icon: String? = nil) {
+        init(_ label: String, _ value: String, second: String? = nil,
+             cls: String = "na", icon: String? = nil) {
             self.label = label
             self.value = value
+            self.second = second
             self.cls = cls
             self.icon = icon
         }
@@ -473,7 +482,9 @@ struct DSStatStrip: View {
     var items: [Item]
 
     var body: some View {
-        HStack(spacing: 0) {
+        //  顶对齐（不是默认的居中）：有一格写成两行读数时，三格的**标签**仍然在同一条
+        //  基线上，多出来的那一行只有它自己往下长。
+        HStack(alignment: .top, spacing: 0) {
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
                 if idx > 0 {
                     Rectangle()
@@ -497,6 +508,15 @@ struct DSStatStrip: View {
                         .foregroundStyle(item.cls == "na" ? TokensPalette.primary : TokensPalette.statusColor(item.cls))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
+                    // 第二行与第一行**同一字体、同一颜色、同一对齐**（见 `Item.second`）：
+                    // 它们是同一类的两个读数，不是一个主值加一个附注。
+                    if let second = item.second {
+                        Text(second)
+                            .font(TokensTypo.data)
+                            .foregroundStyle(item.cls == "na" ? TokensPalette.primary : TokensPalette.statusColor(item.cls))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, TokensSpacing.md)
@@ -750,7 +770,7 @@ struct DSSegmented<T: Hashable>: View {
                         //  固定高 32 的一格：这里的字**绝不能折行**（用户第 5 条）——
                         //  折了不是变成两行，而是被 32pt 的框**剪掉**（下一行看不见了）。
                         //  所以先不许折，再允许缩：宁可字小一点，不能出现半个字。
-                        //  两段与三段都在用这个控件（车辆 / 我的那两个），段名都是两个字，
+                        //  两段与三段都在用这个控件（车辆 / 出行 / 我的那三个），段名都是两个字，
                         //  所以缩到 0.8 这一步在真机上大概用不着 —— 它是护栏，不是常态。
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
