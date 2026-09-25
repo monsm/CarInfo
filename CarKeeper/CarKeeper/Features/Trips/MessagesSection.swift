@@ -254,18 +254,20 @@ struct MessagesSection: View {
     private func messageRow(_ item: MessageItem, showsSeparator: Bool) -> some View {
         let isOpen = expanded.contains(item.id)
         return DSGroupRow(showsSeparator: showsSeparator) {
-            rowButton(item, isOpen: isOpen)
+            // 提示由 `withHint` 挂（理由见那个函数）：此处不能与 `.accessibilityLabel`
+            // 链在一起 —— 它报过 “ambiguous use of 'accessibilityHint'”。
+            withHint(Text(isOpen ? "双击收起详情" : "双击展开详情并标记已读")) {
+                rowButton(item, isOpen: isOpen)
+            }
         }
     }
 
-    /// 行的按钮本体（含无障碍那两句）。
+    /// 行的按钮本体（无障碍的**标签**在这里，**提示**由调用处的 `withHint` 挂）。
     ///
-    /// 为什么它独立成一个函数：2026-09-25 的 CI 在 `.accessibilityHint` 上报
-    /// “ambiguous use of 'accessibilityHint'” —— 同一个方法同时声明在 `View` 与
-    /// `ModifiedContent` 上；而当**一条链同时要负责定下 `DSGroupRow{…}` 的泛型
-    /// `Content` 与函数的 `some View`** 时，两个候选都合法（是推断问题，不是语义）。
-    /// 拆开之后每一步的期望类型都明确。行为一字未变 —— 无障碍那两句仍然挂在
-    /// 同一个 Button 上，只是它现在有个具名的落点。
+    /// 为什么它独立成一个函数：这一条的 Label 里嵌着 `if isOpen`、三个 `let` 与
+    /// 第二个 Button，是那一批里最大的表达式 —— 整条链再同时背着 `DSGroupRow{…}`
+    /// 的泛型 `Content` 与函数的 `some View` 时，推断预算会不够（`accessibilityHint`
+    /// 就是在那时候报的歧义）。拆开之后每一步的期望类型都明确，行为一字未变。
     private func rowButton(_ item: MessageItem, isOpen: Bool) -> some View {
         Button { toggle(item) } label: {
             HStack(alignment: .top, spacing: TokensSpacing.sm) {
@@ -311,11 +313,13 @@ struct MessagesSection: View {
                         if bp.restLines > 0 {
                             DSCardMoreRow(rest: bp.restLines, unit: "行",
                                           screens: bp.screens, open: false) {
-                                withAnimation(TokensMotion.count) { fullBodies.insert(item.id) }
+                                // `_ =` 的理由同「体检」卡那两处：`insert` 有返回值，
+                                // 而 `withAnimation` 在 ViewBuilder 里的 `Result` 会因此对不上 Void。
+                                withAnimation(TokensMotion.count) { _ = fullBodies.insert(item.id) }
                             }
                         } else if isOpen, bp.truncatable, fullBodies.contains(item.id) {
                             DSCardMoreRow.collapse {
-                                withAnimation(TokensMotion.count) { fullBodies.remove(item.id) }
+                                withAnimation(TokensMotion.count) { _ = fullBodies.remove(item.id) }
                             }
                         }
                     }
@@ -358,7 +362,26 @@ struct MessagesSection: View {
         }
         .buttonStyle(DSRowButtonStyle())
         .accessibilityLabel(Text("\(item.read ? "已读" : "未读")，\(item.title)"))
-        .accessibilityHint(Text(isOpen ? "双击收起详情" : "双击展开详情并标记已读"))
+    }
+
+    /// 给一个视图挂上无障碍提示（全 App 唯一那处需要包装的地方）。
+    ///
+    /// 为什么不直接链式写 `.accessibilityHint(…)`：它同时声明在 `View` 与
+    /// `ModifiedContent` 上（两者**返回类型不同**），而当 receiver 恰好是上一步
+    /// 留下的 `ModifiedContent`（`.accessibilityLabel` 的产物）时，两个候选都合法 ——
+    /// 2026-09-25 的 CI 在消息这一行上报 “ambiguous use of 'accessibilityHint'”。
+    ///
+    /// 需要说清的是：**全仓还有 27 处一模一样的「标签接提示」写法，它们都编译得过**
+    /// （见 `MapSpineReadouts` / `MapSpineView` / `MineView` …）。所以这不是语义问题，
+    /// 而是类型推断的预算问题 —— 这一行的 Label 里嵌着 `if isOpen`、三个 `let` 与
+    /// 第二个 Button，是那一批里最大的表达式。既然「同样写法别处能过」，
+    /// 就不该把它当成一条全仓规矩去改其它 27 处（每一处都在说 VoiceOver 的事）。
+    ///
+    /// 这里的固定做法：把提示交给一个**泛型函数**。`content()` 的类型是 `V: View`
+    /// （类型参数），成员查找只看它的约束 —— 候选只剩 `View` 那一个，
+    /// 无论 V 具体是什么类型（包括 ModifiedContent）都不会有歧义。
+    private func withHint<V: View>(_ hint: Text, _ content: () -> V) -> some View {
+        content().accessibilityHint(hint)
     }
 
     // =========================================================================

@@ -3073,3 +3073,68 @@ abstract「A shape type that is able to inset itself to produce another shape.�
 **这一批说明的事**：CI 的第一次红停在第一行，所以「修完那一条」从来不等于「能编译」。
 真正把边界推出去的办法是让 CI 尽量走到下一步 —— 而它每走一步，都在把「静态门禁替代编译器」
 这层代理的天花板往上顶一寸。
+
+## CI 第三批：26 → 2（2026-09-25）
+
+上一批修完之后，CI 从 26 条错误降到 **2 条**。两条都记在这里，包括**我上一批猜错的那一条**。
+
+### ① `HealthDataView.swift:385` —— `conflicting arguments to generic parameter 'Result' ('Void' vs. '(inserted: Bool, memberAfterInsert: String)')`
+
+```
+withAnimation(TokensMotion.count) { fullyOpen.insert(sys.name) }
+```
+
+根因：`Set.insert` **有返回值**（那个元组）。在 ViewBuilder 里，`withAnimation` 的泛型
+`Result` 同时收到两个约束 —— 外层（ViewBuilder 的语句位置）要 `Void`，而单表达式闭包给出
+那个元组，于是它们对不上。
+
+修法：写成 `_ = fullyOpen.insert(sys.name)`。值本来就没人用（这是「按下就记住这一档」），
+把它说出来之后 `Result` 就是 `Void`，两个约束合成一个。
+**同一形状的四处一起写了**（体检卡的 insert / remove、消息卡的 insert / remove）——
+CI 只报了一处，但另外三处的表达式形状完全相同，而这一轮已经证明「编译器走到哪一步」
+是预算问题：与其等下一轮，不如把同一句话说完。
+
+### ② `MessagesSection.swift:361` —— `ambiguous use of 'accessibilityHint'`（**上一批的修法没成**）
+
+上一批我把那一行的按钮拆成了独立函数，理由是「推断预算」。这一轮的 CI 说：**没用，同一行还在报。**
+这是一条教训（已写进那个文件的注）：
+
+```
+SwiftUI.ModifiedContent.accessibilityHint:2:25: note: found this candidate
+nonisolated public func accessibilityHint(_ hint: Text) -> ModifiedContent<Content, Modifier>
+SwiftUI.View.accessibilityHint:2:25: note: found this candidate
+nonisolated public func accessibilityHint(_ hint: Text) -> ModifiedContent<Self, AccessibilityAttachmentModifier>
+```
+
+`accessibilityHint` 在 `View` 与 `ModifiedContent` 上**各有一份、返回类型还不同**；当 receiver
+恰好是上一步 `.accessibilityLabel` 留下的 `ModifiedContent` 时，两个候选都合法。
+
+**决定性的测量**（这一步比推理值钱）：把全仓「无障碍标签接另一个无障碍修饰符」的链**数了一遍** ——
+**28 处，其中 27 处编译得过**（`MapSpineReadouts` / `MapSpineView` / `MineView` / `ControlView` …），
+只有消息这一处报歧义。这条测量同时定下了两件事：
+
+· **不要把它变成一条全仓规矩。** 27 处合法代码，每一处都在说 VoiceOver 的事；照着一个
+  推断预算的偶发结果去改它们，是把「编译器这次的心情」写进界面代码。
+· **那这一处要怎么修才有定论？** 让 receiver 不再是 `ModifiedContent` 就够了。做法是一个泛型函数：
+
+```swift
+private func withHint<V: View>(_ hint: Text, _ content: () -> V) -> some View {
+    content().accessibilityHint(hint)   // content() 的类型是类型参数 V，成员查找只看它的约束
+}
+```
+
+`content()` 的静态类型是 `V: View`（类型参数）。**成员查找在泛型声明处做，只看约束** ——
+无论调用点把 `V` 推成什么（包括 `ModifiedContent`），候选都只剩 `View` 那一支。
+这与 `ViewModifier.body(content:)` 里能随手写 `content.xxx` 是同一个道理。
+
+消息那一节现在的结构：`messageRow` → `DSGroupRow { withHint(…) { rowButton(…) } }`，
+`rowButton` 只带**标签**，**提示**由调用处的 `withHint` 挂。上一批那次拆分留着 ——
+它本身是对的（表达式更小、每一步的期望类型更明确），只是它**不足以**解决歧义。
+
+**验证状态**：本地 **31/31 门禁 + 风格检查 0 问题**全绿。这一批两处都只有 CI 能判对错：
+`_ =` 是语言规则层面的确定修法（有把握）；`withHint` 的把握来自「泛型声明的成员查找只看约束」
+这条规则本身，但它仍然要在真编译器上过一遍才算数。
+
+**这一轮最该记住的一件事**：上一批我在文档里写「`accessibilityHint` 是推断问题，拆开就好了」——
+那是**推理**，而 CI 证明它错了。同一个怀疑，用一分钟数一遍全仓同类写法（28 处 / 1 处失败）
+就变成了事实，而事实给出的结论完全不同：不是「改这一处的形状」，而是「别把它当规矩」。

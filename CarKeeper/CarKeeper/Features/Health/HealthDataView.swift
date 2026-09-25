@@ -382,13 +382,18 @@ struct HealthDataView: View {
                     if plan.hidden > 0 {
                         DSGroupRow(showsSeparator: false) {
                             DSCardMoreRow(rest: plan.hidden, screens: screens, open: false) {
-                                withAnimation(TokensMotion.count) { fullyOpen.insert(sys.name) }
+                                // `_ =` 不是装饰：`Set.insert` 返回 (inserted:memberAfterInsert:)。
+                                // 在 ViewBuilder 里 `withAnimation` 的泛型 `Result` 同时收到两个
+                                // 约束（外层要 Void、闭包给出那个元组），编译器报「conflicting
+                                // arguments to generic parameter 'Result'」（2026-09-25 的 CI）。
+                                // 这里本来就是「按下就记住这一档」，值不用 —— 写出来它才成立。
+                                withAnimation(TokensMotion.count) { _ = fullyOpen.insert(sys.name) }
                             }
                         }
                     } else if fullyOpen.contains(sys.name), details.count > 1 {
                         DSGroupRow(showsSeparator: false) {
                             DSCardMoreRow.collapse {
-                                withAnimation(TokensMotion.count) { fullyOpen.remove(sys.name) }
+                                withAnimation(TokensMotion.count) { _ = fullyOpen.remove(sys.name) }
                             }
                         }
                     }
