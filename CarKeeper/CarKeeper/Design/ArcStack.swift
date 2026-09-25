@@ -49,6 +49,18 @@ struct ArcStack: View {
     var accent: Color = TokensPalette.accent
     /// 无障碍里这一叠叫什么（"充电"…）
     var label: String = ""
+    /// **滑到底了**。给了它，这一叠就变成「可以续的列表」（出行页用它做懒加载）。
+    ///
+    /// 用户 2026-09-25 第 1 条：「行程卡片采用懒加载，而不是需要人点加载 N 条」。
+    /// 为什么这件事必须住在这里、而不能由页面自己算：滚动的几何只有 `ScrollView`
+    /// 自己知道，而它是这一层的东西（页面拿不到）。上一轮删掉那些自算的位置时，
+    /// 头注里写的就是「系统没有『你现在滚到第几张』这个数可以读」—— 那个数现在
+    /// **有**了（`onScrollGeometryChange`，iOS 18+），所以续页可以按真实的滚动位置发。
+    ///
+    /// ⚠️ 它只会在「从不到底 → 到底」那一刻叫一次（`onScrollGeometryChange` 的判据是
+    /// 值变了才回调，而它的值是 `Bool`）。所以调用点不必自己去重：
+    /// 续了 5 张之后内容变高，「到底」自己就变回否了。
+    var onReachBottom: (() -> Void)? = nil
 
     /// 无障碍翻页停在清单里的第几张（`step` 的输入）。
     @State private var current = 0
@@ -98,6 +110,20 @@ struct ArcStack: View {
                 .ignoresSafeArea(edges: .top)
                 .contentMargins(.top, topInset)
                 .scrollEdgeEffectStyle(.soft, for: .top)
+                // 「滑到底了」—— 只在这一叠真的能滚时才算数。
+                //
+                // 那条 `contentSize > containerSize` 的守卫是必须的：内容比一屏短时
+                // `contentOffset.y + 可视高` 天然就大于 `contentSize - 可视高`（后者是负数），
+                // 于是判据恒真 —— 那一页会在第一帧里把自己续到底。
+                // 判据留一屏的余量（不是“到底”才触发）：拇指拖到底的那一刻
+                // 下一批卡已经建好了，而不是等松手才出现一张空白的等待。
+                .onScrollGeometryChange(for: Bool.self) { g in
+                    g.contentSize.height > g.containerSize.height
+                        && g.contentOffset.y + g.containerSize.height
+                            >= g.contentSize.height - g.containerSize.height
+                } action: { _, near in
+                    if near { onReachBottom?() }
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .accessibilityElement(children: .contain)
@@ -140,9 +166,11 @@ struct StackPageView: View {
     var accent: Color = TokensPalette.accent
     var label: String = ""
     var cards: [StackCard]
+    /// 转发给 `ArcStack.onReachBottom`（只有出行页用到，见那里的说明）。
+    var onReachBottom: (() -> Void)? = nil
 
     var body: some View {
-        ArcStack(cards: cards, accent: accent, label: label)
+        ArcStack(cards: cards, accent: accent, label: label, onReachBottom: onReachBottom)
     }
 }
 

@@ -154,11 +154,20 @@ struct DSGroup<Content: View>: View {
                 DSSectionHeader(title: title, trailing: trailing,
                                 trailingCls: trailingCls, action: onTrailingTap)
             }
+            //  分组**不再自带一层底**。
+            //
+            //  2026-09-25（用户第 6 条：「指令和一键都降级到玻璃卡片上（其他子界面均降级到
+            //  玻璃卡片上，尽量少的使用多级玻璃或层，容易导致玻璃不通透）」）。
+            //  这里原来是 `RoundedRectangle.fill(TokensPalette.panel)` —— 一层半透明的扁面，
+            //  每一组都叠在卡片自己的玻璃上。于是同一张卡里就有了**两层材质**：卡是玻璃，
+            //  卡里的每一组又各是一块面色。用户看到的“不通透的灰”就是它（上一轮把它的
+            //  不透明度从 0.5 降到 0.34，治不了根：只要是**多出一层**，玻璃的折射就断了）。
+            //
+            //  现在行直接坐在卡片的玻璃上，分组僭界由三件东西说：分组标题（`DSSectionHeader`）、
+            //  行间的发丝线（`DSSeparator`）、以及卡片自己的圆角与内衬。
+            //  代价如实写在这里：分组与卡片背景之间的对比变弱了 —— 而那一层对比是**拿玻璃
+            //  换来的**，而用户这四轮反复要的就是玻璃。回退就是上面那三行（一个 `.background`）。
             VStack(spacing: 0) { content() }
-                .background {
-                    RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                        .fill(TokensPalette.panel)
-                }
                 // 裁剪掉圆角：行的按压底色是矩形，不裁会在分组四角露出方角
                 .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous))
             if let footer {
@@ -199,16 +208,26 @@ struct DSKeyValueRow: View {
     var mono: Bool = true
 
     var body: some View {
+        //  2026-09-25（用户第 5 条：「内容放得下且不换行（全部页面都需要逐个控件审核）」）：
+        //  这一行是**全站用得最多的一行**（车辆档案、充电明细、体检逐项、消息明细…）。
+        //  它此前允许 key 折到两行、而 value 根本不限行数：值一长（VIN、故障码串、
+        //  「3 条 · P0A80,P0A81…」）整行就变两行高，而它下面还有一条发丝线 ——
+        //  一折行看上去就像“这一行没对齐”，不是“这一行内容多”。
+        //  现在两边都是单行、**装不下就缩**（缩比行高变化便宜，也读得完）。
         HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.md) {
             Text(key)
                 .font(TokensTypo.subheadline)
                 .foregroundStyle(TokensPalette.primary)
-                .lineLimit(2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             Spacer(minLength: TokensSpacing.sm)
             Text(value)
                 .font(mono ? TokensTypo.dataSmall : TokensTypo.subheadline)
                 .foregroundStyle(valueCls == "na" ? TokensPalette.secondary : TokensPalette.statusColor(valueCls))
                 .multilineTextAlignment(.trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                // 值优先占位（不够缩时先缩 key）—— 一条读数里值才是要看的东西。
                 .layoutPriority(1)
         }
         .frame(minHeight: TokensSpacing.row)
@@ -242,6 +261,10 @@ struct DSSectionHeader: View {
                     .font(TokensTypo.fixed(13))
                     .tracking(TokensTracking.label)
                     .foregroundStyle(TokensPalette.secondary)
+                    // 标题与右侧那个数挤在同一行（用户第 5 条）：先不许折，再允许缩。
+                    // 分组标题折行会把下面那一组内容整体推下去一格，而它本来只是一行小字。
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             Spacer(minLength: TokensSpacing.sm)
             if let trailing {
@@ -260,6 +283,8 @@ struct DSSectionHeader: View {
                     Text(trailing)
                         .font(TokensTypo.footnote)
                         .foregroundStyle(TokensPalette.tertiary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
             }
         }
@@ -275,12 +300,18 @@ struct DSBigNumber: View {
     var size: CGFloat = 96
     var tint: Color = TokensPalette.primary
     var alignment: HorizontalAlignment = .leading
+    /// 字重。默认值 = 这个原语一直以来的写法（超细 —— 「仪器感」，见 `TokensTypo.display`）。
+    /// 2026-09-25 加这一个参数的原因只有一处：地图抽屉头上那三个数压在通透玻璃上，
+    /// 用户第 3 条要求「字体加粗」（超细的字在 `clear` 玻璃上会散）。
+    /// 它必须放在最后 —— 带标签的实参在 Swift 里要按声明顺序写，
+    /// 加在中间会让**已有**的调用点全部编译不过。
+    var weight: Font.Weight = .ultraLight
 
     var body: some View {
         VStack(alignment: alignment, spacing: TokensSpacing.sm) {
             HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.xs) {
                 Text(value)
-                    .font(TokensTypo.display(size))
+                    .font(TokensTypo.display(size, weight: weight))
                     // 字距 = 按字号算的基准（字号越大越要收紧，否则数字会散开）。
                     // 这里以前还加一项「主题的额外字距」（巨字方向靠它把超大数字
                     // 收成一整块），随艺术主题删除；原生那一项本来就是 0，
@@ -384,6 +415,45 @@ struct DSLightBar: View {
     }
 }
 
+/// 环形读数：一圈轨道 + 一段弧 + 中心里的东西（健康评分用）。
+///
+/// 2026-09-25 新增（用户第 2 条：「车辆页的健康布局太不 iOS，太业余了」）。
+/// 「百分比」在 iOS 上有一个通行的形态：**环**（活动 / 电量 / 健唐 App 都是它）。
+/// 而它此前是「96pt 超细巨字 + 一条线性光带 + 一排行下的方块」三件东西说同一件事，
+/// 其中超细那一支还是全 App 最细的字 —— 那几个字压在卡片上像未完成的排版，
+/// 不像一个结论。环把「分数」与「占多少」合成**同一个图形**，中心那点地方刚好够写它。
+///
+/// 三条取自系统写法的细节，都不是装饰：
+///   · 弧从**十二点**开始（`rotationEffect(-90°)`）—— 系统的表都是这么读的；
+///   · 端点**圆头**（`lineCap: .round`）—— 方头在小进度时看起来像没开始；
+///   · 球道用 `TokensPalette.track`（与光带同一条）。
+/// 缩小不到 1 的进度也照画：环的“没满”本身就是读数的一部分（这一点与光带一致）。
+struct DSRing<Content: View>: View {
+    /// 0…1（超出的部分自己夹掉，调用点不必先夹）
+    var progress: Double
+    var tint: Color
+    var size: CGFloat = 108
+    var lineWidth: CGFloat = 12
+    /// 环中心里的东西（怎么写由调用点决定：这里只保证它居中）
+    @ViewBuilder var content: Content
+
+    private var clamped: Double { max(0, min(1, progress)) }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(TokensPalette.track, lineWidth: lineWidth)
+            Circle()
+                .trim(from: 0, to: clamped)
+                .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            content
+        }
+        .frame(width: size, height: size)
+        .accessibilityElement(children: .contain)
+    }
+}
+
 /// 三段事实条：竖向发丝线分隔的三个读数（v4 首屏用）
 struct DSStatStrip: View {
     struct Item: Identifiable {
@@ -481,14 +551,20 @@ struct DSStatRow: View {
                     .foregroundStyle(TokensPalette.secondary)
                     .frame(width: 20)
             }
+            // 与 `DSKeyValueRow` 同一条（用户第 5 条）：一行一个事实，不折行 ——
+            // 装不下就缩，不把行高变成两行（那看起来是没对齐，不是内容多）。
             Text(label)
                 .font(TokensTypo.body)
                 .foregroundStyle(TokensPalette.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             Spacer(minLength: TokensSpacing.md)
             Text(value)
                 .font(TokensTypo.data)
                 .foregroundStyle(valueCls == "na" ? TokensPalette.secondary : TokensPalette.statusColor(valueCls))
                 .multilineTextAlignment(.trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .frame(minHeight: TokensSpacing.row)
         .accessibilityElement(children: .combine)
@@ -627,7 +703,12 @@ struct DSPrimaryButtonStyle: ButtonStyle {
             .frame(height: TokensSize.button)
             .background(Capsule().fill(tint))
             .opacity(configuration.isPressed ? 0.82 : 1)
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            //  `.scaleEffect(configuration.isPressed ? 0.985 : 1)` 2026-09-25 删除
+            //（用户第 2 条：「全部页面不需要颤抖放大特效，太耗性能」）。
+            //  它是全仓**唯一**一处「按下就缩放」—— 而按下的反馈已经由上面那行透明度
+            //  给了。多那一层的代价是真的：这一条按钮是 `maxWidth: .infinity`，
+            //  一次非整数缩放要让整条胶囊先渲染到离屏缓冲再合成。
+            //  全 App 每一个主操作按钮都在这条路上。
             .animation(TokensMotion.press, value: configuration.isPressed)
     }
 }
@@ -666,6 +747,13 @@ struct DSSegmented<T: Hashable>: View {
                     Text(option.title)
                         .font(TokensTypo.subheadline.weight(selected ? .semibold : .regular))
                         .foregroundStyle(TokensPalette.primary)
+                        //  固定高 32 的一格：这里的字**绝不能折行**（用户第 5 条）——
+                        //  折了不是变成两行，而是被 32pt 的框**剪掉**（下一行看不见了）。
+                        //  所以先不许折，再允许缩：宁可字小一点，不能出现半个字。
+                        //  两段与三段都在用这个控件（车辆 / 我的那两个），段名都是两个字，
+                        //  所以缩到 0.8 这一步在真机上大概用不着 —— 它是护栏，不是常态。
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .frame(maxWidth: .infinity)
                         .frame(height: 32)
                         .background {

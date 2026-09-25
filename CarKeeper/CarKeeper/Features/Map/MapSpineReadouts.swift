@@ -238,7 +238,14 @@ extension MapSpineView {
                             size: 30,
                             tint: r.cls == "na" ? TokensPalette.primary
                                                 : TokensPalette.statusColor(r.cls),
-                            alignment: .center)
+                            alignment: .center,
+                            // 用户 2026-09-25 第 3 条：「卡片的 3 个要素字体加粗」。
+                            // 超细字重是这个原语的「仪器感」（见 `TokensTypo.display`），
+                            // 但这一行压在通透玻璃上 —— 超细的笔画在瓦片/照片上会散掉。
+                            weight: .bold)
+                    // 再叠一层轻微反色外发光（第 8 条那件「发光外壳」）：
+                    // 这三个数下面是什么颜色的瓦片不由我们决定，外发光也不改变字色。
+                    .dsInkGlow(strong: true)
                     .frame(maxWidth: .infinity, alignment: .center)
             }
         }

@@ -16,6 +16,7 @@ import SwiftUI
 import MapKit
 
 /// 出行页一次建几张行程卡（见 `TripsEventsView.shownTrips` 的说明）。
+/// 2026-09-25 起它不再是「一次点多少」，而是**滑到底就续多少**（用户第 1 条）。
 private let tripCardStep: Int = 5
 
 /// 出行页最多建几张行程卡 —— **30 是用户定的上限**（2026-09-25：
@@ -36,6 +37,10 @@ private let tripCardCap: Int = 30
 /// 消息流里的 IGNITION / FLAMEOUT 事件本来就是行程的骨架，两页读的是同一件事。
 struct TripsEventsView: View {
     private let store = AppStore.shared
+    /// 路线服务。**必须订阅它**（而不是只读缓存）：背面那一行「路线长度」是
+    /// 路线到手之后才出现的，而路线到手是一场异步回调 —— 不订阅，那一行要等到
+    /// 下一次重绘才显示（见 `RouteService.revision`）。
+    @ObservedObject private var routes = RouteService.shared
 
     /// 一次建几张行程卡 —— **这不是分页，是防处决**。
     ///
@@ -47,6 +52,11 @@ struct TripsEventsView: View {
     /// 4.01s 1720 MB → 5.3s 被系统收走；而同一份数据在**其他档一点事都没有**
     /// （主屏上也有一张地图，但它只有一张）。用户的原话就是「点到出行界面就闪退」。
     @State private var shownTrips = tripCardStep
+
+    /// 当前翻到背面的那一段（键是它的 `startTime`，理由见 `tripFlip`）。
+    /// `nil` = 没有一张是翻过来的 —— 一开始是这个状态，面且**只有一张**能翻：
+    /// 它是“我正在看这一段”的标记，不是每一张自己的开关。
+    @State private var flippedTrip: Double? = nil
 
     private var trips: [AppStore.TripRecord] {
         store.tripHistory.sorted { $0.startTime > $1.startTime }
@@ -145,15 +155,35 @@ struct TripsEventsView: View {
                 .sorted { $0.startTime > $1.startTime }
     }
 
-    /// 「再放 N 段出来」。它与 `shownTrips` 是一件事的两半：
-    /// 上限由人决定，而不是由「消息里配出了多少行程」决定。
-    private var moreTripsRow: some View {
-        DSRow(icon: "arrow.down.circle", title: "再放 \(tripCardStep) 段出来") {
-            // 夹在上限里：按到第 6 次时它放 5 段，第 7 次只放到 30 为止，
-            // 而不是「过了上限就当没点」或者「越点越多」。
-            shownTrips = min(shownTrips + tripCardStep, tripCardCap)
-            TokensHaptic.select()
+    /// 往下滑就续这一段 —— 懒加载的**唯一**动作。
+    ///
+    /// 2026-09-25（用户第 1 条：「行程卡片采用懒加载，而不是需要人点加载 N 条」）：
+    /// 原来这里是一个 `DSRow` 按钮（「再放 5 段出来」）。改成自动续的理由不是“少一步”：
+    /// 往下滑这个动作**本身就是**「我还要看」的证据，按钮只是把同一个意图多问了一遍；
+    /// 而那个按钮还有一个更差的后果 —— 不点就永远看不到（列表看起来就到此为止了）。
+    ///
+    /// 上限仍然由人定（`tripCardCap` = 30，用户 2026-09-25：「最大行程控制在 30 条」）：
+    /// 到 30 就不再续，剩下的在下面「车的事件」里按时间列着（见 `restAsMessagesRow`）。
+    /// 夹在上限里而不是「过了上限就不再变」：真正的夹取只有这一处，
+    /// 所以「续多少」不可能算出 35。
+    private func loadMoreTrips() {
+        guard shownTrips < tripCardCap else { return }
+        shownTrips = min(shownTrips + tripCardStep, tripCardCap)
+    }
+
+    /// 还没显示完时的一句话。**它不是按钮**（按钮已经跟着第 1 条删了），
+    /// 而它必须说清楚剩下的怎么才会出来 —— 否则那几段对用户来说等于不存在。
+    private func moreTripsNote(_ rest: Int) -> some View {
+        HStack(spacing: TokensSpacing.sm) {
+            Image(safeSymbol: "arrow.down.circle", fallback: "arrow.down.circle")
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.tertiary)
+            Text("往下滑，剩下的 \(rest) 段接着出来")
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// 到上限之后那一行：**不是按钮**，是一句交代。
@@ -199,11 +229,13 @@ struct TripsEventsView: View {
                                      value: String(format: "%.1f km", trip.distanceKm), cls: "ok",
                                      content: AnyView(timelineRow(trip, isLast: isLast))))
             }
-            // 没到上限：「再放 5 段」由人点（每多建一段就多一张地图，不能一次建完）。
-            // 到了上限：同一件事改成一句陈述，而剩下的那些在「车的事件」里仍然读得到。
+            // 没到上限：一句话说清「接着往下滑就出来」（真正的续在 `loadMoreTrips`，
+            // 由 `ArcStack.onReachBottom` 那个滚动位置信号触发）。
+            // 到了上限：同一件事改成另一句陈述，而剩下的那些在「车的事件」里仍然读得到。
             if visible.count < min(list.count, tripCardCap) {
-                out.append(StackCard(id: "more-trips", title: "还有 \(min(list.count, tripCardCap) - visible.count) 段",
-                                     content: AnyView(moreTripsRow)))
+                let rest = min(list.count, tripCardCap) - visible.count
+                out.append(StackCard(id: "more-trips", title: "还有 \(rest) 段",
+                                     content: AnyView(moreTripsNote(rest))))
             } else if list.count > tripCardCap {
                 out.append(StackCard(id: "rest-as-messages", title: "更早的 \(list.count - tripCardCap) 段",
                                      content: AnyView(restAsMessagesRow(list.count - tripCardCap))))
@@ -222,7 +254,9 @@ struct TripsEventsView: View {
 
     var body: some View {
         // 出行只有一套卡：行程在上、常停之地在中间、车的事件在下。
-        StackPageView(accent: HomeMode.trips.accent, label: "出行", cards: cards)
+        // `onReachBottom` = 这一页的懒加载（用户第 1 条）：滑到底就续 5 段。
+        StackPageView(accent: HomeMode.trips.accent, label: "出行", cards: cards,
+                      onReachBottom: { loadMoreTrips() })
         .dsPageTitle("出行")
         .accessibilityLabel(Text("出行"))
     }
@@ -291,19 +325,93 @@ struct TripsEventsView: View {
             }
             .frame(width: 9)
 
-            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-                headerText(trip)
-                MiniTripMap(from: trip.startLocation?.coordinate, to: trip.endLocation?.coordinate)
-                    .frame(height: 132)
-                    .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                            .strokeBorder(TokensPalette.hairline, lineWidth: 0.5)
-                    )
-                statsRow(trip)
-            }
+            tripFlip(trip)
         }
         .padding(.bottom, TokensSpacing.xl)
+    }
+
+    /// 一段行程：**点一下翻到背面**（用户第 1 条：「点击行程卡片可反转看详情」）。
+    ///
+    /// 两件实现细节，都不是风格选择：
+    ///   · 两面**始终**都在视图树里（只是不透明的那一面看得见）—— 否则背面是在
+    ///     点击那一刻才被建出来的，“翻过来”就没有起点可动；
+    ///   · 翻的是**这一张**（`flippedTrip` 记的是行程的 `startTime`）。
+    ///     不能用 `TripRecord.id`：那个 `id` 是 `let id = UUID()`，而这个数组
+    ///     每次求值都重建（`displayTrips` 现算），于是每一个 UUID 都是新的 ——
+    ///     用它当键的话，任何一次重绘都会把翻面状态弄丢。`startTime` 是这段行程
+    ///     唯一稳定的身份（合并两个数据源时用的就是它）。
+    @ViewBuilder
+    private func tripFlip(_ trip: AppStore.TripRecord) -> some View {
+        let key = trip.startTime.timeIntervalSince1970
+        let flipped = flippedTrip == key
+        ZStack(alignment: .top) {
+            tripFront(trip)
+                .opacity(flipped ? 0 : 1)
+                .rotation3DEffect(.degrees(flipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
+            tripBack(trip)
+                .opacity(flipped ? 1 : 0)
+                .rotation3DEffect(.degrees(flipped ? 0 : -180), axis: (x: 0, y: 1, z: 0))
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            TokensHaptic.tap()
+            withAnimation(TokensMotion.value) { flippedTrip = flipped ? nil : key }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityHint(Text("点一下翻到背面看详情"))
+        .accessibilityAction { flippedTrip = flipped ? nil : key }
+    }
+
+    /// 正面：地图 + 三个数（就是原来那一版，只是多了一个“可以翻”的提示）。
+    private func tripFront(_ trip: AppStore.TripRecord) -> some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+            headerText(trip)
+            MiniTripMap(from: trip.startLocation?.coordinate, to: trip.endLocation?.coordinate)
+                .frame(height: 132)
+                .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                        .strokeBorder(TokensPalette.hairline, lineWidth: 0.5)
+                )
+            statsRow(trip)
+        }
+    }
+
+    /// 背面：这一段的其余事实（都是这一段行程自己的读数，没有新数据源）。
+    ///
+    /// 它为什么值得存在：正面那张地图回答的是「从哪到哪」，而「开了多久、掉了几格电、
+    /// 每格电跑多远」在这张卡里原来**没有地方放** —— 摆到正面就是把卡片变成表格。
+    private func tripBack(_ trip: AppStore.TripRecord) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            headerText(trip)
+            DSDivider()
+            DSKeyValueRow(key: "出发", value: trip.startTime.formatted(date: .omitted, time: .shortened))
+            DSDivider()
+            DSKeyValueRow(key: "到达",
+                          value: trip.endTime.map { $0.formatted(date: .omitted, time: .shortened) }
+                                 ?? "还没熄火")
+            DSDivider()
+            DSKeyValueRow(key: "时长", value: trip.durationText)
+            DSDivider()
+            DSKeyValueRow(key: "两点直线", value: String(format: "%.1f km", trip.distanceKm))
+            // 真正沿着路走出来的长度。它要有求到路线才出现（`RouteService` 的缓存）——
+            // 求不到就不摆一行「--」：那个数此刻不存在，摆占位就是装。
+            if let road = roadRoute(trip) {
+                DSDivider()
+                DSKeyValueRow(key: "路线长度",
+                              value: String(format: "%.1f km", road.distanceMeters / 1000))
+            }
+            DSDivider()
+            DSKeyValueRow(key: "电量", value: "\(trip.startSoc)% → \(trip.endSoc)%")
+            if let kmPerPct = trip.kmPerPercent {
+                DSDivider()
+                DSKeyValueRow(key: "每 1% 电量", value: String(format: "%.2f km", kmPerPct))
+            }
+            if let eff = trip.avgEfficiency {
+                DSDivider()
+                DSKeyValueRow(key: "平均能耗", value: String(format: "%.1f kWh/100km", eff))
+            }
+        }
     }
 
     private func headerText(_ trip: AppStore.TripRecord) -> some View {
@@ -330,6 +438,13 @@ struct TripsEventsView: View {
             Text(String(format: "%.1f km", trip.distanceKm))
                 .font(TokensTypo.digits(17))
                 .foregroundStyle(TokensPalette.primary)
+            //  这一个字是用户第 1 条里那句「且是俩点直线距离」的直接回答：
+            //  行程记录里只有起终两个坐标（`TripRecord` 没有轨迹点），所以这个数
+            //  **本来就是直线** —— 之前它只写「3.2 km」，看起来像车真开了 3.2 公里。
+            //  现在把它标出来，而真正的道路长度在背面（`tripBack`）。
+            Text("直线")
+                .font(TokensTypo.caption2)
+                .foregroundStyle(TokensPalette.tertiary)
             Text("\(max(0, trip.startSoc - trip.endSoc))% 电量")
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.secondary)
@@ -345,7 +460,23 @@ struct TripsEventsView: View {
                     .font(TokensTypo.caption)
                     .foregroundStyle(TokensPalette.tertiary)
             }
+            // 「这一张能翻」的提示。一个可以点但没有提示的东西等于不能点 ——
+            // 而这一个是**整张卡的**交互（不是某个按钮），没有可认的控件形状。
+            Image(safeSymbol: "arrow.triangle.2.circlepath", fallback: "arrow.triangle.2.circlepath")
+                .font(TokensTypo.caption2)
+                .foregroundStyle(TokensPalette.tertiary)
+                .accessibilityHidden(true)
         }
+    }
+
+    /// 这一段求到过的那条道路路线（没有就是 nil）。
+    /// 读的是 `RouteService` 的**缓存**（不是再发一次请求）：请求由 `MiniTripMap`
+    /// 发过的那一次负责，这里只是换个地方读同一个答案。
+    private func roadRoute(_ trip: AppStore.TripRecord) -> RouteService.Route? {
+        guard let a = trip.startLocation?.coordinate, let b = trip.endLocation?.coordinate else {
+            return nil
+        }
+        return routes.cached(from: a, to: b)
     }
 
     /// 常停热区与地图主屏是**同一套聚类** —— 两处必须是同一个答案
@@ -381,30 +512,59 @@ struct TripsEventsView: View {
 //  每段行程的真地图：起点 → 终点两点一线
 // =============================================================================
 
-/// 一次行程的迷你地图。**线是起终点连线，不是轨迹** —— TripRecord 没有逐点坐标。
-/// 相机取「恰好框住两点」：中点为心，距离按纬度/经度跨度换算成米取大者；
-/// 任何一端缺失就整个不画（不假装知道车开过哪）。
+/// 一次行程的迷你地图。
+///
+/// 2026-09-25（用户第 1 条）两处改动：
+///  ① **线是道路路线**（不再是两点直线）—— 由 `RouteService` 取，取不到才退直线，
+///     而退直线时图上会自己说一句（不能默认用户看不出区别）；
+///  ② 两个端点有了**字**：「起」绿、「终」蓝，各自一枚圆牌与两个点区分形状。
+///     用户原话是「起点终点图标不容易区分」，而两个同色的点本来就没法区分 ——
+///     之前那个形状上的区别（一个深一点、一个蓝一点）隔着一条地图很难看出来。
+///
+/// `TripRecord` 没有逐点轨迹（只有起终两个坐标），所以：
+///  **有路线时画的不是轨迹，是那两地之间此刻的道路走法** —— 它不等于车当时开的那条路
+///  （同样的起终点，早高峰与凌晨的推荐路线可以不同）。这一点不写在界面上，
+///  但写在代码里，免得下一个读的人把它当成轨迹。
 struct MiniTripMap: View {
     let from: CLLocationCoordinate2D?
     let to: CLLocationCoordinate2D?
 
+    /// 道路路线（点串）。空 = 还没取到 / 取不到 —— 那时画直线。
+    @State private var road: [CLLocationCoordinate2D] = []
+    /// 问过了没有。它区分两件事：「正在取」与「取不到」——
+    /// 前者不该在卡片上写“还没有路线”（那会变成一次闪烁），后者必须说。
+    @State private var tried = false
+
     var body: some View {
         if let a = from, let b = to {
             Map(position: .constant(.camera(MapCamera(
-                centerCoordinate: CLLocationCoordinate2D(
-                    latitude: (a.latitude + b.latitude) / 2,
-                    longitude: (a.longitude + b.longitude) / 2),
+                centerCoordinate: center(a, b),
                 distance: fitDistance(a, b),
                 heading: 0,
                 pitch: 0)))) {
-                MapPolyline(MKPolyline(coordinates: [a, b], count: 2))
+                // 一次算好再画：`line(_:_:)` 在取不到路线时是现拼的数组，
+                // 写两遍就是拼两遍（而它们内容必须一样）—— 一个局部量把它变成一次。
+                let pts = line(a, b)
+                MapPolyline(MKPolyline(coordinates: pts, count: pts.count))
                     .stroke(TokensPalette.accent.opacity(0.9),
                             style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                Annotation("起点", coordinate: a) { dot(TokensPalette.tertiary) }
-                Annotation("终点", coordinate: b) { dot(TokensPalette.accent) }
+                // 标题传空串：`Annotation` 的第一个参数是**图上会画的标题** ——
+                // 地图那一屏的车钉上就因此多出一行服务端给的车名（那一轮记过账）。
+                // 这里的字已经在圆牌里了，再让 MapKit 画一行就是两遍。
+                Annotation("", coordinate: a) { endpoint("起", TokensPalette.success) }
+                Annotation("", coordinate: b) { endpoint("终", TokensPalette.accent) }
             }
             .mapStyle(.standard(elevation: .flat, emphasis: .muted,
                                 pointsOfInterest: .excludingAll, showsTraffic: false))
+            // 取路线：挂在卡片自己身上（卡片被建出来才发请求）。
+            // `.task(id:)` 的 id 是两点 ⇒ 行程变了就重新取（同一段不会重复取，
+            // 缓存与合流都在服务里，见 `RouteService`）。
+            .task(id: routeKey(a, b)) {
+                tried = false
+                road = await RouteService.shared.route(from: a, to: b)?.points ?? []
+                tried = true
+            }
+            .overlay(alignment: .bottomLeading) { fallbackNote }
         } else {
             ZStack {
                 // 它是「一块地图空着」的占位面，在卡里 —— 与 `DSPlaceholder` 同一层底：
@@ -418,20 +578,65 @@ struct MiniTripMap: View {
         }
     }
 
-    /// 把两点框进画面所需的视距（米）。纬度差按 111 km/度换算；经度差乘 cos(纬度)。
+    /// 画在地图上的那串坐标：有路线就是路线，没有就是两点。
+    private func line(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> [CLLocationCoordinate2D] {
+        road.count > 1 ? road : [a, b]
+    }
+
+    /// 视野中心：有路线时用**路线的中点**（不是两点的中点）——
+    /// 绕行的路线可能整个偏在一侧，按两点中点框会把它裁掉一半。
+    private func center(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> CLLocationCoordinate2D {
+        let pts = line(a, b)
+        return pts[pts.count / 2]
+    }
+
+    /// 把画出来的东西框进画面所需的视距（米）。
+    /// 纬度差按 111 km/度换算；经度差乘 cos(纬度)。
+    ///
+    /// 它量的是 `line(_:_:)`（有路线时长得多），而且要把**最远的那一个点**算进去：
+    /// 绕行的路线可能有凸出一大截的部分，只看首尾两端仍会裁掉它。
     private func fitDistance(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> Double {
-        let latMeters = abs(b.latitude - a.latitude) * 111_000
-        let lngMeters = abs(b.longitude - a.longitude) * 111_000
-            * max(0.2, cos(a.latitude * .pi / 180))
-        let span = max(latMeters, lngMeters)
-        // 两点重合或几乎没动：退到能看清两个钉的默认视距
+        let pts = line(a, b)
+        var span: Double = 0
+        for p in pts {
+            let latMeters = abs(p.latitude - a.latitude) * 111_000
+            let lngMeters = abs(p.longitude - a.longitude) * 111_000
+                * max(0.2, cos(a.latitude * .pi / 180))
+            span = max(span, max(latMeters, lngMeters))
+        }
+        // 两端重合或几乎没动：退到能看清两个牌的默认视距
         return max(span * 2.4, 900)
     }
 
-    private func dot(_ color: Color) -> some View {
-        Circle()
-            .fill(color)
-            .frame(width: 10, height: 10)
+    /// 直线的说明。只在**问过、且没拿到**时才出现（正在取时什么都不说 ——
+    /// 否则每一张卡出现时都会先闪一下这句）。
+    @ViewBuilder
+    private var fallbackNote: some View {
+        if tried && road.isEmpty {
+            Text("线是两点连线")
+                .font(TokensTypo.caption2)
+                .foregroundStyle(TokensPalette.secondary)
+                .padding(.horizontal, TokensSpacing.xs)
+                .padding(.vertical, TokensSpacing.xxs)
+                .background(TokensPalette.panel, in: Capsule())
+                .padding(TokensSpacing.xs)
+        }
+    }
+
+    /// 一个端点：圆牌里写着「起」或「终」。
+    /// 字才是区分两个端点的那一件东西 —— 颜色与形状只是辅助（色盲用户也在看这张图）。
+    private func endpoint(_ text: String, _ color: Color) -> some View {
+        Text(text)
+            .font(TokensTypo.fixed(11, weight: .bold))
+            .foregroundStyle(TokensPalette.labelOnTint)
+            .frame(width: 20, height: 20)
+            .background(Circle().fill(color))
             .overlay(Circle().strokeBorder(TokensPalette.surface, lineWidth: 2))
+            .dsInkGlow()
+    }
+
+    /// 取路线的键（两点；5 位小数与 `RouteService` 的键同一口径）。
+    private func routeKey(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> String {
+        String(format: "%.5f,%.5f>%.5f,%.5f", a.latitude, a.longitude, b.latitude, b.longitude)
     }
 }

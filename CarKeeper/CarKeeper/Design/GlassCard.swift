@@ -33,6 +33,18 @@ struct GlassCard<Content: View>: View {
     var accent: Color = TokensPalette.accent
     /// 个性色的浓度。0 = 完全不要那一抹（纯玻璃）
     var accentWash: Double = 0.16
+    /// 这张卡此刻是不是**一个正在被读的表面**（拉出来的抽屉）。
+    ///
+    /// 用户 2026-09-25 第 3 条：「抽屉打开后加深下模糊，关闭后降低模糊」。
+    /// 这句话在系统材质里有一个**准确**的对应物 —— `Glass` 的两个变体：
+    ///   · `.clear` 不磨砂（底下看得清楚）→ 收起时用：卡片只是一条摘要，让地图透出来
+    ///   · `.regular` 磨砂（底下的画面被揉开）→ 拉出来时用：卡里现在是十几行读数
+    /// 所以这里**不是**加一层自造的模糊（那会变成玻璃底下的第二层材质，
+    /// 被 `scan/glass.py` 判红，也确实会把折射挡掉），而是把变体选择交给调用点：
+    /// 「这张卡在被读」这一个事实，只有调用点知道（抽屉的开合住在 `MapSpineView`）。
+    ///
+    /// 默认 `false` = 只看底下是什么（`photoBackdrop`），与这个参数出现之前逐字一致。
+    var frosted: Bool = false
     @ViewBuilder var content: Content
 
     private var shape: RoundedRectangle {
@@ -60,7 +72,9 @@ struct GlassCard<Content: View>: View {
             //（卡头已经走 `TokensInk` 自适应，而正文那几百处仍是不透明的标签色）。
             //  真机上如果某张照片让某一行读不清，回退就是这一行换回 `.regular`。
             // `hairline: false`：描边在下面那一条 `overlay` 里画，走令牌，不重复画两层。
-            .dsGlass(in: shape, variant: photoBackdrop ? .overMedia : .regular, hairline: false)
+            // `frosted` 压过「底下是什么」：正在被读的表面优先要对比度（见参数说明）。
+            .dsGlass(in: shape, variant: (photoBackdrop && !frosted) ? .overMedia : .regular,
+                     hairline: false)
             .overlay { accentWashOverlay }
             .overlay { shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border) }
             .clipShape(shape)

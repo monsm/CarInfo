@@ -190,31 +190,45 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
         var indexURL = Self.spotlightIndex
         if kind == .bing { indexURL = Self.bingIndex }
         do {
-            let index = try await Self.fetch(URL(string: indexURL))
-            var pick: RemotePick?
+            // 索引是一小段 JSON：12 秒对它够用到离谱（那个 timeout 不改）。
+            let index = try await Self.fetch(URL(string: indexURL), timeout: Self.indexTimeout)
+            // 两个源都归成「一串候选」：必应只有一条（它就是当天那张，没有备选），
+            // 聚焦按天轮一张、其余顺次排在后面顶位。
+            let picks: [RemotePick]
             if kind == .bing {
-                pick = Self.bingPick(from: index)
+                picks = Self.bingPick(from: index).map { [$0] } ?? []
             } else {
-                pick = Self.spotlightPick(from: index, stamp: today)
+                picks = Self.spotlightPicks(from: index, stamp: today)
             }
-            guard let pick, let imgURL = URL(string: pick.url) else {
+            guard !picks.isEmpty else {
                 failed = true
                 return
             }
-            let bytes = try await Self.fetch(imgURL)
-            guard let decoded = UIImage(data: bytes),
-                  let jpeg = decoded.jpegData(compressionQuality: 0.82) else {
-                failed = true
-                return
+            //  这一层原本不循环：解析出**一张**，下载它，失败就是 `failed = true`。
+            //  用户 2026-09-25 第 8 条（「Windows 聚焦好像又失败了，必应倒是 100% 成功」）
+            //  量出来的原因在尺寸：必应那张 341 KB、聚焦那张 1.34–2.0 MB，
+            //  而两者此前共用一个 12 秒 timeout（见 `fetch` 的说明）。
+            //  所以这里做两件事，**都是加法**（不改「当天是哪张」：候选[0] 仍是轮播给出的那张）：
+            //    ① 图用 `imageTimeout`（45 秒）而不是索引那个 12；
+            //    ② 这一张下不来就试下一张 —— 索引里本来就给了 4 张。
+            var success = false
+            for pick in picks.prefix(3) {
+                guard let imgURL = URL(string: pick.url) else { continue }
+                guard let bytes = try? await Self.fetch(imgURL, timeout: Self.imageTimeout),
+                      let decoded = UIImage(data: bytes),
+                      let jpeg = decoded.jpegData(compressionQuality: 0.82) else { continue }
+                Self.writeDisk(jpeg)
+                image = UIImage(data: jpeg)
+                credit = pick.credit
+                UserDefaults.standard.set(today, forKey: Key.stamp)
+                UserDefaults.standard.set(pick.credit, forKey: Key.credit)
+                success = true
+                break
             }
-            Self.writeDisk(jpeg)
-            image = UIImage(data: jpeg)
-            credit = pick.credit
-            failed = false
-            UserDefaults.standard.set(today, forKey: Key.stamp)
-            UserDefaults.standard.set(pick.credit, forKey: Key.credit)
+            failed = !success
         } catch {
-            // 网络不通 / 对面改了格式 —— 都走这里。**不抛给界面**：背景图不值当弹错。
+            // 索引都没拿到（网络不通 / 对面改了格式）—— 走到这里。
+            // **不抛给界面**：背景图不值当弹错，失败由 `failed` 说出去。
             failed = true
         }
     }
@@ -226,12 +240,22 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
 
     // MARK: - 取图（两个源各自的解析）
 
-    /// 一条只读 GET，12 秒超时，非 200 当失败。
+    /// 一条只读 GET，非 200 当失败。
     /// UA 写成本和 App 自己的名字 —— 不伪装成浏览器。
-    private static func fetch(_ url: URL?) async throws -> Data {
+    ///
+    /// ⚠️ `timeout` 是**参数**，2026-09-25 晚（用户第 8 条：「Windows 聚焦好像又失败了，
+    /// 必应倒是 100% 成功」）拆出来的。量出来的证据：
+    ///   · 必应那张 `_1920x1080.jpg` = **341 KB**（实测）
+    ///   · 聚焦那张竖图 = **1.34 MB**、横图 = **2.0 MB**（实测，同一个时刻）
+    ///   两者相差 4–6 倍，而此前**共用一个 12 秒的 timeout**。
+    ///   于是「同一个网络下必应每次成、聚焦有时败」正是这个比值的样子：
+    ///   341 KB 在 12 秒内几乎不可能超时，1.34–2 MB 在弱网/移动数据上会。
+    ///   这是**尺寸差**，不是解析差 —— 解析那一段（`asset` 键）上一轮已经对着真报文改对，
+    ///   本轮又用真响应逐层核过一遍（索引 200 → `ad.portraitImage.asset` 在 → 该 URL 200）。
+    private static func fetch(_ url: URL?, timeout: TimeInterval = 12) async throws -> Data {
         guard let url else { throw URLError(.badURL) }
         var req = URLRequest(url: url)
-        req.timeoutInterval = 12
+        req.timeoutInterval = timeout
         req.setValue("CarKeeper/1.0 (iOS)", forHTTPHeaderField: "User-Agent")
         let (data, resp) = try await URLSession.shared.data(for: req)
         if let http = resp as? HTTPURLResponse, http.statusCode != 200 {
@@ -239,6 +263,12 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
         }
         return data
     }
+
+    /// 索引用它（一小段 JSON，12 秒够用到离谱）。
+    private static let indexTimeout: TimeInterval = 12
+    /// 图用它。**45 秒**是按最慢的那张算的：2.0 MB 在 45 KB/s 的网上正好一分钟，
+    /// 留一半余量 —— 「一张 4K 图没下完」不该被记成「聚焦这一源坏了」。
+    private static let imageTimeout: TimeInterval = 45
 
     /// 一天一张图：地址 + 署名。
     private struct RemotePick {
@@ -265,10 +295,14 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
     /// `title_text` —— **这两个键在返回里根本不存在**（真报文只有 `copyright` / `title`），
     /// 所以解析永远落空、署名那行永远是空的。它与图一起坏、但坏得不一样：图整张没有，
     /// 署名只是不显示，看起来像"这张图没有署名"。
-    private static func spotlightPick(from data: Data, stamp: Int) -> RemotePick? {
+    ///
+    /// 返回的是**一串候选**（当天那张在最前，其余顺次），不是一个 —— 理由见 `refresh`：
+    /// 当天选中的那一张下不来时，下一张顶上。`bcnt=4` 那 4 条本来就都带着图，
+    /// 此前只用其中一条，等于把三次现成的机会丢掉。
+    private static func spotlightPicks(from data: Data, stamp: Int) -> [RemotePick] {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let batch = root["batchrsp"] as? [String: Any],
-              let items = batch["items"] as? [[String: Any]] else { return nil }
+              let items = batch["items"] as? [[String: Any]] else { return [] }
         var picks: [RemotePick] = []
         for it in items {
             guard let text = it["item"] as? String,
@@ -280,8 +314,11 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
             let credit = (ad["copyright"] as? String) ?? (ad["title"] as? String) ?? ""
             picks.append(RemotePick(url: url, credit: credit))
         }
-        guard !picks.isEmpty else { return nil }
-        return picks[stamp % picks.count]
+        guard !picks.isEmpty else { return [] }
+        // 轮播仍然按天（「今天第几天 % 张数」）—— 同一份列表在同一天里给出同一张，
+        // 所以「今天这张」是确定的；变的只是「它下不来时谁顶上」。
+        let start = max(0, stamp) % picks.count
+        return Array(picks[start...]) + Array(picks[..<start])
     }
 
     /// 在 `ad` 里找取图地址。

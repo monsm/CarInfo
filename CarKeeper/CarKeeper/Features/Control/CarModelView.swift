@@ -136,30 +136,51 @@ final class CarRig {
         let body = Entity()
 
         // ---- 车身（底盘 + 座舱 + 前后风挡）----
-        let lower = ModelEntity(mesh: .generateBox(width: 1.86, height: 0.62, depth: 4.60, cornerRadius: 0.16),
+        //
+        //  2026-09-25（用户第 6 条：「车控界面要做一个真实的俩厢车」）—— 这一版的
+        //  三处尺寸是照着「两厢」这两个字改的，不是随手缩了缩：
+        //    · **总长短了 0.5 米**（4.60 → 4.10），而轴距没动（车轮仍在 ±1.42）——
+        //      两厢车与同级三厢车的区别正在这里：**后悬短**（4.10/2 − 1.42 = 0.63 m）。
+        //      上一版后悬 0.88 m，再配上一个独立的后备箱盖，看起来就是一台三厢车。
+        //    · **座舱往后拉到尾**（2.20 → 2.50，中心从 −0.18 到 −0.30）：
+        //      两厢车的车顶一直拉到尾门上方，尾门几乎是竖的。
+        //    · 后面那块「后备箱盖」不再是车尾外的一块独立板子（那是三厢的车尾），
+        //      它是**尾门**，就长在座舱后缘上（见下面 `tail`）。
+        let lower = ModelEntity(mesh: .generateBox(width: 1.86, height: 0.62, depth: 4.10, cornerRadius: 0.16),
                                 materials: [bodyMaterial])
         lower.position = [0, 0.55, 0]
         body.addChild(lower)
 
-        let cabin = ModelEntity(mesh: .generateBox(width: 1.62, height: 0.56, depth: 2.20, cornerRadius: 0.22),
+        let cabin = ModelEntity(mesh: .generateBox(width: 1.62, height: 0.56, depth: 2.50, cornerRadius: 0.22),
                                 materials: [bodyMaterial])
-        cabin.position = [0, 1.12, -0.18]
+        cabin.position = [0, 1.12, -0.30]
         body.addChild(cabin)
 
         // 全景玻璃顶（座舱上面那一层）—— 它让车看起来是「这一代的车」，而不是一个盒子。
-        let roof = ModelEntity(mesh: .generateBox(width: 1.44, height: 0.06, depth: 1.92, cornerRadius: 0.03),
+        // 它对两厢车特别重要：车顶要一直延伸到尾门上方，所以它比座舱还长一点。
+        let roof = ModelEntity(mesh: .generateBox(width: 1.44, height: 0.06, depth: 2.24, cornerRadius: 0.03),
                                materials: [glassMaterial])
-        roof.position = [0, 1.42, -0.18]
+        roof.position = [0, 1.42, -0.30]
         body.addChild(roof)
 
         // 前后风挡：斜的是车的样子，直的是箱子 —— 用薄板压一点角度。
-        for (z, tilt) in [(1.02, -0.55), (-1.34, 0.5)] {
+        // 后风挡的倾角（0.34 rad ≈ 20°）是**两厢**与三厢最直观的差别：三厢的后窗
+        // 几乎是躺着的（那一版写的 0.50），而两厢车的尾门接近竖直。
+        for (z, tilt) in [(1.05, -0.55), (-1.52, 0.34)] {
             let shield = ModelEntity(mesh: .generateBox(width: 1.50, height: 0.62, depth: 0.06, cornerRadius: 0.02),
                                      materials: [glassMaterial])
             shield.position = [0, 1.12, Float(z)]
             shield.orientation = simd_quatf(angle: Float(tilt), axis: [1, 0, 0])
             body.addChild(shield)
         }
+
+        // 尾门的门槛：座舱后缘到车身尾端之间那一段（两厢车的「第三厢」其实是个行李舱，
+        // 它没有独立的后备箱盖，所以这一块是车身本身）。
+        let hatchBase = ModelEntity(mesh: .generateBox(width: 1.80, height: 0.58, depth: 0.52,
+                                                      cornerRadius: 0.14),
+                                    materials: [bodyMaterial])
+        hatchBase.position = [0, 0.84, -1.72]
+        body.addChild(hatchBase)
 
         // ---- 四门（**可点**；门的状态就是它们的颜色）----
         let doorPlan: [(CarPart, Float, Float)] = [
@@ -202,10 +223,19 @@ final class CarRig {
             body.addChild(rim)
         }
 
-        // ---- 后备箱（**不可点**：报文里只有它的状态，没有开它的指令）----
-        let tail = ModelEntity(mesh: .generateBox(width: 1.62, height: 0.30, depth: 0.08, cornerRadius: 0.03),
+        // ---- 尾门（**不可点**：报文里只有它的状态，没有开它的指令）----
+        //
+        //  它在上一版是「后备箱盖」：一块独立、平铺在车尾外的板（`z = −2.28`）。
+        //  两厢车没有那个东西 —— 尾门就是车尾，它竖在座舱后缘上（`z ≈ −1.98`），
+        //  而且比后备箱盖**高得多**（0.30 → 0.72），一直顶到车顶下面。
+        //  它的颜色仍是门态的一部分（`applyState` 拿 `trunk` 上色，`trunkOpen` = 橙）。
+        //  变量名仍叫 `trunk`：它在报文里就是后备箱那个字段，界面上的形状变了，
+        //  而读的读数没变 —— 换名字只会多一个「同一个东西两个名字」。
+        let tail = ModelEntity(mesh: .generateBox(width: 1.56, height: 0.72, depth: 0.08, cornerRadius: 0.03),
                                materials: [paint(TokensPalette.success, roughness: 0.3)])
-        tail.position = [0, 0.72, -2.28]
+        tail.position = [0, 1.06, -1.98]
+        // 尾门略往后仰（不是死平的一块板）：两厢车的尾门是斜的，而斜度就是它的样子。
+        tail.orientation = simd_quatf(angle: 0.16, axis: [1, 0, 0])
         trunk = tail
         body.addChild(tail)
 
@@ -213,7 +243,8 @@ final class CarRig {
         for x in [Float(-0.62), Float(0.62)] {
             let lamp = ModelEntity(mesh: .generateBox(width: 0.34, height: 0.12, depth: 0.06, cornerRadius: 0.03),
                                    materials: [paint(TokensPalette.warning, roughness: 0.15, metallic: false)])
-            lamp.position = [x, 0.72, 2.28]
+            // 车身短了 0.5 米，车头那几件跟着往前移同样的距离（不然灯会飘在车外面）。
+            lamp.position = [x, 0.72, 2.03]
             lamp.name = CarPart.headLight.rawValue
             makeTappable(lamp, size: (0.40, 0.18, 0.14))
             headLights.append(lamp)
@@ -223,14 +254,14 @@ final class CarRig {
         // ---- 车头（可点 = 鸣笛）：前保险杠正中那一小块 ----
         let nose = ModelEntity(mesh: .generateBox(width: 0.5, height: 0.16, depth: 0.08, cornerRadius: 0.03),
                                materials: [paint(TokensPalette.primary, roughness: 0.3)])
-        nose.position = [0, 0.45, 2.30]
+        nose.position = [0, 0.45, 2.05]
         nose.name = CarPart.horn.rawValue
         makeTappable(nose, size: (0.56, 0.22, 0.14))
         parts[CarPart.horn.rawValue] = CarPart.horn
         body.addChild(nose)
 
         // ---- 接地阴影：一枚扁的暗片。没有它，车会看起来浮在玻璃上 ----
-        let shadow = ModelEntity(mesh: .generateBox(width: 2.10, height: 0.01, depth: 4.90, cornerRadius: 0.4),
+        let shadow = ModelEntity(mesh: .generateBox(width: 2.10, height: 0.01, depth: 4.40, cornerRadius: 0.4),
                                  materials: [SimpleMaterial(color: UIColor(TokensPalette.scrim.opacity(0.28)),
                                                             roughness: 1, isMetallic: false)])
         shadow.position = [0, 0.005, 0]

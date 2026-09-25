@@ -25,17 +25,19 @@ extension MapSpineView {
     @MapContentBuilder
     func mapContent(_ d: MapSpineData) -> some MapContent {
         if let c = d.carCoordinate {
-            Annotation(d.carName, coordinate: c) {
-                MapCarPin(
-                    socPct: d.socPct,
-                    heading: d.headingDeg,
-                    isActive: false,
-                    lamp: d.sky(at: skyDate)?.lamp ?? 0
-                )
-                .frame(width: 44, height: 44)   // HIG 最小触控目标就落在钉中心
+            //  标题传**空串**，不是 `d.carName`。
+            //
+            //  `Annotation` 的第一个参数是**图上会画的字**（MapKit 会把它画在钉下面）——
+            //  它与我们自己的电量徽标叠在一起，而那个标题是服务端给的车名
+            //（用户看到的「电车」，不是我们写的字）。用户 2026-09-25 第 1 条：
+            //  「**车牌名删除** 电量 删除」—— 钉上现在只剩一辆车，下面什么字都没有。
+            //  钉自己的尺寸（68×44，HIG 的最小触控目标）在 `MapCarPin` 里给：
+            //  同一个几何只有一个出处，调用点不再重复一次。
+            Annotation("", coordinate: c) {
+                MapCarPin(lamp: d.sky(at: skyDate)?.lamp ?? 0)
             }
         }
-        // 手机自己那一点（只在真的拿到位置时出现）—— 与车钝是**两个**点：
+        // 手机自己那一点（只在真的拿到位置时出现）—— 与车钉是**两个**点：
         // 「车在哪」与「我在哪」是两个问题（见 `MapQuickButtons.phonePin`）。
         phonePin()
         rangeCircle(d)
@@ -118,8 +120,11 @@ extension MapSpineView {
                     } else {
                         Button {
                             withAnimation(TokensMotion.value) {
+                                // 俯仰角与另两处镜头同一个（见 `cameraPitch`）——
+                                // 点开一个聚合点不该把地图从 3D 打回平面。
                                 camera = .camera(MapCamera(centerCoordinate: cluster.coordinate,
-                                                           distance: 1200))
+                                                           distance: 1200,
+                                                           pitch: cameraPitch))
                             }
                         } label: {
                             MapClusterPin(count: cluster.count)

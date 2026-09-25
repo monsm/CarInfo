@@ -38,7 +38,11 @@ extension MapSpineView {
     ///     同一个抽屉只有一个开法（见 `MapSpineReadouts` 头注的三代写法）。
     @ViewBuilder
     func nowCard(_ d: MapSpineData) -> some View {
-        GlassCard(accent: HomeMode.now.accent) {
+        // `frosted:` 收的就是抽屉的开合（用户 2026-09-25 第 3 条）——
+        // 收起时卡片是一层不磨砂的玻璃（地图透出来），拉出来时它变成磨砂的
+        // （卡里现在是一片要读的字）。为什么这个参数只能由调用点给、
+        // 以及它为什么不是「再加一层模糊」，写在 `GlassCard.frosted` 上。
+        GlassCard(accent: HomeMode.now.accent, frosted: drawerOpen) {
             VStack(alignment: .leading, spacing: 0) {
                 drawerHead(d)
                 if drawerOpen {

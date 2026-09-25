@@ -214,6 +214,30 @@ enum TokensInk {
     static var tertiary: AnyShapeStyle { AnyShapeStyle(HierarchicalShapeStyle.tertiary) }
 }
 
+/// 玻璃上文字的那层「轻微反色发光外壳」（用户 2026-09-25 第 8 条）。
+///
+/// 用它的地方是 `Design/InkGlow.swift` 里那个 `dsInkGlow()`，而取值表在这一处 ——
+/// 与全仓同一条规矩：颜色不写在调用点。单独一个 enum 而不是塞进 `TokensPalette`，
+/// 因为这里装的是**一对互相相反的色**加一个几何量，而 `TokensPalette` 装的是单色。
+///
+/// 为什么它必须是一对（而不是 `black` 一个）：外壳要的是「与字相反的那一侧」，
+/// 而字是亮还是暗由系统的深浅色决定 —— 暗色主题下字是亮的，就要压一圈黑的；
+/// 亮色主题下字是暗的，就要提一圈白的。写成动态色之后，调用点一个三元都不用写。
+enum TokensHalo {
+    /// 常规文字（13–17pt）的外壳半径。
+    static let radius: CGFloat = 3
+    /// 标题 / 大数字（20pt 以上）的外壳半径 —— 笔画粗了，壳要跟着撑开一点。
+    static let radiusWide: CGFloat = 4
+
+    /// 反色壳本身。深色主题：白字压黑；浅色主题：黑字提白。
+    /// 不透明度都取低值：它是外壳不是投影，重了就变成一圈脏边。
+    static let ink: Color = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+        ? UIColor(white: 0, alpha: 0.45)
+        : UIColor(white: 1, alpha: 0.65)
+    })
+}
+
 // MARK: - 间距（4 的倍数，页面边距 20）
 enum TokensSpacing {
     static let xxs = CGFloat(2)
@@ -277,8 +301,14 @@ enum TokensTypo {
     // ---- 仪表数字：等宽数字（换数不跳动）----
     /// 超大数字（首屏 SOC / 关键指标）：**字重差**是「仪器感」的来源 ——
     /// 超细字重 + 负字距（字距在 DSBigNumber 里按字号算），不靠颜色、不靠发光。
-    static func display(_ size: CGFloat = 72) -> Font {
-        .system(size: size, weight: .ultraLight).monospacedDigit()
+    ///
+    /// `weight` 是 2026-09-25 加的**唯一一个**参数，默认值就是原来的超细。
+    /// 加它的理由只有一处（写在这里免得它被当成「又多了一个旋钮」）：地图抽屉头上
+    /// 那三个数（续航 / 电量 / 车速）压在瓦片与照片上，用户第 3 条原话是
+    /// 「卡片的 3 个要素字体加粗」—— 超细的字在通透玻璃上会散掉。
+    /// 「仪器感」那一套（超细 + 负字距）仍然是默认值，没有被动过。
+    static func display(_ size: CGFloat = 72, weight: Font.Weight = .ultraLight) -> Font {
+        .system(size: size, weight: weight).monospacedDigit()
     }
     /// 中等数字（页面头部大数值）
     static func metric(_ size: CGFloat = 34) -> Font {
@@ -313,6 +343,18 @@ enum TokensMotion {
     // `reveal`（抽屉展开那一下的弹簧）2026-09-25 删除：它的读者是卡里那道自画抽屉
     //（`moreDrawer`），而那个抽屉整块交给了系统 sheet（见 `MapSpineReadouts` 头注）。
     static let count = Animation.spring(response: 0.4, dampingFraction: 0.6)
+    /// 归位：**不过冲**的弹簧（临界阻尼）。
+    ///
+    /// 用户 2026-09-25 第 2 条：「底部导航点选或滑动，全部页面不需要颤抖放大特效，
+    /// 太耗性能」。`count`（dampingFraction 0.6）是有意会「弹一下」的 —— 对抽屉张开、
+    /// 筛选条切换那类**离散**变化，那一点点过冲就是反馈。
+    ///
+    /// 但它不能用来推**模式条的位置**（`DSSwipeStrip.c`）：那一个数每一帧都被宿主拿去算
+    /// 六页的交叉过渡 `opacity`，于是「弹簧过冲」变成「六页（含一张活地图）的透明度
+    /// 来回摆」—— 视觉上正是那次抱怨里的「颤抖」，代价上是那一叠每一帧都被重画一遍，
+    /// 而它做的事只是把条子滑回最近一档。阻尼收到 1.0（临界）之后，`c` 单调走到位，
+    /// 没有回摆：既没有那一下抖，也没有多余的帧。
+    static let settle = Animation.spring(response: 0.34, dampingFraction: 1.0)
     static let press = Animation.spring(response: 0.30, dampingFraction: 0.86)
     static let value = Animation.spring(response: 0.36, dampingFraction: 0.88)
     static let screen = Animation.spring(response: 0.42, dampingFraction: 0.90)
@@ -352,7 +394,9 @@ enum TokensSize {
     static let button: CGFloat = 50
     static let iconSm: CGFloat = 13
     static let icon: CGFloat = 17
-    static let iconLg: CGFloat = 22
+    //  `iconLg`（22）已于 2026-09-25 删除：它只有**一个**读者 ——「我的」里那张
+    //  「去看车辆」的卡（用户第 7 条把它整张删了，因为模式条上就有「车辆」那一档）。
+    //  删功能要跟着删它留下的孤儿，否则下一个读到这里的人会以为还有地方在用它。
     static let tileIcon: CGFloat = 22
     /// 行内图标列宽（iOS 设置行）
     static let iconColumn: CGFloat = 29

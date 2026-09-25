@@ -95,34 +95,57 @@ struct HealthDataView: View {
 
     private func scoreSection(_ m: HealthModel) -> some View {
         let tint = scoreColor(m.scorePct)
+        //  2026-09-25（用户第 2 条）重排。这一块原来是**四件东西说同一件事**：
+        //  96pt 超细巨字（分数）、一条线性光带（同一个分数的百分比）、
+        //  一行芯片与时间戳、一排行下的计数方块。而「超细巨字 + 线光带」
+        //  正是第 3 条里用户点名要加粗的那一支 —— 它在卡片上看起来像排版没做完。
+        //
+        //  现在是一枚**环**（iOS 上百分比的标准形态：活动 / 电量 / 健康都是它）：
+        //    · 分数写在环中心（半粗，不再是超细）
+        //    · 环的弧本身就是百分比 —— 巨字与光带这两件合成了一件
+        //    · 结论（verdict）从“巨字的副标题”升为右边那一块的主行
+        //    · 芯片与时间戳跟着搬进右边那一列，不再单独占一行
+        //  所以这一节从「一块数字墙」变成「一个结论 + 它的证据」。
         return VStack(alignment: .leading, spacing: 0) {
             DSSectionHeader(title: "健康评分")
 
-            HStack(spacing: TokensSpacing.sm) {
-                if let vs = m.vehicleStatus, !vs.isEmpty {
-                    DSChip(text: vehicleText(vs), cls: vehicleCls(vs), icon: vehicleIcon(vs))
+            HStack(alignment: .center, spacing: TokensSpacing.lg) {
+                DSRing(progress: Double(max(0, min(100, m.scorePct))) / 100.0, tint: tint) {
+                    VStack(spacing: TokensSpacing.xxs) {
+                        Text(m.score.isEmpty ? "--" : m.score)
+                            .font(TokensTypo.display(44, weight: .semibold))
+                            .foregroundStyle(tint)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                        Text("分")
+                            .font(TokensTypo.caption)
+                            .foregroundStyle(TokensPalette.secondary)
+                    }
                 }
-                Spacer(minLength: TokensSpacing.sm)
-                if !m.time.isEmpty {
-                    Text("最近检测 \(m.time)")
-                        .font(TokensTypo.footnote)
-                        .foregroundStyle(TokensPalette.secondary)
+                .accessibilityLabel(Text("健康评分"))
+                .accessibilityValue(Text(m.score.isEmpty ? "没有报告" : "\(m.score) 分"))
+
+                VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+                    // 结论：全卡最该被第一眼看到的一句（它原来只是巨字下面那行小字）
+                    Text(verdict(m.scorePct))
+                        .font(TokensTypo.title3)
+                        .foregroundStyle(TokensPalette.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let vs = m.vehicleStatus, !vs.isEmpty {
+                        DSChip(text: vehicleText(vs), cls: vehicleCls(vs), icon: vehicleIcon(vs))
+                    }
+                    if !m.time.isEmpty {
+                        Text("最近检测 \(m.time)")
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.tertiary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
                 }
+                Spacer(minLength: 0)
             }
-
-            DSBigNumber(value: m.score.isEmpty ? "--" : m.score,
-                        unit: "分",
-                        caption: verdict(m.scorePct),
-                        size: 96,
-                        tint: tint)
-                .padding(.top, TokensSpacing.lg)
-
-            DSLightBar(progress: Double(max(0, min(100, m.scorePct))) / 100.0,
-                       height: 6,
-                       tint: LinearGradient(colors: [TokensPalette.lightSource, tint.opacity(0.72), tint],
-                                            startPoint: .leading, endPoint: .trailing))
-                .padding(.top, TokensSpacing.xl)
-                .padding(.bottom, TokensSpacing.xl)
+            .padding(.top, TokensSpacing.sm)
+            .padding(.bottom, TokensSpacing.lg)
 
             if !m.counts.isEmpty {
                 DSStatStrip(items: m.counts.map {
@@ -261,8 +284,11 @@ struct HealthDataView: View {
             blocks.append(.gap(TokensSpacing.xs))
             blocks.append(.text(sys.statusText, .footnote, cap: nil))
         }
-        blocks.append(.gap(TokensSpacing.xs))
-        blocks.append(.fixed(3))            // 健康度那条光带
+        //  这里原本还有 `.gap(TokensSpacing.xs)` + `.fixed(3)`（健康度那条迷你光带）。
+        //  光带 2026-09-25 从 `systemRow` 里删了（用户第 2 条），所以它在这里也必须删 ——
+        //  `CardFit` 唯一的约定就是「它量的就是版式里真画出来的那一件」，
+        //  版式少了一条 3pt 的条而这里不少，每一个分系统的行高都会多算 7pt，
+        //  于是「展开后放不放得下」的裁决会在一个不存在的版式上做。
         return CardFit.Row(blocks, floor: TokensSpacing.row)
     }
 
@@ -330,21 +356,27 @@ struct HealthDataView: View {
                         Text(sys.name)
                             .font(TokensTypo.body)
                             .foregroundStyle(TokensPalette.primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                         Text(sys.statusText.isEmpty ? "—" : sys.statusText)
                             .font(TokensTypo.footnote)
                             .foregroundStyle(tint)
-                        DSLightBar(progress: Double(max(0, min(100, sys.healthPct))) / 100.0,
-                                   height: 3,
-                                   showsGlow: false,
-                                   tint: LinearGradient(colors: [tint, tint],
-                                                        startPoint: .leading, endPoint: .trailing))
-                            .frame(width: 88)
-                            .padding(.top, TokensSpacing.xs)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                        //  『这一行原本还有一条 88pt 宽、3pt 高的迷你光带』。
+                        //  它 2026-09-25 删掉（用户第 2 条）。理由不是“小”——
+                        //  而是它与右边那个百分数是**同一个数**的两种画法，
+                        //  而在一行里并排放着时，那根 3pt 的细条看起来像下划线或分隔线，
+                        //  不像读数（用户看到的就是这一行“没做完”的样子）。
+                        //  百分数留着（它有数、有颜色），它把那一件事说完了。
+                        //  ⚠️ `collapsedFitRow` 里那两条 block（一个 gap + fixed(3)）
+                        //  跟着一起删了 —— CardFit 量的是版式，版式改了它不跟着改就会量错。
                     }
                     Spacer(minLength: TokensSpacing.sm)
                     Text("\(sys.healthPct)%")
-                        .font(TokensTypo.data)
+                        .font(TokensTypo.data.weight(.semibold))
                         .foregroundStyle(tint)
+                        .lineLimit(1)
                     Image(safeSymbol: "chevron.down", fallback: "chevron.down")
                         .font(TokensTypo.caption.weight(.semibold))
                         .foregroundStyle(TokensPalette.tertiary)

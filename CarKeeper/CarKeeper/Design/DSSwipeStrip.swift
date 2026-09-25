@@ -342,10 +342,21 @@ struct DSSwipeStrip: View {
         let shape = Capsule()
         // 宽度也不能比条身还宽（很窄的容器里）：留 6pt，否则它会盖住条的两端圆头。
         let w = min(loupeWidth, max(slot, barW - 2 * TokensSpacing.xs))
-        return shape
-            .fill(TokensPalette.glassHighlight)
-            .overlay { shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border) }
+        //  这枚胶囊现在是一块**真的玻璃**（用户 2026-09-25 第 4 条：
+        //  「选中入口的选择效果需要一个玻璃胶囊」）。
+        //  它此前是 `Capsule().fill(glassHighlight)` + 一圈发丝线 —— 一个不透明的白面，
+        //  也就是「玻璃的假象」：没有折射、没有反射、不和底下的字发生关系，
+        //  看起来就是一枚半透明的白胶囊（这正是用户看到的那一幕）。
+        //
+        //  它现在是**条子这个容器里的第二块形状**，不是叠上去的第二层材质：
+        //  整条底条（左钮 / 模式条 / 右钮）由 `dsGlassLayer` 包成同一个 `GlassEffectContainer`
+        //  （见 `MapSpineView.bottomBar`），所以系统知道它俩换得近 —— 选中格与轨道
+        //  因此会互相折射，也正是 iOS 26 分段控件里「选中」的形态。
+        //  它仍然不是按钮：点选由条子那唯一一个拖动手势判（见 `swipe`），
+        //  所以 `interactive` 不传 —— 一个不会自己动的玻璃不该装成会动。
+        return Color.clear
             .frame(width: w, height: loupeHeight)
+            .dsGlass(in: shape)
             .position(x: barW / 2, y: barHeight / 2)
             .allowsHitTesting(false)
     }
@@ -363,11 +374,20 @@ struct DSSwipeStrip: View {
                         // 选中 = 主题强调色（相机里那一档是黄），其余 = 正文色。
                         // 两档字的字重与字号**一样** —— 相机也是用颜色而不是加粗区分，
                         // 而比较粗的字会让相邻两档的行宽不一致，条子会跟着抖一下。
-                        // 未选中那一档的字母走 `TokensInk`（底是模式条自己的玻璃：
-                        // 系统会按材质给它调亮暗，见 `TokensInk`）；选中的那一个是**状态**，
-                        // 状态色不能用自适应色 —— 用户要看得出「现在是哪一个」。
-                        .foregroundStyle(i == index ? AnyShapeStyle(TokensPalette.accent)
-                                                    : TokensInk.primary)
+                        //
+                        //  未选中那一档此前走 `TokensInk.primary`（自适应色）。
+                        //  用户 2026-09-25 第 4 条：「底部导航的字体颜色都太弱了」——
+                        //  那句抱怨描述的正是 vibrancy 的本意：系统会**压低**材质上文字的
+                        //  对比度，让它看起来「长在材质里」。对一段说明文字那是好事，
+                        //  而对**导航**是坏事：这是全 App 唯一的入口，它必须第一眼看清。
+                        //  所以这里回到实色标签（`TokensPalette.primary` = `.label`），
+                        //  并用下面那层外发光补回「它坐在玻璃上」这个事实。
+                        .foregroundStyle(i == index ? TokensPalette.accent
+                                                    : TokensPalette.primary)
+                        // 外发光外壳（用户第 8 条）：条子底下是地图与照片，
+                        // 同一行字有时压在亮瓦片上、有时压在暗水上 —— 外发光是反色的，
+                        // 两种底都不吃亏，而它不改变字本身的颜色与粗细。
+                        .dsInkGlow()
                         .frame(width: slot)
                         .position(x: x, y: barHeight / 2)
                         .accessibilityLabel(Text(item.title))
@@ -514,6 +534,10 @@ struct DSSwipeStrip: View {
 
     /// 松手时的吸附。`projected` = 按速度预测的连续档位；
     /// 给 `nil` 就按当前 `c` 算（点按 / 没有速度信息）。
+    ///
+    /// 动作用 `TokensMotion.settle`（**不过冲**）而不是 `count`：`c` 不只是条子自己的位置 ——
+    /// 宿主每一帧拿它算六页的交叉过渡。用会弹的弹簧，就是让六页（含一张活地图）
+    /// 的透明度跟着过冲，看起来是「颤抖」，代价是那一叠每一帧重画（用户 2026-09-25 第 2 条）。
     private func snap(gap: CGFloat, lim: ClosedRange<CGFloat>, projected: Double? = nil) {
         let last = Double(max(0, items.count - 1))
         // 先夹再四舍五入：拖动时可以越出端（`clampC` 的软段），而档位只有 0…last。
@@ -522,7 +546,7 @@ struct DSSwipeStrip: View {
         guard items.indices.contains(i) else { return }
         if items[i].id == selectedID {
             // 档位没变：只把位置吸回去（onChange 不会触发，所以自己走一次）
-            withAnimation(TokensMotion.count) {
+            withAnimation(TokensMotion.settle) {
                 c = clampC(ideal(Double(i), gap: gap), lim: lim, gap: gap)
             }
             onPosition?(Double(i))
@@ -533,10 +557,14 @@ struct DSSwipeStrip: View {
     }
 
     /// 外部改档位（深链 / 「我的」里的入口 / 上次停在哪一档）→ 滑过去
+    ///
+    /// 同样走 `settle`（不过冲）—— 点选一档与滑动吸附必须是**同一种**动效，
+    /// 否则「点」与「滑」到同一档看起来是两件事（这是上文那条「同一个量只有一份算法」
+    /// 在动效上的另一半）。
     private func settle(animated: Bool, gap: CGFloat, lim: ClosedRange<CGFloat>) {
         let target = clampC(ideal(Double(index), gap: gap), lim: lim, gap: gap)
         if animated {
-            withAnimation(TokensMotion.count) { c = target }
+            withAnimation(TokensMotion.settle) { c = target }
         } else {
             c = target
         }

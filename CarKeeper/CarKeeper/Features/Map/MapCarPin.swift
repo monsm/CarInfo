@@ -2,104 +2,78 @@
 // MapCarPin.swift — 地图上的"一件物件"
 // =============================================================================
 //
-// 这一屏只有一件实体：车。所以车钉不是图标，是**做出来的一件东西**：
-//   • 外面的**弧就是电量**（不是装饰性圆环）—— 弧的长度 = SOC，起点在正上方
-//   • 弧外面那一圈**刻度**是仪表盘的语言（转轴上的尺），不是花纹
-//   • 里面那个小字是同一个数字（换数值时字宽不跳，monospacedDigit）
-//   • 顶部那个缺口是**车头朝向**（来自 location 接口的 Heading，不是猜的）
-//   • 脚下那圈**接地阴影**是"它站在这块地上"的唯一提示（平面化的钉像是贴上去的）
-//   • 车灯是**算出来的**：亮度 = SkyLight.lamp（1 − 晴空辐照度/220，日照下几乎不亮）
+// 这一屏只有一件实体：车。所以车钉不是图标，是**做出来的一件东西**。
 //
-// 这里原本有三种画法（夜光 / 纸上 / 巨字），由**艺术方向**挑一套 ——
-// 2026-09-25 主题只剩原生，另外两套随艺术方向一起删了（留着它们只会让人
-// 以为「换一套」这件事还存在着）。现在只有一种：刻度盘 + 电量弧 + 车 + 接地阴影。
+// 2026-09-25（用户第 1 条：「车牌名删除 电量 删除 车放正，车用玻璃胶囊 不要黑乎乎」）
+// 之后，它只剩两笔：
+//   • 一枚**玻璃胶囊**里的一辆车（底是真玻璃 —— 见 `capsule`）
+//   • 脚下那圈**接地阴影**（"它站在这块地上"的唯一提示：平面化的钉像是贴上去的）
+// 外加一笔非实体：车灯的光晕（`lampBloom`，亮度 = SkyLight.lamp，日照下几乎不亮）。
 //
-// 尺寸约定：钉本体 76×96（外圈光晕可溢出；多出来的 20pt 是圆盘下那枚电量徽标），
-// 命中区由 MapSpineView 给（HIG 要 44pt）。
+// 删掉的是**刻度盘 / 电量弧 / 盘下那枚数字 / 按航向旋转 / 黑底盘** —— 五件东西，
+// 每一件的账写在 `body` 上面那段（与抽屉里那一格的关系、正面视角的车转过 90° 会怎样）。
+// 这里原本还有三种画法（夜光 / 纸上 / 巨字）由**艺术方向**挑一套；它们随艺术方向
+// 一起删了（留着只会让人以为「换一套」这件事还存在着）。
+//
+// 尺寸约定：胶囊本体约 34×28，钉本体 68×44 —— 44 正是 HIG 的最小触控目标
+//（光晕与阴影可以画到框外，但命中区就是这一块）。
 // =============================================================================
 import SwiftUI
 
 struct MapCarPin: View {
-    /// 0…100
-    var socPct: Int
-    /// 车头朝向（度，0 = 正北）
-    var heading: Double
-    /// 选中态（点了钉 → 车控环展开）
-    var isActive: Bool
     /// 车灯亮度 0…1，来自 SkyLight（真实太阳位置算出来的），默认不亮
     var lamp: Double = 0
 
-    private var progress: Double { max(0, min(1, Double(socPct) / 100)) }
-
-    /// 低电量的语义色由**数值**决定，不由主题决定（状态色是状态）
-    private var ringColor: Color {
-        if socPct < 15 { return TokensPalette.error }
-        if socPct < 30 { return TokensPalette.warning }
-        return TokensPalette.accent
-    }
-
-    //  ⚠️ 2026-09-25 第 9 条（用户：「车的位置没有车的图标了，像是被删了很多」）：
-    //  这不是感觉，是真事 —— **`body` 从来没有调用过 `ringStyle`**。
+    //  2026-09-25（用户第 1 条：「车牌名删除 电量 删除 车放正，车用玻璃胶囊 不要黑乎乎」）
+    //  —— 这一枚钉从此只回答一件事：**车在哪儿**。
     //
-    //  那一刻（艺术主题删到只剩原生那一轮）`body` 里写的是 `headingMark` 一个，
-    //  而刻度盘、电量弧、底盘、接地阴影、那个数字全在 `ringStyle` 里 ——
-    //  于是车钉被画出来的只有两样：一团模糊的色光、一个小缺口环。
-    //  一串「看起来该存在的东西」全变成了**到不了的代码**：不报错、不崩、编译全过，
-    //  只是屏幕上少了一辆车（`scan/orphans.py` 只盖系统类型的扩展成员，看不见项目
-    //  自己的计算属性 —— 这是它明说的盲区，所以这类错只能靠人在真机上看）。
+    //  删掉的三件东西各有理由（不是“顺手精简”）：
+    //    · **电量**（刻度盘 + 电量弧 + 盘下那枚数字徽标）：同一个数在抽屉里已经有一格
+    //      （那一横上的「电量」），而钉上那一个还要靠一圈弧再重复一次。
+    //      这也是上一轮我自己报过的那条：同一个电量在卡里是绿、在钉上是蓝 ——
+    //      同一份数据同屏两种说法。
+    //    · **按航向旋转**（`heading`）：`car.fill` 是**正面视角**的车，按航向转过 90°
+    //      就越看越像“车歪了/翻了”。地图上表达朝向的通行画法是俯视车或箭头，
+    //      那需要另一个符号，不是这一枚钉能承担的事。用户说「车放正」，
+    //      那就让车正着站：它现在的含义是“这里有一辆车”，不是“车头朝东”。
+    //      代价写在这里：`MapSpineData.headingDeg` 因此没有读者了 ——
+    //      而它**保留**在数据层里（它是车端接口的原始字段，跟 `API-FIELD-MAP` 一起
+    //      记着“车头朝哪儿”这件事；将来给俯视车钉或地图上的箭头用得到）。
+    //      真正删掉的是“它必须画出来”这个假设。
+    //    · **黑底盘**（`TokensPalette.surface` 画的实心圆）：深色模式下那正是一块黑。
+    //      用户要「玻璃胶囊」—— 现在是一枚真的玻璃胶囊（`dsGlassCapsule`），
+    //      浮在瓦片上、边缘有折射，而不是一片压在地图上的黑圆。
     //
-    //  现在把三样东西一起画出来，并且各说各的一件事：
-    //    · `ringStyle`  = 刻度盘 + 电量弧 + 底盘（**电量的形状**）
-    //    · `carGlyph`   = 车本身（**车头朝向**，它按 Heading 转 —— 缺口环因此删了，
-    //                     同一件事不再用两种画法说）
-    //    · `socBadge`   = 那个数字（从圆盘里搬到圆盘下：盘心让给了车）
+    //  留着的是**车灯光晕**与**接地阴影**：前者是「此刻的光」在这一屏唯一的体现
+    //  （由太阳的位置算出来），后者是让钉站在地上而不是浮着的那一笔。两者都与电量无关。
+    //
+    //  ⚠️ 这枚钉**没有点击动作**（旧参数 `isActive` 从来没有读者，本轮一并删了）。
+    //  所以玻璃不传 `interactive` —— 一个不会自己动的玻璃不该装成会动（
+    //  见 `DSGlass` 那条：按下去的压缩交给系统演，前提是真的有事发生）。
     var body: some View {
         ZStack {
             lampBloom
-
-            Circle()
-                .fill(ringColor.opacity(0.22))
-                .frame(width: 62, height: 62)
-                .blur(radius: 12)
-
-            ringStyle
-
-            // 电量徽标：挂在圆盘**下面**（`offset` 让开接地阴影）。
-            // 它带一枚与底盘同厚的底 —— 地图底色不可控，数字必须在任何底上读得清。
-            socBadge
-                .offset(y: 34)
+            groundShadow(opacity: 0.34)
+            capsule
         }
-        .frame(width: 76, height: 96)
-        // 钉心仍在圆盘中心（数字往上挪了 34，所以整框高 96、中心对在圆盘上）。
+        .frame(width: 68, height: 44)   // HIG 的最小触控目标就落在这上面
         .accessibilityElement()
         .accessibilityLabel(Text("车的位置"))
-        .accessibilityValue(Text("电量 \(socPct)%，车头朝 \(Int(heading.rounded())) 度"))
     }
 
-    /// 车本身 —— 钉的中心是**车**，不是数字。
-    /// 它按 `heading` 转：车头指向哪边，这张小图就朝哪边。
-    /// `car.fill` 在符号里是**正面视角**的车，转起来仍然是「车」；
-    /// 而记「朝向」本来就不需要俯视图 —— 用户要的是「看得见一辆车」。
-    private var carGlyph: some View {
+    /// 车 —— 一枚玻璃胶囊里的一辆车。**不转**（理由见上）。
+    private var capsule: some View {
         Image(safeSymbol: "car.fill", fallback: "car.fill")
-            .font(TokensTypo.fixed(19, weight: .medium))
-            .foregroundStyle(TokensPalette.primary)
-            .rotationEffect(.degrees(heading))
+            .font(TokensTypo.fixed(19, weight: .semibold))
+            // 底是真玻璃、底下是**连续的画面**（地图瓦片）→ `TokensInk`（系统按材质调它），
+            // 再叠一圈反色外发光（用户第 8 条那一件）：浅色瓦片上那辆车也看得见。
+            .foregroundStyle(TokensInk.primary)
+            .dsInkGlow()
+            .padding(.horizontal, TokensSpacing.snug)
+            .padding(.vertical, TokensSpacing.xs)
+            // 胶囊：`.overMedia`（`.clear`，画面保持可见）—— 这一枚钉的底就是瓦片。
+            .dsGlassCapsule(variant: .overMedia)
             .accessibilityHidden(true)
-    }
-
-    /// 圆盘下方那枚小胶囊：电量数字。
-    private var socBadge: some View {
-        socText(color: ringColor)
-            .padding(.horizontal, TokensSpacing.sm)
-            .padding(.vertical, TokensSpacing.xxs)
-            .background {
-                Capsule().fill(TokensPalette.surface.opacity(0.92))
-            }
-            .overlay {
-                Capsule().strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
-            }
-            .shadow(color: TokensPalette.scrim.opacity(0.35), radius: 6, y: 3)
     }
 
     // MARK: 车灯 —— 唯一一处"由光算出来"的发光
@@ -122,49 +96,6 @@ struct MapCarPin: View {
         }
     }
 
-    // MARK: 车钉本体 —— 刻度盘 + 电量弧 + 车灯 + 接地阴影
-    /// 它以前有三套（刻度盘 / 墨线圈 / 发丝准线），由**艺术方向**挑一套：
-    /// 纸上的方向用墨线、巨字的方向用准线。2026-09-25 主题删到只剩原生，
-    /// 于是另外两套也删了 —— 留着它们只会让人以为 "换一套" 这件事还存在着。
-    private var ringStyle: some View {
-        ZStack {
-            groundShadow(opacity: 0.34)
-
-            // 刻度盘：仪表盘的语言。一圈短尺，不是花纹 ——
-            // 它让"弧"读起来像指针在表盘上走，而不是一条装饰圆弧。
-            Circle()
-                .stroke(TokensPalette.track,
-                        style: StrokeStyle(lineWidth: 9, dash: [0.9, 14.3]))
-                .frame(width: 58, height: 58)
-
-            Circle()
-                .fill(TokensPalette.surface)
-                .frame(width: 48, height: 48)
-                .shadow(color: TokensPalette.scrim.opacity(0.45), radius: 14, y: 6)
-
-            Circle()
-                .strokeBorder(TokensPalette.hairline, lineWidth: 0.5)
-                .frame(width: 48, height: 48)
-
-            // 未充电部分的轨道
-            Circle()
-                .stroke(TokensPalette.track, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
-                .frame(width: 58, height: 58)
-
-            // 电量弧（从正上方开始，顺时针）
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(ringColor,
-                        style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .frame(width: 58, height: 58)
-                .shadow(color: ringColor.opacity(0.7), radius: 6)
-
-            // 盘心：车（数字见 `socBadge`，它挂在圆盘下）
-            carGlyph
-        }
-    }
-
     // MARK: 接地阴影
     /// 一枚扁的椭圆、模糊、偏下 —— 它只做一件事：让钉**站在**地上。
     /// 平面化的钉会像贴纸浮在地图上，这一笔是廉价与不廉价的差别之一。
@@ -172,26 +103,10 @@ struct MapCarPin: View {
         Ellipse()
             // 车钉的落地阴影 = 光照不到的那一块，所以它和暗角同源（`TokensPalette.scrim`）
             .fill(TokensPalette.scrim.opacity(opacity))
-            .frame(width: 36, height: 8)
+            .frame(width: 34, height: 8)
             .blur(radius: 5)
-            .offset(y: 25)
-    }
-
-    //  MARK: 已删除：车头朝向的缺口环 `headingMark`（2026-09-25）
-    //
-    //  它是一圈小缺口，绕中心转，表达从接口读到的 Heading。
-    //  现在这件事由 `carGlyph` 的车**自己**说（车头朝哪儿，那辆车就朝哪儿）——
-    //  同一个事实不再有两个画法：一个缺口环 + 一辆朝前的车，读起来是两种朝向。
-
-    private func socText(color: Color) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 0) {
-            Text("\(socPct)")
-                .font(TokensTypo.digits(16).weight(.semibold))
-                .foregroundStyle(color)
-            Text("%")
-                .font(TokensTypo.digits(9).weight(.medium))
-                .foregroundStyle(color.opacity(0.6))
-        }
+            // 偏移量跟着胶囊：它的半高约 14pt，阴影落在它下沿之下一点点。
+            .offset(y: 17)
     }
 }
 

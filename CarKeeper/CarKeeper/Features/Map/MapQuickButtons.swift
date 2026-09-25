@@ -95,6 +95,10 @@ extension MapSpineView {
             // 圆底是真玻璃、底下是**连续的画面**（地图瓦片）→ `TokensInk`：
             // 系统会按材质调它，固定标签色在瓦片上会糊掉（用户第 10 条）。
             .foregroundStyle(dimmed ? TokensInk.tertiary : TokensInk.primary)
+            // 符号外面一圈反色外发光（用户 2026-09-25 第 8 条）：
+            // 这三枚钳底的是地图（`.clear`，不磨砂）—— 白色符号压在雪地/浅色楼盘上时
+            // 就消失了一半。发光不改变符号色，只给它一个与底相反的轮廓。
+            .dsInkGlow()
             .frame(width: TokensSize.tap, height: TokensSize.tap)
             .dsGlass(in: Circle(), variant: .overMedia, interactive: true)
             .contentShape(Circle())
@@ -176,7 +180,9 @@ extension MapSpineView {
             camera = .camera(MapCamera(centerCoordinate: c,
                                        distance: cameraDistance,
                                        heading: 0,
-                                       pitch: 0))
+                                       // 与「回到车」同一个俯仰角（见 `cameraPitch`）——
+                                       // 一次镜头移动不该把用户的视角从 3D 打回平面。
+                                       pitch: cameraPitch))
         }
     }
 

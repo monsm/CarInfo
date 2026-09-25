@@ -68,7 +68,13 @@ import CoreLocation
 ///
 /// 展开时**宽度真的收掉**，不是「看不见但还占着 50pt」——后者会把条子压到装不下六档，
 /// 于是条子只能压间距，而压间距正是原型明确否掉的那一件事。
-/// （原型 `.bottom.open .arm{opacity:0;transform:scale(.86)}`。）
+///
+/// 原型是 `.bottom.open .arm{opacity:0;transform:scale(.86)}`，而**那句 `scale` 不照搬**
+///（2026-09-25 删，用户第 2 条：「全部页面不需要颤抖放大特效，太耗性能」）。
+/// 理由不是「不好看」，是它每次触摸都在最贵的那一刻发生：手指一按下条子就开始展开，
+/// 而这条底条的三个形状同处一个 `GlassEffectContainer`、背后是一张活地图 ——
+/// 给两枚钮加一层非整数缩放，就是让系统在那几帧里多算两遍离屏合成，
+/// 换来的是一个 14% 的缩放，而它们同时还在往 0 宽收。宽度与透明度已经把它说完了。
 private struct ArmSlot: ViewModifier {
     let open: Bool
     let size: CGFloat
@@ -77,7 +83,6 @@ private struct ArmSlot: ViewModifier {
         content
             .frame(width: open ? 0 : size, height: size)
             .opacity(open ? 0 : 1)
-            .scaleEffect(open ? 0.86 : 1)
             .clipped()
     }
 }
@@ -175,6 +180,20 @@ struct MapSpineView: View {
     /// `MapQuickButtons.swift` 里把镜头移到手机时要用同一个数 ——
     /// 两处各写一个数就是「同一个几何有两个出处」。
     let cameraDistance: Double = 1_400
+
+    /// 镜头的俯仰角（度）—— 用户 2026-09-25：「地图页默认极限 3D 视角」。
+    ///
+    /// 为什么是 65 而不是更大：Apple 的文档里对 `pitch` 写得很清楚 ——
+    /// *“A value of 0 results in a camera that points straight down at the map.
+    /// Angles greater than 0 result in a camera that pitches toward the horizon”*，
+    /// 而**没有固定的上限**（实际能到多少由镜头高度决定，MapKit 自己会夹）。
+    /// 所以“极限”不是写一个更大的数，而是写一个仍然读得清路网的角度：
+    /// 65° 是 Apple 地图那个 3D 视图的量级 —— 一眼看出“这是斜着看的城市”，
+    /// 而街区网格还看得见。再往上，地图会变成一条条水平线。
+    ///
+    /// 三处镜头（回到车 / 移到手机 / 地图上的焦点）**共用这一个值**：
+    /// 同一个几何只有一个出处 —— 否则“回到车”与“移到手机”会是两个不同的视角。
+    let cameraPitch: Double = 65
 
     /// 系统那两件仪器（罗盘 / 比例尺）挂在地图上的那条线。
     ///
@@ -353,6 +372,24 @@ struct MapSpineView: View {
             // 地图出现之后的这几步是启动轨迹里原本的盲区（见 StartupJournal 头注）：
             // 用户报的「地图出来以后几秒就退」正落在这里，所以每一步都留个路标。
             StartupJournal.shared.mark("地图页开始取数")
+            //  第一帧就把镜头立起来（用户 2026-09-25 第 1 条：「默认极限 3D 视角」）。
+            //
+            //  为什么需要这一句：`camera` 的初值是 `.automatic`（MapKit 自己取景），
+            //  而**俯仰角是镜头的一个属性** —— `.automatic` 没有它，于是从进页到
+            //  第一次取数回来（2 秒，或网络慢就是十几秒）那一整段是一张平躺的图，
+            //  之后 `centerOnCar` 一跑又突然立起来。
+            //
+            //  停在哪：**上一次知道的车位**（`store.parkingLocation`，它是持久化的）。
+            //  这不是一个占位坐标（不摆假点）：车停在哪是一个已知的事实，
+            //  而真实的定位一回来 `centerOnCar` 就会把它移到车位（那个值更准）。
+            //  从没有过位置的车没有这个点，那就交给 `.automatic`（它没有俯仰角，
+            //  但也没有别的可停之处）。
+            if let last = store.parkingLocation {
+                camera = .camera(MapCamera(centerCoordinate: last.coordinate,
+                                           distance: cameraDistance,
+                                           heading: 0,
+                                           pitch: cameraPitch))
+            }
             // 围栏（见 LaunchFence）：地图页自己的三条取数（车况 / 充电桩 / 天气）。
             if LaunchFence.mapFetches {
                 await refresh()
@@ -395,9 +432,9 @@ struct MapSpineView: View {
         //（点还在路上）—— 而用户已经答应过一次了，不该再按第二次。
         // 镜头那一动只有一处实现（`MapQuickButtons.swift` 的 `fly(to:)`）。        // 盯的是**画在图上用的那个坐标**（`mapCoordinate` = 换算成 GCJ-02），
             // 不是 CoreLocation 的原始读数：镜头要和蓝点落在同一个点上（见 `ChinaDatum`）。
-            .onChange(of: PhoneLocation.shared.mapCoordinate?.latitude) { _, _ in
-                fly(to: PhoneLocation.shared.mapCoordinate)
-            }
+        .onChange(of: PhoneLocation.shared.mapCoordinate?.latitude) { _, _ in
+            fly(to: PhoneLocation.shared.mapCoordinate)
+        }
     }
 
     /// 取一次天气（TTL 与「车没走远」两道护栏都在服务里）。
@@ -422,7 +459,17 @@ struct MapSpineView: View {
         Map(position: $camera, scope: mapScope) {
             mapContent(d)
         }
-        .mapStyle(.standard)
+        //  样式：**写实高程**（`.realistic`）。
+        //
+        //  用户 2026-09-25：「地图页默认极限 3D 视角」。光给镜头加俯仰角（`cameraPitch`）
+        //  只能得到“斜着看的一张平面图”；`.realistic` 才会把建筑立起来、地面有高低 ——
+        //  两个加起来才是 Apple 地图那个 3D 视图。
+        //  元素名对着 Apple 文档核过：`MapStyle.Elevation` 只有三个取值
+        //（`automatic` / `flat` / `realistic`），而这个 App 里本来就有一处用 `.flat`
+        //（出行页那四张小地图：它们只要“看得清两点连线的底图”，不需要立体）。
+        //  ⚠️ 代价如实记：立体建筑比平面瓦片贵（GPU），而这一屏是**六页同屏里那一页**。
+        //  如果真机上觉得卡，回退就是这一行换回 `.mapStyle(.standard)`。
+        .mapStyle(.standard(elevation: .realistic))
         // ── 系统控件：位置由**我们**给，不是 MapKit 定死的 ─────────────────────
         //
         // 第十一轮：这两行把**自动摆放的那一套**关掉 —— 两件仪器改由我们在
@@ -501,7 +548,11 @@ struct MapSpineView: View {
         // 展开时中缝归零：条子展开后要占满整行（374），两侧各留 9 的中缝就装不下，
         // 而「压间距」正是原型明确否掉的那一件事（同 `ArmSlot` 的说明）。
         HStack(spacing: barOpen ? 0 : Self.barSeam) {
-            arm(text: plateShort) { nav.openMode(.vehicle) }
+            //  左臂原来是**车牌的前两个字**（「鄂A」）。2026-09-25 改成车的图形
+            //（用户：「车牌名删除」）—— 它本来就是用“回到车辆那一档”这一个动作，
+            //  而车牌的两个字既认不出来是按钮、又只在一半车上有意义（未绑定车牌时写的是“车”）。
+            //  同一个动作、换个能认出来的图标；右臂那个搜索图标也是同一种做法。
+            arm(icon: "car.fill") { nav.openMode(.vehicle) }
                 .accessibilityLabel(Text("车辆"))
 
             DSSwipeStrip(items: HomeMode.stripItems,
@@ -693,11 +744,13 @@ struct MapSpineView: View {
                                          icon: ok ? c.symbol : "exclamationmark.triangle.fill")
     }
 
-    /// 左臂上的字：车牌的前两个字（原型是「鄂A」）。取不到就退回「车」。
-    private var plateShort: String {
-        let p = VM.vehicleSummary(store.car, store.controlCache)?.plate ?? ""
-        return p.isEmpty ? "车" : String(p.prefix(2))
-    }
+    //  这里原来有两个计算属性：`plateShort`（左臂上那两个字）与 `plateText`（抽屉里
+    //  的兜底车牌）—— 2026-09-25 两个都删了：前者被上面那颗车的图标替掉（用户：
+    //  「车牌名删除」），后者**在本轮之前就已经没有读者**（那是它自己的账：
+    //  上一轮把「车所在的地址」搬进抽屉时，它就没地方用了，而没人发现 ——
+    //  `scan/orphans.py` 只盖顶层类型与系统类型的扩展成员，看不见项目自己的计算属性，
+    //  这是它写明的盲区）。删掉比留着强：留一个没人读的属性，下一个人会以为
+    //  “车牌还有一个地方在显示”。
 
     // =========================================================================
     // MARK: 每一档的页面
@@ -723,8 +776,19 @@ struct MapSpineView: View {
                 // 关掉时只建当前那一档，其余五档连 body 都不跑（也就没有它们的取数）。
                 if LaunchFence.sixPageDeck || i == modeIndex {
                     pageBody(HomeMode.allCases[i])
-                        // 原型 render()：`scale(1 − a*0.035)` —— 进来的从 96.5% 长出。
-                        .scaleEffect(1 - a * 0.035)
+                        //  这里原来还有原型那句 `scale(1 − a*0.035)` ——“进来的从 96.5% 长出”。
+                        //  2026-09-25 删掉（用户：「底部导航点选或滑动，全部页面不需要
+                        //  颤抖放大特效，太耗性能」）。
+                        //
+                        //  它不只是观感问题：`scaleEffect` 是一个**非整数缩放**，
+                        //  而这一层里有地图、有卡片玻璃 —— 系统为了把整棵子树重画一遍，
+                        //  要把它先渲染到离屏缓冲再缩放合成。而它**每一帧都在变**
+                        //  （`a` 跟着手指的连续位置走）。于是拖模式条那些帧里，
+                        //  最贵的合成正在做一件“看不出来”的事（3.5% 的缩放）。
+                        //  交叉过渡本身留着（下一行那个 opacity）—— 那才是“换页”的反馈。
+                        //
+                        //  原型那一句到此为止：它描述的是**样品**的动效，而真机上那一层
+                        //  代价由六页同屏（含一张活地图）承担，不是原型里几个 div。
                         // 原型 render()：`opacity = a ≥ 0.62 ? 0 : 1 − 1.6a`
                         //（0.62 正是 `1 − 1.6a` 到 0 的位置，不夹会算出负数）。
                         .opacity(a >= 0.62 ? 0 : 1 - a * 1.6)
@@ -926,6 +990,10 @@ struct MapSpineView: View {
                     .font(TokensTypo.micro)
             }
             .foregroundStyle(TokensInk.secondary)
+            // 外发光外壳（用户 2026-09-25 第 8 条）：胶囊本身是 `.clear`（不磨砂），
+            // 字底下直接就是瓦片 —— 上一版的实测情况正是它的名字被瓦片上的地名吃掉了
+            //（截图：右上角胶囊里的字几乎读不出来）。
+            .dsInkGlow()
             .padding(.horizontal, TokensSpacing.snug)
             .padding(.vertical, TokensSpacing.xs)
             // 图层胶囊浮在**地图**上（连续的画面）→ `.overMedia`（`.clear`）：
@@ -938,11 +1006,6 @@ struct MapSpineView: View {
     }
 
     /// 车牌。取不到就退回车名 —— 车牌空着不是「没有车」，是「还没取到」。
-    private func plateText(_ d: MapSpineData) -> String {
-        let p = VM.vehicleSummary(store.car, store.controlCache)?.plate ?? ""
-        if !p.isEmpty { return p }
-        return d.carName.isEmpty ? "车" : d.carName
-    }
 
     /// 菜单里那一项的标题带上此刻的光名（「此刻的光 · 上午」）。
     /// 原来它是一枚压在右上角的药丸 —— 那是原型里没有的一件东西。
@@ -1034,7 +1097,7 @@ struct MapSpineView: View {
             camera = .camera(MapCamera(centerCoordinate: CLLocationCoordinate2D(latitude: f.lat,
                                                                               longitude: f.lng),
                                        distance: cameraDistance * 1.6,
-                                       pitch: 0))
+                                       pitch: cameraPitch))
         }
         didCenterOnce = true   // 别让随后的车位置刷新把镜头拉回车上
         ToastManager.shared.show(f.label.isEmpty ? "已移到事件位置" : f.label,
@@ -1042,7 +1105,12 @@ struct MapSpineView: View {
         store.mapFocus = nil
     }
 
-    /// 把相机移到车上（正北朝上、无俯仰：这是看自己的车，不是飞行视角）。
+    /// 把相机移到车上。
+    ///
+    /// 朝正北（`heading: 0`）—— 看自己的车不该把地图转起来；俯仰角取 `cameraPitch`：
+    /// 2026-09-25 用户第 1 条「默认极限 3D 视角」之后，**三处镜头共用同一个角**
+    /// （这里 / `fly(to:)` / 点充电站聚合点），否则「回到车」与「移到手机」会是两个视角。
+    /// （这一行此前写的是「无俯仰」，而代码已经是 `pitch: cameraPitch` —— 注释当时没跟着改。）
     @MainActor
     /// **不是 `private`**：右侧那枚「回到车」在 `MapQuickButtons.swift` 里。
     func centerOnCar(force: Bool) {
@@ -1052,7 +1120,7 @@ struct MapSpineView: View {
         withAnimation(TokensMotion.value) {
             camera = .camera(MapCamera(centerCoordinate: c,
                                        distance: cameraDistance,
-                                       pitch: 0))
+                                       pitch: cameraPitch))
         }
     }
 

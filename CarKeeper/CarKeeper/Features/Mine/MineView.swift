@@ -76,14 +76,19 @@ struct MineView: View {
     /// 旧版把全部设置组塞进一张卡，叠叠乐里永远读不完。拆开后每屏都有得读。
     ///
     /// `private`：它按本页的实时状态现算，只有本视图的 `cards` 有权调它。
+    ///
+    ///  2026-09-25（用户第 7 条：「我的 去掉电车，因为有车辆入口」）：
+    ///  这里原来还有一张 `StackCard(id: "car")` —— 一张写着车名与车牌的「去看车辆」按钮。
+    ///  它已经被删。它唯一的动作是 `nav.openMode(.vehicle)`，而 车辆就是模式条上的一档
+    ///  （相隔一次拖拽）；一个只用来「跳到隔壁那一档」的入口，在底下导航就摆在屏幕上的
+    ///  界面里是纯重复 —— 而它占的是这一页第二张卡的位置（用户看到的「电车」就是它：
+    ///  车名来自服务端，不是我们写的字，全仓搜「电车」一处都搜不到）。
+    ///  它顺带展示的信息（保险剩多少天）在车辆那一档里本来就有，且更完整。
     @MainActor
     private var sectionCards: [StackCard] {
         var out: [StackCard] = [
             StackCard(id: "profile", title: "账号", content: AnyView(profileCard))
         ]
-        if let car = store.car {
-            out.append(StackCard(id: "car", title: "车辆", content: AnyView(carCard(car))))
-        }
         out.append(StackCard(id: "settings", title: "设置", content: AnyView(settingsGroups)))
         out.append(StackCard(id: "about", title: "关于", content: AnyView(updateCard)))
         return out
@@ -93,7 +98,7 @@ struct MineView: View {
         StackPageView(accent: HomeMode.mine.accent, label: "车与账号", cards: cards)
         .dsPageTitle("车与账号")
             .accessibilityLabel(Text("车与账号"))
-            .accessibilityHint(Text("账号、车辆、数据、关于"))
+            .accessibilityHint(Text("账号、设置、应急、诊断、关于"))
         .onAppear { consumeHint() }
         .onChange(of: nav.homeSub) { _, _ in consumeHint() }
         .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
@@ -204,46 +209,6 @@ struct MineView: View {
     }
 
     // MARK: 车辆卡
-    private func carCard(_ car: [String: Any]) -> some View {
-        // 里程只在车控报文里（getMyCars 的 totalOdometer 恒为 null），所以要把控制缓存传进去；
-        // 这里传的是 `store.car`，即当前选中的那辆车 —— 两者必须是同一辆。
-        let sum = VM.vehicleSummary(car, store.controlCache)
-        return Button {
-            // 去看车辆 = 把底部模式条拨到「车辆」那一档（`nav.openMode`）。
-            // 此前是 push 一份车辆页 + 更早是发 .navToVehicle 通知 —— 同一个功能
-            // 因此有过三种走法（Tab / 通知 / push），每一种的返回行为都不一样。
-            nav.openMode(.vehicle)
-        } label: {
-            HStack(spacing: TokensSpacing.lg) {
-                Image(safeSymbol: "car.fill", fallback: "car.fill")
-                    .font(TokensTypo.fixed(TokensSize.iconLg))
-                    .foregroundStyle(TokensPalette.ambient)
-                    .frame(width: 48, height: 48)
-                    .background(RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
-                        .fill(TokensPalette.ambient))
-                VStack(alignment: .leading, spacing: TokensSpacing.xs) {
-                    Text(sum?.name ?? "未绑定车辆")
-                        .font(TokensTypo.headline)
-                        .foregroundStyle(TokensPalette.primary)
-                    Text(sum?.plate ?? "暂无车牌")
-                        .font(TokensTypo.dataSmall)
-                        .foregroundStyle(TokensPalette.secondary)
-                }
-                Spacer(minLength: TokensSpacing.sm)
-                if let d = sum?.insuranceDays {
-                    DSChip(text: d < 0 ? "保险到期" : "保险剩 \(d) 天",
-                           cls: d < 0 ? "bad" : (d <= 30 ? "warn" : "ok"))
-                }
-                Image(safeSymbol: "chevron.right", fallback: "chevron.right")
-                    .font(TokensTypo.fixed(13, weight: .semibold))
-                    .foregroundStyle(TokensPalette.tertiary)
-            }
-            .padding(TokensSpacing.md)
-            .dsSurface(padding: 0)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
 
     // MARK: 设置分组（inset-grouped 行）
     //
@@ -582,16 +547,10 @@ struct MineView: View {
         showDownload = false
         Task { @MainActor in
             do {
-                // 令牌**写在代码里**（用户 2026-09-25 第 5 条：「将 key 直接写在代码中」）
-                // —— `Services/GithubToken.swift` 是它唯一的一处。这里是它为空时的**一句话**：
-                // 没配令牌时按钮照旧按得动，只是会说出为什么（而不是「点了什么都不发生」）。
-                if UpdateService.githubToken.isEmpty {
-                    updateMsgIsError = true
-                    updateMsg = "没有配访问令牌，暂时无法检查更新"
-                    isChecking = false
-                    updateBusy = false
-                    return
-                }
+                //  这里原本有一道「令牌为空就先退出」的早返回（一句「没有配访问令牌」）。
+                //  2026-09-25 第 9 条实测后删掉：仓库是**公开库**，匿名就能读 Release
+                //（`curl` 的返回记在 `GithubToken.swift`），所以令牌为空是**默认状态**，
+                //  不是一种失败。留着那一道，按钮按下去就只会吐一句话，而明明能办成。
                 let rel = try await UpdateService.fetchLatestRelease(token: UpdateService.githubToken)
                 updateMsgIsError = false
                 updateMsg = "发现构建 \(rel.name) · \(rel.displaySize)，开始下载…"

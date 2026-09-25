@@ -431,12 +431,22 @@ struct ChargeView: View {
         parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
+    /// 一个小块：名字 + 数 + 单位，三样挤在一行里（充电页用它摆电压/电流/绝缘那几块）。
+    ///
+    /// 2026-09-25（用户第 5 条：「充电页面要考虑内容放得下且不换行」）：
+    /// 三个 `Text` 此前都没有限行 —— 行车记录仪那种长名字（「单体压差」）
+    /// 或者带小数位的读数一长，这一行就折成两行，而这个块的外形是跟着行高走的，
+    /// 于是同一排三个块会**高矮不一**（一排里一个两行、两个一行）。
+    /// 现在三样都是单行：名字与单位允许缩到 0.75，数字不许缩太多（它是读数）。
     private func miniStat(_ k: String, _ v: String, _ unit: String, warn: Bool = false) -> some View {
         HStack(spacing: TokensSpacing.xs) {
             Text(k).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
+                .lineLimit(1).minimumScaleFactor(0.75)
             Text(v).font(TokensTypo.caption.weight(.bold)).monospacedDigit()
                 .foregroundStyle(warn ? TokensPalette.error : TokensPalette.primary)
+                .lineLimit(1).minimumScaleFactor(0.85)
             Text(unit).font(TokensTypo.caption2).foregroundStyle(TokensPalette.secondary)
+                .lineLimit(1).minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, TokensSpacing.sm)
