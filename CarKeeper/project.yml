@@ -46,7 +46,12 @@ targets:
         - CFBundleURLName: com.you.CarKeeper
           CFBundleURLSchemes:
           - carkeeper
-        NSLocationWhenInUseUsageDescription: 用于显示车辆当前位置
+        # 这句必须与代码里真的在问的东西一致（用户 2026-09-25：地图右侧加
+        # 「手机的位置」那枚钮）。此前写的是「用于显示车辆当前位置」—— 而车的位置
+        # 是**服务端**给的（AppStore 的车端报文），一直没碰过 CoreLocation：
+        # 文案与行为对不上。现在手机自己的位置真的会被取（`Services/PhoneLocation.swift`），
+        # 所以这句话改成它真的做的事。
+        NSLocationWhenInUseUsageDescription: 用于在地图上显示手机与车辆的位置
         # 以下是实际调用了对应 API 就必须存在的键，缺失会直接杀进程（不是报错）
         NSCameraUsageDescription: 用于拍摄车辆照片
         NSPhotoLibraryUsageDescription: 用于选择车辆照片

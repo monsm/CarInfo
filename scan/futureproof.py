@@ -27,10 +27,25 @@ TK = ["CarKeeper/CarKeeper", "CarKeeper/Services", "CarKeeper/Models",
 PROJECT_ENUM_HINT = re.compile(
     r"\b(TimeOfDay|NightModeMode|TripCostType|DynamicType|BatteryModel|VehicleSummary|AppTab|Tab|Phase|Mode|Kind|State|Status|Role|Variant|Type|Level|Category|Style|Scope|Period|Source|StyleType)\b"
 )
+# 主题词表：**只收系统专属的名字**，不收 `status` / `phase` / `configuration` 这类
+# 普通名词。
+#
+# 为什么（2026-09-25）：那三个词在这个仓库里遍地都是 —— 模型上叫 `status` 的属性、
+# 我们自己枚举的 `phase`。判据一旦按它们命中，`switch phone.status`
+#（`PhoneLocation.Status`，我们自己的枚举）就会被要求补 `@unknown default`，
+# 而对自己的枚举补它是**反的**：那会把「以后新增一档时编译器提醒你改这里」
+# 一起关掉 —— 正是这个门禁想保住的东西。
+#
+# 剩下这些名字（`scenePhase` / `dynamicTypeSize` / `authorizationStatus`…）都是
+# 系统专有词，不可能与项目里的东西撞名。
+#
+# 代价写在明处：如果将来真的对一个**成员名叫 `status` 的系统枚举**穷举
+#（例如某个框架的 `foo.status`），这条判据看不出来 —— 方向是「宁可漏，不可噪」，
+# 与 `expand.py` / `initguard.py` 那几条的取向一致。
 SDK_SUBJECT_HINT = re.compile(
     r"\b(colorScheme|dynamicTypeSize|userInterfaceStyle|horizontalSizeClass|verticalSizeClass|scenePhase|"
-    r"authorizationStatus|locationAuthorization|status|phase|interfaceOrientation|mapType|"
-    r"configuration|layoutDirection|legibilityWeight|accessibilityContrast|displayScale|"
+    r"authorizationStatus|locationAuthorization|interfaceOrientation|mapType|"
+    r"layoutDirection|legibilityWeight|accessibilityContrast|displayScale|"
     r"privacySensitive|sizeCategory|traitCollection|UIScene|UIUserInterface|MKUserTrackingMode|"
     r"ImageOrientation|Writer|ContentMode)\b"
 )
@@ -42,6 +57,29 @@ def strip_literals(text):
     s = re.sub(r"//[^\n]*", "", s)
     s = re.sub(r"/\*[\s\S]*?\*/", "", s)
     return s
+
+
+# 项目自己**声明**的类型名。用途：把「我们的枚举」从「SDK 的弹性枚举」里分出来。
+#
+# 为什么需要：判据说到底是在问「这个 switch 是不是穷举了一个系统框架的枚举」——
+# 而上一版的依据只有**主题词的拼写**（`SDK_SUBJECT_HINT` 里那个 `status`）：
+# 于是 `switch PhoneLocation.shared.status`（我们自己的 `enum Status`）被当成
+# SDK 枚举，要求补 `@unknown default`。而对自己的枚举补它是**反的** ——
+# 那会把「新增一档时编译器提醒你改这里」一起关掉（正是这个门禁想保住的东西）。
+# 2026-09-25 新增那一枚手机位置钮时撞上的就是这个假阳性。
+DECLARED_TYPE_RE = re.compile(r"\b(?:struct|class|enum|actor|protocol|typealias)\s+([A-Z][A-Za-z0-9_]*)")
+PROJECT_TYPES = set()
+for f in swift_files(TK):
+    PROJECT_TYPES |= {m.group(1) for m in DECLARED_TYPE_RE.finditer(Path(f).read_text(encoding="utf-8"))}
+
+
+def looks_like_sdk_enum(subject):
+    # 主题词命中 **且** 主语里没有项目自己的类型名 —— 两个条件都要。
+    # 于是 `scenePhase` / `dynamicTypeSize` 这些还是报（它们的主语就是一个属性名），
+    # 而 `PhoneLocation.shared.status` 不报。
+    if SDK_SUBJECT_HINT.search(subject) is None:
+        return False
+    return not any(re.search(r"\b" + re.escape(t) + r"\b", subject) for t in PROJECT_TYPES)
 
 
 files = swift_files(TK)
@@ -65,7 +103,7 @@ for f in files:
         blob = "\n".join(body)
         if "default:" in blob or "@unknown default" in blob:
             continue
-        no_default.append((f, i + 1, subject, SDK_SUBJECT_HINT.search(subject) is not None))
+        no_default.append((f, i + 1, subject, looks_like_sdk_enum(subject)))
 
 print(f"扫描 {len(files)} 个 Swift 文件")
 print(f"没有 default / @unknown default 的 switch：{len(no_default)} 处")

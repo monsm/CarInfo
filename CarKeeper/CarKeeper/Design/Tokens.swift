@@ -238,7 +238,8 @@ enum TokensTypo {
 enum TokensMotion {
     static let tap = Animation.spring(response: 0.25, dampingFraction: 0.7)
     static let page = Animation.spring(response: 0.5, dampingFraction: 0.8)
-    static let reveal = Animation.spring(response: 0.6, dampingFraction: 0.85)
+    // `reveal`（抽屉展开那一下的弹簧）2026-09-25 删除：它的读者是卡里那道自画抽屉
+    //（`moreDrawer`），而那个抽屉整块交给了系统 sheet（见 `MapSpineReadouts` 头注）。
     static let count = Animation.spring(response: 0.4, dampingFraction: 0.6)
     static let press = Animation.spring(response: 0.30, dampingFraction: 0.86)
     static let value = Animation.spring(response: 0.36, dampingFraction: 0.88)

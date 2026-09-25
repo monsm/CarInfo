@@ -420,14 +420,13 @@ struct MapShellView: View {
                     .padding(.top, 0)
             }
         }
-        // Toast 浮层：底部中央的液态玻璃胶囊（由 NavState.currentToast 驱动）
-        .overlay(alignment: .bottom) {
-            if let t = nav.currentToast {
-                ToastView(text: t.text, icon: t.icon)
-                    .id(UUID())
-            }
-        }
-        .animation(.easeOut(duration: 0.2), value: nav.currentToast?.text)
+        // Toast 浮层**已搬进 `MapSpineView`**（2026-09-25 用户第 2 条：
+        // 「电量低于 X 的提醒挡住了底部导航」）。
+        //
+        // 它原来是这里的一个 `.overlay(alignment: .bottom)` —— 对齐到**屏幕底**，
+        // 而模式条就长在那里，于是那颗胶囊正好压在条子上。
+        // 「要抬多高」只有知道条子几何的那一处答得出（`MapSpineView.barTotal`），
+        // 所以浮层跟着条子走，而不是在这里再抄一份条高（抄的那一份一定会漂）。
         // 全局搜索（`GlobalSearchHUD` + 它的 fullScreenCover）已整体删除：
         // 用户 2026-09-23「右下角的搜索功能从项目移除」。
         // 这个 HUD 的两层东西都被更直接的东西接走了：一层是「去找某个功能」——

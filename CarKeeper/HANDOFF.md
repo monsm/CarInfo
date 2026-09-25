@@ -42,7 +42,7 @@
 **这台开发机上没有 Swift 工具链**（`swift` / `swiftc` / Xcode 都不存在）。因此：
 
 - **编译只在 CI 上发生**。本地唯一能做的验证是静态门禁 + 风格检查 + `bash -n`。
-- 改完必须看 CI 日志才能知道「编不编得过」。这也是仓库里为什么会有 28 条静态门禁
+- 改完必须看 CI 日志才能知道「编不编得过」。这也是仓库里为什么会有 31 条静态门禁
   （§8；加上 `check_style.js` 共 31 项，`scan/all.py` 一次跑齐）。
 
 ```bash
@@ -83,7 +83,7 @@ xcodebuild build \
 
 两个 job：第二个依赖第一个（**2026-09-25 起是两条** —— 原来还有第三个 `make-private`）。
 
-1. **`static-gate`**（ubuntu，秒级）：`check_style.js` + 29 项 `scan/*.py`。**任一红即整体失败**。
+1. **`static-gate`**（ubuntu，秒级）：`check_style.js` + 31 项 `scan/*.py`。**任一红即整体失败**。
    （它的 checkout 要 `fetch-depth: 2` —— CI 上工作区干净，`delguard.py` 要拿 `HEAD~1`
    才比得出「这次提交改掉了什么」。）
 2. **`build-unsigned-ipa`**（macos，约 3 分钟，额度按 10 倍计费）：XcodeGen → xcodebuild → 打 `Payload/` zip 成 ipa
@@ -157,6 +157,19 @@ MapShellView（唯一的屏）
 它离底那 26pt 空白带 —— `contentShape(Rectangle())`）、**一档宽 34 → 38**（整条更长）、
 **选中胶囊 = 格宽 × 1.9**（原 1.75；它是选中**指示器**，而各段依旧等宽，所以吸附不会飘）。
 模式条占的纵向空间随之从 86 涨到 94（`barTotal` = 26 + 54 + 14）—— 它是派生量。
+
+**整条上的横拖只有一个写者**（2026-09-25 修）：手指按在条子**任意位置**（含它上下那圈
+空白带）都能拖，但宿主（`MapSpineView`）只把「绝对增量 + 松手预测落点」转发给条子
+（`DSSwipeStrip.RowDrag`）—— 位置 `c`、越界阻尼、吸附、展开与 620ms 后的收回**全在条子里**；
+条子自己的手势在跟同一根手指时，这条转发整个作废（`guard cBase == nil`）并忘掉起点，
+所以永远不会出现第二个写 `c` 的人。
+上一版是宿主自己按 `barRowWidth / 档数` 算档位写 `modePosition`，三个后果都真实存在过：
+**条子不跟手**（`c` 没人碰，动的只有页面）、**松手没人写回**（页面停在两页各半透明，
+`fade` = 0.5，下一次碰条子才归位）、**两臂展开后没人收回**（收回的节奏住在条子的
+松手逻辑里，只有条子自己的手势会走到）。吸附同时改成**看速度**：`snap(projected:)` 吃
+系统给的 `predictedEndTranslation` —— 只看松手位置的话，「甩」与「停」结果一样。
+（明账：转发的是绝对增量，条子按当时插值中的节距换算 —— 手停在档位边界几 pt 之内的
+轻甩理论上可能差一档；但与上一版的区别是性质上的：两个人算、还是一个人算。）
 
 > **条子的几何只有一个来源，就是「当前露出几档」**（2026-09-24 第三次修正）：
 > 间距按露出档数算 —— 静止露三档 → 宽裕（节距 68）；展开装全部 → 不够才压。
@@ -307,9 +320,11 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 
 ## 4. 界面逐项
 
-### 4.1 地图主屏（「现在」档）—— 全 App 唯一的屏**文件**：`Features/Map/MapSpineView.swift`（**1178 行**，骨架：六页同屏 / 底条 / 浮动两卡 / 图层胶囊；
+### 4.1 地图主屏（「现在」档）—— 全 App 唯一的屏**文件**：`Features/Map/MapSpineView.swift`（**1169 行**，骨架：六页同屏 / 底条 / 镜头 / 图层 / 手势；2026-09-25 最后一轮又拆出 `MapNowCard.swift`（卡里三个数的排版）与 `MapQuickButtons.swift`（右侧两枚钮），都是在同一个阈值前拆的，界面一字未改；
 2026-09-25 它到过 1201 行、越过了 `lintcfg.py` 的 1200 阈值，于是把「光」表拆成
-`MapSkySheet.swift`（含共用原语 `MapNotice`）—— 拆的是文件，界面一字未改。
+`MapSkySheet.swift`（含共用原语 `MapNotice`）；同日再涨到 1212 行（托底要抬到条子之上 +
+子页顶部留白），于是把那张铺底的壁纸再拆成 `MapWallpaperLayer.swift` —— 两次拆的都是文件，
+界面一字未改。**Toast 浮层也住在这一屏里**（它要抬到底条之上，而条子的高度只有这里知道）。
 **同一天「底条整行横拖」从 `MapSpineBottomBar.swift` 搬了回来**：那次拆分让一个
 从没编译过的文件进了仓库（见 §11 的 09-25 行），而它要用的四个成员都是 `private` ——
 搬回来之后它们各自保持 `private`，那一条手势与它的状态 `barDragBase` 又住在一起）、
@@ -366,15 +381,34 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 - 卡头一行只剩**一枚图层胶囊**（`layerMenu`）—— 右对齐。原先那行还写着车牌 + 状态
   + 上报时间，与卡内正文说的是同一件事，已删（重复）。
 - `.now` 分支的正文：地址（大字）→ 巨字**续航**（`DSBigNumber`）→ 副行（表显 · 充不充电）
-  → 光带（`nowMetrics`）→ **一排读数 + 一个抽屉**（`MapSpineReadouts.swift`）。
+  → 光带（`nowMetrics`，已拆成 `MapNowCard.swift`）→ **一排读数 + 「其余读数」那行入口**
+  （`MapSpineReadouts.swift`）。
 - **读数分两层（2026-09-25：用户「地图页数据用抽屉的方式展示，默认只有续航 电量 车速，
   其他数据均通过拉开抽屉展示」）**：默认一屏就三个数 —— **续航（巨字）/ 电量 / 车速**
-  （`readoutsPrimary`，两格分一行，比原来四格挤一行宽一倍）；其余读数（`readoutsMore`：
-  胎压取四轮最低那条 / 车锁 / 充电时的「还要充多久」）收在 `moreDrawer` 那道拉手之后。
-  拉手既是按钮（点）也是拖动面（上拖 12pt 开、下拖 12pt 收），命中区 44pt（HIG）。
-  依据是 HIG 的 Layout 那条：“Use progressive disclosure to make layouts cleaner and
-  easier to interact with…reduce how much content to initially display” ——
+  （`readoutsPrimary`，两格分一行，比原来四格挤一行宽一倍）；其余读数在「其余读数」
+  那行入口后面。依据是 HIG 的 Layout 那条：“Use progressive disclosure to make layouts
+  cleaner and easier to interact with…reduce how much content to initially display” ——
   它不是省略，而是把「一瞬」与「细看」各自定一个量。
+- **「其余读数」= 真正的系统 sheet（2026-09-25 第二轮，用户在我列的候选里选了
+  「地图抽屉换成系统 sheet + `presentationDetents`」）**：卡里只有一行 disclosure
+  （`readoutsDisclosure`：标签 + 右尖括号，整行 44pt 命中区），点开是
+  `.sheet` + `.presentationDetents([.medium, .large])` +
+  `.presentationDragIndicator(.visible)` + `.presentationBackgroundInteraction(.enabled(upThrough: .medium))`
+  （半屏时底下那张地图仍然可以拖 —— Apple 地图正是这个行为）。内容由 `readoutsSheet`
+  给：两排读数（`readoutsMore` 胎压/车锁/充满，`readoutsRest` 平均电耗/航向/GPS），
+  **不重复卡里已经有的三个数**。
+  · 上一版是**卡里自己拉的一道抽屉**（自画拉手 + `drawerReveal` 连续量 + 自算的两个
+    落点 + `drawerMeasure` 量自然高度）。它每一条都在重做系统已经做好的事，
+    而且做得少（两档 vs 三个档位 + 橡皮筋；自画的 36×5 拉手 vs 系统那枚随辅助功能
+    设置走的 grabber；全程盖住地图）。整块已删 —— 逐条代价写在 `MapSpineReadouts` 头注。
+  · 连带删掉的 `TokensMotion.reveal`：它是那道抽屉的展开弹簧，抽屉一走它就没有读者了。
+- **地图右侧两枚快速钮（同日第三轮，用户：「地图页要像 ios 地图 app 右侧的图标一样
+  加入快速回到车的位置和手机的位置」）**：`MapQuickButtons.swift`（两枚 44×44
+  `.overMedia` 玻璃圆钮，竖排、让开系统罗盘）。「回到车」原本在图层菜单里 ——
+  那里删掉、这里留下（同一件事两个入口就是重复）；「手机的位置」是**新能力**：
+  全仓此前没有任何 CoreLocation 代码（见 `Services/PhoneLocation.swift`），
+  钮的图形自己就是状态（`location.fill` / `location` / `location.slash`），
+  拿到的点作为蓝点画在图上（`phonePin`）。
 - `readoutChips`（旧版独立玻璃卡）：零调用点，已删（2026-09-25 逐卡核对那一轮）——
   「同一件事有两个写法」在这个仓库里就是下一个事故的种子（文件里那段注释留了去向）。
 
@@ -611,12 +645,14 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
   `MonthlyReportSection`、`PowerSavingToggle`。
 - **`Design/Charts.swift`**：`DSTrendChart`（单序列，SOC / 功率共用）、`DSTyreTrendChart`（四条曲线）、
   `DSTrendEmpty`（数据不够时的说明，不是灰块）。
-- **`Design/StackSpec.swift`**：叠叠乐的全部手感数字（`StackMetrics`）+ 纯几何（`StackMath`，不碰视图，可单独对）。
-  **手感要调就只改这里**，不要到页面里改一个局部数字。
-  · **叠法只剩一种**（用户 2026-09-24：「叠叠乐只用吸附堆叠（但是要删除吸附）其他都删除」）：
-  `StackVariant` 现在只有 `.sticky` **一个** case，`StackSpec.chosen` 恒等于它、
-  `remember()` 也只写它 —— 旧用户存过的其他值下次打开时被迁移到它（不报错、不静默降级）。
-  原型里 A~G 七种只剩这一种：它不再是「七选一」，而是一个固定值。
+- **`Design/StackSpec.swift`**：那一叠剩下的那点几何 —— **只有 `Card`（圆角、内边距、
+  左右外边距、卡片间距）与 `settle`（无障碍翻页那一下）**。间距要调就改这里，
+  不要到页面里改一个局部数字。
+  2026-09-25 这个文件从「七种叠法的一张表」缩成一张卡：`StackVariant` / `StackMetrics` /
+  `StackKind` / `variantKey` / `chosen` / `remember` 全删 —— 用户 09-24 删到只剩一种叠法，
+  09-25 滚动本身又交回系统，「叠法」这件事已经没有可选项（见 `ArcStack` 头注）。
+  同一轮删掉的还有阅读线、消失带与两端留白：它们都是自管滚动时代的产物。
+  要找回那七种的参数，看删掉它们的那次提交。
 - **`Design/CardFit.swift`**（411 行，2026-09-25 新增）：**「展开后有多挤」的唯一算法** ——
   行高取自 `UIFont.preferredFont(forTextStyle:).lineHeight`（当前动态字号下的真实值）、
   折行数取自 `NSString.boundingRect`（真量，不是字数÷每行字数）、可用高度取自
@@ -632,13 +668,14 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
   变体按**底下是什么**选（App 界面 → `.regular`；地图 / 照片这种连续画面 → `.clear`），
   可点的表面交 `interactive`（按压由系统演，不再自己压透明度）。
   守门人是 `scan/glass.py`（编号 28）。
-- **`Design/StackLabView.swift`**：叠法对照页现在只显示「唯一叠法」那个静态说明
-  （七选一已经取消，`DevView` → 叠叠乐 这一条路径保留着 —— 它仍是查看叠法参数的地方）。
-- **五个功能界面共用的三个原语**（阶段 1 的产物，职责分得很硬）：
-  `GlassCard`（一张卡的材质与内边距） → `ArcStack`（几何 / 手势 / 消失带 / 无障碍翻页）
-  → `StackPageView`（巨字头 + 那一叠） → `DSSwipeStrip`（底部那条相机式模式条，已重写）。
-  `ArcStack` 收的是**未包装的 `StackCard`** 而不是 `AnyView` —— 因为
-  「这张卡要不要挂系统玻璃」取决于它此刻离阅读线多远，而那个距离只有 `ArcStack` 知道。
+- **`Design/StackLabView.swift`**：卡片叠预览页（`DevView` → 卡片叠）。它原来叫「叠法对照页」，
+  七选一取消后剩下的那一半仍有意义：卡高参差时的观感、玻璃的层次、条子的两种跟手形态 ——
+  那些只有真机判得了。
+- **六个功能界面共用的三个原语**（阶段 1 的产物，职责分得很硬）：
+  `GlassCard`（一张卡的材质与内边距） → `ArcStack`（**只有系统滚动** + 无障碍翻页）
+  → `StackPageView`（那一叠 + 页面的个性色） → `DSSwipeStrip`（底部那条相机式模式条，已重写）。
+  `ArcStack` 收的是**未包装的 `StackCard`** 而不是 `AnyView` —— 卡片的类型本来就不同
+  （巨字头 / 图表 / 列表），而顺序是运行时可变的（分段控件换段、行程条数随数据变）。
 
 **铁律（`scan/design.py` 在 CI 上拦）**：字号与颜色分量只允许出现在令牌定义文件里。
 不许在页面里写 `.font(.system(size: 14))` 或 `Color(red:...)`。
@@ -757,9 +794,10 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | `MaintenanceReminderScheduler` / `InsuranceReminderScheduler` | 保养 / 年检提醒排程 | 里程变化 / 启动 |
 | `ServiceReminderManager` | 保养项定义与进度 | 车辆档 |
 | `WeatherService` | open-meteo 实况（TTL 内且没走远不发请求） | 位置变化 / 启动 |
+| `PhoneLocation` | **手机自己的位置**（CoreLocation）：按需要权限、取到就停、拿不到就如实说（`idle/asking/denied/locating/found/failed`）。全仓唯一的 CoreLocation 代码（地图右侧那枚「手机的位置」）| 用户按下那枚钮 |
 | `WallpaperService` | 子页面壁纸图（相册选的一张 JPEG，本地存 `Documents/carkeeper-wallpaper.jpg`，不依赖网络） | 「我的→设置」选一张/不铺；启动时读回 |
 | `RefreshLoop` | **自动刷新的节律**（地图 2s/60s、其余档 5 分钟、手动「全局刷新」= 全部接口） | 根视图启动时 `start()`（幂等） |
-| `Retrier` / `NetworkEnhancements` | 退避重试 / 网络质量监控 / 离线模式 | 请求层 |
+| `Retrier` / `NetworkEnhancements` | 退避重试 / 网络质量监控 / 离线模式。⚠️ `NetworkEnhancements` 里原本还有一套 `RetryConfig` + `URLSession.dataTaskRetryable`，2026-09-25 删（**第二套重试实现**且零读者；真正在用的是 `Retrier.global`，见 §4 请求层） | 请求层 |
 | `Monitoring` | 内存读数（**不落盘**） | 启动后每 10s |
 | ~~`DataEncryption` / `SecureStorage`~~ | 已删（2026-09-25） | 只写不读的加密壳，见 §9.3 |
 | `BiometricLock` / `RemoteLockManager` | FaceID 二次验证 / 后台超时隐藏 | 敏感页 / 启动 |
@@ -769,13 +807,13 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | `InsuranceManager` | 保单 CRUD | 保养档 |
 | `BillingAndCalendar` | 车辆估值 + 年检日历（估值是**估算**，不是市场价，界面写明） | 保养档 |
 | `UpdateService` | 检查更新（读 GitHub Release `latest`）+ 分享 | 我的档 |
-| `EnhancedToastManager` / `AppStore.ToastManager` | 全局提示 | 全局 |
+| `AppStore.ToastManager` | 全局提示（**唯一**一条：`EnhancedToastManager` 2026-09-25 已删 —— 16 处调用写给一个没有任何视图渲染的 `@Published`，等于按了按钮什么都不弹；浮层现在住在 `MapSpineView` 里，抬在底条之上） | 全局 |
 | `RawLogStore` | 请求/错误原始日志（排障） | 请求层 |
 | `MD5` | 登录签名 `signF` | 认证 |
 
 ---
 
-## 8. 工程约束与门禁（29 项 + 风格检查）
+## 8. 工程约束与门禁（31 项 + 风格检查）
 
 ### 8.1 门禁表（每一项都是某次真实事故的产物）
 
@@ -796,8 +834,8 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | 9 | `scenes.py` | 多窗口 / 分屏（`#47`）接线必须完整 |
 | 10 | `targets.py` | 跨 target 符号可见性 |
 | 11 | `unreachable.py` | `return` 之后仍有同缩进语句 |
-| 12 | `futureproof.py` | 未来系统版本（iOS 27/28）前瞻性审计 + 根目录必须存在 |
-| 13 | `orphans.py` | 孤儿页面：「写了但没有任何地方能到达」 |
+| 12 | `futureproof.py` | 未来系统版本（iOS 27/28）前瞻性审计 + 根目录必须存在。判据是「对**系统**的弹性枚举做穷举 switch 却不写 `default`」—— 2026-09-25 修了一处假阳性：它原来只看主题词的**拼写**，而表里有 `status` / `phase` / `configuration` 这类普通名词，于是 `switch phone.status`（我们自己的 `PhoneLocation.Status`）被要求补 `@unknown default` —— 对自己的枚举补它是**反的**（会把「新增一档时编译器提醒你改这里」一起关掉）。现在两个条件都要：主题词命中 **且** 主语里没有项目自己声明的类型名，且那三个普通名词已从表里拿掉。代价写在文件里：真遇见「成员名叫 `status` 的系统枚举」会漏报 —— 方向是「宁可漏，不可噪」。探针：注入一个真的 `switch scenePhase`（无 default）→ 当场报出；还原后文件哈希一致、转绿 |
+| 13 | `orphans.py` | 两条判据。① 孤儿页面：「写了但没有任何地方能到达」（只认顶层类型）。② **系统类型扩展里没人读的成员**（`extension X` 里 `X` 不是项目自己声明的类型，而成员名在全仓除声明外一次都没出现）。② 是 2026-09-25 补的：那时删掉底条自算档位那段代码后，文件层的 `private extension Double { func clamped(to:) }` 成了「声明在、没有读者」—— 而它前面 31 条门禁一条都看不见（判据 ① 只认顶层类型）。加上判据 ② 的当场报到两个真的：`URLSession.dataTaskRetryable` + `RetryConfig`（**第二套重试实现**，App 真正走的是 `Retrier.global`）与 `UIColor.dsDynamic`（**第二套动态色**，全 App 用的是 `ArtTheme.nativeDynamic`）。收窄三条写在文件里：名字短于 6 个字符不看、读者只按「名字出现过」数（保守方向，宁可漏报）、`DerivedData/` 不算读者。探针验过：注入 `extension Double { func probeDeadMember() }` → 当场报出那个文件与成员名；还原后文件哈希与注入前一致、转绿 |
 | 14 | `deep.py` | 更深的结构问题：SDK 同名遮蔽、协议一致性、闭包参数、清洗保真度 |
 | 15 | `eol.py` | committed blob 的字节级行尾问题（字面量里裸换行 / 行中裸 CR / `\r\r\n`） |
 | 16 | `oneentry.py` | **入口唯一性**：同一件事只准有一条到达路径。判据 ③ 是「档位在 `HomeModeHead` 里出现**恰好一次**」——0 次 = 加了档位卡头没跟上；≥2 次 = 同一档有两处表述（原判据是「< 2 报错」，2026-09-24 定义反了，见 §11） |
@@ -807,7 +845,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | 20 | `copy.py` | 界面文案三类判据：实现词（缓存/报文/字段/接口）不上界面、复述句式、超 30 字 |
 | 21 | `lintcfg.py` | `.swiftlint.yml` 的排除清单与阈值必须和真实文件树一致 |
 | 22 | `ternary.py` | 三元运算符的 `?` 不能贴住前一个 token（否则变可选链）—— 见 §11 事故记录 |
-| 23 | `delguard.py` | **删了声明、使用还在**：旧版本里成员级声明过、新版本里没有声明了、代码里还在用它（`pvValue` / `shapeScroll` / `messageWeeks` 三次事故的根因）。**跨文件**：声明在 A、使用在 B 也算（B 里的用法只认带前缀的那种）—— 它自己的两个盲区都是 2026-09-24 当场补的 |
+| 23 | `delguard.py` | **删了声明、使用还在**：旧版本里成员级声明过、新版本里没有声明了、代码里还在用它（`pvValue` / `shapeScroll` / `messageWeeks` 三次事故的根因）。**跨文件**：声明在 A、使用在 B 也算（B 里的用法只认带前缀的那种）—— 它自己的两个盲区都是 2026-09-24 当场补的。2026-09-25 又补了**两条收窄**（判据 ④ / ⑤）：删 `StackMetrics.padTop/padBottom`（自管排版的死字段）时它把三处**别的类型**的同名成员当成残留引用报了出来 —— 使用处文件自己声明了同名成员（`CardFit.Row`）不看，`A.B.name` 里紧挨着名字的那段是项目类型（`StackSpec.Card.padTop`）也不看；而历史那三次（`APIClient.messageWeeks` 这种一段前缀）照旧报。同一天还查出一条**文档说谎**：文件尾那两条 `--from/--to` 自测在两种取法下都是绿的（旧版里那两个名字的声明缩进比 4 深，判据 ① 当场就找不到），已换成两条今天真能跑的探针 |
 | 24 | `enumguard.py` | 表驱动调用族的 SDK 枚举简写必须是已核成员（`accessibilityAction` / `textCase` / `accessibilityElement(children:)` / `scrollBounceBehavior`） |
 | 25 | `spacing.py` | 界面代码里的间距必须是 `TokensSpacing` 那一档（字面量只允许 0/1 与四个**几何值** 18/20/40/108，逐条写明理由）。它是 2026-09-25「所有页面的间距布局都很不 iOS」那一轮的守门人：先吸 111 处字面量、补刻度缺的 12（`snug`），再把它固定下来 |
 | 26 | `expand.py` | **展开类内容不许写死高度**：界面代码里不得出现 `frame(height: 数字)`（只给高度、没给宽度的那种；`frame(width: 44, height: 44)` 是形状，不管）。例外表 11 条，键是「文件:值」，每条都写清「为什么这个高度是画出来的」（图表 / 指示线 / 样例色块 / 缩略图），**一条不再成立就报红**。它是 2026-09-25「展开后的拥挤程度要完全根据数据算」那一轮的守门人 |
@@ -815,6 +853,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | 28 | `glass.py` | **玻璃只有一个入口**：`.glassEffect` / `GlassEffectContainer` 只许出现在 `Design/DSGlass.swift`；玻璃底下不许垫不透明的面（同一条链里 `.fill(TokensPalette.…)` 出现在 `.dsGlass` 之前即报红）；不许再引入旧材质语言（`…Material`）。它是 2026-09-25「全局液态玻璃的质感全项目每个犄角旮旯方方面面都做到位了吗」那一轮的守门人：那一轮查出真玻璃只有 3 处，其余浮层用的都是「名字叫 glass、值等于 `fillSubtle`」的扁平令牌（该别名已删），另有两处把玻璃**垫在不透明的面底下** |
 | 29 | `extguard.py` | **extension 的三条铁律**：① 必须在文件层（不许嵌套）；② 直接成员层不许有实例存储属性（`static` 放行）；③ 跨文件不许碰别处的 `private` / `fileprivate` 成员。它是 2026-09-25 那次 CI 红的产物：`MapSpineBottomBar.swift` 一台戏犯了三条（嵌套的 `private extension Double`、`@State` 存储属性、读写四个 `private` 成员），而 29 条门禁一条都没拦住 —— 因为没有任何判据知道「extension 该长什么样」 |
 | 30 | `initguard.py` | **调用点的实参标签必须能被某个声明的 init 接下**。三条收窄（宁可漏，不可噪）：只判「init 写在类型**体内**」的类型（写在 extension 里不会抑制隐式 memberwise init，那时按参数表判会误报）、只判至少两个带标签实参的调用点（`Foo(x)` 与 `init(_:)` 从文本上分不开）、同名类型多处出现就整条跳过（裸名字对应哪一个要看调用点上下文）。它是 2026-09-25 第二批 CI 红的产物：`ArtThemeSpec` 四处「参数全对、却没有任何 init 收得下」——根因是 Swift 那条规则：结构体一旦自己声明了任何 `init`，编译器就不再合成 memberwise init。它诞生当天被自己的**两条误报**教过（嵌套类型的 init 被算到外层；`TripRecord` 同名两个），两条都写在文件头里 |
+| 31 | `iconcheck.py` | **图标**：`Contents.json` 与 PNG 必须说同一件事。五条判据 —— 文件都在 / 声明尺寸 × scale == 实际像素 / 每个槽位有浅色·深色·着色三套 / 三张 1024 主图满幅（不带透明，四角与四边中点各与相隔 64px 的内侧色差 ≤ 14） / 没有没人引用的 PNG。它是 2026-09-25「图标完全不符合 iOS 调性」那一轮的产物：v1.0 犯了三个**可量**的错却编译得过、当时 31 条门禁全绿（自己套圆角 + 内缩 4%；`convert('RGB')` 把透明边压成纯黑、实测四角 (0,0,0)；只有一张图、没有深色/着色外观）。**它自己读 PNG**：`scan/copy.py` 与标准库 `copy` 同名会把 Pillow 的 XML 依赖打坏（`AttributeError: module 'copy' has no attribute 'deepcopy'`），所以 scan/ 里任何 `import PIL` 的门禁都跑不起来 —— 解码器与 Pillow 逐点比对过。探针验过：换回 v1.0 的 1024 → 报出 4 条（左右边中点 (0,0,0) vs 内侧 (255,159,0)，色差 255）；多一张没人引用的 PNG → 报出；删掉某槽位的着色条目 → 报出 |
 | + | `check_style.js`（node） | 风格与括号配平 |
 | + | `all.py`（**本地**执行器） | 不判任何东西：把上面这份清单（从工作流解析，不另抄）一次跑齐。CI 不跑它 —— 跑第二遍没有信息量 |
 
@@ -881,10 +920,18 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
   `daysUntil` 走的 `parseDate` 解析不了就返回 nil。
   **没过期的那一条**：车控页还没按 `funCode` 开合控件（见 §9.1 的数据缺口）。
   教训同上一行：日志类文档写下的「仍未做」没人会回头改 —— 读它的人要自己核一遍代码。
+- **`scan/scan.py` 白名单里的两句话在替不存在的用法担保**（2026-09-25 本轮清掉）：
+  `accessibilityScrollAction` 那条写着「叠叠乐**没有 ScrollView**，不挂它 VoiceOver 用户完全无法翻页」——
+  而那一叠现在就是系统的 `ScrollView`（三指滚动自带），那句话描述的世界已经不存在；
+  `accessibilityAction` 那条也已无人调用。两条一起从白名单删除（白名单里留着不用的名字
+  是另一种「清单失真」），而 `enumguard.py` 的那条教训以 `#` 注释留在原处。
+  另：`interpolatingSpring` 那条的「吸附回落的弹簧」也改了 —— 它现在只服务无障碍翻页那一步。
+  这一类漂移（**注释/白名单里的断言**）31 条门禁全部查不到：它们查的是代码里的名字，
+  不查「这句话说的东西还在不在」。
 - `DESIGN-SPEC.md` 的小节标题仍用旧页面名（如「行程页 (TripAnalyticsView)」），实际类型是 `TripsEventsView`。
 - `GlobalSearchHUD` 的空态提示曾写「搜页面、车牌、行程、指令、**充电记录**。」，而充电记录随
   充电账本一起删了（代码里的注释已注明），提示却还在承诺它 —— **已改**。
-  这一类「文案承诺了一个已删除的功能」的漂移，30 条静态门禁**查不到**：`copy.py` 只管词、长度与复述句式，
+  这一类「文案承诺了一个已删除的功能」的漂移，31 条静态门禁**查不到**：`copy.py` 只管词、长度与复述句式，
   不核对「这句话说的东西还在不在」。写文档时逐屏读才会碰到。
 
 ### 9.4 未验证的部分（必须如实交接）
@@ -895,8 +942,9 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 
 **只能等真机的四件事**（不是没做，是这台机器上量不出来）：
 
-1. 卡片栈自己的竖向拖动与屏幕左缘的返回手势会不会打架。
-2. 手工传给弹簧的 `initialVelocity`（`StackSpec.settle(velocity:)`）转得对不对。
+1. 卡片栈的竖向滚动（现在是系统 `ScrollView`）与屏幕左缘的返回手势会不会打架。
+2. 系统滚动的惰性与橡皮筋在真机上的观感（这正是用户第 1 条要的东西；
+   `scrollBounceBehavior(.always)` 是显式写出来的，而「两端都回弹」最终要眼睛确认）。
 3. 底部条在真实 390pt 下「三个字露出来多少」看着顺不顺。
 4. 八张卡全在画面里时的帧率（性能策略是只给 `abs(tShape) < 0.9` 的卡挂系统玻璃，
    其余走主题表面色；若卡，下一步是调阈值而不是换材质）。
@@ -965,6 +1013,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | 09-25 | **CI 连红两次：`MapSpineBottomBar.swift:71` 「declaration is only valid at file scope」** | 上一轮为了把 `MapSpineView.swift` 收回 1200 行以内，把「底条整行横拖」搬进新文件，而那个文件**一台戏犯了三个错**：① `private extension Double` 写在 `extension MapSpineView { … }` 体内（Swift 只允许文件层）；② `@State private var barDragBase` 是 extension 里的存储属性；③ 读写 `modePosition` / `barOpen` / `modeIndex` / `barRowWidth` —— 四个都是 `MapSpineView.swift` 里的 `private`（`private` 的作用域是**文件**）。而**29 条门禁全绿**：当时的判据里没有一条知道 extension 该长什么样 | 那个文件整体撤掉，手势与控制它的状态搬回同一个文件；`filteredRuns` 在 `ControlView.swift` 里去掉 `private`（它被 `ControlFit.swift` 用着 —— 同一个错的第二处）。新增第 29 条门禁 `extguard.py`（三条铁律），探针验过：判据 ①② 注入即报、撤掉转绿；判据 ③ 用真事故复现（把 `filteredRuns` 改回 `private`，当场报出 `ControlFit.swift:58/63`）。第一版探针把宿主与扩展写在同一个文件里，③ 因此不报 —— 而那是**对的**（`private` 的作用域是文件，同文件用私有成员合法）：探针不报可能是判据漏了，也可能是探针没造成那个形状，两者必须先分清。教训写进那条门禁的文件头：**「拆文件」不是免费的 —— 它会把「同一个作用域」拆成两个** |
 | 09-25 | **CI 第二批红：一次 26 条、六种形状** | 上一次把语法层那三个错修掉之后，编译器**第一次走过语法层**，于是一口气把「很久没编译过」的账摊开：① `ArtTheme.swift` 四处 `extra arguments at positions #3, #4, #5, #7…`——根因是 Swift 的规则：**结构体一旦自己声明了任何 `init`，就不再合成隐式的 memberwise init**，而 `75c80ce` 给 `ArtThemeSpec` 加的便捷 init 正好把那四处全字段写法弄红（标签与值一个都没错）；② `DSGlass` 的 `S: Shape` 接不住 `strokeBorder`（它只在 `InsettableShape` 上）；③ `HealthDataView` 的 `ambiguous use of 'opacity'`（`Color.opacity` 与 `ShapeStyle.opacity` 同名，而 `.background(_:)` 的参数是泛型 `S: ShapeStyle`）；④ `MapSpineView` 的 `Self.barSeam`——**它从未在任何提交里被声明过**（注释与两个使用点是同一笔写进来的，只有声明那一行没进文件）；⑤ `MapStyleSpec` 十六处裸写静态成员 `mutedSpec`（实例上下文里用静态成员不合法）；⑥ `MessagesSection` 的 `ambiguous use of 'accessibilityHint'`（推断问题，不是语义问题） | `ArtTheme` 那四处调用点**不动**，改为把全字段 init 显式写回来（26 个参数、顺序 = 存储属性声明顺序）——那四套主题每个颜色旁都写着对比度实测值，改用便捷入口＝「把量过的值换成算出来的值」，是设计变更；`dsGlass` 的约束收窄到 `InsettableShape`（三个便捷入口与全部调用点都满足，不损失调用点）；`opacity` 用具名 `let inset: Color` 钉住**期望类型**；`barSeam` 补回声明（那段注释早就写明了这个 9）；`mutedSpec` 十六处改 `Self.mutedSpec`；消息行的按钮拆成 `rowButton(_:isOpen:)`（行为一字未变，无障碍那两句仍挂在同一个 Button 上）。门禁侧补了两个洞：`scan.py` 的「未知成员」判据现在认 `Self.`——此前**所有 `Self.` 引用都在盲区**（`MEMBER_REF` 把 `Self` 当成类型名，判据遇到不在类型表里的名字直接跳过），`barSeam` 就是这么溜过去的；新增第 30 条 `initguard.py`（调用点实参 vs 声明的 init），双向探针验过：**删掉全字段 init 就恰好报出那四处**、补回即绿，当前树 0 处。`initguard` 诞生当天被自己的两条误报教过 —— 嵌套类型的 init 被算到外层、同名类型（`AppStore.TripRecord` 与 `Models/AppDataModel.swift` 的 `TripRecord`）—— 两条都写进了文件头；另有一处是共用件的洞：`extguard.mask` 处理行注释时留下开头那根 `/`，把 4 个最大调用点的标签抽取全弄脏了 |
 | 09-25 | **CI 第三批：26 → 2** | ① `HealthDataView` 的 `conflicting arguments to generic parameter 'Result' ('Void' vs. '(inserted: Bool, memberAfterInsert: String)')` —— `Set.insert` 有返回值，而在 ViewBuilder 里 `withAnimation` 的泛型 `Result` 同时收到「外层要 Void」与「单表达式闭包给出元组」两个约束；② `MessagesSection` 的 `ambiguous use of 'accessibilityHint'` **上一批的修法没成**（把按钮拆成独立函数不足以解决），因为 `accessibilityHint` 在 `View` 与 `ModifiedContent` 上各有一份、返回类型还不同，receiver 恰是 `.accessibilityLabel` 留下的 `ModifiedContent` 时两个候选都合法 | `_ = set.insert(x)` 四处一起写明（值本来没人用，说出来 `Result` 就只剩 Void）；`accessibilityHint` 那一处改用泛型函数 `withHint<V: View>(_:)` —— **成员查找在泛型声明处做、只看约束**，`ModifiedContent` 那一支永远不可能是候选（与 `ViewModifier.body(content:)` 里能随手写 `content.xxx` 同理）。**决定性的测量**：全仓「无障碍标签接另一个无障碍修饰符」共 **28 处、27 处编译得过** —— 所以这**不是**一条全仓规矩，只是那一处推断预算不够；照着一个偶发结果去改另外 27 处，是把「编译器这次的心情」写进界面代码。上一批文档里把它归为「推断问题、拆开就好」是**推理**，CI 证明它错了：同一处怀疑花一分钟数一遍同类写法（28 / 1），结论就完全不同 |
+| 09-25 | **权限说明一直在替一个不存在的能力担保** | `NSLocationWhenInUseUsageDescription` 写的是「用于显示车辆当前位置」—— 而车的位置是**服务端**给的（`AppStore.currentLocation` 来自车端报文），全仓没有任何 CoreLocation 代码：这句话从写下那天起就没对过。同一轮才发现用户要的那枚「手机的位置」钮**无依无靠**（没有第二个位置可指）| 新增 `Services/PhoneLocation.swift`（按需要权限、取到就停、拿不到就如实说），说明改成它真的做的事：「用于在地图上显示手机与车辆的位置」。这一类漂移（**plist 权限文案**）31 条门禁查不到：`paidcap.py` 只管禁键，没有任何判据核对「权限键的文案说的是不是代码真做的事」 |
 | 09-24 | 冷启动把同一件事问了三遍 | 根视图 `onAppear` 里两处 + 地图外壳 `.task` 各自调 `bootstrap()` —— 并发三份 `getCars` + `getUser`，并三次 `cancel` / 重启预加载（每次预加载都是 6 个请求）。冷启动头几秒本来就在抢 CPU 与网络 | `bootstrap()` 合并**同时**在飞的那几趟；串行重复调用（重新登录 / 下拉刷新）照旧各取一次；`logout()` 丢掉句柄，新账号必须另起一趟 |
 
 ---
@@ -1007,9 +1056,9 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 
 | 类型 | 它管什么 | 它**不**管什么 |
 |---|---|---|
-| `StackSpec` / `StackMath` | 全部数值与纯判定（焦点、吸附落点、两端硬停） | 不 import SwiftUI 之外的任何东西，不碰视图 |
-| `GlassCard` | 一张卡的外观（玻璃 + 一抹个性色 + 标题行） | 不决定卡在哪儿 |
-| `ArcStack` | 叠叠乐的几何、手势、消失带、无障碍翻页（叠法只有 `.sticky` 一种） | 不知道卡里装的是什么 |
+| `StackSpec` | 卡片自己的几何（圆角 / 内边距 / 外边距 / 间距）+ 无障碍翻页那一下的弹簧 | 不 import SwiftUI 之外的任何东西，不碰视图。叠法、阅读线、消失带、判定全删（2026-09-25）| 
+| `GlassCard` | 一张卡的外观（玻璃 + 一抹个性色 + 标题行） | 不决定卡在哪儿；也没有「要不要挂玻璃」的开关（那个开关会随滚动位置换材质）|
+| `ArcStack` | 那一叠：**系统 `ScrollView` + `VStack` + 无障碍翻页** | 位置、惯性、两端、指示条、三指滚动全归系统；它不知道卡里装的是什么 |
 | `DSSwipeStrip` | 底部那条：胶囊外轨 + 胶囊选中格，静止三档、按下展开、连续跟手，选中那档的字是主题强调色 | 不换屏（它只写回 `homeMode`） |
 | `DSGlass` | 「浮在内容之上」那一层的唯一材质（形状 / 变体 / `interactive` / 多块合成一层） | 不决定哪块表面该是玻璃（那是设计判断，写在它的头注里） |
 
@@ -1031,26 +1080,142 @@ var body: some View { StackPageView(accent: mode.accent, label: "…", cards: ca
 - **头卡只给一个事实。** 它曾经还带三行依据（车牌 / 车架号 / 保险 之类），而那三行
   逐条又在下一张卡里再说一遍 —— 已删（2026-09-24）。一条事实只该有一个出处：
   头卡是这一页的标题，依据在下面每一张卡里。
-- **卡高由内容撑**，不写 `frame(height:)`。焦点与吸附全部靠真实高度算，
-  写死高度会让「行程那一叠」与「设置那一叠」手感不一样。
+- **卡高由内容撑**，不写 `frame(height:)`。卡片按真实高度排队（系统 `VStack`），
+  写死高度会让「行程那一叠」与「设置那一叠」的滚动距离不一样。
 - **无数据就写一句真话**（`GlassCardEmpty`），不要摆 `--`。读数带时间用 `StackCard.at`。
 
 ### ③ 三条容易踩的坑（都是这次真的踩到的）
 
-- **`StackMath` 里的数字只能改一处。** 六页的手感任何一处不同，都说明有人在页面里
+- **`StackSpec` 里的数字只能改一处。** 六页的手感任何一处不同，都说明有人在页面里
   另写了一遍间距。
 - **条子的几何全部由 `width` 参数推出来，没有一处存起来。** 把它存成 @State 那版
   在非 390pt 的机器上首帧会停在错的地方（而且只在第一帧，很容易被当成“闪一下”）。
-- **卡片栈没有 `ScrollView`，也就没有系统给的三指滚动。** 翻页靠容器上的两条动作：
-  `.accessibilityAdjustableAction`（元素级上下轻扫 = 上一张 / 下一张）与
-  `.accessibilityScrollAction`（区域级三指扫）。改 `ArcStack` 的手势层时不要顺手
-  删掉 —— 它不会报错，只会让 VoiceOver 用户完全翻不了页。
-  （这里原本写的是 `.accessibilityAction(.scrollUp/.scrollDown)` —— 那两个成员不存在，
+- **改 `ArcStack` 时不要往它上面加东西。** 它现在就是「`ScrollView` + `VStack` + 无障碍翻页」；
+  每一层自己画的东西在上面都加过一遍：遮罩（消失带）、每张卡的 `offset / rotation3DEffect /
+  scaleEffect / opacity / allowsHitTesting`、`.scrollIndicators(.hidden)`、自己算的高度与落点。
+  它们一一被删（用户 2026-09-25 第 1 条：「除了地图外其他的界面怎么滑动起来都很不 iOS？
+  iOS 的原生流畅呢？」）—— 删除理由逐条写在 `ArcStack` 头注，加回来前先去读那一节。
+  留在容器上的唯一非系统行为是 `.accessibilityAdjustableAction`（元素级上下轻扫 =
+  上一张 / 下一张，它比连续滚动更好定位；三指滚动本来就是系统的）。
+  已知限制：它只跟「被点了几次」走，手滚过好几张之后下一次翻页仍从上次的序号继续。
+  （更早这里写过 `.accessibilityAction(.scrollUp/.scrollDown)` —— 那两个成员不存在，
   见 `REDESIGN-STATUS` 的「CI 报回来的三处」一节。）
 
-### ④ 怎么挑叠法
+### ④ 怎么看那一叠卡
 
-`我的 → 诊断 → 叠叠乐`。叠法自 2026-09-24 起**只有一种**（吸附堆叠），
-那个对照页如今只显示这条静态说明 —— 原来的七选一与它的 `UserDefaults` 已删除
-（`StackSpec.variantKey` 保留，旧值读到时迁移到 `.sticky`）。
+`我的 → 诊断 → 卡片叠`。它自 2026-09-24 起不是「对照页」了：叠法只剩一种，
+而 2026-09-25 滚动也归了系统 —— 页子留着是为了一叠卡本身的观感（参差高度、玻璃层次、
+条子的两种跟手形态），那些只有真机能判，七选一与它的 `UserDefaults` 已删。
 这套东西在浏览器里的原型是 `design-preview/stack.html`（那个文件夹是设计过程，不进 App target）。
+
+---
+
+## 14. 2026-09-25 第二轮：那一叠卡只剩系统滚动
+
+触发：用户「子页面上下滚动的换回 ios 原生吧，还有哪些可以换回 ios 原生的用问题问我」。
+这句话里要留意一件事：**第一轮已经换过了**（`ArcStack` 09-25 上一轮就从自管手势改成
+`ScrollView`），但**那一轮从未编过** —— CI 连续三个批次红在各处类型错误上（见 §11）。
+所以用户手上那个包很可能还是「自管手势」那一版。第一轮改对了方向，壳上却还挂着
+三层自己画的东西，那些是不需要 CI 也能读出来的：
+
+| 删掉的东西 | 它原来为什么在 | 为什么现在不对 |
+|---|---|---|
+| 上下**消失带遮罩**（`.mask` + 渐隐） | 卡片当时是斜的、要转出画面，硬裁会在边上露直角 | 转出 09-24 就删了。剩下的作用只是让一个原生滚动容器的两端平白变淡（而且那些子页铺的是**壁纸**，渐隐是往一个不存在的底色里淡） |
+| 每张卡的 `offset / rotation3DEffect / scaleEffect / opacity / allowsHitTesting` | 七种叠法的形变 | 唯一叠法下系数全是 0/1 —— 五个修饰符里四个什么也没做，剩下那个把滚出去的卡淡成 0.9 |
+| `.scrollIndicators(.hidden)` | 「这一层没有 chrome」 | 它连「你在滚动」那条指示条一起关了；系统列表是**给**的 |
+| 量高度 / `tops` / 落点清单 / 两端边距 | 位置与形变要自己算 | 位置归系统之后全部失去读者（`CardFit` 只用宽度） |
+| `StackVariant` / `StackMetrics` / `StackKind` / `variantKey` / `chosen` / `remember` | 七选一与「存下来的那一档」 | 只剩一种叠法，而它已经没有属于自己的行为（= 系统的 `VStack`）| 
+| `GlassCard.glassy` + `CardSurface` | 「只给可见的卡挂玻璃」的性能妥协 | 同一张卡会因滚动位置换材质 —— 滚过去那一刻最像贴图 |
+
+改完 `ArcStack` 是 159 行（此前 383）：`ScrollView { VStack(spacing: StackSpec.Card.gap) { 卡片 } }`
++ 无障碍逐张翻页。`StackSpec` 缩成 56 行（只有 `Card` 与 `settle`）。
+
+**留下的唯一非系统行为**：`.accessibilityAdjustableAction`（读屏用户上下轻扫 = 上一张 /
+下一张）。它是无障碍挡位、不画东西、也不碰滚动的物理。已知限制写在 `ArcStack` 头注：
+它只跟「被点了几次」走，手滚过好几张之后下一次翻页仍从上次的序号继续。
+
+**顺带修的注释漂移**（都是「代码已经对了、注释还在替旧实现说话」这一类）：
+`DS.swift` / `ControlFit.swift` / `ExportDataSection.swift` / `MessagesSection.swift` /
+`EmergencyPanel.swift` 里五处「叠叠乐自管手势（没有 ScrollView）」—— 那句话现在是错的。
+结论不变（卡里不要套第二层滚动），但理由变了：外面那一层现在是真 `ScrollView`，
+卡里再套一层，那一块区域的竖向拖动会被**内层**吃掉（旧版是「手势塌给内层」）。**门禁侧一条**：新写的预览页页头文案被 `copy.py` 报「过长（64 > 30）」—— 门禁是对的
+（那句话在替用户解释实现），改成一句短的。
+
+### 同一轮的第二个决定（用户从候选里选的）：「其余读数」改成系统 sheet
+
+我把「还有哪些可以换回系统原生」列成了一张表交给用户（问题在提交信息 / 对话里），
+他选了三项里的两项，改的就是这两项：
+
+- **保留相机式模式条**（不换系统 Tab 栏）：六档 + 两侧圆钮映不进系统页签栏（一般最多五个），
+  换掉会同时丢掉拖动跟手与两臂布局。
+- **保留玻璃叠叠乐**（不换 `List`/`Form`）：玻璃卡是这个 App 的识别度所在。
+- **做：地图抽屉 → 系统 sheet + `presentationDetents`。**
+
+改动：卡里那一道**自己拉的抽屉**整块删除（自画拉手 `drawerGrabber` + 连续量
+`drawerReveal` + 拖动起点 `drawerBase` + 量自然高的 `drawerMeasure` + 宿主 `moreDrawer`），
+换成一行 disclosure（`readoutsDisclosure`）+ 一个 `.sheet`：
+
+| 上一版自画的 | 现在系统的 |
+|---|---|
+| 两个落点（走 / 不走）+ 手算吸附 | `presentationDetents([.medium, .large])`：档位、橡皮筋、下拉关闭全归系统 |
+| 自画拉手（`Capsule` 36×5） | `presentationDragIndicator(.visible)`：那枚随辅助功能设置走的系统 grabber |
+| 抽屉全程盖着地图 | `presentationBackgroundInteraction(.enabled(upThrough: .medium))`：半屏时地图仍可拖 |
+| 三个状态变量 | 一个 `showReadouts: Bool` |
+
+两个新的 SDK 名字对着 Apple 文档 JSON 核过后登记进 `scan/scan.py`
+（`presentationBackgroundInteraction` / `presentationDragIndicator` / `PresentationBackgroundInteraction`，
+externalID 写在登记项里）。顺带删掉 `TokensMotion.reveal` —— 它唯一的读者就是那道抽屉。
+
+**顺带查出的一个门禁盲区（未动，只记录）**：`orphans.py` 只认「系统类型扩展里的成员」，
+而**项目自己的令牌枚举**（`TokensMotion` / `TokensTypo`）里的零读者成员整类不在范围内。
+用一把粗探针（Design 下全部 `static let/var` × 全仓 `.名字` 计数）扫出来 6 个候选，
+但它分不清「真死」与「通过别的路径被用到」：其中 `TokensMotion.page` / `screen`
+两个**在 HEAD 与工作树里都是零读者**（已单独核过），而 `ArtTheme.changed` /
+`CardFit.defaultValue` 那两个需要看上下文才能判。这一条要不要变成判据是一个独立决定。
+
+**一个差点被写进文档的错误结论（记在这里）**：改 `DevView` 时我看到那里的 `DSGroup(footer:)`
+文案很长而没被报，一度以为「作为参数传出去的文案逃过了 `copy.py`」并把它写成了发现。
+量了一下才反转：`copy.py` 扫的是**每一行的字符串字面量**，与它出现在哪个位置无关；
+`DevView` 之所以没被报是它在 `EXEMPT_FILES` 里（设计令牌页的正文就是「缓存/字段」那些词）。
+量出来的数：这种「作为参数传出」的中文文案 399 条，其中 > 30 字的 **0 条** ——
+判据在全仓是一致的。教训与 HANDOFF §11 里那条同源：**先把「它真的有这个形状吗」量出来，
+再下结论**（这次是先写了结论，才想起来量）。
+
+---
+
+## 15. 2026-09-25 第三轮：AppIcon 整张重画（v1.0 → v2.1）
+
+触发：用户「重新设计软件图标吧！完全不符合 ios 调性！太丑了！」。
+
+「调性」听着主观，但这件事之所以不是「换一张好看点的图」，是因为 v1.0 犯了四条**可以指着像素说清**的错
+—— 它们全部编译得过、当时 31 条门禁全绿、模拟器里也完全正常，因此没有任何自动检查看得见：
+
+| # | 问题 | 实测 | v2.x |
+|---|---|---|---|
+| ① | 底色近黑 | 1024 亮度 p05/p50/p95 = **0.000 / 0.096 / 0.659**（深蓝黑 `#1A1A2E→#0D0D1A`）—— 主屏上一块黑 | 亮琥珀→橙，p05/p50/p95 = **0.561 / 0.718 / 0.957** |
+| ② | 图上有字 | 「长安车管家」+「CHANGAN CONNECT」两行，占下缘约一成高 | 一个字都没有（Apple 规范第一条：图标不要放文字） |
+| ③ | 自己套圆角 + 内缩 4%，四角被压成纯黑 | `convert('RGB')` 把透明边压成 **(0,0,0)**；左右边中点 (0,0,0) vs 内侧 (255,159,0)，**色差 255** | 满幅、模式 `RGB`、不画圆角；8 点实测最大色差 **7**（门禁上限 14） |
+| ④ | 没有深色 / 着色外观 | 7 张全是同一张浅色 | 7 槽位 × 3 外观 = **21 张** |
+
+**改完的形状**：白色（深色外观下琥珀色）轿车侧影 + 顶上一道淡白高光；窗与轮拱是**挖空**
+（透出底色，不是画深色块），没有描边 / 阴影 / 光晕。车身底下那道弧是 App 里「车钉外面那圈弧」
+（续航圈）的图形引用。实测占位：车身 689×409（长高比 1.68），占画布宽 67% / 高 40%，
+连同弧到画布高 93%。（v2.0 的车只有 300 高 / 占 29%，主屏上看是「中间一条小车」，v2.1 放大到只留一圈呼吸位。）
+
+**出包来源只剩一条路**：`generate_appicon_pillow.py`（唯一来源）+ `generate_appicon.sh`（入口，
+顺手跑 `scan/iconcheck.py`）。之前 `generate_appicon.sh` 的 ImageMagick 分支在这台机器上根本用不到，
+而它的 cairosvg 退路指向一个**不存在的** `generate_appicon.py` —— 也就是说文档承诺的退路是条死路，
+只在「这台机器没有 ImageMagick」时才会被走到。更根本的问题：ImageMagick 只能渲 SVG，
+而 SVG 里只有浅色一套外观，用它刷新会得到「一半新图一半旧图」的图标集 —— 正是这个仓库记过的那个坑
+（**改了 A，真机上看到 B**）。所以现在 `AppIcon.svg` 降级为矢量对照，不再出包。
+
+**新增一条门禁** `scan/iconcheck.py`（工作流清单末尾，第 31 条；详见 §8.1），
+五条判据全部当场能量。写它的过程中撞到一个值得记的墙：**`scan/` 里不能 `import PIL`** ——
+脚本目录会进 `sys.path`，而 `scan/copy.py`（文案门禁）与标准库 `copy` 同名，Pillow 的 XML 依赖
+一 `import copy` 就拿错模块，当场 `AttributeError: module 'copy' has no attribute 'deepcopy'`。
+于是它自己写了 PNG 解码器（zlib + 五种过滤器），并与 Pillow 逐点比对过（3 张主图 × 9 采样点）。
+
+**验证状态**：本地 `python3 scan/all.py` **32/32 全绿**（31 条门禁 + `check_style.js`）。
+本机没有 Swift 工具链，**编译与真实观感只有 CI / 真机能回答**；这里能给的证据是可量的事实
+（尺寸、三套外观齐全、满幅色差 ≤ 7、亮度分位、58px 下 ASCII 渲染能读出车形）。
+文档：`AppIcon-SPEC.md` 重写为 v2.x（含每条旧问题的实测数字）；本节；`REDESIGN-STATUS.md` 同名日期一节。

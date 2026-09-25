@@ -719,7 +719,7 @@ struct ControlView: View {
     private func onCmd(_ key: String) {
         guard !busy, running == nil else { return }
         guard !store.carId.isEmpty else {
-            EnhancedToastManager.shared.show("请先选择车辆", icon: "car.fill"); return
+            ToastManager.shared.show("请先选择车辆", icon: "car.fill"); return
         }
         request = ControlRequest(key: key, name: nameOf(key))
     }

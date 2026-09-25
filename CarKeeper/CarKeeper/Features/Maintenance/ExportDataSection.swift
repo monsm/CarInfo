@@ -79,8 +79,8 @@ struct ExportDataSection: View {
                     .foregroundStyle(TokensPalette.secondary)
 
                 // 这里原本是 `ScrollView { Text(…).lineLimit(8) }.frame(height: 100)`，一个人占了
-                // 两件错：① 卡片里再套一层滚动 —— 叠叠乐自管手势（没有 ScrollView），
-                // 内层拿到的又是无限高，于是它永远滚不动、却把拖动吃掉；
+                // 两件错：① 卡片里再套一层滚动 —— 外面那一叠就是系统 `ScrollView`，
+                // 竖向拖动会归内层，而内层拿到的又是无限高，于是它永远滚不动、却把拖动吃掉；
                 // ② 那个 100 是拍出来的高度，而这个块里真正有几行由**数据**决定
                 //（一行 CSV 在窄屏上折成几行，取决于那个时间戳字符串有多长）。
                 // 现在整块高度由行数与字号算出来：放得下就全放（内容撑高），

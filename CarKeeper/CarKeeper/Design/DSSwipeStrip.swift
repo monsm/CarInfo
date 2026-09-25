@@ -101,10 +101,34 @@ struct DSSwipeStrip: View {
     /// 单向通知，而不是宿主反过来指挥条子的参数。
     var onExpand: ((Bool) -> Void)? = nil
 
+    /// 条**以外**的整行拖动：宿主把「手指在整条上的横向增量」转发进来。
+    /// 跟手、越界阻尼、吸附**全部仍在条子里** —— 宿主只转发，不换算。
+    ///
+    /// 为什么不能让宿主自己把增量换算成档位（上一版就是这么写的）：条子的位置是
+    /// **一个**连续量（`c`），谁换算谁就是第二个实现。那种写法的两个后果都真实存在过：
+    ///   · 手指按在条子上下的空白带里拖时，页面在换、**条子一动不动**
+    ///     （宿主改的是它自己的 `modePosition`，`c` 没人碰）；
+    ///   · 松手时没有谁写回档位 —— `fade` 就停在 0.5（两页各半透明地叠着），
+    ///     下一次碰条子才归位。而那 26pt 的空白带正是拇指自然停放的位置
+    ///     （宿主自己写着「整条都算滑动区」）。
+    struct RowDrag: Equatable {
+        /// 手指从按下到此刻的横向增量
+        var translation: CGFloat
+        /// 系统给的「松手后手指将到的地方」（含速度）—— 吸附用它
+        var predicted: CGFloat
+        /// 是否已越过「算拖」的阈值（宿主判的 8pt；条子据此决定展开）
+        var moved: Bool
+    }
+
+    /// `nil` = 条外没有正在进行的拖动。松手就是把这条通道关掉 ——
+    /// 吸附发生在「非 nil → nil」这一步（见 `rowDragChanged`）。
+    var rowDrag: RowDrag? = nil
+
     // ---- 几何（全部由条高推出来，见文件头）----
     /// 条高。HIG 最小触控目标是 44；2026-09-25 从 46 抬到 **54** —— 用户「滑动区变高」，
-    /// 而这条子既是显示、也是它自己唯一的拖动面（合叠乐与底条都没有系统 `ScrollView`），
-    /// 所以「看起来更大」与「更好按」在这件控件上是同一件事。
+    /// 而这条子既是显示、也是它自己的拖动面（上下叠叠乐 2026-09-25 起就是系统 `ScrollView`，
+    /// 条子**不能**用：它要的是「整行跟手 + 吸附到档」这一种相机式的滑动，
+    /// 而不是自由滚动），所以「看起来更大」与「更好按」在这件控件上是同一件事。
     /// 54 也与 iOS 26/27 那批浮动玻璃栏（工具栏 / Tab 栏）同一个量级。
     private let barHeight: CGFloat = 54
     /// 一档的宽度（定宽，见文件头）。2026-09-25：34 → **38**（用户：「全界面的控件大小
@@ -139,6 +163,12 @@ struct DSSwipeStrip: View {
     /// 原型 `setTimeout(()=>{ if(!this.dragging) targetExpand = 0 }, 620)`。
     /// 没有这一步，快速连按两下会被旧计时器把第二次展开收走。
     @State private var retractToken = 0
+    /// 条外那次拖动按下时条子停在哪儿（`nil` = 条外没有正在进行的拖动）
+    @State private var rowBase: CGFloat?
+    /// 条外那次拖动的最新预测落点（横向增量，含速度）
+    @State private var rowPredicted: CGFloat = 0
+    /// 条外那次拖动是否已越过 8pt（决定松手后是「立即收回」还是「620ms 后收回」）
+    @State private var rowMoved = false
 
     private var index: Int { items.firstIndex { $0.id == selectedID } ?? 0 }
 
@@ -267,6 +297,8 @@ struct DSSwipeStrip: View {
         .highPriorityGesture(swipe(gap: gap, lim: lim, barW: barW))
         .onAppear { settle(animated: false, gap: gap, lim: lim) }
         .onChange(of: selectedID) { _, _ in settle(animated: true, gap: gap, lim: lim) }
+        // 条外的整行拖动：只接收增量，位置与吸附仍在这里算（见 `rowDragChanged`）。
+        .onChange(of: rowDrag) { _, new in rowDragChanged(new, gap: gap, lim: lim) }
         // 容器宽度变了（旋转 / iPad 分栏 / 首帧量到宽度）→ 按新间距重新落位。
         // 少了这一步，条子会按旧间距停在旧位置，直到用户碰它一下才归位。
         .onChange(of: availableWidth) { _, _ in settle(animated: false, gap: gap, lim: lim) }
@@ -379,7 +411,7 @@ struct DSSwipeStrip: View {
                 if !moved {
                     pick(nearest(to: v.location.x, gap: gap, barW: barW))
                 } else {
-                    snap(gap: gap, lim: lim)
+                    snap(gap: gap, lim: lim, projected: projectedPV(v, gap: gap))
                 }
                 // 松手后再收回，节奏照原型：**拖过**的等 620ms（给眼睛时间看清
                 // 刚才划过哪些档），**没动过**（纯点按）立即收回。
@@ -415,8 +447,82 @@ struct DSSwipeStrip: View {
     }
 
     /// 松手：吸附到最近一档。位置与档位用的是同一条 spring，所以看上去是「滑过去」。
-    private func snap(gap: CGFloat, lim: ClosedRange<CGFloat>) {
-        let i = min(max(Int(pvValue(c: c, gap: gap).rounded()), 0), max(0, items.count - 1))
+    /// 条外的整行拖动（宿主转发进来，见 `RowDrag`）。
+    ///
+    /// `guard cBase == nil`：条子自己的手势正跟着这一根手指时，这条转发**整个作废** ——
+    /// 两者算出来的值相同（都是从按下那一刻的 `c` 减去同一个绝对增量），
+    /// 但没有必要让同一根手指有两个写 `c` 的人。
+    private func rowDragChanged(_ e: RowDrag?, gap: CGFloat, lim: ClosedRange<CGFloat>) {
+        guard cBase == nil else {
+            // 条子自己的手势接管了这根手指（转发作废）—— 连同起点一起忘掉：
+            // 否则松手时还会按一个过时的起点再吸附一次（两次算出来的档通常相同，
+            // 但「通常」不是「一次」）。
+            rowBase = nil
+            rowMoved = false
+            return
+        }
+        guard let e else {
+            // 松手：按**预测落点**吸附（速度算进去），与条内拖动的松手同一条路。
+            if let base = rowBase {
+                rowBase = nil
+                snap(gap: gap, lim: lim,
+                     projected: pvValue(c: base - rowPredicted, gap: gap))
+            }
+            guard rowMoved else { return }
+            rowMoved = false
+            // 收回节奏照原型：**拖过**的等 620ms（给眼睛时间看清划过哪些档），
+            // 没拖过的立即收回。计时器带代号（与条内拖动共用 `retractToken`）——
+            // 手指若已经回到条子上，这次收回作废。
+            let token = retractToken
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.62) {
+                guard token == retractToken else { return }
+                withAnimation(TokensMotion.fade) { expand = 0 }
+                onExpand?(false)
+            }
+            return
+        }
+        if rowBase == nil {
+            rowBase = c
+            retractToken += 1          // 新触摸作废还没生效的收回
+        }
+        guard let base = rowBase else { return }
+        // 展开只在越过 8pt 之后（纯点按不该把条子长开又缩回 —— 那是一次闪烁；
+        // 条内拖动那边「按下就展开」是因为那一刻手指一定在条上）。
+        if e.moved {
+            rowMoved = true
+            if expand < 1 {
+                withAnimation(TokensMotion.fade) { expand = 1 }
+                onExpand?(true)
+            }
+        }
+        rowPredicted = e.predicted
+        c = clampC(base - e.translation, lim: lim, gap: gap)
+        onPosition?(pvValue(c: c, gap: gap))
+    }
+
+    /// 松手时的**预测落点**（连续档位，`pvValue` 的同一量纲）：
+    /// 用系统给的 `predictedEndTranslation`，而不是松手那一刻的位置 —— 两者差的就是速度。
+    ///
+    /// 为什么必须看速度：iOS 的吸附（列表、翻页、选择器）都看它，轻甩一下就该走过去。
+    /// 只看位置的话，「甩」和「停」结果一样 —— 手感只能是「不跟手」。
+    /// 两种跟手形态改的不是同一个量（整行跟手改 `c`，透镜跟手直接改 `pv`），
+    /// 所以预测也分开算：它们是**同一个吸附**的两个入口，不是两套吸附。
+    private func projectedPV(_ v: DragGesture.Value, gap: CGFloat) -> Double {
+        switch follow {
+        case .row:
+            return pvValue(c: (cBase ?? c) - v.predictedEndTranslation.width, gap: gap)
+        case .loupe:
+            return pvValue(c: c, gap: gap) - Double(v.predictedEndTranslation.width / pitch(gap))
+        }
+    }
+
+    /// 松手时的吸附。`projected` = 按速度预测的连续档位；
+    /// 给 `nil` 就按当前 `c` 算（点按 / 没有速度信息）。
+    private func snap(gap: CGFloat, lim: ClosedRange<CGFloat>, projected: Double? = nil) {
+        let last = Double(max(0, items.count - 1))
+        // 先夹再四舍五入：透镜跟手时可拖出端 0.35 档，而档位只有 0…last。
+        let pv = min(max(projected ?? pvValue(c: c, gap: gap), 0), last)
+        let i = min(max(Int(pv.rounded()), 0), max(0, items.count - 1))
         guard items.indices.contains(i) else { return }
         if items[i].id == selectedID {
             // 档位没变：只把位置吸回去（onChange 不会触发，所以自己走一次）

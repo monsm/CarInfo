@@ -103,13 +103,18 @@ struct MapSpineView: View {
     /// 宿主只用它做内容过渡 —— 条子自己不用它排版。
     /// 初值 `-1` 是**哨兵**：条子的回调要等 `onAppear`，而第一帧已经画了。
     /// 用 0 当初值会让冷启动先闪一帧第一档（「出行」）再到记住的那一档。
+    ///
+    /// ⚠️ 它只有**一个**写者：条子的 `onPosition`。2026-09-25 之前这里还有第二个
+    /// （宿主自己的整行拖动按自己节距算一个位置写进来），两个写者的后果写在
+    /// `DSSwipeStrip.RowDrag` 上：条子不跟手、松手后页面停在两页之间。
     @State private var modePosition: Double = -1
 
-    /// 整条底条上那次横拖的起点档位（`nil` = 手指还没按下）。
-    /// 它是 `bottomBarDrag` 的状态 —— 那两样东西必须住在同一个文件里：
-    /// Swift 的 `private` 作用域是**文件**，把状态拆到另一个文件里的扩展，
-    /// 要么看不见它、要么就得把它降级成模块级可见（2026-09-25 的 CI 就是这么红的）。
-    @State private var barDragBase: Double?
+    /// 整条底条上那次横拖（`nil` = 手指不在条上）。它只是**转发**给条子：
+    /// 条子仍是位置的唯一计算者（跟手、越界阻尼、吸附都在那里，见 `RowDrag`）。
+    /// 状态与手势必须住在同一个文件里：Swift 的 `private` 作用域是**文件**，
+    /// 把状态拆到另一个文件里的扩展要么看不见它、要么就得把它降级成模块级可见
+    ///（2026-09-25 的 CI 就是这么红的）。
+    @State private var barRowDrag: DSSwipeStrip.RowDrag?
     /// 底条是否正在展开（手指按在条子上）。
     /// 它只服务一件事：展开时把两侧的两枚圆钮**让出宽度并淡出** ——
     /// 原型 `.bottom.open .arm{opacity:0;transform:scale(.86)}`，
@@ -117,7 +122,10 @@ struct MapSpineView: View {
     /// 留给两枚圆钮就只能把间距压扁，而压间距正是原型明确否掉的那一件事。
     @State private var barOpen = false
 
-    @State private var camera: MapCameraPosition = .automatic
+    /// 镜头。**不是 `private`**：右侧那两枚快速钮（`MapQuickButtons.swift`）里
+    /// 「回到车 / 手机的位置」都要把它移过去 —— 而 `private` 的作用域是**文件**，
+    /// 另一个文件里的扩展看不见（2026-09-25 那次 CI 红就是同一个原因）。
+    @State var camera: MapCameraPosition = .automatic
     @State private var didCenterOnce = false
     /// 不是 `private`：同上，充电那一层的内容在 `MapSpineLayers.swift` 里读它。
     @State var chargers: [MapCharger] = []
@@ -129,10 +137,15 @@ struct MapSpineView: View {
     @State private var skyLive = true
     @State private var skyHour: Double = 12
 
-    /// 「更多读数」抽屉开着没有（默认关着：一屏只留续航 / 电量 / 车速）。
-    /// **不是 `private`**：抽屉的视图住在 `MapSpineReadouts.swift`（与读数同一份文件），
-    /// 而 `private` 的作用域是文件 —— 那个文件看不见它。
-    @State var drawerOpen = false
+    /// 「其余读数」那张 sheet 开着没有（默认关着：一屏只留续航 / 电量 / 车速）。
+    /// **不是 `private`**：入口那行与 sheet 的内容都住在 `MapSpineReadouts.swift`
+    ///（与读数同一份文件），而 `private` 的作用域是文件 —— 那个文件看不见它。
+    ///
+    /// 它上一版是三个状态（`drawerReveal` 连续量 + `drawerBase` 拖动起点 +
+    /// `drawerHeight` 量到的自然高度），因为那时抽屉是**卡里自己拉的一层**。
+    /// 现在拉手、档位、橡皮筋、下拉关闭都在系统那张 sheet 里（见
+    /// `MapSpineReadouts` 头注）—— 一个 `Bool` 就是这件事的全部状态。
+    @State var showReadouts = false
 
     /// 壁纸状态（非地图子页铺的底）。**必须订阅它**：图是异步到达的，
     /// 不订阅的话 `换一张 / 不铺` 要等到下一次换档才生效（body 才重新求值）。
@@ -145,7 +158,10 @@ struct MapSpineView: View {
     }
 
     private var theme: ArtTheme { ArtTheme(rawValue: themeRaw) ?? .native }
-    private var spec: MapStyleSpec { theme.mapSpec }
+    /// 当前艺术方向落成的地图规格。**不是 `private`**：`MapQuickButtons.swift`
+    /// 里把镜头移到手机时要用同一个 `cameraDistance` —— 两处各写一个数就是
+    /// 「同一个几何有两个出处」。
+    var spec: MapStyleSpec { theme.mapSpec }
     private var layer: MapSpineLayer { MapSpineLayer(rawValue: layerRaw) ?? .now }
     private var homeMode: HomeMode { HomeMode(rawValue: homeModeRaw) ?? .now }
 
@@ -225,14 +241,29 @@ struct MapSpineView: View {
             //    height:calc(var(--H) + 14px)}`：模式条就长在**最底**，
             //    内容从它上面长上去 —— 相机就是这么摆的。
             bottomBar
+
+            // ② 顶：Toast 浮层 —— 抬到条子**之上**。
+            //    它原来挂在外壳（`MapShellView`）的 `.bottom` 上（那是屏幕底），
+            //    而模式条就长在那里，于是「电量低于 20%」正好压住底部导航
+            //（用户 2026-09-25 的第 2 条）。抬多高只有这一处答得出：条子自己占
+            //    `barTotal`（26 + 54 + 14），上面再留一格呼吸位。
+            //    `.id(t.text)` 而不是 `.id(UUID())`（外壳那一版是后者）：
+            //    后者会让**每一次 body 求值**都换一个新身份，而拖模式条时每帧都在求值。
+            if let t = nav.currentToast {
+                ToastView(text: t.text, icon: t.icon)
+                    .padding(.bottom, Self.barTotal + TokensSpacing.snug)
+                    .id(t.text)
+            }
         }
         // 底条离底 26、页面窗到「屏底 − 86」：原型的这两个数都是从**屏幕**量的
         // （`.bottom{bottom:26}` / `.stack{bottom:86}`）。安全区底那 34pt 若不排除，
         // 条子会凭空抬高一截 —— 与原型差出一个手指的宽度。
         .ignoresSafeArea(edges: .bottom)
+        // Toast 的出现 / 消失（它原来跟在外壳上，随浮层一起搬过来）。
+        .animation(.easeOut(duration: 0.2), value: nav.currentToast?.text)
         // 暗层全删（用户 2026-09-24：「每个子界面的暗层都去掉」）：
         // 根上**不再铺** `TokensPalette.canvas` —— 让 AppCanvas（画布+实时光）透出来。
-        // 五张子页各自铺**壁纸图**（见 `wallpaperLayer`）；地图那一档铺自己的瓦片。
+        // 五张子页各自铺**壁纸图**（见 `MapWallpaperLayer`）；地图那一档铺自己的瓦片。
         // 之前那层的理由是「换档过渡时底下不能透出地图」—— 现在的解法：
         // 五张子页各自铺图（铺图的下面就是 AppCanvas，不是地图），
         // 所以过渡期间透出的不再是地图的灰黑，而是壁纸/画布。
@@ -285,6 +316,9 @@ struct MapSpineView: View {
         .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
             centerOnCar(force: false)
         }
+        // 手机的位置取回来了 → 把镜头移过去（按了那枚钮、答应过权限之后自动完成；
+        // 实现见 `MapQuickButtons.swift`）。
+        .followPhoneOnce()
     }
 
     /// 取一次天气（TTL 与「车没走远」两道护栏都在服务里）。
@@ -366,6 +400,9 @@ struct MapSpineView: View {
                 .frame(width: 44, height: 44)   // HIG 最小触控目标就落在钉中心
             }
         }
+        // 手机自己那一点（只在真的拿到位置时出现）—— 与车钝是**两个**点：
+        // 「车在哪」与「我在哪」是两个问题（见 `MapQuickButtons.phonePin`）。
+        phonePin()
         rangeCircle(d)
         tripLines(d)
         hotspotCircles(d)
@@ -516,7 +553,9 @@ struct MapSpineView: View {
                          },
                          onExpand: { open in
                              withAnimation(TokensMotion.fade) { barOpen = open }
-                         })
+                         },
+                         // 整条上的横拖（含条子上下那圈空白带）。
+                         rowDrag: barRowDrag)
 
             quickArm
         }
@@ -552,49 +591,39 @@ struct MapSpineView: View {
 
     /// 一枚圆钮（有行为的那两枚用它）。
     /// 底条整行的横向拖（用户 2026-09-24：「不跟手」→ 手指按在条子**任意位置**
-    /// 都能拖，不只是胶囊上）。它不直接改条子的状态 —— 而是把「拖动的横向增量」
-    /// 换算成条子内部的连续档位（`modePosition`），让条子自己跟手展开。
+    /// 都能拖，不只是胶囊上）。
     ///
-    /// 几何：按下时记下条子当时的档位（`modePosition`，哨兵 -1 时按记住的那一档画），
-    /// 拖动中 = 档位起点 ± 增量 / 节距。节距 = 条宽 / 档数（5 个间隔分 `barRowWidth`，
-    /// 两端各一档 —— 与 `DSSwipeStrip` 展开后的全行程同一物理量）。
-    /// 手指往左拖 = 看左边的档（出行/车辆），往右拖 = 看右边的档（充电/车控/我的）。
+    /// 它**只转发**：把「手指的横向增量 + 系统的预测落点」交给条子（`RowDrag`），
+    /// 由条子自己改位置、自己吸附、自己写回档位。
+    ///
+    /// 上一版是在这里自己算档位（按 `barRowWidth / 档数` 当节距写 `modePosition`），
+    /// 两个后果都真实存在过，也都在 `DSSwipeStrip.RowDrag` 里写明了：
+    ///   · 手指按在条子上下的空白带里拖时，**条子一动不动**（`c` 没人碰），
+    ///     动的只有页面 —— 而那条空白带正是拇指自然停放的位置；
+    ///   · 松手时没有谁写回 `homeModeRaw`，于是几页停在半透明相叠的状态，
+    ///     下一次碰条子才归位（那 26pt 空白带被上一版显式算作「滑动区」，
+    ///     所以这不是一条够不着的路）。
     ///
     /// 为什么用 `simultaneousGesture` 而不是 `highPriorityGesture`：两侧圆钮是 `Button`，
     /// 用 `highPriority` 会把圆钮的 tap 也吃掉（点不动了）。`simultaneous` 让两件事并存：
     /// 轻点（位移 < 8pt）= 圆钮的 tap / 条子的点选；横拖（位移 > 8pt）= 条子展开跟手。
-    /// 圆钮的 tap 由 `Button` 自己消费，横拖由这条手势消费 —— 互不冲突。
-
+    /// 手指落在条子上时，条子自己的手势也在跟（它的 `onChanged` 与这条同时发生）——
+    /// 那时条子会把这条转发整个作废（`guard cBase == nil`），两边不打架。
     var bottomBarDrag: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
             .onChanged { v in
-                guard barRowWidth > 0 else { return }
                 // 只有横拖才算（竖向 / 斜向让给地图）。
                 guard abs(v.translation.width) > abs(v.translation.height) else { return }
-                if barDragBase == nil {
-                    // 按下时的档位：哨兵 -1（还没被条子回调过）就按记住的那一档画。
-                    barDragBase = modePosition >= 0 ? modePosition : Double(modeIndex)
-                }
-                guard let base = barDragBase else { return }
-                // 节距 = 条宽 / 5 个间隔（6 档）。拖 1 个节距 = 移动一档。
-                let n = max(1, HomeMode.allCases.count - 1)
-                let pitch = barRowWidth / CGFloat(n)
-                let pos = (base - Double(v.translation.width / pitch))
-                    .clamped(to: 0...Double(n))
-                modePosition = pos
-                // 拖过 8pt 才算「拖」：同时把条子展开（圆钮让位），与 DSSwipeStrip
-                // 自己的「按下就展开」是同一件事的两种触发（它管按在胶囊上，
-                // 这条管按在整条上）。
-                if abs(v.translation.width) > 8, !barOpen {
-                    withAnimation(TokensMotion.fade) { barOpen = true }
-                }
+                barRowDrag = DSSwipeStrip.RowDrag(
+                    translation: v.translation.width,
+                    // `predictedEndTranslation` = 系统按速度算出的「松手后手指将到的地方」。
+                    // 它一路传到条子的吸附里 —— 轻甩一下就走过一档，正是 iOS 的手感。
+                    predicted: v.predictedEndTranslation.width,
+                    moved: abs(v.translation.width) > 8)
             }
             .onEnded { _ in
-                // 松手：档位停在手指停的地方（`modePosition` 已经跟手到位），
-                // 档位的**写回**（`homeModeRaw`）交给 `DSSwipeStrip` 自己的吸附
-                //（它每帧都在用 `pvValue` 读 `c`，而 `c` 由 `onPosition` 驱动 ——
-                //  两条手势改的是同一个连续量，不会打架）。
-                barDragBase = nil
+                // 松手 = 关掉这条通道；吸附发生在「非 nil → nil」这一步里（条子那边）。
+                barRowDrag = nil
             }
     }
 
@@ -694,7 +723,7 @@ struct MapSpineView: View {
     /// 成功与失败都照实说一句 —— 遥控制的提示不能只报喜。
     private func refreshCondition(_ c: QuickCommand) async {
         let ok = await store.sendControlCommand(c.key)
-        EnhancedToastManager.shared.show(ok ? "\(c.name)指令已发送" : "\(c.name)发送失败",
+        ToastManager.shared.show(ok ? "\(c.name)指令已发送" : "\(c.name)发送失败",
                                          icon: ok ? c.symbol : "exclamationmark.triangle.fill")
     }
 
@@ -754,11 +783,20 @@ struct MapSpineView: View {
                 // 只建当前那一档，于是「哪一档在建」直接决定了「谁在吃内存」。
                 .onAppear { StartupJournal.shared.mark("亮出屏幕：地图") }
         } else {
-            // 全屏：与地图页（`.now`）一样忽略顶部安全区 —— 状态栏不再「挡着」子页。
+            // 子页的顶：**背景铺到屏顶，内容留在安全区里**。
+            //
             // 用户 2026-09-24：「地图页可以全屏没有状态栏，为什么子页面有时间信号
-            // 的状态栏挡着」。壁纸 / 画布铺到屏顶，内容窗仍停在安全区下（第一张卡是
-            // 巨字头，顶到安全区下沿即可），背景与地图页一样画到屏幕最上沿。
+            // 的状态栏挡着」→ 壁纸（背景）从此画到屏幕最上沿，这一条不变。
+            // 用户 2026-09-25 第 3 条：「所有的子界面顶部要留有一定的空间吧？
+            // 现在连第一个卡片的圆角都看不到了」—— 上一版这里写的是
+            // `.ignoresSafeArea(edges: .top)` + `.safeAreaPadding(.top, 44)`：
+            // 前者把**内容**也顶到了屏幕最上沿（第一张卡的圆角正好落在状态栏底下），
+            // 后者想把它推回来，但它加进的是「子树自己已经忽略掉的那条安全区」，
+            // 而且那个 44 是个字面量。
+            // 现在：只有背景忽略安全区（`.background { …ignoresSafeArea() }`），
+            // 内容留在系统安全区里，上面再让一格呼吸位 —— 圆角因此看得见。
             pageContent(mode)
+                .padding(.top, TokensSpacing.md)
                 .padding(.bottom, Self.barTotal)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 // 五张子页的底色 = 壁纸图（相册选的一张本地图，不依赖网络）。
@@ -767,11 +805,7 @@ struct MapSpineView: View {
                 // 主屏壁纸（无公开 API），只能从相册选一张本地图铺底（见 WallpaperService）。
                 // 没选图时（或点了「不铺」）回落到画布底色（`TokensPalette.canvas`），
                 // 观感上和删暗层之前一样 —— 只是从「暗层」变成「App 自己的画布」。
-                .background(wallpaperLayer())
-                .ignoresSafeArea(edges: .top)
-                // 背景画到屏顶之后，内容窗仍停在安全区下沿（用户 2026-09-24：
-                // 子页不被状态栏挡，但字也不该压进状态栏底下）。
-                .safeAreaPadding(.top, 44)
+                .background { MapWallpaperLayer(image: wallpaper.image).ignoresSafeArea() }
                 .onAppear { StartupJournal.shared.mark("亮出屏幕：\(mode.title)") }
         }
     }
@@ -805,11 +839,17 @@ struct MapSpineView: View {
 
             // `.float{left:16;right:16;bottom:98}`：底边离屏底（条子占 `barTotal` + 12 呼吸位）。
             // 这一档**只有一张大卡**，它自己从下往上排：巨字续航 → 副行 → 光带
-            // → 一排读数（电量 / 车速）→ 「更多读数」抽屉（胎压 / 车锁 / 充满）。
+            // → 一排读数（电量 / 车速）→ 「其余读数」那行入口（点开是系统 sheet）。
             nowCard(d)
                 .padding(.horizontal, TokensSpacing.md)
                 .padding(.bottom, Self.barTotal + 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+            // 地图右侧那一列快速钮（回到车 / 手机的位置）—— 用户 2026-09-25：
+            // 「像 ios 地图 app 右侧的图标一样」。它们贴在**右上角**（让开系统罗盘），
+            // 不是贴底：底下那张卡与模式条已经占满了（见 `MapQuickButtons`）。
+            quickMapButtons(d)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
         // `.plate{left:20;top:62}`：车牌徽标挂在安全区下的左上角（62 ≈ 54 + 8）。
         // 原来这里挂着**车牌徽标**（车牌 + 状态 + 上报时间 + 菜单），压在安全区下 8pt。
@@ -860,12 +900,10 @@ struct MapSpineView: View {
             } label: {
                 Label(lightTitle(d), systemImage: "sun.max")
             }
-            Button {
-                TokensHaptic.tap()
-                centerOnCar(force: true)
-            } label: {
-                Label("回到车", systemImage: "location.fill")
-            }
+            // 「回到车」原来在这里 —— 2026-09-25 搬去地图右侧那枚常驻圆钮
+            //（`MapQuickButtons.swift`，用户：「像 ios 地图 app 右侧的图标一样」）。
+            // 菜单里不再留一条：同一个动作两个入口就是重复，而「车在哪」是
+            // 迷路时第一个问题 —— 它不该藏在一个要打开才知道有的地方。
             if sizeClass == .regular {
                 Button {
                     TokensHaptic.tap()
@@ -944,65 +982,42 @@ struct MapSpineView: View {
                     }
                     // 读数分两层（用户 2026-09-25：「地图页数据用抽屉的方式展示」）：
                     // 默认一屏就是**续航（巨字）/ 电量 / 车速**三个数，
-                    // 其余读数（胎压 / 车锁 / 还要充多久）在那道拉手之后（`moreDrawer`）。
+                    // 其余读数在那行入口后面 —— 点开是**系统的 sheet**
+                    //（用户 2026-09-25 第二轮：在我列的候选里选了「换成系统 sheet + `presentationDetents`」，
+                    //  见 `MapSpineReadouts` 头注里上一版那道自画抽屉的每一条代价）。
                     readoutRow(readoutsPrimary(d))
-                    moreDrawer(d)
+                    readoutsDisclosure()
                 case .trips: tripsContent(d)
                 case .holds: holdsContent(d)
                 case .charge: chargeContent(d)
                 }
             }
         }
-    }
-
-    /// 现状卡的读数：地址 → 巨字续航 → 副行 → 光带。
-    @ViewBuilder
-    private func nowMetrics(_ d: MapSpineData) -> some View {
-        if !d.address.isEmpty {
-            Text(d.address)
-                .font(TokensSerif.title(22))
-                .tracking(TokensTracking.title)
-                .foregroundStyle(TokensPalette.primary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        if d.rangeText == "--" {
-            // 车没报续航就**不摆「-- km」** —— 那是一个假的读数
-            GlassCardEmpty(text: "还没收到剩余续航", icon: "bolt.slash")
-        } else {
-            DSBigNumber(value: d.rangeText, unit: "km", caption: "续航", size: 56,
-                        tint: TokensPalette.primary)
-        }
-        nowSub(d)
-        // 光带 = 电量（全 App 唯一的形状，在地图上它是「车钉外面那圈弧」的展开）
-        DSLightBar(progress: Double(d.socPct) / 100,
-                   height: 5,
-                   showsGlow: spec.allowsGlow,
-                   tint: TokensPalette.lightBar)
-    }
-
-    /// 副行。空段直接丢掉（不摆占位）—— 「表显 53,766 km · 未充电」里任何一个字
-    /// 取不到，那一句就不出现，而不是留一个 `--`。
-    ///
-    /// 它曾经从「电量 68%」开头 —— 那个数已经是下面四格里的「电量」那一格，
-    /// 而电量在这张卡里还有第三种说法（光带）。一个 68% 说三遍不是信息多，是没精简。
-    @ViewBuilder
-    private func nowSub(_ d: MapSpineData) -> some View {
-        let mileage = VM.vehicleSummary(store.car, store.controlCache)?.mileage
-        let line = Self.join([mileage.map { "表显 \($0) km" },
-                              d.chargeText])
-        if !line.isEmpty {
-            Text(line)
-                .font(TokensTypo.caption)
-                .foregroundStyle(TokensPalette.tertiary)
+        // 「其余读数」= **系统的 sheet**（用户 2026-09-25 第二轮选的候选）。
+        // 三个修饰符都是系统的事，没有一个是我们画的：
+        //   · `presentationDetents`：两档（半屏 / 全屏），橡皮筋与吸附由系统给 ——
+        //     上一版自画的抽屉只有两个落点，而吸附还是手算的；
+        //   · `presentationDragIndicator`：系统那枚拉手。写 `.visible` 而不是 `.automatic`：
+        //     自动模式下它会在「sheet 不可下拉关闭」时才出现，而这里永远可关 ——
+        //     写出来是为了让「这里的拉手一定在」不靠系统的默认值（默认值会随版本变）；
+        //   · `presentationBackgroundInteraction(.enabled(upThrough: .medium))`：
+        //     半屏那一档底下那张地图**仍然可以拖**（Apple 地图正是这样）——
+        //     上一版自画的抽屉从头到尾都盖在地图上。
+        .sheet(isPresented: $showReadouts) {
+            readoutsSheet(d)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
     }
 
-    /// 把若干片段拼成一行：空段与 `--` 直接丢掉（全站统一的做法）。
-    private static func join(_ parts: [String?]) -> String {
-        parts.compactMap { $0 }
-            .filter { !$0.isEmpty && $0 != "--" }
-            .joined(separator: " · ")
-    }
+    // `nowMetrics` / `nowSub` / `join`（现状卡里那三个数怎么画）已搬进
+    // `Map/MapNowCard.swift`（2026-09-25）：本文件当时加了那两枚快速钮、手机位置的点
+    // 与抽屉的三段状态之后涨到 1211 行，越过了 `lintcfg.py` 的 1200 阈值。
+    // 按那个阈值的用法是把东西搬出去（不是把文件加进排除清单，也不是把阈值抬到刚够）——
+    // 搬的那一块是**一件独立的事**：这张卡里三个数的排版，与地图的镜头、图层、手势互不相干。
+    // 界面一字未改。三份拆出去的文件：`MapNowCard` / `MapSpineReadouts` / `MapQuickButtons`
+    //（后来那道抽屉又交给了系统 sheet，连带那三个状态一起删 —— 见 `nowCard`）。
 
     /// 每一档 = 一个完整的功能界面。
     /// **入口只有一个 switch**：加页面就在 `HomeMode` 里加一档、在这里加一个 case。
@@ -1023,30 +1038,10 @@ struct MapSpineView: View {
         case .mine: MineView()
         }
     }
-    /// 五张子页（非地图）铺的底色：壁纸图（在线取，失败回退画布）。
-    ///
-    /// 为什么是壁纸图而不是 `TokensPalette.canvas`（用户 2026-09-24：「其他页面的背景全部
-    /// 设为当前桌面的背景」）：iOS 没有读主屏壁纸的公开 API（壁纸归 SpringBoard 管，App
-    /// 进程拿不到）。能做到的最接近的一版是铺一张在线风景图当壁纸（Unsplash 官方直链）。
-    ///
-    /// 观感：图片 `resizable + aspectRatio(.fill)` 铺满全屏，`ignoresSafeArea()`；
-    /// 取图失败（或用户点了「不铺」）就回落到 `TokensPalette.canvas`，观感上等于删暗层之前
-    /// 那层 `TokensPalette.canvas`，只是现在它是 AppCanvas 透出来的画布，不再是「暗层」。
-    @ViewBuilder
-    private func wallpaperLayer() -> some View {
-        ZStack {
-            // 底色兜底：没选图（或点了「不铺」）就铺画布（跟随系统深浅色 ——
-            // 浅色模式浅灰、深色模式近黑，但那是 AppCanvas 的颜色，不再是「暗层」）。
-            TokensPalette.canvas
-            // 选中的那张（相册本地取，不依赖网络）：铺满全屏，`aspectRatio(.fill)` 裁满。
-            if let img = wallpaper.image {
-                Image(uiImage: img)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .ignoresSafeArea()
-            }
-        }
-    }
+    // `wallpaperLayer()` 已搬进 `Map/MapWallpaperLayer.swift`（2026-09-25）：
+    // 这个文件涨到 1211 行，越过了 `lintcfg.py` 的 1200 阈值 —— 按那个阈值的用法
+    // 是把东西搬出去，不是把文件加进排除清单。搬的是**一件独立的事**（一张铺底的图），
+    // 界面一字未改：调用点就是下面那个 `.background { MapWallpaperLayer(...) }`。
 
     //  这里原本有一条 `tyreRow`：四轮胎压逐轮排在卡里（标签 + kPa + 报警色）。
     //  它把下面四格里的「胎压」说了第二遍 —— 四格里那一格取的是**最低的那一条**
@@ -1109,7 +1104,8 @@ struct MapSpineView: View {
 
     /// 把相机移到车上。heading 来自**当前艺术方向**（夜光转 7°，让路网斜走）。
     @MainActor
-    private func centerOnCar(force: Bool) {
+    /// **不是 `private`**：右侧那枚「回到车」在 `MapQuickButtons.swift` 里。
+    func centerOnCar(force: Bool) {
         guard let c = store.currentLocation?.coordinate else { return }
         if didCenterOnce && !force { return }
         didCenterOnce = true
@@ -1176,16 +1172,9 @@ struct MapSpineView: View {
     }
 }
 
-// =============================================================================
-//  文件作用域的小工具：双向夹
-// =============================================================================
-//
-//  ⚠️ 它必须**在文件层**：`private extension Double` 曾经被写进 `extension MapSpineView`
-//  的体内，2026-09-25 的 CI 因此红在第一行 —— 「declaration is only valid at file scope」。
-//  Swift 不允许嵌套 extension，也不允许在 extension 里放实例存储属性。
-//  `scan/extguard.py` 现在两条都拦（那第 29 条门禁就是为这一课写的）。
-private extension Double {
-    func clamped(to range: ClosedRange<Double>) -> Double {
-        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
-    }
-}
+//  这里原本有一个 `private extension Double { func clamped(to:) }`（文件层的小工具）。
+//  2026-09-25 删：它唯一的使用点是宿主自己算档位的那段代码（已删，见 `bottomBarDrag`），
+//  留下的就是「声明在、没有读者」。它当年留下的那条教训不在这里 —— 它写在
+//  `scan/extguard.py` 的文件头与 HANDOFF §8 第 29 条里（extension 必须文件层、
+//  不许带实例存储属性、不许碰别处的 private）：注释留在原处而值已经没人用，
+//  正是这个仓库反复吃亏的那种「文档在替不存在的代码担保」。

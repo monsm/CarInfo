@@ -1,12 +1,13 @@
 import SwiftUI
 
 // =============================================================================
-//  MapSpineView · 「现在」这一档里的读数（默认一排：电量 / 车速；抽屉里：胎压 / 车锁 / 充满）
+//  MapSpineView · 「现在」这一档里的读数
+//（默认一排：电量 / 车速；点开「其余读数」：胎压 / 车锁 / 充满 + 平均电耗 / 航向 / GPS）
 // =============================================================================
 //
 //  与 `MapSpineLayers.swift` 同一个理由 —— 关切不同：`MapSpineView` 管这一屏的
 //  骨架（六页同屏、底条、车牌徽标、底部浮动两卡），这里只回答一件事：
-//  「一瞥的那四个数从哪来、取不到时写什么」。
+//  「一瞥的那几个数从哪来、取不到时写什么、其余的怎么让人看到」。
 //
 //  另一条理由更实际：`scan/lintcfg.py` 的 `file_length` 盯着最大那个文件。
 //  2026-09-24 骨架那一份涨到 1206 行（阈值 1200），差 6 行就红 ——
@@ -16,10 +17,24 @@ import SwiftUI
 //
 //  注：下面用到的 `store` 因此**不是 `private`** —— `private` 的作用域是文件，
 //  跨文件看不见。它在骨架里的注释写明了为什么。
+//
+//  2026-09-25（第二轮）：**「其余读数」改成了系统的 sheet**（用户：把地图的抽屉做成
+//  iOS 地图那种；并在我列的候选里选了「换成系统 sheet + `presentationDetents`」）。
+//  上一版是卡里自己拉的一道抽屉：一枚自画的拉手 + `drawerReveal` 连续量 + 自算的两个
+//  落点 + 把内容藏起来量自然高度（`drawerMeasure`）。那套东西**每一条都在重做系统
+//  已经做好的事**，而且做得少：
+//    · 系统 sheet 的落点是三个 + 橡皮筋，我们只有两个 + 手算的吸附；
+//    · 系统的拉手是 UIKit 那一枚（尺寸 / 对比度 / 点击热区都随动态字号与辅助功能设置走），
+//      我们画的是 `Capsule().fill(track).frame(width: 36, height: 5)`；
+//    · 系统在 `.medium` 那一档会让**底下的地图继续可交互**（`.presentationBackgroundInteraction`），
+//      而卡里那道抽屉从头到尾都盖在地图上；
+//    · 系统给下拉关闭、VoiceOver 的「收起/展开」、键盘与指针行为，这些都要自己写。
+//  现在这一档只剩一句话：「点这行 → 系统把它拉上来」。`drawerReveal` / `drawerBase` /
+//  `drawerHeight` / `drawerMeasure` / `drawerGrabber` / `moreDrawer` 全部删除。
 // =============================================================================
 
 extension MapSpineView {
-    // ---- 四格读数 ----
+    // ---- 读数格 ----
     //
     //  原型 `.card.chips`：车速 / 电量 / 胎压 / 车门，四格一行。
     //
@@ -42,8 +57,8 @@ extension MapSpineView {
 
     /// 一排读数格（同一行、同一基线；裸的一行，不含玻璃壳）：排进 `nowCard` 大卡的下沿。
     ///
-    /// 默认那一排与抽屉里那一排都是它 —— 两处形状一模一样，所以「拉开抽屉」看起来是
-    /// 「下面又长出一排」，而不是「换了一套排版」。
+    /// 卡里那一排与 sheet 里那两排都是它 —— 三处形状一模一样，所以「点开其余读数」
+    /// 看起来是「同一套读数多出来两排」，而不是换了一套排版。
     /// 排版权：每格同高同宽（`readoutCell` 自己 `maxWidth: .infinity`）。
     func readoutRow(_ items: [Readout]) -> some View {
         HStack(spacing: TokensSpacing.sm) {
@@ -72,11 +87,11 @@ extension MapSpineView {
         ]
     }
 
-    /// 抽屉里那几格（默认收起来的那一半）。顺序 = 关心的顺序：胎压 → 车锁 → 还要充多久。
+    /// 收在 sheet 里的第一排（一瞬看不出来的那半）。顺序 = 关心的顺序：胎压 → 车锁 → 还要充多久。
     ///
     /// 取不到的那一格**照实说「无数据」**：不摆 `--`、也不拿别的数顶上（全站同一条）。
     /// 「还要充多久」只在充电时存在（`timeToFull` 为 nil 就是没有这件事），
-    /// 所以它不占一格 —— 没在充电时抽屉里只有胎压与车锁，而不是一格空着。
+    /// 所以它不占一格 —— 没在充电时只有胎压与车锁，而不是一格空着。
     @MainActor
     func readoutsMore(_ d: MapSpineData) -> [Readout] {
         let lock = VM.bodyStatus(store.caches).first { $0.label == "车锁" }
@@ -98,77 +113,105 @@ extension MapSpineView {
         return out
     }
 
+    /// sheet 里的第二排：**其余读数里还有的那几个**。
+    ///
+    /// 用户 2026-09-25 要的是 iOS 地图那种抽屉：「仅显示重要项，拉开抽屉就是剩余数据」——
+    /// 上一版拉开只多一排（胎压/车锁/充满），「剩余」这两个字没兑现。
+    /// 这三个都是 `MapSpineData` 里**真实存在**的字段，推不出来就整格不出现：
+    ///   · 平均电耗（`avgConsumption`）—— 车端报的，不是我们算的
+    ///   · 航向（`headingText`）—— 车头朝哪儿，地图上那个钉子在转，但看不到度数
+    ///   · GPS（`gpsText`）—— 定位质量；它不好时上面每个数都该打折看
+    @MainActor
+    func readoutsRest(_ d: MapSpineData) -> [Readout] {
+        var out: [Readout] = []
+        if let avg = d.avgConsumption, !avg.isEmpty, avg != "--" {
+            out.append(Readout(id: "avg", key: "平均电耗", value: avg))
+        }
+        if !d.headingText.isEmpty, d.headingText != "--" {
+            out.append(Readout(id: "heading", key: "航向", value: d.headingText))
+        }
+        if !d.gpsText.isEmpty, d.gpsText != "--" {
+            out.append(Readout(id: "gps", key: "GPS", value: d.gpsText, cls: d.gpsCls))
+        }
+        return out
+    }
+
     // =========================================================================
-    // MARK: 「更多读数」抽屉
+    // MARK: 「其余读数」—— 一行入口 + 一个系统 sheet
     // =========================================================================
 
-    /// 那道拉手 + 收在它后面的几格读数（用户 2026-09-25：「地图页数据用抽屉的方式
-    /// 展示，默认只有续航 电量 车速，其他数据均通过拉开抽屉展示」）。
+    /// 卡里那一行入口。**它是 iOS 的分级披露那一行**：一句标签 + 一个右尖括号，
+    /// 点开是系统 sheet（见 `readoutsSheet` 与 `nowCard` 上的 `.sheet`）。
     ///
-    /// HIG 把这件事叫**渐进披露**（Layout → Visual hierarchy，原话是
-    /// “Use progressive disclosure to make layouts cleaner and easier to interact with…
-    /// reduce how much content to initially display”）：它的目的不是藏东西，
-    /// 而是让「一瞬」与「细看」各自有一个明确的量。
+    /// 为什么不再自己画拉手：iOS 里「这里可以拉」是**底部表单**这件事本身，
+    /// 而底部表单的拉手由系统画（尺寸、对比度、点击热区都随辅助功能设置走）。
+    /// 卡里再画一枚 36×5 的胶囊，等于在系统已经画了拉手的地方又画一个 ——
+    /// 而这一行是**卡片内容**，不是表单：它该长得像「一条通往更多数据的路」，
+    /// 也就是 iOS 里无处不在的那种 disclosure 行。
     ///
-    /// 拉手既是**按钮**也是**拖动面**：只做拖动会把「想看一眼」变成一次猜手感，
-    /// 只做点按又与「拉开抽屉」这个说法不符 —— 两种都给，谁也不会因为不知道怎么用而卡住。
-    /// 命中区按 HIG 的最小触控目标给足 44pt（`TokensSpacing.row`），而画出来的把手
-    /// 只是一条 3pt 的横线 —— 手感来自可点面积，不来自把它画得更黑。
-    ///
-    /// 它**不需要** `CardFit` 分块，因为它的展开量被构造限定了：拉手一行（44）+ 最多一排
-    /// 读数（胎压/车锁/充满 三格同高同宽），不再有第二种排法 —— 那是比「算出来放得下」
-    /// 更强的保证。万一以后滑屉里开始堆行（比如按轮位展开四条胎压），这里要改成
-    /// CardFit 那一套（那是目前仓库里唯一的算法，见 `Design/CardFit.swift` 的头注）。
-    func moreDrawer(_ d: MapSpineData) -> some View {
-        let more = readoutsMore(d)
-        return VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-            Button {
-                TokensHaptic.tap()
-                withAnimation(TokensMotion.count) { drawerOpen.toggle() }
-            } label: {
-                HStack(spacing: TokensSpacing.sm) {
-                    Capsule()
-                        .fill(TokensPalette.track)
-                        .frame(width: 36, height: 3)
-                    Text(drawerOpen ? "收起" : "更多读数")
-                        .font(TokensTypo.caption2)
-                        .foregroundStyle(TokensPalette.tertiary)
-                    Spacer(minLength: 0)
-                    Image(safeSymbol: drawerOpen ? "chevron.down" : "chevron.up",
-                          fallback: "chevron.down")
-                        .font(TokensTypo.micro)
-                        .foregroundStyle(TokensPalette.tertiary)
-                }
-                .frame(minHeight: TokensSpacing.row)
-                .contentShape(Rectangle())
+    /// 命中区给足 `TokensSpacing.row`（HIG 最小触控目标 44pt）。
+    @MainActor
+    func readoutsDisclosure() -> some View {
+        Button {
+            TokensHaptic.tap()
+            showReadouts = true
+        } label: {
+            HStack(spacing: TokensSpacing.sm) {
+                Text("其余读数")
+                    .font(TokensTypo.caption)
+                    .foregroundStyle(TokensPalette.secondary)
+                Spacer(minLength: TokensSpacing.sm)
+                Image(safeSymbol: "chevron.right", fallback: "chevron.right")
+                    .font(TokensTypo.micro)
+                    .foregroundStyle(TokensPalette.tertiary)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text(drawerOpen ? "收起更多读数" : "更多读数"))
-            .accessibilityHint(Text("胎压、车锁、还要充多久"))
-            // 「拉开」也真能拉：向上拖过 12pt 开，向下拖过 12pt 收。
-            // 12pt 是手势与点按的分界（小于它一律算点按，与底条那条手势同一个门槛）。
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 12)
-                    .onEnded { v in
-                        if v.translation.height < -12, !drawerOpen {
-                            TokensHaptic.tap()
-                            withAnimation(TokensMotion.count) { drawerOpen = true }
-                        } else if v.translation.height > 12, drawerOpen {
-                            TokensHaptic.tap()
-                            withAnimation(TokensMotion.count) { drawerOpen = false }
-                        }
-                    }
-            )
-            // 收起来时**不占高度**（不是「高度 0 但还在」的那种）：
-            // 抽屉关着就是一排两格 + 一道拉手，与其他卡一样干净。
-            if drawerOpen, !more.isEmpty {
-                readoutRow(more)
-            }
+            .frame(minHeight: TokensSpacing.row)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("其余读数"))
+        .accessibilityHint(Text("胎压、车锁、还要充多久、平均电耗、航向、GPS"))
+    }
+
+    /// sheet 里的内容：一排一瞥时看不见的那些读数。
+    ///
+    /// **不重复卡里已经有的三个数**（续航 / 电量 / 车速）—— 一个事实只有一个出处是
+    /// 这个仓库反复删出来的规矩，而它们此刻就在底下那张卡上。
+    ///
+    /// 两排之间让一格（`TokensSpacing.lg`）：它们回答的是两个不同的问题
+    ///（「车此刻的状态」与「这趟路走得怎么样」），挤在一起会被读成一排六个。
+    @MainActor
+    func readoutsSheet(_ d: MapSpineData) -> some View {
+        let more = readoutsMore(d)
+        let rest = readoutsRest(d)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+                Text("其余读数")
+                    .font(TokensTypo.headline)
+                    .foregroundStyle(TokensPalette.primary)
+                readoutRow(more)
+                // 一排都不剩就不占位（不摆一行空气）—— 与卡里同一条规矩。
+                if !rest.isEmpty {
+                    readoutRow(rest)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // 页边距用 `TokensSpacing.lg`：sheet 的四边都是系统给的，这一格是内容与
+            // 它的边缘之间那点呼吸位（与分组卡片的水平边距同一档）。
+            .padding(.horizontal, TokensSpacing.lg)
+            .padding(.top, TokensSpacing.md)
+            .padding(.bottom, TokensSpacing.xl)
+        }
+        // `ScrollView` 而不是 `VStack`：这一屏现在装得下，但读数会随「充着电」
+        //（多一格「充满」）与以后的字段变多 —— 系统的做法是「表单可以滚」，
+        // 而不是我们自己算它能长多高。
+        .scrollBounceBehavior(.basedOnSize)
+        // 标题不进导航栏（这是 sheet，不是页面）：系统在 `.medium` 档位下不会给标题栏，
+        // 而一个只在一档出现的栏会让 sheet 在拖动时「跳」一下。
     }
 
     /// 一格：上面是键（小字），下面是值（数字体）。各格完全同高同宽 ——
-    /// 行里没有一格带额外偏移，所以「一行四个」就是它们的**全部排版**。
+    /// 行里没有一格带额外偏移，所以「一行两格」就是它们的**全部排版**。
     func readoutCell(_ r: Readout) -> some View {
         VStack(spacing: TokensSpacing.xs) {
             Text(r.key)
@@ -186,8 +229,8 @@ extension MapSpineView {
                 }
             }
         }
-        // 同宽：`.frame(maxWidth: .infinity)` 让四格平分行宽；
-        // 同高：两行文字 + 同一个 9pt 内边距，没有哪一格多一行。
+        // 同宽：`.frame(maxWidth: .infinity)` 让一格平分一行宽；
+        // 同高：两行文字 + 同一个内边距，没有哪一格多一行。
         .frame(maxWidth: .infinity)
         .padding(.vertical, TokensSpacing.sm)
         .background {

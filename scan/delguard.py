@@ -65,10 +65,30 @@
   只有编译器看得见。这正是本文件要防的那一类错误，它却从本文件旁边走了过去。
   两个模式都打印「旧版本取的是谁、为什么」，不让它默默退回去。
 
-自测（拿上面两次真事故当探针，两条都必须报出来）：
+  2026-09-25 的假阳性（两条收窄就是这么来的）：删掉 `StackMetrics.padTop/padBottom`
+  （自管排版时代的死字段）时，它报了三处用法 —— 全部是**另一个类型**的同名成员：
+  `CardFit.Row.padTop/padBottom`（嵌套类型，缩进 8）与 `StackSpec.Card.padTop`。
+  两处都不该报，而「名字一样」正是这个守门人无法自行分辨的东西。于是各加一条收窄：
 
-  python3 scan/delguard.py --from e78a344~1 --to e78a344    # 应报 pvValue
-  python3 scan/delguard.py --from 55794c4~1 --to 55794c4    # 应报 shapeScroll
+  ④ **使用处所在的文件**自己就声明了同名成员 → 不报（`CardFit.swift` 里
+     `self.padTop = padTop` 那两行）。判据 ① 的 `global_new` 只看缩进 ≤ 4 的声明，
+     而嵌套类型在 8 —— 同一条道理，只是把「本文件」也算进来看。
+  ⑤ 嵌套类型前缀：`A.B.name` 里紧挨着名字的那一段若是**项目里声明过的类型**
+     （`StackSpec.Card.padTop` 里的 `Card`）→ 不报。它是**另一个类型**的成员；
+     而 `APIClient.messageWeeks`（一段）与 `APIClient.shared.messageWeeks`
+     （`shared` 不是类型）照旧报 —— 历史那三次都在后两种形状里。
+
+  两条都是「宁可漏，不可噪」那一侧的：一条误报就足以让人开始绕过这个门禁。
+
+自测（2026-09-25 重新实测过 —— 原来那两条 `--from/--to` 命令是**恒绿**的：
+两个名字在旧版里的声明缩进都比 4 深，判据 ① 当场就找不到它们。
+所以换成两条**今天真能跑**的探针：把某个成员声明删掉，必须当场报出来）：
+
+  删 `CarKeeper/Design/ArcStack.swift` 里的 `focusInset`  -> 必须报 focusInset
+  删 `CarKeeper/Design/StackSpec.swift` 里的 `tiltDeg`      -> 必须报 tiltDeg
+
+  反面（判据 ④/⑤）：删 `StackSpec.Card.padBottom`（它有同名成员在别的类型上）
+  -> 必须**不**报 —— 它在 2026-09-25 之前会报（两条收窄就是为它加的）。
 """
 
 import argparse
@@ -160,19 +180,55 @@ def uses_of(name, text):
     return out
 
 
-def qualified_uses_of(name, text):
+# 类型声明（`struct` / `enum` / `class` / `actor` / `protocol`）—— 缩进不卡：
+# 嵌套类型（`StackSpec.Card`）缩进 8，而那正是本文件要认出来的东西（见判据 ⑤）。
+TYPE_DECL = re.compile(
+    r"^[ \t]*(?:@[A-Za-z_][\w.]*(?:\([^)]*\))?\s+)*"
+    r"(?:(?:" + MODIFIER + r")\s+)*"
+    r"(?:struct|enum|class|actor|protocol)\s+([A-Za-z_]\w*)\b",
+    re.M,
+)
+
+# 任意缩进的成员级声明（`let` / `var` / `func` / `case`）—— 只给判据 ④ 用。
+# 它是**未编译**的模板：名字得先填进去（`ANY_DECL_SRC % 名字`）。
+ANY_DECL_SRC = (
+    r"^[ \t]*(?:@[A-Za-z_][\w.]*(?:\([^)]*\))?\s+)*"
+    r"(?:(?:" + MODIFIER + r")\s+)*"
+    r"(?:let|var|func|case)\s+%s\b"
+)
+
+
+def type_names(text):
+    """这个文件里声明过的类型名（含嵌套类型）—— 判据 ⑤ 的输入。"""
+    return set(TYPE_DECL.findall(strip_comments(text)))
+
+
+def declares_anywhere(text, name):
+    """这个文件自己声明了同名成员吗（任意缩进）—— 判据 ④ 的输入。"""
+    return re.search(ANY_DECL_SRC % re.escape(name), strip_comments(text), re.M) is not None
+
+
+def qualified_uses_of(name, text, project_types):
     """别的文件里**带前缀**的用法：`X.name` / `Self.name` / `foo().name`。
 
     为什么跨文件另立一条：无前缀的裸名字极易撞上局部量（另一个函数里的 `let name`），
     而本文件头的取舍是「宁可漏，不可噪」—— 一条误报会让整条门禁被绕过。
+    判据 ⑤（嵌套类型前缀）也在这里 —— 它是同一条取舍的延续。
     """
     body = strip_comments(text)
     hit = re.compile(r"(?:\b[A-Za-z_]\w*|\))\s*\.\s*%s\b" % re.escape(name))
+    chain = re.compile(r"((?:\b[A-Za-z_]\w*\s*\.\s*)+)%s\b" % re.escape(name))
     binding = re.compile(LOCAL_BINDING % re.escape(name))
     out = []
     for i, line in enumerate(body.split("\n"), start=1):
         if binding.search(line):
             continue
+        m = chain.search(line)
+        if m:
+            comps = re.findall(r"[A-Za-z_]\w*", m.group(1))
+            # `A.B.name` 里紧挨着名字的那一段是类型 → 那是**另一个类型**的成员，不报。
+            if len(comps) >= 2 and comps[-1] in project_types:
+                continue
         if hit.search(line):
             out.append((i, line.strip()))
     return out
@@ -203,31 +259,25 @@ def pick_base(args):
     return "HEAD~1", "工作区干净 → 比 HEAD~1（就是 CI 的那一笔）"
 
 
-def all_member_names(rev=None):
-    """整个项目的成员级名字（新版本）。
+def workspace_texts():
+    """工作区里范围内的全部正文（「新版本」那一侧）。
 
-    它的唯一用途是降噪：名字被挪到另一个文件（同类型的 extension）时，
-    在这个文件里看不到声明，但项目里还有 —— 那种情况编译得过，不该报。
-    给了 `rev` 就从那个提交读，否则读工作区。
+    为什么自测模式（`--from/--to`）也从工作区取，而不是从 `--to` 那一份取：
+    两者是不同的东西。从 `--to` 取的话，自测就变成「重放了一遍历史」——
+    而 2026-09-25 实测：文件头原来写着「两条都必须报出来」的那两条命令
+    在**两种取法下都是绿的**，原因也不在取哪一份（①`pvValue` 在旧版里的声明
+    缩进比 4 深，判据 ① 就找不到；②`shapeScroll` 在新版里还声明着）。
+    所以没有改取法，只把文件尾那两条自测换成了**今天真能跑的**两条
+    （删 `focusInset` / 删 `tiltDeg`，两条都必须报）。
     """
-    names = set()
-    if rev:
-        listing = run_git(["ls-tree", "-r", "--name-only", rev, "--"] + SCOPE_DIRS) or ""
-        for rel in listing.split("\n"):
-            rel = rel.strip()
-            if not rel.endswith(".swift"):
-                continue
-            text = run_git(["show", "%s:%s" % (rev, rel)])
-            if text:
-                names |= member_names(text)
-        return names
+    out = {}
     for rel in scope_files():
         try:
             with open(os.path.join(PROJECT_ROOT, rel), encoding="utf-8") as fh:
-                names |= member_names(fh.read())
+                out[rel] = fh.read()
         except OSError:
             continue
-    return names
+    return out
 
 
 def old_and_new(args):
@@ -275,19 +325,21 @@ def main():
         print("本次没有变化的 Swift 文件 —— 没有「删了声明、使用还在」的名字")
         return 0
 
-    # 新版本全项目的成员名（含被挪到别的文件的那些）—— 见文件头的「降噪」。
-    global_new = all_member_names(args.rev_to if args.rev_to else None)
-
     # 新版本的全部正文 —— **不只变了的那些文件**：一个名字可能在 A 里被删，
     # 而使用它的地方在 B（`messageWeeks` 就是这样：声明在 `API.swift`、
     # 用在 `MessagesSection.swift`）。「旧版本里声明过」与「现在还在用」本来就跨文件。
-    new_texts = {}
-    for rel in scope_files():
-        try:
-            with open(os.path.join(PROJECT_ROOT, rel), encoding="utf-8") as fh:
-                new_texts[rel] = fh.read()
-        except OSError:
-            continue
+    new_texts = workspace_texts()
+
+    # 新版本全项目的成员名（含被挪到别的文件的那些）—— 见文件头的「降噪」。
+    # 它与 `new_texts` 同源（同一份工作区）。
+    global_new = set()
+    for text in new_texts.values():
+        global_new |= member_names(text)
+
+    # 判据 ⑤ 的输入：项目里声明过的**全部**类型名（含嵌套类型）。
+    project_types = set()
+    for text in new_texts.values():
+        project_types |= type_names(text)
 
     bad = []
     for rel, old, _new in pairs:
@@ -295,11 +347,14 @@ def main():
         for name in sorted(old_names):
             if len(name) < MIN_NAME_LEN or name in global_new:
                 continue
-            hits = [(rel, n, t) for n, t in uses_of(name, new_texts.get(rel, ""))]
+            # 判据 ④：使用处所在的文件自己声明了同名成员 → 不报。
+            hits = []
+            if not declares_anywhere(new_texts.get(rel, ""), name):
+                hits += [(rel, n, t) for n, t in uses_of(name, new_texts.get(rel, ""))]
             for other, text in new_texts.items():
-                if other == rel:
+                if other == rel or declares_anywhere(text, name):
                     continue
-                for n, t in qualified_uses_of(name, text):
+                for n, t in qualified_uses_of(name, text, project_types):
                     hits.append((other, n, t))
             if hits:
                 bad.append((rel, name, hits))

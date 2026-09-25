@@ -90,12 +90,12 @@ final class ShakeDetector: ObservableObject {
             _ = try await APIClient.shared.sendControlCommand(cmd: "CentralLock", carId: store.carId, pin: pin)
             let dur = Date().timeIntervalSince(start)
             store.addCommandHistory(cmd: "CentralLock", name: "锁车（摇一摇）", success: true, duration: dur)
-            EnhancedToastManager.shared.show("已摇一摇锁车", icon: "lock.fill")
+            ToastManager.shared.show("已摇一摇锁车", icon: "lock.fill")
             TokensHaptic.result(true)
         } catch {
             let dur = Date().timeIntervalSince(start)
             store.addCommandHistory(cmd: "CentralLock", name: "锁车（摇一摇）", success: false, duration: dur)
-            EnhancedToastManager.shared.show("锁车失败：\(error.localizedDescription)", icon: "xmark.circle.fill")
+            ToastManager.shared.show("锁车失败：\(error.localizedDescription)", icon: "xmark.circle.fill")
             TokensHaptic.result(false)
         }
     }

@@ -188,7 +188,7 @@ final class CommandCenter: ObservableObject {
         // 提示带**指令名**：地图上的操作条发完就回到原样，用户需要一个「刚才那条怎么了」
         // 的落点；原先这里是空字符串（只有图标），在地图上读不出是哪条指令的结果。
         TokensHaptic.result(ok)
-        EnhancedToastManager.shared.show(ok ? "\(run.name)已完成" : "\(run.name)失败",
+        ToastManager.shared.show(ok ? "\(run.name)已完成" : "\(run.name)失败",
                                         icon: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
         showResult = true
     }

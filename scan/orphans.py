@@ -18,6 +18,16 @@
   • 只看 `CarKeeper/CarKeeper/**`、`CarKeeper/{Services,Models,Design,Shared,HealthKit}/**`
     —— 这些是编进 App 主 target 的源码；扩展 target（Widgets / WatchApp）
     与测试不在报告范围（但它们的引用**算数**）。
+
+  判据 ②（2026-09-25 补）：**系统类型扩展里没人读的成员**。
+  起因是判据 ① 的盲区：它只认顶层类型，于是
+  `private extension Double { func clamped(to:) }` 这类声明与漏洞整个看不见 ——
+  那个 `clamped` 的唯一使用点删掉后，声明还在，31 条门禁一条都没说话。
+  补上后当场报到两个真的：`URLSession.dataTaskRetryable`（+ `RetryConfig`，
+  第二套重试实现，真正在用的是 `Retrier.global`）与 `UIColor.dsDynamic`
+  （第二套动态色，真正在用的是 `ArtTheme.nativeDynamic`）。
+  探针：注入 `extension Double { func probeDeadMember() }` → 当场报出；
+  还原后文件哈希与注入前一致、转绿。收窄三条写在判据 ② 的注释里。
   • 一个文件里的**顶层类型声明**（列 0 的 struct/class/enum/actor）如果在
     **其它任何文件**里一次都没被提到，就算孤儿。
   • 跳过入口类文件：含 `@main` / `PreviewProvider` / `#Preview` /
@@ -74,6 +84,89 @@ TOP_TYPE_RE = re.compile(
     r"^(?:public |internal |private |final |open |@\w+\s+)*(struct|class|enum|actor)\s+([A-Za-z_][A-Za-z0-9_]*)",
     re.M,
 )
+
+# =============================================================================
+#  判据 ②：**扩展在系统类型上的成员，有没有读者**
+# =============================================================================
+#
+#  为什么需要它：判据 ① 只认**顶层类型**（`TOP_TYPE_RE`），于是
+#  `private extension Double { func clamped(to:) }` 这一类完全在盲区里 ——
+#  2026-09-25 那个 `clamped` 就是这样活下来的：它唯一的使用点（宿主自己算档位
+#  的那一段，见 `DSSwipeStrip.RowDrag`）删掉之后，声明还在，31 条门禁一条都没说话，
+#  是人工过 diff 时看到的。而「声明在、没有读者」正是这个仓库反复吃亏的那一类。
+#
+#  判据：`extension X` 里 `X` **不是**项目自己声明的类型（= 系统 / 外部类型），
+#  而它某个成员的名字在**全仓**除了声明以外一次都没出现过 —— 那就是没有读者。
+#
+#  收窄（宁愿漏，不可噪）：
+#    · 名字短于 6 个字符不看（`==`、`id` 这类撞名太多，数读者会数出假阳性）；
+#    · 只数「名字出现过」，不看它用在哪儿 —— 这是**保守**方向：
+#      名字在注释里出现一次也算有人读，于是宁可漏报；
+#    · `DerivedData/` 里的生成文件不参与统计（它们不是读者）。
+#
+#  为什么长在 orphans 里：它就是这个文件的题目 —— 「写了却没人用」。
+EXT_MIN_NAME = 6
+
+# 例外：{ "文件:类型.成员": 理由 }。只有「确实不需要被代码引用」才允许进来。
+EXT_WHITELIST: dict[str, str] = {}
+
+TYPE_DECL_RE = re.compile(
+    r"^(?:public |internal |private |fileprivate |final |open |@\w+\s+)*"
+    r"(?:struct|class|enum|actor|protocol)\s+([A-Za-z_][A-Za-z0-9_]*)",
+    re.M,
+)
+EXT_BLOCK_RE = re.compile(
+    r"^(?:public |internal |private |fileprivate )?extension\s+([A-Za-z_][A-Za-z0-9_.]*)",
+    re.M,
+)
+EXT_MEMBER_RE = re.compile(
+    r"^[ \t]+(?:@\w+(?:\([^)]*\))?\s+)*"
+    r"(?:public |internal |private |fileprivate |static |final |mutating )*"
+    r"(?:func|var|let)\s+([A-Za-z_][A-Za-z0-9_]*)",
+    re.M,
+)
+
+
+def extension_member_orphans(texts):
+    """返回 [(键, 成员名, 类型名, 文件)]：系统类型扩展里没有人读的成员。"""
+    readable = {q: t for q, t in texts.items() if "DerivedData" not in q}
+    project_types = set()
+    for text in readable.values():
+        project_types |= {m.group(1) for m in TYPE_DECL_RE.finditer(text)}
+
+    hits = []
+    for path, text in readable.items():
+        for m in EXT_BLOCK_RE.finditer(text):
+            raw = m.group(1)
+            typ = raw.split(".")[-1]
+            # 项目自己的类型（含嵌套写法）不看：它们由判据 ① 与编译器管。
+            if typ in project_types:
+                continue
+            brace = text.find("{", m.end())
+            if brace < 0:
+                continue
+            depth, i = 1, brace + 1
+            while i < len(text) and depth:
+                if text[i] == "{":
+                    depth += 1
+                elif text[i] == "}":
+                    depth -= 1
+                i += 1
+            body = text[brace + 1:i]
+            for member in EXT_MEMBER_RE.finditer(body):
+                name = member.group(1)
+                if len(name) < EXT_MIN_NAME:
+                    continue
+                key = f"{path}:{typ}.{name}"
+                if key in EXT_WHITELIST:
+                    continue
+                word = r"\b" + re.escape(name) + r"\b"
+                decl = r"\b(?:func|var|let)\s+" + re.escape(name) + r"\b"
+                uses = sum(len(re.findall(word, t)) for t in readable.values())
+                decls = sum(len(re.findall(decl, t)) for t in readable.values())
+                if uses - decls <= 0:
+                    hits.append((key, name, typ, path))
+    return hits
 
 
 def all_swift_files(root):
@@ -152,6 +245,20 @@ def main():
         return 1
 
     print("\n✅ 无『孤儿页面』（每个写了页面的文件都有地方能到达它）")
+
+    # ---- 判据 ②：系统类型扩展里没有读者的成员 ----------------------------
+    ext_hits = extension_member_orphans(texts)
+    hard_ext = [h for h in ext_hits if h[0] not in EXT_WHITELIST]
+    if hard_ext:
+        print("\n❌ 系统类型扩展里没人读的成员（声明在、没有读者）：")
+        for key, name, typ, path in hard_ext:
+            print(f"   {path} → extension {typ} → {name}")
+        print("\n   两种修法（都要选一种，不能留着）：")
+        print("     ① 接上读者 —— 它本来就该被某处调用；")
+        print("     ② 删掉 —— 留着它的代价是下一个人以为「它可以被调用」。")
+        print("   确实不需要被代码引用的，写进 EXT_WHITELIST 并说明理由。")
+        return 1
+    print(f"\n✅ 系统类型扩展里的成员都有读者（例外表 {len(EXT_WHITELIST)} 条）")
     return 0
 
 

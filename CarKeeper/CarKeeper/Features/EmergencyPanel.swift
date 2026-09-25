@@ -13,9 +13,9 @@ struct EmergencyPanel: View {
 
     var body: some View {
         //  正文只提供内容 —— 它住在「我的」那张叫「应急」的卡里（`StackCard`），
-        //  而那一叠自己就是滚动容器（`ArcStack` 头注：自管手势，没有 ScrollView）。
+        //  而那一叠自己就是滚动容器（`ArcStack` 头注：系统 `ScrollView`）。
         //  三层页壳在这里全部拆掉（用户 2026-09-25：「每个卡片仔细核对，内容展开后
-        //  是否拥挤」）：① 内层 `ScrollView`（手势塌给它，而它拿到无限高、永远滚不动）；
+        //  是否拥挤」）：① 内层 `ScrollView`（竖向拖动归它，而它拿到无限高、永远滚不动）；
         //  ② 页边距（卡自己左右各有 18pt，再加一层水平 20pt = 38pt，全 App 最窄的一
         //  张）；③ 页标题（卡头写「应急」，正文再写一遍「紧急求助」是同一个东西两个名字）。
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
@@ -182,32 +182,32 @@ struct EmergencyPanel: View {
 
     private func lockCar() async {
         _ = await store.sendControlCommand("lock")
-        EnhancedToastManager.shared.show("锁车指令已发送", icon: "lock.fill")
+        ToastManager.shared.show("锁车指令已发送", icon: "lock.fill")
     }
 
     private func honkCar() async {
         _ = await store.sendControlCommand("honk")
-        EnhancedToastManager.shared.show("鸣笛中...", icon: "speaker.wave.3.fill")
+        ToastManager.shared.show("鸣笛中...", icon: "speaker.wave.3.fill")
     }
 
     private func flashLights() async {
         _ = await store.sendControlCommand("flash")
-        EnhancedToastManager.shared.show("闪灯中...", icon: "lightbulb.fill")
+        ToastManager.shared.show("闪灯中...", icon: "lightbulb.fill")
     }
 
     private func turnOnAC() async {
         _ = await store.sendControlCommand("ac_on")
-        EnhancedToastManager.shared.show("空调已开启", icon: "fan.fill")
+        ToastManager.shared.show("空调已开启", icon: "fan.fill")
     }
 
     private func saveContact() {
         UserDefaults.standard.set(emergencyContact, forKey: "emergency_contact")
-        EnhancedToastManager.shared.show("联系人已保存", icon: "checkmark.circle.fill")
+        ToastManager.shared.show("联系人已保存", icon: "checkmark.circle.fill")
     }
 
     private func shareLocation() {
         guard let loc = store.currentLocation else {
-            EnhancedToastManager.shared.show("暂无位置数据", icon: "location.slash")
+            ToastManager.shared.show("暂无位置数据", icon: "location.slash")
             return
         }
         let text = "我的位置：\(loc.coordinate.latitude), \(loc.coordinate.longitude)"

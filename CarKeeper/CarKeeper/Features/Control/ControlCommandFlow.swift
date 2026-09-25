@@ -77,7 +77,7 @@ struct ControlCommandFlow: ViewModifier {
                         // #8 首次输入 PIN 后保存到 Keychain
                         if store.readPin() == nil {
                             store.savePin(pin)
-                            EnhancedToastManager.shared.show("PIN码已安全保存", icon: "key.fill")
+                            ToastManager.shared.show("PIN码已安全保存", icon: "key.fill")
                         }
                         fire(pin: pin)
                     }
@@ -111,7 +111,7 @@ struct ControlCommandFlow: ViewModifier {
         // 别的发起处用的：摇一摇锁车、Siri 快捷方式都直接进中心）
         guard !commands.busy, commands.running == nil else { return }
         guard !store.carId.isEmpty else {
-            EnhancedToastManager.shared.show("请先选择车辆", icon: "car.fill")
+            ToastManager.shared.show("请先选择车辆", icon: "car.fill")
             return
         }
         pending = r

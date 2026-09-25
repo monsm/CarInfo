@@ -24,13 +24,11 @@ import UIKit
 //        但它们现在渲染的是 v4 语言。老页面无需逐个修改即可继承新观感。
 // =============================================================================
 
-// MARK: - 动态色（浅/深色两套，跟随系统外观）
-
-extension UIColor {
-    static func dsDynamic(light: UIColor, dark: UIColor) -> UIColor {
-        UIColor { traits in traits.userInterfaceStyle == .dark ? dark : light }
-    }
-}
+//  这里原本有一段 `extension UIColor { static func dsDynamic(light:dark:) }`（动态色）。
+//  2026-09-25 删：一个读者都没有，而且是**第二套实现** —— 全 App 真正在用的是
+//  `ArtTheme.swift` 里的 `nativeDynamic(light:dark:)`（它的注释记着来历：原本由
+//  WidgetTokens 的 `Palette.dynamic` 提供，那个文件删掉后内联进去）。
+//  发现它的是 `scan/orphans.py` 判据 ②（系统类型扩展里没人读的成员）。
 
 /// 设计系统组件（DSCard / DSRow / DSTile / DSSkeleton …）。
 /// 令牌（颜色 / 字体 / 间距 / 圆角 / 动效 / 触觉）已全部合并到 `Tokens.swift`。
@@ -1005,8 +1003,9 @@ extension View {
 //（2026-09-25）。它们的用法只有两个：「体检」与「保养」那两张卡的内容
 //（`HealthDataView` / `MaintenanceMoneyView`）—— 那两个视图当初是页面，后来被挂进
 // 车卡里，页面壳没拆。叠进卡里的代价是可算的，而且三样都看得见：
-//   ① 第二层 `ScrollView`：里外两层都能滚时手势塌给内层，而内层拿到的是无限高，
-//      它自己永远滚不动，只是把那一块区域的拖动吃掉（叠叠乐是自管手势）；
+//   ① 第二层 `ScrollView`：里外两层都能滚时竖直拖动归内层，而内层拿到的是无限高，
+//      它自己永远滚不动，只是把那一块区域的拖动吃掉（写这段话时叠叠乐还是自管手势，
+//      现在是系统 `ScrollView` —— 结论不变：卡里再套一层滚动，这一块就滚不动了）；
 //   ② 第二层纸面底 + 它自己的左右 16pt：叠在卡片的 18pt 上 = 内容距卡边 34pt；
 //   ③ 一行页标题（「体检与数据」）：而卡片头已经写着「体检」。
 // 拆完之后三件套零引用，所以整段删掉 —— 留着它就是「一件已经没有人用的东西」，

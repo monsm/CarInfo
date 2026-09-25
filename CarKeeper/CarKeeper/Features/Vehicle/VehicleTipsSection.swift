@@ -230,7 +230,7 @@ struct VehicleTipsSection: View {
         // 按「去充电」或「查看详情」**什么都不发生**，然后提示就被标记已读 ——
         // 用户以为处理过了，其实只是被藏起来了。这一节没有自己的导航目标，
         // 所以先把话说清楚：给一个可见的回应，再标记已读。
-        EnhancedToastManager.shared.show(tip.body, icon: tip.icon)
+        ToastManager.shared.show(tip.body, icon: tip.icon)
         dismiss(tip)
     }
 }

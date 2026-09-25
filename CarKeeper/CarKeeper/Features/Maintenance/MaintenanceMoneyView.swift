@@ -281,7 +281,7 @@ struct MaintenanceMoneyView: View {
             services = String(data: data, encoding: .utf8) ?? "[]"
         }
         showAddService = false
-        EnhancedToastManager.shared.show("记录已保存", icon: "checkmark.circle.fill")
+        ToastManager.shared.show("记录已保存", icon: "checkmark.circle.fill")
     }
 }
 

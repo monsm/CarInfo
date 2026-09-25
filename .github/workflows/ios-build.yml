@@ -116,7 +116,12 @@ jobs:
           # 两次真实事故都是它（`pvValue` 与 `shapeScroll`，各三条 cannot find in scope），
           # 两次都白烧了一整轮 10 倍计费的 macOS runner。
           # 它比的是 HEAD~1（见上面 fetch-depth: 2），所以 CI 与本地是同一套判据。
-          for s in delguard paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps scopeguard paidcap copy lintcfg ternary enumguard spacing expand printguard glass extguard initguard; do
+          # iconcheck.py：图标。它不是 Swift 文件，上面那些检查一条都看不到它 ——
+          # 而图标出过一次「改了 A、真机上看到 B」（两份 appiconset 并存），
+          # v1.0 还犯了三个可量的错（自己画圆角 + 内缩 4%、透明边被压成黑角、
+          # 没有深色 / 着色外观）。它自己读 PNG（不依赖 Pillow：scan/copy.py 会遮蔽
+          # 标准库 copy，任何在 scan/ 里 import Pillow 的门禁都跑不起来）。
+          for s in delguard paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps scopeguard paidcap copy lintcfg ternary enumguard spacing expand printguard glass extguard initguard iconcheck; do
             echo "::group::$s.py"
             python3 scan/$s.py
             echo "::endgroup::"

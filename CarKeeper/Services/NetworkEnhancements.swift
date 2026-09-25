@@ -1,49 +1,18 @@
 // =============================================================================
-// N36 API 自动重试 + N37 网络质量监控
+// N37 网络质量实时监控
 // =============================================================================
+//
+//  这里原本还有一段「N36 指数退避重试」：`RetryConfig` + `URLSession.dataTaskRetryable`。
+//  2026-09-25 删 —— 它是**第二套重试实现**，而且一个读者都没有（全仓只有它自己的
+//  声明与默认参数里那个 `RetryConfig`）。App 真正走的重试是 `Retrier.global`
+//  （`API.request` 里那一步，HANDOFF 的服务表写着它的策略），而这段代码留着会让
+//  读的人以为网络层有两套策略 —— 两套实现里先看到的那一套看起来就是真的。
+//  发现它的是 `scan/orphans.py` 判据 ②（系统类型扩展里没人读的成员）：
+//  那条判据是这一轮加的，加完当场报到它。
 
 import Foundation
 import Network
 import Combine
-
-// MARK: - N36 指数退避重试
-struct RetryConfig {
-    let maxRetries: Int
-    let baseDelay: TimeInterval
-    let maxDelay: TimeInterval
-    let jitter: Double
-}
-
-extension URLSession {
-    /// 带自动重试的 GET 请求
-    func dataTaskRetryable(
-        url: URL,
-        config: RetryConfig = RetryConfig(maxRetries: 3, baseDelay: 1.0, maxDelay: 10.0, jitter: 0.3)
-    ) async throws -> (Data, URLResponse) {
-        var lastError: Error?
-        for attempt in 0..<config.maxRetries {
-            do {
-                let (data, response) = try await self.data(from: url)
-                guard let httpResponse = response as? HTTPURLResponse else { continue }
-                if httpResponse.statusCode >= 500 && attempt < config.maxRetries - 1 {
-                    let delay = min(config.baseDelay * pow(2, Double(attempt)), config.maxDelay)
-                        * (1 + Double.random(in: -config.jitter...config.jitter))
-                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                    lastError = NSError(domain: "RetryableError", code: httpResponse.statusCode, userInfo: nil)
-                    continue
-                }
-                return (data, response)
-            } catch {
-                lastError = error
-                if attempt < config.maxRetries - 1 {
-                    let delay = min(config.baseDelay * pow(2, Double(attempt)), config.maxDelay)
-                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                }
-            }
-        }
-        throw lastError ?? NSError(domain: "Network", code: -1, userInfo: nil)
-    }
-}
 
 // MARK: - N37 网络质量实时监控
 class NetworkQualityMonitor: ObservableObject {

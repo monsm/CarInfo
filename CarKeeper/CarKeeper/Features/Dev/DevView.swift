@@ -19,7 +19,7 @@ struct DevView: View {
     @State private var showClearConfirm = false
     /// 「原始日志」那一组的重读代号（`RawLogStore` 不是 ObservableObject）
     @State private var logTick = 0
-    /// 叠法对照页（`Features/Dev/StackLabView.swift`）
+    /// 卡片叠预览页（`Features/Dev/StackLabView.swift`）
     @State private var showStackLab = false
 
     // 订阅那些「启动了但没人看」的监控。用 @ObservedObject 而不是直接读单例：
@@ -47,7 +47,7 @@ struct DevView: View {
 
     var body: some View {
         //  正文只提供内容 —— 它住在「我的」那张叫「诊断」的卡里（`StackCard`），
-        //  而那一叠自己就是滚动容器（`ArcStack` 头注：它是自管手势，没有 ScrollView）。
+        //  而那一叠自己就是滚动容器（`ArcStack` 头注：系统 `ScrollView`）。
         //  这里原本还包着一层 `ScrollView`：里外两层都能滚时手势塌给内层，
         //  而内层拿到的是无限高 —— 它自己永远滚不动，却把这块区域的拖动吃掉了
         //  （用户 2026-09-25：「每个卡片仔细核对，内容展开后是否拥挤」）。
@@ -93,30 +93,32 @@ struct DevView: View {
         ThemeGallerySection()
     }
 
-    // MARK: - 叠法对照入口
+    // MARK: - 卡片叠预览入口
 
-    /// 上下滑动有七种做法（弧出 / 吸附堆叠 / 压层叠 / 纵深叠 / 错位叠 / 钱夹叠 / 滚轮）。
-    /// 叠法现在是唯一的（用户 2026-09-24：只用吸附堆叠，其他全删），
-    /// 所以这个入口进去只是**看叠法**（条子跟手方式仍可挑），不再「七选一」。
+    /// 叠法曾经有七种（弧出 / 吸附堆叠 / 压层叠 / 纵深叠 / 错位叠 / 钱夹叠 / 滚轮）：
+    /// 2026-09-24 用户删到只剩一种，2026-09-25 滚动本身交回系统 `ScrollView` ——
+    /// 也就是说「叠法」这件事已经结束了，这里不再有当前值可显示。
+    /// 入口留着是为了**在真机上看那一叠卡本身**（卡高矮参差时的观感、玻璃的层次、
+    /// 底条两种跟手形态），那些只有真机判得了。
     private var stackEntry: some View {
-        DSGroup(title: "叠叠乐",
-                footer: "功能界面的卡是上下滑的。叠法已固定为吸附堆叠（无吸附回落）；条子跟手方式仍可对照。") {
+        DSGroup(title: "卡片叠",
+                footer: "功能界面的卡是上下滑的，滚动手感就是系统 `ScrollView` 的手感（惯性、橡皮筋、指示条全归系统）。这一页能验的是卡片本身与底条的跟手形态。") {
             DSGroupRow(showsSeparator: false) {
                 Button {
                     showStackLab = true
                 } label: {
                     HStack(spacing: TokensSpacing.sm) {
-                        Text("当前叠法")
+                        Text("卡片叠预览")
                             .font(TokensTypo.body)
                             .foregroundStyle(TokensPalette.primary)
                         Spacer(minLength: TokensSpacing.sm)
-                        Text(StackSpec.chosen.title)
-                            .font(TokensTypo.dataSmall)
-                            .foregroundStyle(TokensPalette.accent)
+                        Image(safeSymbol: "chevron.right", fallback: "chevron.right")
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.tertiary)
                     }
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint(Text("打开叠法对照"))
+                .accessibilityHint(Text("打开卡片叠预览"))
             }
         }
     }

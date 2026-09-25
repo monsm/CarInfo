@@ -430,6 +430,22 @@ def load_baseline_cache():
 # 基线白名单是从「最后一次能编译的提交」反推的，所以新引入的 SDK 名字
 # （例如 iOS 18 的 Tab）必然不在里面 —— 在这里显式登记，登记前必须核实。
 VERIFIED_SDK_ADDITIONS = {
+    # 手机自己的位置（`Services/PhoneLocation.swift`，2026-09-25）。
+    # 四个名字都在写进代码前核过 Apple 文档 JSON：
+    #   · CLLocationManager                  c:objc(cs)CLLocationManager，iOS 2.0+
+    #     「The object you use to start and stop the delivery of location-related
+    #      events to your app.」
+    #   · requestWhenInUseAuthorization()    c:objc(cs)CLLocationManager(im)requestWhenInUseAuthorization
+    #     「Requests the user’s permission to use location services while the app
+    #      is in use.」
+    #   · startUpdatingLocation()            c:objc(cs)CLLocationManager(im)startUpdatingLocation
+    #     「Starts the generation of updates that report the user’s current location.」
+    #   · stopUpdatingLocation()             c:objc(cs)CLLocationManager(im)stopUpdatingLocation
+    #     「Stops the generation of location updates.」
+    "CLLocationManager": "CoreLocation.CLLocationManager（iOS 2.0+；externalID c:objc(cs)CLLocationManager）—— 手机自己的位置，按需取一次",
+    "requestWhenInUseAuthorization": "CLLocationManager.requestWhenInUseAuthorization()（iOS 8+；externalID c:objc(cs)CLLocationManager(im)requestWhenInUseAuthorization）",
+    "startUpdatingLocation": "CLLocationManager.startUpdatingLocation()（iOS 2.0+；externalID c:objc(cs)CLLocationManager(im)startUpdatingLocation）",
+    "stopUpdatingLocation": "CLLocationManager.stopUpdatingLocation()（iOS 2.0+；externalID c:objc(cs)CLLocationManager(im)stopUpdatingLocation）—— 取到就停",
     "Tab": "SwiftUI.Tab（iOS 18+/watchOS 11+，init(value:content:label:) 已核对 interface）",
     "AnyView": "SwiftUI.AnyView（iOS 13+）",
     "UnitPoint": "SwiftUI.UnitPoint（iOS 13+）",
@@ -486,6 +502,11 @@ VERIFIED_SDK_ADDITIONS = {
     "GraphicsContext": "SwiftUI.GraphicsContext（iOS 15+；stroke(_:with:style:)/fill(_:with:)/draw(_:at:) 已核）",
     "Path": "SwiftUI.Path（iOS 13+；move/addLine/closeSubpath）",
     "presentationDetents": "View.presentationDetents(_:)（iOS 16+；sheet 高度档）",
+    # 「其余读数」由卡里那道自画抽屉换成系统 sheet（2026-09-25）。三个名字都对着
+    # Apple 文档 JSON 核过才写进代码：
+    "presentationBackgroundInteraction": "View.presentationBackgroundInteraction(_ interaction: PresentationBackgroundInteraction)（iOS 16.4+；externalID s:7SwiftUI4ViewPAAE33presentationBackgroundInteractionyQrAA012PresentationeF0VF）—— 半屏时底下那张地图仍然可以拖，Apple 地图就是这个行为；上一版自画的抽屉从头到尾盖住地图",
+    "presentationDragIndicator": "View.presentationDragIndicator(_ visibility: Visibility)（iOS 16.0+；externalID s:7SwiftUI4ViewPAAE25presentationDragIndicatoryQrAA10VisibilityOF）—— 系统那枚拉手（尺寸/对比度/热区由系统给，不再自己画 Capsule）",
+    "PresentationBackgroundInteraction": "SwiftUI.PresentationBackgroundInteraction（iOS 16.4+；静态方法 enabled(upThrough: PresentationDetent) -> Self，externalID s:7SwiftUI33PresentationBackgroundInteractionV7enabled9upThroughAcA0C6DetentV_tFZ）",
     "formatted": "Date.formatted(date:time:)（iOS 15+；Foundation）",
     # 行程时间轴（TripsTimelineView）：四个均对着 Apple 文档 JSON 核过
     "LazyVStack": "SwiftUI.LazyVStack struct（iOS 14+；externalID s:7SwiftUI10LazyVStackV）",
@@ -529,22 +550,36 @@ VERIFIED_SDK_ADDITIONS = {
     # 叠叠乐与相机式模式条（Design/StackSpec.swift、ArcStack.swift、GlassCard.swift、
     # DSSwipeStrip.swift）。以下每个都写进代码前对着 Apple 文档核过 decl 与平台。
     "glassEffect": "View.glassEffect(_:in:)（iOS 26+；decl: func glassEffect(_ glass: Glass = .regular, in shape: some Shape = .capsule) -> some View；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/glassEffect(_:in:)；概述见「Applying Liquid Glass to custom views」）——卡片与模式条的**唯一材质来源**。用系统玻璃而不是自己叠 blur+opacity：折射与反射是物理材质，四套艺术主题下都会自己去适配底色",
-    "interpolatingSpring": "Animation.interpolatingSpring(mass:stiffness:damping:initialVelocity:)（iOS 13+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/Animation/interpolatingSpring(mass:stiffness:damping:initialVelocity:)）——吸附回落的弹簧。选它而不是 easeOutBack：过冲是同一件事，但弹簧能被下一次手势接管，缓动不能",
+    "interpolatingSpring": "Animation.interpolatingSpring(mass:stiffness:damping:initialVelocity:)（iOS 13+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/Animation/interpolatingSpring(mass:stiffness:damping:initialVelocity:)）——2026-09-25 起它只服务无障碍翻页那一步（`ArcStack.step`）：手势与惯性都归系统 `ScrollView` 了。选它而不是 easeOutBack：过冲是同一件事，但弹簧能被下一次手势接管，缓动不能",
     "rotation3DEffect": "View.rotation3DEffect(_:axis:anchor:anchorZ:perspective:)（iOS 13+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/rotation3DEffect(_:axis:anchor:anchorZ:perspective:)）——卡片离开阅读线时向后转出去，滚轮叠法靠它绕圆柱面",
     "zIndex": "View.zIndex(_:)（iOS 13+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/zIndex(_:)）——把压在阅读线上的那张抬到最上层；重合叠放不加它会出现「近的那张被远的盖住」",
     "clipped": "View.clipped(antialiased:)（iOS 13+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/clipped(antialiased:)）——叠叠乐是一个固定窗口，带外的卡必须先裁掉再谈渐隐",
     "highPriorityGesture": "View.highPriorityGesture(_:including:)（iOS 13+；externalID doc://com.apple.SwiftUI/documentation/SwiftUI/View/highPriorityGesture(_:including:)）——模式条要「按下就展开」，所以整条的拖动优先于标签自己的点选（点选由同一条手势里判断位移来做，见 DSSwipeStrip）",
     "textCase": "View.textCase(_:)（iOS 13+；decl: func textCase(_ textCase: Text.Case?) -> some View）——卡片小标题走 iOS 分组头的大写形态",
-    "accessibilityAction": "View.accessibilityAction(_:_:)（iOS 13+；decl: func accessibilityAction(_ actionKind: AccessibilityActionKind = .default, _ handler: @escaping () -> Void) -> ModifiedContent<Self, AccessibilityAttachmentModifier>）——给一个元素挂自定义动作。**它只用来挂命名动作**；翻页不用它，见下面两条。",
-    # ⚠️ 这两条以前是**一条错的**：上一版白名单里写着「`.scrollUp` / `.scrollDown` 为
+    # ⚠️ 这一条以前是**一条错的**：上一版白名单里写着「`.scrollUp` / `.scrollDown` 为
     # AccessibilityActionKind 的静态成员」，于是 ArcStack 照这个写，门禁全绿、
     # CI 报 `type 'AccessibilityActionKind' has no member 'scrollUp'`。
     # 教训不是「打错了一个名字」，而是：**白名单里的一句话也是断言**，
     # 而当时的 scan.py 只检查「名字在不在白名单」，从不检查白名单里的说法对不对。
     # 两个真实成员已对着 Apple 文档 JSON 核过（accessibilityactionkind 一页的
     # topicSections 列出：default / delete / escape / magicTap / showMenu）。
+    #
+    # 2026-09-25：`accessibilityAction` 与 `accessibilityScrollAction` 两条**已从
+    # 白名单删除** —— 不再有任何一行代码用它们，而白名单里留着不用的名字就是另一种
+    # 「清单失真」。前者本来只挂命名动作（翻页从来不用它）；后者是叠叠乐没有
+    # `ScrollView` 时的**替身**，而那一叠现在就是系统的 `ScrollView`（三指滚动是它自带
+    # 的）—— 替身没有了存在理由，随它一起删。
     "accessibilityAdjustableAction": "View.accessibilityAdjustableAction(_:)（iOS 13+；decl: func accessibilityAdjustableAction(_ handler: @escaping (AccessibilityAdjustmentDirection) -> Void) -> ModifiedContent<Self, AccessibilityAttachmentModifier>；externalID s:7SwiftUI4ViewPAAE29accessibilityAdjustableActionyAA15ModifiedContentVyxAA31AccessibilityAttachmentModifierVGyAA0I19AdjustmentDirectionOcF）——叠叠乐翻页的**元素级**手势：焦点落在这叠纸上时，VoiceOver 上下轻扫 = 上一张 / 下一张（方向枚举 AccessibilityAdjustmentDirection.increment 已核，externalID s:7SwiftUI32AccessibilityAdjustmentDirectionO9incrementyA2CmF）",
-    "accessibilityScrollAction": "View.accessibilityScrollAction(_:)（iOS 13+；decl: func accessibilityScrollAction(_ handler: @escaping (Edge) -> Void) -> ModifiedContent<Self, AccessibilityAttachmentModifier>；externalID s:7SwiftUI4ViewPAAE25accessibilityScrollActionyAA15ModifiedContentVyxAA31AccessibilityAttachmentModifierVGyAA4EdgeOcF）——叠叠乐翻页的**区域级**手势：三指上/下扫 = 朝那一边滚（Edge.bottom 即往下看，与系统 ScrollView 同向）。这条不是可选的：叠叠乐**没有 ScrollView**，不挂它，VoiceOver 用户完全无法翻页，而且不会有任何报错提醒你",
+    # 叠叠乐改回系统滚动（2026-09-25，用户第 1 条：「除了地图外其他的界面怎么滑动起来
+    # 都很不 iOS？iOS 的原生流畅呢」）。上一版是自管手势 + 自管弹簧，代价写在 `ArcStack`
+    # 头注里（没有三指滚动、没有惯性、两端硬停）；换回 `ScrollView` 之后那几条一起消失。
+    # 五个名字都在写进代码前对着 Apple 文档 JSON 核过（abstract / identifier.url /
+    # metadata.externalID / platforms 四项都看过）：
+    "ScrollViewReader": "SwiftUI.ScrollViewReader（iOS 14+；externalID s:7SwiftUI16ScrollViewReaderV；abstract: A view that provides programmatic scrolling, by working with a proxy to scroll to known child views.）——它给的是**程序化滚动**那一个入口（无障碍翻页用）",
+    "ScrollViewProxy": "SwiftUI.ScrollViewProxy（iOS 14+；externalID s:7SwiftUI15ScrollViewProxyV；abstract: A proxy value that supports programmatic scrolling of the scrollable views within a view hierarchy.）",
+    "scrollTo": "ScrollViewProxy.scrollTo(_:anchor:)（iOS 14+；decl: func scrollTo<ID>(_ id: ID, anchor: UnitPoint?)，ID : Hashable；externalID s:7SwiftUI15ScrollViewProxyV8scrollTo_6anchoryx_AA9UnitPointVSgtSHRzlF）——无障碍翻页的两个落点都靠它：普通卡 `anchor: .top`（卡顶贴容器顶 = 卡顶停在阅读线），末卡 `.bottom`（末卡底贴容器底 = 我们原来的「停到底」）",
+    "scrollIndicators": "View.scrollIndicators(_:axes:)（iOS 16+；decl: func scrollIndicators(_ visibility: ScrollIndicatorVisibility, axes: Axis.Set) -> some View；externalID s:7SwiftUI4ViewPAAE16scrollIndicators_4axesQrAA25ScrollIndicatorVisibilityV_AA4AxisO3SetVtF）——卡片自己就是内容，系统滚动条在这一层是多余的 chrome",
+    "onScrollGeometryChange": "View.onScrollGeometryChange(for:of:action:)（iOS 18+；decl: nonisolated func onScrollGeometryChange<T>(for type: T.Type, of transform: @escaping (ScrollGeometry) -> T, action: @escaping (T, T) -> Void) -> some View，T : Equatable；externalID s:7SwiftUI4ViewPAAE22onScrollGeometryChange3for2of6actionQrqd__m_qd__AA0eF0Vcyqd___qd__tctSQRd__lF）——形变（透明度 / 缩放）的唯一输入：`contentOffset.y`。它取代了上一版那个自管 `scroll` 状态",
     # 首页重排（2026-09-23，按原型 stack.html）新增的三个 SDK 名字。
     # 三个都对着 Apple 文档 JSON 核过 decl / 平台 / externalID。
     "GeometryProxy": "SwiftUI.GeometryProxy（iOS 13+；externalID s:7SwiftUI13GeometryProxyV；doc://com.apple.SwiftUI/documentation/SwiftUI/GeometryProxy）——拿到容器尺寸的那个结构体。**注意它与 MapCompass 一起被登记，但两者缘由不同**：GeometryProxy 一直都在用（`pageLayer(_ geo:)`），而 scan.py 的「未声明的类型」判据是拿**冻结提交的缓存**比 —— 基线里那一个只出现在 `members` / `calls` 里、没进 `refs`，于是本机跑（有 scan/baseline/ 目录）与 CI 跑（用提交进仓库的 baseline_cache.json）结果不一样。这一条就是把「到底认不认它」写成一个显式名字，两种跑法都对得上",
