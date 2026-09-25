@@ -20,10 +20,11 @@ import MapKit
 //  顶从安全区下 `TokensSpacing.xxxl` 起。
 //
 //  2026-09-25 第 9 条：这一列从**两枚**变成**三枚** —— 罗盘也搬进来了。
-//  原来那个罗盘是系统的（`MapCompass`），它的位置由 MapKit 定（安全区紧下沿的角落），
-//  搬不动 —— 而用户要它下来一点（「太上了」）。现在它是我们自己画的一枚：
-//  一根指向正北的针（`Triangle`，与警示钉同一个形状原语）+ 点一下回正北。
-//  它与另两枚同一行、同一种材质、同一个尺寸 —— 这才看起来是「同一列控件」。
+//  第 9 条那一轮以为「系统的 `MapCompass` 位置由 MapKit 定、搬不动」，于是自己画了一枚。
+//  2026-09-25 **第十一轮把那个判断推翻了**（用户：「我要的是系统罗盘和系统比例尺，
+//  只是他们被时间压住了，往下调整下」）：`MapCompass(scope:)` 可以当**独立视图**挂，
+//  位置由这一列决定 —— 所以这一列的第一件就是系统罗盘本身（我们画的那一枚连同
+//  `resetNorth` 一起删掉，它做的事系统那枚点一下也会做）。
 //
 //  材质：`.overMedia` —— 它们浮在**连续的画面**（地图瓦片）上，不是卡的面。
 //  可点 → `interactive`：按下去的压缩与折射由系统演（`DSGlass.swift` 的三条规则）。
@@ -39,7 +40,12 @@ extension MapSpineView {
         // 而把动作当参数传会引入两层新东西 —— 闭包的 actor 归属与它的类型 ——
         // 换不来任何复用。
         VStack(spacing: TokensSpacing.snug) {
-            compassButton
+            // 罗盘 = **系统的**那一枚（`MapCompass`，第十一轮）：位置由这一列给，
+            // 不再是 MapKit 贴在状态栏里的那个角。
+            // 固定一格尺寸：北朝上时系统那枚自己不画（Apple 的行为），
+            // 留出这一格，下面两枚钮就不会随它上下跳。
+            MapCompass(scope: mapScope)
+                .frame(width: TokensSize.tap, height: TokensSize.tap)
 
             Button {
                 TokensHaptic.tap()
@@ -74,58 +80,11 @@ extension MapSpineView {
         .dsGlassLayer(spacing: TokensSpacing.snug)
     }
 
-    /// 罗盘：一根**永远指向正北**的针 + 点一下回正北。
-    ///
-    /// 为什么不是 SF Symbol：`location.north.fill` 那一类符号是「箭头」，
-    /// 而罗盘读的是**北在哪** —— 一根红针是全世界的地图 App 共用的一种画法，
-    /// 而 `Triangle` 这个形状原语本仓已经有了（警示钉）。
-    ///
-    /// 针转的是 `-cameraHeading`：镜头朝哪，北就在相反的方向。
-    /// 那个数只有 `onMapCameraChange` 说得出（见 `MapSpineView.cameraHeading`）。
-    var compassButton: some View {
-        Button {
-            TokensHaptic.tap()
-            resetNorth()
-        } label: {
-            ZStack {
-                // 针：一半实一半虚 —— 地图上它是「北指向」，不是装饰。
-                Triangle()
-                    .fill(TokensPalette.error)
-                    .frame(width: 11, height: 10)
-                    .rotationEffect(.degrees(-cameraHeading))
-                // 南针的半边也走 `TokensInk`（它坐在罗盘的玻璃上，见 `compassButton`）。
-                Triangle()
-                    .fill(TokensInk.secondary)
-                    .frame(width: 11, height: 10)
-                    .rotationEffect(.degrees(180 - cameraHeading))
-                    .opacity(0.7)
-            }
-            .frame(width: TokensSize.tap, height: TokensSize.tap)
-            .dsGlass(in: Circle(), variant: .overMedia, interactive: true)
-            .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text("罗盘"))
-        .accessibilityValue(Text(cameraHeading == 0 ? "已朝正北" : "北在 \(Int((360 - cameraHeading).rounded()) % 360) 度方向"))
-        .accessibilityHint(Text("回到正北朝上"))
-    }
-
-    /// 回正北：**只把朝向归零**，中心与缩放照旧。
-    ///
-    /// `MapCamera` 要一个完整的镜头（中心 + 距离 + 朝向 + 俯仰），所以这三个数得从
-    /// 手里有的地方来：中心取镜头自己的（拿不到就退回车），距离取**镜头此刻的**
-    /// （写死 `cameraDistance` 会把用户缩放好的尺度一把推回默认 —— 那是另一种“"
-    /// 点了什么都不对”）。
-    @MainActor
-    func resetNorth() {
-        guard let c = cameraCenter ?? store.currentLocation?.coordinate else { return }
-        withAnimation(TokensMotion.value) {
-            camera = .camera(MapCamera(centerCoordinate: c,
-                                       distance: cameraDistanceNow,
-                                       heading: 0,
-                                       pitch: 0))
-        }
-    }
+    //  这里原本有 `compassButton`（自己画的一枚罗盘：`Triangle` 红针 + 点一下回正北）
+    //  与它调用的 `resetNorth`（把镜头朝向归零、中心与缩放照旧）。
+    //  **第十一轮一起删了**：系统那一枚（`MapCompass(scope:)`）点一下也会回正北，
+    //  而它的朝向由它自己知道 —— 不必再让 `onMapCameraChange` 每帧喂一个数进来。
+    //  形状原语 `Triangle` 没有跟着走：警示钉（`MapSpotPin.issuePin`）还在用它。
 
     /// 一枚钮的图形：圆底玻璃 + 安全取符号。
     @MainActor
@@ -196,11 +155,11 @@ extension MapSpineView {
             // 手上是个粗点：先移过去（总比没反应好），同时**再要一次** ——
             // 走两步常常就能拿到准的点。取到之后由那条 `onChange` 再移一次镜头。
             phone.request()
-            fly(to: phone.coordinate)
+            fly(to: phone.mapCoordinate)
             ToastManager.shared.show("位置精度较低，正在再取一次", icon: "location")
         case .found:
             phone.request()          // 重新取一次（它取到就停，所以这次是「刷新」）
-            fly(to: phone.coordinate)
+            fly(to: phone.mapCoordinate)
         }
     }
 
@@ -225,7 +184,9 @@ extension MapSpineView {
     /// 只在真的拿到位置时出现 —— 不摆一个假点，坐标也不会是 (0,0)。
     @MapContentBuilder
     func phonePin() -> some MapContent {
-        if let c = PhoneLocation.shared.coordinate {
+        // `mapCoordinate` 而不是 `coordinate`：后者是 WGS-84 的原始读数，
+        // 在中国区的地图上会偏 300–600 m（用户 2026-09-25：蓝点落在湖里）。
+        if let c = PhoneLocation.shared.mapCoordinate {
             // 不确定范围：`horizontalAccuracy` 就是**半径**（CoreLocation 给的 95% 置信圆）。
             // iOS 地图的蓝点外面那圈淡圆就是它 —— 而它是用户第 9 条（「手机的位置飘逸
             // 很严重」）在界面上的答案：点到底准不准，图上自己说得出，不再偷偷地错。

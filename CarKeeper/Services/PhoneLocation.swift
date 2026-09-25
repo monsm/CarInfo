@@ -69,6 +69,21 @@ final class PhoneLocation: NSObject, ObservableObject, CLLocationManagerDelegate
     /// 也是我们这一屏唯一能如实表达「我有多确定」的方式。
     @Published private(set) var accuracy: CLLocationAccuracy?
 
+    /// 画在**地图**上用的那个坐标（GCJ-02）。
+    ///
+    /// `coordinate` 是 CoreLocation 给的**原始读数**（WGS-84），而中国区的地图瓦片
+    /// （高德，见地图右下角那个署名）用的是 GCJ-02 —— 两者差 300–600 m。
+    /// 2026-09-25 用户报的「我的位置离车很近很近就 20 米左右，但是给我自己定位到
+    /// 湖里面去了」就是这一条：手机那个点用原始坐标画出去，偏了约 600 m；
+    /// 而车的坐标本来就是 GCJ-02（车端接口 `mapType=GCJ02`，见 `API-FIELD-MAP.md`），
+    /// 所以整屏只有它一个是歪的。
+    ///
+    /// **画地图时才用它**（钉、镜头、误差圈）：距离、方位这类量用哪个坐标系都一样。
+    /// 换算只有 `ChinaDatum` 一个出处（境外原样返回），别处不许自己再算一遍。
+    var mapCoordinate: CLLocationCoordinate2D? {
+        coordinate.map { ChinaDatum.gcj02(fromWGS84: $0) }
+    }
+
     /// 够准的门槛（米）。比它差的点先留着当兜底，但继续等更好的。
     ///
     /// 35 是一个取舍：iPhone 在城市里拿到 5–20 m 是常态（用了 WiFi 指纹就更准），
@@ -83,8 +98,8 @@ final class PhoneLocation: NSObject, ObservableObject, CLLocationManagerDelegate
     private let manager = CLLocationManager()
     /// 兜底点（精度不够但可用）+ 它的精度 —— 超时之后就用它。
     private var fallback: CLLocation?
-    /// 超时计时器的代号（同一手法见 `MapSpineView.flashScale`）：
-    /// 一次新的请求会让上一次的等待作废。
+    /// 超时计时器的代号（同一手法见 `DSSwipeStrip.retractToken`：那种「到期前又发生了一次
+    /// 就把上一次作废」的计时器都带一个代号）：一次新的请求会让上一次的等待作废。
     private var settleToken = 0
 
     private override init() {

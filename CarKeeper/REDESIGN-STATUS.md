@@ -3939,3 +3939,39 @@ over visually rich backgrounds.”* 本仓已有的两个变体常量就是这�
 本机没有 Swift 工具链：**编译与真实观感只有 CI / 真机能回答**。这一轮风险最高的两处：
 `.clear` 玻璃（正文对比度跟着底下的照片走，回退是一行）、以及 `@AppStorage` 换掉
 `@State`（抽屉的开合状态从内存搬到了磁盘）。两者都在 HANDOFF §21 里写明了代价与回退法。
+
+---
+
+## 2026-09-25 第十一轮：系统罗盘与系统比例尺回来了、续航圈差 1000 倍、我跑到湖里
+
+### ① 「系统控件搬不动」被推翻 —— 它为这一屏养了整套机器
+
+第 9 条那一轮认定 `MapCompass` / `MapScaleView` 的位置由 MapKit 定死，于是自己画罗盘、
+自己量尺子。**Apple 文档里明写这两件可以当独立视图用**（`Map(scope:)` +
+`MapCompass(scope:)` + `MapScaleView(anchorEdge:scope:)` + `.mapScope(_:)`）——
+位置由持有它们的容器决定。删掉的是：`MapReader` / `MapProxy.convert` 测距、
+`metersPerPoint` / `scaleBar` / `ruler` / `scaleRuler` / `flashScale`、
+`compassButton` / `resetNorth`、6 个 `@State`、还有**一条每帧回调**
+（`onMapCameraChange(frequency: .continuous)`）。
+
+同一轮补上第 9 条的副作用：撤掉 `.mapControls { MapCompass() }` 反而把**默认控件集**放回来了
+（地图转过之后自动出现一枚，贴在地图自己的角上 = 状态栏里，压住电池 —— 用户截图里有两枚罗盘）。
+现在 `.mapControls { }` + `.mapControlVisibility(.hidden)`，位置改由我们给：
+比例尺在左上、罗盘在右列第一格，两者都在安全区之下。
+
+### ② 续航圈：把 km 当米用，半径差 1000 倍
+
+车端 `RemainedPowerMile` 的单位是 **km**（`API-FIELD-MAP.md` 写着样例 204；
+而且卡里那一格一直按 km 显示）—— 代码里的注释却写着「本身就是米」。
+于是「续航圈」只有 243 m，看起来与「定位误差圈」一模一样（用户截图里那个虚线圆就是它）。
+改法：`rangeMeters` 一处 ×1000。
+
+### ③ 我跑到湖里：WGS-84 与 GCJ-02
+
+手机是 WGS-84（CoreLocation 原始值），车是 GCJ-02（接口 `mapType=GCJ02`），
+瓦片也是 GCJ-02（高德）—— 于是只有自己那个点偏 300–600 m，而它**自称精度 ≤20 m**。
+新增 `ChinaDatum` + `PhoneLocation.mapCoordinate`，三处画图 / 移镜头的调用点改用它。
+
+### 验证状态
+
+`python3 scan/all.py` —— **34/34 全绿**。本机没有 Swift 工具链，编译与观感只有 CI / 真机能回答。

@@ -153,13 +153,6 @@ struct MapSpineView: View {
     ///  键名只一个出处，`@AppStorage` 里写字面量是这一层唯一被重复过的那种写法。
     @AppStorage(MapSpineView.drawerKey) var drawerOpen = false
 
-    /// 比例尺露着没有（用户 2026-09-25：「地图页的比列缩尺放到灵动岛下面，2 秒后消失」）。
-    /// 它只在「地图刚动过」的那两秒里出现 —— 与 Apple 地图同一个节奇。
-    /// **不是 `private`**：尺子本体住在 `MapSpineReadouts.swift`。
-    @State var scaleShown = false
-    /// 那两秒的计时器代号：两秒内地图又动了，上一次的隐藏就作废（同模式条收回的手法）。
-    @State var scaleToken = 0
-
     /// 壁纸状态（非地图子页铺的底）。**必须订阅它**：图是异步到达的，
     /// 不订阅的话 `换一张 / 不铺` 要等到下一次换档才生效（body 才重新求值）。
     /// 与 MineView 那行订阅的是同一个单例，两处的更新永远同步。
@@ -183,16 +176,19 @@ struct MapSpineView: View {
     /// 两处各写一个数就是「同一个几何有两个出处」。
     let cameraDistance: Double = 1_400
 
-    /// 镜头此刻真正的参数：**朝向**（罗盘要它）、**中心**、**距离**（回北时不能把缩放也重置了）。
+    /// 系统那两件仪器（罗盘 / 比例尺）挂在地图上的那条线。
     ///
-    /// 它们是 `MapCameraPosition` 里读不出来的东西 —— 那个类型只写不读（只有 `Equatable`）。
-    /// 唯一说得出「镜头现在朝哪儿、多远」的是 `onMapCameraChange`，所以由它喂这三个数。
+    /// 2026-09-25 第十一轮（用户：「**我要的是系统罗盘和系统比例尺**，只是他们被时间
+    /// 压住了，往下调整下」）：`MapCompass` / `MapScaleView` 可以当**独立视图**用
+    ///（`Map(scope:)` + `MapCompass(scope:)` + `.mapScope(_:)`，Apple 文档里就是这写法），
+    /// 所以它们的位置**由我们给**，不是 MapKit 定死的。
+    ///
+    /// 上一轮（第 9 条）的判断在这里被推翻：当时认定「系统控件搬不动」（位置由 MapKit 定），
+    /// 于是自己画了一枚罗盘、又自己量了一把尺子 —— 代价是 `MapReader` / `MapProxy.convert`
+    /// 一整套测距、两个 `@State` 加一条**每帧回调**（`onMapCameraChange` 喂镜头朝向、
+    /// 中心、距离）。那些全都在为躲一个**不存在**的限制服务，这一轮一起删了。
     /// **不是 `private`**：罗盘住在 `MapQuickButtons.swift`，而 `private` 的作用域是文件。
-    @State var cameraHeading: Double = 0
-    @State var cameraCenter: CLLocationCoordinate2D?
-    @State var cameraDistanceNow: Double = 1_400
-    /// 上一次记下的距离（比例尺只在**真的变了**的时候重露，见 `onMapCameraChange`）。
-    @State private var lastScaleDistance: Double = 0
+    @Namespace var mapScope
     /// 屏幕顶到这一层的顶 = 系统安全区那一段（见 `body` 末尾那个量探针）。
     /// 它喂给五张子页的滚动内衬（`stackTopInset`）。
     @State private var topSafeGap: CGFloat = 0
@@ -354,9 +350,6 @@ struct MapSpineView: View {
         // 不把用户推到车控页（一条锁车指令不该让人离开地图）。
         .controlCommandFlow($quickRequest)
         .task {
-            // 比例尺开场露一次（用户 2026-09-25：它 2 秒后消失）：
-            // 先让用户看到「这一段有多长」，然后它自己走掉。
-            flashScale()
             // 地图出现之后的这几步是启动轨迹里原本的盲区（见 StartupJournal 头注）：
             // 用户报的「地图出来以后几秒就退」正落在这里，所以每一步都留个路标。
             StartupJournal.shared.mark("地图页开始取数")
@@ -381,30 +374,14 @@ struct MapSpineView: View {
             setDrawer(open: true)
             if LaunchFence.mapFetches && new == .charge { Task { await searchChargersIfNeeded() } }
         }
-        // 镜头一动就把比例尺再露两秒（与 Apple 地图同一个节奇）——
-        // `MapCameraPosition` 是 `Equatable`，所以这一条能直接盯它。
-        //
-        // ⚠️ 它**不够**：用户 2026-09-25 第 9 条「比例尺也不出现了，缩放地图的时候
-        // 应该要出现啊」—— `camera` 这个绑定的回写并不覆盖每一种手势（双指缩放
-        // 在真机上就常常不回写），而这条 `onChange` 是它唯一的触发者，
-        // 于是尺子实际上只剩「进入这一屏时露一次」。真正管用的触发在下面：
-        // `onMapCameraChange`（Apple 给地图的官方回调，平移与缩放都会来）。
-        .onChange(of: camera) { _, _ in flashScale() }
-        // 镜头变化：罗盘要朝向、回北要中心与距离、比例尺要「地图动了」这件事。
-        // 用 `.continuous`（拖动过程中每帧都来）而不是 `.onEnd`：尺子要在**缩放时**
-        // 就露出来，而不是等手指松开。代价是每帧都回调 —— 所以每个动作都有门槛：
-        // 距离没变过 6% 就不重露尺子（不然一次拖动会留下上百个待执行的 2 秒计时器）。
-        .onMapCameraChange(frequency: .continuous) { ctx in
-            cameraHeading = ctx.camera.heading
-            cameraCenter = ctx.camera.centerCoordinate
-            cameraDistanceNow = ctx.camera.distance
-            let moved = lastScaleDistance == 0
-                || abs(ctx.camera.distance - lastScaleDistance) > lastScaleDistance * 0.06
-            if moved {
-                lastScaleDistance = ctx.camera.distance
-                flashScale()
-            }
-        }
+        //  这里原本有两条**为自量比例尺服务**的回调：`.onChange(of: camera) { flashScale() }`
+        //  与 `.onMapCameraChange(frequency: .continuous) { … }`（后者喂镜头朝向 / 中心 /
+        //  距离给**我们自己画的罗盘与尺子**，并带一个 6% 的门槛防止一次拖动留下上百个
+        //  待执行的 2 秒计时器）。第十一轮两件仪器都换成系统的，于是这两条连同
+        //  `cameraHeading` / `cameraCenter` / `cameraDistanceNow` / `lastScaleDistance`
+        //  四个 `@State` 一起删掉：系统罗盘自己知道朝向，系统尺子自己知道地图在动。
+        //  （它也是这一屏唯一一条**每帧都来**的回调 —— 删掉它顺带把第七轮性能那一轮
+        //   记下的一个隐忧消掉了。）
         // 盯的是**车自己的读数**（同一个 `caches["location"]`），不是派生数据里的那份：
         // 这一条原来写 `.onChange(of: d.carCoordinate?.latitude)`，而 `.onChange` 的条件
         // 每次求值都要算一次 —— 于是它单独又建了一整份派生数据（见 `body` 上的说明）。
@@ -416,10 +393,11 @@ struct MapSpineView: View {
         // 手机的位置取回来了 → 把镜头移过去（按了那枚钮、答应过权限之后自动完成）。
         // 少了这一步，「按一下 → 弹权限 → 答应」之后那一按看起来什么也没发生
         //（点还在路上）—— 而用户已经答应过一次了，不该再按第二次。
-        // 镜头那一动只有一处实现（`MapQuickButtons.swift` 的 `fly(to:)`）。
-        .onChange(of: PhoneLocation.shared.coordinate?.latitude) { _, _ in
-            fly(to: PhoneLocation.shared.coordinate)
-        }
+        // 镜头那一动只有一处实现（`MapQuickButtons.swift` 的 `fly(to:)`）。        // 盯的是**画在图上用的那个坐标**（`mapCoordinate` = 换算成 GCJ-02），
+            // 不是 CoreLocation 的原始读数：镜头要和蓝点落在同一个点上（见 `ChinaDatum`）。
+            .onChange(of: PhoneLocation.shared.mapCoordinate?.latitude) { _, _ in
+                fly(to: PhoneLocation.shared.mapCoordinate)
+            }
     }
 
     /// 取一次天气（TTL 与「车没走远」两道护栏都在服务里）。
@@ -436,21 +414,37 @@ struct MapSpineView: View {
 
     @ViewBuilder
     private func mapCanvas(_ d: MapSpineData) -> some View {
-        //  比例尺（我们自己的那把，见 `MapSpineReadouts`）**不挂在这一层**：
-        //  地图 `ignoresSafeArea(.top)`，任何挂在它身上的浮层会跟着画到灵动岛底下。
-        //  它挂在下一层（`nowLayer`）—— 那里还在安全区里，所以对齐到“顶”就是
-        //  **灵动岛下沿**（用户 2026-09-25 第 2 条），不必去猜刘海多高。
-        Map(position: $camera) {
+        //  系统那两件仪器（比例尺 / 罗盘）**不挂在这一层**：
+        //  地图 `ignoresSafeArea(.top)`，任何挂在它身上的东西都会跟着画到灵动岛底下
+        //（第 9 条那枚「自动出现」的罗盘就落在那里 —— 状态栏里，压住电池）。
+        //  两件都挂在下一层（`nowLayer`）—— 那里还在安全区里，所以对齐到“顶”就是
+        //  **灵动岛下沿**（用户 2026-09-25 第 2 条 + 第十一轮「往下调整下」）。
+        Map(position: $camera, scope: mapScope) {
             mapContent(d)
         }
         .mapStyle(.standard)
-        // 这里原本有一个 `.mapControls { MapCompass() }`（系统的罗盘）。
-        // 2026-09-25 第 9 条（用户：「指南针的图标位置是系统定死的吗？太上了」）：
-        // 是定死的 —— `MapCompass` 贴在 MapKit 自己给的角落（安全区紧下沿），
-        // 我们搬不动它。所以罗盘换成我们自己画的那一枚（`MapQuickButtons.compassButton`），
-        // 它挂在**与右侧两枚圆钮同一行**的位置上（`TokensSpacing.xxxl`），
-        // 而且与它们同一种材质。`mapControls` 因此整个消失：
-        // 那一片地方再没有系统控件了（比例尺早就是我们自己量的）。
+        // ── 系统控件：位置由**我们**给，不是 MapKit 定死的 ─────────────────────
+        //
+        // 第十一轮：这两行把**自动摆放的那一套**关掉 —— 两件仪器改由我们在
+        // `nowLayer` 那一层亲手摆（`MapCompass(scope:)` / `MapScaleView(anchorEdge:scope:)`，
+        // 见那两个调用点）。
+        //
+        // 为什么必须显式关：第 9 条那一轮把 `.mapControls { MapCompass() }` 整个撤掉，
+        // 而**撤掉不等于关掉** —— MapKit 的默认控件集里本来就有罗盘，它在地图**转过之后**
+        // 自动出现（Apple 原文：*the default mapControls configuration shows a compass
+        // when the map is rotated*）。地图又是 `ignoresSafeArea(edges: .top)`，
+        // 于是那枚自动罗盘贴在**地图自己的角**上 —— 正好是状态栏里，压住电池
+        //（用户 2026-09-25 的截图：右上角一枚带「西」字的，右列一枚我们画的 —— 两枚罗盘）。
+        //
+    // 两行都写在 Map **自己**身上（不是外层容器）：`mapControlVisibility` 是一个
+    // 向下传的环境值，挂在容器上会把我们摆在别处的那两件也一起隐藏掉。
+    //
+    // ⚠️ 真机上要盯一眼：如果角落里那枚自动罗盘还在，说明空 builder 没压住默认控件集 ——
+    // 那时的下一手是 UIKit 的 `MKMapView.appearance().showsCompass = false`
+    //（SwiftUI 的 `Map` 底下就是 MKMapView，这颗开关一定关得掉；代价是全局影响，
+    // 而这个 App 只有这一张地图，所以就放在那一手里）。
+    .mapControls { }
+    .mapControlVisibility(.hidden)
         // 这里原本还有两层浮层：**色温蒙版**（系统瓦片改不了色，只能盖一层 ——
         // 二十套艺术方向各有一个蒙版色与不透明度）与**光层**（光池 / 暗角 / 颗粒，
         // 位置由太阳方位角算）。两层都只在艺术方向下出现，随主题一起删掉（2026-09-25）。
@@ -807,49 +801,55 @@ struct MapSpineView: View {
     @ViewBuilder
     private func nowLayer() -> some View {
         let d = data
-        //  `MapReader` 只服务一件事：把**屏幕上的两点**交给 `MapProxy` 换成经纬度，
-        //  从而量出「一个点等于多少米」—— 比例尺要的就是这个数。
-        //  它包在这一层（而不是地图那一层）是因为比例尺的位置：地图自己
-        //  `ignoresSafeArea(.top)`，而这一层还在安全区里 —— 对齐到「顶」
-        //  就是**灵动岛下沿**（用户 2026-09-25 第 2 条：「放到灵动岛下面」）。
-        MapReader { proxy in
-            ZStack(alignment: .bottom) {
-                // 地图是这一页**本身**（原型 `#page-now` 里的 `.map{inset:0}`），
-                // 不是衬在六页底下的背景：换走时它跟着淡出、缩小，
-                // 而不是「别的页浮在一张活地图上」（那样两页交界处会露出地图）。
-                mapCanvas(d)
+        //  `MapReader`（把屏幕上两点交给 `MapProxy.convert` 换成经纬度、从而量出
+        //  「一个点等于多少米」）随**自量比例尺**那一步一起删（2026-09-25 第十一轮）：
+        //  系统 `MapScaleView` 可以当独立视图挂、位置由这一层给，
+        //  所以那整套测距是在躲一个不存在的限制（见 `mapCanvas` 上的说明）。
+        ZStack(alignment: .bottom) {
+            // 地图是这一页**本身**（原型 `#page-now` 里的 `.map{inset:0}`），
+            // 不是衬在六页底下的背景：换走时它跟着淡出、缩小，
+            // 而不是「别的页浮在一张活地图上」（那样两页交界处会露出地图）。
+            mapCanvas(d)
 
-                // 比例尺：地图上那个「这一段有多长」的仪器。它自己 2 秒后淡出
-                //（用户：「2 秒后消失」），什么时候再露由 `flashScale()` 定。
-                scaleRuler(proxy)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            // ── 系统的那两件仪器（第十一轮）────────────────────────────────
+            // 比例尺（左上）：`MapScaleView(anchorEdge:scope:)`。**显隐由它自己**——
+            // Apple 的行为是「地图在动就露、停下就淡出」，与用户第 2 条要的
+            // 「2 秒后消失」是同一个节奇，而上一轮为此写了两个 `@State` + 一条每帧回调。
+            // 位置由这一层给：这一层还在安全区里，所以对齐到「顶」就是**灵动岛下沿**
+            //（用户第 2 条 + 第十一轮：「被时间压住了，往下调整下」）。
+            MapScaleView(anchorEdge: .leading, scope: mapScope)
+                .padding(.leading, TokensSpacing.md)
+                .padding(.top, TokensSpacing.sm)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                // 尺子不是控件（Apple 地图里它也不接点击）：让它把地图的拖动吃掉，
+                // 就成了「一块看不见的挡板」。
+                .allowsHitTesting(false)
 
-                // 底图之上**没有任何压暗层**（原型这里有 `.maptop` + `.mapvig` 两层，都已删）。
-                //
-                // 用户 2026-09-24：「全局不要加暗层」+「地图页顶部的信息挪到下面的玻璃卡片」——
-                // 这两条是同一件事的两面：`.maptop` 存在的唯一理由是「车牌徽标压在瓦片上要读得出」，
-                // 而徽标已经搬进下面那张玻璃卡。理由消失，层就跟着走。
-                // 删干净之后地图上不是瓦片的东西只剩两样：**罗盘**（系统的）与
-                // **比例尺**（2026-09-25 起是我们自己量的，见 `MapSpineReadouts`）——
-                // 它们自带底 / 自带阴影，不靠这层压暗。而那一行大字地名已按
-                // 用户 2026-09-25 第 2 条删掉。
+            // 底图之上**没有任何压暗层**（原型这里有 `.maptop` + `.mapvig` 两层，都已删）。
+            //
+            // 用户 2026-09-24：「全局不要加暗层」+「地图页顶部的信息挪到下面的玻璃卡片」——
+            // 这两条是同一件事的两面：`.maptop` 存在的唯一理由是「车牌徽标压在瓦片上要读得出」，
+            // 而徽标已经搬进下面那张玻璃卡。理由消失，层就跟着走。
+            // 删干净之后地图上不是瓦片的东西只剩两样：**罗盘**与**比例尺**，
+            // 两件都是**系统的**（第十一轮起；它们自带底 / 自带阴影，不靠这层压暗）——
+            // 而那一行大字地名已按用户 2026-09-25 第 2 条删掉。
 
-                // `.float{left:16;right:16;bottom:98}`：底边离屏底（条子占 `barTotal` + 12 呼吸位）。
-                // 这一档**只有一张卡，而且它是一个抽屉**（用户 2026-09-25 第 2 条：
-                // 「默认只显示一横，拉出来才是全部」）：收起 = 拉手 + 续航/电量/车速
-                // + 图层胶囊；拉出来才是卡的全部内容（地址 / 副行 / 光带 / 其余读数）。
-                nowCard(d)
-                    .padding(.horizontal, TokensSpacing.md)
-                    .padding(.bottom, Self.barTotal + 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            // `.float{left:16;right:16;bottom:98}`：底边离屏底（条子占 `barTotal` + 12 呼吸位）。
+            // 这一档**只有一张卡，而且它是一个抽屉**（用户 2026-09-25 第 2 条：
+            // 「默认只显示一横，拉出来才是全部」）：收起 = 拉手 + 续航/电量/车速
+            // + 图层胶囊；拉出来才是卡的全部内容（地址 / 副行 / 光带 / 其余读数）。
+            nowCard(d)
+                .padding(.horizontal, TokensSpacing.md)
+                .padding(.bottom, Self.barTotal + 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                // 地图右侧那一列快速钮（罗盘 / 回到车 / 手机的位置）—— 用户 2026-09-25：
-                // 「像 ios 地图 app 右侧的图标一样」。它们贴在**右上角**，
-                // 不是贴底：底下那张卡与模式条已经占满了（见 `MapQuickButtons`）。
-                quickMapButtons(d)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            }
+            // 地图右侧那一列（系统罗盘 / 回到车 / 手机的位置）—— 用户 2026-09-25：
+            // 「像 ios 地图 app 右侧的图标一样」。它们贴在**右上角**，
+            // 不是贴底：底下那张卡与模式条已经占满了（见 `MapQuickButtons`）。
+            quickMapButtons(d)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         }
+        .mapScope(mapScope)
         // `.plate{left:20;top:62}`：车牌徽标挂在安全区下的左上角（62 ≈ 54 + 8）。
         // 原来这里挂着**车牌徽标**（车牌 + 状态 + 上报时间 + 菜单），压在安全区下 8pt。
         // 它已搬进下面那张玻璃卡的头（用户 2026-09-24：「顶部的信息挪动到下面的玻璃卡片」）：

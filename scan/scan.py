@@ -591,7 +591,7 @@ VERIFIED_SDK_ADDITIONS = {
     # 首页重排（2026-09-23，按原型 stack.html）新增的三个 SDK 名字。
     # 三个都对着 Apple 文档 JSON 核过 decl / 平台 / externalID。
     "GeometryProxy": "SwiftUI.GeometryProxy（iOS 13+；externalID s:7SwiftUI13GeometryProxyV；doc://com.apple.SwiftUI/documentation/SwiftUI/GeometryProxy）——拿到容器尺寸的那个结构体。**注意它与 MapCompass 一起被登记，但两者缘由不同**：GeometryProxy 一直都在用（`pageLayer(_ geo:)`），而 scan.py 的「未声明的类型」判据是拿**冻结提交的缓存**比 —— 基线里那一个只出现在 `members` / `calls` 里、没进 `refs`，于是本机跑（有 scan/baseline/ 目录）与 CI 跑（用提交进仓库的 baseline_cache.json）结果不一样。这一条就是把「到底认不认它」写成一个显式名字，两种跑法都对得上",
-    "MapCompass": "MapKit.MapCompass（iOS 17+；decl: struct MapCompass；externalID s:15_MapKit_SwiftUI0A7CompassV；doc://com.apple.mapkit/documentation/MapKit/MapCompass，relatedModules: SwiftUI，abstract: A view that reflects the current orientation of the associated map）——原型 `.compass`（右上角那枚罗盘）的真机对应物：它是地图自己的仪器（回答「哪边是北」），不是我们摆上去的控件。放在 `.mapControls { }` 里",
+    "MapCompass": "MapKit.MapCompass（iOS 17+；decl: struct MapCompass；externalID s:15_MapKit_SwiftUI0A7CompassV；doc://com.apple.mapkit/documentation/MapKit/MapCompass，relatedModules: SwiftUI，abstract: A view that reflects the current orientation of the associated map；init(scope:) 已核：externalID s:15_MapKit_SwiftUI0A7CompassV5scopeAC0cD09NamespaceV2IDVSg_tcfc）——原型 `.compass`（右上角那枚罗盘）的真机对应物：它是地图自己的仪器（回答「哪边是北」）。**2026-09-25 第十一轮起当独立视图挂在 `MapQuickButtons` 那一列的第一格**（`MapCompass(scope: mapScope)` + 容器上的 `.mapScope(_:)`），不再放进 `.mapControls { }`（那条路的位置由 MapKit 定，会贴在状态栏里）",
     "toolbar": "View.toolbar(_:for:)（iOS 16+；decl: func toolbar(_ visibility: Visibility, for bars: ToolbarPlacement...) -> some View；externalID s:7SwiftUI4ViewPAAE7toolbar_3forQrAA10VisibilityO_AA16ToolbarPlacementVdtF；doc://com.apple.SwiftUI/documentation/SwiftUI/View/toolbar(_:for:)）——按可见性控制某一条栏。首页用它把导航栏收掉（`.toolbar(.hidden, for: .navigationBar)`）：原型里**首页根本没有顶栏**，地图一直画到屏幕最上沿。⚠️ 这个名字在 **iOS 27.2 起被改名为 `toolbarVisibility(_:for:)`**（文档 JSON 里 `renamed: toolbarVisibility(_:for:)`、`deprecatedAt: 27.2`）—— 本项目的部署目标是 iOS 26.0、用 iPhoneOS26.5 SDK 编译，所以现在不产生弃用警告；等 SDK 升到 27.2 之后要改用它",
     # 启动轨迹的心跳（Services/StartupJournal.swift，2026-09-24 第二轮）。
     # 背景：轨迹原本在 2–12 秒之间是瞎的（打点全在头一两秒），而用户报的
@@ -637,15 +637,18 @@ VERIFIED_SDK_ADDITIONS = {
     "EnvironmentKey": "SwiftUI.EnvironmentKey 协议（iOS 13+；decl: protocol EnvironmentKey；doc://com.apple.SwiftUI/documentation/SwiftUI/EnvironmentKey）——卡片视口那个环境值的键（`defaultValue` 是 `.zero`，即「没量到」）",
     # 地图比例尺（Features/Map/MapSpineReadouts.swift，2026-09-25 第三轮）。
     # 用户第 2 条：「地图页的比列缩尺放到灵动岛下面，2 秒后消失」——
-    # 系统的 `MapScaleView` 位置由 MapKit 定（贴在地图角落），搬不动，所以量法自己来：
-    # 把屏幕上相距 200pt 的两点换成经纬度、再量出地面距离。
+    # 下面这三个名字（`MapReader` / `MapProxy` / `convert`）**2026-09-25 第十一轮起没有读者**：
+    # 当时是为了「自己量一把比例尺」而登记的（理由是「系统的 `MapScaleView` 位置搬不动」——
+    # 那句话第十一轮被推翻：它可以当独立视图挂，位置由我们自己给）。
+    # **登记留着不撤**：白名单是按**名字**判的，撤掉 `convert` 这种泛名字会让别处合法的
+    # `.convert(` 变成误报；但注释必须写明现状 —— 一张说「它在用」的登记表就是失真。
     # 三个名字当天取过 doc JSON（abstract / identifier.url / metadata.externalID /
     # platforms 四项都看过）：
-    "MapReader": "MapKit.MapReader（iOS 17+；decl: struct MapReader；externalID s:15_MapKit_SwiftUI0A6ReaderV；doc://com.apple.mapkit/documentation/MapKit/MapReader；abstract: A container view that defines its contents as a function of information about the first contained map）——拿到 `MapProxy`（比例尺靠它把屏幕上的两点换成坐标）",
-    "MapProxy": "MapKit.MapProxy（iOS 17+；decl: struct MapProxy；externalID s:15_MapKit_SwiftUI0A5ProxyV；doc://com.apple.mapkit/documentation/MapKit/MapProxy）——屏幕坐标 ↔ 地图坐标的那个转换器",
+    "MapReader": "MapKit.MapReader（iOS 17+；decl: struct MapReader；externalID s:15_MapKit_SwiftUI0A6ReaderV；doc://com.apple.mapkit/documentation/MapKit/MapReader；abstract: A container view that defines its contents as a function of information about the first contained map）——拿到 `MapProxy`（**已无读者**，见上）",
+    "MapProxy": "MapKit.MapProxy（iOS 17+；decl: struct MapProxy；externalID s:15_MapKit_SwiftUI0A5ProxyV；doc://com.apple.mapkit/documentation/MapKit/MapProxy）——屏幕坐标 ↔ 地图坐标的那个转换器（**已无读者**）",
     # ⚠️ `convert` 这个名字很泛（白名单是按**名字**判的，所以任何 `.convert(` 都会因此通过）。
-    # 它当前只用在 `MapProxy` 上，一处一处可数；换到别处去用它要重新对着文档核一遍。
-    "convert": "MapProxy.convert(_:from:)（iOS 17+；decl: func convert(_ point: CGPoint, from: some CoordinateSpaceProtocol) -> CLLocationCoordinate2D?；externalID s:15_MapKit_SwiftUI0A5ProxyV7convert_4fromSo22CLLocationCoordinate2DVSgSo7CGPointV_xt0cD023CoordinateSpaceProtocolRzlF；doc://com.apple.mapkit/documentation/MapKit/MapProxy/convert(_:from:)；abstract: Converts a point in the specified coordinate space to a map coordinate）——比例尺那个数**唯一**的来源：两点之间的地面距离由它量出来（不是按镜头距离估的）",
+    # 它现在全仓没有调用点；换到别处去用它要重新对着文档核一遍。
+    "convert": "MapProxy.convert(_:from:)（iOS 17+；decl: func convert(_ point: CGPoint, from: some CoordinateSpaceProtocol) -> CLLocationCoordinate2D?；externalID s:15_MapKit_SwiftUI0A5ProxyV7convert_4fromSo22CLLocationCoordinate2DVSgSo7CGPointV_xt0cD023CoordinateSpaceProtocolRzlF；doc://com.apple.mapkit/documentation/MapKit/MapProxy/convert(_:from:)；abstract: Converts a point in the specified coordinate space to a map coordinate）——**已无读者**（它曾是自己那把比例尺唯一的测距手段）",
     # 车控那一屏的三维车（Features/Control/CarModelView.swift，2026-09-25 第 8 条：
     # 「车控的车太丑了，能不能搞个真车或立体车，可以滑动的……也可以点击控车」）。
     # RealityKit 这一批名字在写进代码前逐个取过 Apple 文档 JSON（title / kind /

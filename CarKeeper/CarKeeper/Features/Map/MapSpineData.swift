@@ -216,14 +216,25 @@ struct MapSpineData {
     /// 最近一次上报到现在（用于"数据有多新"）
     var updatedText: String { updated.isEmpty ? "--" : updated }
 
-    /// 剩余续航（米）。**车端报文里的 RemainedPowerMile 本身就是米**，不换算、不猜单位。
+    /// 剩余续航（**米**，地图画圈用）。
+    ///
+    /// ⚠️ 车端那个字段的单位是**公里**，不是米 —— 这不是猜的：
+    ///   · `API-FIELD-MAP.md` 里写着（`remainedPowerMile` 样例 `204`，「剩余续航 km」，
+    ///     charge 与 control 两个接口一致）；
+    ///   · 卡里那一格一直按 km 显示（同一个数「续航 243 km」）。
+    ///
+    /// 原先这里直接把它当米用 —— 于是「续航圈」在地图上只有两百多米：
+    /// 一个 243 km 的圈在当前缩放下**根本看不见**，而那个小圈看起来正好像
+    /// 「定位误差圈」（2026-09-25 第十一轮，对着用户那张截图核出来的）。
+    /// 单位也是「同一件事实」：换算只在这一处，别处不许再乘一次。
+    ///
     /// 车没报就是 nil —— 续航圈不画。（AppStore 是 @MainActor，这里也必须标）
     @MainActor
     var rangeMeters: Double? {
         let cache = AppStore.shared.caches
         for key in ["charge", "control"] {   // 与 VM.energy 取 range 的顺序一致
             if let n = ciNumber(ciVal(cache, key), ["RemainedPowerMile"]), n > 0 {
-                return n
+                return n * 1_000        // km → m（唯一一处换算）
             }
         }
         return nil
