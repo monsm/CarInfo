@@ -23,7 +23,7 @@ localstore.py —— 本机持久化键的「归属」与「换账号会不会�
   （连 `last_service_mileage` 都清了），漏的原因是**它清的是「记得的那几项」，
   而没有任何一处能回答「一共该清几项」**。这张表就是那一处。
 
-判据（三条，都只认这张表与代码两边的名字）：
+判据（四条，都只认这张表与代码两边的名字）：
 
   ① 代码里出现的每个 `carkeeper_*` 键都必须在 `HANDOFF.md` §6 的分类表里。
      （新加一个键时，门禁逼你回答「它是关于车的还是关于这台手机的」—— 这正是那个设计决定。）
@@ -35,8 +35,12 @@ localstore.py —— 本机持久化键的「归属」与「换账号会不会�
        （`carkeeper_parking_loc` 就是这种：它没有直接的 `removeObject`，
        而 `parkingLocation` 的 setter 在传 nil 时清键）。
   ③ 表里写着的键必须在代码里真的存在。缺了就是**这张表在说谎** ——
-     它以前就说过：`carkeeper_art_theme` 随艺术主题删掉之后还在表里，
-     而标题写着「42 个」、实际 33 个。一张无法机械对账的清单，一次也没被对过。
+     它以前就说过：`carkeeper_art_theme` 随艺术主题删掉之后还在表里。
+  ④ 标题里自称的那个数必须等于表的行数（`## 6. …（27 个 carkeeper_* 键）`）。
+     这是**同一个事实写在两处**：删功能时表里的行删了，标题里的数字不会自己跟着变
+     —— 它错过两次：先写「42」而实际 33（随艺术主题删九套），
+     再写「33」而实际 26（2026-09-25 第九轮删「设备与模式」等七个键）。
+     一张无法机械对账的清单，一次也没被对过。
 
 为什么是门禁而不是「改一次就好」：这一类的错**没有输出**。清少了不会报错、不会崩，
 只会在换账号那天让用户看见别人的东西（或者看不见自己的）。而「记得清」从来不是一种
@@ -46,7 +50,8 @@ localstore.py —— 本机持久化键的「归属」与「换账号会不会�
 **一行一个键、写全名（不许 `_points` 这种简写）**，归属只能是「账号」或「设备」，
 最后一列只能是 ✅ 或 ❌（✅ 表示退出登录会清）。
 
-退出码：0 = 表与代码一致；1 = 有键没定性 / 账号键没被清 / 表里有不存在的键。
+退出码：0 = 表与代码一致；1 = 有键没定性 / 账号键没被清 / 表里有不存在的键 /
+标题自称的键数与表行数不一致。
 """
 
 import os
@@ -63,6 +68,8 @@ LOGOUT_FILE = os.path.join(APP, "AppStore.swift")
 TOP_DIRS = [APP, SERVICES]
 
 HEADER = "| 键 | 它是什么 | 归属 | 退出登录清 |"
+# §6 的标题。它自称的键数也在判据里（判据 ④）—— 标题与表是同一个数字的两处。
+HEADING = "## 6. 本机持久化清单"
 
 # 退出登录的**清法**登记表：每条 = (函数名, 文件, 理由)。
 # 门禁会核对：同名函数确实被 `logout()` 调用；这个文件里**每一处**同名函数的体里
@@ -192,10 +199,29 @@ def parse_table():
     return rows
 
 
+def heading_count():
+    r"""§6 标题里自称的键数（`（27 个 `carkeeper_*` 键）`）。
+
+    读不到就返回 None + 理由：标题被改掉等于这个数字没人管了，那也是一种失真。
+    """
+    text = open(HANDOFF, encoding="utf-8").read()
+    at = text.find(HEADING)
+    if at < 0:
+        return None, f"在 {HANDOFF} 里找不到 §6 的标题（那句 `{HEADING}`）"
+    line = text[at:].split("\n")[0]
+    m = re.search(r"（(\d+) 个", line)
+    if not m:
+        return None, f"§6 的标题里没有「（N 个 ……）」那个数字：{line}"
+    return int(m.group(1)), None
+
+
 def main():
     assert_roots(TOP_DIRS)
 
     table = parse_table()
+    # 注意：变量名不要叫 `why` —— 下面 `SETTERS` 那个循环的同名局部会漏到这里来
+    #（第一版就叫 `why`，于是第四判据每次都报「对不上」，理由却是某条 setter 的注释）。
+    claim, claim_why = heading_count()
     account = {k for k, (owner, _) in table.items() if owner == "账号"}
     device = {k for k, (owner, _) in table.items() if owner == "设备"}
     bad_owner = {k: v[0] for k, v in table.items() if v[0] not in ("账号", "设备")}
@@ -269,12 +295,23 @@ def main():
             print(f"⚠️  {key} 登记为「经 setter 清」，但证人 `{witness}` 不在 `logout()` 体里")
             print(f"   {why}")
 
-    print(f"HANDOFF §6 分类表：{len(table)} 个键（账号 {len(account)} / 设备 {len(device)}）")
+    print(f"HANDOFF §6 分类表：{len(table)} 个键（账号 {len(account)} / 设备 {len(device)}）"
+          f"，标题自称 {claim if claim is not None else '?'} 个")
     print(f"代码里出现的键：{len(code_keys)} 个")
     print(f"退出登录这条路覆盖的键：{len(cleared)} 个"
           f"（cleaners: {', '.join(sorted(set(used_cleaners))) or '无'}）")
 
     problems = 0
+
+    if claim_why or claim != len(table):
+        problems += 1
+        print("\n❌ §6 标题里那个数与表里的行数对不上：")
+        if claim_why:
+            print(f"   {claim_why}")
+        else:
+            print(f"   标题写着 {claim} 个，表里实际 {len(table)} 行")
+        print("   数字写在两处就会漂（它漂过两次：42→33→标题没跟着变）。")
+        print("   改法是改标题里的那个数 —— 或者是删掉这个数字，改判据 ④ 就一起改。")
 
     if bad_owner:
         problems += 1

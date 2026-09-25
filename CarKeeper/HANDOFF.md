@@ -741,7 +741,7 @@ Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形�
 
 ---
 
-## 6. 本机持久化清单（33 个 `carkeeper_*` 键）
+## 6. 本机持久化清单（27 个 `carkeeper_*` 键）
 
 > 判据：**服务端有这个字段吗？** 有 → 不落盘；没有（只能本机攒）→ 落盘，并在文档与界面上说清它是本机的。
 >
@@ -778,6 +778,7 @@ Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形�
 | `carkeeper_biometric_setup` | 生物识别已设置 | 设备 | ❌ |
 | `carkeeper_home_mode` | 上次停留的档位 | 设备 | ❌ |
 | `carkeeper_map_layer` | 地图「现在」层的子层 | 设备 | ❌ |
+| `carkeeper_map_drawer` | 地图抽屉拉出来了没有（2026-09-25「给它一点记忆」） | 设备 | ❌ |
 | `carkeeper_home_card_order` | 首页卡片顺序 | 设备 | ❌ |
 | `carkeeper_force_dark_mode` | 明暗偏好：强制深色（唯一出处是「我的 → 夜间模式」） | 设备 | ❌ |
 | `carkeeper_onboarding_seen` | 引导页看过 | 设备 | ❌ |
@@ -1489,7 +1490,7 @@ v2.1 那道车底弧**删掉**（040 里没有它）。折进来时与探索稿*
 | 事实 | 出处 | 结论 |
 |---|---|---|
 | 地图页在车动起来时 **每 2 秒** 求值一次 | `RefreshLoop.Cadence.moving`（用户 2026-09-25 定的节律） | 每次求值里的任何浪费，× 0.5 Hz |
-| 六页同屏**是关着的**（`LaunchFence.sixPageDeck = false`） | `Services/LaunchFence.swift` | 树里只有当前那一档 → 只需优化「当前页」的路 |
+| 六页同屏**是关着的**（`LaunchFence.sixPageDeck = false`） | `Services/LaunchFence.swift` | 树里只有当前那一档 → 只需优化「当前页」的路（**这一行的前提第十轮被推翻了**：用户要求正常启动 → 四个开关全开，见 §21.2） |
 | 手机定位：百米精度、取到就停 | `Services/PhoneLocation.swift` | 不是热路径，不动 |
 | 历史库上限 soc 2000 / power 1500 / tyre 760 | `Services/HistoryStore.swift` 的 cap | 全表扫描只有 3 个读者、都带窗口 → 不是热路径 |
 | 壁纸只在载入/刷新时解码一次 | `Services/WallpaperService.swift` | 不是热路径 |
@@ -1511,6 +1512,11 @@ v2.1 那道车底弧**删掉**（040 里没有它）。折进来时与探索稿*
 `caches` 的写入重新求值」—— 那需要把隐藏页换成 `EmptyView`，而**代价是每页自己的状态
 （滚动位置、展开的分组）在换档时被销毁**。那是设计变更，不是性能修复：
 真要做，得由用户决定「省那点 CPU」还是「保住换档前的状态」。**记在这里，不动。**
+
+> **后续（2026-09-25 第十轮）**：用户回执「先正常启动试一次」→ `LaunchFence` 四个开关
+> 全部打开，六页同屏回到树上。于是上面那个「隐藏页会不会跟着 `caches` 的写入重新求值」
+> 的问题**重新成立**（那是这份代码里最大的一笔开销），而取舍仍然没变：省 CPU 就得
+> 毁掉每页自己的状态。等真机上的观感与内存数据回来再决定。
 
 ### 18.4 防回归：新门禁 `scan/perf.py`
 
@@ -1785,3 +1791,90 @@ HIG「Materials」：*“Help ensure legibility by using vibrant colors on top o
 （都写在各文件的头注里）：RealityKit 那一段（`RealityView` 是 iOS 18+、`@Sendable` 的
 `make` 闭包里不碰 `self`）、`MapSpineAnnotations.swift` 这次搬移（八个函数从
 `private` 放开）、以及 `scrollEdgeEffectStyle`（iOS 26+，部署目标正好是 26.0）。
+
+---
+
+## 21. 2026-09-25 第十轮：CI 第一次红（3 条）+ 用户四条回执
+
+这一轮只有两件事：把 CI 第一次红修掉，然后按用户的四条回执动手。
+
+### 21.1 CI 第一次红：三条错，全在同一行形状上
+
+```
+CarModelView.swift:269:18: error: value of type 'Entity' has no member 'model'
+CarModelView.swift:274:22: error: value of type 'Entity' has no member 'model'
+CarModelView.swift:278:19: error: value of type 'Entity' has no member 'model'
+```
+
+根因是一处**类型写宽了**：`CarRig` 里 `doors: [Entity]` / `trunk: Entity?` /
+`headLights: [Entity]` —— 而给它们上色走的是 `door.model?.materials`（改状态色那条路）。
+`model` 在 `HasModel` 协议上（**`ModelEntity` 符合它，`Entity` 不符合**），
+所以「写宽」不是「更灵活」，而是**当场丢掉能力**，并且要到 CI 才发现。
+
+改成 `ModelEntity` 之后这行代码的意思也更准确了：那三处本来就都是 `ModelEntity(...)` 造出来的。
+**本机没有编译器时的规矩**（这一轮新加的）：**造出来的是什么类型，就写什么类型** ——
+写宽只会把错误推到 CI，写窄编译器会当场告诉你。
+
+### 21.2 四条回执与落地
+
+| 用户回执 | 落地 |
+|---|---|
+| 「1、先正常启动试一次」 | `LaunchFence` 四个开关**全部打开**（`sixPageDeck` / `launchServices` / `splash` / `mapFetches`）＝ 正式形态。文件头的实验记录从「① 最小启动」改成「① 最小启动 → ② 四个全开」，并写明**如果又退，按什么顺序往回关**（先关最大的一笔：六页同屏） |
+| 「3、试试（但是我追求的就是液态玻璃的美感）」 | 卡片不再一律 `.regular`：按**底下真的是什么**选变体（见 21.3） |
+| 「5、试试」 | 抽屉给了记忆与呼吸（见 21.4） |
+| 「6、私库和个人 ipa，没有任何泄露」 | 把用户的判断记进 `Services/GithubToken.swift`（事实照旧：它进了仓库历史、也会进 ipa；只是**当下没有第二个读者**）。不是「安全」的证明，是一条备注：哪天要把这个 repo 或这个包给别人用，先换一把 |
+
+### 21.3 卡片那一步不是开关，是**事实的传递**
+
+新增 `EnvironmentValues.photoBackdrop`（默认 `false` ＝ 底下是纯色画布）：
+
+- 铺照片的那五张子页：`.environment(\.photoBackdrop, wallpaper.image != nil)`
+  —— **选了「不铺」或还没选时回落到 `TokensPalette.canvas`（一块纯色），那就是 false**；
+- 地图那一档：`.environment(\.photoBackdrop, true)`（底下是瓦片，连续的画面）；
+- `GlassCard` 按它选 `variant: photoBackdrop ? .overMedia : .regular`。
+
+`Glass` 两个变体的选择规则**是 Apple 定的，不是审美定的**（HIG：*reserve clear Liquid Glass
+for components over visually rich backgrounds*），而 `.clear` 压在纯色上几乎什么都看不见
+（卡片会像消失）—— 所以这里没有「更透」这个旋钮，只有「底下是什么」这个事实。
+
+**代价如实说**：`.clear` 不磨砂，卡里正文的对比度会跟着底下的照片走。卡头已经走 `TokensInk`
+（第九轮），而正文那几百处仍是不透明的标签色。真机上如果某张照片让某一行读不清，
+**回退就是这一行**（换回 `.regular`）。
+
+同一轮补的一处漏：地图右侧那三枚圆钮（图层 / 定位 / 罗盘）此前各自是一块玻璃，
+而**底条 + 两臂早就包在 `GlassEffectContainer` 里了** —— 挨着的玻璃要交给容器才会互相折射
+（看起来是同一层材质上的三个形状，而不是三张贴纸）。现在这一列也包上了。
+
+### 21.4 抽屉：记忆 + 呼吸
+
+- **记忆**：`@State var drawerOpen` → `@AppStorage(MapSpineView.drawerKey)` ——
+  键 `carkeeper_map_drawer`，一个**设备**键（「这台手机上我把这张卡拉出来了没有」，
+  与谁登录、哪辆车无关）。写法照抄隔壁两行（`MapSpineLayer.storageKey` / `HomeMode.storageKey`）：
+  键名只有一个出处，不就地写字面量。
+  **「默认只有一横」没有被推翻**：没人拉过时它仍然是收起的（`@AppStorage` 的默认值是 false），
+  只有用户自己拉出来之后，下次打开地图它还在那儿 —— 那是他上一步的意图。
+- **呼吸**：抽屉内容从**硬切**改成 `.transition(.opacity)`。原来卡片高度在 `withAnimation`
+  里长出来，而内容一上来就是满不透明（两件事不同拍）。现在同时发生：高度在长，内容在显影。
+
+### 21.5 门禁自己长了一条（`localstore.py` 判据 ④）
+
+加那个新键时，`localstore.py` 立刻报了「`carkeeper_map_drawer` 没定性」——这是它设计内的行为。
+但同一趟输出里还有一句更值得记的话：
+
+```
+HANDOFF §6 分类表：27 个键（账号 17 / 设备 10），标题自称 27 个
+```
+
+**改之前那句是「表 26 行、标题自称 33 个」。** 第九轮删「设备与模式」等七个键时，
+表里的**行**删了，而**标题里的数字**没人改（它此前已经错过一次：写照「42」实际 33）。
+于是新增判据 ④：**§6 标题自称的键数必须等于表的行数** —— 这是同一个事实写在两处的
+第四次（前三次：`preferredScheme` 与夜间模式、`logout()` 的清键清单、门禁登记表里指向
+已删文件的条目）。
+
+探针双向验过：把标题数字改成 99 → 当场报；把数字整段删掉 → 也报（读不到也是一种失真）；
+两次都还原后哈希与改动前一致、门禁转绿。
+
+顺带记一个**门禁自己踩的坑**：判据 ④ 第一版每次都说「对不上」，而理由打印出来是某条
+setter 的注释 —— 因为我给变量起名叫 `why`，而上面 `SETTERS` 那个循环里的同名局部
+（`for key, (witness, why) in …`）漏到了函数作用域里。**变量名也是一种约定**：
+在同一个函数体里，别跟上面循环的临时名撞。

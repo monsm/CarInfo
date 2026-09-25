@@ -67,6 +67,11 @@ extension MapSpineView {
         }
         .padding(.trailing, TokensSpacing.md)
         .padding(.top, TokensSpacing.xxxl)
+        // 三枚钮是**挨着的三块玻璃**（间距就是那个 snug）—— 交给 `GlassEffectContainer`，
+        // 它们的边缘才会互相折射、看起来是**同一层材质上的三个形状**，而不是三张各自
+        // 画好再贴上去的圆片（见 `DSGlass.swift`）。地图那一屏的另一处（底条 + 两臂）
+        // 早就是这么包的，这一列此前漏了。
+        .dsGlassLayer(spacing: TokensSpacing.snug)
     }
 
     /// 罗盘：一根**永远指向正北**的针 + 点一下回正北。

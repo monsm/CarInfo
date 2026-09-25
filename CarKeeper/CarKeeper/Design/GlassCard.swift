@@ -25,6 +25,10 @@ import SwiftUI
 //  同一张卡会因为**滚动位置**换材质，滚过去那一瞬间正是最像贴图的一刻。
 //  现在每张卡都是同一层玻璃，与它在哪儿无关。
 struct GlassCard<Content: View>: View {
+    /// 底下是不是照片 / 地图（连续的画面）—— 见 `EnvironmentValues.photoBackdrop`。
+    /// 由它决定这张卡用哪个玻璃变体，而不是在这里猜。
+    @Environment(\.photoBackdrop) private var photoBackdrop
+
     /// 这张卡的个性色（页面的艺术方向）。默认取全局强调色。
     var accent: Color = TokensPalette.accent
     /// 个性色的浓度。0 = 完全不要那一抹（纯玻璃）
@@ -43,11 +47,20 @@ struct GlassCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             // 材质本身来自 `dsGlass`（`Design/DSGlass.swift`）——**全 App 唯一入口**。
             // 卡片是它最大的一位用户，但不是例外：玻璃在哪儿、用哪个变体，只该有一个出处。
-            // `.regular` 是标准厚度：够透（看得见下一张卡），也够实（正文读得清）。
-            // `.clear` 在浅色底图上会把字洗掉 —— 卡片底下的内容无论是什么，都是「卡片」
-            // 这类界面，不是照片与地图，所以走 `.regular`，不走 `.overMedia`。
+            //
+            //  变体按**底下真的是什么**选（用户 2026-09-25：「我追求的就是液态玻璃的美感」）：
+            //  五张子页铺的是相册选的照片、地图那一档底下就是瓦片 —— 都是「连续的画面」，
+            //  按 HIG 该用 `.clear`：那一版**不磨砂**，只在边缘折射，底下是真看得见的。
+            //  没有照片时（用户选了「不铺」或还没选）底下是一块纯色画布 —— `.clear`
+            //  压纯色几乎什么都看不见（卡片像消失），那时回到 `.regular`。
+            //
+            //  ⚠️ 这条规则换过一次：此前一律 `.regular`，理由是「卡片底下是 App 自己的界面，
+            //  不是照片与地图」—— 那句话在半页被壁纸铺满之后就不成立了。
+            //  **代价如实说**：`.clear` 不磨砂，所以卡里正文的对比度会跟着底下的照片走
+            //（卡头已经走 `TokensInk` 自适应，而正文那几百处仍是不透明的标签色）。
+            //  真机上如果某张照片让某一行读不清，回退就是这一行换回 `.regular`。
             // `hairline: false`：描边在下面那一条 `overlay` 里画，走令牌，不重复画两层。
-            .dsGlass(in: shape, hairline: false)
+            .dsGlass(in: shape, variant: photoBackdrop ? .overMedia : .regular, hairline: false)
             .overlay { accentWashOverlay }
             .overlay { shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border) }
             .clipShape(shape)

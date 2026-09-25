@@ -41,7 +41,14 @@ extension MapSpineView {
         GlassCard(accent: HomeMode.now.accent) {
             VStack(alignment: .leading, spacing: 0) {
                 drawerHead(d)
-                if drawerOpen { drawerContent(d) }
+                if drawerOpen {
+                    //  2026-09-25「给它一点呼吸」：这一块原来在 `withAnimation` 里是**硬切**的
+                    //（卡片高度在长，而内容一上来就是满不透明）。淡入之后两件事同拍：
+                    // 高度长出来的同时内容显影 —— 与模式条展开同一种手感。
+                    // （不用 `.move` 那一类：抽屉是从卡里长出来的，不是从外面滑进来的。）
+                    drawerContent(d)
+                        .transition(.opacity)
+                }
             }
         }
     }

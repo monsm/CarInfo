@@ -142,7 +142,16 @@ struct MapSpineView: View {
     /// **不是 `private`**：拉手、拖动与抽屉里的内容都住在 `MapSpineReadouts.swift`
     ///（与读数同一份文件），而 `private` 的作用域是文件 —— 那个文件看不见它。
     /// 同一个诉求这是第三次了，三代的写法与代价记在那个文件的头注里。
-    @State var drawerOpen = false
+    ///
+    ///  2026-09-25「给它一点记忆」：`@State` → `@AppStorage`，键是 `drawerKey`
+    ///  （一个**设备**键：它是「这台手机上我把这张卡拉出来了没有」，与谁登录无关，
+    ///  见 HANDOFF §6 那张分类表）。
+    ///  「默认只有一横」没有被推翻：**没人拉过时它仍然是收起的**（默认值 false）；
+    ///  用户自己拉出来之后，下次打开地图它还在那儿 —— 那是他上一步的意图。
+    ///
+    ///  写法照抄隔壁那两行（`MapSpineLayer.storageKey` / `HomeMode.storageKey`）：
+    ///  键名只一个出处，`@AppStorage` 里写字面量是这一层唯一被重复过的那种写法。
+    @AppStorage(MapSpineView.drawerKey) var drawerOpen = false
 
     /// 比例尺露着没有（用户 2026-09-25：「地图页的比列缩尺放到灵动岛下面，2 秒后消失」）。
     /// 它只在「地图刚动过」的那两秒里出现 —— 与 Apple 地图同一个节奇。
@@ -209,6 +218,12 @@ struct MapSpineView: View {
 
     /// 数据在 main actor 上组装（AppStore 是 @MainActor @Observable）。
     @MainActor private var data: MapSpineData { MapSpineData.build() }
+
+    /// 抽屉开合那一个键（`@AppStorage` 要常量，不能就地写字面量）。
+    /// 一个**设备**键：它是「这台手机上我把这张卡拉出来了没有」，与谁登录、哪辆车无关
+    ///（HANDOFF §6 那张分类表）。写法照抄隔壁那两行（`MapSpineLayer.storageKey` 等）：
+    /// 键名只有一个出处。
+    static let drawerKey = "carkeeper_map_drawer"
 
     /// 底条占掉的纵向空间：26（离底）+ **54（条高）** + 14（呼吸位）= 94。
     /// **同一个数在原型里是 `.stack{bottom:86px}`** —— 页面内容的窗口正好停在条子上沿。
@@ -739,6 +754,8 @@ struct MapSpineView: View {
                 // 而那一轮**没有一行说得出当时亮的是哪一屏** —— 六页同屏关掉以后
                 // 只建当前那一档，于是「哪一档在建」直接决定了「谁在吃内存」。
                 .onAppear { StartupJournal.shared.mark("亮出屏幕：地图") }
+                // 地图卡片底下是**瓦片**（连续的画面）→ `.clear`（见 `photoBackdrop`）。
+                .environment(\.photoBackdrop, true)
         } else {
             // 子页的顶：**背景铺到屏顶，内容留在安全区里**。
             //
@@ -769,6 +786,10 @@ struct MapSpineView: View {
                 // 没选图时（或点了「不铺」）回落到画布底色（`TokensPalette.canvas`），
                 // 观感上和删暗层之前一样 —— 只是从「暗层」变成「App 自己的画布」。
                 .background { MapWallpaperLayer(image: wallpaper.image).ignoresSafeArea() }
+                // 卡片底下是**什么**如实交下去：铺了照片 → 真；回落到纯色画布 → 假。
+                // `GlassCard` 按它选玻璃变体（要的「液态玻璃的美感」在照片上才成立，
+                // 压在一块纯色上会让卡片看起来消失）—— 见 `photoBackdrop` 的说明。
+                .environment(\.photoBackdrop, wallpaper.image != nil)
                 .onAppear { StartupJournal.shared.mark("亮出屏幕：\(mode.title)") }
         }
     }
