@@ -12,16 +12,18 @@
 
   ② 颜色分量字面量（手写 RGB）
      `Color(red:green:blue:)` / `Color(white:)` / `Color(hue:)` / `Color(hex:)` / `UIColor(red:…)`
-     → 只允许 ArtTheme.swift（主题取值表）/ WidgetTokens.swift（世界面取值表）
+     → 只允许 Tokens.swift（令牌定义处）
 
   ③ 色相字面量（直接点系统色名）
      `.foregroundStyle(.white)` / `.tint(.blue)` / `.fill(.green)` / `Color.orange`
      → 一律不允许。层级样式 `.primary/.secondary/.tertiary` **不在**此列：
        那是排版层级（跟随深浅色的文字层级），不是颜色，是 iOS 原生做法本身。
 
-为什么 ③ 连 `.white` 也拦：`.white` 在深色/浅色下都是同一个白，而这里的画布会随主题变
-（纸上主题是暖米色）—— 白字会「在纸面上戳一个洞」。令牌里有 `TokensPalette.lightSource`
-与 `labelOnTint`，它们各自对应一个真实用途。
+为什么 ③ 连 `.white` 也拦：`.white` 在深色/浅色下都是同一个白，而界面上的「白」
+几乎总是某一层材质或某一个状态的**一部分**（光条的起点、彩色面上的字）—— 它该有一个
+名字。令牌里有 `TokensPalette.lightSource` 与 `labelOnTint`，各自对应一个真实用途。
+（这条判据原先的理由是「画布会随艺术主题变」，那套主题 2026-09-25 已整份删除；
+ 判据本身留着：**把颜色写成名字**这件事不依赖有没有主题。）
 
 例外必须**显式写明理由**（与 paths.py 的豁免同一约定）：靠沉默蒙过去是不行的。
 """
@@ -33,8 +35,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ---- 允许出现字面量的文件：这是「令牌定义处」，不是「例外」 -------------------
 TOKEN_FILES = {
-    "CarKeeper/CarKeeper/Design/Tokens.swift": "设计令牌的唯一来源（字号/间距/圆角/字距）",
-    "CarKeeper/CarKeeper/Design/ArtTheme.swift": "艺术主题的取值表：换主题就是换这里的值",
+    "CarKeeper/CarKeeper/Design/Tokens.swift": "设计令牌的唯一来源（字号/间距/圆角/字距/颜色）",
+    # 这里曾同时列出 ArtTheme.swift（二十套艺术主题的取值表）。那一套随用户
+    # 2026-09-25 的决定整份删除（只用原生），颜色取值回到 Tokens.swift 里。
     # 这里曾列出 "CarKeeper/Shared/WidgetTokens.swift"（小组件与实时活动那份世界面令牌）。
     # 那份文件随小组件 / 表盘扩展一起删除，不再存在 —— 留着它会让这条清单看起来
     # 覆盖了一个其实没有的文件。
@@ -43,10 +46,6 @@ TOKEN_FILES = {
 # ---- 显式豁免：必须写出理由，输出成 ⚠️ 而不是 ✅ -----------------------------
 EXEMPT = {
     # 例：{"CarKeeper/xxx.swift": "为什么这里只能是字面量"}
-    "CarKeeper/CarKeeper/Features/ThemeGalleryView.swift":
-        "主题样张页：它的**职责**就是把主题的真实取值显示给人看（用眼睛挑主题），"
-        "所以它必须打印原始数值，而不是引用令牌 —— 引用令牌会让样张与真机看起来一样，"
-        "而它的用途恰恰是「核对样张与真机是否一致」。",
     # 这里曾有 WatchApp.swift 两条豁免：watchOS 上的字号是按 155pt 画布另定的一套，
     # 且它不能共享 WT 那份令牌（系统语义色在 watchOS 上不存在）。
     # 手表那两个 target 已随免费账号清理整体删除，豁免也随之作废。
@@ -60,7 +59,7 @@ RULES = [
      "数字用 display/metric/data/digits，它们等宽，换数值时不跳动）"),
     ("② 颜色分量字面量",
      re.compile(r"\b(?:UI)?Color\((?:red|white|hue|hex):"),
-     "颜色一律从 TokensPalette 出；换主题时改的是主题取值表，调用点一行不改"),
+     "颜色一律从 TokensPalette 出；改配色只改令牌那一处，调用点一行不改"),
     ("③ 色相字面量",
      re.compile(r"\.(?:foregroundStyle|foregroundColor|tint|fill|background|stroke|border)"
                 r"\(\s*\.(?:red|orange|yellow|green|mint|teal|cyan|blue|indigo|purple|pink|brown|white|black|gray)\b"

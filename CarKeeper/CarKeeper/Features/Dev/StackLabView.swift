@@ -15,21 +15,23 @@ import SwiftUI
 //  哪些东西**故意**还留在这里当对照：
 //    · 示例卡高矮不一 —— 一律等高会把「下一张在哪儿」这件事藏起来，
 //      而它恰恰是「一叠卡」最容易被做错的地方。
-//    · 底条的两种跟手形态（`DSSwipeStrip.Follow`）：那是条子自己的决定，仍在挑。
+//
+//  它不再有什么可挑的了：这里原本还放着一个「跟手形态」的选择器
+//  （整行跟手 / 透镜跟手）。2026-09-25 用户两种都试过、选了**整行跟手**，
+//  于是那个选择器与 `DSSwipeStrip.Follow` 一起删掉 —— 条子只剩一种跟手形态，
+//  这里再放一个只有一项的选择器就是又一层假的选择。
+//  现在这一页唯一的作用是**在真机上看那一叠卡本身**。
 struct StackLabView: View {
     @Environment(\.dismiss) private var dismiss
 
     /// 演示用的档位（条子上那一格）
     @State private var demo: String = HomeMode.now.rawValue
-    /// 条子的跟手方式（两种形态）
-    @State private var follow: DSSwipeStrip.Follow = .row
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            followRow
             window
-            DSSwipeStrip(items: HomeMode.stripItems, selectedID: $demo, follow: follow)
+            DSSwipeStrip(items: HomeMode.stripItems, selectedID: $demo)
                 .padding(.horizontal, TokensSpacing.md)
                 .padding(.bottom, TokensSpacing.sm)
         }
@@ -61,18 +63,6 @@ struct StackLabView: View {
         .padding(.horizontal, TokensSpacing.md)
         .padding(.top, TokensSpacing.xl)
         .padding(.bottom, TokensSpacing.sm)
-    }
-
-    private var followRow: some View {
-        HStack(spacing: TokensSpacing.sm) {
-            Text("条子")
-                .font(TokensTypo.caption)
-                .foregroundStyle(TokensPalette.tertiary)
-            DSSegmented(options: DSSwipeStrip.Follow.allCases.map { (value: $0, title: $0.title) },
-                        selection: $follow)
-        }
-        .padding(.horizontal, TokensSpacing.md)
-        .padding(.vertical, TokensSpacing.sm)
     }
 
     // =========================================================================

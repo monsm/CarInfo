@@ -17,11 +17,11 @@
 | 行 | `KVRow`（第二代）/ `DSKeyValueRow`（第四代）/ 手写 `HStack` / `ReportRow`（第五种，只在月报里） | 只留 `DSRow` / `DSKeyValueRow` / `DSStatRow` |
 | 分隔线 | `ListDivider`（`Divider().opacity(0.5)`）与 `DSDivider`/`DSSeparator` 并存 | 只留 `DSSeparator`（跟着 `DSGroupRow` 走） |
 | 页面标题 | `DSPageTitle` + `dsPageTitle()`（成套，12 页）／裸 `.navigationTitle`（7 页）／什么都没有 | **30 页全部成套**：内容里 `DSPageTitle`，导航栏交给 `dsPageTitle()` |
-| 页面边距 | `pageBackground()`（contentMargins 20）与手写 `.padding(.horizontal, …)`（20 或 24）并存 | 两种都指向 20pt；**DevView 原本一点横向边距都没有，已补 `pageBackground()`** |
+| 页面边距 | `pageBackground()`（contentMargins 20）与手写 `.padding(.horizontal, …)`（20 或 24）并存 | ⚠️ **本行已作废（2026-09-25 第五轮）：`pageBackground()` 整段删除**。它叫「页面底色 + 统一页边距」，而底色与光早就不在它那儿（在 `AppCanvas`），函数体只剩 `contentMargins(.horizontal, 20)` —— 于是**调过它的页面卡叠比没调的窄 20pt**（实测：车辆 328pt / 出行·车控·我的 288pt，同一台 402pt 宽的机器）。现在页面只有一条边距路：卡叠自己的 18pt 内缩；真需要 20pt 页边距的两处（登录页 / 「光」浮层）自己写 `.padding(.horizontal, TokensSpacing.page)` |
 | 字体 | 令牌 358 处 + `Theme.font(...)` 中转 + 应用内硬编码 `.font(.system(size:` 68 处 | `Theme.font` 清零；**字号字面量全库清零**（定义处之外 0 处，仅 3 处显式豁免）；`Theme.font` / `Theme.lineHeight` / `Color(hex:)` 已从代码里删掉 |
 | 空态 | `DSPlaceholder`（12 处）／`PageLoadingView`+`PageErrorView`（各 1 处）／手写灰图标 | 空态一律 `DSPlaceholder`（维保记录页本轮改过来） |
 | 颜色 | 令牌 631 处 + `.green`/`.orange`/`.red`/`.white`/`.black` 直用，散在 25 个文件 | **全库清零**；补了三个缺口令牌：`scrim`（遮罩/暗角/阴影）、`labelOnTint`（彩色面上的文字）、`fillSubtle` 家族 |
-| 跨 target 令牌 | 小组件用 `WT.*`，AppClip/Watch 各自写死一套（合计 23 处字面量） | **小组件与 App 共用 `Shared/WidgetTokens.swift`**（同一份源文件）；Watch 显式豁免（理由已核实，见下）—— ⚠️ **本行已作废（2026-09-23）**：小组件 / 表盘 / 实时活动三个 target 与 `Shared/WidgetTokens.swift` 均因免费账号拿不到 App Group 而整体删除，现在只有 App 一份令牌（`Tokens.swift` + `ArtTheme.swift`） |
+| 跨 target 令牌 | 小组件用 `WT.*`，AppClip/Watch 各自写死一套（合计 23 处字面量） | **小组件与 App 共用 `Shared/WidgetTokens.swift`**（同一份源文件）；Watch 显式豁免（理由已核实，见下）—— ⚠️ **本行已作废（2026-09-23）**：小组件 / 表盘 / 实时活动三个 target 与 `Shared/WidgetTokens.swift` 均因免费账号拿不到 App Group 而整体删除，现在只有 App 一份令牌（`Tokens.swift`）—— `ArtTheme.swift` 又于 2026-09-25 随艺术主题删除 |
 
 ---
 
@@ -34,14 +34,19 @@ ScrollView {
         DSGroup(title: "分组") { DSGroupRow { DSRow(...) } }   ← 行在表面上，标题在画布上
         …
     }
-    .padding(.horizontal, TokensSpacing.page)   ← 或者 .pageBackground()，两者都必须是 20
+    .padding(.horizontal, TokensSpacing.page)   ← 唯一一条；pageBackground() 已删（见第 0 节那张表）
 }
-.dsPageTitle("标题")        ← 与上一行**成套**：艺术主题清导航栏，内容补标题；原生相反
+.dsPageTitle("标题")        ← 与上一行**成套**（⚠️ 2026-09-25 起不再成套，见下）
 ```
 
 **为什么成套**：`DSPageTitle` 在原生主题下是 `EmptyView`（原生 = 现状，逐像素不变），
 `dsPageTitle()` 在艺术主题下把导航栏清空。只写一个就会：原生下没有标题，或艺术下同一句话
 说两遍。这就是"三种标题机制"的根。
+
+> ⚠️ **本段已作废（2026-09-25）**：艺术主题整份删除后不再有两种标题机制，
+> `DSPageTitle`（原生下画 `EmptyView` 的那个）与它的兄弟 `dsPaperPage()` 一起删掉，
+> `dsPageTitle()` 只剩 `navigationTitle`（`inline` 保留 —— 有些页面本来就一直用行内标题，
+> 而「逐像素等于现状」在这里是硬要求）。上面那段「为什么成套」现在是一条**历史结论**。
 
 ---
 
@@ -107,7 +112,7 @@ ScrollView {
 | `scan/access.py` | 跨文件引用 `private` 成员（`类型.成员` 形式） |
 | `scan/shadowguard.py` | 把泛用名（`Color` 之类）劫持进项目命名空间的形状 |
 | `scan/unreachable.py` / `deep.py` / `eol.py` / `logic.py` / `lexguard.py` / `scenes.py` / `targets.py` / `futureproof.py` | 见各自文件头 |
-| `scan/design.py` | **字号 / 颜色分量 / 色相字面量**只能出现在令牌定义文件里（`CarKeeper/Design/Tokens.swift` / `CarKeeper/Design/ArtTheme.swift`）；豁免必须写明理由，输出 ⚠️ 而不是 ✅ |
+| `scan/design.py` | **字号 / 颜色分量 / 色相字面量**只能出现在令牌定义文件里（`CarKeeper/Design/Tokens.swift`；它以前还列着 `ArtTheme.swift`，该文件 2026-09-25 已删）；豁免必须写明理由，输出 ⚠️ 而不是 ✅ |
 | `CarKeeper/check_style.js` | 风格（含被删的 Tab 骨架残留） |
 
 **注意**：这些脚本能可靠抓的是**结构**（跨文件 private、未声明成员、路径缺失、孤儿页面）。
@@ -124,7 +129,7 @@ ScrollView {
 |---|---|---|
 | `CarKeeper/Design/Tokens.swift` | App 内的全部取值（颜色/字号/间距/圆角/字距/尺寸/发丝线） | App target |
 | ~~`Shared/WidgetTokens.swift`~~ | **已删除（2026-09-23）**：它服务的小组件 / 表盘 / 实时活动三个 target 因免费账号拿不到 App Group 而整体删掉，这份「世界面取值表」也随之失去唯一消费者 | ——（曾：小组件、App） |
-| `Design/ArtTheme.swift` | 艺术主题（原生/夜光/纸上/巨字）的**取值表**：换主题 = 换这里的值 | App target 经 `TokensPalette` 读 |
+| ~~`Design/ArtTheme.swift`~~ | **已删除（2026-09-25）**：它曾是艺术主题（原生/夜光/纸上/巨字，后扩到 20 套）的**取值表**。用户定下「主题用原生，其他 19 套全删」后，取值与两个计算值（`artHex` / `nativeDynamic`）**逐值搬回** `Tokens.swift`，`TokensPalette` 不再转发 | —— |
 
 **为什么小组件不直接用 `TokensPalette`**：扩展不编译 App 的 `Design/`。所以 v4 的做法是
 「值只写在 `WT` 一处，App 的 `TokensPalette` 从那里转发」—— 两边由**编译器**保证不漂移。
@@ -397,7 +402,8 @@ App 一棵树、一份 `Tokens.swift`。上面那段「为什么小组件不直�
 
 **门禁同步**：`scan/design.py` 已能拦截 `.font(.system(size: N)` 和 `.fill(.secondary)` 这类用法；`check_style.js` 与 `scan/keys.py` 不变。全库 `Image(systemName:)` 从原来散在 Design 组件里的合法用例（`DS.swift` 里 2 处设计层内部调用）+ 业务层的 40+ 处 → 业务层全部换成 `safeSymbol`；Design 层的 2 处保留（因为它们是设计系统的**实现细节**，不是界面调用）。
 
-> ⚠️ `ThemeGalleryView.swift` 仍豁免：它的职责是展示主题的真实取值，**必须用原始字号**。
+> ~~⚠️ `ThemeGalleryView.swift` 仍豁免：它的职责是展示主题的真实取值，**必须用原始字号**。~~
+> **2026-09-25 作废**：那个文件已随艺术主题整份删除（主题只剩原生一种，没有东西可展示）。
 > ⚠️ Watch 仍豁免：watchOS 有自己的字号阶梯，不共享 `TokensTypo`。
 
 ### 第五轮：消息 API 修复 + 电池页框框背景（2026-09-22 第五轮）

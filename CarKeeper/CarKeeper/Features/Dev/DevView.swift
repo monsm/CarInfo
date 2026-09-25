@@ -54,7 +54,6 @@ struct DevView: View {
         //  页标题也一并删：卡头写着「诊断」，正文再写一遍「设计令牌」是同一个东西
         //  两个名字（它下面那一节自己还有「艺术主题」的标题）。
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            themeEntry
             stackEntry
             swatchGroup(title: "画布与表面", footer: "内容层不透明：玻璃只允许出现在导航栏、Tab 栏与弹层。", items: surfaceTokens)
             swatchGroup(title: "语义色", footer: "颜色只来自系统，且只表达状态；界面里没有装饰性彩色。", items: semanticTokens)
@@ -81,28 +80,25 @@ struct DevView: View {
         }
     }
 
-    // MARK: - 艺术主题入口
+    // MARK: - 已删除：艺术主题入口（2026-09-25）
 
-    /// 艺术主题。切换后**全 App** 立刻变 ——
-    /// 令牌（TokensPalette）是唯一读取点，而这里换的是值，不是名字。
-    /// 样张与取值：Features/ThemeGalleryView.swift、Design/ArtTheme.swift。
-    ///
-    /// 它以前是一个 NavigationLink，推开一整页样张；2026-09-23 降成这一屏里的一节
-    /// （`ThemeGallerySection`）—— 「诊断」里再多一层导航，只会让人以为又是另一个 App。
-    private var themeEntry: some View {
-        ThemeGallerySection()
-    }
+    /// 这里以前是「诊断」里的第一组：二十套艺术主题的样张（`ThemeGallerySection`），
+    /// 点一套全 App 立刻变 —— 那时它的用途是**用眼睛挑**。
+    /// 用户 2026-09-25 定下只用原生、其余 19 套全删，于是样张页与本入口一起删掉：
+    /// 只剩一套取值时，一页样张是「拿真实的取值给自己的唯一答案看」。
+    /// 取值现在住在 `Tokens.swift`（`TokensPalette`），下面那些色板就是它的读数。
 
     // MARK: - 卡片叠预览入口
 
     /// 叠法曾经有七种（弧出 / 吸附堆叠 / 压层叠 / 纵深叠 / 错位叠 / 钱夹叠 / 滚轮）：
     /// 2026-09-24 用户删到只剩一种，2026-09-25 滚动本身交回系统 `ScrollView` ——
     /// 也就是说「叠法」这件事已经结束了，这里不再有当前值可显示。
-    /// 入口留着是为了**在真机上看那一叠卡本身**（卡高矮参差时的观感、玻璃的层次、
-    /// 底条两种跟手形态），那些只有真机判得了。
+    /// 入口留着是为了**在真机上看那一叠卡本身**（卡高矮参差时的观感、玻璃的层次），
+    /// 那些只有真机判得了。（底条的跟手形态已于 2026-09-25 定下整行跟手，
+    /// 那个选择器与 `DSSwipeStrip.Follow` 一起删了 —— 这里不再有可挑的东西。）
     private var stackEntry: some View {
         DSGroup(title: "卡片叠",
-                footer: "功能界面的卡是上下滑的，滚动手感就是系统 `ScrollView` 的手感（惯性、橡皮筋、指示条全归系统）。这一页能验的是卡片本身与底条的跟手形态。") {
+                footer: "功能界面的卡是上下滑的，滚动手感就是系统 `ScrollView` 的手感（惯性、橡皮筋、指示条全归系统）。这一页能验的是卡片本身。") {
             DSGroupRow(showsSeparator: false) {
                 Button {
                     showStackLab = true

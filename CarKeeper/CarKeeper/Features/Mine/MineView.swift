@@ -104,7 +104,6 @@ struct MineView: View {
 
     var body: some View {
         StackPageView(accent: HomeMode.mine.accent, label: "车与账号", cards: cards)
-        .pageBackground()
         .dsPageTitle("车与账号")
             .accessibilityLabel(Text("车与账号"))
             .accessibilityHint(Text("账号、车辆、数据、关于"))
@@ -148,7 +147,6 @@ struct MineView: View {
             NavigationStack {
                 TempKeyListView()
                     .navigationTitle("共享钥匙")
-                    .dsSheetCanvas()
                     .navigationBarTitleDisplayMode(.inline)
             }
         }
@@ -156,7 +154,6 @@ struct MineView: View {
             NavigationStack {
                 FamilyManagementView()
                     .navigationTitle("家庭管理")
-                    .dsSheetCanvas()
                     .navigationBarTitleDisplayMode(.inline)
             }
         }

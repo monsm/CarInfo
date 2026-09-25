@@ -95,7 +95,6 @@ struct MaintenanceMoneyView: View {
         }
         .sheet(isPresented: $showAddService) {
             AddServiceView(onSave: addEntry)
-                .dsSheetCanvas()
         }
         .accessibilityLabel(Text("保养"))
     }

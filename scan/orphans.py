@@ -25,7 +25,8 @@
   那个 `clamped` 的唯一使用点删掉后，声明还在，31 条门禁一条都没说话。
   补上后当场报到两个真的：`URLSession.dataTaskRetryable`（+ `RetryConfig`，
   第二套重试实现，真正在用的是 `Retrier.global`）与 `UIColor.dsDynamic`
-  （第二套动态色，真正在用的是 `ArtTheme.nativeDynamic`）。
+  （第二套动态色，真正在用的是 `TokensPalette.nativeDynamic` —— 它原名
+  `ArtTheme.nativeDynamic`，2026-09-25 随艺术主题删除搬进 `Tokens.swift`）。
   探针：注入 `extension Double { func probeDeadMember() }` → 当场报出；
   还原后文件哈希与注入前一致、转绿。收窄三条写在判据 ② 的注释里。
   • 一个文件里的**顶层类型声明**（列 0 的 struct/class/enum/actor）如果在

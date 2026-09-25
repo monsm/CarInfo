@@ -66,7 +66,6 @@ struct ControlCommandFlow: ViewModifier {
                         stage = .none
                         gate()
                     }
-                    .dsSheetCanvas()
             }
             // ③ 控车码
             .sheet(isPresented: stageBinding(.pin)) {
@@ -81,7 +80,6 @@ struct ControlCommandFlow: ViewModifier {
                         }
                         fire(pin: pin)
                     }
-                    .dsSheetCanvas()
             }
             // ② 生物识别（#N13：敏感操作先验身份，过了再进控车码）
             .overlay {

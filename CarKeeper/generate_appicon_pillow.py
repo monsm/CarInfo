@@ -6,80 +6,84 @@
     python3 generate_appicon_pillow.py                 # 写出到 appiconset
     python3 generate_appicon_pillow.py <输出目录>       # 写到别处（用来对照，不进包）
 
-v2.0（2026-09-25）整张重画。旧版的问题不是「不好看」这种说不清的事，四条都能指出来：
+v3.0（2026-09-25）：用户在 100 个探索方向里挑了 **040「两厢 · 纸白底」**
+（`design-preview/icon-100.html` 那批；选完就随稿删掉了，见 `AppIcon-SPEC.md`）。
+这一版就是把 040 折进来 —— 它长什么样：**浅灰白底 + 一台深墨色的两厢侧影**，
+车身满铺，车轮与车窗是**挖空**（透出底色），底下一层柔影、上面一层很淡的白高光。
 
-  ① **底色近黑**。旧图 1024 的亮度中位数是 0.096（深蓝黑 #1A1A2E→#0D0D1A）——
-     它在主屏上就是一块黑，而 iOS 的图标语言是**亮底 + 一个物体**。这是「不符合
-     iOS 调性」最主要的一条。
-  ② **图上有字**（「长安车管家」+「CHANGAN CONNECT」两行）。Apple 的图标规范第一条
-     就是不要放文字：29pt 下那是两团灰噪点，而它占了画面下缘整整一成高度。
-  ③ **自己套了圆角与 4% 内缩**。系统会用自己的 squircle 遮罩裁一遍 —— 图里再裁一遍
-     等于两层，成品比旁边系统图标小一圈。更糟的是旧脚本最后 `convert('RGB')`
-     把透明边压成了**纯黑**（实测四角 = (0,0,0)），于是遮罩里留下四个黑角。
-  ④ **没有深色 / 着色外观**。iOS 18 起主屏有浅色 / 深色 / 着色三种图标外观；
-     只给一张图，系统只能把同一张往深色与着色里硬套。
+与 v2.1（同一份文件的上一个版本）的差别 —— 每一条都是「用户选中的不是那个」：
 
-v2.0 的画法（每条都对应上面一条）：
-  · **满幅**：1024×1024 铺满，不画圆角、不留边、不留透明 —— 遮罩由系统裁。
-  · **亮底**：琥珀→橙的竖向渐变（浅色外观）；深色外观是暖近黑 + 琥珀车；着色外观是
-    灰阶（系统按亮度上色）。
-  · **一个物体**：白色（深色外观是琥珀色）轿车侧影，窗与轮拱是**挖空**（透出底色），
-    没有任何描边、阴影、光晕、贴图感。
-  · **一层高光**：顶部一道很淡的白色渐变 —— iOS 26 的玻璃表面在图标上就是这么一层，
-    没有它，纯渐变会显得平。
+  · **车形**：轿车 → 两厢。车身 934 × 473，占画布宽 91%、高 46%（v2.1 是 689 × 409）。
+  · **底色**：琥珀→橙 → 纸白 #F9FAFC→#E2E7F0；车身从白 → 墨色 #161A22。
+    亮底 + 一个深色物体，也是 iOS 图标语言里最常见的那一种搭配。
+  · **v2.1 那道「车底下的路」（`ARC_*`）删掉**：040 里没有它。它不是不好，
+    是用户挑的那一张没有 —— 折进来的东西与被挑中的东西必须长得一样。
+  · 没变的两点：一层白高光 + 一层柔影（040 的 treatment 原样就是 gloss + shadow）。
 
 几何全部写在 `CAR` / `WHEELS` / `WINDOWS` 里，单位是 1024 的坐标系；
 改形状只改那几个常量（与 `AppIcon.svg` 是同一套几何，见 `AppIcon-SPEC.md`）。
+
+与探索稿 040 的**逐点比对**（同一张 1024、同一套画法）：99.76% 的像素完全相同，
+余下的是轮廓上 ±0.5px 的取整（最大色差 199，全部落在 1px 宽的车身边缘上）——
+本文件的常数是取整过的整数（给人改形状用），把映射的原值写进来则是 0 处差异。
+柔影的位移是这里唯一会「整体错一点」的参数，量出来的正确值是 22（见 `SHADOW_DY`）。
+
+为什么是 Pillow 而不是 SVG 出包：这台机器没有 ImageMagick、也没有 cairosvg，
+而 SVG 只能渲一套外观（浅色）—— 用它刷新会得到「一半新图一半旧图」的图标集，
+正是这个仓库记过的那个坑（改了 A，真机上看到 B）。见 `generate_appicon.sh`。
 """
 import os
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 # =============================================================================
 #  几何（1024 坐标系）
 # =============================================================================
 #
-#  车头朝右的轿车侧影。四个数决定它读起来像不像一台车：
-#    · **车身高度 ≈ 300**（车顶 400 → 车底 700），长 696 —— 长高比 2.3，是轿车的比例
-#      （旧图那个多边形算出来是 2.0 且车顶堆在中间，像面包车）。
-#  v2.1（同日第二轮）：v2.0 的车只有 300 高、只占画布 29% —— 缩到主屏尺寸后是
-#  一颗「中间一条小车、四周全是底」的图标。现在实测车身 689×409（长高比 1.68），
-#  占画布宽 67%、高 40%（连同底下那道弧则到画布高 93%）—— 图标该把画布填到
-#  只留一圈呼吸位，而不是缩在中间。这几个数是量出来的，不是估的。
+#  车头朝右的**两厢**侧影（探索稿里的 `hatch`）。折线一律从「后保险杠下角」起，
+#  沿车顶绕到「前保险杠下角」，再沿底边回来 —— 下面每个点都标了它是车身哪一处。
+#
+#  这一组数是**映射出来的，不是画出来的**：探索稿把它写在 0…1 的方框里
+# （`frac=0.60 × 1.52 = 0.912`，长高比 0.593），再映到 1024 的画布 ——
+#  于是同一个形状在 100 个方向里能换容器、换尺寸而不改一个数。折进来时把映射结果
+#  写成常数（保留 1024 这一个坐标系），逐点与探索稿比对过：见 `AppIcon-SPEC.md`。
 CAR = [
-    (180, 780),   # 后保险杠下
-    (180, 690),   # 后保险杠上
-    (248, 612),   # 后备厢
-    (368, 496),   # C 柱
-    (470, 372),   # 车顶后
-    (640, 372),   # 车顶前
-    (722, 470),   # A 柱
-    (804, 552),   # 引擎盖
-    (852, 580),   # 车鼻
-    (868, 690),   # 车鼻下
-    (868, 780),   # 前保险杠下
+    (45, 789),    # 后保险杠下
+    (45, 612),    # 后保险杠上（尾门竖直的那一段）
+    (101, 512),   # 尾门折角
+    (232, 346),   # C 柱（两厢的尾巴是立着的，这一折不能省）
+    (512, 313),   # 车顶
+    (680, 368),   # A 柱
+    (811, 490),   # 引擎盖
+    (904, 534),   # 车鼻
+    (979, 623),   # 车鼻下
+    (979, 789),   # 前保险杠下
 ]
-# 轮心必须满足 `cy + R ≤ 车底线（780）`：一旦超出，轮毂（圆心那一小块）就会从
+# 轮心必须满足 `cy + R ≤ 车底线（789）`：一旦超出，轮毂（圆心那一小块）就会从
 # 车身下缘探出去、飘在底色上（v2.0 实测过：cy=700、R=84 时每个轮子下面露出 32 单位）。
-WHEELS = [(320, 684), (740, 684)]
-WHEEL_R = 96
-HUB_R = 34
+WHEELS = [(236, 720), (778, 720)]
+WHEEL_R = 135
+HUB_R = 49
 # 窗必须落在**车厢内部**（车身折线在每个 y 上的左右边界之间）—— 越界会在车身边上
-# 咬出一个缺口。车厢在 y=425 处大约跨 x 430…680，所以窗从 455 排到 665；
-# 两扇之间的 B 柱留 30（58pt 下约 1.7px，再窄缩小时就糊成一扇）。
-WINDOWS = [(455, 425, 545, 515), (575, 425, 665, 515)]
-ROUND_PX = 16          # 角上的圆化半径（用「模糊 + 阈值」实现，避免手写圆弧）
-# 那道弧：App 里「车钉外面那圈弧」（续航圈）的图形引用 —— 在图标里它是车底下一条
-# **向下弯的路**。圆心在车身上、只取下面那一段，于是两端向上收、中间最低，
-# 读起来是地面/道路，而不是一个包围盒。半径 250 让它在车底线（780）之下再
-# 让出 45，最低点在 y=950（离画布下边还有 74）—— 弧穿过车轮会让两个形状糊在一起，
-# 贴到边上则会被 squircle 遮罩的圆角切掉。
-ARC_CENTER = (524, 700)
-ARC_R = 250
-ARC_WIDTH = 26
-ARC_SPAN = (30, 150)   # 度：PIL 的角度顺时针为正、0° = 3 点钟方向
+# 咬出一个缺口。车厢在 y=430 处大约跨 x 250…700，所以窗从 283 排到 680；
+# 两扇之间的 B 柱留 42（58pt 下约 2.4px，再窄缩小时就糊成一扇）。
+WINDOWS = [(283, 376, 484, 484), (526, 376, 680, 484)]
+ROUND_PX = 21          # 车身折线的圆化：用「模糊 + 阈值」实现，避免手写圆弧
+HOLE_BLUR = 6          # 挖空（窗与轮拱）也走同一条路 —— 直角在 58pt 下会扎眼
+WINDOW_R = 30          # 窗自己的圆角（挖空之后仍要留一点弧度）
+
+# 柔影与高光的量（探索稿 `apply_treatment` 的 gloss + shadow）。
+# 影子是**同一张形状往下偏一点、模糊后再压 30% 黑** —— 不是描边、不是投影贴图；
+# 它给的是「这东西离底有一点点距离」，纯渐变没有它就会像贴纸。
+SHADOW_DX = 6      # = int(1024 × 0.006)
+SHADOW_DY = 22     # = int(1024 × 0.022)。**这里是 22，不是 23** —— 探索稿那一版
+                   #   走的是 `int(size × 0.022)`，写成 23 会让影子整体下移 1px。
+                   #   这一条是逐点比对时量出来的：22 时只有 174 个像素有差（最大 1），
+                   #   23 时有 89485 个（最大 2）—— 数字不会说谎，眼睛看不出来。
+SHADOW_BLUR = 18   # = int(1024 × 0.018)
+GLOSS_ALPHA = 0.12     # 与柔影搭伴的顶光只给一半（影子已经在做立体感了）
 
 # =============================================================================
 #  三套外观
@@ -87,15 +91,18 @@ ARC_SPAN = (30, 150)   # 度：PIL 的角度顺时针为正、0° = 3 点钟方�
 #
 #  一律给 RGB（不带 alpha）：图标的形状由系统遮罩裁，我们只负责画面内容。
 APPEARANCES = {
-    # 浅色：琥珀→橙，白色车。亮底是这套图标语言的地基（旧图正好反过来）。
-    "light": dict(bg_top=(255, 197, 61), bg_bottom=(255, 118, 26),
-                  glyph=(255, 255, 255), arc_alpha=0.22, sheen=0.16, shade=0.10),
-    # 深色：暖近黑底 + 琥珀车 —— 就是 App 自己那套夜间配色（#FF9F00 是品牌主色）。
+    # 浅色：纸白底 + 墨色车。就是 040 原样（也是这套图标语言里最稳的搭配）。
+    "light": dict(bg_top=(249, 250, 252), bg_bottom=(226, 231, 240),
+                  glyph=(22, 26, 34), shadow=0.30, gloss=0.12),
+    # 深色：暖近黑底 + 白车 —— 深色外观在系统里本来就是「换底 + 调图形」，
+    # 只换底会让墨色的车直接看不见（探索稿的 `dark_preview` 就是这个判据：
+    # 车身亮度 < 128 → 深色下转白）。
     "dark": dict(bg_top=(46, 36, 24), bg_bottom=(16, 13, 10),
-                 glyph=(255, 179, 71), arc_alpha=0.18, sheen=0.05, shade=0.0),
+                 glyph=(255, 255, 255), shadow=0.30, gloss=0.12),
     # 着色：系统按**亮度**上色，所以这里只给灰阶（白车 + 中灰底）。
+    # 底偏暗而不是偏亮：着色外观下系统给整张图上一层色，亮底会变成一大块实色。
     "tinted": dict(bg_top=(126, 126, 132), bg_bottom=(62, 62, 68),
-                   glyph=(255, 255, 255), arc_alpha=0.20, sheen=0.08, shade=0.0),
+                   glyph=(255, 255, 255), shadow=0.30, gloss=0.08),
 }
 
 # Contents.json 真正引用的七个槽位（为什么没有 1x / iPad：见 AppIcon-SPEC.md）
@@ -112,56 +119,36 @@ SLOTS = [
 FIXED = 1024
 
 
-def scaled(points, k):
-    return [(x * k, y * k) for x, y in points]
-
-
 def glyph_mask():
-    """返回 (车身 mask, 弧 mask) 两张 L 图（255 = 画在这里）。
+    """返回车身 mask（一张 L 图，255 = 画在这里）。
 
-    两张分开是因为它们**用的不是同一个浓度**：车是主体（实心），
-    弧是底纹（App 里那圈弧也是虚线、比车钉淡）—— 同一张 mask 画不出两种浓度。
+    步骤是有顺序的，顺序本身就是内容：**先挖空、再补回轮毂** ——
+    一个实心洞是「窟窿」，洞里有芯才是「轮子」。窗与轮拱挖出来的地方透的是底色，
+    不是一层更深的灰：它们必须是**底色**，否则一旦换外观（深色 / 着色）
+    那两个洞就会留在原来的颜色上。
     """
-    k = 1.0
     body = Image.new("L", (FIXED, FIXED), 0)
-    d = ImageDraw.Draw(body)
-    # 车身：先按折线填，再用「模糊 + 阈值」把角圆化 ——
-    # 手写贝塞尔在纯 Pillow 里代价大，而这一步的效果就是「几何但有肉」。
-    d.polygon(scaled(CAR, k), fill=255)
-    body = body.filter(ImageFilter.GaussianBlur(ROUND_PX))
-    body = body.point(lambda v: 255 if v >= 128 else 0)
+    ImageDraw.Draw(body).polygon(CAR, fill=255)
+    # 「模糊 + 阈值」= 把折线的尖角换成有肉的圆角。手写贝塞尔在纯 Pillow 里代价大，
+    # 而这一步的效果就是「几何但有肉」。
+    body = body.filter(ImageFilter.GaussianBlur(ROUND_PX)).point(lambda v: 255 if v >= 128 else 0)
 
     holes = Image.new("L", (FIXED, FIXED), 0)
     hd = ImageDraw.Draw(holes)
     for cx, cy in WHEELS:
-        r = WHEEL_R
-        hd.ellipse([(cx - r) * k, (cy - r) * k, (cx + r) * k, (cy + r) * k], fill=255)
+        hd.ellipse([cx - WHEEL_R, cy - WHEEL_R, cx + WHEEL_R, cy + WHEEL_R], fill=255)
     for x0, y0, x1, y1 in WINDOWS:
-        hd.rounded_rectangle([x0 * k, y0 * k, x1 * k, y1 * k],
-                             radius=30 * k, fill=255)
-    holes = holes.filter(ImageFilter.GaussianBlur(4 * k)).point(lambda v: 255 if v >= 128 else 0)
+        hd.rounded_rectangle([x0, y0, x1, y1], radius=WINDOW_R, fill=255)
+    holes = holes.filter(ImageFilter.GaussianBlur(HOLE_BLUR)).point(lambda v: 255 if v >= 128 else 0)
 
-    mask = Image.eval(body, lambda v: v)
-    mp, hp = mask.load(), holes.load()
-    for y in range(FIXED):
-        for x in range(FIXED):
-            if hp[x, y]:
-                mp[x, y] = 0
+    mask = ImageChops.subtract(body, holes)
 
-    # 轮毂：挖空之后再把轮子的中心补回来 —— 一个实心洞是「窟窿」，
-    # 洞里有芯才是「轮子」。
-    hd2 = ImageDraw.Draw(mask)
+    # 轮毂：挖空之后再把轮子的中心补回来。
+    hubs = Image.new("L", (FIXED, FIXED), 0)
+    hub_draw = ImageDraw.Draw(hubs)
     for cx, cy in WHEELS:
-        r = HUB_R
-        hd2.ellipse([(cx - r) * k, (cy - r) * k, (cx + r) * k, (cy + r) * k], fill=255)
-
-    # 弧：App 里「车钉外面那圈弧」（续航圈 / 路径）的图形引用。
-    arc = Image.new("L", (FIXED, FIXED), 0)
-    ImageDraw.Draw(arc).arc(
-        [(ARC_CENTER[0] - ARC_R) * k, (ARC_CENTER[1] - ARC_R) * k,
-         (ARC_CENTER[0] + ARC_R) * k, (ARC_CENTER[1] + ARC_R) * k],
-        start=ARC_SPAN[0], end=ARC_SPAN[1], fill=255, width=int(ARC_WIDTH * k))
-    return mask, arc
+        hub_draw.ellipse([cx - HUB_R, cy - HUB_R, cx + HUB_R, cy + HUB_R], fill=255)
+    return ImageChops.lighter(mask, hubs)
 
 
 def vertical_gradient(top, bottom, size):
@@ -184,26 +171,36 @@ def alpha_gradient(alpha_at_top, alpha_at_bottom, size):
     return strip.resize((size, size), Image.NEAREST)
 
 
+def offset_mask(mask, dx, dy):
+    """平移一张 mask。**不用 `ImageChops.offset`** —— 它会环绕，把底边那一溜
+    搬到顶上去（探索稿里的影子与倒影都被它咬过一次）。
+    这里平移量固定为正（往下、往右），所以 `paste` 不会有别的问题。
+    """
+    out = Image.new("L", (FIXED, FIXED), 0)
+    out.paste(mask, (int(dx), int(dy)))
+    return out
+
+
 def render_master(appearance):
     """渲染 1024 主图（**满幅、不透明**）。三个外观共用同一份几何。"""
     spec = APPEARANCES[appearance]
     img = vertical_gradient(spec["bg_top"], spec["bg_bottom"], FIXED)
+    mask = glyph_mask()
+
+    # 柔影：先铺影子，再把车身压上去 —— 顺序反了影子会盖在车身上。
+    if spec["shadow"] > 0:
+        sh = offset_mask(mask, SHADOW_DX, SHADOW_DY).filter(ImageFilter.GaussianBlur(SHADOW_BLUR))
+        img = Image.composite(Image.new("RGB", (FIXED, FIXED), (0, 0, 0)), img,
+                              sh.point(lambda v: round(v * spec["shadow"])))
 
     glyph = Image.new("RGB", (FIXED, FIXED), spec["glyph"])
-    mask, arc = glyph_mask()
-    img.paste(glyph, (0, 0), arc.point(lambda v: round(v * spec["arc_alpha"])))
     img.paste(glyph, (0, 0), mask)
 
-    # 玻璃高光：顶上一道渐隐的白。它就是 iOS 26 图标那层「玻璃表面」，
-    # 没有它纯渐变会显得平（旧图是靠一圈光晕，那是插画的做法）。
-    if spec["sheen"] > 0:
-        sheen = alpha_gradient(spec["sheen"], 0.0, FIXED)
+    # 顶光：一道渐隐的白。它就是 iOS 26 图标那层「玻璃表面」，
+    # 没有它纯渐变会显得平（旧版是靠一圈光晕，那是插画的做法）。
+    if spec["gloss"] > 0:
+        sheen = alpha_gradient(spec["gloss"], 0.0, FIXED)
         img = Image.composite(Image.new("RGB", (FIXED, FIXED), (255, 255, 255)), img, sheen)
-
-    # 底部压暗：给圆柱感，也让白色车尾不糊在亮底上。
-    if spec["shade"] > 0:
-        shade = alpha_gradient(0.0, spec["shade"], FIXED)
-        img = Image.composite(Image.new("RGB", (FIXED, FIXED), (120, 40, 0)), img, shade)
 
     return img
 

@@ -70,6 +70,20 @@ class InspectionCalendar: ObservableObject {
         save(list)
     }
 
+    /// 退出登录时清空。**两半都要清**：
+    ///
+    /// 2026-09-25 第八轮（地毯式对抗式审核）：年检记录是手填的账号数据，
+    /// 而 `AppStore.logout()` 上一版只删了 `carkeeper_inspections` 这个**键** ——
+    /// 内存里那份 `@Published var inspections` 还活着，于是同一次运行里换账号后，
+    /// 年检日历上仍然是前一个账号的记录（下次启动才“自动消失”，而那是重启的功劳）。
+    /// 这正是本文件自己记载过的那个坑的另一面：`addInspection` 曾经只写盘、
+    /// 不写回 `@Published`，于是“保存年检”在当次运行里看上去毫无反应。
+    /// —— 一处数据两个住处（磁盘 + 内存）时，**任一侧漏了都会说谎**。
+    func resetAll() {
+        inspections = []
+        UserDefaults.standard.removeObject(forKey: "carkeeper_inspections")
+    }
+
     /// 距离下次年检天数
     func daysUntilInspection(for inspection: Inspection) -> Int {
         Calendar.current.dateComponents([.day], from: Date(), to: inspection.date).day ?? 0

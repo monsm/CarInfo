@@ -223,7 +223,6 @@ struct TripsEventsView: View {
     var body: some View {
         // 出行只有一套卡：行程在上、常停之地在中间、车的事件在下。
         StackPageView(accent: HomeMode.trips.accent, label: "出行", cards: cards)
-        .pageBackground()
         .dsPageTitle("出行")
         .accessibilityLabel(Text("出行"))
     }
@@ -408,8 +407,10 @@ struct MiniTripMap: View {
                                 pointsOfInterest: .excludingAll, showsTraffic: false))
         } else {
             ZStack {
+                // 它是「一块地图空着」的占位面，在卡里 —— 与 `DSPlaceholder` 同一层底：
+                // 读 `panel`（半透明），不是不透明的 `raised`（深色 #2C2C2E）。
                 RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                    .fill(TokensPalette.raised)
+                    .fill(TokensPalette.panel)
                 Text("这一段没有记录坐标")
                     .font(TokensTypo.caption)
                     .foregroundStyle(TokensPalette.tertiary)

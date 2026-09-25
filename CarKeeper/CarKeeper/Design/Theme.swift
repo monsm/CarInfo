@@ -40,33 +40,33 @@ extension Image {
 // 同一个 App 里同一件事有两个名字，就一定会有人用错那一个。
 //
 // 现在这里只剩三类，每一类都只有一份：
-//   ① 全 App 唯一的画布与光（AppCanvas / CanvasDecorLayer / SheetCanvasModifier）
+//   ① 全 App 唯一的画布（AppCanvas）
 //   ② 全 App 唯一的小零件（StatusDot / Pill）
 //   ③ 被「车与账号」直接使用的两个视图（月报、省电开关）
 // `Theme` 与 `Color(hex:)` 也一并删了：字体一律从 `TokensTypo` 出，
 // 颜色一律从 `TokensPalette` 出，不再保留第二个入口。
 // =============================================================================
 
-extension View {
-    // 页面底色 + 统一页面边距
-    // 刻意不接受任何颜色参数：页面底色只能是 TokensPalette.background 这一层。
-    //
-    // v5：画布之上再叠一层**主题装饰**（CanvasDecorLayer）。
-    // 它永远在内容之下（写在 background 里，不是 overlay），所以不遮挡、不吃点击。
-    // 装饰不是“氛围背景”的回归：它只表达这套艺术方向的做法 ——
-    //   夜光 = 一束来自车所在地的光；纸上 = 纸面在光下的不均；巨字 = 发丝网格。
-    func pageBackground() -> some View {
-        // 画布与光**不在这一层**：它们在 App 根部（`CarKeeperApp` 里的 `AppCanvas`）。
-        // 原因很实际：逐屏去加背景，就一定会有屏幕漏掉 —— 改之前 28 屏里只有 2 屏有画布，
-        // 这正是「换了主题却看不出变化」的根源。光只在根上画一次，方向就永远不会自相矛盾。
-        contentMargins(.horizontal, TokensSpacing.page, for: .scrollContent)
-    }
-
-    // 卡片修饰符（glassCard / glassHeroCard）已删：全 App 的卡片只有 `DSCard` 一个来源。
-    // 这两个方法曾经和 DSCard 长得几乎一样（同一块不透明面 + 艺术主题下发丝描边），
-    // 但它们是第二套命名 —— 同一件事有两个名字，就一定会有人用错那个。
-
-}
+// =============================================================================
+//  `pageBackground()` 已于 2026-09-25 删除
+// =============================================================================
+//
+//  它原来是一个 `extension View`，名字说的是「页面底色 + 统一页面边距」，
+//  而函数体里只剩一行 `contentMargins(.horizontal, TokensSpacing.page, for: .scrollContent)` ——
+//  **底色与光早就不在这里了**（它们在 App 根部的 `AppCanvas`：逐屏去加背景一定会有屏幕漏掉）。
+//
+//  留下的那一行不是无害的：`contentMargins` 加在**这一页滚动内容的左右**上，
+//  于是「调用过它的页面」的卡叠比「没调用的页面」窄 20pt。实测（2026-09-25，402pt 宽的机器，
+//  量的是卡里那层分组面到屏幕边的距离）：
+//
+//      车辆（没调用）          面宽 328pt，左右各空 36pt = 18(卡内缩) + 18(卡内边距)
+//      出行 / 车控 / 我的       同样的面只有 288pt，左右各空 56pt —— 多出来的正是那 20pt
+//
+//  用户 2026-09-25 第 1 条报的就是这个：「只有现在和车辆界面的卡片宽度合格」。
+//
+//  所以它被删掉，而不是留着：一个叫「页面底色」却不产生底色、只把卡片变窄的函数，
+//  与「一个叫 `glass` 却不产生玻璃的参数」是同一类谎（`DSCard` 头注里记过那一条）。
+//  真正需要那 20pt 页边距的两处（登录页 / 「光」浮层）现在自己把它写明白。
 
 // =============================================================================
 // SheetCanvas —— 浮层背后的同一束光
@@ -77,132 +77,36 @@ extension View {
 // 这一支用 `presentationBackground` 把同一束光补到浮层背后：
 //   • 不用 `.background`：那是给内容铺底，浮层自己的面还压在上面；
 //     `presentationBackground` 才是「这个呈现层的背景」这件事本身。
-//   • 原生主题**什么都不做**（原生 = 现状）：浮层继续用系统自带的面，逐像素不变。
-//   • 光不吃点击（AppCanvas 里已经 allowsHitTesting(false)），它只是光。
-extension View {
-    func dsSheetCanvas() -> some View {
-        modifier(SheetCanvasModifier())
-    }
-}
-
-struct SheetCanvasModifier: ViewModifier {
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if TokensPalette.decor == .none {
-            content
-        } else {
-            content.presentationBackground { AppCanvas() }
-        }
-    }
-}
+//  2026-09-25 删除：它只在**艺术方向**下才做事（原生主题下 `content` 原样返回，
+//  所以九处 `.dsSheetCanvas()` 调用点全部一行不改地删掉了）。主题只剩原生之后，
+//  这个 modifier 是一个恒等变换 —— 一个叫「浮层画布」却什么都不做的 modifier，
+//  与它下面那个 `CanvasDecorLayer` 是同一类东西。
 
 // =============================================================================
-// AppCanvas —— 全 App 的画布：整棵界面背后的一层光
+// AppCanvas —— 全 App 的画布
 // =============================================================================
-// 光池的位置与强度来自 `SkyLight`（车所在经纬度 + 此刻算出的**真实太阳位置**），
-// 纸面颗粒、暗角、发丝网格同理 —— 这不是「氛围背景」的回归，每一层都对应一个物理量。
+// 为什么画在根部而不是每屏自己画：逐屏去加，一定会有屏幕漏掉（改之前 28 屏里只有 2 屏有画布），
+// 而「底色」这件事只有一个答案 —— 每屏各画一次就有第二种。
 //
-// 为什么画在根部而不是每屏自己画：
-//   ① 逐屏去加，一定会有屏幕漏掉（改之前 28 屏里只有 2 屏有画布）；
-//   ② 同一束光必须只有一份 —— 两个屏幕上的光方向不一样，比没有光更糟。
-// @MainActor：AppStore 是 @MainActor（View 的 body 本来就在主线程上）。
+// 2026-09-25：它上面原来还叠着一层「光」（`SkyOverlay` + `CanvasDecorLayer`：
+// 光池 / 纸纹 / 发丝网格，位置与强度由车所在地的**真实太阳位置**算出）。
+// 那两层只在艺术方向下出现（原生主题一个像素都不画），随艺术主题一起删除。
+// 光引擎本身（`SkyLight`）留着 —— 它不是装饰：地图上那颗车灯的亮度就是它算的。
 struct AppCanvas: View {
-    /// 天气实况（云量）。**订阅**它：快照到达时整棵树重画一次 ——
-    /// 光依赖一份异步到达的数据，不订阅就会停在「取到天气之前」的那一版。
-    @ObservedObject private var weather = WeatherService.shared
-
-    @MainActor private var sky: SkyLight? {
-        guard let c = AppStore.shared.currentLocation?.coordinate else { return nil }
-        return SkyLight.now(at: Date(), coordinate: c, weather: weather.current)
-    }
-
     var body: some View {
-        ZStack {
-            TokensPalette.canvasGradient
-            if let light = sky {
-                // 与地图主屏用的是同一套光层：换个屏幕，光不会换个方向
-                SkyOverlay(light: light)
-            } else {
-                CanvasDecorLayer()
-            }
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        // 取天气挂在根画布上（它每一屏都在），而不是逐屏去取：
-        // TTL 是护栏，不该被当成调度器。取不到就退回晴空模型，界面照实写明。
-        .task {
-            let coordinate = await MainActor.run { AppStore.shared.currentLocation?.coordinate }
-            guard let coordinate else { return }
-            await WeatherService.shared.refreshIfNeeded(coordinate: coordinate)
-        }
+        TokensPalette.canvasGradient
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
     }
 }
 
 // =============================================================================
-// CanvasDecorLayer —— 按当前主题给画布叠一层装饰
+//  已删除：`CanvasDecorLayer`（2026-09-25，随艺术主题）
 // =============================================================================
-// 三种装饰各对应一种艺术方向的做法，不是随机氛围：
-//   lightPool    夜光：一束来自车所在地的光（暖色、位置固定、不是动画）
-//   paperGrain   纸上：纸面在光下的色温不均（印刷物不会完全均匀）
-//   hairlineGrid 巨字：发丝网格 —— 版面本身就是内容
-//
-// 它只出现在 pageBackground() 的 background 里（内容之下），并且关闭命中测试，
-// 所以不会遮挡、不会吃掉任何点击。
-struct CanvasDecorLayer: View {
-    private var decor: CanvasDecor { TokensPalette.decor }
-
-    var body: some View {
-        switch decor {
-        case .none:
-            Color.clear
-
-        case .lightPool:
-            // 光池曾经在这里画一块固定在右上角的暖光 —— 那是错的：光的**方向**是物理量，
-            // 不该由版式决定。现在光池由 `SkyOverlay` 按真实太阳方位角画（见 AppCanvas）。
-            // 这一档只兜底「还没有车的位置」：那就没有光，不编一个方向。
-            Color.clear
-
-        case .paperGrain:
-            // 纸面的色温不均：用**主题自己的颜料**极淡地洗两层。
-            // 原来这里是两组写死的暖棕 RGB —— 那是「这张纸的颜色」被写进了版式层：
-            // 换主题之后它就成了画面上唯一不跟随的东西。
-            ZStack {
-                RadialGradient(
-                    colors: [TokensPalette.accent.opacity(0.10), .clear],
-                    center: UnitPoint(x: 0.18, y: 0.08),
-                    startRadius: 0,
-                    endRadius: 420
-                )
-                RadialGradient(
-                    colors: [TokensPalette.secondary.opacity(0.06), .clear],
-                    center: UnitPoint(x: 0.90, y: 0.85),
-                    startRadius: 0,
-                    endRadius: 520
-                )
-            }
-
-        case .hairlineGrid:
-            GeometryReader { geo in
-                Path { p in
-                    let step: CGFloat = 44
-                    var x: CGFloat = 0
-                    while x <= geo.size.width {
-                        p.move(to: CGPoint(x: x, y: 0))
-                        p.addLine(to: CGPoint(x: x, y: geo.size.height))
-                        x += step
-                    }
-                    var y: CGFloat = 0
-                    while y <= geo.size.height {
-                        p.move(to: CGPoint(x: 0, y: y))
-                        p.addLine(to: CGPoint(x: geo.size.width, y: y))
-                        y += step
-                    }
-                }
-                .stroke(TokensPalette.primary.opacity(CanvasDecor.hairlineGrid.strength), lineWidth: 0.5)
-            }
-        }
-    }
-}
+//  它按当前主题给画布叠一层装饰：光池（夜光）/ 纸纹（纸上）/ 发丝网格（巨字）。
+//  三个分支里有两个本来就是 `Color.clear`，第三个是「没有车的位置时也不编方向」——
+//  也就是说它在**默认（原生）主题下什么都不画**。用户 2026-09-25 定下只用原生，
+//  于是这三档一起删掉：装饰是「主题的做法」，不是界面的一层。
 
 // MARK: - 状态点（纯色圆点，无附加效果）
 struct StatusDot: View {
@@ -345,10 +249,8 @@ struct MonthlyReportSection: View {
         // （不能用「各段 km/% 的平均」——短途段的读数会被放大）。
         let socUsed = trips.reduce(0) { $0 + max(0, $1.startSoc - $1.endSoc) }
         let samples = HistoryStore.shared.soc.suffix(240).map { $0.v }
-        let mf = DateFormatter()
-        mf.dateFormat = "yyyy年M月"
         let data = ReportData(
-            monthLabel: mf.string(from: now),
+            monthLabel: DateText.shared.string(now, "yyyy年M月"),
             tripCount: trips.count,
             totalMileage: distance,
             kmPerPercent: socUsed > 0 ? distance / Double(socUsed) : nil,

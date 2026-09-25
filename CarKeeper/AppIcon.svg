@@ -1,72 +1,73 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  长安车管家 AppIcon v2.0（浅色外观）—— **矢量对照**，不是出包的那一份。
+  长安车管家 AppIcon v3.0（浅色外观）—— **矢量对照**，不是出包的那一份。
 
   出包的唯一来源是 `generate_appicon_pillow.py`（它渲染浅色 / 深色 / 着色三套外观，
   共 21 张 PNG）。这个 SVG 是同一套几何的矢量写法，给人看、给人改设计用：
-  改形状时**两个文件都要改**，几何常量（CAR / WHEELS / WINDOWS / ARC_*）以脚本里的为准。
+  改形状时**两个文件都要改**，几何常量（CAR / WHEELS / WINDOWS / ROUND_PX）以脚本里的为准。
   （为什么不让 SVG 直接出包：这台开发机上 cairosvg 与 ImageMagick 都没有，
   能跑通的只有 Pillow —— 详见 AppIcon-SPEC.md。）
 
-  与 v1.0 的区别，四条都是「不符合 iOS 调性」的具体原因：
-    ① v1 是深蓝黑底（亮度中位数 0.096）→ 主屏上就是一块黑；现在反过来：亮底 + 一个物体。
-    ② v1 图上有两行文字（长安车管家 / CHANGAN CONNECT）→ 29pt 下是两团灰噪点，已删。
-    ③ v1 自己画了圆角并内缩 4% → 系统还要再套一层 squircle，成品比邻居小一圈；
-       现在满幅 1024，圆角交给系统。
-    ④ v1 没有深色 / 着色外观 → 系统只能把同一张往两种外观里硬套。
+  v3.0 就是用户在 100 个探索方向里挑中的 **040「两厢 · 纸白底」**：
+  浅灰白底 + 一台深墨色的两厢侧影，车身满铺、车轮与车窗挖空、底下一层柔影。
+  与 v2.x（琥珀底 + 白轿车 + 车底一道弧）是同一种做法（亮底 + 一个物体 + 一层高光），
+  换的是车形与底，并**删掉了那道弧** —— 用户挑的那一张没有它。
+
+  四条不能丢的规矩（v1.0 正是违反它们才「不符合 iOS 调性」，见 AppIcon-SPEC.md 第一节）：
+    ① 亮底（v1 是近黑底）；② 图上不放文字（v1 有两行）；③ 满幅 1024、圆角交给系统
+    （v1 自己套了圆角并内缩 4%，还留了四个黑角）；④ 浅色 / 深色 / 着色三套都要有。
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFC53D"/>
-      <stop offset="1" stop-color="#FF761A"/>
+      <stop offset="0" stop-color="#F9FAFC"/>
+      <stop offset="1" stop-color="#E2E7F0"/>
     </linearGradient>
 
     <!-- iOS 26 图标表面那层「玻璃高光」：顶上一道渐隐的白，没有它纯渐变会显得平 -->
-    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.12"/>
       <stop offset="0.62" stop-color="#FFFFFF" stop-opacity="0"/>
     </linearGradient>
 
-    <!-- 底部轻微压暗：给圆柱感，也让白色车尾不糊在亮底上 -->
-    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0.68" stop-color="#782800" stop-opacity="0"/>
-      <stop offset="1" stop-color="#782800" stop-opacity="0.10"/>
-    </linearGradient>
+    <!-- 柔影：同一张形状往下偏一点、模糊后压 30% 黑。
+         它不是描边、不是投影贴图 —— 给的是「这东西离底有一点点距离」，
+         纯渐变没有它就会像贴纸（脚本里 SHADOW_DX/DY = 6/22、模糊 18、浓度 0.30）。 -->
+    <filter id="shadowBlur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
 
-    <!-- 车的镂空：轮拱 + 两扇窗。窗与轮拱透出的是**底色**（在脚本里是同一件事：
-         从车身 mask 上挖掉），所以这里用一张反向遮罩，而不是再画一层底色。 -->
-    <mask id="carHoles">
-      <rect x="0" y="0" width="1024" height="1024" fill="#fff"/>
-      <circle cx="320" cy="684" r="96" fill="#000"/>
-      <circle cx="740" cy="684" r="96" fill="#000"/>
-      <rect x="455" y="425" width="90" height="90" rx="30" fill="#000"/>
-      <rect x="575" y="425" width="90" height="90" rx="30" fill="#000"/>
+    <!-- 车身：**一份形状，两处用**（影子 + 车身本体），所以写成遮罩。
+         白的留下、黑的挖掉 —— 顺序与脚本一致：先车身 → 再挖轮拱与车窗 → 最后补回轮毂。
+         `stroke-linejoin="round"` 是脚本里「高斯模糊 21 + 阈值」的近似写法
+         （近似：SVG 里画不出那一步，量出来最多差半个像素，肉眼不可见）。 -->
+    <mask id="carMask">
+      <path d="M45,789 L45,612 L101,512 L232,346 L512,313 L680,368 L811,490
+               L904,534 L979,623 L979,789 Z"
+            fill="#fff" stroke="#fff" stroke-width="42" stroke-linejoin="round"/>
+      <!-- 轮拱（下半截故意露在车身底边之外：那是**轮拱开口**，不是画错的圆） -->
+      <circle cx="236" cy="720" r="135" fill="#000"/>
+      <circle cx="778" cy="720" r="135" fill="#000"/>
+      <!-- 车窗。两扇之间的 B 柱留 42（58pt 下约 2.4px，再窄缩小时会糊成一扇） -->
+      <rect x="283" y="376" width="201" height="108" rx="29" fill="#000"/>
+      <rect x="526" y="376" width="154" height="108" rx="29" fill="#000"/>
+      <!-- 轮毂：挖空之后再把轮心补回来。一个实心洞是窟窿，洞里有芯才是轮子 -->
+      <circle cx="236" cy="720" r="49" fill="#fff"/>
+      <circle cx="778" cy="720" r="49" fill="#fff"/>
     </mask>
   </defs>
 
   <!-- 满幅底（不画圆角：系统会用 squircle 遮罩裁） -->
   <rect width="1024" height="1024" fill="url(#bg)"/>
 
-  <!-- 车底那条弧：App 里「车钉外面那圈弧」（续航圈）的图形引用。
-       圆心在车身上、只取下面一段 → 两端向上收、中间最低，读起来是地面/道路。
-       它比车淡一档（0.22）：弧是底纹，不是主体。 -->
-  <path d="M741,825 A250,250 0 0 1 307,825"
-        fill="none" stroke="#FFFFFF" stroke-opacity="0.22"
-        stroke-width="26" stroke-linecap="round"/>
-
-  <!-- 车身：折线 + 圆角接头。脚本里这一步是「模糊 + 阈值」（等效圆角半径 16）。 -->
-  <g mask="url(#carHoles)">
-    <path d="M180,780 L180,690 L248,612 L368,496 L470,372 L640,372
-             L722,470 L804,552 L852,580 L868,690 L868,780 Z"
-          fill="#FFFFFF" stroke="#FFFFFF" stroke-width="32" stroke-linejoin="round"/>
+  <!-- 影子：一张被同一份遮罩裁出来的黑块，整体下移一点点再模糊 -->
+  <g filter="url(#shadowBlur)" opacity="0.30" transform="translate(6,22)">
+    <rect width="1024" height="1024" fill="#000000" mask="url(#carMask)"/>
   </g>
 
-  <!-- 轮毂：必须画在**遮罩之外**（在遮罩里会被轮拱一起挖掉）。
-       一个实心的洞是窟窿，洞里有芯才是轮子。 -->
-  <circle cx="320" cy="684" r="34" fill="#FFFFFF"/>
-  <circle cx="740" cy="684" r="34" fill="#FFFFFF"/>
+  <!-- 车身本体（墨色 #161A22） -->
+  <rect width="1024" height="1024" fill="#161A22" mask="url(#carMask)"/>
 
-  <rect width="1024" height="1024" fill="url(#sheen)"/>
-  <rect width="1024" height="1024" fill="url(#shade)"/>
+  <!-- 顶光画在最上层：它照的是整张图，不只是车 -->
+  <rect width="1024" height="1024" fill="url(#gloss)"/>
 </svg>

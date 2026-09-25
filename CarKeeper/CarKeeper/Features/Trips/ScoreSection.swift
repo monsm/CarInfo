@@ -298,9 +298,11 @@ struct ScoreSection: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(TokensSpacing.md)
+        // 这层底在**卡里**：读 `panel`（半透明分组面）而不是不透明的 `surface` ——
+        // 用户 2026-09-25 第 5 条的截图里，这块「还没有评分」就是那个黑洞。
         .background {
             RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                .fill(TokensPalette.surface)
+                .fill(TokensPalette.panel)
         }
     }
 

@@ -100,9 +100,10 @@ enum HomeMode: String, CaseIterable, Identifiable {
 
     /// 这一档的个性色。
     ///
-    /// 取值不在这里：它在主题表（`ArtThemeSpec.pageAccents`）里 ——
-    /// 四套艺术主题下它自动是四套配色，而调用点一行不改（与全 App 的颜色纪律一致）。
-    /// 下标取 **case 顺序**而不是 rawValue：色相是跟着在条子上的位置走的，
+    /// 取值在令牌里（`TokensPalette.pageAccents`：六个系统色），这里只按下标取 ——
+    /// 它一度写成「由主题表给」（二十套主题下自动是二十套配色），
+    /// 2026-09-25 主题只剩原生，于是它回到一组定值，而调用点一行没改。
+    /// 下标取 **case 顺序**而不是 rawValue：色相跟着在条子上的位置走，
     /// 第几档就应该是第几个色（换名字不会把配色也换掉）。
     var accent: Color {
         let all = TokensPalette.pageAccents

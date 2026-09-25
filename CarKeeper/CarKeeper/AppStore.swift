@@ -559,8 +559,9 @@ final class AppStore: @unchecked Sendable {
     // 它们是「现在是不是夜间」的**第二套实现**，而它与 `NightModeManager` 那套的差别还有两处
     // 实错：① 它把 UserDefaults 读进 `static let`（进程内只读一次，改了也不会变 ——
     // 这正是 `delguard` 盯的那种「看起来在算其实早就算死了」）；② 它在全仓**没有任何调用方**
-    //（`isNightMode` 也没人读）。明暗的唯一出处现在是 `NightModeManager.schemeOverride`
-    // 与 `ArtThemeStore.current.spec.preferredScheme`，`CarKeeperApp` 两个窗口都从那里取。
+    //（`isNightMode` 也没人读）。明暗的唯一出处是 `NightModeManager.schemeOverride`，
+    // `CarKeeperApp` 两个窗口都从那里取 —— 它一度还要与「艺术方向自带的明暗」取一个或，
+    // 那套主题 2026-09-25 已整份删除。
 
     // `#17 请求去重`（`inFlightRequests` + `markRequestStarted` / `markRequestFinished`）
     // 已于 2026-09-25 删除：**全仓零调用**（它当年是给「同一时刻两处点着同一个请求」用的，
@@ -922,11 +923,46 @@ final class AppStore: @unchecked Sendable {
         lastParkingTime = nil
         UserDefaults.standard.removeObject(forKey: Self.lastServiceMileageKey)
         UserDefaults.standard.removeObject(forKey: "carkeeper_parking_time")
-        // 家庭成员 / 临时钥匙 / 里程账本 / 保险费 / Siri 使用统计 —— 全是跟账号绑定的数据
+        // 家庭成员 / 临时钥匙 / 里程账本 / 保险费 —— 全是跟账号绑定的数据
         FamilyManager.shared.resetAll()
         TempKeyManager.shared.resetAll()
         UserDefaults.standard.removeObject(forKey: "carkeeper_mileage_entries")
         UserDefaults.standard.removeObject(forKey: "carkeeper_insurance_policies")
+        // 年检记录：它有 **@Published 内存副本**，只删键不够 —— 同一次运行里下一个账号
+        // 仍然看得见前一个账号的年检（把它当教训的同一处：`InspectionCalendar.addInspection`
+        // 曾经只存盘、不写回内存，于是「保存年检」当次运行看上去毫无反应）。
+        InspectionCalendar.shared.resetAll()
+        // ---------------------------------------------------------------------
+        // 以下七条是 2026-09-25 第八轮（地毯式对抗式审核）补上的。
+        //
+        // 它们与上面那些是**同一类**（账号/车辆绑定，判据就是 HANDOFF §6 那张表里的
+        // 「退出登录是否清」一列），而这一版之前只清了由它们**派生**的内存数据 ——
+        // 于是换账号后分别会出现：
+        //
+        //   · `parking_points`（最多 200 个停车点，含地址与时间）
+        //     → 地图「停车」层的钉与「常停热区」显示的是**前一个账号**去过的地方。
+        //       上一版清了停车位置（单数、`parking_loc`）与时间，漏了这个数组 ——
+        //       而 `parkingHistory` 是从磁盘现算的，清了内存也不会让它消失。
+        //   · `processed_event_ids`（行程去重台账）
+        //     → **清派生却留台账**是最坏的一种半清：`tripHistory` 被清空了，
+        //       台账里那 7 天窗口的事件仍然是「已处理」，于是同一账号重新登录后
+        //       行程页一直是空的（数据再也重建不出来，直到出现新事件）。
+        //   · `maintenance_photos`（用户拍的单据照，base64）
+        //     → 下一个账号看得见前一个账号的照片。
+        //   · `service_reminders` / `current_mileage` / `total_mileage` / `service_timestamp`
+        //     → 里程与保养基线是**上一辆车/上一个账号**的，
+        //       「距下次保养还有多少公里」跟着错（`last_service_mileage` 上一版已清，
+        //       这四个与它是一套，只清一个是清不干净的）。
+        //
+        // `service_reminders` 清掉后 `ServiceReminderManager.reminders` 会回落到
+        // `defaultReminders`（它的定义就是「用户还没有任何记录时的那份底」）。
+        // ---------------------------------------------------------------------
+        for key in ["carkeeper_parking_points", "carkeeper_processed_event_ids",
+                    "carkeeper_maintenance_photos", "carkeeper_service_reminders",
+                    "carkeeper_current_mileage", "carkeeper_total_mileage",
+                    "carkeeper_service_timestamp"] {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
         NotificationCenter.default.post(name: .didLogout, object: nil)
     }
 

@@ -77,10 +77,6 @@ ALLOWED = {
         "壁纸缩略图（按宽度填满后裁切，120 是它的展示高度）",
     key("Features/SplashView.swift") + ":2":
         "开场那一横线（2pt 的图形，不是行高）",
-    key("Features/ThemeGalleryView.swift") + ":4":
-        "主题样例里的光带走线",
-    key("Features/ThemeGalleryView.swift") + ":0.5":
-        "主题样例里的发丝线",
     key("Features/Trips/MessagesSection.swift") + ":30":
         "标签胶囊自己的形状（分段控件那一档高度，不是内容高度）",
     key("Features/Trips/ScoreSection.swift") + ":5":

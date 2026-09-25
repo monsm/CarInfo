@@ -97,10 +97,13 @@ struct MapTripLine: Identifiable {
     /// 这一段用了几个百分点
     var socUsed: Int { max(0, startSoc - endSoc) }
 
+    /// 起点时刻（`HH:mm`）。
+    ///
+    /// 它是这一层里最烫的一个字符串：`MapSpineLayers` 为**每一段行程**读它一次，
+    /// 而地图页在车动起来时每 2 秒求值一次（节律见 `RefreshLoop`）—— 原来每读一次
+    /// 就现造一个 `DateFormatter`，30 段就是 30 个。现在构造器在 `DateText` 的池子里。
     var timeText: String {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        return f.string(from: startedAt)
+        DateText.shared.string(startedAt, "HH:mm")
     }
 }
 
@@ -244,13 +247,18 @@ struct MapSpineData {
                             weather: isNow ? WeatherService.shared.current : nil)
     }
 
-    /// 地图上那句大字地名：**就是车端上报的那句地址**，长了就照实截断（带省略号）。
-    /// 不做地址解析、不猜行政区 —— 猜错的地名比没有地名更糟。
-    var placeLabel: String {
-        let t = address.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return "" }
-        return t.count > 7 ? String(t.prefix(7)) + "…" : t
-    }
+    // 【已删】`placeLabel`（2026-09-25）。它原本是**地图上那句大字地名**：
+    // 把车端上报的地址截到 7 个字（「听涛观海龙台」之类），长了带省略号。
+    //
+    // 删它的原因不是它写错了，是**它唯一的读者没了**：那个读者是
+    // `MapSpineView.mapPlaceLabel`（左上角、安全区下 108pt 的那行衬线大字），
+    // 用户 2026-09-25 第 2 条点名把它删掉（「地图页最上面的位置没删」）。
+    // 地图本身就在画地名，卡里的地址说的是同一个地方 —— 第三种说法。
+    //
+    // 留着它的后果与 `DS.swift` 里删「纸页外壳」时记的那条一样：
+    // **一件已经没有读者的东西，下一个写这一页的人会拿它当模板。**
+    // 地址那个字段（`address`）还在，且仍有读者（抽屉正文的第一行）；被删的只是
+    // 「把它截成 7 个字」这一个转写。
 
     // -------------------------------------------------------------------------
     // MARK: 组装
@@ -543,10 +551,12 @@ struct MapSpineData {
             }
             let center = CLLocationCoordinate2D(latitude: lat / Double(group.count),
                                                 longitude: lng / Double(group.count))
+            // 质心只造一次（2026-09-25 性能轮）：原来它在 `for j in group` 的**每一轮**里
+            // 造一个 —— 同一个坐标造了 group.count 次。几何与结果一字未改。
+            let centerLoc = CLLocation(latitude: center.latitude, longitude: center.longitude)
             var maxMeters = 0.0
             for j in group {
-                maxMeters = max(maxMeters, records[j].location.distance(
-                    from: CLLocation(latitude: center.latitude, longitude: center.longitude)))
+                maxMeters = max(maxMeters, records[j].location.distance(from: centerLoc))
             }
             let newest = group.map { records[$0].time }.max() ?? records[i].time
             out.append(MapHotspot(
@@ -604,25 +614,36 @@ extension MapSpineData {
     static func clusterChargers(_ chargers: [MapCharger],
                                 radiusMeters: Double = 400) -> [MapChargerCluster] {
         var out: [MapChargerCluster] = []
+        // 与 `out` 一一平行的 CLLocation（2026-09-25 性能轮）。
+        //
+        // 原来那句判据是 `out.firstIndex(where: { CLLocation(...).distance(from: here) ... })`
+        // —— 也就是**每一次比较**都现造一个 CLLocation：一枚钉子 × 已有的每一组。
+        // 几十个站时就是几百次分配，而它跑在每次求值的地图图层里。
+        // 现在每个站/每个组各造一次（O(n) 而不是 O(n × 组数)），比较用的还是
+        // `CLLocation.distance(from:)` 本尊 —— **判据与分组结果一字未改**。
+        var outLoc: [CLLocation] = []
         for c in chargers.sorted(by: { $0.distanceMeters < $1.distanceMeters }) {
             let here = CLLocation(latitude: c.coordinate.latitude, longitude: c.coordinate.longitude)
-            if let i = out.firstIndex(where: {
-                CLLocation(latitude: $0.coordinate.latitude,
-                           longitude: $0.coordinate.longitude).distance(from: here) <= radiusMeters
-            }) {
+            if let i = outLoc.firstIndex(where: { $0.distance(from: here) <= radiusMeters }) {
                 let old = out[i]
                 let n = Double(old.count)
+                // 重心与原式逐位相同（同一串运算、同一个顺序）。
+                let center = CLLocationCoordinate2D(
+                    latitude: (old.coordinate.latitude * n + c.coordinate.latitude) / (n + 1),
+                    longitude: (old.coordinate.longitude * n + c.coordinate.longitude) / (n + 1)
+                )
                 out[i] = MapChargerCluster(
                     id: old.id,
-                    coordinate: CLLocationCoordinate2D(
-                        latitude: (old.coordinate.latitude * n + c.coordinate.latitude) / (n + 1),
-                        longitude: (old.coordinate.longitude * n + c.coordinate.longitude) / (n + 1)
-                    ),
+                    coordinate: center,
                     count: old.count + 1,
                     nearest: old.nearest
                 )
+                // 比较用的坐标必须跟着走：下一枚钉子比的是**重心**，
+                // 与原来（`where: { $0.coordinate ... }` 读 `out[i]`）一模一样。
+                outLoc[i] = CLLocation(latitude: center.latitude, longitude: center.longitude)
             } else {
                 out.append(MapChargerCluster(id: c.id, coordinate: c.coordinate, count: 1, nearest: c))
+                outLoc.append(here)
             }
         }
         return out

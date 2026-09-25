@@ -59,8 +59,12 @@ struct DSCanvas<Content: View>: View {
 // MARK: - inset-grouped 表面（v4 唯一的"容器"）
 // =============================================================================
 
-/// 分组表面：iOS inset-grouped 的卡片面。不透明、无描边、无阴影。
+/// 分组表面：iOS inset-grouped 的卡片面。**半透明**（`TokensPalette.panel`）、无描边、无阴影。
 /// 只有需要"把一组行框在一起"时才用它；单条信息直接落在画布上用发丝线分隔。
+///
+///  为什么它不是不透明的（2026-09-25）：它铺在 `GlassCard` 里面，而卡片是玻璃。
+///  一块不透明的面（`nightSurface`，深色 #1C1C1E）压在玻璃里，结果是「玻璃中间挖了一个黑洞」——
+///  用户第 5 条说的「黑颜色太突兵」就是它。现在它读 `TokensPalette.panel`（同一色值的半透明版）。
 /// ⚠️ `glass` 与 `hero` 两个参数已于 2026-09-25 删除：它们**存下来就没再读过**
 /// （`body` 永远填 `nightSurface`，也从不看 `hero`）。一个叫 `glass` 的参数不产生
 /// 玻璃，是这个仓库最忌讳的那种谎 —— 谁写 `DSCard(glass: true)` 都会以为拿到了材质
@@ -84,16 +88,12 @@ struct DSCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(TokensPalette.nightSurface)
+                    .fill(TokensPalette.panel)
             }
-            // 艺术方向下给卡片一条发丝描边：纸与墨的语言里，「一块面」是靠线画出来的。
-            // 原生主题不加（原生 = 现状）。这一处一改，全 App 的卡片同时变。
-            .overlay {
-                if TokensPalette.decor != .none {
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line)
-                }
-            }
+            // 「艺术方向下给卡片一条发丝描边」这一块随艺术主题删掉了（2026-09-25）：
+            // 那是「纸与墨」那套方向才有的做法，而它**只在那套主题下出现** ——
+            // 主题只剩原生之后，这里的条件是恒假，留着就是一份永远不会执行的样式。
+            // 现在全 App 的卡片只有一层底（`TokensPalette.panel`），没有描边。
     }
 }
 
@@ -156,17 +156,10 @@ struct DSGroup<Content: View>: View {
             VStack(spacing: 0) { content() }
                 .background {
                     RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                        .fill(TokensPalette.nightSurface)
+                        .fill(TokensPalette.panel)
                 }
                 // 裁剪掉圆角：行的按压底色是矩形，不裁会在分组四角露出方角
                 .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous))
-                // 艺术方向下分组也要有线（与 DSCard 同一规则，原生不加）
-                .overlay {
-                    if TokensPalette.decor != .none {
-                        RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                            .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line)
-                    }
-                }
             if let footer {
                 Text(footer)
                     .font(TokensTypo.footnote)
@@ -238,13 +231,14 @@ struct DSSectionHeader: View {
     var action: (() -> Void)? = nil
 
     var body: some View {
-        // 分组标题是全 App 最密集的一行字（~28 屏都在用它）：
-        // 它一换成衬线 + 疏排，整套界面的语气就从「App」变成「印刷物」。
-        // 原生主题下 `TokensSerif.section` 返回系统字，所以原生 = 现状。
+        // 分组标题是全 App 最密集的一行字（~28 屏都在用它）。
+        // 它以前走 `TokensTypo.fixed(13)` —— 原生下返回的正是 `.system(size: 13)`，
+        // 只有艺术方向下才换成宋体；主题删掉之后那个名字底下什么都不剩，
+        // 所以这里直接写定尺字体（与原返回值逐值相同）。字距仍是 `TokensTracking.label`。
         HStack(alignment: .firstTextBaseline) {
             if !title.isEmpty {
                 Text(title.uppercased())
-                    .font(TokensSerif.section(13))
+                    .font(TokensTypo.fixed(13))
                     .tracking(TokensTracking.label)
                     .foregroundStyle(TokensPalette.secondary)
             }
@@ -286,10 +280,11 @@ struct DSBigNumber: View {
             HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.xs) {
                 Text(value)
                     .font(TokensTypo.display(size))
-                    // 字距 = 按字号算的基准 + 主题的额外收紧。
-                    // 原生主题的额外量为 0，所以切换前是什么样现在还是什么样；
-                    // 「巨字」方向靠这一项把超大数字收成一整块（海报的做法）。
-                    .tracking(-size * 0.035 + TokensTypo.displayTracking)
+                    // 字距 = 按字号算的基准（字号越大越要收紧，否则数字会散开）。
+                    // 这里以前还加一项「主题的额外字距」（巨字方向靠它把超大数字
+                    // 收成一整块），随艺术主题删除；原生那一项本来就是 0，
+                    // 所以取值逐值不变。
+                    .tracking(-size * 0.035)
                     .foregroundStyle(tint)
                     .contentTransition(.numericText())
                     .lineLimit(1)
@@ -315,20 +310,16 @@ struct DSBigNumber: View {
 // 而它们嘴上那张卡自己已经写着名字（卡头 `GlassCardHead`）—— 于是同一屏出现两个名字
 //（「诊断」+「设计令牌」、「应急」+「紧急求助」）。卡头就是标题，正文不再交一份。
 extension View {
-    /// 页面标题的两种活法：
-    ///   原生      = iOS 大标题留在导航栏（逐像素等于切换前的现状）
-    ///   艺术方向  = 导航栏清空，大标题搬进版面（衬线 + 疏排）
-    /// ⚠️ 后者原先靠 `DSPageTitle` 把标题补进版面，那个视图已于 2026-09-25 删掉
-    ///（它的四个使用者都是卡里的正文，标题由卡头负责）。所以艺术方向下这些页
-    /// 目前没有大标题 —— 它们的标题仍然在「卡头」上，而卡头是全 App 统一的。
-    /// `inline: true` = 原生下也用行内标题（有些页面本来就一直用行内标题 ——
-    /// 原生必须逐像素等于切换前的现状，所以那个选择要保留）。
+    /// 页面标题：iOS 大标题留在导航栏。
+    ///
+    /// 它以前有**两种活法** —— 艺术方向下把导航栏清空、大标题搬进版面（衬线 + 疏排）。
+    /// 2026-09-25 艺术主题整份删除，于是只剩这一条；`inline: true` 保留，
+    /// 因为有些页面本来就一直用行内标题，而「逐像素等于现状」是这里的硬要求。
+    /// （艺术方向那一支的两个零件都已删：`DSPageTitle` 于同日删掉，
+    ///  `TokensSerif` 随主题一起走。）
     func dsPageTitle(_ title: String, inline: Bool = false) -> some View {
-        if TokensPalette.decor == .none {
-            return AnyView(navigationTitle(title)
-                .navigationBarTitleDisplayMode(inline ? .inline : .large))
-        }
-        return AnyView(navigationTitle("").navigationBarTitleDisplayMode(.inline))
+        navigationTitle(title)
+            .navigationBarTitleDisplayMode(inline ? .inline : .large)
     }
 
 }
@@ -614,7 +605,7 @@ struct DSTile: View {
             .frame(minHeight: 84, alignment: .topLeading)
             .background {
                 RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                    .fill(TokensPalette.nightSurface)
+                    .fill(TokensPalette.panel)
             }
         }
         .buttonStyle(DSCardButtonStyle())
@@ -676,7 +667,13 @@ struct DSSegmented<T: Hashable>: View {
                         .background {
                             if selected {
                                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                    .fill(TokensPalette.nightSurface)
+                                    // 选中的滑块 = **玻璃里面那一层更亮的底**，与模式条上那枚透镜
+                                    // 是同一个东西，所以用同一个令牌（`glassHighlight`）。
+                                    // 它原来读 `nightSurface` —— 深色模式下那是 (28,28,30)，
+                                    // 比它所在的凹槽（`fillSubtle`）还暗，于是「选中的那一格」
+                                    // 看起来是一个黑洞（用户 2026-09-25 第 5 条截图的「全部 / 未读」）。
+                                    // iOS 深色下选中段本来就该比凹槽**亮**，不是更暗。
+                                    .fill(TokensPalette.glassHighlight)
                                     .shadow(color: TokensPalette.scrim.opacity(0.12), radius: 3, y: 1)
                             }
                         }
@@ -740,7 +737,7 @@ struct DSNotice: View {
         .padding(.horizontal, TokensSpacing.md)
         .padding(.vertical, TokensSpacing.sm)
         .background(RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
-            .fill(TokensPalette.nightSurface))
+            .fill(TokensPalette.panel))
         .accessibilityElement(children: .combine)
     }
 }
@@ -849,7 +846,7 @@ struct DSExpandGroup<Content: View>: View {
             } label: {
                 HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                     Text(title.uppercased())
-                        .font(TokensSerif.section(13))
+                        .font(TokensTypo.fixed(13))
                         .tracking(TokensTracking.label)
                         .foregroundStyle(TokensPalette.secondary)
                     Spacer(minLength: TokensSpacing.sm)
@@ -872,15 +869,9 @@ struct DSExpandGroup<Content: View>: View {
                 VStack(spacing: 0) { content() }
                     .background {
                         RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                            .fill(TokensPalette.nightSurface)
+                            .fill(TokensPalette.panel)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous))
-                    .overlay {
-                        if TokensPalette.decor != .none {
-                            RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                                .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line)
-                        }
-                    }
             }
 
             if let footer {
@@ -925,7 +916,7 @@ struct DSSection<Content: View>: View {
             } label: {
                 HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                     Text(title.uppercased())
-                        .font(TokensSerif.section(13))
+                        .font(TokensTypo.fixed(13))
                         .tracking(TokensTracking.label)
                         .foregroundStyle(TokensPalette.secondary)
                     Spacer(minLength: TokensSpacing.sm)
@@ -979,13 +970,10 @@ struct DSSurfaceModifier: ViewModifier {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(subtle ? TokensPalette.fillSubtle : TokensPalette.nightSurface)
-            }
-            .overlay {
-                if TokensPalette.decor != .none {
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line)
-                }
+                    // 两档底：`subtle` = 更浅的那一档（输入框 / 未选中的底），否则是分组面。
+                    // 「分组面」这一档已从 `nightSurface`（不透明）换成 `panel`（半透明），
+                    // 理由见 `TokensPalette.panel` —— 卡里那层底不能是不透明的。
+                    .fill(subtle ? TokensPalette.fillSubtle : TokensPalette.panel)
             }
     }
 }

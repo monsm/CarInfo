@@ -149,7 +149,6 @@ struct MileageJournalSection: View {
         .sheet(isPresented: $showAddSheet) {
             AddCostEntrySheet(selectedType: $selectedType, amountText: $amountText, noteText: $noteText)
                 .onAppear { amountText = "" ; noteText = "" }
-                .dsSheetCanvas()
         }
         .confirmationDialog("清空全部里程记账？",
                             isPresented: $showClearConfirm,

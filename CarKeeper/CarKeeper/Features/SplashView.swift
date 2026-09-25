@@ -32,8 +32,7 @@ struct SplashView: View {
 
                 VStack(spacing: TokensSpacing.sm) {
                     Text("长安车管家")
-                        // 艺术方向下走衬线（原生下 TokensSerif.page 就是原来的系统字）
-                        .font(TokensSerif.page(28))
+                        .font(TokensTypo.fixed(28, weight: .semibold))
                         .foregroundStyle(TokensPalette.primary)
                         .tracking(TokensTracking.title)
 

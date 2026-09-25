@@ -285,7 +285,6 @@ struct ControlView: View {
 
     var body: some View {
         StackPageView(accent: HomeMode.control.accent, label: "车控", cards: cards)
-        .pageBackground()
         // 车控指令的**唯一**那道门：温度 → 生物识别 → 控车码 → 下发。
         // 它原先长在这一页里（三个 sheet + 一个遮罩共 60 行），地图右臂就绕过去了；
         // 现在它是一处 modifier，两处发起处挂同一个（见 `ControlCommandFlow`）。
@@ -329,7 +328,7 @@ struct ControlView: View {
         }
         .sheet(isPresented: Binding(get: { commands.showResult },
                                     set: { commands.showResult = $0 })) {
-            resultSheet.dsSheetCanvas()
+            resultSheet
         }
         // #N13 生物识别验证覆盖层已随那道门一起搬到 `ControlCommandFlow`：
         // 它在那边是「四步里的第②步」，而不是本页的一个开关。

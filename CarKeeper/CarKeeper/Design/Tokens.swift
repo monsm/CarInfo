@@ -22,79 +22,103 @@
 //   呼吸动效（TokensMotion.breathe / kanseiBreathe）—— v4 规定：
 //   界面里所有会动、会发光的东西都必须对应一个真实状态。
 //
-// v5 · 可切换的艺术主题（ArtTheme.swift）：
-//   下面的颜色值不再直接写死，而是从**当前主题**读（ArtThemeStore.spec）。
-//   `.native` 主题的取值与 v4 逐值相同 —— 默认不切换时界面与之前完全一致。
-//   换主题 = 换值，不是换名字：全 App 的调用点（`TokensPalette.accent` 之类）一行不改。
-//   重绘由 CarKeeperApp 的 root 上的 `.id(主题)` 触发（静态计算值本身不产生依赖）。
+// v5 · 可切换的艺术主题（2026-09-25 **已整份删除**）
+//   v5 曾经把下面的颜色值改成「从当前主题读」（ArtTheme.swift 里有 20 套取值：
+//   夜光 / 纸上 / 巨字 / 原生 + 后来加的 16 套）。用户 2026-09-25 定下**只用原生**，
+//   其余 19 套与整套切换机制一起删掉 —— 于是这里又回到 v4 的样子：
+//   **值直接写在这一处**，没有再往外转一层。
+//   （连带删掉的还有：`CanvasDecor` 画布装饰、`TokensSerif` 衬线标题、
+//    `preferredScheme` 主题自带明暗、地图的艺术蒙版与三种车钉样式、
+//    以及那页「主题样张」。理由与其余几处一致：**只有一种取值的开关就是一层假的选择**。）
 // =============================================================================
 import SwiftUI
 import UIKit
 
 // MARK: - 颜色令牌（单一来源）
 enum TokensPalette {
-    /// 当前主题的全部取值。**唯一读取点** —— 下面每个颜色都从这里转发。
-    /// （计算属性，无可变静态存储：不引入并发风险。）
-    static var spec: ArtThemeSpec { ArtThemeStore.spec }
-
     // ---- 表面 ----
-    /// 页面画布（原生主题 = systemGroupedBackground，亮 #F2F2F7 / 暗 #000）
-    static var canvas: Color { spec.canvas }
-    /// 一级分组表面（原生主题 = secondarySystemGroupedBackground）
-    static var surface: Color { spec.surface }
-    /// 内凹 / 抬升表面
-    static var raised: Color { spec.raised }
-    /// 发丝分隔线
-    static var hairline: Color { spec.hairline }
-    /// 光条 / 进度轨道
-    static var track: Color { spec.track }
-    /// 铺在强调色之上的文字色。**不是全局常量** —— 琥珀底配白字不可读（1.9:1）。
-    static var labelOnTint: Color { spec.onAccent }
-    /// 遮罩：弹层 / HUD 背后的一层、以及光照不到的暗角（SkyOverlay）。
-    /// 为什么它必须是令牌：纯黑在暖色纸面上会发蓝 —— 纸主题的遮罩是**墨**，不是黑。
-    /// 调用点只给不透明度（`.opacity(0.45)`），色相由主题决定。
-    static var scrim: Color { spec.scrim }
-    /// 光从哪来（原生/夜光 = 暖白，纸上 = 朱红，巨字 = 近白）。
-    /// 用在「电量就是光」的光条起点、以及光池/光晕——**不要再用写死的 Color.white**：
-    /// 纸上主题里它是朱红，白色会在纸面上戳出一个洞。
-    static var lightSource: Color { spec.lightSource }
-    /// 车灯光带渐变（原生主题 = 白 → 浅蓝 → 系统蓝）：只在「电量就是光」的地方出现
+    /// 页面画布（systemGroupedBackground，亮 #F2F2F7 / 暗 #000）
+    static let canvas: Color = Color(uiColor: UIColor.systemGroupedBackground)
+    /// 一级分组表面（secondarySystemGroupedBackground）
+    static let surface: Color = Color(uiColor: UIColor.secondarySystemGroupedBackground)
+    /// 内凹 / 抬升表面（tertiarySystemGroupedBackground）
+    static let raised: Color = Color(uiColor: .tertiarySystemGroupedBackground)
+    /// 发丝分隔线（UIColor.separator）
+    static let hairline: Color = Color(uiColor: UIColor.separator)
+    /// 光条 / 进度轨道（quaternaryLabel）
+    static let track: Color = Color(uiColor: .quaternaryLabel)
+    /// 铺在强调色之上的文字色。系统蓝配白可以 —— 而这个 App 的强调色只有系统蓝一种。
+    static let labelOnTint: Color = .white
+    /// 遮罩：弹层 / HUD 背后的一层。**纯黑 + 调用点给的不透明度**。
+    static let scrim: Color = .black
+    /// 光从哪来（白）。用在「电量就是光」的光条起点、以及车灯的光晕。
+    static let lightSource: Color = .white
+    /// 系统蓝（= accent 的亮色那一档）。`lightBar` 的终点用它，
+    /// 所以它必须是同一个值，而不是又写一遍三元组。
+    private static let blue: Color = tokenDynamic(light: (0.000, 0.478, 1.000),
+                                                  dark: (0.039, 0.518, 1.000))
+    /// 车灯光带渐变（白 → 浅蓝 → 系统蓝）：只在「电量就是光」的地方出现
     static var lightBar: LinearGradient {
-        LinearGradient(colors: spec.lightBar, startPoint: .leading, endPoint: .trailing)
+        LinearGradient(colors: [.white,
+                                Color(red: 0.612, green: 0.776, blue: 1.000),
+                                blue],
+                       startPoint: .leading, endPoint: .trailing)
     }
-    /// 平坦画布渐变（滚动背景用）。v4 只有一个画布，没有氛围渐变。
+    /// 平坦画布渐变（滚动背景用）。只有一个画布，没有氛围渐变。
     static var canvasGradient: LinearGradient {
         LinearGradient(colors: [canvas, canvas], startPoint: .top, endPoint: .bottom)
     }
 
     // ---- 文字三档 ----
-    static var primary: Color { spec.label }
-    static var secondary: Color { spec.labelSecondary }
-    static var tertiary: Color { spec.labelTertiary }
+    static let primary: Color = Color(uiColor: .label)
+    static let secondary: Color = Color(uiColor: .secondaryLabel)
+    static let tertiary: Color = Color(uiColor: .tertiaryLabel)
 
-    // ---- 强调色（每个主题只有一个）----
-    static var accent: Color { spec.accent }
+    // ---- 强调色（只有一个）----
+    static let accent: Color = tokenDynamic(light: (0.000, 0.478, 1.000),
+                                            dark: (0.039, 0.518, 1.000))
     /// 兼容旧调用名的别名。**不再是时间感知色** —— 金色方案已整体废弃。
     static var ambient: Color { accent }
 
     // ---- 语义状态色（界面上唯一的「彩色」来源）----
-    static var success: Color { spec.success }
-    static var warning: Color { spec.warning }
-    static var error: Color { spec.error }
+    static let success: Color = tokenDynamic(light: (0.204, 0.780, 0.349),
+                                             dark: (0.188, 0.820, 0.345))
+    static let warning: Color = tokenDynamic(light: (1.000, 0.584, 0.000),
+                                             dark: (1.000, 0.624, 0.039))
+    static let error: Color = tokenDynamic(light: (1.000, 0.231, 0.188),
+                                           dark: (1.000, 0.271, 0.227))
     /// 充电 / 电驱（EV 语义，不等于 success）
-    static var info: Color { spec.info }
+    static let info: Color = tokenDynamic(light: (0.000, 0.780, 0.745),
+                                          dark: (0.400, 0.839, 1.000))
 
     // ---- 兼容名（历史调用点保留）----
-    /// 旧名：夜间表面。v4 只有「系统表面」一种，跟随主题。
-    static var nightSurface: Color { spec.surface }
+    /// 旧名：夜间表面。只有「系统表面」一种，跟随深浅色。
+    static var nightSurface: Color { surface }
     /// 页面底色（旧名）
     static var background: Color { canvas }
-    /// 浅填充（输入框、未选中的底）。
-    /// 原来这里是写死的 `Color(uiColor: .quaternarySystemFill)` —— 于是所有输入框
-    /// 在四套主题里都是同一块系统灰。现在它读主题（原生主题的值与原来逐值相同）。
-    static var fillSubtle: Color { spec.fillSubtle }
+    /// 浅填充（输入框、未选中的底）—— `quaternarySystemFill`。
+    /// 它一度改成「跟主题走」；主题没了之后它就是一个系统语义色，跟着深浅色变。
+    static let fillSubtle: Color = Color(uiColor: .quaternarySystemFill)
+
+    /// 卡片**里面**那一层面：分组面、占位面、提示条、搜索框。
+    ///
+    /// ⚠️ 它**不是** `surface`，虽然它读的是同一个色值。`surface` 是**不透明**的分组底色
+    ///（secondarySystemGroupedBackground，深色 #1C1C1E），而卡片本身是一层玻璃
+    ///（`GlassCard` → `dsGlass`）。一块不透明的面压在玻璃里，等于「玻璃中间挖了一个黑洞」：
+    /// 深色模式 + 彩色壁纸下，卡是半透明暖红、里面的面是 (28,28,30)，两者挨在一起就是断的 ——
+    /// 用户 2026-09-25 第 5 条：「每个界面的控件都应该是玻璃质感 …… 黑颜色太突兀了」。
+    ///
+    /// 取值是 `surface` 的半透明版（0.5），而不是另写一个灰：卡片自己的玻璃与它底下的壁纸
+    /// 因此能继续透上来 —— 它才像同一块材质的一层，而不是贴上去的一块板。
+    /// **0.5 是这里唯一的刻度**：调大就更实、调小就更透，全 App 的面一起变。
+    ///
+    /// 为什么不在这里用真材质（`.glassEffect`）：`Design/DSGlass.swift` 三层规则的第 ② 条 ——
+    /// **卡里不玻璃**（玻璃叠玻璃会糊成一片，而卡片自己已经是玻璃）。这一层要的是
+    /// 「玻璃里面那层更暗的底」，不是第二块材质。
+    static var panel: Color { surface.opacity(0.5) }
+
     // 已删除：`glassBorder`（2026-09-25，与 `glassLight` 同一批）。
-    // 它也是 `spec.hairline` 的重复声明 —— 而 12 位用户里只有 4 位（`dsGlass` /
+    // 它也是 `hairline` 的重复声明 —— 而 12 位用户里只有 4 位（`dsGlass` /
     // `GlassCard` / 模式条 / 卡片）真的在给玻璃描边，其余是图表的网格线、读数的
     // 分隔线、开发页的色板。**分隔线就叫 `hairline`**，它们现在读那个名字。
     // 于是「带 glass 的名字」只剩 `glassHighlight` 一个，而它是材质内部的高光面
@@ -104,17 +128,15 @@ enum TokensPalette {
     /// ⚠️ 它**不是**玻璃，也不该拿去当「浮层」的底 —— 浮层走 `dsGlass`
     /// （`Design/DSGlass.swift`，那才是真材质）。这个值只用来在**已经是玻璃**的
     /// 表面上再压一层更亮的形状（规则 ②：一块表面里不再叠第二块玻璃）。
-    static var glassHighlight: Color { spec.glassHighlight }
+    static let glassHighlight: Color = .white.opacity(0.15)
 
     // 已删除：`glassLight`（2026-09-25）。
     // 它是 `fillSubtle` 的**重复声明**（同一个值、两个名字），而「名字里带 glass
-    // 的扁平色」正是这一轮材质审核要找的那类谎：谁读到 `glassLight` 都会以为拿到了
+    // 的扁平色」正是那一轮材质审核要找的那类谎：谁读到 `glassLight` 都会以为拿到了
     // 材质，实际拿到的是「未选中的底」那种系统灰。四处调用点已改成 `fillSubtle`，
     // 于是全仓再没有一个叫 glass 的扁平令牌。
 
     /// 状态类名（ok / warn / charge…）→ 颜色。
-    /// 原生主题下与 `ArtTheme.nativeSpec` 的语义色逐个等价（同一套判定），
-    /// 换成艺术主题时改走主题的语义色。
     static func statusColor(_ cls: String) -> Color {
         switch cls {
         case "ok", "normal": return success
@@ -126,17 +148,14 @@ enum TokensPalette {
         }
     }
 
-    /// 每一页的个性色（顺序与 `HomeMode.allCases` 一致）。
+    /// 每一页的个性色（顺序与 `HomeMode.allCases` 一致：
+    /// 出行 · 车辆 · 现在 · 充电 · 车控 · 我的）。
     /// 它用在：卡片左上角那一抹、巨字下面一行光晕。**不是文字色**，
     /// 所以不参与对比度约定；需要文字对比度的地方一律用 primary/secondary/tertiary。
-    static var pageAccents: [Color] { spec.pageAccents }
-
-    /// 这套主题允不允许"光"（发光 / 光晕）。纸上不允许 —— 纸张没有发光。
-    static var allowsGlow: Bool { spec.allowsGlow }
-    /// 标题是不是走宋体（印刷物的做法）
-    static var usesSerifTitles: Bool { spec.usesSerifTitles }
-    /// 画布装饰（光池 / 纸纹 / 发丝网格）
-    static var decor: CanvasDecor { spec.decor }
+    /// 六个就是 iOS 系统调色板里那六个（紫 / 浅蓝 / 蓝 / 绿 / 青 / 靛）。
+    static let pageAccents: [Color] = [tokenColor(0xAF52DE), tokenColor(0x5AC8FA),
+                                       tokenColor(0x007AFF), tokenColor(0x34C759),
+                                       tokenColor(0x30B0C7), tokenColor(0x5856D6)]
 }
 
 // MARK: - 间距（4 的倍数，页面边距 20）
@@ -201,13 +220,10 @@ enum TokensTypo {
 
     // ---- 仪表数字：等宽数字（换数不跳动）----
     /// 超大数字（首屏 SOC / 关键指标）：**字重差**是「仪器感」的来源 ——
-    /// 超细字重 + 负字距（字距在 DSBigNumber 里加），不靠颜色、不靠发光。
+    /// 超细字重 + 负字距（字距在 DSBigNumber 里按字号算），不靠颜色、不靠发光。
     static func display(_ size: CGFloat = 72) -> Font {
-        .system(size: size, weight: ArtThemeStore.spec.displayWeight).monospacedDigit()
+        .system(size: size, weight: .ultraLight).monospacedDigit()
     }
-    /// 超大数字的字距（不随 Dynamic Type 的那一档）。
-    /// 原生 −0.5（几乎看不出）、巨字 −1.8（字号越大越要收紧，否则数字会散开）。
-    static var displayTracking: CGFloat { ArtThemeStore.spec.displayTracking }
     /// 中等数字（页面头部大数值）
     static func metric(_ size: CGFloat = 34) -> Font {
         .system(size: size, weight: .light).monospacedDigit()
@@ -287,50 +303,15 @@ enum TokensSize {
     static let barHeight: CGFloat = 56
 }
 
-// MARK: - 衬线（只有标题与地名走它）
+// MARK: - 已删除：`TokensSerif`（2026-09-25，随艺术主题一起删）
 //
-// 为什么需要衬线：样品版里最像"印刷物"的两处 —— 地图上的大字地名、底部面板的大标题 ——
-// 用的是宋体 + 疏排字距。系统默认的黑体（PingFang）怎么调都调不出这个感觉：
-// 黑体的字面是均匀的，宋体的横细竖粗本身就是明暗，那是**版面的光**。
+//  它曾经是「标题与地名走宋体」的那一份字体表：原生主题下它返回系统字（所以原生 = 现状），
+//  三个艺术方向下返回 Songti SC。主题只剩原生之后，它每一处调用拿到的都是系统字 ——
+//  也就是说**这一个名字底下什么都不剩**，而那正是这个仓库一直在删的那类东西
+//  （同一个决定被做了两次：字体该从 `TokensTypo` 出，衬线只是它的一种取值）。
+//  八处调用点改成 `TokensTypo.fixed(...)`（与原返回值逐值相同：13 / 34 semibold /
+//  28 semibold / 22），`place` 与 `label` 两个只有衬线才用得上的入口一并消失。
 //
-// 一条不假设的原则：中文字体名在不同系统上不一定都在。
-// 所以先问系统有没有（`UIFont(name:size:)` 返回 nil 就是没有），没有就退回
-// 系统的衬线设计（`.serif`，拉丁语系一定有，中文会落到系统能给的衬线面）。
-enum TokensSerif {
-    /// 中文衬线在 iOS 上叫「Songti SC」
-    private static var cjkSerifName: String? {
-        UIFont(name: "Songti SC", size: 12) != nil ? "Songti SC" : nil
-    }
-
-    /// 标题衬线（面板大标题、纸张上的标题）
-    static func title(_ size: CGFloat) -> Font { font(size, .regular) }
-    /// 地名 / 大标注：字距由调用方给 —— 它才是主角
-    static func place(_ size: CGFloat) -> Font { font(size, .light) }
-    /// 小标注（图上标签、比例尺）
-    static func label(_ size: CGFloat) -> Font { font(size, .regular) }
-
-    private static func font(_ size: CGFloat, _ weight: Font.Weight) -> Font {
-        if let name = cjkSerifName { return .custom(name, size: size) }
-        return .system(size: size, weight: weight, design: .serif)
-    }
-
-    // ---- 跟随主题的两档（全 App 用它们，而不是直接调上面的）----
-    // 规则：**三个艺术方向走衬线，原生不换** —— 原生必须逐像素等于切换前的现状。
-    // （不把衬线写进数字：宋体的数字没有等宽特性，换数值时会跳动；
-    //   样品里也是这么分的 —— 衬线只给地名与大标题，数字仍然是 Inter/系统字。）
-    private static var followsArt: Bool { TokensPalette.decor != .none }
-
-    /// 页面 / 弹层的大标题
-    static func page(_ size: CGFloat) -> Font {
-        followsArt ? title(size) : .system(size: size, weight: .semibold)
-    }
-
-    /// 分组标题（全 App 的 section header 走它）
-    static func section(_ size: CGFloat) -> Font {
-        followsArt ? label(size) : .system(size: size)
-    }
-}
-
 // MARK: - 字距
 //
 // 疏排是这套视觉的主要手段之一：中文小字一旦排得开，就从"说明文字"变成"地图注记"。
@@ -342,4 +323,31 @@ enum TokensTracking {
     static let label: CGFloat = 0.6
     /// 面板大标题：略收紧
     static let title: CGFloat = -0.2
+}
+
+// MARK: - 颜色构造（两个小工具）
+/// 顶层工具：0xRRGGBB + alpha → Color。
+/// 用 `Color(.sRGB, ...)` 而不是 UIColor，是为了让取值在任何外观下都精确。
+/// （原 `ArtTheme.artHex`，随 ArtTheme.swift 一起搬来这里 —— 它的读者只剩 `pageAccents`。）
+private func tokenColor(_ hex: UInt32, alpha: Double = 1) -> Color {
+    Color(
+        .sRGB,
+        red: Double((hex >> 16) & 0xFF) / 255,
+        green: Double((hex >> 8) & 0xFF) / 255,
+        blue: Double(hex & 0xFF) / 255,
+        opacity: alpha
+    )
+}
+
+/// 明暗两套取值。系统深色时取 dark，否则取 light。
+/// （原 `ArtTheme.nativeDynamic`，同一段实现、同一批取值。）
+private func tokenDynamic(
+    light: (CGFloat, CGFloat, CGFloat),
+    dark: (CGFloat, CGFloat, CGFloat)
+) -> Color {
+    Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+        ? UIColor(red: dark.0, green: dark.1, blue: dark.2, alpha: 1)
+        : UIColor(red: light.0, green: light.1, blue: light.2, alpha: 1)
+    })
 }

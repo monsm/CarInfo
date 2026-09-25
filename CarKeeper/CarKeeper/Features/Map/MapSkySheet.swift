@@ -104,8 +104,12 @@ struct MapSkySheet: View {
                 }
                 .padding(.top, TokensSpacing.sm)
                 .padding(.bottom, TokensSpacing.xxl)
+                // 页面左右边距**写在这里**：原来它来自 `pageBackground()` 里那句
+                // `contentMargins(.horizontal, 20, for: .scrollContent)`，而那个修饰符
+                // 2026-09-25 整段删掉（它叫「页面底色」却只把卡片变窄，见 `Theme.swift`）。
+                // 这一屏的正文原来一分横向边距都没有、全赖那一句，所以拆的时候必须补上。
+                .padding(.horizontal, TokensSpacing.page)
             }
-            .pageBackground()
             .navigationTitle("光")
             .navigationBarTitleDisplayMode(.inline)
             .presentationDetents([.medium, .large])
@@ -156,5 +160,51 @@ struct MapNotice: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, TokensSpacing.sm)
+    }
+}
+
+// =============================================================================
+//  SkyFactTable —— 「光」表（2026-09-25 从 `Design/SkyOverlay.swift` 搬来）
+// =============================================================================
+//  它原来住在光层那个文件里，而那个文件随艺术主题一起删掉了；这一张表不是装饰 ——
+//  它是这一页正文的**唯一**内容（`MapSkySheet` 就是「给光算出来的每一个数看」）。
+//  一个视图跟着它的唯一读者走，比留在一个只服务于主题的文件里更说得通。
+//
+// SkyFactTable —— 「光」表
+// =============================================================================
+//
+// 一行一个事实：左边是这一栏叫什么 + **它是怎么来的**，右边是值。
+// 为什么值得占一页：光好不好看是主观的，但「这一屏的光从哪来」不该是主观的。
+// 把规则印在值的旁边，这一屏就变得可以被争论 —— 而可以被争论，才谈得上被设计。
+struct SkyFactTable: View {
+    let facts: [SkyFact]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(facts) { f in
+                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.md) {
+                    VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
+                        Text(f.label)
+                            .font(TokensTypo.caption)
+                            .foregroundStyle(TokensPalette.secondary)
+                        Text(f.note)
+                            .font(TokensTypo.caption2)
+                            .foregroundStyle(TokensPalette.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                    Text(f.value)
+                        .font(TokensTypo.digits(13))
+                        .foregroundStyle(TokensPalette.primary)
+                        .fixedSize()
+                }
+                .padding(.vertical, TokensSpacing.sm)
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(TokensPalette.hairline)
+                        .frame(height: TokensHair.line)
+                }
+            }
+        }
     }
 }

@@ -259,8 +259,12 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
     }
 
     /// Windows 聚焦：外层 `batchrsp.items[]`，每条的 `item` 是**一段 JSON 文本**，
-    /// 里面有 `ad`，`ad` 下面的资源键名随版本变过（landscape / portrait / square …）。
-    /// 所以不列键名，改成"在 ad 的每个子字典里找 `u` / `url`"—— 加一个尺寸不会失效。
+    /// 里面有 `ad`。除图以外的东西都在同一层：`copyright`（署名）、`title`（这张的标题）。
+    ///
+    /// 署名那两个键名 2026-09-25 用真报文改过：此前读的是 `copyright_text` /
+    /// `title_text` —— **这两个键在返回里根本不存在**（真报文只有 `copyright` / `title`），
+    /// 所以解析永远落空、署名那行永远是空的。它与图一起坏、但坏得不一样：图整张没有，
+    /// 署名只是不显示，看起来像"这张图没有署名"。
     private static func spotlightPick(from data: Data, stamp: Int) -> RemotePick? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let batch = root["batchrsp"] as? [String: Any],
@@ -271,18 +275,40 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
                   let inner = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
                   let ad = inner["ad"] as? [String: Any],
                   let url = assetURL(in: ad) else { continue }
-            let credit = (ad["copyright_text"] as? String) ?? (ad["title_text"] as? String) ?? ""
+            // 署名优先取 `copyright`（© 摄影师 / 图库）—— 那是真正的出处；
+            // `title` 是这张图的标题，只能算退路。
+            let credit = (ad["copyright"] as? String) ?? (ad["title"] as? String) ?? ""
             picks.append(RemotePick(url: url, credit: credit))
         }
         guard !picks.isEmpty else { return nil }
         return picks[stamp % picks.count]
     }
 
-    /// 在 `ad` 的每个子字典里找取图地址（值以 http 开头的 `u` 或 `url`）。
+    /// 在 `ad` 里找取图地址。
+    ///
+    /// **`asset` 这个键名是 2026-09-25 用真报文核出来的**（此前这里只有 `u` / `url`）。
+    /// 实际接口返回的形状是：
+    /// ```
+    /// "ad": { "landscapeImage": { "asset": "https://res.public.onecdn.static.microsoft/…" },
+    ///         "portraitImage":  { "asset": "…" }, "title": …, "copyright": … }
+    /// ```
+    /// 键名是 `asset`。于是只找 `u` / `url` 的结果是 **`picks` 永远为空 → 聚焦这一源永远取不到图**，
+    /// 而必应那一源走的是 `urlbase`（另一条路），所以「必应行、聚焦不行」—— 用户 2026-09-25 报的第 4 条。
+    ///
+    /// 顺序是**写死的**，不再遍历 `ad.values`：字典遍历顺序在 Swift 里是未定义的，
+    /// 同一份报文可能今天取竖图、明天取横图。竖屏手机上先要竖图（1080×1920），
+    /// 再退横图，最后才扫所有子字典（接口以后再加尺寸也不会失效）。
     private static func assetURL(in ad: [String: Any]) -> String? {
+        for name in ["portraitImage", "landscapeImage", "squareImage"] {
+            if let asset = ad[name] as? [String: Any],
+               let s = asset["asset"] as? String, s.hasPrefix("http") {
+                return s
+            }
+        }
+        // 兜底：接口若是又换了键名，退回「扫每个子字典里的 u / url / asset」。
         for value in ad.values {
             guard let asset = value as? [String: Any] else { continue }
-            for key in ["u", "url"] {
+            for key in ["asset", "u", "url"] {
                 guard let s = asset[key] as? String else { continue }
                 if s.hasPrefix("http") { return s }
             }

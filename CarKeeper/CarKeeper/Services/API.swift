@@ -518,14 +518,13 @@ final class APIClient: @unchecked Sendable {
     }
 
     private func messagesURL(from start: Date, to end: Date) -> String {
+        // ⚠️ 必须钉住 locale：没有它，设备若用非公历（佛历 / 和历 / 民国纪年），
+        // 这里会打出「2569-09-24」这样的年份 —— 服务端收到一个不存在的区间，
+        // 回 0 条，而界面只会说「暂无消息」。这类错不报错、不崩，只是永远空。
+        // 构造器现在从 `DateText` 的池子里取（同一个 `en_US_POSIX`，同一个格式串）——
+        // 这一条是报文格式，池子的键里有 locale，所以它不会被别人显示用的那个池子污染。
         let f: (Date) -> String = { d in
-            let f = DateFormatter()
-            // ⚠️ 必须钉住 locale：没有它，设备若用非公历（佛历 / 和历 / 民国纪年），
-            // 这里会打出「2569-09-24」这样的年份 —— 服务端收到一个不存在的区间，
-            // 回 0 条，而界面只会说「暂无消息」。这类错不报错、不崩，只是永远空。
-            f.locale = Locale(identifier: "en_US_POSIX")
-            f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-            return f.string(from: d)
+            DateText.shared.string(d, "yyyy-MM-dd HH:mm:ss", locale: "en_US_POSIX")
         }
         let enc: (String) -> String = { s in s.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? s }
         // limit=2000 + 7 天一段：与抓包对齐。日志实测 7 天约 55~64 条，2000 完全覆盖，

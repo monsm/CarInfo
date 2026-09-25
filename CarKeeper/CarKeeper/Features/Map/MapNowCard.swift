@@ -1,45 +1,99 @@
 import SwiftUI
 
 // =============================================================================
-//  MapSpineView · 「现在」那张卡里的三个数（地址 / 巨字续航 / 副行 / 光带）
+//  MapSpineView · 「现在」那一张卡（抽屉的两态 + 卡里的地址 / 副行 / 光带）
 // =============================================================================
 //
 //  与 `MapSpineReadouts.swift`、`MapQuickButtons.swift` 同一个理由 —— 关切不同：
 //  `MapSpineView` 管这一屏的骨架（六页同屏、底条、镜头、图层、手势），这里只回答
-//  「卡里那三个数怎么排、取不到时写什么」。
+//  「这张卡长什么样、里面的数怎么排、取不到时写什么」。
 //
 //  另一条理由更实际：`scan/lintcfg.py` 的 `file_length` 盯着最大那个文件。2026-09-25
-//  这一轮加了两枚快速钮、手机位置的点与抽屉的三段状态之后，骨架那一份涨到 1211 行
-//  （阈值 1200）。搬出来的是**一件独立的事**（三个数的排版），界面一字未改。
+//  搬了**两次**，都是同一个阈值：先搬三个数的排版（骨架那一份当时 1211 行），
+//  再搬这张卡本身（加完抽屉之后它又到 1201 行）。搬的都是**一件独立的事**，
+//  界面一字未改 —— 不是把它加进排除清单，也不是把阈值抬到刚够。
 //
-//  注：下面用到的 `spec`（艺术方向落成的地图规格）与 `store` 因此**不是 `private`** ——
-//  `private` 的作用域是**文件**，跨文件看不见。它们在骨架里的注释写明了为什么。
+//  注：下面用到的 `spec` / `store` / `layer` / `layerMenu` / `drawerOpen` 因此
+//  **不是 `private`** —— `private` 的作用域是**文件**，跨文件看不见。
+//  它们在骨架里的注释写明了为什么。
 // =============================================================================
 
 extension MapSpineView {
 
-    /// 现状卡的读数：地址 → 巨字续航 → 副行 → 光带。
+    // =========================================================================
+    // MARK: 「现在」那一张卡（抽屉）
+    // =========================================================================
+
+    /// 「现在」这一档底部那张卡 —— **它现在是一个抽屉**（用户 2026-09-25 第 2 条：
+    /// 「下面的卡片不是抽屉样，不是我发的图片的参考 …… 默认只显示一横，拉出来才是全部」）。
+    ///
+    /// 收起（默认）= 拉手 + 三个数（续航 / 电量 / 车速）+ 图层胶囊；
+    /// 拉出来 = 这张卡的全部内容。两态的排版（拉手、拖动、那三个数、其余读数）
+    /// 都在 `MapSpineReadouts.swift`（与读数同一份文件），这里只有它们的外壳。
+    ///
+    /// 两件事因此从这一处消失，理由写在它们的新家：
+    ///   · 巨字续航 → 它已是收起时那三个数之一（`summaryBar`），不再摆在卡里：
+    ///     一个事实一个出处（用户 2026-09-24：「地图页的信息有很多是重复的」）；
+    ///   · 上一轮那张系统 sheet 与它那行「其余读数」入口 → 删。抽屉就是这张卡，
+    ///     同一个抽屉只有一个开法（见 `MapSpineReadouts` 头注的三代写法）。
+    @ViewBuilder
+    func nowCard(_ d: MapSpineData) -> some View {
+        GlassCard(accent: HomeMode.now.accent) {
+            VStack(alignment: .leading, spacing: 0) {
+                drawerHead(d)
+                if drawerOpen { drawerContent(d) }
+            }
+        }
+    }
+
+    /// 抽屉拉出来之后的正文。**`switch` 在这里**：图层是本屏的状态（`layer`），
+    /// 而三个图层各自的正文本来就在 `MapSpineLayers.swift` 里；
+    /// `now` 那一层的一半在 `MapSpineReadouts.swift`。
+    @ViewBuilder
+    func drawerContent(_ d: MapSpineData) -> some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+            switch layer {
+            case .now:
+                if d.hasLocation == false {
+                    // 没有位置时不摆一堆「--」：说清为什么
+                    emptyNotice(MapSpineLayer.now.emptyNote)
+                } else {
+                    nowMetrics(d)
+                }
+                readoutsDrawer(d)
+            case .trips: tripsContent(d)
+            case .holds: holdsContent(d)
+            case .charge: chargeContent(d)
+            }
+        }
+        .padding(.top, TokensSpacing.lg)
+    }
+
+    /// 抽屉拉出来之后卡里的正文：地址 → 副行 → 光带。
+    ///
+    ///  这里原本还有**巨字续航**（`DSBigNumber` 56pt）+ 它取不到时的空态
+    ///（`GlassCardEmpty("还没收到剩余续航")`）。两者 2026-09-25 第三轮一起搬走：
+    ///  卡收起时只剩「一横」，而那一横上是**续航 / 电量 / 车速**三个数
+    ///（`MapSpineReadouts.summaryBar`）—— 同一个数在卡里说两遍就是这一仓
+    ///  反复删的那种重复（用户 2026-09-24：「地图页的信息有很多是重复的」）。
+    ///  「车没报续航」那一支也跟着走了：现在那**一格自己写「无数据」**，
+    ///  与抽屉里其余读数是同一条写法（不摆 `--`、也不摆一块空态）。
     @ViewBuilder
     func nowMetrics(_ d: MapSpineData) -> some View {
         if !d.address.isEmpty {
             Text(d.address)
-                .font(TokensSerif.title(22))
+                .font(TokensTypo.fixed(22))
                 .tracking(TokensTracking.title)
                 .foregroundStyle(TokensPalette.primary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        if d.rangeText == "--" {
-            // 车没报续航就**不摆「-- km」** —— 那是一个假的读数
-            GlassCardEmpty(text: "还没收到剩余续航", icon: "bolt.slash")
-        } else {
-            DSBigNumber(value: d.rangeText, unit: "km", caption: "续航", size: 56,
-                        tint: TokensPalette.primary)
-        }
         nowSub(d)
         // 光带 = 电量（全 App 唯一的形状，在地图上它是「车钉外面那圈弧」的展开）
+        // `showsGlow` 不再传：它以前读「当前艺术方向允不允许发光」（纸上不允许 —— 纸张没有
+        // 发光）。主题只剩原生之后那是常真，于是这一处回到 `DSLightBar` 的默认值（true），
+        // 而那个参数仍在（充电页那类地方需要不发光的光带）。
         DSLightBar(progress: Double(d.socPct) / 100,
                    height: 5,
-                   showsGlow: spec.allowsGlow,
                    tint: TokensPalette.lightBar)
     }
 

@@ -19,9 +19,14 @@ import SwiftUI
 //      这一条决定了整个做法：**静止只露三档是「条宽」造成的，不是屏幕不够宽**。
 //      所以「手一滑就横向全显示」的正确形态是**条向两侧长出去**，而不是把间距压扁。
 //
-//  两种跟手方式（`Follow`）：
-//    · `.row`   手指拖的是**整行**，透镜钉在条正中，字从它下面滑过去（iOS 26 默认）
-//    · `.loupe` 手指拖的是**透镜**，它从字上滑过去，整行基本不动（iOS 26 的反向开关）
+//  跟手形态**只有一种**：手指拖的是**整行**，透镜钉在条正中、字从它下面滑过去 ——
+//  这是 iOS 26 模式条的默认形态。
+//
+//  它曾经是个参数（`Follow` 枚举，另一个是「透镜跟手」：透镜从字上滑过去、整行基本不动，
+//  那是 iOS 26 给这个默认留的反向开关）。2026-09-25 用户在真机上两种都试过、选了**整行**，
+//  于是另外一个连同那个枚举一起删掉 —— 「仍在挑」最贵的代价不是多写一个分支，
+//  而是每一个读到这里的人都要重新判断一次该用哪个（同一类账见 `DSCard` 头注里那个
+//  叫 `glass` 却不产生玻璃的参数）。
 //
 //  有一件**刻意不照搬**：相机里左右滑取景框就换模式。地图上的横向拖拽是**平移** ——
 //  抢掉它会让「拖地图」变成「换模式」，比少一个手势糟得多。所以这里只做条子自身。
@@ -66,26 +71,9 @@ struct DSSwipeStrip: View {
         }
     }
 
-    /// 手指拖的是整行，还是透镜
-    enum Follow: String, CaseIterable, Identifiable {
-        case row
-        case loupe
-
-        var id: String { rawValue }
-
-        var title: String {
-            switch self {
-            case .row: return "整行跟手"
-            case .loupe: return "透镜跟手"
-            }
-        }
-    }
-
     let items: [Item]
     /// 当前档（双向：拖动/点击会写回，外部改它也会滑过去）
     @Binding var selectedID: String
-    /// 默认整行跟手（iOS 26 的默认；`.loupe` 是它那个反向开关的形态）
-    var follow: Follow = .row
     /// 这一行**可用的横向宽度**（屏宽 − 两侧留白）。
     ///
     /// ⚠️ 它必须是「容器给的宽度」，**不能**是条子自己被布局分到的宽度（见文件头）。
@@ -241,8 +229,7 @@ struct DSSwipeStrip: View {
         barW / 2 + rowX - c
     }
 
-    /// 透镜所在的连续档位：`c` 反算成「第几档」（可带小数）。
-    /// 松手时拿它吸附（`snap`），透镜跟手时用它做起点（`setPV`）。
+    /// 透镜所在的连续档位：`c` 反算成「第几档」（可带小数）。松手时拿它吸附（`snap`）。
     private func pvValue(c: CGFloat, gap: CGFloat) -> Double {
         Double((c - slot / 2) / pitch(gap))
     }
@@ -302,6 +289,27 @@ struct DSSwipeStrip: View {
         // 容器宽度变了（旋转 / iPad 分栏 / 首帧量到宽度）→ 按新间距重新落位。
         // 少了这一步，条子会按旧间距停在旧位置，直到用户碰它一下才归位。
         .onChange(of: availableWidth) { _, _ in settle(animated: false, gap: gap, lim: lim) }
+        // 展开 / 收回也要重新落位 —— 它们改的是**间距**（静止按三档算、展开按全部算）。
+        //
+        // 为什么必须补这一步（用户 2026-09-25 第 3 条：「点选菜单入口时不会出现
+        // 选中框和入口没对准，但是滑动选入口很容易出现对不准」）：`c` 是「行内坐标」里的
+        // 一个数，而同一档在两个间距下的行内坐标**不是同一个数**。间距一变，上次算出来的
+        // `c` 就落在两档之间 —— 透镜钉在条正中不动，而当前那一档的字已经偏到旁边去了。
+        //
+        // 而两条路的时序不一样，所以只有滑动那条会偏 —— 这就是用户看到的不对称：
+        //   · 点选：`pick()` 改档位与 `expand = 0` 发生在同一轮里，于是
+        //     `.onChange(of: selectedID)` 拿到的 `gap` 已经是收回之后的值 → 算对了；
+        //   · 滑动：`snap()` 改档位时条子还**开着**（收回被推到 620ms 之后，
+        //     见 `onEnded`）→ 落位用的是展开的间距；等 620ms 后收回，间距变了，
+        //     **没有谁再算一次 `c`** → 那一档从此偏着，直到用户再碰一下条子。
+        //
+        // 手指正按着时不重算：那一刻 `c` 归手势管（松手会被 `snap` 接过去），
+        // 两者都写同一个量就会打架。收回发生在松手之后（`cBase` 已置 nil），
+        // 所以这条守卫拦不住要治的那个时序。
+        .onChange(of: expand) { _, _ in
+            guard cBase == nil, rowBase == nil else { return }
+            settle(animated: false, gap: gap, lim: lim)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("功能"))
     }
@@ -396,16 +404,10 @@ struct DSSwipeStrip: View {
                     onExpand?(true)
                 }
                 if abs(v.translation.width) > 8 { moved = true }
-                let dx = v.translation.width
-                if follow == .loupe {
-                    // 透镜跟手：透镜从字上滑过去，整行基本不动（原型反向开关形态）
-                    setPV(pvValue(c: c, gap: gap) - Double(dx / pitch(gap)), lim: lim, gap: gap)
-                } else {
-                    // 整行跟手：行跟着手指走，透镜钉在正中
-                    let raw = (cBase ?? c) - dx
-                    c = clampC(raw, lim: lim, gap: gap)
-                    onPosition?(pvValue(c: c, gap: gap))
-                }
+                // 行跟着手指走，透镜钉在正中（唯一的跟手形态，见文件头）
+                let raw = (cBase ?? c) - v.translation.width
+                c = clampC(raw, lim: lim, gap: gap)
+                onPosition?(pvValue(c: c, gap: gap))
             }
             .onEnded { v in
                 if !moved {
@@ -429,15 +431,6 @@ struct DSSwipeStrip: View {
                 }
                 cBase = nil
             }
-    }
-
-    /// 透镜跟手形态：把「透镜所在的连续档位」写进 `c`（透镜钉在正中，所以等于平移整行）。
-    /// 两端各留 0.35 档越界阻尼，与 `clampC` 同一条手感曲线。
-    private func setPV(_ value: Double, lim: ClosedRange<CGFloat>, gap: CGFloat) {
-        let last = Double(max(0, items.count - 1))
-        let v = max(-0.35, min(last + 0.35, value))
-        c = clampC(ideal(v, gap: gap), lim: lim, gap: gap)
-        onPosition?(v)
     }
 
     private func nearest(to x: CGFloat, gap: CGFloat, barW: CGFloat) -> Int {
@@ -505,22 +498,18 @@ struct DSSwipeStrip: View {
     ///
     /// 为什么必须看速度：iOS 的吸附（列表、翻页、选择器）都看它，轻甩一下就该走过去。
     /// 只看位置的话，「甩」和「停」结果一样 —— 手感只能是「不跟手」。
-    /// 两种跟手形态改的不是同一个量（整行跟手改 `c`，透镜跟手直接改 `pv`），
-    /// 所以预测也分开算：它们是**同一个吸附**的两个入口，不是两套吸附。
+    /// 预测只有一处：跟手形态只有一种，「松手会到哪儿」因此也只有一种算法。
+    /// （`Follow` 被删掉之前这里是一个 switch —— 两个分支就是两份预测，
+    ///  而它们描述的是同一个量：`c` 减掉预测位移之后的连续档位。）
     private func projectedPV(_ v: DragGesture.Value, gap: CGFloat) -> Double {
-        switch follow {
-        case .row:
-            return pvValue(c: (cBase ?? c) - v.predictedEndTranslation.width, gap: gap)
-        case .loupe:
-            return pvValue(c: c, gap: gap) - Double(v.predictedEndTranslation.width / pitch(gap))
-        }
+        pvValue(c: (cBase ?? c) - v.predictedEndTranslation.width, gap: gap)
     }
 
     /// 松手时的吸附。`projected` = 按速度预测的连续档位；
     /// 给 `nil` 就按当前 `c` 算（点按 / 没有速度信息）。
     private func snap(gap: CGFloat, lim: ClosedRange<CGFloat>, projected: Double? = nil) {
         let last = Double(max(0, items.count - 1))
-        // 先夹再四舍五入：透镜跟手时可拖出端 0.35 档，而档位只有 0…last。
+        // 先夹再四舍五入：拖动时可以越出端（`clampC` 的软段），而档位只有 0…last。
         let pv = min(max(projected ?? pvValue(c: c, gap: gap), 0), last)
         let i = min(max(Int(pv.rounded()), 0), max(0, items.count - 1))
         guard items.indices.contains(i) else { return }

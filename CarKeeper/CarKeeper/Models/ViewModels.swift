@@ -57,13 +57,9 @@ enum VM {
         // 少了它会**静默解析失败** → 车联网服务到期日永远不显示（daysUntil 返回 nil）。
         let formats = ["yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "yyyy/MM/dd HH:mm:ss",
                        "yyyy/M/d", "yyyy.MM.dd", "yyyyMMdd", "yyyy年M月d日"]
-        for f in formats {
-            let df = DateFormatter()
-            df.locale = Locale(identifier: "zh_CN")
-            df.dateFormat = f
-            if let d = df.date(from: t) { return d }
-        }
-        return nil
+        // 7 个构造器搬进 `DateText` 的池子（2026-09-25 性能轮）：原来每次调用现造 7 个，
+        // 而日期串是**按记录**来的 —— 一页列表就是 7 × 条数次。locale 一字未改。
+        return DateText.shared.date(t, formats: formats, locale: "zh_CN")
     }
 
     // ---------- 车辆选择 ----------
@@ -337,9 +333,7 @@ enum VM {
     }
 
     static func nowText() -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return f.string(from: Date())
+        DateText.shared.string(Date(), "yyyy-MM-dd HH:mm:ss")
     }
 
     // ---------- 门窗锁状态条 ----------

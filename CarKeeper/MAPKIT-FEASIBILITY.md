@@ -3,6 +3,13 @@
 > 这份文档回答一个问题：**设计稿上的那张地图，在真机上到底有多少能画出来？**
 > 三种艺术方向（夜光 / 纸上 / 巨字）各自的判词都以这里为准；
 > App 里的「艺术主题」样张页（`Features/ThemeGalleryView.swift`）会把这套判词显示给用户看。
+>
+> ⚠️ **2026-09-25：本文的服务对象已经不在了。** 三种艺术方向、本文 §4/§5 里那份
+> `Design/MapStyleSpec.swift`（判词的代码形态）与那页样张，随用户「主题用原生，其他 19 套全删」
+> 一起整份删除 —— 地图现在是系统原样（`.standard` 不传参）。
+> 保留本文的唯一理由仍然成立：**§1 那张「MapKit 的全部旋钮」清单是逐个核过 Apple 文档 JSON
+> 的事实**，与「我们用不用它」无关。下次有人想改地图颜色时，先读 §1 与 §3.2，
+> 能省掉一次「试了才发现做不到」。
 
 ---
 
@@ -146,7 +153,8 @@ mapView.overrideUserInterfaceStyle = .dark  // 暗色瓦片（iOS 13+，UIKit �
 > `Features/TripDetailView.swift` / `Features/ParkingMapView.swift` / `Features/Home/HomeView.swift`
 > 都已在「收成一条脊背」那一批里删掉或并入。现在地图只有一处：
 > `CarKeeper/Features/Map/MapSpineView.swift`（行号会变，所以不再标行号），
-> 风格由 `CarKeeper/Design/MapStyleSpec.swift` 决定。下表保留作为决策记录。
+> 风格由 ~~`CarKeeper/Design/MapStyleSpec.swift`~~ 决定 —— **该文件已于 2026-09-25
+> 随艺术主题删除，地图现在就是系统原样**（见文件头横幅）。下表保留作为决策记录。
 
 | 位置 | 现在怎么写 | 迁移建议 |
 |---|---|---|
@@ -179,6 +187,10 @@ extension ArtTheme { var mapSpec: MapStyleSpec { … } }
 
 **验证方法（顺序不能颠倒）**：先做一个单屏真工程（1 个地图 + 1 个车钉 + 1 条路线 + 1 个风格开关），在模拟器里把三种 `MapStyleSpec` 各截一张；**用真截图定值，不用设计稿定值**。
 
+> ⚠️ **本节的「三种风格」已不存在（2026-09-25）**：只剩系统原样一种。但下面这条方法论
+> 与风格数量无关，仍然照着做：**先做单屏真工程、用真截图定值**。留着的理由是
+> 这里前三条未知（聚合 API、半透明面相乘、真瓦片对比度）今天依然成立。
+
 ---
 
 ## 6. 落地状态（已实现 / 未实现）
@@ -187,17 +199,19 @@ extension ArtTheme { var mapSpec: MapStyleSpec { … } }
 
 | 文件 | 它负责什么 |
 |---|---|
-| `CarKeeper/Design/MapStyleSpec.swift` | 艺术方向 → **真实 MapKit 配置**（本文件就是上面那张对应表的代码形态） |
+| ~~`CarKeeper/Design/MapStyleSpec.swift`~~ | **已删除（2026-09-25）**：它曾是「艺术方向 → 真实 MapKit 配置」的代码形态（上面那张对应表） |
 | `CarKeeper/Features/Map/MapSpineData.swift` | 把 AppStore 的真实字段翻译成地图画得出来的东西（每个字段注明来自哪个接口；没有数据就是 nil，不用默认值填空） |
 | `CarKeeper/Features/Map/MapCarPin.swift` | 车钉（外面那圈弧就是电量、缺口就是真实 Heading）+ 停车/充电/异常三类小钉 |
 | `CarKeeper/Features/Map/MapSpineView.swift` | 地图主屏：四个图层（现在/行程/停车/充电）+ 底部「为什么」面板 + 全部功能索引页 |
 | `CarKeeper/CarKeeperApp.swift` | 首页 tab 指向 `MapSpineView`。列表版首页（`HomeView`）已在「行程 tab 重建」那一批**删除** —— 想回退用 Git |
 | `CarKeeper/Design/SkyLight.swift` | 光引擎：太阳高度角/方位角（NOAA 简化算法）→ 光名、光的方向、车灯亮度、暗角、颗粒。**纯数学，不联网** |
-| `CarKeeper/Features/Map/MapSkyOverlay.swift` | 叠在瓦片上的光层（光池/雾霭/暗角/颗粒/发丝网格）+ 「光」表。按主题档位开关，原生主题一个像素都不加 |
+| ~~`CarKeeper/Features/Map/MapSkyOverlay.swift`~~ | **已删除（2026-09-25）**：叠在瓦片上的光层（光池/雾霭/暗角/颗粒/发丝网格）。它先被拆开（「光」表搬进 `Features/Map/MapSkySheet.swift`），五个**装饰**图层最后随艺术主题一起删 —— 它们只在艺术方向下出现，而方向只剩原生（「原生主题一个像素都不加」= 这个开关只剩一个取值） |
 
 **落地时守住的四条规则**（都在代码注释里写明了理由）：
 1. **钉 = 屏幕空间**（`Annotation`），轨迹/面积 = 地理空间（`MapPolyline`）。
-2. 地图样式只有一个来源：`ArtTheme.mapSpec`。换艺术主题 = 换真实 MapKit 配置。
+2. ~~地图样式只有一个来源：`ArtTheme.mapSpec`。换艺术主题 = 换真实 MapKit 配置。~~
+   **2026-09-25 作废**：地图样式现在只有一个**取值**（系统 `.standard`，不传参），
+   没有可换的来源 —— 这一条承诺以「不需要了」的方式兑现了。
 3. **不做假数据**：行程没有轨迹点就写"起终点连线"，异常没有地点就写"发现时车在这儿"，充电站是实时搜索结果。
 4. 控制长在对象上（面板里的四个入口直接进已有的车控/电池页），**不新写第二套车控**。
 
@@ -212,7 +226,8 @@ extension ArtTheme { var mapSpec: MapStyleSpec { … } }
 ### 6.3 下一步（顺序不能颠倒）
 
 1. **构建一次**，把 `MapSpineView` 跑起来 —— 静态检查过不代表能编译（这个项目已经栽过两次）。
-2. 用**真截图**（不是设计稿）把三套 `MapStyleSpec` 各存一张，比较在真瓦片上的对比度。
+2. ~~用**真截图**（不是设计稿）把三套 `MapStyleSpec` 各存一张，比较在真瓦片上的对比度。~~
+   **2026-09-25 作废**：只剩一种样式，没有可比较的三套。
 3. 拿真截图定方向 —— 设计稿只能决定"看不看得懂结构"，决定不了"在真瓦片上还成不成立"。
 
 ---

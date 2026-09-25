@@ -42,8 +42,8 @@
 **这台开发机上没有 Swift 工具链**（`swift` / `swiftc` / Xcode 都不存在）。因此：
 
 - **编译只在 CI 上发生**。本地唯一能做的验证是静态门禁 + 风格检查 + `bash -n`。
-- 改完必须看 CI 日志才能知道「编不编得过」。这也是仓库里为什么会有 31 条静态门禁
-  （§8；加上 `check_style.js` 共 31 项，`scan/all.py` 一次跑齐）。
+- 改完必须看 CI 日志才能知道「编不编得过」。这也是仓库里为什么会有 **33 条**静态门禁
+  （§8；加上 `check_style.js` 共 34 项，`scan/all.py` 一次跑齐）。
 
 ```bash
 # 本机可跑的全部验证（在仓库根）—— 一条命令，别挑着跑
@@ -127,7 +127,7 @@ xcodebuild build \
 │         Models/ViewModels.swift     enum VM：纯计算，从 [String: Any?] 取出界面要的值
 │         Models/Analysis.swift       enum AN：8 域 verdict + overall 结论
 ├ 状态层  AppStore.swift              @MainActor @Observable 单例：登录态 / caches / 命令历史 / 本机累积
-├ 设计层  Design/Tokens → ArtTheme → DS → Charts / SkyLight / SkyOverlay / MapStyleSpec / DSSwipeStrip
+├ 设计层  Design/Tokens → DS → Charts / SkyLight / Theme / DSSwipeStrip
 ├ 界面层  CarKeeperApp（入口 + NavState）→ MapShellView → MapSpineView（唯一的屏）→ 6 档页面
 └ 服务层  Services/*.swift            通知 / 提醒 / 健康钥匙 / 采样 / 天气 / 更新 / 估值……
 ```
@@ -320,7 +320,7 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 
 ## 4. 界面逐项
 
-### 4.1 地图主屏（「现在」档）—— 全 App 唯一的屏**文件**：`Features/Map/MapSpineView.swift`（**1192 行**，离 1200 阈值只剩个位数行 —— 再加东西之前先拆文件；骨架：六页同屏 / 底条 / 镜头 / 图层 / 手势；2026-09-25 最后一轮又拆出 `MapNowCard.swift`（卡里三个数的排版）与 `MapQuickButtons.swift`（右侧两枚钮），都是在同一个阈值前拆的，界面一字未改；
+### 4.1 地图主屏（「现在」档）—— 全 App 唯一的屏**文件**：`Features/Map/MapSpineView.swift`（**1157 行**；骨架：六页同屏 / 底条 / 镜头 / 图层 / 手势；2026-09-25 一共拆出三份，都在同一个阈值（1200）之前：`MapNowCard.swift`（「现在」那一张卡本身 + 卡里三个数的排版）、`MapSpineReadouts.swift`（收起时那一横 + 抽屉 + 比例尺）、`MapQuickButtons.swift`（右侧两枚钮）。拆的都是**一件独立的事**，界面一字未改 —— 第三次拆（加完抽屉之后本文件又到 1201 行）搬的正是那张卡本身；
 2026-09-25 它到过 1201 行、越过了 `lintcfg.py` 的 1200 阈值，于是把「光」表拆成
 `MapSkySheet.swift`（含共用原语 `MapNotice`）；同日再涨到 1212 行（托底要抬到条子之上 +
 子页顶部留白），于是把那张铺底的壁纸再拆成 `MapWallpaperLayer.swift` —— 两次拆的都是文件，
@@ -333,8 +333,9 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 `HomeModeHead.swift`（巨字头：只给**一个**事实 + 一行小字，依据在下面每一张卡里）。
 
 **骨架（2026-09-23 按原型 `design-preview/stack.html` 重排过）**：一张全屏 MapKit 地图，
-上面只摆原型里本来就有的东西 —— **底部浮动两卡**
-（`.float`：底边离屏底 98pt、卡间 12）+ 地图自己的**罗盘**与**比例尺**。
+上面只摆原型里本来就有的东西 —— **底部那一张卡**（2026-09-25 起它是一个抽屉）
+（`.float`：底边离屏底 98pt）+ **罗盘**（系统的）与**比例尺**（2026-09-25 起是我们自己量的：
+挂在灵动岛下面、2 秒后淡出 —— 系统的 `MapScaleView` 位置由 MapKit 定，搬不动）。
 **这一档没有导航栏**（`.toolbar(.hidden, for: .navigationBar)`）：地图一直画到屏幕最上沿。
 
 **车牌徽标不在图上了**（2026-09-24，用户：「地图页顶部的信息也挪动到下面的玻璃卡片」）：
@@ -380,28 +381,25 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 
 - 卡头一行只剩**一枚图层胶囊**（`layerMenu`）—— 右对齐。原先那行还写着车牌 + 状态
   + 上报时间，与卡内正文说的是同一件事，已删（重复）。
-- `.now` 分支的正文：地址（大字）→ 巨字**续航**（`DSBigNumber`）→ 副行（表显 · 充不充电）
-  → 光带（`nowMetrics`，已拆成 `MapNowCard.swift`）→ **一排读数 + 「其余读数」那行入口**
-  （`MapSpineReadouts.swift`）。
-- **读数分两层（2026-09-25：用户「地图页数据用抽屉的方式展示，默认只有续航 电量 车速，
-  其他数据均通过拉开抽屉展示」）**：默认一屏就三个数 —— **续航（巨字）/ 电量 / 车速**
-  （`readoutsPrimary`，两格分一行，比原来四格挤一行宽一倍）；其余读数在「其余读数」
-  那行入口后面。依据是 HIG 的 Layout 那条：“Use progressive disclosure to make layouts
-  cleaner and easier to interact with…reduce how much content to initially display” ——
-  它不是省略，而是把「一瞬」与「细看」各自定一个量。
-- **「其余读数」= 真正的系统 sheet（2026-09-25 第二轮，用户在我列的候选里选了
-  「地图抽屉换成系统 sheet + `presentationDetents`」）**：卡里只有一行 disclosure
-  （`readoutsDisclosure`：标签 + 右尖括号，整行 44pt 命中区），点开是
-  `.sheet` + `.presentationDetents([.medium, .large])` +
-  `.presentationDragIndicator(.visible)` + `.presentationBackgroundInteraction(.enabled(upThrough: .medium))`
-  （半屏时底下那张地图仍然可以拖 —— Apple 地图正是这个行为）。内容由 `readoutsSheet`
-  给：两排读数（`readoutsMore` 胎压/车锁/充满，`readoutsRest` 平均电耗/航向/GPS），
-  **不重复卡里已经有的三个数**。
-  · 上一版是**卡里自己拉的一道抽屉**（自画拉手 + `drawerReveal` 连续量 + 自算的两个
-    落点 + `drawerMeasure` 量自然高度）。它每一条都在重做系统已经做好的事，
-    而且做得少（两档 vs 三个档位 + 橡皮筋；自画的 36×5 拉手 vs 系统那枚随辅助功能
-    设置走的 grabber；全程盖住地图）。整块已删 —— 逐条代价写在 `MapSpineReadouts` 头注。
-  · 连带删掉的 `TokensMotion.reveal`：它是那道抽屉的展开弹簧，抽屉一走它就没有读者了。
+- `.now` 分支拉出来之后的正文：地址（大字）→ 副行（表显 · 充不充电）→ 光带
+  （`nowMetrics`，在 `MapNowCard.swift`）→ **两排其余读数**（`readoutsDrawer`，
+  `MapSpineReadouts.swift`）。
+- **这张卡现在是一个抽屉（2026-09-25 第五轮，用户第 2 条：「下面的卡片不是抽屉样……
+  默认只显示一横，拉出来才是全部」，并附了 Apple 地图那张导航卡当参考）**：
+  收起（默认）= 一枚拉手（那「一横」）+ **三个数**（续航 / 电量 / 车速，`summaryBar`
+  用 `DSBigNumber`、字号 30）+ 图层胶囊；拉出来 = 卡的全部内容。
+  两态的排版在 `MapSpineReadouts.swift`，外壳在 `MapNowCard.swift`。
+  · 那三个数是**用户点名的三个**，且它们**不随开合消失** —— 参考图里也在同一个位置，
+    所以抽屉正文里**不再重复**这三个数（一个事实一个出处）。
+  · **巨字续航因此不见了**：它原先占 `size 56` 一整行。这不是排版缩水，是重复的消除 ——
+    同一个 412 km 不必在卡里说两遍（用户 2026-09-24：「地图页的信息有很多是重复的」）。
+  · **上一轮那张系统 sheet 与它那行「其余读数」入口一起删了**（`readoutsSheet` /
+    `readoutsDisclosure`）：抽屉**就是这张卡**，而系统 sheet 永远是屏幕底部的一张新面 ——
+    它会盖住模式条（全站唯一的入口），于是「拉开的抽屉」与「卡片自己」成了两处内容；
+    用户要的参考图里那张卡本身就是抽屉。三代写法各自的代价记在 `MapSpineReadouts` 头注。
+  · 拖动只看**方向 + 阈值**（`predictedEndTranslation`，所以轻甩就走过去），
+    不做连续跟手：两个落点固定，中间没有第三种停法 —— 第一代那样自己算高度、
+    自己夹边界，换来的只有「拖的时候卡跟着手指长」。
 - **地图右侧两枚快速钮（同日第三轮，用户：「地图页要像 ios 地图 app 右侧的图标一样
   加入快速回到车的位置和手机的位置」）**：`MapQuickButtons.swift`（两枚 44×44
   `.overMedia` 玻璃圆钮，竖排、让开系统罗盘）。「回到车」原本在图层菜单里 ——
@@ -587,7 +585,7 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
   代价说明：从「1 次拖动」变成「1 次拖动 + 1 次点击」，但 SOS 也仍然在地图操作条上。
 - **诊断 `DevView`**：色板 / 字体 / 令牌数值 / 运行状态 / 能力位图（`car.funCode`）+
   （2026-09-25 同样拆掉 `ScrollView` + 页标题「设计令牌」；滚动归叠叠乐）
-  **艺术主题入口 `ThemeGallerySection`**（主题画廊住在这里，不占档位）+
+  （同日删掉这里的第一组「艺术主题样张」`ThemeGallerySection` —— 主题只剩原生一种，没有东西可样张）+
   **消息自检 + 原始日志**（两台仪器并排在同一个 `diagnosticsGroups` 里）。
   它们是为同一类抱怨造的：「消息拿不到数据」。
   · **消息自检**（`MessageProbeSection`，2026-09-24）：一次发三种窗口（30 天一段 /
@@ -616,22 +614,25 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 | `LoginView` | 未登录 | 手机号 + 短信码 + 图形码；`TokenStore.save` 后进主屏 |
 | `GlobalSearchHUD` | 地图工具栏 / 我的 | `fullScreenCover`（不是 sheet）；搜页面、车牌、行程、指令；空态文案分「还没输」与「没匹配」两种情况 |
 | `BiometricLockOverlay` | 敏感页二次验证 | `RemoteLockManager` 后台超时自动隐藏 |
-| `ThemeGallerySection` | 诊断档 | 20 套艺术方向（切换器横向可滑）+ 小界面样本，切换立即生效 |
+| ~~`ThemeGallerySection`~~ | ~~诊断档~~ | **已删除（2026-09-25）**，随艺术主题整份删除 —— 它列的是 20 套可切换方向，而方向只剩原生一种 |
 | `PrivacyDashboardView` | 我的 | 三类：留在本机的 / 离开本机的 / 没在收集的 |
 
 ---
 
 ## 5. 设计系统
 
-### 5.1 四层，严格单向
+### 5.1 三层，严格单向
 
 ```
-Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套取值） → DS 原语（唯一容器/分组形态） → 页面
+Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形态） → 页面
+  （2026-09-25 之前中间还有一层 `ArtTheme`：20 个方向 = 一整套取值。
+   用户定下只用原生后这一层整份删除 —— 见 §5.2、§17.1）
 ```
 
 - **`Design/Tokens.swift`**：`TokensPalette`（颜色）/ `TokensSpacing`（4 的倍数，页面边距 20；
   2026-09-25 补上缺的一档 **12 = `snug`** —— 原先全 App 有十几处用字面量 `10/11/12` 去凑它）/ `TokensRadius` /
-  `TokensTypo`（字号）/ `TokensMotion` / `TokensHaptic` / `TokensHair`（发丝线）/ `TokensSize` / `TokensSerif` / `TokensTracking`。
+  `TokensTypo`（字号）/ `TokensMotion` / `TokensHaptic` / `TokensHair`（发丝线）/ `TokensSize` / `TokensTracking`
+  （`TokensSerif` 衬线标题 2026-09-25 随艺术主题一起删 —— 它服务的「艺术方向下把标题搬进版面」那条路不存在了）。
 - **`Design/DS.swift`**（1077 行）：唯一一套容器与排版原语 —— `DSCanvas`、`DSCard`、`DSGroup`/`DSGroupRow`、
   `DSSection`（唯一的分组形态，inset-grouped）、`DSKeyValueRow`、`DSBigNumber`、`DSLightBar`、`DSStatStrip`、
   `DSSegmented`、`DSChip`、`DSNotice`、`DSPlaceholder`、`DSSkeleton`、`DSExpandGroup`（唯一的折叠）、
@@ -641,7 +642,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
     （体检 / 保养 / 诊断 / 应急），而卡里的正文不该再套一层页面 —— 那是双重内边距
     （卡 18 + 页 16/20）与「一个东西两个名字」（卡头 + 页标题）的来源。
     真正的整页（登录 / 引导 / 开场）不用它们：它们本来就只有导航栏。
-- **`Design/Theme.swift`**：`AppCanvas`（画布与光**在根部只画一次**）、`SkyOverlay` 接入、`StatusDot`、`Pill`、
+- **`Design/Theme.swift`**：`AppCanvas`（画布与光**在根部只画一次**）、`StatusDot`、`Pill`、
   `MonthlyReportSection`、`PowerSavingToggle`。
 - **`Design/Charts.swift`**：`DSTrendChart`（单序列，SOC / 功率共用）、`DSTyreTrendChart`（四条曲线）、
   `DSTrendEmpty`（数据不够时的说明，不是灰块）。
@@ -683,52 +684,40 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 **颜色从哪来**：`TokensPalette` 是**主题相关**的静态计算值，所以切主题靠
 `CarKeeperApp` 上的 `.id(artThemeRaw)` **重建整棵树**才生效（令牌不产生 SwiftUI 依赖）。
 
-### 5.2 二十个艺术方向（`ArtTheme`）
+### 5.2 艺术主题（2026-09-25 **已整份删除**）
 
-**四套完整定制**（每套 15+ 字段逐一手工取过值，各自带对比度注释与实测依据）：
+这里曾经有 **20 套可切换的艺术方向**（夜光 / 纸上 / 巨字 / 原生，外加第八轮头脑风暴补的
+16 套），每套是**一整套取值**（画布 / 表面 / 字 / 强调 / 装饰 / 字重 / 明暗 / 六页个性色），
+外加一页「主题样张」与一个横向可滑的切换器。
 
-| 方向 | 信条 | 落地难度 | 明暗 | 画布装饰 |
-|---|---|---|---|---|
-| `nocturne` 夜光 | 美来自光：黑底承担信息量，光只给车 | 最能落地 | 深色 | 光池（0.16） |
-| `paper` 纸上 | 美来自印刷：纸面、墨线、红笔 | 最贵（MapKit 画不出纸与墨） | 浅色 | 纸纹（0.05） |
-| `typographic` 巨字 | 美来自尺度：极细巨字对极小标注 | 最省 | — | 发丝网格（0.08） |
-| `native` 原生 | 美来自系统：语义色、分组表面、发丝线（跟随系统外观） | 现状 | nil | 无 |
+**2026-09-25 用户定下「主题用原生，其他 19 套全删了」**，于是：
 
-**十六套第八轮新增**（用户 2026-09-24：「艺术主题有点欠缺，头脑风暴搞出 20 种
-完全不一样的」）：`frost` 玻璃 / `celadon` 青釉 / `darkroom` 胶片 / `phosphor` 荧光 /
-`dune` 沙丘 / `snowfield` 雪夜 / `blueprint` 蓝图 / `amber` 琥珀 / `brushed` 银灰 /
-`cellar` 绛紫 / `cinnabar` 朱砂 / `tundra` 苔原 / `inkwash` 玄墨 / `forge` 熔炉 /
-`mist` 晨雾 / `neon` 霓虹。每套的美来自**一个不同的机制**（材质 / 印刷 / 摄影 /
-玻璃 / 版画 / 仪表盘 / 胶片），不来自配色微调。它们全走 `ArtThemeSpec` 的
-**便捷构造**（`ArtTheme.swift`）：每个主题只给「它自己是什么」（画布 / 表面 /
-字 / 强调 / 装饰 / 字重 / 明暗 / 六页个性色），其余 15+ 字段按**同一套推导规则**
-一次算齐（发丝线 = 字色×12%、轨道 = ×15%、填充 = ×6%、高光 = ×15%、遮罩 = 画布、
-光条 = 亮→中→强调三段、语义色 = 明暗两套定值、onAccent = 按强调色亮度取深/浅 ——
-读 `CGColor` 分量，不碰 `UIColor`）。规则写在一处 = 二十套不会各长一套习惯。
+| 删掉的 | 它原来做什么 |
+|---|---|
+| `Design/ArtTheme.swift` | 20 个方向的取值表 + `ArtThemeStore` + `ArtThemeSpec` 便捷构造（一次算齐 15+ 字段） |
+| `Features/ThemeGalleryView.swift` | 诊断档里的主题样张页（20 枚胶囊 + 小界面样本） |
+| `Design/MapStyleSpec.swift` | 把主题翻译成 MapKit 旋钮（见 §5.3） |
+| `Design/SkyOverlay.swift` | 光池 / 雾霭 / 暗角 / 颗粒 / 发丝网格五个**装饰**图层 |
+| `TokensSerif` / `CanvasDecor` / `preferredScheme` | 衬线标题 / 画布装饰 / 主题自带明暗 |
 
-切换器（`ThemeGalleryView.swift`）：20 枚胶囊一行排不下，已改成**横向可滑**
-（`ScrollView(.horizontal)`，每枚自定宽不强行均分）。旧版 4 值用户在升级后
-`ArtThemeStore.current` 回落到 `.native`，不会崩。
+**留下的**：`TokensPalette` / `TokensTypo` 等的取值**直接写在这一处**（回到 v4 的样子），
+不再往外转一层 —— 「只有一种取值的开关就是一层假的选择」。两个原来由主题提供的计算值
+（`artHex` 解析、`nativeDynamic` 动态色）**原实现原取值搬进 `Tokens.swift`**；
+`Design/Theme.swift` 只剩画布与光；地图回到**系统原样**（不再压暗、不再盖蒙版、车钉只有一种）。
 
-### 5.3 地图样式（`Design/MapStyleSpec.swift`）
+顺手治了一处**说谎的指针**：`SkyLight.swift` 与 `WeatherService.swift` 的「命名：顶层类型，
+不嵌套泛用名（历史事故见 ArtTheme.swift 的说明）」指的是一份已删的文件 —— 已改指
+`Tokens.swift` 的文件头（那里的记录一直在，只是换了住处）。
 
-`ArtTheme.mapSpec` 把主题翻译成 MapKit 旋钮。**二十套都用 `.standard`**，差别只在参数与蒙版上
-（实测值，`Design/MapStyleSpec.swift`）：
+### 5.3 地图样式（2026-09-25 **已删除**）
 
-| 主题 | MapStyle | 蒙版 scrim | 不透明度 | cameraHeading | 车钉 | 发光 |
-|---|---|---|---|---|---|---|
-| `nocturne` | `.standard(elevation: .flat, emphasis: .muted, pointsOfInterest: .excludingAll, showsTraffic: false)` | `0x0A0910` | 0.55 | 7° | `.ring` | ✅ |
-| `paper` | 同上 | `0xF2E9D8` | 0.30 | 0° | `.ink` | ❌ |
-| `typographic` | 同上 | `0x0A0A0C` | 0.78 | 0° | `.rule` | ❌ |
-| `native` | `.standard`（不传参 = 系统默认） | 无 | 0 | 0° | `.ring` | ✅ |
-| 新增 16 套 | `mutedSpec`（= 夜光那行同参数） | 各主题自己的蒙版色 | 0.20~0.85 | 0° | `.ring`/`.ink`/`.rule` | 按主题 | 见 `MapStyleSpec.swift` |
+这里曾经有一张「主题 → MapKit 旋钮」的对应表（`Design/MapStyleSpec.swift`：蒙版 scrim /
+不透明度 / `cameraHeading` / 三种车钉 `.ring`·`.ink`·`.rule` / 发光开关）。
+二十套里**十九套其实共用同一行参数**（`muted` + 色温蒙版），差别只在蒙版色上。
 
-`cameraDistance` 固定 1400。二十套共同点：**压暗系统瓦片 + 排除全部 POI + 关路况**，
-再用蒙版层把色彩拉向主题方向。`paper` 在代码注释里被诚实标注为「打折方案」——
-纸与墨需要整层自建地图（MapLibre + 自有样式），代价见 `MAPKIT-FEASIBILITY.md` §3.2。
-
-> 法律边界写在 `MAPKIT-FEASIBILITY.md`：**不能**用自绘瓦片替代 MapKit（会违反地图数据条款），
-> 所以「纸上」方向只能在 MapKit 之上叠纸纹与墨线，不能自己画地图。
+**2026-09-25 随主题一起删**：地图现在**就是系统地图**（`.standard` 不传参 = 系统默认），
+车钉只剩一种。`MAPKIT-FEASIBILITY.md` 保留 —— 它研究的是 **MapKit 到底有几个旋钮**，
+那些结论与「我们用不用它们」无关，文件头已注明它的服务对象已删。
 
 ### 5.4 光（这个 App 的「颜色来自天上」的部分）
 
@@ -738,29 +727,95 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
   `SkyFact` 是「为什么现在是这个光」的逐条事实（地图的 `lightPill`/`skySheet` 展示它）。
 - **`Services/WeatherService.swift`**：`api.open-meteo.com`（免 key）。WMO 天气码 → 中文。
   **取不到就退回晴空模型，并在界面上照实写明「上面是晴空模型的算法值」**——不拿默认值冒充实况。
-- **`Design/SkyOverlay.swift`**：光池 / 雾霭 / 暗角 / 颗粒 / 发丝网格五个图层。
+- **`Design/SkyOverlay.swift`（已删）**：光池 / 雾霭 / 暗角 / 颗粒 / 发丝网格五个装饰图层 ——
+  2026-09-25 随艺术主题一起删。留下的 `SkyLight` 不是装饰：它是**算光的**（太阳位置 → 六相 →
+  云量衰减），地图车钉的 `lamp` 与「光」表都还在读它。
 - 纯函数部分有单元测试：`Tests/PureLogicTests.swift`（太阳位置、云量衰减、充电站聚合）——
   **只在开发机的 Xcode 上跑**（CI 的测试 job 已按成本考量删除）。
 
 ---
 
-## 6. 本机持久化清单（42 个 `carkeeper_*` 键 + 网络层几个非前缀键）
+## 6. 本机持久化清单（33 个 `carkeeper_*` 键）
 
 > 判据：**服务端有这个字段吗？** 有 → 不落盘；没有（只能本机攒）→ 落盘，并在文档与界面上说清它是本机的。
+>
+> ⚠️ **这张表是 `scan/localstore.py` 的唯一真值**（它不是另抄一份清单：门禁直接读这张表，
+> 与 `scan/all.py` 从工作流里解析门禁清单同一个做法）。三条判据：
+> ① 代码里出现的每个 `carkeeper_*` 键都必须在这张表里（否则「新加的键没人给它定性」）；
+> ② 标了「账号」的键必须在**退出登录**时被清掉（清的人是 `logout()` 自己，
+>    或它调用到的某个 `clear()` / `resetAll()` —— 见门禁文件头）；
+> ③ 表里写着的键必须在代码里真的存在（否则就是这份清单在说谎 —— 它以前就说过：
+>    `carkeeper_art_theme` 随艺术主题删除后还在表里，而表的标题写着「42 个」而实际是 33 个）。
+>
+> 全名写、不写简写（早先用过 `carkeeper_parking_loc` / `_time` / `_points` 这种缩写，
+> 代价是**这张表根本没法机械对账** —— 简写只有人能补全，而人不会每次都补）。
 
-| 类别 | 键（节选） | 退出登录是否清 |
-|---|---|---|
-| 账号与凭据 | `car_token_config`（**Keychain**）、`carkeeper_encryption_key`、`carkeeper_key`（PIN）、`carkeeper_biometric_setup` | ✅ |
-| 选择与导航 | `carkeeper_selected_car_id`、`carkeeper_home_mode`、`carkeeper_map_layer` | 部分 |
-| 外观与提示 | `carkeeper_art_theme`、`carkeeper_force_dark_mode` / `_light_mode`、`carkeeper_night_start_hour` / `_end_hour`、`carkeeper_voice_enabled`、`carkeeper_home_card_order`、`carkeeper_power_saving` | ❌（属于本机偏好） |
-| **本机累积**（服务端无历史接口） | `carkeeper_hist_soc_v1` / `_power_v1` / `_tyre_v1`（三条曲线）、`carkeeper_processed_event_ids`（行程生成）、`carkeeper_parking_loc` / `_time` / `_points`（停车史） | ✅ |
-| 手填记录 | `carkeeper_last_service_mileage`、`carkeeper_service_reminders`、`carkeeper_mileage_entries`、`carkeeper_maintenance_photos`、`carkeeper_insurance_policies`、`carkeeper_inspections`、`carkeeper_current_mileage` / `_total_mileage` | ✅ |
-| 提醒与勿扰 | `carkeeper_dnd_mode`、`carkeeper_charge_notify`、`carkeeper_charge_complete_notify`、`carkeeper_next_service_date`、`carkeeper_last_charge_alert` | 部分 |
-| 家人与钥匙 | `carkeeper_family_members`、`carkeeper_temp_keys` | ✅ |
-| 其它 | `carkeeper_focus_mode`、`carkeeper_current_speed`、`carkeeper_shake_to_lock`、`carkeeper_onboarding_seen` | ❌ |
+| 键 | 它是什么 | 归属 | 退出登录清 |
+|---|---|---|---|
+| `carkeeper_selected_car_id` | 上次选中的车（重启后回到那一辆） | 账号 | ✅ |
+| `carkeeper_hist_soc_v1` | SOC 曲线（5 分钟一个 ≈ 7 天） | 账号 | ✅ |
+| `carkeeper_hist_power_v1` | 充电功率曲线（1 分钟一个 ≈ 25 小时） | 账号 | ✅ |
+| `carkeeper_hist_tyre_v1` | 胎压曲线（30 分钟一个 ≈ 16 天） | 账号 | ✅ |
+| `carkeeper_processed_event_ids` | 行程去重台账（服务端每次返回同一个 7 天窗口） | 账号 | ✅ |
+| `carkeeper_parking_loc` | 最近一次停车位置 | 账号 | ✅ |
+| `carkeeper_parking_time` | 最近一次停车时刻 | 账号 | ✅ |
+| `carkeeper_parking_points` | 停车点序列（≥2 次成「常停热区」） | 账号 | ✅ |
+| `carkeeper_last_service_mileage` | 上次保养里程（本机记录） | 账号 | ✅ |
+| `carkeeper_service_reminders` | 保养项与上次/下次（清掉回落到出厂周期表） | 账号 | ✅ |
+| `carkeeper_service_timestamp` | 维保时间戳 | 账号 | ✅ |
+| `carkeeper_current_mileage` | 里程（上一次取到的那个数） | 账号 | ✅ |
+| `carkeeper_total_mileage` | 总里程（保养计划的基线） | 账号 | ✅ |
+| `carkeeper_mileage_entries` | 里程账本 | 账号 | ✅ |
+| `carkeeper_maintenance_photos` | 保养单据照（base64） | 账号 | ✅ |
+| `carkeeper_insurance_policies` | 保单 | 账号 | ✅ |
+| `carkeeper_inspections` | 年检记录 | 账号 | ✅ |
+| `carkeeper_family_members` | 家庭成员 | 账号 | ✅ |
+| `carkeeper_temp_keys` | 临时钥匙 | 账号 | ✅ |
+| `carkeeper_biometric_setup` | 生物识别已设置 | 设备 | ❌ |
+| `carkeeper_home_mode` | 上次停留的档位 | 设备 | ❌ |
+| `carkeeper_map_layer` | 地图「现在」层的子层 | 设备 | ❌ |
+| `carkeeper_home_card_order` | 首页卡片顺序 | 设备 | ❌ |
+| `carkeeper_power_saving` | 省电模式开关 | 设备 | ❌ |
+| `carkeeper_voice_enabled` | 语音播报开关 | 设备 | ❌ |
+| `carkeeper_shake_to_lock` | 摇一摇锁车开关 | 设备 | ❌ |
+| `carkeeper_focus_mode` | 专注模式配置 | 设备 | ❌ |
+| `carkeeper_force_dark_mode` | 明暗偏好：强制深色（唯一出处是「我的 → 夜间模式」） | 设备 | ❌ |
+| `carkeeper_force_light_mode` | 明暗偏好：强制浅色（同上） | 设备 | ❌ |
+| `carkeeper_onboarding_seen` | 引导页看过 | 设备 | ❌ |
+| `carkeeper_wallpaper_source` | 子页壁纸的来源（必应 / Windows 聚焦 / 相册） | 设备 | ❌ |
+| `carkeeper_wallpaper_stamp` | 子页壁纸的日期戳（同一天不重复取） | 设备 | ❌ |
+| `carkeeper_wallpaper_credit` | 子页壁纸的署名（必应/聚焦要求显示） | 设备 | ❌ |
 
-**已删除、不要加回来的**：`carkeeper_api_stats` / `_page_metrics` / `_home_load_time` / `_version_logs` / `_crash_log`
-（诊断统计，用户明确要求删）、充电账本、以及 App Group 里的 `widget_*` / `watch_*` 共享快照。
+> 「归属」列的定义：**账号** = 换一个账号登录后它必须消失（否则要么是隐私泄漏，
+> 要么是拿上一个账号的数当自己的用）；**设备** = 这台机器上的偏好，与谁登录无关。
+>
+> 一句话判据（写代码时用它）：**这条数据是关于「车/人」的，还是关于「这台手机」的？**
+
+### 6.0 这张表被对抗式审核修过一次（2026-09-25 第七轮）
+
+那一轮把「表里标 ✅ 的键」与「`logout()` 真的清了什么」对了一遍，查出 **8 个标了 ✅
+却没人清**的键 —— 三条后果：
+
+| 漏掉的键 | 换账号后会怎样 |
+|---|---|
+| `carkeeper_parking_points` | 地图「停车」层的钉与「常停热区」显示**前一个账号**去过的地方（位置隐私）。上一版清了停车位置（单数）与时刻，漏了这个数组 —— 而 `parkingHistory` 是从磁盘现算的，清内存没用 |
+| `carkeeper_maintenance_photos` | 前一个账号拍的保养单据照仍在，新账号直接看得见 |
+| `carkeeper_inspections` | 年检记录跨账号可见 —— 而且它还有 **@Published 内存副本**：只删键的话，同一次运行里仍然看得见（下次启动才「自动消失」，那是重启的功劳） |
+| `carkeeper_processed_event_ids` | **清派生却留台账**：`tripHistory` 被清空、台账里那 7 天窗口的事件仍是「已处理」→ 重新登录后行程页一直是空的（数据再也重建不出来） |
+| `carkeeper_service_reminders` / `carkeeper_current_mileage` / `carkeeper_total_mileage` / `carkeeper_service_timestamp` | 里程与保养基线是**上一辆车**的，「距下次保养还有多少公里」跟着错（`last_service_mileage` 当时已清 —— 只清一套里的一个，等于没清） |
+
+所以这张表现在有门禁；改代码时**先改这张表**（键的归属是设计决定，不是实现细节）。
+
+**已删除、不要加回来的**：`carkeeper_api_stats` / `_page_metrics` / `_home_load_time` /
+`_version_logs` / `_crash_log`（诊断统计，用户明确要求删）、`carkeeper_art_theme`
+（随艺术主题整份删除）、`carkeeper_encryption_key` / `carkeeper_key`（PIN 现在在 Keychain）、
+`carkeeper_checkin_count` / `carkeeper_last_checkin`（「上车打卡」已删）、
+`carkeeper_siri_usage`（Siri 统计已删）、`carkeeper_current_speed`（唯一读者
+`FocusModeManager.isDriving` 已删 —— 它当年读的就是这个**从来没人写**的键）、
+`carkeeper_dnd_mode` / `carkeeper_charge_complete_notify` / `carkeeper_next_service_date` /
+`carkeeper_last_charge_alert`、`carkeeper_night_start_hour` / `_end_hour`、
+`carkeeper_hist_*`（旧的不带 `_v1` 后缀那批）、充电账本，以及 App Group 里的
+`widget_*` / `watch_*` 共享快照（小组件体系已删）。
 
 ### 6.1 三个例外文件（不是 UserDefaults，也不是业务数据）
 
@@ -835,7 +890,8 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | 10 | `targets.py` | 跨 target 符号可见性 |
 | 11 | `unreachable.py` | `return` 之后仍有同缩进语句 |
 | 12 | `futureproof.py` | 未来系统版本（iOS 27/28）前瞻性审计 + 根目录必须存在。判据是「对**系统**的弹性枚举做穷举 switch 却不写 `default`」—— 2026-09-25 修了一处假阳性：它原来只看主题词的**拼写**，而表里有 `status` / `phase` / `configuration` 这类普通名词，于是 `switch phone.status`（我们自己的 `PhoneLocation.Status`）被要求补 `@unknown default` —— 对自己的枚举补它是**反的**（会把「新增一档时编译器提醒你改这里」一起关掉）。现在两个条件都要：主题词命中 **且** 主语里没有项目自己声明的类型名，且那三个普通名词已从表里拿掉。代价写在文件里：真遇见「成员名叫 `status` 的系统枚举」会漏报 —— 方向是「宁可漏，不可噪」。探针：注入一个真的 `switch scenePhase`（无 default）→ 当场报出；还原后文件哈希一致、转绿 |
-| 13 | `orphans.py` | 两条判据。① 孤儿页面：「写了但没有任何地方能到达」（只认顶层类型）。② **系统类型扩展里没人读的成员**（`extension X` 里 `X` 不是项目自己声明的类型，而成员名在全仓除声明外一次都没出现）。② 是 2026-09-25 补的：那时删掉底条自算档位那段代码后，文件层的 `private extension Double { func clamped(to:) }` 成了「声明在、没有读者」—— 而它前面 31 条门禁一条都看不见（判据 ① 只认顶层类型）。加上判据 ② 的当场报到两个真的：`URLSession.dataTaskRetryable` + `RetryConfig`（**第二套重试实现**，App 真正走的是 `Retrier.global`）与 `UIColor.dsDynamic`（**第二套动态色**，全 App 用的是 `ArtTheme.nativeDynamic`）。收窄三条写在文件里：名字短于 6 个字符不看、读者只按「名字出现过」数（保守方向，宁可漏报）、`DerivedData/` 不算读者。探针验过：注入 `extension Double { func probeDeadMember() }` → 当场报出那个文件与成员名；还原后文件哈希与注入前一致、转绿 |
+| 13 | `orphans.py` | 两条判据。① 孤儿页面：「写了但没有任何地方能到达」（只认顶层类型）。② **系统类型扩展里没人读的成员**（`extension X` 里 `X` 不是项目自己声明的类型，而成员名在全仓除声明外一次都没出现）。② 是 2026-09-25 补的：那时删掉底条自算档位那段代码后，文件层的 `private extension Double { func clamped(to:) }` 成了「声明在、没有读者」—— 而它前面 31 条门禁一条都看不见（判据 ① 只认顶层类型）。加上判据 ② 的当场报到两个真的：`URLSession.dataTaskRetryable` + `RetryConfig`（**第二套重试实现**，App 真正走的是 `Retrier.global`）与 `UIColor.dsDynamic`（**第二套动态色**，全 App 用的是 `TokensPalette.nativeDynamic` —— 原名
+`ArtTheme.nativeDynamic`，2026-09-25 随那个文件搬进 `Tokens.swift`）。收窄三条写在文件里：名字短于 6 个字符不看、读者只按「名字出现过」数（保守方向，宁可漏报）、`DerivedData/` 不算读者。探针验过：注入 `extension Double { func probeDeadMember() }` → 当场报出那个文件与成员名；还原后文件哈希与注入前一致、转绿 |
 | 14 | `deep.py` | 更深的结构问题：SDK 同名遮蔽、协议一致性、闭包参数、清洗保真度 |
 | 15 | `eol.py` | committed blob 的字节级行尾问题（字面量里裸换行 / 行中裸 CR / `\r\r\n`） |
 | 16 | `oneentry.py` | **入口唯一性**：同一件事只准有一条到达路径。判据 ③ 是「档位在 `HomeModeHead` 里出现**恰好一次**」——0 次 = 加了档位卡头没跟上；≥2 次 = 同一档有两处表述（原判据是「< 2 报错」，2026-09-24 定义反了，见 §11） |
@@ -854,6 +910,8 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | 29 | `extguard.py` | **extension 的三条铁律**：① 必须在文件层（不许嵌套）；② 直接成员层不许有实例存储属性（`static` 放行）；③ 跨文件不许碰别处的 `private` / `fileprivate` 成员。它是 2026-09-25 那次 CI 红的产物：`MapSpineBottomBar.swift` 一台戏犯了三条（嵌套的 `private extension Double`、`@State` 存储属性、读写四个 `private` 成员），而 29 条门禁一条都没拦住 —— 因为没有任何判据知道「extension 该长什么样」 |
 | 30 | `initguard.py` | **调用点的实参标签必须能被某个声明的 init 接下**。三条收窄（宁可漏，不可噪）：只判「init 写在类型**体内**」的类型（写在 extension 里不会抑制隐式 memberwise init，那时按参数表判会误报）、只判至少两个带标签实参的调用点（`Foo(x)` 与 `init(_:)` 从文本上分不开）、同名类型多处出现就整条跳过（裸名字对应哪一个要看调用点上下文）。它是 2026-09-25 第二批 CI 红的产物：`ArtThemeSpec` 四处「参数全对、却没有任何 init 收得下」——根因是 Swift 那条规则：结构体一旦自己声明了任何 `init`，编译器就不再合成 memberwise init。它诞生当天被自己的**两条误报**教过（嵌套类型的 init 被算到外层；`TripRecord` 同名两个），两条都写在文件头里 |
 | 31 | `iconcheck.py` | **图标**：`Contents.json` 与 PNG 必须说同一件事。五条判据 —— 文件都在 / 声明尺寸 × scale == 实际像素 / 每个槽位有浅色·深色·着色三套 / 三张 1024 主图满幅（不带透明，四角与四边中点各与相隔 64px 的内侧色差 ≤ 14） / 没有没人引用的 PNG。它是 2026-09-25「图标完全不符合 iOS 调性」那一轮的产物：v1.0 犯了三个**可量**的错却编译得过、当时 31 条门禁全绿（自己套圆角 + 内缩 4%；`convert('RGB')` 把透明边压成纯黑、实测四角 (0,0,0)；只有一张图、没有深色/着色外观）。**它自己读 PNG**：`scan/copy.py` 与标准库 `copy` 同名会把 Pillow 的 XML 依赖打坏（`AttributeError: module 'copy' has no attribute 'deepcopy'`），所以 scan/ 里任何 `import PIL` 的门禁都跑不起来 —— 解码器与 Pillow 逐点比对过。探针验过：换回 v1.0 的 1024 → 报出 4 条（左右边中点 (0,0,0) vs 内侧 (255,159,0)，色差 255）；多一张没人引用的 PNG → 报出；删掉某槽位的着色条目 → 报出 |
+| 32 | `perf.py` | **「每次界面求值都会跑的那条路上，不许有一次性就能建好的东西」**。两条判据：① `DateFormatter()` / `NumberFormatter()` / `ISO8601DateFormatter()` 的构造只许出现在 `DateText.swift`（池子在那里；键是 `locale|格式`，所以有界）；② `CLLocation(` 不许造在比较/筛选/排序闭包里（按花括号配对扫到闭包结束，跨行的也认）。它是 2026-09-25「性能轮」的产物，两条都来自**量出来的**形状：全仓原有 9 处 `DateFormatter()`，其中 `MapTripLine.timeText`（`MapSpineLayers` 每段行程读一次 → 30 段 × 每 2 秒求值一次）、`VM.parseDate`（一次调用最多造 7 个，按记录调）、`RawLogStore.now()` 落在每次求值的路径上；`clusterChargers` 的判据 `out.firstIndex(where: { CLLocation(...).distance(from: here) … })` 是**每次比较**造一个对象（一枚钉子 × 每一组）。两条都**不报错、不崩、编译全过**，只是慢 —— 而慢没有输出。探针验过（双向）：池子外注入 `let f = DateFormatter()` → 当场报出该文件与行号；比较闭包里注入 `CLLocation(...)` → 当场报出；还原后文件哈希与注入前一致、转绿。例外表两处（`ALLOWED` / `COORD_ALLOWED`）都要求写明理由 |
+| 33 | `localstore.py` | **本机持久化键的归属与「换账号会不会跟着走」**。真值是 `HANDOFF.md` §6 那张分类表（门禁直接读它，不另抄一份 —— 与 `all.py` 从工作流解析门禁清单同一个做法）。三条判据：① 代码里出现的每个 `carkeeper_*` 键都必须在表里（新键必须被定性：关于车/人 = 账号，关于这台手机 = 设备）；② 标「账号」的必须在退出登录时被清（清法是三选一：`logout()` 体里直接删、调一个登记过的 `clear()`/`resetAll()`、或经 setter 清并留下证人）；③ 表里的键必须在代码里真的存在。它是 2026-09-25 第七轮对抗式审核的产物：把「表里标 ✅」与「`logout()` 真的清了什么」对一遍，查出 **8 个标了 ✅ 却没人清**的键（停车史数组 → 位置隐私；保养单据照；年检记录（还有 `@Published` 内存副本，只删键不够）；行程去重台账 → 清派生却留台账，重新登录后行程再也生成不出来；里程/保养基线四项）。这些**只在换账号时才看得见**。门禁诞生当天被自己的两个洞教过：一是不认「键写在符号常量里」（`socKey` / `Self.selectedCarIdKey`，六条假阳性），二是把 `MineView.toggleVoice()` 里的局部 `let key` 当成符号常量（于是「设备键 `carkeeper_voice_enabled` 被清了」误报）—— 两条收窄都写在文件头。探针验过三条：注入新键 → 报「没定性」；从 `logout()` 里拿掉一个账号键 → 报「没被清」；往表里塞一个幽灵键 → 报「表在说谎」；三次还原哈希都一致 |
 | + | `check_style.js`（node） | 风格与括号配平 |
 | + | `all.py`（**本地**执行器） | 不判任何东西：把上面这份清单（从工作流解析，不另抄）一次跑齐。CI 不跑它 —— 跑第二遍没有信息量 |
 
@@ -1143,6 +1201,13 @@ var body: some View { StackPageView(accent: mode.accent, label: "…", cards: ca
 
 ### 同一轮的第二个决定（用户从候选里选的）：「其余读数」改成系统 sheet
 
+> ⚠️ **2026-09-25 第五轮已取代**：用户看过 Apple 地图那张导航卡之后说
+> 「下面的卡片不是抽屉样……默认只显示一横，拉出来才是全部」，于是那一张 sheet
+> 与它那行入口整块删掉，抽屉回到**这张卡自己**里（见 §16 第二项）。
+> 下面这一节保留原样，它是那一步的完整代价清单 —— 里面「系统的落点更多 / 拉手随
+> 辅助功能走 / 半屏时地图仍可拖」三条都是真的，换代的原因**不是**它们不对，
+> 而是系统 sheet 的位置永远在屏幕底部：它会盖住模式条，而那一条是全站唯一的入口。
+
 我把「还有哪些可以换回系统原生」列成了一张表交给用户（问题在提交信息 / 对话里），
 他选了三项里的两项，改的就是这两项：
 
@@ -1219,3 +1284,342 @@ externalID 写在登记项里）。顺带删掉 `TokensMotion.reveal` —— 它
 本机没有 Swift 工具链，**编译与真实观感只有 CI / 真机能回答**；这里能给的证据是可量的事实
 （尺寸、三套外观齐全、满幅色差 ≤ 7、亮度分位、58px 下 ASCII 渲染能读出车形）。
 文档：`AppIcon-SPEC.md` 重写为 v2.x（含每条旧问题的实测数字）；本节；`REDESIGN-STATUS.md` 同名日期一节。
+
+### 15.1 之后又换了一次：v2.1 → v3.0（用户挑了探索稿 040）
+
+v2.x 修掉了四条**规**上的错，但构图仍是我一个人定的（琥珀底 + 白色轿车 + 车底一道弧）。
+于是又做了一轮 **100 个 1024 方向的探索稿**（自包含单页，用户在浏览器 / 真机里看），
+用户报回一个编号：**040「两厢 · 纸白底」**。
+
+v3.0 = 把 040 折进正式渲染器：车形换**两厢**、底换**纸白**、车身从白换成**墨色**；
+v2.1 那道车底弧**删掉**（040 里没有它）。折进来时与探索稿**逐点比对**过：完全相同 99.76%、
+差 > 8 色阶的 0.24%（全落在 1px 宽的车身边缘，来自常数取整）—— 比对顺带查出一个真参数错
+（柔影位移 23 → 22：23 时有 89485 个像素有差，22 时 174 个）。探索稿与它的两个生成脚本
+**用完即弃**，只留中选的那一张（留着 100 个方案，下一个人改图标时不知道以哪个为准）。
+
+当前亮色 1024 实测：亮度 p05 / p50 / p95 = **0.136 / 0.916 / 0.980**，模式 `RGB`（无 alpha，
+满幅）。`AppIcon-SPEC.md` 是这一版的完整规范。
+
+## 16. 2026-09-25 第五轮：五条真机反馈
+
+用户一次给了五条（编号就是他给的顺序）。这一节的顺序也是这个，每条后面写清**根因**、
+**改法**与**证据**。所有改动都未提交。
+
+### 16.1 卡片宽度：只有「现在」与「车辆」合格，其余五页窄了 20pt
+
+**根因是 `pageBackground()`**：它叫「页面底色 + 统一页面边距」，而函数体只剩一行
+`contentMargins(.horizontal, 20, for: .scrollContent)` —— **底色与光早就不在那里**
+（它们在 App 根部的 `AppCanvas`）。留下的那一行加在**这一页滚动内容**的左右，
+于是「调用过它的页面」的卡叠比「没调用的页面」窄 20pt。实测（402pt 宽的机器，
+量卡里那层分组面到屏幕边的距离）：
+
+| 页面 | 分组面宽 | 左右各空 |
+|---|---|---|
+| 车辆（没调用） | 328pt | 36pt（= 18 卡内缩 + 18 卡内边距） |
+| 出行 / 车控 / 我的（调用了） | 288pt | 56pt —— 多出来的正是那 20pt |
+
+**改法**：整段删掉，而不是留着它 —— 一个叫「页面底色」却不产生底色、只把卡片变窄的函数，
+与「一个叫 `glass` 却不产生玻璃的参数」是同一类谎（`DSCard` 头注里记过那一条）。
+六个调用点全部删掉；真正需要那 20pt 页边距的两处（登录页 / 「光」浮层）现在自己写明白。
+登录页顺带修掉一个**双重内缩**：它自己已经有一层 `.padding(.horizontal, page)`，
+叠上 `contentMargins` 的那 20 就是 40pt。
+
+### 16.2 地图页：删掉大字地名；底部那张卡改成抽屉；比例尺移到灵动岛下面
+
+用户原话：「地图页最上面的位置没删」「下面的卡片不是抽屉样……默认只显示一横，
+拉出来才是全部」「地图页的比列缩尺放到灵动岛下面，2 秒后消失」。
+**第一句与第三句我问了澄清**（`ask_questions`）：他确认「最上面」= **那行大字地名**
+（衬线 29pt，安全区下 108pt），比例尺则要挂到灵动岛下面。
+
+- **删掉 `mapPlaceLabel`**：图上那句地名唯一的存在处。顺带删掉它读的
+  `MapSpineData.placeLabel`（地址截到 7 个字）—— **删完就没有读者了**，
+  而这一步只能靠人 grep：`scan/orphans.py` 只盖系统类型的扩展成员。
+- **底部那张卡变成抽屉**：收起（默认）= 拉手 + **续航 / 电量 / 车速** + 图层胶囊；
+  拉出来 = 卡的全部内容。那一横用 `DSBigNumber`（字号 30，同一套排版换字号），
+  拖动只看方向 + 阈值（`predictedEndTranslation`，轻甩就走）。
+  **巨字续航（`size 56`）因此消失**：它就是那三个数里的第一个 —— 不是排版缩水，
+  是重复的消除（用户 09-24：「地图页的信息有很多是重复的」）。
+- **上一轮那张系统 sheet 整块删掉**（`readoutsSheet` / `readoutsDisclosure` /
+  `showReadouts`）：抽屉**就是这张卡**，而系统 sheet 永远在屏幕底部 —— 它会盖住模式条
+  （`oneentry.py` 守着的那条唯一入口）。三代写法（自画抽屉 → 系统 sheet → 卡自己）
+  各自的代价记在 `MapSpineReadouts` 头注里，这是同一个诉求的第三次答复。
+- **比例尺自己量**：系统 `MapScaleView` 的位置由 MapKit 定（贴角），搬不动，所以
+  `MapReader` + `MapProxy.convert(_:from:)` 把屏幕上相距 200pt 的两点换成经纬度、
+  用 `CLLocation.distance` 量出地面距离。**数是真的量出来的，不是按镜头距离估的** ——
+  一支会撒谎的尺子比没有尺子更糟。尺子挂在**安全区之内**（`nowLayer` 那一层），
+  所以对齐到「顶」就是灵动岛下沿；挂在地图上就会跟着 `ignoresSafeArea(.top)` 钻到
+  灵动岛底下。2 秒后淡出（`flashScale()`；镜头每变一次重计时，代号防串台）。
+  三个新 SDK 名字（`MapReader` / `MapProxy` / `convert`）对着 Apple 文档 JSON 核过后
+  登记进 `scan/scan.py`；`convert` 这条**特意写明**「名字很泛、白名单是按名字判的」。
+
+### 16.3 底部模式条：点选对得准，滑动选对不准
+
+用户：「点选菜单入口的时候，不会出现选中框和入口没对准，但是滑动选入口，
+很容易出现对不准」—— 这个**不对称**本身就是根因的指纹。条子里的 `c` 是「行内坐标」的
+一个数，而同一档在两个**间距**下的行内坐标不是同一个数（间距随展开插值：静止按三档算、
+展开按全部算），于是间距一变，上一次算出来的 `c` 就落在两档之间：
+透镜钉在条正中不动，而当前那一档的字偏到旁边去了。
+
+两条路的**时序不同**，所以只有滑动那条会偏：
+
+- **点选**：`pick()` 改档位与 `expand = 0` 发生在同一轮里 → `.onChange(of: selectedID)`
+  拿到的 `gap` 已经是收回后的值 → 算对了；
+- **滑动**：`snap()` 改档位时条子还**开着**（收回被推到 620ms 之后，那是「给你看刚才划过
+  哪些档」），等 620ms 后收回，间距变了而**没有谁再算一次 `c`** → 从此偏着，
+  直到用户再碰一下条子。
+
+**改法**：加一条 `.onChange(of: expand)` → 重新落位（`settle`）。手指正按着时不重算
+（那一刻 `c` 归手势管），而收回发生在松手之后，所以守卫拦不住要治的那个时序。
+
+### 16.4 Windows 聚焦取不到图（必应却行）
+
+用户：「必应可以拿到图片，但是 windows 聚焦失败了」。**用真报文核出来的**：
+接口返回的形状是 `ad.landscapeImage.asset` / `ad.portraitImage.asset` —— 键名是
+**`asset`**，而解析器只找 `u` / `url`（`ad` 的子字典里**没有这两个键**）。
+于是 `picks` 永远为空 → 这一源永远取不到图；必应走的是 `urlbase`（另一条路），
+所以「必应行、聚焦不行」。
+
+**顺带查出同一函数里的第二个 bug**：署名读的是 `copyright_text` / `title_text`，
+而真报文里叫 **`copyright`** / **`title`** —— 署名那行**永远是空的**（看起来像
+「这张图没有署名」）。两个都改了。
+
+**证据**：把新旧两个解析器逐行照抄成 Python、在真实接口上跑（2026-09-25 实跑）：
+旧 = **0 张图 / 0 条署名**，新 = **4 张图**，取到的地址是 `1080x1920` 的竖图，
+署名 `© Ondrej Prosicky / iStock / Getty Images Plus`。顺序也写死了（竖图优先，
+不再遍历 `ad.values` —— Swift 字典遍历顺序未定义，同一份报文会今天取竖、明天取横）。
+
+### 16.5 控件应该是玻璃质感，「黑颜色太突兀」
+
+**根因是 `TokensPalette.nightSurface`**（= `spec.surface` = 深色 #1C1C1E / 浅色 #FFFFFF，
+**不透明**）：卡片本身是玻璃（`GlassCard` → `dsGlass`），而卡里那层面用它 ——
+等于「玻璃中间挖了一个黑洞」。用户截图里那一块块黑：分组面（`DSGroup`）、
+占位面（`DSPlaceholder`）、提示条（`DSNotice`）、搜索框、分段控件的滑块、评分空态。
+
+**改法：加一个令牌 `TokensPalette.panel`**（= 当前主题 `surface` 的**半透明版**，0.5），
+把上面七处全部改成它。为什么是「同一个色值的半透明版」而不是另写一个灰：
+二十套主题因此各自保住自己的面色（纸上主题里这层仍是纸色），而 0.5 让卡片自己的玻璃
+与它底下的壁纸继续透上来 —— 它才像同一块材质的一层，而不是贴上去的一块板。
+**0.5 是这里唯一的刻度**，全 App 的面一起变。
+
+分段控件的滑块单独一条：它改读 **`glassHighlight`**（「玻璃里面那一层更亮的底」）——
+与模式条上那枚透镜是同一个东西，同一个令牌。原先它在深色下是 (28,28,30)，
+**比它所在的凹槽还暗**，于是「选中的那一格」看起来是个黑洞；而 iOS 深色下选中段
+本来就该比凹槽**亮**。顺带把最后一个系统 `Picker(.segmented)`（充电页的趋势周期）
+换成 `DSSegmented`：全 App 只有一个分段控件。
+
+**故意不做的事**：不在卡里再挂一层 `.glassEffect`。`DSGlass` 三层规则第 ② 条写着
+**卡里不玻璃**（玻璃叠玻璃会糊成一片，而卡片自己已经是玻璃），而 `scan/glass.py`
+第 ③ 条也会拦「玻璃底下垫不透明面」。用户要的「玻璃质感」在这里是**半透明**，
+不是第二块材质 —— 这一条我写在令牌的注释里，免得下一个人把它当成漏做。
+
+### 16.6 这一轮的门禁与文档
+
+`python3 scan/all.py` —— **32/32 全绿**。三处门禁当场抓到过东西：`scan.py` 拦下三个
+没登记的 SDK 名字（`MapReader` / `MapProxy` / `convert`，登记后才绿）、
+`lintcfg.py` 拦下 `MapSpineView.swift` 到 **1201 行**（改法是把「现在」那一张卡
+搬进 `MapNowCard.swift`，现在 1157 行 —— 不是加进排除清单、也不是抬阈值）。
+文档：本节；`REDESIGN-STATUS.md` 同名日期一节；`DESIGN-UNIFY.md` 里两处引用
+`pageBackground()` 的表格改成现状。
+
+**边界**：本机没有 Swift 工具链，**编译与真实观感只有 CI / 真机能回答**。
+这一轮新引入的可编译性风险集中在三处：`MapReader` / `MapProxy.convert` 的用法、
+抽屉的 `DragGesture` + `accessibilityElement` 组合、以及 `TokensPalette.panel`
+（`Color.opacity` 在 `fill` 里）。纯 Swift 侧的括号平衡与改动前后逐一比对过（未变），
+但那不等于编译得过。
+## 17. 2026-09-25 第六轮：主题只剩原生、图标换成 040、底条只留一种跟手
+
+用户三句话：「图标用 040」「主题用原生，其他 19 套全删了」「选整行滚动，另外一个也删了」。
+三条都是**减到只剩一种**——而每一次减，真正的工作量都不在删掉那一样东西，
+而在「删掉之后谁接住它的读者」。
+
+### 17.1 主题：20 套 → 1 套
+
+删掉的五处见 §5.2 的表。**难点全在值必须逐个搬，不能重写**：
+
+| 原来由主题提供的 | 现在 | 为什么不能连值一起删 |
+|---|---|---|
+| `TokensPalette` / `TokensTypo` 的取值 | 直接写回 `Tokens.swift` | 全 App 约 800 处读者，值必须**逐值相等**地搬 |
+| `ArtTheme.artHex` | `TokensPalette.artHex`（同实现同取值） | `pageAccents` 的六个个性色仍在读它 |
+| `ArtTheme.nativeDynamic` | `TokensPalette.nativeDynamic` | 动态色是系统语义值的另一种写法，v4 起就在用 |
+| `preferredScheme`（主题自带明暗） | 删 | 「我的 → 夜间模式」成为**唯一**说这件事的人；nil = 跟随系统 |
+| 地图蒙版 / 三种车钉 | 系统原样 | 见 §5.3 |
+
+「只有一种取值的开关就是一层假的选择」——这句话这轮又兑现了四次。
+代价也照实写在这里：**`scan/orphans.py` 看不见这一层**（它只认「系统类型扩展里没人读的成员」，
+而项目自己的令牌枚举整类不在范围内），所以这一轮是不是真的删干净了，靠的是人过一遍
+（`grep` 全仓 + 每个删除点都留了记录），不是门禁。这条盲区在 §16 已记过一次，依旧未动。
+
+### 17.2 图标：v2.1 → v3.0（用户挑了 040）
+
+见 §15.1。要点：这不是「再画一张更好看的」，是**把选择权交回用户**之后照他的选择重建；
+`generate_appicon_pillow.py` 仍是唯一出包来源，`scan/iconcheck.py` 仍是那五条可量的判据。
+
+### 17.3 底条：跟手形态只有一种
+
+`DSSwipeStrip` 的 `Follow` 枚举有两个值：「整行跟手」（手指拖整行、透镜钉在正中、字从它下面
+滑过）与「透镜跟手」（透镜从字上滑过去、整行基本不动）。用户定下前者，后者删掉 ——
+枚举本身一起删，因为**只有一个取值的参数不是参数**。
+
+删完之后**「松手会到哪儿」的预测算法也只剩一份**：那里原本是一个 `switch`，两个分支就是两份
+预测。少一种跟手形态，顺带少了半套惯性逻辑 —— 这是这轮唯一一处「删了对、顺手也对了」的地方。
+
+### 验证状态
+
+本地 `python3 scan/all.py` —— **33/33 全绿**（32 条门禁 + `check_style.js`；第 32 条 `perf.py`
+是紧接着的性能轮加的，见 §18）。
+本机没有 Swift 工具链，**编译与真实观感只有 CI / 真机能回答**：这里能给的证据只有可量的事实
+（图标三外观齐全、满幅色差、亮度分位；令牌搬移是逐值相等）。
+
+这轮新引入的可编译性风险集中在三处，都已写进 `REDESIGN-STATUS.md` 同名一节：
+`MapReader` / `MapProxy.convert` 的用法、抽屉的 `DragGesture` + `accessibilityElement` 组合、
+`TokensPalette.panel`（带透明度的 `Color` 进 `fill`）。
+## 18. 2026-09-25 第七轮：性能与流畅性（先量，后改）
+
+用户：「再全局全项目优化性能流畅性！」—— 这一轮不做「感觉更快」的改动：
+**先量出「谁在每次求值时重来一遍」，再改那几处，并把量出来的数字写进注释与门禁。**
+
+### 18.1 先把预算算清楚（这决定了改哪儿值）
+
+本机没有编译器、没有 Instruments，所以「预算」只能从代码里推：
+
+| 事实 | 出处 | 结论 |
+|---|---|---|
+| 地图页在车动起来时 **每 2 秒** 求值一次 | `RefreshLoop.Cadence.moving`（用户 2026-09-25 定的节律） | 每次求值里的任何浪费，× 0.5 Hz |
+| 六页同屏**是关着的**（`LaunchFence.sixPageDeck = false`） | `Services/LaunchFence.swift` | 树里只有当前那一档 → 只需优化「当前页」的路 |
+| 手机定位：百米精度、取到就停 | `Services/PhoneLocation.swift` | 不是热路径，不动 |
+| 历史库上限 soc 2000 / power 1500 / tyre 760 | `Services/HistoryStore.swift` 的 cap | 全表扫描只有 3 个读者、都带窗口 → 不是热路径 |
+| 壁纸只在载入/刷新时解码一次 | `Services/WallpaperService.swift` | 不是热路径 |
+
+于是热路径只有一条：**地图页「现在」这一档，每次求值里的那几件事。**
+
+### 18.2 量出来的三处（都是同一个形状：每次求值重造「只取决于常量的东西」）
+
+| # | 位置 | 量出来的形状 | 改法 |
+|---|---|---|---|
+| ① | `MapSpineView`：`let d = data` + `.onChange(of: d.carCoordinate…)` + `nowLayer()` 各一处 | `MapSpineData.build()` **一次求值建三套** —— 而 `build()` 里含行程映射、停车点映射、胎压、异常点与两处聚类 | 三处收成一处：sheet 那份挪进**闭包**（只在弹出时求值）、`.onChange` 改盯 `store.currentLocation`（车自己的读数，同一个 `caches["location"]`）、只留 `nowLayer` 那一处 |
+| ② | `MapTripLine.timeText`、`VM.parseDate`、`RawLogStore.now()` 等 9 处 `DateFormatter()` | `DateFormatter` 构造要现装一套 ICU 格式化器，而同一个 `(locale, 格式)` **造出来永远一样**；`timeText` 是**每段行程读一次**（30 段 × 每 2 秒），`parseDate` 一次调用最多造 7 个 | 新建 `Services/DateText.swift`：按 `locale\|格式` 缓存的池子。**locale 逐调用点保留**（`zh_CN` / `en_US_POSIX` / 系统默认三种都不合并），所以是搬住处、不是改行为 |
+| ③ | `clusterChargers` 的 `firstIndex(where: { CLLocation(...).distance(from: here) … })`、`clusterHotspots` 的质心 | 前者**每次比较**造一个 `CLLocation`（一枚钉子 × 每一组），后者在 `for j in group` 的每一轮重造同一个质心 | 每个站/每个组各造一次（O(n) 而不是 O(n × 组数)）、质心提到循环外。比较用的仍是 `CLLocation.distance(from:)` 本尊 —— **判据与分组结果一字未改** |
+
+### 18.3 为什么这一轮没有动「六页同屏」
+
+它是这份代码里**最大**的一笔开销（`LaunchFence` 的注释记着：内存从 49 MB 涨到 1.7 GB 只要四秒），
+但它已经有一个**明确的开关**、且现在是关的。剩下能省的只有「隐藏的那几页要不要跟着
+`caches` 的写入重新求值」—— 那需要把隐藏页换成 `EmptyView`，而**代价是每页自己的状态
+（滚动位置、展开的分组）在换档时被销毁**。那是设计变更，不是性能修复：
+真要做，得由用户决定「省那点 CPU」还是「保住换档前的状态」。**记在这里，不动。**
+
+### 18.4 防回归：新门禁 `scan/perf.py`
+
+这一轮的两处都**不报错、不崩、编译全过**，只是慢 —— 而慢没有输出。
+所以按本仓惯例给它们各立一条判据（详见 §8 第 32 条）：
+格式化器只许从池子里取、坐标不许造在比较闭包里。
+两条都做了**双向探针**（注入即报、还原即绿、哈希一致）。
+
+### 验证状态
+
+本地 `python3 scan/all.py` —— **33/33 全绿**（32 条门禁 + `check_style.js`）。
+
+**本机没有 Swift 工具链：编译与真实帧率只有 CI / 真机能回答。** 这一轮能站得住的证据是
+**计数**（一次求值建几套派生数据：3 → 1；每次比较分配几次坐标对象：O(n × 组数) → O(n)；
+每次求值构造几个 `DateFormatter`：按行数计 → 0），不是帧率。
+本轮新引入的可编译性风险集中在三处：`MapSpineView.body` 里 sheet 闭包内构造
+（`@ViewBuilder` 闭包里的表达式求值时机）、`clusterChargers` 的平行数组
+（`outLoc` 必须与 `out` 一一对应 —— 这一点写进了注释，因为它是这里唯一能被写错的约束）、
+以及 `DateText` 的线程安全形态（见下）。
+
+**一处写完又改回来的东西（值得记）**：`DateText` 第一版写的是
+`@MainActor enum` + `static var` 池 —— 看起来最自然（"全 App 都在主线程"），
+**但它会直接编译不过**：读者里有两个明确在后台线程上，`RawLogStore` 与 `APIClient`
+（后者的注释自己写着「parseMessages 会在协作线程跑，不能在那里假设主线程」），
+而 `APIClient.messagesURL` 是**同步的非隔离函数** —— 从它里面调 `@MainActor` 的
+静态方法没有异步跳转的余地。已改成全仓既有的形态：`final class` + `static let shared`
++ `NSLock`（与 `RawLogStore` 同一个形状、同一个理由），锁的粒度是「取构造器」一次，
+格式化在锁外跑。**教训**：「主线程」是本仓库的**默认假设**，不是**事实** ——
+凡是给全仓共用的工具，先看有没有后台读者，再决定隔不隔离。
+## 19. 2026-09-25 第八轮：地毯式对抗式审核（这一轮查的是**语义层**）
+
+用户：「再次全局全项目地毯式对抗式各维度审查全项目！」。这一轮不查语法与结构
+（那 33 条门禁已经把它们扫过很多遍了），专挑**门禁看不见的那一层**：两处代码各自都对，
+但它们**关于同一件事的假设不一致** —— 编译器不报错、门禁不报错、平时也看不出来。
+
+### 19.1 怎么挑维度：找「两边都写着真值」的地方
+
+这一轮的判据是：**同一个事实被写在了两个地方**。列出来之后逐对核对：
+
+| 事实 | 写在哪 | 对不对得起 |
+|---|---|---|
+| 「哪些本机键是关于账号的」 | `HANDOFF.md` §6 那张表（每行标 ✅/❌） | `AppStore.logout()` 真的清了什么 |
+| 「报文里那个键叫什么」 | 真实抓包 | 代码里的读键（`keys.py` 守着一半） |
+| 「这个数是公里还是米 / 是比例还是百分比」 | 服务端字段语义 | 界面上的单位 |
+| 「这条数据是设备的还是账号的」 | 界面上的措辞 | 代码的清理路径 |
+
+第一条当场对出了东西（见下）。第二条上一轮查过（`asset` / `copyright` 两个键），
+第三条第四条留在「未查」里 —— 它们需要真机或真报文，这一轮**没有**硬结论。
+
+### 19.2 对出来的东西：8 个账号绑定的键，退出登录时没人清
+
+§6 那张表的每一行都写着归属，而 `logout()` 是照着「记得的那几项」写的 ——
+两边的差就是这一轮的收获。**八条，三个后果**：
+
+| 漏掉的键 | 换账号后会发生什么 |
+|---|---|
+| `carkeeper_parking_points`（最多 200 个停车点，含地址与时间） | 地图「停车」层的钉与「常停热区」显示**前一个账号**去过的地方。上一版清了停车位置（单数）与时刻，漏了这个数组 —— 而 `parkingHistory` 是**从磁盘现算**的，清内存不会让它消失 |
+| `carkeeper_maintenance_photos`（用户拍的单据照，base64） | 前一个账号的照片新账号直接看得见 |
+| `carkeeper_inspections`（年检记录） | 跨账号可见 —— 且它有 `@Published` **内存副本**：只删键的话同一次运行里照样看得见（「下次启动才自动消失」是重启的功劳） |
+| `carkeeper_processed_event_ids`（行程去重台账） | **清派生却留台账**：`tripHistory` 被清空、台账里那 7 天窗口的事件仍然算「已处理」→ 重新登录后行程页**一直是空的**，数据再也重建不出来 |
+| `carkeeper_service_reminders` / `_current_mileage` / `_total_mileage` / `_service_timestamp` | 里程与保养基线是**上一辆车**的，「距下次保养还有多少公里」跟着错。上一版清了 `last_service_mileage` —— 而它们本来是一套，**只清一套里的一个等于没清** |
+
+改法：`logout()` 补齐七处（`parking_loc` 本来就走 setter 清），并给 `InspectionCalendar`
+加一个 `resetAll()`（内存 + 键一起清，与 `FamilyManager` / `TempKeyManager` 同一个形状）。
+
+**这一轮最值得记的不是那八个键，是它们为什么能一起漏**：`logout()` 清的是
+「记得的那几项」，而**没有任何一处能回答「一共该清几项」**。所以修法与修法不一样 ——
+补齐八个键只是把账还了；让 §6 那张表变成 `scan/localstore.py` 的**唯一真值**，
+才是把这一类错关掉。
+
+### 19.3 顺带治掉的文档漂移：那张表本身
+
+对账时先撞上的是**表自己的毛病**，两条都能量出来：
+
+- 标题写着「42 个 `carkeeper_*` 键」，代码里实际 **33 个**；
+- 表里混着**三个简写**（`carkeeper_parking_loc` / `_time` / `_points` 这种缩写），
+  还有几行塞两三个键 —— 后果是**这张表根本没法机械对账**：简写只有人能补全，
+  而人不会每次都补。反方向也有：表里躺着 `carkeeper_art_theme`（随艺术主题删除）
+  与 `carkeeper_checkin_count` / `carkeeper_siri_usage` / `carkeeper_current_speed`
+  这几个**已经没有任何读者**的键。
+
+所以 §6 重写成「一行一个键、全名、四列（键 / 它是什么 / 归属 / 退出登录清）」，
+并明确写上**它就是那道门禁的真值**。键的归属从今天起是**设计决定**，不是实现细节。
+
+### 19.4 新门禁 `scan/localstore.py`（第 33 条）
+
+三条判据见 §8。两处**自己撞的洞**也写进了文件头（它们比判据本身更值得留）：
+
+1. 第一版不认「键写在符号常量里」—— 而 `HistoryStore.socKey` 与 `Self.selectedCarIdKey`
+   都是这种写法，于是 `clear()` 明明清了三条曲线、门禁却报「没清」（**六条假阳性**）；
+2. 认了符号之后又**认得太多**：`MineView.toggleVoice()` 里有一句局部
+   `let key = "carkeeper_voice_enabled"`，而 `logout()` 里也有个叫 `key` 的循环变量 ——
+   两者一撞，「设备键 `carkeeper_voice_enabled` 被清了」误报。收窄成
+   **只认以 `Key` 结尾的符号 + 跨文件必须带限定**。
+
+（写这道门的第一版还踩了本仓记载过的同一个坑的变体：掩码函数把**字符串内容也丢掉**，
+于是 33 个真实键被数成 9 个 —— 全是注释里的。掩码是本仓反复出错的地方，
+`extguard.mask` 也在这里留过一根多余的 `/`。）
+
+### 19.5 这一轮**没有**下结论的
+
+诚实记下来，免得下次以为查过了：
+
+- **单位与量纲**（公里/米、比例/百分比、摄氏度/华氏度）：需要真报文或真机截图才能定，
+  这一轮只确认了「没有任何地方做单位换算」（`VM` 里全是取数与显示，换算发生在服务端）；
+- **服务端字段语义随时间变化**（同一个键在不同车型上含义不同）：同上；
+- **内存与线程的实际行为**（泄漏、真并发）：本机没有 Instruments 也没有真机。
+
+### 验证状态
+
+本地 `python3 scan/all.py` —— **34/34 全绿**（33 条门禁 + `check_style.js`）。
+
+本机没有 Swift 工具链，**编译与真实观感只有 CI / 真机能回答**。这一轮的证据是
+**对账**（33 个键逐行核对）+ **双向探针**（三条判据各注入一次、还原哈希一致），
+而不是运行时观测。`InspectionCalendar.resetAll()` 是新增的公开方法，
+它的调用点只有 `logout()` 一处 —— 这一类「为清理而新加的方法」是这轮唯一的新 API 面。

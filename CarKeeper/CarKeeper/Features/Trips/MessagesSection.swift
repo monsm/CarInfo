@@ -179,8 +179,10 @@ struct MessagesSection: View {
         }
         .padding(.horizontal, TokensSpacing.md)
         .frame(height: TokensSpacing.row)
+        // 搜框在**卡里**：底读 `panel`（半透明分组面），不是不透明的分组底色 ——
+        // 否则它就是在玻璃卡中间那个黑洞（用户 2026-09-25 第 5 条，截图里那一条）。
         .background(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-            .fill(TokensPalette.nightSurface))
+            .fill(TokensPalette.panel))
     }
 
     // MARK: - 筛选条（分段控件 + 标签胶囊）
@@ -560,8 +562,7 @@ struct MessagesSection: View {
 
     private func dayLabel(_ key: String) -> String {
         guard !key.isEmpty else { return "更早" }
-        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
-        guard let d = df.date(from: key) else { return "更早" }
+        guard let d = DateText.shared.date(key, formats: ["yyyy-MM-dd"]) else { return "更早" }
         let cal = Calendar.current
         let today = Date()
         let diff = cal.dateComponents([.day], from: d, to: today).day ?? 0
@@ -570,8 +571,7 @@ struct MessagesSection: View {
         case 1: return "昨天"
         case 2: return "前天"
         default:
-            let f = DateFormatter(); f.dateFormat = "M月d日"
-            return f.string(from: d)
+            return DateText.shared.string(d, "M月d日")
         }
     }
 

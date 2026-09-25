@@ -80,6 +80,15 @@
 
   两条都是「宁可漏，不可噪」那一侧的：一条误报就足以让人开始绕过这个门禁。
 
+  2026-09-25 的第二条假阳性（判据 ⑥，同一天加的）：删掉 `MapCarPin.style` /
+  `MapSpotPin.style`（车钉那三套艺术样式的选择器）时，它报了六处用法 ——
+  全部是**参数标签**：`RoundedRectangle(cornerRadius: 3, style: .continuous)`、
+  `stroke(…, style: StrokeStyle(…))`。参数标签解析的是**被调用者的**参数名，
+  与「这个名字的成员」没有关系，而 `style` 是系统 API 里最常见的参数名之一。
+  于是：**一行里这个名字的每一次出现都是「紧跟 `:`，且前面是 `(` / `,` 或者整行只有缩进」
+  的形状 → 不算使用**（后半句管多行调用的续行：`style: StrokeStyle(…)` 自己占一行，
+  它前面没有 `(`）；只要有一处是真正的成员访问（`x.style` / `style = …`）照旧报。
+
 自测（2026-09-25 重新实测过 —— 原来那两条 `--from/--to` 命令是**恒绿**的：
 两个名字在旧版里的声明缩进都比 4 深，判据 ① 当场就找不到它们。
 所以换成两条**今天真能跑**的探针：把某个成员声明删掉，必须当场报出来）：
@@ -89,6 +98,8 @@
 
   反面（判据 ④/⑤）：删 `StackSpec.Card.padBottom`（它有同名成员在别的类型上）
   -> 必须**不**报 —— 它在 2026-09-25 之前会报（两条收窄就是为它加的）。
+  反面（判据 ⑥）：删 `MapCarPin.style`（它有六处参数标签同形）
+  -> 必须**不**报 —— 它在 2026-09-25 之前会报六处 `style:`（系统 API 的标签）。
 """
 
 import argparse
@@ -165,6 +176,30 @@ def member_names(text):
     return set(MEMBER_DECL.findall(strip_comments(text)))
 
 
+def only_argument_labels(line, name):
+    """这一行里这个名字的每一次出现都是**参数标签**形状吗（至少出现一次）。
+
+    判据 ⑥。参数标签（`f(style: …)` / `f(a: 1, style: …)`）解析到的是**被调用者**
+    的参数名，不是这个名字的成员 —— 所以它不是「使用」。只要有一处不是这种形状
+    （`x.style`、`.style = …`、裸 `style`），整行就仍算使用（宁可漏，不可噪）。
+    """
+    hits = list(re.finditer(r"\b%s\b" % re.escape(name), line))
+    if not hits:
+        return False
+    for m in hits:
+        before, after = line[:m.start()], line[m.end():]
+        # 标签的形状：紧跟 `:`，且它前面是 `(` / `,` **或者这一行只有缩进**
+        #（后者是多行调用的续行 —— `style:` 自己单独占一行）。
+        # 行首 + 紧跟 `:` 只可能是参数标签：真正的成员访问要么带前缀（`x.style`），
+        # 要么后面接 `=` / `.` / `(`，不会有裸 `style: ` 这种形状。
+        if not re.match(r"\s*:", after):
+            return False
+        if re.search(r"[\(,]\s*$", before) or before.strip() == "":
+            continue
+        return False
+    return True
+
+
 def uses_of(name, text):
     """新版本里**仍在代码中**用到这个名字的行号（注释不算，局部量声明行也不算）。"""
     body = strip_comments(text)
@@ -175,6 +210,8 @@ def uses_of(name, text):
         if not hit.search(line):
             continue
         if binding.search(line):      # 这一行是在**声明**同名局部量，不是使用
+            continue
+        if only_argument_labels(line, name):   # 判据 ⑥：参数标签不算使用
             continue
         out.append((i, line.strip()))
     return out

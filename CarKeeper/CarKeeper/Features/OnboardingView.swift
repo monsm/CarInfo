@@ -96,10 +96,10 @@ struct OnboardingView: View {
                     .foregroundStyle(TokensPalette.ambient)
             }
 
-            // 标题和描述（标题走衬线：艺术方向下「引导页」也是一页纸）
+            // 标题和描述
             VStack(spacing: TokensSpacing.snug) {
                 Text(page.title)
-                    .font(TokensSerif.page(28))
+                    .font(TokensTypo.fixed(28, weight: .semibold))
                     .foregroundStyle(TokensPalette.primary)
 
                 Text(page.description)

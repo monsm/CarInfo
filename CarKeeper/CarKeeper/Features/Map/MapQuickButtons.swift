@@ -134,14 +134,14 @@ extension MapSpineView {
     /// 是把镜头放过去（跟方向是另一次点按的事），这里只做前半件。
     ///
     /// **不是 `private`**：`MapSpineView` 的 `body` 里那条 `onChange`
-    ///（手机位置取回来就移镜头）要调它 —— 与 `camera` / `spec` 那两处同一个理由：
+    ///（手机位置取回来就移镜头）要调它 —— 与 `camera` / `cameraDistance` 那两处同一个理由：
     /// 一件事只有一处实现，跨文件时不复制第二份。
     @MainActor
     func fly(to coordinate: CLLocationCoordinate2D?) {
         guard let c = coordinate else { return }
         withAnimation(TokensMotion.value) {
             camera = .camera(MapCamera(centerCoordinate: c,
-                                       distance: spec.cameraDistance,
+                                       distance: cameraDistance,
                                        heading: 0,
                                        pitch: 0))
         }

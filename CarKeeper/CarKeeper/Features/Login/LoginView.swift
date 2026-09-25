@@ -65,7 +65,6 @@ struct LoginView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .scrollDismissesKeyboard(.interactively)
-        .pageBackground()
         .onAppear { loadCaptcha(); checkBiometric() }
         .onDisappear { countdownTask?.cancel() }
         .alert("生物识别登录", isPresented: $showBiometricPrompt) {
@@ -87,7 +86,7 @@ struct LoginView: View {
     private var brand: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             Text("长安车管家")
-                .font(TokensSerif.page(34))
+                .font(TokensTypo.fixed(34, weight: .semibold))
                 .tracking(TokensTracking.title)
                 .foregroundStyle(TokensPalette.primary)
             Text("CHANGAN CONNECT")

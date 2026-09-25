@@ -121,17 +121,13 @@ struct CarKeeperApp: App {
     var body: some Scene {
         WindowGroup {
             root
-                // 明暗：**用户的夜间模式选择**压过艺术方向自带的那个值。
+                // 明暗：**只有「我的 → 夜间模式」这一个决定**。
                 //
-                // 2026-09-25 地毯式审核：这一行原来只读 `ArtThemeStore.current.spec.preferredScheme`，
-                // 于是「我的 → 夜间模式」那个选择器拨了没有任何变化（它只改自己那一行）。
-                // 现在：选择器选「自动」时 `schemeOverride` 是 nil → 仍由艺术方向决定
-                // （这才是这个 App 的明暗观念，见 `ArtTheme.swift` 的头注）。
-                .preferredColorScheme(nightMode.schemeOverride
-                                      ?? ArtThemeStore.current.spec.preferredScheme)
-                // 令牌是静态计算值，不产生 SwiftUI 依赖 —— 靠 .id 换值重建整棵树，
-                // 否则切主题后界面不会立刻重绘（要等下一次状态变化才生效）。
-                .id(artThemeRaw)
+                // 2026-09-25：它以前还要与「艺术方向自带的明暗」取一个或
+                //（`ArtThemeStore.current.spec.preferredScheme`：纸上=亮、夜光/巨字=暗）。
+                // 艺术主题整份删除后没有第二个人说话，`schemeOverride` 的 nil
+                //（选择器选「自动」）就是**跟随系统** —— 与 iOS 其余部分一致。
+                .preferredColorScheme(nightMode.schemeOverride)
         }
         // #47 iPad 分屏：第二个窗口（原写成 `os(iOS) && os(macOS)` 恒为假，导致该场景从未注册）。
         // 能否真正被打开由「平台 + Info.plist 的 UIApplicationSceneManifest.UIApplicationSupportsMultipleScenes」
@@ -141,9 +137,7 @@ struct CarKeeperApp: App {
         //    同一份导航状态 —— 同一条路径。即“能同时看两个窗口”，但还不是两块独立画布。
         WindowGroup(id: SceneID.detail) {
             DetailSplitView()
-                .preferredColorScheme(nightMode.schemeOverride
-                                      ?? ArtThemeStore.current.spec.preferredScheme)
-                .id(artThemeRaw)
+                .preferredColorScheme(nightMode.schemeOverride)
         }
     }
 
@@ -153,10 +147,6 @@ struct CarKeeperApp: App {
     @State private var isAppLoading = false
     // #NEW-113 Onboarding 引导状态
     @AppStorage("carkeeper_onboarding_seen") private var onboardingSeen = false
-    /// 艺术主题（键见 ArtThemeStore.key）。它存在的意义只有一个：
-    /// **产生 SwiftUI 依赖** —— 令牌本身是静态计算值，不订阅任何东西，
-    /// 所以切换主题时靠它变化去驱动 root 上的 `.id(...)` 重建。
-    @AppStorage(ArtThemeStore.key) private var artThemeRaw: String = ArtTheme.native.rawValue
 
     /// 处理 carkeeper:// 深链。
     /// 此前 Info.plist 注册了 scheme，但全项目没有任何 onOpenURL 接收方 —— 扫二维码/点链接豪无反应。

@@ -451,13 +451,21 @@ VERIFIED_SDK_ADDITIONS = {
     "UnitPoint": "SwiftUI.UnitPoint（iOS 13+）",
     "blendMode": "View.blendMode(_:)（iOS 13+）",
     "repeatForever": "Animation.repeatForever(autoreverses:)（iOS 13+）",
-    # 艺术主题（ArtTheme）用到的两个：登记前已核 Apple 文档 JSON
+    # 艺术主题（ArtTheme）那一轮登记的四个。2026-09-25 主题只剩原生、ArtTheme.swift
+    # 已删，但四个名字**都有别的读者**，所以登记一个都不能撤：
+    #   preferredColorScheme / allowsHitTesting —— 还在用（App 根部的明暗、禁点）
+    #   ColorScheme —— NightModeManager.schemeOverride 的返回类型
+    #   RadialGradient —— GlassCard 的强调色痕、MapCarPin 的车钉光晕
+    # 登记前已核 Apple 文档 JSON：
     "preferredColorScheme": "View.preferredColorScheme(ColorScheme?)（iOS 13+；swiftui/view/preferredcolorscheme(_:)）",
     "allowsHitTesting": "View.allowsHitTesting(Bool)（iOS 13+；swiftui/view/allowshittesting(_:)）",
     "ColorScheme": "SwiftUI.ColorScheme（iOS 13+；主题自带明暗用它表达 light/dark）",
     "RadialGradient": "SwiftUI.RadialGradient(colors:center:startRadius:endRadius:)（iOS 13+；已核文档 JSON）",
-    # 光层与衬线排版（Design/SkyLight.swift、Features/Map/MapSkyOverlay.swift、MapCarPin.swift、
-    # Design/Tokens.swift 的 TokensSerif）。登记前逐个核过 Apple 文档 JSON：
+    # 光层与衬线排版。**注意这两个名字原来指向谁**：`UIFont` / `custom` 是
+    # `TokensSerif`（衬线标题）探中文衬线时用的，`Ellipse` 是车钉脚下的接地阴影。
+    # `Design/SkyOverlay.swift`（五个装饰图层）与 `TokensSerif` 都已于 2026-09-25 删除，
+    # 但另有两个**活着的**读者让这些登记不能撤：`UIFont` 还给 `CardFit` 量行高，
+    # `Ellipse` 还在 `MapCarPin` 里。登记前逐个核过 Apple 文档 JSON：
     "Ellipse": "SwiftUI.Ellipse（iOS 13+；externalID s:7SwiftUI7EllipseV）——车钉脚下的接地阴影",
     "UIFont": "UIKit.UIFont（iOS 2+；externalID c:objc(cs)UIFont）——用 UIFont(name:size:) 探测中文衬线是否存在",
     "custom": "Font.custom(_ name: String, size: CGFloat)（iOS 13+；externalID s:7SwiftUI4FontV6custom_4sizeACSS_14CoreFoundation7CGFloatVtFZ）",
@@ -627,6 +635,17 @@ VERIFIED_SDK_ADDITIONS = {
     "CGSize": "CoreGraphics.CGSize（iOS 2+；doc://com.apple.corefoundation/documentation/corefoundation/cgsize）——量文字用的「给定宽度」与卡片视口（宽 × 高）",
     "environment": "View.environment(_:_:)（iOS 13+；doc://com.apple.SwiftUI/documentation/SwiftUI/View/environment(_:_:)）——`ArcStack` 把**量到的**卡片视口写进环境，供 `CardFit` 做裁决（读不到就是 .zero = 不知道）",
     "EnvironmentKey": "SwiftUI.EnvironmentKey 协议（iOS 13+；decl: protocol EnvironmentKey；doc://com.apple.SwiftUI/documentation/SwiftUI/EnvironmentKey）——卡片视口那个环境值的键（`defaultValue` 是 `.zero`，即「没量到」）",
+    # 地图比例尺（Features/Map/MapSpineReadouts.swift，2026-09-25 第三轮）。
+    # 用户第 2 条：「地图页的比列缩尺放到灵动岛下面，2 秒后消失」——
+    # 系统的 `MapScaleView` 位置由 MapKit 定（贴在地图角落），搬不动，所以量法自己来：
+    # 把屏幕上相距 200pt 的两点换成经纬度、再量出地面距离。
+    # 三个名字当天取过 doc JSON（abstract / identifier.url / metadata.externalID /
+    # platforms 四项都看过）：
+    "MapReader": "MapKit.MapReader（iOS 17+；decl: struct MapReader；externalID s:15_MapKit_SwiftUI0A6ReaderV；doc://com.apple.mapkit/documentation/MapKit/MapReader；abstract: A container view that defines its contents as a function of information about the first contained map）——拿到 `MapProxy`（比例尺靠它把屏幕上的两点换成坐标）",
+    "MapProxy": "MapKit.MapProxy（iOS 17+；decl: struct MapProxy；externalID s:15_MapKit_SwiftUI0A5ProxyV；doc://com.apple.mapkit/documentation/MapKit/MapProxy）——屏幕坐标 ↔ 地图坐标的那个转换器",
+    # ⚠️ `convert` 这个名字很泛（白名单是按**名字**判的，所以任何 `.convert(` 都会因此通过）。
+    # 它当前只用在 `MapProxy` 上，一处一处可数；换到别处去用它要重新对着文档核一遍。
+    "convert": "MapProxy.convert(_:from:)（iOS 17+；decl: func convert(_ point: CGPoint, from: some CoordinateSpaceProtocol) -> CLLocationCoordinate2D?；externalID s:15_MapKit_SwiftUI0A5ProxyV7convert_4fromSo22CLLocationCoordinate2DVSgSo7CGPointV_xt0cD023CoordinateSpaceProtocolRzlF；doc://com.apple.mapkit/documentation/MapKit/MapProxy/convert(_:from:)；abstract: Converts a point in the specified coordinate space to a map coordinate）——比例尺那个数**唯一**的来源：两点之间的地面距离由它量出来（不是按镜头距离估的）",
 }
 
 

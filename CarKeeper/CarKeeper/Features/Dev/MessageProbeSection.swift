@@ -101,10 +101,7 @@ struct MessageProbeSection: View {
             out.append(await APIClient.shared.probeMessageWindow(
                 "7 天一段", from: now.addingTimeInterval(-7 * 24 * 3600), to: now))
 
-            let df = DateFormatter()
-            df.locale = Locale(identifier: "en_US_POSIX")
-            df.dateFormat = "HH:mm:ss"
-            ranAt = df.string(from: Date())
+            ranAt = DateText.shared.string(Date(), "HH:mm:ss", locale: "en_US_POSIX")
             results = out
             running = false
         }

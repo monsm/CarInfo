@@ -119,9 +119,7 @@ final class RawLogStore: @unchecked Sendable {
     }
 
     private func now() -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return f.string(from: Date())
+        DateText.shared.string(Date(), "yyyy-MM-dd HH:mm:ss")
     }
 
     private func push(_ entry: String) {

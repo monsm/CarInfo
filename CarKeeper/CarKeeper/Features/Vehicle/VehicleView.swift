@@ -82,7 +82,6 @@ struct VehicleView: View {
                 saveMaintenancePhotos()
                 TokensHaptic.result(true)
             }
-            .dsSheetCanvas()
         }
     }
 

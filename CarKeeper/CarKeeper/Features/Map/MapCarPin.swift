@@ -24,8 +24,6 @@ struct MapCarPin: View {
     var socPct: Int
     /// 车头朝向（度，0 = 正北）
     var heading: Double
-    var style: MapPinStyle
-    var allowsGlow: Bool
     /// 选中态（点了钉 → 车控环展开）
     var isActive: Bool
     /// 车灯亮度 0…1，来自 SkyLight（真实太阳位置算出来的），默认不亮
@@ -44,18 +42,10 @@ struct MapCarPin: View {
         ZStack {
             lampBloom
 
-            if allowsGlow {
-                Circle()
-                    .fill(ringColor.opacity(0.22))
-                    .frame(width: 62, height: 62)
-                    .blur(radius: 12)
-            }
-
-            switch style {
-            case .ring:  ringStyle
-            case .ink:   inkStyle
-            case .rule:  ruleStyle
-            }
+            Circle()
+                .fill(ringColor.opacity(0.22))
+                .frame(width: 62, height: 62)
+                .blur(radius: 12)
 
             headingMark
         }
@@ -70,7 +60,7 @@ struct MapCarPin: View {
     /// 所以正午的钉是干净的，黄昏的钉脚下开始有暖光。
     @ViewBuilder
     private var lampBloom: some View {
-        if allowsGlow, lamp > 0.05 {
+        if lamp > 0.05 {
             Circle()
                 .fill(
                     RadialGradient(
@@ -85,7 +75,10 @@ struct MapCarPin: View {
         }
     }
 
-    // MARK: 夜光 —— 刻度盘 + 弧形 + 发光 + 接地阴影
+    // MARK: 车钉本体 —— 刻度盘 + 电量弧 + 车灯 + 接地阴影
+    /// 它以前有三套（刻度盘 / 墨线圈 / 发丝准线），由**艺术方向**挑一套：
+    /// 纸上的方向用墨线、巨字的方向用准线。2026-09-25 主题删到只剩原生，
+    /// 于是另外两套也删了 —— 留着它们只会让人以为 "换一套" 这件事还存在着。
     private var ringStyle: some View {
         ZStack {
             groundShadow(opacity: 0.34)
@@ -118,67 +111,7 @@ struct MapCarPin: View {
                         style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .frame(width: 58, height: 58)
-                .shadow(color: allowsGlow ? ringColor.opacity(0.7) : .clear, radius: 6)
-
-            socText(color: TokensPalette.primary)
-        }
-    }
-
-    // MARK: 纸上 —— 墨线圈（无发光、无阴影，纸是平的）
-    private var inkStyle: some View {
-        ZStack {
-            Circle()
-                .fill(TokensPalette.surface)
-                .frame(width: 52, height: 52)
-
-            Circle()
-                .stroke(TokensPalette.primary, lineWidth: 1.6)
-                .frame(width: 52, height: 52)
-
-            // 电量：弧仍然是真的，但画成墨 —— 纸上只有墨与红
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(ringColor,
-                        style: StrokeStyle(lineWidth: 3, lineCap: .butt))
-                .rotationEffect(.degrees(-90))
-                .frame(width: 62, height: 62)
-
-            // 未充的部分用虚线，像手工标注的刻度
-            Circle()
-                .trim(from: progress, to: 1)
-                .stroke(TokensPalette.primary.opacity(0.35),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .butt, dash: [1, 4]))
-                .rotationEffect(.degrees(-90))
-                .frame(width: 62, height: 62)
-
-            socText(color: TokensPalette.primary)
-        }
-    }
-
-    // MARK: 巨字 —— 发丝环 + 十字准线
-    private var ruleStyle: some View {
-        ZStack {
-            Circle()
-                .stroke(TokensPalette.primary.opacity(0.28), lineWidth: 0.5)
-                .frame(width: 64, height: 64)
-            Circle()
-                .stroke(TokensPalette.primary.opacity(0.16), lineWidth: 0.5)
-                .frame(width: 44, height: 44)
-
-            // 准线：四条短线，把钉变成"瞄准标记"而不是"图标"
-            ForEach(0..<4, id: \.self) { i in
-                Rectangle()
-                    .fill(TokensPalette.primary.opacity(0.30))
-                    .frame(width: 8, height: 0.5)
-                    .offset(y: -34)
-                    .rotationEffect(.degrees(Double(i) * 90))
-            }
-
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(ringColor, style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .frame(width: 64, height: 64)
+                .shadow(color: ringColor.opacity(0.7), radius: 6)
 
             socText(color: TokensPalette.primary)
         }
@@ -189,7 +122,7 @@ struct MapCarPin: View {
     /// 平面化的钉会像贴纸浮在地图上，这一笔是廉价与不廉价的差别之一。
     private func groundShadow(opacity: Double) -> some View {
         Ellipse()
-            // 车钉的落地阴影 = 光照不到的那一块，所以它和暗角同源（主题的遮罩色）
+            // 车钉的落地阴影 = 光照不到的那一块，所以它和暗角同源（`TokensPalette.scrim`）
             .fill(TokensPalette.scrim.opacity(opacity))
             .frame(width: 36, height: 8)
             .blur(radius: 5)
@@ -202,8 +135,8 @@ struct MapCarPin: View {
         ZStack {
             Circle()
                 .trim(from: 0.0, to: 0.055)
-                .stroke(TokensPalette.primary.opacity(style == .ink ? 0.9 : 0.65), lineWidth: 3)
-                .frame(width: style == .rule ? 52 : 46, height: style == .rule ? 52 : 46)
+                .stroke(TokensPalette.primary.opacity(0.65), lineWidth: 3)
+                .frame(width: 46, height: 46)
                 .rotationEffect(.degrees(heading - 90 - 5))
         }
     }
@@ -257,8 +190,6 @@ struct MapSpotPin: View {
     }
 
     var kind: Kind
-    var style: MapPinStyle
-    var allowsGlow: Bool
     /// 钉旁边的文字注记。异常才需要（"后备箱未关"这类必须一眼看见）——
     /// 它带文字阴影，因为地图底色不可控，注记必须在任何底上读得清。
     var label: String? = nil
@@ -297,7 +228,7 @@ struct MapSpotPin: View {
                         .strokeBorder(ink.opacity(isLatest ? 0.85 : 0.45),
                                       lineWidth: isLatest ? 1.6 : 1)
                 }
-                .shadow(color: allowsGlow ? TokensPalette.scrim.opacity(0.35) : .clear, radius: 8, y: 4)
+                .shadow(color: TokensPalette.scrim.opacity(0.35), radius: 8, y: 4)
             if isLatest {
                 RoundedRectangle(cornerRadius: 1.5, style: .continuous)
                     .fill(ink)
@@ -345,7 +276,7 @@ struct MapSpotPin: View {
                 .offset(y: 1)
         }
         .frame(width: 44, height: 44)
-        .shadow(color: allowsGlow ? TokensPalette.error.opacity(0.6) : .clear, radius: 8)
+        .shadow(color: TokensPalette.error.opacity(0.6), radius: 8)
         .accessibilityLabel(Text("有一条异常"))
     }
 }
