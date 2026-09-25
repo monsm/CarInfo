@@ -7,6 +7,11 @@
 > `TokensSerif`」这些词在下面的历史小节里到处都是 —— **它们在 2026-09-25 已全部删除**
 >（用户：「主题用原生，其他 19 套全删了」）。最新的状态永远在**文末那几节**；
 > 前面的小节是当时的记录，只有明确标了「已被取代 / 已作废」的地方才需要回看。
+>
+> 2026-09-25 第九轮又删掉了一批名字（同样只在历史小节里出现）：
+> `CarTopView`（线描俯视图 → 现在是 RealityKit 的 `CarModelView`）、`StackLabView`、
+> `NightModeManager` / `FocusModeManager` / `GestureEnhancements` / `ShakeDetector` /
+> `PowerSavingToggle` / `VoiceBroadcastManager` / `FamilyAndKeySharing`（家庭管理 / 临时钥匙）。
 
 ---
 
@@ -17,7 +22,7 @@
 | **设计层** | 令牌（颜色/字/间距/圆角/动效/触觉）+ DS 组件 —— **只有原生一套取值**（艺术主题 2026-09-25 整份删除，见文末第六轮） | `Design/Tokens.swift`、`Design/DS.swift`、`Design/Theme.swift` |
 | **数据适配层** | 把 `AppStore` 的真实缓存翻译成"地图上画得出来的东西"；**没有数据就是 nil** | `Features/Map/MapSpineData.swift`、`Services/ChargeLedger.swift`、`Services/HistoryStore.swift` |
 | **页面层** | 地图主屏 + 深潜页（43 个文件 → 现在 12 个面） | `Features/Map/*`、`Features/Battery/*`、`Features/Control/*`、`Features/Mine/*` |
-| **系统层** | Widget / Watch / App Clip / Siri / 无障碍 | `Widgets/`、`WatchApp/`、`AppClip/`、`Shared/` |
+| **系统层** | Siri / 无障碍 ｜ ⚠️ Widget / Watch / App Clip / App Group 与它们的目录**均已删除**（免费账号拿不到这些能力，见 §0 的硬约束） | `Features/SiriShortcuts.swift`；~~`Widgets/` / `WatchApp/` / `AppClip/` / `Shared/`~~ |
 
 **换肤是换值，不是换名字**（⚠️ **2026-09-25 已作废**）：`TokensPalette` / `TokensTypo` 的取值
 曾全部转发自当前主题（`ArtThemeStore.spec`），于是约 800 处调用点跟随切换而零改动。
@@ -3812,3 +3817,84 @@ v2.1 那道车底弧**删掉**（040 里没有它）。折进来时与探索稿*
 都需要真报文或真机，这一轮没有硬结论。这一轮的证据是**对账 + 双向探针**，不是运行时观测。
 
 验证：`python3 scan/all.py` —— **34/34 全绿**（33 条门禁 + `check_style.js`）。
+
+---
+
+## 2026-09-25 第九轮：十条（玻璃通透度 / 顶部 / 卡里的灰 / 三处删除 / 三维车 / 地图七处 / 玻璃上的字）
+
+十条一次来。它们混着**问句**与**改法**，所以先分类：问句两条（1 玻璃是不是最通透那一档、
+10 玻璃上的字怎么适配）、一致性两条（2 子页顶部、3 卡里那层灰）、删除三条（4 / 6 / 7，
+外加 5 的一半）、重做两条（8 车控的车、9 地图七处）。
+
+### ① 玻璃的「通透度」不是旋钮，它跟着底下是什么走（第 1 条）
+
+系统只有两档：`Glass.regular` 与 `Glass.clear`。`.clear` 就是最通透的那一档，
+而 HIG「Materials」对它的用法写得很死：*“reserve clear Liquid Glass for components
+over visually rich backgrounds.”* 本仓已有的两个变体常量就是这句话的两半 ——
+地图上的三处（图层胶囊、两枚快速钮、罗盘）走 `.overMedia`（= `.clear`），
+卡片走 `.regular`：卡片是「读的内容」，`.clear` 会让卡里的正文对比度跟着壁纸走。
+
+### ② 玻璃上的字：自适应确实没开，根因是我们一直传固定色（第 10 条）
+
+`Color(uiColor: .label)` 是**已经解析成固定值**的颜色，而系统的 vibrancy 只作用于
+`foregroundStyle(.primary/.secondary/.tertiary)` 这类语义层级样式（WWDC25 与 HIG 都有明文）。
+于是新增令牌 `TokensInk`（三档 `AnyShapeStyle`），只换**底下真的是玻璃**的那些调用点：
+模式条、卡头、次操作按钮、轻提示、地图上三枚圆钮、图层胶囊、底条两臂。卡片里的正文不换。
+
+### ③ 子页顶部与地图页对齐（第 2 条）
+
+`MapSpineView` 量出「屏幕顶到这一层的顶」（`frame(in: .global).minY`，而不是在已被让开的
+视图里会读到 0 的 `safeAreaInsets`）写进环境，`ArcStack` 用 `.contentMargins(.top, …)`
+让第一张卡静止时让开状态栏、滑动时从时钟下连续穿过，并加 `.scrollEdgeEffectStyle(.soft, for: .top)`。
+
+### ④ 卡里那层灰（第 3 条）
+
+`fillSubtle` 从 `quaternarySystemFill`（为**不透明背景**定的灰，压在玻璃上就是一块灰纱）
+改成 `surface.opacity(0.22)`，`panel` 从 0.5 收到 0.34 —— 卡片、分组面、控件底成了
+**同一块材质的三个深浅**，而不是三种来路不同的灰。
+
+### ⑤ 删除三条（第 4 / 6 / 7 条）
+
+「设备与模式」整节（摇一摇 / 省电 / 夜间 / 专注四个**功能**，三个文件整份删除）、
+诊断里六组 UI 相关项（含 `StackLabView` 整页）、共享密钥 / 家庭管理 / 语音播报
+（`FamilyAndKeySharing.swift` 整份删除）。语音那一行删得最干净：它翻转的键
+**全仓没有一个读者**，而读它的那个类型早就没了。
+
+连带效果最能说明这仓的规矩：§6 那张本机键表要同时删七行，`scan/localstore.py` 里
+指向已删文件的清理登记也要删 —— 否则门禁立刻报「这张清单在说谎」（它就是在读取时
+`FileNotFoundError` 被发现的）。**删功能 = 同时删表里的行**。
+
+### ⑥ 检查更新：令牌收成一个出处（第 5 条，⚠️ 还差用户粘贴那把 key）
+
+新增 `Services/GithubToken.swift`：`static let value` 是 key 的**唯一**住处，
+`UpdateService.githubToken` 只做只读转发（原先读 `UserDefaults`，于是每台设备都要手输一次）。
+那个 Token 弹窗与它的两个 `@State` 一起删除。⚠️ 值仍是空串 —— 用户说「我之前提供过」，
+但全仓与 git 全历史都搜不到该形状的字符串（`git log --all -S"ghp_"` 两次都空）。
+为空时按钮照旧按得动，只是会说一句真话。
+
+### ⑦ 车控那一屏的车（第 8 条）
+
+`Features/Control/CarModelView.swift`（RealityKit，新文件）：代码搭的真三维车，
+拖动转车（转的是模型不是镜头）、点部位控车（`.targetedToAnyEntity()`）。
+可点的**只有**指令表里有的那几件 —— 后备箱点不动（它只有状态、没有开合指令），
+四门点下去给一个二选一，不替用户猜。旧的线描俯视图 `CarTopView` 整块删除。
+
+### ⑧ 地图页七处（第 9 条）
+
+定位漂移（百米精度 + 第一个点就用 + 从没读过 `horizontalAccuracy` → 改成最高精度、
+挑最准的一个、够准就用、6 秒兜底、精度如实画出来）、车钉（`body` 从来没调用过
+`ringStyle`，刻度盘/电量弧/数字全是到不了的代码）、罗盘（系统控件搬不动 → 自己画一枚，
+与右侧那两枚同一行）、比例尺（`.onChange(of: camera)` 不覆盖所有手势 → 换
+`onMapCameraChange(frequency: .continuous)` + 6% 门槛）、抽屉（去掉「框选」的底与描边，
+改成数字当头、名字在下、各格等宽平分、整行同一中轴）。
+
+### 验证状态
+
+`python3 scan/all.py` —— **34/34 全绿**（33 条门禁 + `check_style.js`）。这一轮没有新门禁，
+但门禁当场抓出三处：`copy.py` 三条超长文案、`lintcfg.py`（`MapSpineView.swift` 又到 1207 行
+→ 搬出 `MapSpineAnnotations.swift`）、`localstore.py`（§6 表里七个键已不存在）；
+`scan.py` 另拦下 20 个未登记的 SDK 名字，逐个对着 Apple 文档 JSON 核过（其中当场
+改掉一个真错误：`SimpleMaterial` 的 `roughness` 是 `MaterialScalarParameter` 不是 `Float`）。
+
+本机没有 Swift 工具链：**编译与真实观感只有 CI / 真机能回答**。这一轮风险最高的三处
+写在 HANDOFF §20 的验证状态里。

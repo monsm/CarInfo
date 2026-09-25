@@ -17,7 +17,8 @@ import CoreLocation
 //  不选「把阈值抬到刚够」：贴着阈值的代价是下一次**任何**小改动都要先做一遍取舍，
 //  而 `MapSpineLayers.swift` 的头注里已经写过一次这个账。
 //
-//  注：下面用到的 `store` / `spec` / `layerMenu` 因此**不是 `private`** ——
+//  注：下面用到的 `store` / `layerMenu` / `drawerOpen` / `toggleDrawer` / `setDrawer`
+//  因此**不是 `private`** ——
 //  `private` 的作用域是文件，跨文件看不见。它们在骨架里的注释写明了为什么。
 //
 //  ===========================================================================
@@ -70,9 +71,11 @@ extension MapSpineView {
     /// 一排读数格（同一行、同一基线；裸的一行，不含玻璃壳）。
     /// 抽屉里那两排都是它 —— 形状一模一样，所以「拉出来」看起来是
     /// 「同一套读数多出来两排」，而不是换了一套排版。
-    /// 排版权：每格同高同宽（`readoutCell` 自己 `maxWidth: .infinity`）。
+    ///
+    /// 排版权：**居中、各格等宽平分、彼此不留间距**（位置由「平分」给，
+    /// 而不是由间距给 —— 三个数与五个数才能看起来是同一种排版）。
     func readoutRow(_ items: [Readout]) -> some View {
-        HStack(spacing: TokensSpacing.sm) {
+        HStack(alignment: .top, spacing: 0) {
             ForEach(items) { c in
                 readoutCell(c)
             }
@@ -149,16 +152,25 @@ extension MapSpineView {
         return out
     }
 
-    /// 一格：上面是键（小字），下面是值（数字体）。各格完全同高同宽 ——
-    /// 行里没有一格带额外偏移，所以「一行两格」就是它们的**全部排版**。
+    /// 一格：**上面是数、下面是它的名字**，居中。
+    ///
+    /// 2026-09-25 第 9 条（用户：「抽屉里面的参数不要框选了，直接平铺在卡片上，
+    /// 这些参数要重新思考下怎么布局优雅！大前提是要居中显示」）。两处都是真的：
+    ///
+    ///   · **框删了**：原来每格一个圆角矩形 + 一圈发丝线 —— 而那不是在「分组」，
+    ///     是给每一个数各配了一个容器，于是同一行读数被切成四块牌子。
+    ///     现在没有底、没有描边，数就贴在卡片上（卡片自己已经是玻璃，见 `dsGlass` 三层规则）。
+    ///   · **居中**：原来一行里的格是 `leading` 对齐 —— 四个数长短不一，左对齐之后
+    ///     整行的重心看起来是歪的。现在每个格自己居中对齐，格与格等宽平分，
+    ///     于是无论这一行有两个数还是五个数，整行都是**同一条中轴**。
+    ///
+    /// 顺序也换了（数与名字）：数字当头、名字在下面一行小字 —— 与 Apple 地图那张卡
+    /// 的收起态一致（`12:51 到达 / 16 分钟 / 12 公里`），也与 `summaryBar` 同一套读法。
     func readoutCell(_ r: Readout) -> some View {
-        VStack(spacing: TokensSpacing.xs) {
-            Text(r.key)
-                .font(TokensTypo.caption2)
-                .foregroundStyle(TokensPalette.tertiary)
+        VStack(spacing: TokensSpacing.xxs) {
             HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.xxs) {
                 Text(r.value)
-                    .font(TokensTypo.digits(15))
+                    .font(TokensTypo.digits(16))
                     .foregroundStyle(r.cls == "na" ? TokensPalette.primary
                                                    : TokensPalette.statusColor(r.cls))
                 if let unit = r.unit {
@@ -167,19 +179,14 @@ extension MapSpineView {
                         .foregroundStyle(TokensPalette.tertiary)
                 }
             }
+            Text(r.key)
+                .font(TokensTypo.caption2)
+                .foregroundStyle(TokensPalette.tertiary)
+                .lineLimit(1)
         }
-        // 同宽：`.frame(maxWidth: .infinity)` 让一格平分一行宽；
-        // 同高：两行文字 + 同一个内边距，没有哪一格多一行。
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, TokensSpacing.sm)
-        .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(TokensPalette.fillSubtle)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
-        }
+        // 各格等宽平分（没有间距，位置全由平分给），文字居中。
+        .frame(maxWidth: .infinity, alignment: .center)
+        .multilineTextAlignment(.center)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(r.unit.map { "\(r.key) \(r.value) \($0)" } ?? "\(r.key) \(r.value)"))
     }
@@ -223,13 +230,16 @@ extension MapSpineView {
     func summaryBar(_ d: MapSpineData) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
             ForEach(readoutsPrimary(d)) { r in
+                // 居中（用户第 9 条的大前提）：三个数各占一份等宽，
+                // 数与它下面那行名字同一中轴 —— 与抽屉里那两排是同一种排版。
                 DSBigNumber(value: r.value,
                             unit: r.unit,
                             caption: r.key,
                             size: 30,
                             tint: r.cls == "na" ? TokensPalette.primary
-                                                : TokensPalette.statusColor(r.cls))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                : TokensPalette.statusColor(r.cls),
+                            alignment: .center)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
         }
         .accessibilityElement(children: .contain)
@@ -297,9 +307,12 @@ extension MapSpineView {
     @MainActor
     func readoutsDrawer(_ d: MapSpineData) -> some View {
         let rest = readoutsRest(d)
-        return VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+        return VStack(alignment: .leading, spacing: TokensSpacing.md) {
             readoutRow(readoutsMore(d))
             if !rest.isEmpty {
+                // 两排之间用一条发丝线分开（全站分组就这一种做法：线内缩、不通栏）。
+                // 少了它，五个数连成一片时看不出「这里是两件事」。
+                DSDivider()
                 readoutRow(rest)
             }
         }

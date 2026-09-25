@@ -165,7 +165,7 @@ struct MapSpineView: View {
     @ObservedObject private var phone = PhoneLocation.shared
 
     /// 算光用的时刻（实时就是现在）
-    private var skyDate: Date {
+    var skyDate: Date {
         SkyLight.date(hour: skyLive ? nil : Int(skyHour.rounded()), from: Date())
     }
 
@@ -173,8 +173,22 @@ struct MapSpineView: View {
     /// `MapQuickButtons.swift` 里把镜头移到手机时要用同一个数 ——
     /// 两处各写一个数就是「同一个几何有两个出处」。
     let cameraDistance: Double = 1_400
+
+    /// 镜头此刻真正的参数：**朝向**（罗盘要它）、**中心**、**距离**（回北时不能把缩放也重置了）。
+    ///
+    /// 它们是 `MapCameraPosition` 里读不出来的东西 —— 那个类型只写不读（只有 `Equatable`）。
+    /// 唯一说得出「镜头现在朝哪儿、多远」的是 `onMapCameraChange`，所以由它喂这三个数。
+    /// **不是 `private`**：罗盘住在 `MapQuickButtons.swift`，而 `private` 的作用域是文件。
+    @State var cameraHeading: Double = 0
+    @State var cameraCenter: CLLocationCoordinate2D?
+    @State var cameraDistanceNow: Double = 1_400
+    /// 上一次记下的距离（比例尺只在**真的变了**的时候重露，见 `onMapCameraChange`）。
+    @State private var lastScaleDistance: Double = 0
+    /// 屏幕顶到这一层的顶 = 系统安全区那一段（见 `body` 末尾那个量探针）。
+    /// 它喂给五张子页的滚动内衬（`stackTopInset`）。
+    @State private var topSafeGap: CGFloat = 0
     /// **不是 `private`**：抽屉的正文（`MapNowCard.swift`）要按它分发三个图层各自的内容 ——
-    /// 而 `private` 的作用域是**文件**。与 `spec` / `store` / `camera` / `layerMenu` 同一条。
+    /// 而 `private` 的作用域是**文件**。与 `store` / `camera` / `layerMenu` / `skyDate` 同一条。
     var layer: MapSpineLayer { MapSpineLayer(rawValue: layerRaw) ?? .now }
     private var homeMode: HomeMode { HomeMode(rawValue: homeModeRaw) ?? .now }
 
@@ -282,6 +296,19 @@ struct MapSpineView: View {
         // （`.bottom{bottom:26}` / `.stack{bottom:86}`）。安全区底那 34pt 若不排除，
         // 条子会凭空抬高一截 —— 与原型差出一个手指的宽度。
         .ignoresSafeArea(edges: .bottom)
+        // 量「屏幕顶到这一层的顶」= 系统安全区那一段（灵动岛机型 59、涛海 47、老机型 20）。
+        // 它只服务一件事：交给五张子页当**滚动内容的顶部内衬**（`stackTopInset`），
+        // 让卡片从时钟下面连续滑过、而静止时第一张卡仍让开状态栏。
+        // 拿 `frame(in: .global)` 而不是 `safeAreaInsets`：前者是「它到底在屏幕上的哪儿」
+        //（就是我们要的那个数），后者在已被父层让开的视图里会读到 0。
+        .background {
+            GeometryReader { g in
+                Color.clear
+                    .onAppear { topSafeGap = g.frame(in: .global).minY }
+                    .onChange(of: g.frame(in: .global).minY) { _, y in topSafeGap = y }
+            }
+        }
+        .environment(\.stackTopInset, topSafeGap + TokensSpacing.md)
         // Toast 的出现 / 消失（它原来跟在外壳上，随浮层一起搬过来）。
         .animation(.easeOut(duration: 0.2), value: nav.currentToast?.text)
         // 暗层全删（用户 2026-09-24：「每个子界面的暗层都去掉」）：
@@ -341,7 +368,28 @@ struct MapSpineView: View {
         }
         // 镜头一动就把比例尺再露两秒（与 Apple 地图同一个节奇）——
         // `MapCameraPosition` 是 `Equatable`，所以这一条能直接盯它。
+        //
+        // ⚠️ 它**不够**：用户 2026-09-25 第 9 条「比例尺也不出现了，缩放地图的时候
+        // 应该要出现啊」—— `camera` 这个绑定的回写并不覆盖每一种手势（双指缩放
+        // 在真机上就常常不回写），而这条 `onChange` 是它唯一的触发者，
+        // 于是尺子实际上只剩「进入这一屏时露一次」。真正管用的触发在下面：
+        // `onMapCameraChange`（Apple 给地图的官方回调，平移与缩放都会来）。
         .onChange(of: camera) { _, _ in flashScale() }
+        // 镜头变化：罗盘要朝向、回北要中心与距离、比例尺要「地图动了」这件事。
+        // 用 `.continuous`（拖动过程中每帧都来）而不是 `.onEnd`：尺子要在**缩放时**
+        // 就露出来，而不是等手指松开。代价是每帧都回调 —— 所以每个动作都有门槛：
+        // 距离没变过 6% 就不重露尺子（不然一次拖动会留下上百个待执行的 2 秒计时器）。
+        .onMapCameraChange(frequency: .continuous) { ctx in
+            cameraHeading = ctx.camera.heading
+            cameraCenter = ctx.camera.centerCoordinate
+            cameraDistanceNow = ctx.camera.distance
+            let moved = lastScaleDistance == 0
+                || abs(ctx.camera.distance - lastScaleDistance) > lastScaleDistance * 0.06
+            if moved {
+                lastScaleDistance = ctx.camera.distance
+                flashScale()
+            }
+        }
         // 盯的是**车自己的读数**（同一个 `caches["location"]`），不是派生数据里的那份：
         // 这一条原来写 `.onChange(of: d.carCoordinate?.latitude)`，而 `.onChange` 的条件
         // 每次求值都要算一次 —— 于是它单独又建了一整份派生数据（见 `body` 上的说明）。
@@ -381,12 +429,13 @@ struct MapSpineView: View {
             mapContent(d)
         }
         .mapStyle(.standard)
-        .mapControls {
-            // 面板：罗盘仍然是系统控件（原型 `.compass`）—— 它回答「哪边是北」，
-            // 位置由 MapKit 定、我们不动它。比例尺**不在**这里（见 `nowLayer`）。
-            MapCompass()
-                .mapControlVisibility(.visible)
-        }
+        // 这里原本有一个 `.mapControls { MapCompass() }`（系统的罗盘）。
+        // 2026-09-25 第 9 条（用户：「指南针的图标位置是系统定死的吗？太上了」）：
+        // 是定死的 —— `MapCompass` 贴在 MapKit 自己给的角落（安全区紧下沿），
+        // 我们搬不动它。所以罗盘换成我们自己画的那一枚（`MapQuickButtons.compassButton`），
+        // 它挂在**与右侧两枚圆钮同一行**的位置上（`TokensSpacing.xxxl`），
+        // 而且与它们同一种材质。`mapControls` 因此整个消失：
+        // 那一片地方再没有系统控件了（比例尺早就是我们自己量的）。
         // 这里原本还有两层浮层：**色温蒙版**（系统瓦片改不了色，只能盖一层 ——
         // 二十套艺术方向各有一个蒙版色与不透明度）与**光层**（光池 / 暗角 / 颗粒，
         // 位置由太阳方位角算）。两层都只在艺术方向下出现，随主题一起删掉（2026-09-25）。
@@ -408,126 +457,16 @@ struct MapSpineView: View {
     //  删完就没有读者了。这一步只能靠人 grep —— `scan/orphans.py` 只盖系统类型的
     //  扩展成员，看不到项目自己的计算属性（那是它明说的盲区）。
 
-    @MapContentBuilder
-    private func mapContent(_ d: MapSpineData) -> some MapContent {
-        if let c = d.carCoordinate {
-            Annotation(d.carName, coordinate: c) {
-                MapCarPin(
-                    socPct: d.socPct,
-                    heading: d.headingDeg,
-                    isActive: false,
-                    lamp: d.sky(at: skyDate)?.lamp ?? 0
-                )
-                .frame(width: 44, height: 44)   // HIG 最小触控目标就落在钉中心
-            }
-        }
-        // 手机自己那一点（只在真的拿到位置时出现）—— 与车钝是**两个**点：
-        // 「车在哪」与「我在哪」是两个问题（见 `MapQuickButtons.phonePin`）。
-        phonePin()
-        rangeCircle(d)
-        tripLines(d)
-        hotspotCircles(d)
-        holdPins(d)
-        chargerPins
-        issuePins(d)
-    }
-
-    /// 行程：**一条一条的起终点连线**（不是轨迹 —— TripRecord 里没有轨迹点）
-    ///
-    /// 每条线画两遍：先一条更宽更淡的（光晕），再一条细的（主线）。
-    /// 只加这一点，路线就从「贴在瓦片上的线」变成「发着光的路径」——
-    /// 原型里那个观感差主要就差在这一层，而不是差在底图上。
-    /// 颜色仍是**同一个 accent**，没有新增颜色。
-    @MapContentBuilder
-    private func tripLines(_ d: MapSpineData) -> some MapContent {
-        if layer == .trips {
-            ForEach(d.trips) { t in
-                MapPolyline(MKPolyline(coordinates: [t.from, t.to], count: 2))
-                    .stroke(TokensPalette.accent.opacity(0.16),
-                            style: StrokeStyle(lineWidth: 10, lineCap: .round))
-                MapPolyline(MKPolyline(coordinates: [t.from, t.to], count: 2))
-                    .stroke(TokensPalette.accent.opacity(0.9),
-                            style: StrokeStyle(lineWidth: 3, lineCap: .round))
-            }
-        }
-    }
-
-    /// 续航圈：半径就是车报的 RemainedPowerMile（米）。车没报就不画 —— 不猜。
-    @MapContentBuilder
-    private func rangeCircle(_ d: MapSpineData) -> some MapContent {
-        if layer == .now, let c = d.carCoordinate, let meters = d.rangeMeters, meters > 0 {
-            MapCircle(center: c, radius: meters)
-                .stroke(TokensPalette.accent,
-                        style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [4, 5]))
-                .foregroundStyle(TokensPalette.accent.opacity(0.05))
-        }
-    }
-
-    /// 常停热区：停车史聚出来的圈。描边示形状，填充透明度随次数加深。
-    @MapContentBuilder
-    private func hotspotCircles(_ d: MapSpineData) -> some MapContent {
-        if layer == .holds {
-            ForEach(d.hotspots) { h in
-                MapCircle(center: h.center, radius: h.radiusMeters)
-                    .stroke(TokensPalette.accent.opacity(0.55),
-                            style: StrokeStyle(lineWidth: 1, dash: [2, 4]))
-                    .foregroundStyle(TokensPalette.accent.opacity(h.visits >= 3 ? 0.14 : 0.07))
-            }
-        }
-    }
-
-    @MapContentBuilder
-    private func holdPins(_ d: MapSpineData) -> some MapContent {
-        if layer == .holds {
-            ForEach(d.holds) { h in
-                Annotation("停车点", coordinate: h.coordinate) {
-                    MapSpotPin(kind: .hold(isLatest: h.isLatest))
-                }
-            }
-        }
-    }
-
-    /// 显示用的聚合结果（地图与面板共用同一份）
-    private var chargerClusters: [MapChargerCluster] {
-        MapSpineData.clusterChargers(chargers)
-    }
-
-    @MapContentBuilder
-    private var chargerPins: some MapContent {
-        if layer == .charge {
-            // 一个位置只放一个标记：孤立的是钉子，挨在一起的是一个带**真实站数**的圈。
-            // 点圈 = 放大到那一组 —— 聚合不能变成「点不开的东西」。
-            ForEach(chargerClusters) { cluster in
-                Annotation("充电站", coordinate: cluster.coordinate) {
-                    if cluster.count == 1 {
-                        MapSpotPin(kind: .charger(distanceText: cluster.nearest.distanceText))
-                    } else {
-                        Button {
-                            withAnimation(TokensMotion.value) {
-                                camera = .camera(MapCamera(centerCoordinate: cluster.coordinate,
-                                                           distance: 1200))
-                            }
-                        } label: {
-                            MapClusterPin(count: cluster.count)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-
-    @MapContentBuilder
-    private func issuePins(_ d: MapSpineData) -> some MapContent {
-        if layer == .now {
-            ForEach(d.issues) { i in
-                Annotation("异常", coordinate: i.coordinate) {
-                    // 异常必须在图上自己说出来 —— 要点一下才知道是哪一条，不算「看见」
-                    MapSpotPin(kind: .issue, label: i.title)
-                }
-            }
-        }
-    }
+    //  `mapContent` / `tripLines` / `rangeCircle` / `hotspotCircles` / `holdPins` /
+    //  `chargerClusters` / `chargerPins` / `issuePins`（「地图上画什么」那一段）
+    //  2026-09-25 搬进 `Map/MapSpineAnnotations.swift` —— 同一个阈值的第三次：
+    //  本文件这一轮又到 1207 行，越过了 `lintcfg.py` 的 1200 阈值。
+    //  按那个阈值的用法是把东西搬出去（不是加排除清单、也不是抬阈值到刚够）——
+    //  而搬的这一块是**一件独立的事**：图上那几个东西怎么画（车钉 / 行程线 /
+    //  续航圈 / 热区 / 停车点 / 充电桩 / 异常点），与镜头、图层、手势、六页同屏
+    //  互不相干。界面一字未改。
+    //  连带 `skyDate` 从 `private` 放开（搬出去的那一段要按此刻的光给车钉的灯取数），
+    //  理由与 `layer` 那次相同（见下面那段说明）。
 
     // =========================================================================
     // MARK: 车牌徽标上的那颗状态点
@@ -665,14 +604,16 @@ struct MapSpineView: View {
             Color.clear
                 .frame(width: Self.armSize, height: Self.armSize)
                 .dsGlass(in: Circle(), interactive: true)
+            // 字与图形都走 `TokensInk`：这一枚底是**真玻璃**（上面那行 `dsGlass`），
+            // 而它浮在地图/壁纸之上 —— 固定标签色在这里读不出对比度（用户第 10 条）。
             if let text {
                 Text(text)
                     .font(TokensTypo.fixed(11, weight: .bold))
-                    .foregroundStyle(TokensPalette.secondary)
+                    .foregroundStyle(TokensInk.secondary)
             } else if let icon {
                 Image(safeSymbol: icon, fallback: icon)
                     .font(TokensTypo.fixed(17, weight: .medium))
-                    .foregroundStyle(TokensPalette.primary)
+                    .foregroundStyle(TokensInk.primary)
             }
         }
         .frame(width: Self.armSize, height: Self.armSize)
@@ -801,18 +742,24 @@ struct MapSpineView: View {
         } else {
             // 子页的顶：**背景铺到屏顶，内容留在安全区里**。
             //
-            // 用户 2026-09-24：「地图页可以全屏没有状态栏，为什么子页面有时间信号
-            // 的状态栏挡着」→ 壁纸（背景）从此画到屏幕最上沿，这一条不变。
-            // 用户 2026-09-25 第 3 条：「所有的子界面顶部要留有一定的空间吧？
-            // 现在连第一个卡片的圆角都看不到了」—— 上一版这里写的是
-            // `.ignoresSafeArea(edges: .top)` + `.safeAreaPadding(.top, 44)`：
-            // 前者把**内容**也顶到了屏幕最上沿（第一张卡的圆角正好落在状态栏底下），
-            // 后者想把它推回来，但它加进的是「子树自己已经忽略掉的那条安全区」，
-            // 而且那个 44 是个字面量。
-            // 现在：只有背景忽略安全区（`.background { …ignoresSafeArea() }`），
-            // 内容留在系统安全区里，上面再让一格呼吸位 —— 圆角因此看得见。
+            // 子页的顶 —— 三代写法，每一代的代价都记在这里：
+            //
+            //  ① `.ignoresSafeArea(edges: .top)`（内容也顶到屏最上沿）：第一张卡的
+            //     圆角正好落在状态栏底下（用户 09-25 第 3 条：「连圆角都看不到」）。
+            //  ②  `.safeAreaPadding(.top, 44)` 想把它推回来：但那个 44 是个字面量，
+            //     而且加的是「子树已经忽略掉的那条安全区」—— 没推回来。
+            //  ③  只让**背景**忽略安全区、内容留在安全区里（上一轮的修法）：圆角回来了，
+            //     代价是这一叠上沿变成一道**硬裁线**，而且顶上永远横着一条空白带 ——
+            //     地图那一档不是这样的（它画到屏幕最上沿）。
+            //
+            //  现在（用户 09-25 第 2 条：「顶部的时间和信号应该和地图页一样，不要遮盖」）：
+            //  **与地图页同一套行为** —— 内容铺到屏顶，所以卡片是从时钟下面连续滑过的，
+            //  不再在半空中被裁断；而静止位置由滚动内容自己的顶部内衬保住
+            //（`stackTopInset` = 量出来的安全区 + 一格呼吸位）。两条要求因此不再对立：
+            //  圆角看得见，且顶上不横着一条空白带。
+            //  顶上那一段的可读性交给系统的滚动边缘效果（`ArcStack` 里那一条），
+            //  而不是我们自己再加一层压暗（用户 09-24：「全局不要加暗层」）。
             pageContent(mode)
-                .padding(.top, TokensSpacing.md)
                 .padding(.bottom, Self.barTotal)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 // 五张子页的底色 = 壁纸图（相册选的一张本地图，不依赖网络）。
@@ -875,8 +822,8 @@ struct MapSpineView: View {
                     .padding(.bottom, Self.barTotal + 12)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                // 地图右侧那一列快速钮（回到车 / 手机的位置）—— 用户 2026-09-25：
-                // 「像 ios 地图 app 右侧的图标一样」。它们贴在**右上角**（让开系统罗盘），
+                // 地图右侧那一列快速钮（罗盘 / 回到车 / 手机的位置）—— 用户 2026-09-25：
+                // 「像 ios 地图 app 右侧的图标一样」。它们贴在**右上角**，
                 // 不是贴底：底下那张卡与模式条已经占满了（见 `MapQuickButtons`）。
                 quickMapButtons(d)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
@@ -907,7 +854,7 @@ struct MapSpineView: View {
     /// 回到车一枚浮钮、顶栏三枚（刷新 / 搜索 / 回到车，而且长在**六页每一页**上）。
     /// **不是 `private`**：抽屉的头（`MapSpineReadouts.swift`）要把它摆在拉手那一行的
     /// 右侧 —— 而 `private` 的作用域是**文件**，另一个文件看不见它。
-    /// 它与 `spec` / `store` / `camera` 是同一条：一件事只有一个实现，跨文件时不复制第二份。
+    /// 它与 `store` / `camera` 是同一条：一件事只有一个实现，跨文件时不复制第二份。
     func layerMenu(_ d: MapSpineData) -> some View {
         Menu {
             ForEach(MapSpineLayer.allCases) { l in
@@ -957,7 +904,7 @@ struct MapSpineView: View {
                 Image(safeSymbol: "chevron.up.chevron.down", fallback: "chevron.down")
                     .font(TokensTypo.micro)
             }
-            .foregroundStyle(TokensPalette.secondary)
+            .foregroundStyle(TokensInk.secondary)
             .padding(.horizontal, TokensSpacing.snug)
             .padding(.vertical, TokensSpacing.xs)
             // 图层胶囊浮在**地图**上（连续的画面）→ `.overMedia`（`.clear`）：

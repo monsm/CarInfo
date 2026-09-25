@@ -1,5 +1,4 @@
 import SwiftUI
-import AVFoundation
 
 // 车控 —— iOS 27 Liquid Glass：
 // 渐变主控双盘 + 玻璃指令列表 + 执行进度卡 + PIN 数字键盘 / 温度弹层。
@@ -94,6 +93,8 @@ struct ControlView: View {
     /// 地图右臂直接调 `AppStore.sendControlCommand`（拿 Keychain 里的旧码就发），
     /// 而本页要走温度 → 生物识别 → 控车码。现在两边挂的是同一个 modifier。
     @State private var request: ControlRequest?
+    /// 车身上点了某一扇门：等用户选「锁车 / 解锁」（见 `onCarPartTap`）。
+    @State private var doorPart: CarPart?
     @State private var isRefreshing = false         // 下拉刷新进行中
     // 原先这里还有个 `@EnvironmentObject var nav` —— 全文件一次都没用过
     // （本页从不 push 别的页面），已删。留着的代价是：一旦这一屏改用 sheet 呈现，
@@ -289,6 +290,18 @@ struct ControlView: View {
         // 它原先长在这一页里（三个 sheet + 一个遮罩共 60 行），地图右臂就绕过去了；
         // 现在它是一处 modifier，两处发起处挂同一个（见 `ControlCommandFlow`）。
         .controlCommandFlow($request)
+        // 点车门不是「一条指令」：报文里没有单开一扇门的动作，所以给一个二选一。
+        // 选完仍然走**同一道门**（`controlCommandFlow`）—— 三维视图没有第二条执行路径。
+        .confirmationDialog(doorPart?.title ?? "车门",
+                            isPresented: Binding(get: { doorPart != nil },
+                                                 set: { if !$0 { doorPart = nil } }),
+                            titleVisibility: .visible) {
+            Button("锁车") { onCmd("LockDoor") }
+            Button("解锁") { onCmd("UnLockDoor") }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("没有单独开一扇门的指令，只有整车上锁与解锁。")
+        }
         .refreshable {
             // 数字归零
             Task {
@@ -298,19 +311,11 @@ struct ControlView: View {
         .dsPageTitle("车控")
             .accessibilityLabel(Text("车控"))
             .accessibilityHint(Text("锁车、解锁、空调、座椅加热"))
-        // #35 语音播报入口
-        .toolbar {
-            if !UIAccessibility.isSpeakScreenEnabled {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        speakStatus()
-                    } label: {
-                        Image(safeSymbol: "speaker.wave.3.fill", fallback: "speaker.wave.3.fill")
-                    }
-                    .accessibilityLabel(Text("语音播报车况"))
-                }
-            }
-        }
+        // 这里原本有一个 `.toolbar { … speakStatus() … }`（#35 语音播报车况）。
+        // 用户 2026-09-25 第 7 条要求删掉语音播报 → 按钮、`speakStatus()`、
+        // `VoiceBroadcastManager`、以及「我的」里那个开关一起走。
+        // 顺带记一条：这一页的导航栏是隐藏的（`MapSpineView` 里 `.toolbar(.hidden)`），
+        // 所以那枚钮**从来没有显示过** —— 一个到不了的入口。
         // MARK: 生命周期（车身明细、缓存）
 
         .onAppear {
@@ -367,15 +372,20 @@ struct ControlView: View {
                 }
             }
 
-            CarTopView(
+            // 车 = 一辆**真的三维模型**（用户 2026-09-25 第 8 条：
+            // 「车太丑了，能不能搞个真车或立体车，可以滑动的，像特斯拉屏幕那样的
+            //  也可以点击控车」）。它取代的是那张线描俯视图（`CarTopView`，已删）。
+            CarModelView(
                 doorCls: doorStates(),
                 trunkOpen: trunkIsOpen(),
-                windowsOpen: windowsAreOpen()
+                windowsOpen: windowsAreOpen(),
+                onTapPart: { onCarPartTap($0) }
             )
-            // 形状定高：320:470 是那块画布自己的比例（`CarTopView.artSize`），
-            // 再用卡片量到的可用高度封顶。原来这里是写死的 286 —— 而画布按 `min` 缩放，
-            // 高度写小了就白拿一圈左右留白（380pt 宽的机器上车只有 195pt 宽）。
-            .aspectRatio(CarTopView.artAspect, contentMode: .fit)
+            // 三维视图没有「原始画布比例」—— 比例得由我们自己定：4:3 是一辆车
+            // 从四分之三视角看过去最自然的取景（宽大于高；竖着会像一张海报）。
+            // 高度上限仍是卡片量到的可用高度 ×0.58（`carTopMaxHeight`）：量不到就不封顶，
+            // 宁可高一点，也不拿一个想象的屏高去砍。
+            .aspectRatio(4.0 / 3.0, contentMode: .fit)
             .frame(maxHeight: carTopMaxHeight)
             .padding(.vertical, TokensSpacing.sm)
 
@@ -471,12 +481,21 @@ struct ControlView: View {
         request = ControlRequest(key: cmd, name: scene.name, temp: scene.temp)
     }
 
-    // #35 语音播报车况
-    private func speakStatus() {
-        let utterance = AVSpeechUtterance(string: "当前车况：电量 \(store.caches["control"] != nil ? "在线" : "离线")，请查看详细报告")
-        utterance.rate = 0.5
-        utterance.pitchMultiplier = 0.9
-        AVSpeechSynthesizer().speak(utterance)
+    /// 三维车身上点了一下（`CarModelView.onTapPart` 的唯一去处）。
+    ///
+    /// 分两种，**没有第三种**（`CarModelView` 头注那条硬规则：界面上每个动作都要
+    /// 对应一条真的会发出去的指令）：有指令的部位直接发；四门没有「开门」这种指令，
+    /// 所以给一个二选一 —— 而不是替用户猜「现在该锁还是该解」。
+    ///
+    /// ⚠️ 为什么不去读车锁的读数再取反：`VM.bodyStatus` 的判据是 `num(...) == 0`，
+    /// 而同一个字段拿不到时它返回 0 —— 于是那一行**永远**显示「车锁 已锁」
+    /// （`API-FIELD-MAP.md` 里那条「最会骗人的一处」）。照它取反 = 永远只发解锁。
+    private func onCarPartTap(_ part: CarPart) {
+        if let key = part.commandKey {
+            onCmd(key)
+            return
+        }
+        doorPart = part
     }
 
     // MARK: 指令执行中
@@ -778,183 +797,19 @@ struct ControlView: View {
     }
 }
 
-// MARK: - 俯视示意图（v4：薄线描、不着色 —— 一辆从天上看得懂的车）
+// MARK: - 已删除：俯视示意图 `CarTopView`（2026-09-25）
+//
+// 它是一条条线画出来的俯视图（`Canvas` + 手写路径）：线描、不着色、没有体积。
+// 用户第 8 条要的是「真车或立体车、可以滑动、可以点击控车」——
+// 线描俯视图这三件事一件都做不到（它转不了、点不到、也没有「立体」这回事）。
+// 现在是 `CarModelView`（RealityKit 的真实三维实体，同目录）。
+// 删掉之后 `CarTopView.artSize` / `artAspect` 两个派生量也一起消失 ——
+// 三维视图没有「原始画布比例」，比例由调用点自己定（4:3）。
+//
+// 它读状态的那几处（`doorStates()` / `trunkIsOpen()` / `windowsAreOpen()`）留着，
+// 现在喂给三维视图 —— 状态从哪儿来这件事与车长什么样无关。
 /// 车身是线描，只有「状态」带颜色：绿 = 已关，橙 = 未关。
 /// 填色会把示意变成插画，着色会把插画变成儿童 App —— 所以一辆车只用线。
-struct CarTopView: View {
-    /// 左前 / 右前 / 左后 / 右后
-    var doorCls: [String]
-    var trunkOpen: Bool
-    var windowsOpen: Bool
-
-    /// 画布的原始尺寸 —— 形状（320:470）与所有坐标都是按它写的。
-    /// 调用点靠它推高度（`.aspectRatio`），不再另外写一个高度。
-    static let artSize = CGSize(width: 320, height: 470)
-    static var artAspect: CGFloat { artSize.width / artSize.height }
-
-    private func color(_ cls: String) -> Color {
-        cls == "bad" ? TokensPalette.warning : TokensPalette.success
-    }
-
-    private func doorColor(_ idx: Int) -> Color {
-        guard doorCls.indices.contains(idx) else { return TokensPalette.success }
-        return color(doorCls[idx])
-    }
-
-    var body: some View {
-        Canvas { ctx, size in
-            let scale = min(size.width / Self.artSize.width, size.height / Self.artSize.height)
-            let dx = (size.width - Self.artSize.width * scale) / 2
-            let dy = (size.height - Self.artSize.height * scale) / 2
-            let t = CGAffineTransform(translationX: dx, y: dy).scaledBy(x: scale, y: scale)
-            func xf(_ p: Path) -> Path { p.applying(t) }
-
-            // 地面反光（径向渐变，边界外恒为 0）
-            ctx.fill(
-                Path(CGRect(origin: .zero, size: size)),
-                with: .radialGradient(
-                    Gradient(colors: [
-                        TokensPalette.primary.opacity(0.06),
-                        TokensPalette.primary.opacity(0.015),
-                        TokensPalette.primary.opacity(0.0)
-                    ]),
-                    center: CGPoint(x: size.width / 2, y: size.height * 0.52),
-                    startRadius: 0,
-                    endRadius: size.height * 0.48
-                )
-            )
-
-            // 车身轮廓（薄线）
-            var outline = Path()
-            outline.move(to: CGPoint(x: 160, y: 26))
-            outline.addCurve(to: CGPoint(x: 254, y: 50),
-            control1: CGPoint(x: 206, y: 26),
-            control2: CGPoint(x: 240, y: 34))
-            outline.addCurve(to: CGPoint(x: 267, y: 96),
-            control1: CGPoint(x: 264, y: 61),
-            control2: CGPoint(x: 267, y: 76))
-            outline.addLine(to: CGPoint(x: 267, y: 250))
-            outline.addCurve(to: CGPoint(x: 254, y: 312),
-            control1: CGPoint(x: 267, y: 282),
-            control2: CGPoint(x: 264, y: 300))
-            outline.addCurve(to: CGPoint(x: 160, y: 336),
-            control1: CGPoint(x: 240, y: 328),
-            control2: CGPoint(x: 206, y: 336))
-            outline.addCurve(to: CGPoint(x: 66, y: 312),
-            control1: CGPoint(x: 114, y: 336),
-            control2: CGPoint(x: 80, y: 328))
-            outline.addCurve(to: CGPoint(x: 53, y: 250),
-            control1: CGPoint(x: 56, y: 300),
-            control2: CGPoint(x: 53, y: 282))
-            outline.addLine(to: CGPoint(x: 53, y: 96))
-            outline.addCurve(to: CGPoint(x: 66, y: 50),
-            control1: CGPoint(x: 53, y: 76),
-            control2: CGPoint(x: 56, y: 61))
-            outline.addCurve(to: CGPoint(x: 160, y: 26),
-            control1: CGPoint(x: 80, y: 34),
-            control2: CGPoint(x: 114, y: 26))
-            outline.closeSubpath()
-            ctx.stroke(xf(outline), with: .color(TokensPalette.primary.opacity(0.85)),
-                       style: StrokeStyle(lineWidth: 1.5, lineJoin: .round))
-
-            // 风挡 / 天窗 / 后风挡
-            var windshield = Path()
-            windshield.move(to: CGPoint(x: 84, y: 62))
-            windshield.addCurve(to: CGPoint(x: 160, y: 42),
-            control1: CGPoint(x: 100, y: 48),
-            control2: CGPoint(x: 128, y: 42))
-            windshield.addCurve(to: CGPoint(x: 236, y: 62),
-            control1: CGPoint(x: 192, y: 42),
-            control2: CGPoint(x: 220, y: 48))
-            windshield.addLine(to: CGPoint(x: 245, y: 84))
-            windshield.addLine(to: CGPoint(x: 75, y: 84))
-            windshield.closeSubpath()
-            ctx.stroke(xf(windshield), with: .color(TokensPalette.secondary),
-                       style: StrokeStyle(lineWidth: 1.3, lineJoin: .round))
-
-            let roof = Path(roundedRect: CGRect(x: 92, y: 98, width: 136, height: 76), cornerRadius: 16)
-            ctx.stroke(xf(roof), with: .color(TokensPalette.secondary), style: StrokeStyle(lineWidth: 1.3))
-
-            var rear = Path()
-            rear.move(to: CGPoint(x: 75, y: 278))
-            rear.addLine(to: CGPoint(x: 84, y: 316))
-            rear.addCurve(to: CGPoint(x: 160, y: 334),
-            control1: CGPoint(x: 100, y: 328),
-            control2: CGPoint(x: 128, y: 334))
-            rear.addCurve(to: CGPoint(x: 236, y: 316),
-            control1: CGPoint(x: 192, y: 334),
-            control2: CGPoint(x: 220, y: 328))
-            rear.addLine(to: CGPoint(x: 245, y: 278))
-            rear.closeSubpath()
-            ctx.stroke(xf(rear), with: .color(TokensPalette.secondary), style: StrokeStyle(lineWidth: 1.3))
-
-            // 后视镜
-            var mirrorL = Path()
-            mirrorL.move(to: CGPoint(x: 56, y: 88))
-            mirrorL.addLine(to: CGPoint(x: 40, y: 97))
-            mirrorL.addLine(to: CGPoint(x: 43, y: 110))
-            mirrorL.addLine(to: CGPoint(x: 57, y: 105))
-            mirrorL.closeSubpath()
-            var mirrorR = Path()
-            mirrorR.move(to: CGPoint(x: 264, y: 88))
-            mirrorR.addLine(to: CGPoint(x: 280, y: 97))
-            mirrorR.addLine(to: CGPoint(x: 277, y: 110))
-            mirrorR.addLine(to: CGPoint(x: 263, y: 105))
-            mirrorR.closeSubpath()
-            ctx.stroke(xf(mirrorL), with: .color(TokensPalette.secondary), style: StrokeStyle(lineWidth: 1.3))
-            ctx.stroke(xf(mirrorR), with: .color(TokensPalette.secondary), style: StrokeStyle(lineWidth: 1.3))
-
-            // 四门状态线：绿 = 已关，橙 = 未关
-            let doorSpans: [(CGFloat, CGFloat, CGFloat)] = [
-                (53, 96, 144), (267, 96, 144), (53, 204, 252), (267, 204, 252)
-            ]
-            for (idx, span) in doorSpans.enumerated() {
-                let c = doorColor(idx)
-                var line = Path()
-                line.move(to: CGPoint(x: span.0, y: span.1))
-                line.addLine(to: CGPoint(x: span.0, y: span.2))
-                ctx.drawLayer { layer in
-                    layer.addFilter(.blur(radius: 4))
-                    layer.opacity = 0.35
-                    layer.stroke(xf(line), with: .color(c), style: StrokeStyle(lineWidth: 12, lineCap: .round))
-                }
-                ctx.stroke(xf(line), with: .color(c), style: StrokeStyle(lineWidth: 3, lineCap: .round))
-            }
-
-            // 后备箱
-            var trunk = Path()
-            trunk.move(to: CGPoint(x: 112, y: 336))
-            trunk.addLine(to: CGPoint(x: 208, y: 336))
-            let trunkColor = trunkOpen ? TokensPalette.warning : TokensPalette.success
-            if trunkOpen {
-                ctx.drawLayer { layer in
-                    layer.addFilter(.blur(radius: 5))
-                    layer.opacity = 0.3
-                    layer.stroke(xf(trunk), with: .color(trunkColor),
-                               style: StrokeStyle(lineWidth: 14, lineCap: .round))
-                }
-            }
-            ctx.stroke(xf(trunk), with: .color(trunkColor), style: StrokeStyle(lineWidth: 3, lineCap: .round))
-
-            // 车窗开启时，两侧给一条细橙线
-            if windowsOpen {
-                var wl = Path()
-                wl.move(to: CGPoint(x: 53, y: 96))
-                wl.addLine(to: CGPoint(x: 53, y: 250))
-                var wr = Path()
-                wr.move(to: CGPoint(x: 267, y: 96))
-                wr.addLine(to: CGPoint(x: 267, y: 250))
-                ctx.stroke(xf(wl), with: .color(TokensPalette.warning.opacity(0.45)),
-                           style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                ctx.stroke(xf(wr), with: .color(TokensPalette.warning.opacity(0.45)),
-                           style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-            }
-        }
-        .accessibilityElement()
-        .accessibilityLabel(Text("车辆俯视状态图"))
-    }
-}
-
 // MARK: - PIN 数字键盘弹层（玻璃化）
 
 struct PINKeypadView: View {

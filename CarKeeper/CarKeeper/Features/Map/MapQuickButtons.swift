@@ -15,10 +15,15 @@ import MapKit
 //    · 「手机的位置」**根本不存在**：全仓没有任何 CoreLocation 代码，
 //      地图上只有车（见 `Services/PhoneLocation.swift` 的文件头）。
 //
-//  观感照 iOS 地图右侧那一列：两枚 44×44 的圆钮（`TokensSize.tap` = HIG 最小
-//  触控目标），竖着排成一条，间距 12，右边与卡同一条边距（`TokensSpacing.md`），
-//  顶从安全区下 `TokensSpacing.xxxl` 起 —— 正好让开系统罗盘（`MapCompass`），
-//  于是这一列与罗盘看起来是同一个仪表盘的两颗钮，而不是两堆浮物。
+//  观感照 iOS 地图右侧那一列：44×44 的圆钮（`TokensSize.tap` = HIG 最小触控目标），
+//  竖着排成一条，间距 12，右边与卡同一条边距（`TokensSpacing.md`），
+//  顶从安全区下 `TokensSpacing.xxxl` 起。
+//
+//  2026-09-25 第 9 条：这一列从**两枚**变成**三枚** —— 罗盘也搬进来了。
+//  原来那个罗盘是系统的（`MapCompass`），它的位置由 MapKit 定（安全区紧下沿的角落），
+//  搬不动 —— 而用户要它下来一点（「太上了」）。现在它是我们自己画的一枚：
+//  一根指向正北的针（`Triangle`，与警示钉同一个形状原语）+ 点一下回正北。
+//  它与另两枚同一行、同一种材质、同一个尺寸 —— 这才看起来是「同一列控件」。
 //
 //  材质：`.overMedia` —— 它们浮在**连续的画面**（地图瓦片）上，不是卡的面。
 //  可点 → `interactive`：按下去的压缩与折射由系统演（`DSGlass.swift` 的三条规则）。
@@ -34,6 +39,8 @@ extension MapSpineView {
         // 而把动作当参数传会引入两层新东西 —— 闭包的 actor 归属与它的类型 ——
         // 换不来任何复用。
         VStack(spacing: TokensSpacing.snug) {
+            compassButton
+
             Button {
                 TokensHaptic.tap()
                 recenterCar(d)
@@ -62,13 +69,68 @@ extension MapSpineView {
         .padding(.top, TokensSpacing.xxxl)
     }
 
+    /// 罗盘：一根**永远指向正北**的针 + 点一下回正北。
+    ///
+    /// 为什么不是 SF Symbol：`location.north.fill` 那一类符号是「箭头」，
+    /// 而罗盘读的是**北在哪** —— 一根红针是全世界的地图 App 共用的一种画法，
+    /// 而 `Triangle` 这个形状原语本仓已经有了（警示钉）。
+    ///
+    /// 针转的是 `-cameraHeading`：镜头朝哪，北就在相反的方向。
+    /// 那个数只有 `onMapCameraChange` 说得出（见 `MapSpineView.cameraHeading`）。
+    var compassButton: some View {
+        Button {
+            TokensHaptic.tap()
+            resetNorth()
+        } label: {
+            ZStack {
+                // 针：一半实一半虚 —— 地图上它是「北指向」，不是装饰。
+                Triangle()
+                    .fill(TokensPalette.error)
+                    .frame(width: 11, height: 10)
+                    .rotationEffect(.degrees(-cameraHeading))
+                // 南针的半边也走 `TokensInk`（它坐在罗盘的玻璃上，见 `compassButton`）。
+                Triangle()
+                    .fill(TokensInk.secondary)
+                    .frame(width: 11, height: 10)
+                    .rotationEffect(.degrees(180 - cameraHeading))
+                    .opacity(0.7)
+            }
+            .frame(width: TokensSize.tap, height: TokensSize.tap)
+            .dsGlass(in: Circle(), variant: .overMedia, interactive: true)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("罗盘"))
+        .accessibilityValue(Text(cameraHeading == 0 ? "已朝正北" : "北在 \(Int((360 - cameraHeading).rounded()) % 360) 度方向"))
+        .accessibilityHint(Text("回到正北朝上"))
+    }
+
+    /// 回正北：**只把朝向归零**，中心与缩放照旧。
+    ///
+    /// `MapCamera` 要一个完整的镜头（中心 + 距离 + 朝向 + 俯仰），所以这三个数得从
+    /// 手里有的地方来：中心取镜头自己的（拿不到就退回车），距离取**镜头此刻的**
+    /// （写死 `cameraDistance` 会把用户缩放好的尺度一把推回默认 —— 那是另一种“"
+    /// 点了什么都不对”）。
+    @MainActor
+    func resetNorth() {
+        guard let c = cameraCenter ?? store.currentLocation?.coordinate else { return }
+        withAnimation(TokensMotion.value) {
+            camera = .camera(MapCamera(centerCoordinate: c,
+                                       distance: cameraDistanceNow,
+                                       heading: 0,
+                                       pitch: 0))
+        }
+    }
+
     /// 一枚钮的图形：圆底玻璃 + 安全取符号。
     @MainActor
     private func quickIcon(_ symbol: String, fallback: String,
                            dimmed: Bool) -> some View {
         Image(safeSymbol: symbol, fallback: fallback)
             .font(TokensTypo.fixed(17, weight: .semibold))
-            .foregroundStyle(dimmed ? TokensPalette.tertiary : TokensPalette.primary)
+            // 圆底是真玻璃、底下是**连续的画面**（地图瓦片）→ `TokensInk`：
+            // 系统会按材质调它，固定标签色在瓦片上会糊掉（用户第 10 条）。
+            .foregroundStyle(dimmed ? TokensInk.tertiary : TokensInk.primary)
             .frame(width: TokensSize.tap, height: TokensSize.tap)
             .dsGlass(in: Circle(), variant: .overMedia, interactive: true)
             .contentShape(Circle())
@@ -79,7 +141,7 @@ extension MapSpineView {
     /// `location.slash` = 拿不到（被拒或取不到）—— iOS 地图也是这么表示的。
     private var phoneSymbol: String {
         switch PhoneLocation.shared.status {
-        case .found: return "location.fill"
+        case .found, .coarse: return "location.fill"
         case .denied, .failed: return "location.slash"
         case .idle, .asking, .locating: return "location"
         }
@@ -89,8 +151,9 @@ extension MapSpineView {
         switch PhoneLocation.shared.status {
         case .idle: return "把地图移到手机所在的位置（第一次会问权限）"
         case .asking: return "正在等定位权限"
-        case .locating: return "正在取手机的位置"
+        case .locating: return "正在取手机的位置（尽量取准的那一个）"
         case .found: return "再按一次：重新取手机的位置"
+        case .coarse: return "只拿到粗定位：蓝点外面那圈就是误差范围"
         case .denied: return "定位权限没开 —— 去系统设置里允许这个 App 使用位置"
         case .failed: return "取不到手机的位置（室内或没有信号时常见）"
         }
@@ -124,6 +187,12 @@ extension MapSpineView {
             ToastManager.shared.show("取不到手机的位置", icon: "location.slash")
         case .idle, .asking, .locating:
             phone.request()
+        case .coarse:
+            // 手上是个粗点：先移过去（总比没反应好），同时**再要一次** ——
+            // 走两步常常就能拿到准的点。取到之后由那条 `onChange` 再移一次镜头。
+            phone.request()
+            fly(to: phone.coordinate)
+            ToastManager.shared.show("位置精度较低，正在再取一次", icon: "location")
         case .found:
             phone.request()          // 重新取一次（它取到就停，所以这次是「刷新」）
             fly(to: phone.coordinate)
@@ -152,6 +221,15 @@ extension MapSpineView {
     @MapContentBuilder
     func phonePin() -> some MapContent {
         if let c = PhoneLocation.shared.coordinate {
+            // 不确定范围：`horizontalAccuracy` 就是**半径**（CoreLocation 给的 95% 置信圆）。
+            // iOS 地图的蓝点外面那圈淡圆就是它 —— 而它是用户第 9 条（「手机的位置飘逸
+            // 很严重」）在界面上的答案：点到底准不准，图上自己说得出，不再偷偷地错。
+            // 只画出「看得出来」的那个量级（>20 m），否则一圈比点还小的圆只是噪声。
+            if let acc = PhoneLocation.shared.accuracy, acc > 20 {
+                MapCircle(center: c, radius: acc)
+                    .foregroundStyle(TokensPalette.info.opacity(0.16))
+                    .stroke(TokensPalette.info.opacity(0.40), lineWidth: 1)
+            }
             Annotation("我的位置", coordinate: c) {
                 Circle()
                     .fill(TokensPalette.info)

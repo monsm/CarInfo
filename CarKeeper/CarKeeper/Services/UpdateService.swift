@@ -3,7 +3,9 @@ import SwiftUI
 
 // 检查更新：查询 GitHub 仓库 tag=latest 的 Release（由 Actions 每次构建覆盖上传 ipa），
 // 下载其 ipa 附件到 App 沙盒，再以系统分享菜单（UIActivityViewController）弹出。
-// 私库访问需要用户填入具备 repo 权限的 Personal Access Token（缓存在 UserDefaults）。
+//
+// 2026-09-25（用户第 5 条）：令牌**写在代码里**（`Services/GithubToken.swift`，唯一一处），
+// 不再是「每台设备手输一次、缓存在 UserDefaults」—— 那条路上的按钮在输入前什么都不做。
 enum UpdateService {
 
     // 仓库 monsm/CarInfo（私库）。如需改仓库只改这里两个常量即可。
@@ -11,12 +13,10 @@ enum UpdateService {
     static let repoName = "CarInfo"
     static let tagLatest = "latest"
 
-    private static let tokenKey = "github_token"
-
-    static var githubToken: String {
-        get { UserDefaults.standard.string(forKey: tokenKey) ?? "" }
-        set { UserDefaults.standard.set(newValue, forKey: tokenKey) }
-    }
+    /// 令牌只有**一个**出处（不是 UserDefaults、也不是本文件的常量）：
+    /// 它住 `GithubToken.value`，因为「这个 key 写在哪」应该只有一个人能回答。
+    /// 只读属性而不是可写：没有任何界面能改它了（那个 Token 弹窗已删）。
+    static var githubToken: String { GithubToken.value }
 
     static func apiHeader(_ token: String) -> [String: String] {
         ["Authorization": "Bearer \(token)", "Accept": "application/vnd.github+json"]
@@ -131,7 +131,7 @@ enum UpdateError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .noToken: return "请先填写 GitHub Token（私库访问需要）"
+        case .noToken: return "没有内置访问令牌，无法检查更新"
         case .fetchFailed(let m): return "获取更新失败：\(m)"
         case .downloadFailed(let m): return "下载失败：\(m)"
         }

@@ -19,31 +19,12 @@ struct DevView: View {
     @State private var showClearConfirm = false
     /// 「原始日志」那一组的重读代号（`RawLogStore` 不是 ObservableObject）
     @State private var logTick = 0
-    /// 卡片叠预览页（`Features/Dev/StackLabView.swift`）
-    @State private var showStackLab = false
-
     // 订阅那些「启动了但没人看」的监控。用 @ObservedObject 而不是直接读单例：
     // 内存每 10 秒刷新一次、网络质量也是周期性的 —— 不订阅就永远停在打开那一瞬的值。
     @ObservedObject private var memory = MemoryMonitor.shared
     @ObservedObject private var networkQuality = NetworkQualityMonitor.shared
     @ObservedObject private var offline = OfflineModeManager.shared
     @ObservedObject private var chargeMonitor = ChargingStatusMonitor.shared
-    @ObservedObject private var focus = FocusModeManager.shared
-
-    private struct SWatch: Identifiable {
-        let id = UUID()
-        let name: String
-        let color: Color
-        let note: String
-    }
-
-    private struct TypeToken: Identifiable {
-        let id = UUID()
-        let name: String
-        let metrics: String
-        let font: Font
-        let sample: String
-    }
 
     var body: some View {
         //  正文只提供内容 —— 它住在「我的」那张叫「诊断」的卡里（`StackCard`），
@@ -53,13 +34,15 @@ struct DevView: View {
         //  （用户 2026-09-25：「每个卡片仔细核对，内容展开后是否拥挤」）。
         //  页标题也一并删：卡头写着「诊断」，正文再写一遍「设计令牌」是同一个东西
         //  两个名字（它下面那一节自己还有「艺术主题」的标题）。
+        //  2026-09-25 第 6 条（用户：「诊断里面删除一切和 UI 相关的」）：
+        //  上面原本还挂着六组**与界面本身有关**的东西 ——
+        //  卡片叠预览（`StackLabView`）、画布与表面色板、语义色色板、字体样张、
+        //  几何数值、动效数值。它们回答的是「我们的设计长什么样」，
+        //  而这一页的名字叫诊断：诊断回答的是「这台设备此刻在发生什么」。
+        //  两件事住在一页里的代价很实在：真正要报障的人得先划过一屏设计令牌。
+        //  （色板与样张当年还有第二个理由 —— 用眼睛挑二十套艺术主题；主题只剩原生
+        //   之后那个理由早就没了，是这一次一起走的。）
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            stackEntry
-            swatchGroup(title: "画布与表面", footer: "内容层不透明：玻璃只允许出现在导航栏、Tab 栏与弹层。", items: surfaceTokens)
-            swatchGroup(title: "语义色", footer: "颜色只来自系统，且只表达状态；界面里没有装饰性彩色。", items: semanticTokens)
-            typographyGroup
-            kvGroup("几何", geometry, footer: "页边距 20pt、分组圆角 12pt、发丝线 0.5pt 是全 App 定值。")
-            kvGroup("动效", motion, footer: "只有两类：状态变化的弹簧，以及一次性绘制。")
             kvGroup("运行状态", runtime)
             capabilityGroups
             diagnosticsGroups
@@ -67,7 +50,6 @@ struct DevView: View {
             kvGroup("关于", about)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .fullScreenCover(isPresented: $showStackLab) { StackLabView() }
         .confirmationDialog("清除全部车端缓存？", isPresented: $showClearConfirm, titleVisibility: .visible) {
             Button("清除缓存", role: .destructive) {
                 store.clearCache()
@@ -88,133 +70,6 @@ struct DevView: View {
     /// 只剩一套取值时，一页样张是「拿真实的取值给自己的唯一答案看」。
     /// 取值现在住在 `Tokens.swift`（`TokensPalette`），下面那些色板就是它的读数。
 
-    // MARK: - 卡片叠预览入口
-
-    /// 叠法曾经有七种（弧出 / 吸附堆叠 / 压层叠 / 纵深叠 / 错位叠 / 钱夹叠 / 滚轮）：
-    /// 2026-09-24 用户删到只剩一种，2026-09-25 滚动本身交回系统 `ScrollView` ——
-    /// 也就是说「叠法」这件事已经结束了，这里不再有当前值可显示。
-    /// 入口留着是为了**在真机上看那一叠卡本身**（卡高矮参差时的观感、玻璃的层次），
-    /// 那些只有真机判得了。（底条的跟手形态已于 2026-09-25 定下整行跟手，
-    /// 那个选择器与 `DSSwipeStrip.Follow` 一起删了 —— 这里不再有可挑的东西。）
-    private var stackEntry: some View {
-        DSGroup(title: "卡片叠",
-                footer: "功能界面的卡是上下滑的，滚动手感就是系统 `ScrollView` 的手感（惯性、橡皮筋、指示条全归系统）。这一页能验的是卡片本身。") {
-            DSGroupRow(showsSeparator: false) {
-                Button {
-                    showStackLab = true
-                } label: {
-                    HStack(spacing: TokensSpacing.sm) {
-                        Text("卡片叠预览")
-                            .font(TokensTypo.body)
-                            .foregroundStyle(TokensPalette.primary)
-                        Spacer(minLength: TokensSpacing.sm)
-                        Image(safeSymbol: "chevron.right", fallback: "chevron.right")
-                            .font(TokensTypo.footnote)
-                            .foregroundStyle(TokensPalette.tertiary)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint(Text("打开卡片叠预览"))
-            }
-        }
-    }
-
-    // MARK: - 色板
-
-    private var surfaceTokens: [SWatch] {
-        [
-            SWatch(name: "canvas", color: TokensPalette.background, note: "页面画布 · systemGroupedBackground"),
-            SWatch(name: "surface", color: TokensPalette.nightSurface, note: "分组表面 · secondarySystemGroupedBackground"),
-            SWatch(name: "surfaceRaised", color: TokensPalette.nightSurface,
-                    note: "内凹表面 · tertiarySystemGroupedBackground"),
-            SWatch(name: "hairline", color: TokensPalette.hairline, note: "发丝分隔线 · UIColor.separator"),
-            SWatch(name: "fill", color: TokensPalette.fillSubtle, note: "通用填充 · tertiarySystemFill"),
-            SWatch(name: "tintSoft", color: TokensPalette.ambient, note: "强调色淡底（选中胶囊）")
-        ]
-    }
-
-    private var semanticTokens: [SWatch] {
-        [
-            SWatch(name: "tint", color: TokensPalette.ambient, note: "唯一强调色 · 系统蓝 #007AFF / #0A84FF"),
-            SWatch(name: "ok", color: TokensPalette.success, note: "正常 / 已就绪 · systemGreen"),
-            SWatch(name: "warn", color: TokensPalette.warning, note: "预警 / 需关注 · systemOrange"),
-            SWatch(name: "bad", color: TokensPalette.error, note: "故障 / 异常 · systemRed"),
-            SWatch(name: "charge", color: TokensPalette.info, note: "充电 / 电驱状态"),
-            SWatch(name: "labelTertiary", color: TokensPalette.tertiary, note: "文字第三级 · 30%")
-        ]
-    }
-
-    private func swatchGroup(title: String, footer: String? = nil, items: [SWatch]) -> some View {
-        DSGroup(title: title, trailing: "\(items.count)", footer: footer) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
-                DSGroupRow(showsSeparator: idx < items.count - 1) {
-                    HStack(spacing: TokensSpacing.md) {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(item.color)
-                            .frame(width: 28, height: 28)
-                            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line))
-                        VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
-                            Text(item.name)
-                                .font(TokensTypo.body)
-                                .foregroundStyle(TokensPalette.primary)
-                            Text(item.note)
-                                .font(TokensTypo.caption)
-                                .foregroundStyle(TokensPalette.secondary)
-                                .lineLimit(2)
-                        }
-                        Spacer(minLength: TokensSpacing.sm)
-                        Text(item.color.hexString())
-                            .font(TokensTypo.digits(13))
-                            .foregroundStyle(TokensPalette.secondary)
-                    }
-                    .padding(.vertical, TokensSpacing.sm)
-                    .accessibilityElement(children: .combine)
-                }
-            }
-        }
-    }
-
-    // MARK: - 字体
-
-    private var typeTokens: [TypeToken] {
-        [
-            TypeToken(name: "display", metrics: "96 / ultraLight · 等宽数字", font: TokensTypo.display(96), sample: "88"),
-            TypeToken(name: "metric", metrics: "34 / light · 等宽数字", font: TokensTypo.metric(34), sample: "420 km"),
-            TypeToken(name: "largeTitle", metrics: "34 / bold", font: TokensTypo.largeTitle, sample: "车况"),
-            TypeToken(name: "title2", metrics: "22 / semibold", font: TokensTypo.title2, sample: "驾驶舱"),
-            TypeToken(name: "title3", metrics: "20 / semibold", font: TokensTypo.title3, sample: "充电设置"),
-            TypeToken(name: "headline", metrics: "17 / semibold", font: TokensTypo.headline, sample: "主操作按钮"),
-            TypeToken(name: "body", metrics: "17 / regular · 字距 −0.41", font: TokensTypo.body, sample: "正文与列表行标题"),
-            TypeToken(name: "callout", metrics: "16", font: TokensTypo.callout, sample: "次级正文"),
-            TypeToken(name: "subheadline", metrics: "15", font: TokensTypo.subheadline, sample: "字段名与说明"),
-            TypeToken(name: "footnote", metrics: "13", font: TokensTypo.footnote, sample: "分组标题与脚注"),
-            TypeToken(name: "caption", metrics: "12", font: TokensTypo.caption, sample: "标签"),
-            TypeToken(name: "data", metrics: "17 · 等宽数字", font: TokensTypo.data, sample: "356 V / 12 A")
-        ]
-    }
-
-    private var typographyGroup: some View {
-        DSGroup(title: "文字", trailing: "\(typeTokens.count)", footer: "字号用 iOS 的真实阶梯；仪器感来自字重差，不来自颜色。") {
-            ForEach(Array(typeTokens.enumerated()), id: \.element.id) { idx, token in
-                DSGroupRow(showsSeparator: idx < typeTokens.count - 1) {
-                    VStack(alignment: .leading, spacing: TokensSpacing.xs) {
-                        Text(token.sample)
-                            .font(token.font)
-                            .foregroundStyle(TokensPalette.primary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                        Text("\(token.name) · \(token.metrics)")
-                            .font(TokensTypo.digits(12))
-                            .foregroundStyle(TokensPalette.secondary)
-                    }
-                    .padding(.vertical, TokensSpacing.sm)
-                    .accessibilityElement(children: .combine)
-                }
-            }
-        }
-    }
-
     // MARK: - 通用键值组
 
     private func kvGroup(_ title: String, _ rows: [(String, String)], footer: String? = nil) -> some View {
@@ -225,29 +80,6 @@ struct DevView: View {
                 }
             }
         }
-    }
-
-    // MARK: - 令牌数值
-
-    private var geometry: [(String, String)] {
-        [
-            ("页面边距", "\(Int(TokensSpacing.page)) pt"),
-            ("分组内边距", "\(Int(TokensSpacing.md)) pt"),
-            ("行高", "\(Int(TokensSpacing.row)) pt"),
-            ("圆角 · 小 / 分组 / 弹层",
-             "\(Int(TokensRadius.small)) / \(Int(TokensRadius.medium)) / \(Int(TokensRadius.large)) pt"),
-            ("发丝线", "\(TokensHair.line) pt"),
-            ("主按钮高度", "\(Int(TokensSize.button)) pt")
-        ]
-    }
-
-    private var motion: [(String, String)] {
-        [
-            ("press（按压）", "spring 0.30 / 0.86"),
-            ("value（数值变化）", "spring 0.36 / 0.88"),
-            ("screen（页面过渡）", "spring 0.42 / 0.90"),
-            ("draw（光条一次性绘制）", "easeOut 1.1 s")
-        ]
     }
 
     // MARK: - 运行状态与操作
@@ -279,8 +111,6 @@ struct DevView: View {
                 : "未测出"),
             ("离线模式", offline.isOffline ? "已开启" : "关闭"),
             ("充电监控", chargeMonitor.summary),
-            ("摇一摇锁车", ShakeDetector.shared.isEnabled ? "已开启" : "关闭"),
-            ("专注模式", focus.config.enabled ? "已开启" : "关闭"),
             ("车端里程", mileage > 0 ? "\(mileage) km" : "未取到"),
             // 保养计划：这里要看得出「数字从哪来」—— 服务端字段（20000 / 20100）
             // 与本机兜底（10000 / 用户手记）会给出完全不同的结论。
@@ -520,19 +350,7 @@ struct DevView: View {
         [
             ("版本", appVersion),
             ("构建", buildNumber),
-            ("设计语言", "CarKeeper v4 · iOS 原生"),
             ("外观", "跟随系统（浅色 / 深色各一套）")
         ]
-    }
-}
-
-// MARK: - HEX 辅助
-
-extension Color {
-    /// 返回 6 位 HEX 字符串（不含 #），按当前外观解析动态色
-    func hexString() -> String {
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &a)
-        return String(format: "%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
     }
 }

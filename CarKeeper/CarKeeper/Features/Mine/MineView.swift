@@ -14,29 +14,16 @@ struct MineView: View {
     @State private var downloadPct: Double = 0
     @State private var downloadPctDisplay: Int = 0    // 下载进度数字滚动计数
     @State private var showDownload = false
-    @State private var showToken = false
-    @State private var tokenDraft: String = ""
     @State private var downloadFile: URL? = nil
     @State private var shareItems: [Any] = []
     @State private var shareSheetFlag = false
     @State private var isRefreshing = false     // 下拉刷新进行中标志
     @State private var isChecking = false        // OTA 检查中（不含下载）
-    @State private var showTempKeys = false
-    @State private var showFamily = false
     /// 退出登录二次确认（按钮在 tilesCard 的「应用」组里）
     @State private var logoutConfirm = false
-    /// 行内开关的**本地镜像**。
-    /// ShakeDetector / VoiceBroadcast / FocusModeManager 三个单例都不是 ObservableObject，
-    /// 直接把开关绑到它们的属性上会出现「拨了不动」（值变了但没人通知视图）。
-    /// 这一页不是常驻屏，所以镜像一份状态：先改本地（立刻重绘），再写回单例。
-    @State private var shakeOn = ShakeDetector.shared.isEnabled
-    @State private var voiceOn = UserDefaults.standard.bool(forKey: "carkeeper_voice_enabled")
-    @State private var focusOn = FocusModeManager.shared.config.enabled
     // 这一页里的「去做某件事」全部走 `nav.openMode(...)`（拨到那一档 / 那段），
     // 不再保留一堆从未绑定 sheet 的 @State（此前 7 个磁贴设了状态却没人监听 = 死按钮）。
     @EnvironmentObject var nav: NavState
-    // #NEW-115 夜间模式管理
-    @StateObject private var nightModeManager = NightModeManager.shared
     /// 档内段落：设置 / 应急 / 诊断。它不是导航层级（见 `HomeSub`）。
     @State private var tab: HomeSub = .settings
     /// 壁纸状态（相册里选的一张图，子页面铺底；用户 2026-09-24「其他页面的背景全部
@@ -130,33 +117,7 @@ struct MineView: View {
         } message: {
             Text(aboutText)
         }
-        .alert("GitHub Token", isPresented: $showToken) {
-            TextField("粘贴 Token", text: $tokenDraft)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .keyboardType(.asciiCapable)
-            Button("保存") {
-                UpdateService.githubToken = tokenDraft
-                updateMsgIsError = false
-                updateMsg = tokenDraft.isEmpty ? "已清空 Token" : "Token 已保存，点「检查更新」获取最新构建"
-            }
-            Button("取消", role: .cancel) { }
-        }
         .sheet(isPresented: $shareSheetFlag) { ShareSheet(items: shareItems) }
-        .sheet(isPresented: $showTempKeys) {
-            NavigationStack {
-                TempKeyListView()
-                    .navigationTitle("共享钥匙")
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-        }
-        .sheet(isPresented: $showFamily) {
-            NavigationStack {
-                FamilyManagementView()
-                    .navigationTitle("家庭管理")
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-        }
         .alert("退出登录", isPresented: $logoutConfirm) {
             Button("退出", role: .destructive) { logout() }
             Button("取消", role: .cancel) { }
@@ -293,33 +254,29 @@ struct MineView: View {
     // 那两组已删：**功能目录只有底部模式条一份**，这一页只留设置。
     private var settingsGroups: some View {
         VStack(spacing: TokensSpacing.xl) {
-            DSGroup(title: "报告与共享") {
-                actionRow("key.fill", "共享钥匙") { showTempKeys = true }
-                actionRow("person.2.fill", "家庭管理", last: true) { showFamily = true }
-            }
-
-            DSGroup(title: "设备与模式",
-                    footer: "摇一摇会真的发锁车指令。") {
-                customRow { shakeToggle }
-                // #31 省电模式
-                customRow { PowerSavingToggle() }
-                customRow { nightModeRow }
-                customRow(last: true) {
-                    DSRow(icon: "moon.fill", title: "专注模式",
-                          value: focusOn ? "已开启" : "已关闭") { toggleFocus() }
-                }
-            }
+            //  这里原本有两组：「报告与共享」（共享钥匙 / 家庭管理）与
+            //  「设备与模式」（摇一摇锁车 / 省电模式 / 夜间模式 / 专注模式）。
+            //
+            //  用户 2026-09-25 第 4 与第 7 条要求删掉它们，明暗改由系统决定
+            //（「全部删除 明暗根据系统获取」）。删的不是几个开关，是四个功能：
+            //    · 共享钥匙 / 家庭管理 → `TempKeyManager` / `FamilyManager` 与两个页面
+            //    · 摇一摇锁车 → `ShakeDetector`
+            //    · 省电模式 → `PowerSavingToggle`
+            //    · 专注模式 → `FocusModeManager`
+            //    · 夜间模式 → `NightModeManager`（App 根部不再有 `.preferredColorScheme`，
+            //      nil 就是跟随系统 —— 与 iOS 其余部分一致）
+            //  只服务它们的那几个文件、启动时那几行初始化、以及它们各自的键，
+            //  一起删干净 —— 留下「代码在、没人能到」正是这个仓库一直在删的东西。
 
             DSGroup(title: "应用") {
                 // 「全局搜索」那一行已删：全局搜索从项目移除（用户 2026-09-23，
                 // 与地图右臂一起）。要找一个功能，走底部模式条 —— 那是**唯一**的目录；
                 // 搜索页本身是第二份目录，而且没有任何一条只能从它到达的功能。
-                // 此前是空操作（VoiceBroadcastManager 自动启动，点这里什么都不发生）。
-                // 现在是真能用的开关：翻转 VoiceBroadcastManager 读取的 UserDefaults 键。
-                customRow {
-                    DSRow(icon: "speaker.wave.3.fill", title: "语音播报",
-                          value: voiceOn ? "已开启" : "已关闭") { toggleVoice() }
-                }
+                // 「语音播报」那一行已删（用户 2026-09-25 第 7 条）。
+                // 更值得记的是它为什么删得掉：它翻转的是 `carkeeper_voice_enabled`，
+                // 而**全仓没有一个读者** —— `VoiceBroadcastManager` 这个类型早就不存在了，
+                // 车控页那枚也没有显示过（那一页的导航栏是隐藏的）。
+                // 一个只有写者、没有读者的开关，是这个仓库里最贵的一种摆设。
                 // 壁纸（非地图子页的背景图，用户 2026-09-24「其他页面的背景全部设为
                 // 当前桌面的背景」→ iOS 没有读主屏壁纸的公开 API，只能从相册选一张
                 // 本地图铺底 —— 不依赖网络，选完落盘，下次启动还在）。
@@ -354,54 +311,6 @@ struct MineView: View {
     }
 
     // MARK: 行内的小组件 / 退出登录（都在 settingsGroups 里用）
-
-    /// 摇一摇锁车开关。
-    /// 此前这个功能只有一个从未被写入过的 UserDefaults 键（`carkeeper_shake_to_lock`，
-    /// bool 默认 false）—— 也就是说它永远是关的，而且没有任何地方能把它打开。
-    /// 现在开关真的写到 ShakeDetector，并且**本地镜像**状态（它不是 ObservableObject，
-    /// 直接绑定会出现「拨了不动」）。
-    private var shakeToggle: some View {
-        Toggle(isOn: Binding(
-            get: { shakeOn },
-            set: { newValue in
-                shakeOn = newValue
-                ShakeDetector.shared.isEnabled = newValue
-                TokensHaptic.select()
-            }
-        )) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("摇一摇锁车")
-                    .font(TokensTypo.body)
-                    .foregroundStyle(TokensPalette.primary)
-                Text("摇一下手机，发锁车指令（需 PIN）")
-                    .font(TokensTypo.footnote)
-                    .foregroundStyle(TokensPalette.secondary)
-            }
-        }
-        .frame(minHeight: TokensSpacing.row)
-    }
-
-    /// #NEW-115 夜间模式切换：iOS 设置里的「值选择器」行
-    /// （原来是行内分段控件 + 自己的 padding + 第二套卡片底：一整块彩色块嵌在白色分组里）
-    private var nightModeRow: some View {
-        HStack {
-            Text("夜间模式")
-                .font(TokensTypo.body)
-                .foregroundStyle(TokensPalette.primary)
-            Spacer(minLength: TokensSpacing.sm)
-            Picker("夜间模式", selection: Binding(
-                get: { nightModeManager.currentMode },
-                set: { nightModeManager.setMode($0) }
-            )) {
-                Text("自动").tag(NightModeMode.auto)
-                Text("浅色").tag(NightModeMode.light)
-                Text("深色").tag(NightModeMode.dark)
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-        }
-        .frame(minHeight: TokensSpacing.row)
-    }
 
     /// 壁纸小卡：缩略图（当前那张）+ 两个小钮（换一张 / 不铺）。
     ///
@@ -618,7 +527,6 @@ struct MineView: View {
         HStack(spacing: TokensSpacing.snug) {
             mainUpdateButton
             if downloadFile != nil { shareButton }
-            tokenButton
         }
     }
 
@@ -652,20 +560,6 @@ struct MineView: View {
         .buttonStyle(.plain)
     }
 
-    private var tokenButton: some View {
-        Button {
-            tokenDraft = UpdateService.githubToken
-            showToken = true
-        } label: {
-            Label("Token", systemImage: "key.fill")
-                .font(TokensTypo.caption)
-                .foregroundStyle(TokensPalette.secondary)
-                .padding(.horizontal, TokensSpacing.snug).padding(.vertical, TokensSpacing.snug)
-                .background(TokensPalette.fillSubtle, in: Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-
     private var aboutText: String {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
@@ -675,37 +569,6 @@ struct MineView: View {
     private func logout() {
         store.logout()
         // RootView 监听 isLoggedIn 变化后自动切回登录页
-    }
-
-    // MARK: 真开关（此前这两个磁贴一个空操作、一个跳错页）
-
-    /// 语音播报开关：VoiceBroadcastManager 每次播报前都读这个键，翻转后立即生效
-    private func toggleVoice() {
-        let key = "carkeeper_voice_enabled"
-        let next = !UserDefaults.standard.bool(forKey: key)
-        UserDefaults.standard.set(next, forKey: key)
-        voiceOn = next
-        ToastManager.shared.show(next ? "语音播报已开启" : "语音播报已关闭",
-                                 icon: next ? "speaker.wave.3.fill" : "speaker.slash.fill")
-        TokensHaptic.select()
-    }
-
-    /// 专注模式开关：与首页 toggleFocusMode 同一套配置结构
-    private func toggleFocus() {
-        let fm = FocusModeManager.shared
-        let next = FocusModeConfig(
-            enabled: !fm.config.enabled,
-            hideSensitiveData: fm.config.hideSensitiveData,
-            showEssentialOnly: fm.config.showEssentialOnly,
-            doNotDisturb: fm.config.doNotDisturb,
-            autoStartDriving: fm.config.autoStartDriving,
-            customMessage: fm.config.customMessage
-        )
-        fm.saveConfig(next)
-        focusOn = next.enabled
-        ToastManager.shared.show(next.enabled ? "专注模式已开启" : "专注模式已关闭",
-                                 icon: next.enabled ? "moon.fill" : "moon.zzz.fill")
-        TokensHaptic.select()
     }
 
     private func checkUpdate() {
@@ -719,9 +582,12 @@ struct MineView: View {
         showDownload = false
         Task { @MainActor in
             do {
+                // 令牌**写在代码里**（用户 2026-09-25 第 5 条：「将 key 直接写在代码中」）
+                // —— `Services/GithubToken.swift` 是它唯一的一处。这里是它为空时的**一句话**：
+                // 没配令牌时按钮照旧按得动，只是会说出为什么（而不是「点了什么都不发生」）。
                 if UpdateService.githubToken.isEmpty {
                     updateMsgIsError = true
-                    updateMsg = "请先点「GitHub Token」填入私库访问 Token"
+                    updateMsg = "没有配访问令牌，暂时无法检查更新"
                     isChecking = false
                     updateBusy = false
                     return

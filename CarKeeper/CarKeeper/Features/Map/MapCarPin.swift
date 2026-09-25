@@ -10,12 +10,12 @@
 //   • 脚下那圈**接地阴影**是"它站在这块地上"的唯一提示（平面化的钉像是贴上去的）
 //   • 车灯是**算出来的**：亮度 = SkyLight.lamp（1 − 晴空辐照度/220，日照下几乎不亮）
 //
-// 三种艺术方向在这里的差别不是配色，是**画法**：
-//   ring  夜光 —— 刻度盘 + 弧形 + 外发光 + 接地阴影（光只出现在车上）
-//   ink   纸上 —— 墨线圈 + 虚线刻度 + 无发光（纸不会发光）
-//   rule  巨字 —— 两层发丝细环 + 十字准线，没有实心填充（版面即内容）
+// 这里原本有三种画法（夜光 / 纸上 / 巨字），由**艺术方向**挑一套 ——
+// 2026-09-25 主题只剩原生，另外两套随艺术方向一起删了（留着它们只会让人
+// 以为「换一套」这件事还存在着）。现在只有一种：刻度盘 + 电量弧 + 车 + 接地阴影。
 //
-// 尺寸约定：钉本体 76pt（外圈光晕可溢出），命中区由 MapSpineView 给（HIG 要 44pt）。
+// 尺寸约定：钉本体 76×96（外圈光晕可溢出；多出来的 20pt 是圆盘下那枚电量徽标），
+// 命中区由 MapSpineView 给（HIG 要 44pt）。
 // =============================================================================
 import SwiftUI
 
@@ -38,6 +38,21 @@ struct MapCarPin: View {
         return TokensPalette.accent
     }
 
+    //  ⚠️ 2026-09-25 第 9 条（用户：「车的位置没有车的图标了，像是被删了很多」）：
+    //  这不是感觉，是真事 —— **`body` 从来没有调用过 `ringStyle`**。
+    //
+    //  那一刻（艺术主题删到只剩原生那一轮）`body` 里写的是 `headingMark` 一个，
+    //  而刻度盘、电量弧、底盘、接地阴影、那个数字全在 `ringStyle` 里 ——
+    //  于是车钉被画出来的只有两样：一团模糊的色光、一个小缺口环。
+    //  一串「看起来该存在的东西」全变成了**到不了的代码**：不报错、不崩、编译全过，
+    //  只是屏幕上少了一辆车（`scan/orphans.py` 只盖系统类型的扩展成员，看不见项目
+    //  自己的计算属性 —— 这是它明说的盲区，所以这类错只能靠人在真机上看）。
+    //
+    //  现在把三样东西一起画出来，并且各说各的一件事：
+    //    · `ringStyle`  = 刻度盘 + 电量弧 + 底盘（**电量的形状**）
+    //    · `carGlyph`   = 车本身（**车头朝向**，它按 Heading 转 —— 缺口环因此删了，
+    //                     同一件事不再用两种画法说）
+    //    · `socBadge`   = 那个数字（从圆盘里搬到圆盘下：盘心让给了车）
     var body: some View {
         ZStack {
             lampBloom
@@ -47,12 +62,44 @@ struct MapCarPin: View {
                 .frame(width: 62, height: 62)
                 .blur(radius: 12)
 
-            headingMark
+            ringStyle
+
+            // 电量徽标：挂在圆盘**下面**（`offset` 让开接地阴影）。
+            // 它带一枚与底盘同厚的底 —— 地图底色不可控，数字必须在任何底上读得清。
+            socBadge
+                .offset(y: 34)
         }
-        .frame(width: 76, height: 76)
+        .frame(width: 76, height: 96)
+        // 钉心仍在圆盘中心（数字往上挪了 34，所以整框高 96、中心对在圆盘上）。
         .accessibilityElement()
         .accessibilityLabel(Text("车的位置"))
         .accessibilityValue(Text("电量 \(socPct)%，车头朝 \(Int(heading.rounded())) 度"))
+    }
+
+    /// 车本身 —— 钉的中心是**车**，不是数字。
+    /// 它按 `heading` 转：车头指向哪边，这张小图就朝哪边。
+    /// `car.fill` 在符号里是**正面视角**的车，转起来仍然是「车」；
+    /// 而记「朝向」本来就不需要俯视图 —— 用户要的是「看得见一辆车」。
+    private var carGlyph: some View {
+        Image(safeSymbol: "car.fill", fallback: "car.fill")
+            .font(TokensTypo.fixed(19, weight: .medium))
+            .foregroundStyle(TokensPalette.primary)
+            .rotationEffect(.degrees(heading))
+            .accessibilityHidden(true)
+    }
+
+    /// 圆盘下方那枚小胶囊：电量数字。
+    private var socBadge: some View {
+        socText(color: ringColor)
+            .padding(.horizontal, TokensSpacing.sm)
+            .padding(.vertical, TokensSpacing.xxs)
+            .background {
+                Capsule().fill(TokensPalette.surface.opacity(0.92))
+            }
+            .overlay {
+                Capsule().strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
+            }
+            .shadow(color: TokensPalette.scrim.opacity(0.35), radius: 6, y: 3)
     }
 
     // MARK: 车灯 —— 唯一一处"由光算出来"的发光
@@ -113,7 +160,8 @@ struct MapCarPin: View {
                 .frame(width: 58, height: 58)
                 .shadow(color: ringColor.opacity(0.7), radius: 6)
 
-            socText(color: TokensPalette.primary)
+            // 盘心：车（数字见 `socBadge`，它挂在圆盘下）
+            carGlyph
         }
     }
 
@@ -129,17 +177,11 @@ struct MapCarPin: View {
             .offset(y: 25)
     }
 
-    // MARK: 车头朝向
-    /// 一个小缺口环，绕中心转 —— 它表达的是**从接口读到的 Heading**，不是装饰动画。
-    private var headingMark: some View {
-        ZStack {
-            Circle()
-                .trim(from: 0.0, to: 0.055)
-                .stroke(TokensPalette.primary.opacity(0.65), lineWidth: 3)
-                .frame(width: 46, height: 46)
-                .rotationEffect(.degrees(heading - 90 - 5))
-        }
-    }
+    //  MARK: 已删除：车头朝向的缺口环 `headingMark`（2026-09-25）
+    //
+    //  它是一圈小缺口，绕中心转，表达从接口读到的 Heading。
+    //  现在这件事由 `carGlyph` 的车**自己**说（车头朝哪儿，那辆车就朝哪儿）——
+    //  同一个事实不再有两个画法：一个缺口环 + 一辆朝前的车，读起来是两种朝向。
 
     private func socText(color: Color) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
@@ -294,64 +336,13 @@ struct Triangle: Shape {
 }
 
 // =============================================================================
-// CarGlyphShape —— 一台用线画出来的车
+//  已删除：`CarGlyphShape` / `CarGlyph`（线描的车，2026-09-25）
 // =============================================================================
 //
-// 样品版里的车是**描边**画出来的（不是 SF Symbol）：一条腰线、一条底盘线、两个轮。
-// 差别在于：符号是"图标语言"，描边是"制图语言"—— 后者放在地图与版面上都不违和。
-// 坐标取自样品版（150×150 画布里的 44×23 那一段），这里按 rect 归一化。
-// 只画车身与底盘 —— 两个轮由 `CarGlyph` 用两个圆补上（同一个图形，两种画法拆开）。
-struct CarGlyphShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        // 原始坐标空间：x 53…97、y 69…92
-        func px(_ x: Double) -> CGFloat { rect.minX + CGFloat((x - 53) / 44) * rect.width }
-        func py(_ y: Double) -> CGFloat { rect.minY + CGFloat((y - 69) / 23) * rect.height }
-
-        var p = Path()
-        // 车顶与腰线
-        p.move(to: CGPoint(x: px(56), y: py(86)))
-        p.addLine(to: CGPoint(x: px(60.5), y: py(73)))
-        p.addQuadCurve(to: CGPoint(x: px(66.4), y: py(69)),
-                       control: CGPoint(x: px(61.8), y: py(69)))
-        p.addLine(to: CGPoint(x: px(83.6), y: py(69)))
-        p.addQuadCurve(to: CGPoint(x: px(89.5), y: py(73)),
-                       control: CGPoint(x: px(88.2), y: py(69)))
-        p.addLine(to: CGPoint(x: px(94), y: py(86)))
-        // 底盘线
-        p.move(to: CGPoint(x: px(53), y: py(86)))
-        p.addLine(to: CGPoint(x: px(97), y: py(86)))
-        return p
-    }
-}
-
-/// 完整的"一台车"：车身（描边路径）+ 两个轮（描边圆）。
-/// 为什么拆开：椭圆子路径要带一个 CGAffineTransform 重载，而"两个圆"用视图表达更直白、
-/// 也不用为一个装饰图形承担一个未核实签名的风险。
-struct CarGlyph: View {
-    var width: CGFloat = 30
-    var height: CGFloat = 16
-    var color: Color = TokensPalette.secondary
-
-    /// 轮径 = 车宽的 10.8/44（样品版的原始坐标）
-    private var wheel: CGFloat { width * 10.8 / 44 }
-
-    var body: some View {
-        ZStack(alignment: .topLeading) {
-            CarGlyphShape()
-                .stroke(color, lineWidth: 1.4)
-            wheelView(centerX: 66)
-            wheelView(centerX: 84)
-        }
-        .frame(width: width, height: height)
-        .accessibilityHidden(true)
-    }
-
-    /// 轮心按样品版的坐标系定位（x 66 / 84、y 87）
-    private func wheelView(centerX: Double) -> some View {
-        Circle()
-            .stroke(color, lineWidth: 1.4)
-            .frame(width: wheel, height: wheel)
-            .offset(x: width * CGFloat((centerX - 53) / 44) - wheel / 2,
-                    y: height * CGFloat((87 - 69) / 23) - wheel / 2)
-    }
-}
+//  那是一台**描边画出来**的车（一条腰线、一条底盘线、两个轮），当时是地图与
+//  版面上的「制图语言」。而且它**早就没有读者了** —— 车钉（`MapCarPin`）在
+//  主题删到只剩原生那一轮之后就没有再引用它，留着只是「看起来还有一辆车」。
+//
+//  现在车钉里那辆车是 SF Symbol 的 `car.fill`（见 `MapCarPin.carGlyph`）：
+//  它按 Heading 转，而且在任何底色上都读得出来 —— 手写路径做不到这一条。
+//

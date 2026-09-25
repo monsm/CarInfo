@@ -53,6 +53,10 @@ struct ArcStack: View {
     /// 无障碍翻页停在清单里的第几张（`step` 的输入）。
     @State private var current = 0
 
+    /// 滚动内容的顶部内衬（由宿主量出来的安全区 + 一格呼吸位，见 `stackTopInset`）。
+    /// 0 = 没人量过 —— 那时这一叠完全按系统布局走（默认行为，一个字都不变）。
+    @Environment(\.stackTopInset) private var topInset
+
     var body: some View {
         GeometryReader { geo in
             ScrollViewReader { proxy in
@@ -80,6 +84,20 @@ struct ArcStack: View {
                 .accessibilityAdjustableAction { direction in
                     step(direction == .increment ? 1 : -1, proxy: proxy)
                 }
+                // 顶部：**内容顶到屏顶、卡片从时钟下连续滑过**（用户 2026-09-25 第 2 条：
+                // 「顶部的时间和信号应该和地图页一样，不要遮盖」）。
+                //
+                // 改之前是「这一叠画在安全区里面」—— 静止时第一张卡确实让开了状态栏，
+                // 但代价是它的上沿就是一道**硬裁线**：卡片滑到那里就凭空断掉，
+                // 顶上永远横着一条什么都没有的空白带；而地图那一档是画到屏幕最上沿的。
+                // 现在两者同一套行为：这一叠往上铺满（`.ignoresSafeArea(edges: .top)`），
+                // 静止位置由**滚动内容的顶部内衬**保住（量出来的安全区 + 16，见
+                // `stackTopInset`）—— 第 7 轮那条「第一张卡的圆角要看得见」因此没被推翻。
+                // 顶上再交给系统的滚动边缘效果：内容从时钟下经过时由它给出可读性
+                //（那是系统自己的处理，不是我们自造的又一层压暗）。
+                .ignoresSafeArea(edges: .top)
+                .contentMargins(.top, topInset)
+                .scrollEdgeEffectStyle(.soft, for: .top)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .accessibilityElement(children: .contain)

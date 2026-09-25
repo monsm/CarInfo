@@ -646,6 +646,34 @@ VERIFIED_SDK_ADDITIONS = {
     # ⚠️ `convert` 这个名字很泛（白名单是按**名字**判的，所以任何 `.convert(` 都会因此通过）。
     # 它当前只用在 `MapProxy` 上，一处一处可数；换到别处去用它要重新对着文档核一遍。
     "convert": "MapProxy.convert(_:from:)（iOS 17+；decl: func convert(_ point: CGPoint, from: some CoordinateSpaceProtocol) -> CLLocationCoordinate2D?；externalID s:15_MapKit_SwiftUI0A5ProxyV7convert_4fromSo22CLLocationCoordinate2DVSgSo7CGPointV_xt0cD023CoordinateSpaceProtocolRzlF；doc://com.apple.mapkit/documentation/MapKit/MapProxy/convert(_:from:)；abstract: Converts a point in the specified coordinate space to a map coordinate）——比例尺那个数**唯一**的来源：两点之间的地面距离由它量出来（不是按镜头距离估的）",
+    # 车控那一屏的三维车（Features/Control/CarModelView.swift，2026-09-25 第 8 条：
+    # 「车控的车太丑了，能不能搞个真车或立体车，可以滑动的……也可以点击控车」）。
+    # RealityKit 这一批名字在写进代码前逐个取过 Apple 文档 JSON（title / kind /
+    # platforms / metadata.externalID / primaryContentSections.declarations 五项）。
+    # 核实里**当场改掉了一个真错误**：`SimpleMaterial.init(color:roughness:isMetallic:)`
+    # 的 iOS 页写的是 `roughness: MaterialScalarParameter`（不是 Float）—— 而
+    # `MaterialScalarParameter` 是 `ExpressibleByFloatLiteral` 的枚举，只吃字面量。
+    # 第一版把 roughness 写成 `Float` 参数转发，那会编译不过（值类型之间没有隐式转换）。
+    "RealityView": "RealityKit.RealityView（iOS 18+；externalID s:19_RealityKit_SwiftUI0A4ViewV；decl: @MainActor @preconcurrency struct RealityView<Content> where Content: View；init(make:update:) 的 make 是 `@MainActor @Sendable (inout RealityViewCameraContent) async -> Void`）——三维车的宿主视图",
+    "Entity": "RealityKit.Entity（iOS 13+；externalID s:17RealityFoundation6EntityC；decl: @MainActor @preconcurrency class Entity）——车是一台 Entity 树，转的是根节点",
+    "addChild": "HasHierarchy.addChild(_:preservingWorldTransform:)，Entity 符合它（iOS 13+；decl: func addChild(_ entity: Entity, preservingWorldTransform: Bool = false)）——装配时挂子节点",
+    "ModelEntity": "RealityKit.ModelEntity（iOS 13+；externalID s:17RealityFoundation11ModelEntityC）——带网格与材质的实体（车身 / 座舱 / 门 / 轮 / 灯）",
+    "generateBox": "MeshResource.generateBox(width:height:depth:cornerRadius:splitFaces:)（iOS 13+；externalID s:17RealityFoundation12MeshResourceC11generateBox5width6height5depth12cornerRadius10splitFacesSbSSgtFZ；cornerRadius 与 splitFaces 都有默认值，所以只传前四个参数就成立）——车身与那些薄板都是它",
+    "generateCylinder": "MeshResource.generateCylinder(height:radius:)（iOS 18+；externalID s:17RealityFoundation12MeshResourceC16generateCylinder6height6radiusACSf_SftFZ；decl: static func generateCylinder(height: Float, radius: Float) -> MeshResource）——四个轮子",
+    "ShapeResource": "RealityKit.ShapeResource（iOS 13+；decl: @MainActor @preconcurrency class ShapeResource，类型页 externalID 同族）——碰撞体的形状",
+    "CollisionComponent": "RealityKit.CollisionComponent（iOS 13+；decl: init(shapes: [ShapeResource], mode: CollisionComponent.Mode = .default, filter: CollisionFilter = .default)）——「点得到」的前提之一",
+    "InputTargetComponent": "RealityKit.InputTargetComponent（iOS 18+；decl: init(allowedInputTypes: InputTargetComponent.InputType = .all)）——「点得到」的前提之二（这一仓只写它有的那条路）",
+    "SimpleMaterial": "RealityKit.SimpleMaterial（iOS 13+；init(color:roughness:isMetallic:) 的 **iOS** 那页 externalID 是 s:17RealityFoundation14SimpleMaterialV0A3KitE5color9roughness10isMetallicACSo7UIColorC_AA0D15ScalarParameterOSbtcfc；注意 color 是 UIColor、roughness 是 MaterialScalarParameter）——车身那几个材质",
+    "MaterialScalarParameter": "RealityKit.MaterialScalarParameter（iOS 13+；enum，`ExpressibleByFloatLiteral` + `ExpressibleByIntegerLiteral`：init(floatLiteral:) / init(integerLiteral:) / case float(_:) / case texture(_:)）——**roughness 的类型**；只吃字面量，传 Float 变量编译不过",
+    "TapGesture": "SwiftUI.TapGesture（iOS 13+；externalID s:7SwiftUI10TapGestureV）——配 targetedToAnyEntity() 用来点车身上的部位",
+    "targetedToAnyEntity": "Gesture.targetedToAnyEntity()（iOS 18+；decl: @MainActor @preconcurrency func targetedToAnyEntity() -> some Gesture<EntityTargetValue<Self.Value>>；s:7SwiftUI6Gester... 这一支由 RealityKit SwiftUI 提供）——被点中的实体直接交回来（它的 `name` 就是 `CarPart` 的 rawValue）",
+    "CLLocationAccuracy": "CoreLocation.CLLocationAccuracy（iOS 2+；externalID c:@T@CLLocationAccuracy；decl: typealias CLLocationAccuracy = Double）——手机定位请求「精确定位」时的精度值",
+    "Float": "Swift 标准库 Float（32 位）。本仓此前只用过 CGFloat / Double —— 而 `Entity.position` / `Entity.scale` / `simd_quatf` 的角度都是 Float，所以三维车那一批坐标与角度都写成它",
+    # 子页顶部与地图页对齐（用户 2026-09-25 第 2 条）用到的两个 SwiftUI 名字。
+    # 两个都取过文档 JSON（platforms / externalID / declarations 都看过）：
+    "contentMargins": "View.contentMargins(_:_:for:)（iOS 17+；externalID s:7SwiftUI4ViewPAAE14contentMargins__3forQrAA4EdgeO3SetV_AA0G6InsetsVAA22ContentMarginPlacementVtF）——`ArcStack` 给滚动内容让出顶部内衬（第一张卡静止时让开状态栏、滑动时从时钟下连续穿过）",
+    "scrollEdgeEffectStyle": "View.scrollEdgeEffectStyle(_:for:)（iOS 26+；externalID s:7SwiftUI4ViewPAAE21scrollEdgeEffectStyle_3forQrAA06ScrollefG0VSg_AA0E0O3SetVtF；decl: func scrollEdgeEffectStyle(_ style: ScrollEdgeEffectStyle?, for edges: Edge.Set) -> some View）——iOS 26 系统给滚动边缘的那层柔化延伸（`.soft` 就是系统默认的那一档）",
+    "onMapCameraChange": "View.onMapCameraChange(frequency:_:)（iOS 17+；MapKit 的 SwiftUI 扩展，externalID s:7SwiftUI4ViewP08_MapKit_aB0E02onD12CameraChange9frequency_QrAD0dG15UpdateFrequencyV_yyctF；frequency 默认 .onEnd，本页用 .continuous）——比例尺「地图动了就露一次」与罗盘朝向的唯一触发者",
 }
 
 

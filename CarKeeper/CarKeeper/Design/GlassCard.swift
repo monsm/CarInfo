@@ -85,9 +85,12 @@ struct GlassCardHead: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+            // 卡头坐在**卡片自己的玻璃**上 → 走 `TokensInk`（自适应色，
+            // 用户 2026-09-25 第 10 条：玻璃上的字要看得到）。值那一个不走它：
+            // 它是状态色，颜色本身就是信息。
             Text(title)
                 .font(TokensTypo.sectionLabel)
-                .foregroundStyle(TokensPalette.secondary)
+                .foregroundStyle(TokensInk.secondary)
                 .textCase(.uppercase)
             Spacer(minLength: TokensSpacing.sm)
             if let value {
@@ -98,7 +101,7 @@ struct GlassCardHead: View {
             if let at {
                 Text(at.formatted(date: .omitted, time: .shortened))
                     .font(TokensTypo.micro)
-                    .foregroundStyle(TokensPalette.tertiary)
+                    .foregroundStyle(TokensInk.tertiary)
             }
         }
     }
@@ -117,10 +120,10 @@ struct GlassCardEmpty: View {
         HStack(spacing: TokensSpacing.sm) {
             Image(safeSymbol: icon, fallback: icon)
                 .font(TokensTypo.footnote)
-                .foregroundStyle(TokensPalette.tertiary)
+                .foregroundStyle(TokensInk.tertiary)
             Text(text)
                 .font(TokensTypo.footnote)
-                .foregroundStyle(TokensPalette.secondary)
+                .foregroundStyle(TokensInk.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, TokensSpacing.xs)

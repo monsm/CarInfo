@@ -77,7 +77,10 @@ struct DSSwipeStrip: View {
     /// 这一行**可用的横向宽度**（屏宽 − 两侧留白）。
     ///
     /// ⚠️ 它必须是「容器给的宽度」，**不能**是条子自己被布局分到的宽度（见文件头）。
-    /// 兜底 374 = 390 的屏宽减去两侧各 8 的留白 —— 开发页（`StackLabView`）不量也成立。
+    /// 兜底 374 = 390 的屏宽减去两侧各 8 的留白 —— 让「暂时量不到宽度」的那一帧也算得下去
+    ///（开发页 `StackLabView` 曾经是这样一个不量宽度的调用点，它已随用户第 6 条
+    ///  「诊断里删掉一切与 UI 相关的」一起删除；兜底留着，因为它服务的是首帧，
+    ///  而不是某一个调用点）。
     var availableWidth: CGFloat = 374
     /// 连续位置：`2.0` = 停在第三档，`1.4` = 正拖在第二、三档之间。
     /// 宿主用它做内容的交叉过渡 —— 换模式是渐变，不是闪一下。
@@ -360,7 +363,11 @@ struct DSSwipeStrip: View {
                         // 选中 = 主题强调色（相机里那一档是黄），其余 = 正文色。
                         // 两档字的字重与字号**一样** —— 相机也是用颜色而不是加粗区分，
                         // 而比较粗的字会让相邻两档的行宽不一致，条子会跟着抖一下。
-                        .foregroundStyle(i == index ? TokensPalette.accent : TokensPalette.primary)
+                        // 未选中那一档的字母走 `TokensInk`（底是模式条自己的玻璃：
+                        // 系统会按材质给它调亮暗，见 `TokensInk`）；选中的那一个是**状态**，
+                        // 状态色不能用自适应色 —— 用户要看得出「现在是哪一个」。
+                        .foregroundStyle(i == index ? AnyShapeStyle(TokensPalette.accent)
+                                                    : TokensInk.primary)
                         .frame(width: slot)
                         .position(x: x, y: barHeight / 2)
                         .accessibilityLabel(Text(item.title))

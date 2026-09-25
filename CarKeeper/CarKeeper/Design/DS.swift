@@ -64,7 +64,8 @@ struct DSCanvas<Content: View>: View {
 ///
 ///  为什么它不是不透明的（2026-09-25）：它铺在 `GlassCard` 里面，而卡片是玻璃。
 ///  一块不透明的面（`nightSurface`，深色 #1C1C1E）压在玻璃里，结果是「玻璃中间挖了一个黑洞」——
-///  用户第 5 条说的「黑颜色太突兵」就是它。现在它读 `TokensPalette.panel`（同一色值的半透明版）。
+///  用户第 5 条说的「黑颜色太突兀」就是它。现在它读 `TokensPalette.panel`（同一色值的半透明版）——
+///  那个透明度第九轮又从 0.5 收到 0.34（用户第 3 条：「我要通透」，列表尤甚）。
 /// ⚠️ `glass` 与 `hero` 两个参数已于 2026-09-25 删除：它们**存下来就没再读过**
 /// （`body` 永远填 `nightSurface`，也从不看 `hero`）。一个叫 `glass` 的参数不产生
 /// 玻璃，是这个仓库最忌讳的那种谎 —— 谁写 `DSCard(glass: true)` 都会以为拿到了材质
@@ -636,7 +637,10 @@ struct DSSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(TokensTypo.headline)
-            .foregroundStyle(TokensPalette.primary)
+            // 这层底是**真玻璃**（下面那行 `dsGlassCapsule`）→ 字走 `TokensInk`：
+            // 系统会按材质调它（vibrancy），而 `Color(uiColor: .label)` 是解析死的值
+            // —— 在玻璃上它就是一层实字（见 `TokensInk` 的说明）。
+            .foregroundStyle(TokensInk.primary)
             .frame(maxWidth: .infinity)
             .frame(height: TokensSize.button)
             // 次操作 = 玻璃胶囊（iOS 26 的次级按钮就是这层材质）。

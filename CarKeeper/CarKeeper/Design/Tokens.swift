@@ -74,6 +74,25 @@ enum TokensPalette {
     static let secondary: Color = Color(uiColor: .secondaryLabel)
     static let tertiary: Color = Color(uiColor: .tertiaryLabel)
 
+    //  上面这三个是**不透明的系统标签色**（`.label` 三档）—— 它们在卡片、分组面
+    //  这类标准表面上是对的（那也正是它们 99% 的用法）。
+    //
+    //  而在**真玻璃**上（浮层：模式条、地图上的胶囊与圆钮、轻提示）它们少了一样东西：
+    //  系统给材质上文字的「自适应」（vibrancy）。HIG「Materials」写的就是这件：
+    //     · “Help ensure legibility by using vibrant colors on top of materials.”
+    //     · “reserve clear Liquid Glass for components over visually rich backgrounds.”
+    //  WWDC25「Build a SwiftUI app with the new design」把 SwiftUI 这一侧说死了：
+    //  “SwiftUI automatically uses a vibrant text color that adapts to maintain legibility
+    //   against colorful backgrounds.”
+    //
+    //  ⚠️ 而那个「自动」只作用于**系统语义的文字色**（`foregroundStyle(.primary)` /
+    //  `.secondary` / `.tertiary` 这几个层级样式），**不作用于** `Color(uiColor: .label)`
+    //  这种已经解析成固定值的颜色 —— 后者在玻璃上就是一层实字，底下再花也不会调自己。
+    //  这就是用户 2026-09-25 第 10 条问的那件事（「是不是没开启自适应文字颜色」）：
+    //  对，没开启 —— 因为我们一直在传具体颜色。
+    //
+    //  所以玻璃上的字走 **`TokensInk`**（同文件里的顶层类型，与这里的三个一一对应）。
+
     // ---- 强调色（只有一个）----
     static let accent: Color = tokenDynamic(light: (0.000, 0.478, 1.000),
                                             dark: (0.039, 0.518, 1.000))
@@ -96,9 +115,22 @@ enum TokensPalette {
     static var nightSurface: Color { surface }
     /// 页面底色（旧名）
     static var background: Color { canvas }
-    /// 浅填充（输入框、未选中的底）—— `quaternarySystemFill`。
-    /// 它一度改成「跟主题走」；主题没了之后它就是一个系统语义色，跟着深浅色变。
-    static let fillSubtle: Color = Color(uiColor: .quaternarySystemFill)
+    /// 卡里的**控件底**（输入框 / 分段控件的凹槽 / 未选中的底 / 骨架 / 按压态）。
+    ///
+    /// 用户 2026-09-25 第 3 条：「所有子页面的卡片上面还是有这种控件显示着不通透的
+    /// 灰色（列表尤甚），我要通透」。根因就是它：原来读的是 `quaternarySystemFill`
+    /// —— 那是系统为**不透明背景**定的灰，压在玻璃卡上就是一块灰纱：
+    /// 它不折射、不跟着底下的颜色变，于是卡片是透的、卡片里那块灰是“实”的。
+    /// （同一条账在 `panel` 上已经算过一次，那次清的是分组面。）
+    ///
+    /// 现在它与 `panel` 同源：都从 `surface` 取，只是更淡。卡片、分组面、控件底
+    /// 于是是**同一块材质的三个深浅**，而不是三种来路不同的灰。
+    /// 数字化它就是系统动态色 `secondarySystemGroupedBackground` 的一层透明度。
+    ///
+    /// ⚠️ 为什么不干脆改成真材质（`.glassEffect`）：`Design/DSGlass.swift` 三层规则
+    /// 第 ② 条 —— **卡里不玻璃**（卡片自己已经是玻璃，里面再摆一块是同一层放两次）。
+    /// 这一仓要的「通透」是【半透明】，不是【多一层材质】。
+    static var fillSubtle: Color { surface.opacity(0.22) }
 
     /// 卡片**里面**那一层面：分组面、占位面、提示条、搜索框。
     ///
@@ -108,14 +140,19 @@ enum TokensPalette {
     /// 深色模式 + 彩色壁纸下，卡是半透明暖红、里面的面是 (28,28,30)，两者挨在一起就是断的 ——
     /// 用户 2026-09-25 第 5 条：「每个界面的控件都应该是玻璃质感 …… 黑颜色太突兀了」。
     ///
-    /// 取值是 `surface` 的半透明版（0.5），而不是另写一个灰：卡片自己的玻璃与它底下的壁纸
+    /// 取值是 `surface` 的半透明版，而不是另写一个灰：卡片自己的玻璃与它底下的壁纸
     /// 因此能继续透上来 —— 它才像同一块材质的一层，而不是贴上去的一块板。
-    /// **0.5 是这里唯一的刻度**：调大就更实、调小就更透，全 App 的面一起变。
+    /// **那个透明度是这里唯一的刻度**：调大就更实、调小就更透，全 App 的面一起变。
     ///
     /// 为什么不在这里用真材质（`.glassEffect`）：`Design/DSGlass.swift` 三层规则的第 ② 条 ——
     /// **卡里不玻璃**（玻璃叠玻璃会糊成一片，而卡片自己已经是玻璃）。这一层要的是
     /// 「玻璃里面那层更暗的底」，不是第二块材质。
-    static var panel: Color { surface.opacity(0.5) }
+    ///
+    ///  2026-09-25 第 3 条把它从 0.5 调到 **0.34**：0.5 在深色模式 + 彩色壁纸下仍然
+    ///  读得出「一块灰面」（用户：「控件显示着不通透的灰色（列表尤甚），我要通透」）。
+    ///  往下调要盯的只有一件事：卡片里的字还有没有底 —— 而文字令牌是不透明的
+    /// `label` 三档，所以同一个数在这四套（明/暗 × 有色/无色底）下都是安全的。
+    static var panel: Color { surface.opacity(0.34) }
 
     // 已删除：`glassBorder`（2026-09-25，与 `glassLight` 同一批）。
     // 它也是 `hairline` 的重复声明 —— 而 12 位用户里只有 4 位（`dsGlass` /
@@ -156,6 +193,25 @@ enum TokensPalette {
     static let pageAccents: [Color] = [tokenColor(0xAF52DE), tokenColor(0x5AC8FA),
                                        tokenColor(0x007AFF), tokenColor(0x34C759),
                                        tokenColor(0x30B0C7), tokenColor(0x5856D6)]
+}
+
+// MARK: - 玻璃上的文字（三档，自适应）
+//
+//  与 `TokensPalette` 的文字三档一一对应，区别只有一件事：它们是
+//  `HierarchicalShapeStyle` —— 系统会跟着底下的材质调它们（vibrancy / 自适应亮暗），
+//  而 `Color(uiColor: .label)` 是已经解析死的值（原因与引用见 `TokensPalette` 里
+//  「文字三档」下面那一段）。
+//
+//  用在哪：**只有底下是真玻璃的地方**（`dsGlass` 的那些调用点：模式条、地图上的
+//  胶囊与圆钮、轻提示、卡片自己的卡头）。卡片里的正文继续用那三个具体颜色 ——
+//  卡片里的底是 `panel`（标准半透明面），那里要的是确定的对比度，不是自调。
+//
+//  写成 `static var`（计算属性）而不是 `static let`：`AnyShapeStyle` 是装箱值，
+//  当成共享常量存起来会撞上 Swift 6 的并发检查（同一类账见 `TokensPalette.lightBar`）。
+enum TokensInk {
+    static var primary: AnyShapeStyle { AnyShapeStyle(HierarchicalShapeStyle.primary) }
+    static var secondary: AnyShapeStyle { AnyShapeStyle(HierarchicalShapeStyle.secondary) }
+    static var tertiary: AnyShapeStyle { AnyShapeStyle(HierarchicalShapeStyle.tertiary) }
 }
 
 // MARK: - 间距（4 的倍数，页面边距 20）

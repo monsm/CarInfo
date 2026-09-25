@@ -98,10 +98,6 @@ enum SceneID {
 // 但为避免再踩，这里不再往 @main 与 struct 之间放任何东西。
 @main
 struct CarKeeperApp: App {
-    /// 夜间模式的选择（默认「自动」= 交给艺术方向）。
-    /// 它是 `@StateObject` 而不是只读单例：拨动选择器后两个窗口都要立刻重绘
-    /// —— 这正是从前那个开关「拨了不动」的成因（见 `NightModeManager.schemeOverride`）。
-    @StateObject private var nightMode = NightModeManager.shared
     private let store = AppStore.shared
     @StateObject private var nav = NavState.shared
 
@@ -121,13 +117,12 @@ struct CarKeeperApp: App {
     var body: some Scene {
         WindowGroup {
             root
-                // 明暗：**只有「我的 → 夜间模式」这一个决定**。
+                // 明暗：**跟随系统**（用户 2026-09-25 第 4 条：「明暗根据系统获取」）。
                 //
-                // 2026-09-25：它以前还要与「艺术方向自带的明暗」取一个或
-                //（`ArtThemeStore.current.spec.preferredScheme`：纸上=亮、夜光/巨字=暗）。
-                // 艺术主题整份删除后没有第二个人说话，`schemeOverride` 的 nil
-                //（选择器选「自动」）就是**跟随系统** —— 与 iOS 其余部分一致。
-                .preferredColorScheme(nightMode.schemeOverride)
+                // 这里原本是 `.preferredColorScheme(nightMode.schemeOverride)` ——
+                // 「我的 → 夜间模式」是那个值唯一的写者，而它随「设备与模式」一起删了。
+                // 不设就是 nil、就是跟随系统，与 iOS 其余部分一致；再留一个空的
+                // `.preferredColorScheme(nil)` 只会让人以为还有什么在决定明暗。
         }
         // #47 iPad 分屏：第二个窗口（原写成 `os(iOS) && os(macOS)` 恒为假，导致该场景从未注册）。
         // 能否真正被打开由「平台 + Info.plist 的 UIApplicationSceneManifest.UIApplicationSupportsMultipleScenes」
@@ -137,7 +132,6 @@ struct CarKeeperApp: App {
         //    同一份导航状态 —— 同一条路径。即“能同时看两个窗口”，但还不是两块独立画布。
         WindowGroup(id: SceneID.detail) {
             DetailSplitView()
-                .preferredColorScheme(nightMode.schemeOverride)
         }
     }
 
@@ -248,10 +242,6 @@ struct CarKeeperApp: App {
                 Task { await ChargingStatusMonitor.shared.requestAuthorization() }
                 // #N14 远程锁定监听
                 RemoteLockManager.shared.startMonitoring()
-                // #N46 摇一摇锁车
-                // 锁车动作现在由 ShakeDetector 自己在触发时完成（验 PIN → 发 CentralLock）；
-                // 这里那层只弹提示的闭包已经去掉 —— 它让「摇一摇已触发」看起来像做了事。
-                ShakeDetector.shared.startMonitoring()
                 // #NEW-118/N119 维保+保险提醒调度器初始化
                 _ = MaintenanceReminderScheduler.shared
                 _ = InsuranceReminderScheduler.shared
@@ -260,8 +250,6 @@ struct CarKeeperApp: App {
                 // Intent Extension target 去注册，永远不可能被唤起。
                 // E47 性能监控（PerformanceTracker）已删：页面耗时与接口成功率两项
                 // 都是写进 UserDefaults 给「诊断」页看的本机统计，属这一轮要删的东西。
-                // E38 专注模式监听
-                _ = FocusModeManager.shared
                 // E40 充电状态监控（此前只写了 `_ = ChargingStatusMonitor.shared`，
                 // 连 startMonitoring 都没调，而那个方法本身也是空的）
                 ChargingStatusMonitor.shared.startMonitoring()
@@ -473,7 +461,9 @@ struct ToastView: View {
         // 从前却是一块 90% 不透明的扁平色 —— 底下是什么完全看不见。
         // 现在走 `dsGlass`：它飘着的时候，下面的界面真的从它后面透出来。
         .dsGlassRounded(TokensRadius.medium, interactive: false)
-        .foregroundStyle(TokensPalette.primary)
+        // 字走 `TokensInk`：这一层底下永远是**活的内容**（它浮在整屏之上），
+        // 固定标签色在彩色壁纸/地图上会读不出来（用户第 10 条）。
+        .foregroundStyle(TokensInk.primary)
     }
 }
 

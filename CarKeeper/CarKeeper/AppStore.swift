@@ -460,14 +460,16 @@ final class AppStore: @unchecked Sendable {
     // `forceDarkMode` / `forceLightMode`，2026-09-25 地毯式审核）。
     // 四个都只有「声明 + 一套没人调用的算法」，而且 `static let` 在这里意味着
     // **进程内只读一次**：用户改了设置也不会变 —— 看起来在算，其实早就算死了。
-    // 夜间模式的唯一实现现在在 `NightModeManager`（它自己读那两个 force 键）。
+    //
+    // ⚠️ 这一行原本指着 `NightModeManager`（"夜间模式的唯一实现现在在它那里"），
+    // 而那个文件 **2026-09-25 当天就删了**（用户第 4 条：「明暗根据系统获取」）。
+    // 现在明暗的出处是**系统**：App 根部不再设 `preferredColorScheme`。
+    // 删文件时指向它的注释不会自己消失 —— 这一仓为此立过条目，所以这里改准。
 
-    // #31 省电模式
-    static let powerSavingKey = "carkeeper_power_saving"
-    var isPowerSaving: Bool {
-        get { UserDefaults.standard.bool(forKey: Self.powerSavingKey) }
-        set { UserDefaults.standard.set(newValue, forKey: Self.powerSavingKey) }
-    }
+    // 这里原本是「#31 省电模式」的两个成员（`powerSavingKey` + `isPowerSaving`）。
+    // 2026-09-25 删除：唯一的读者是「我的 → 省电模式」那个开关（随「设备与模式」一起删），
+    // 也就是说这个属性从来没有谁读过 —— 一个「开了省电模式」的开关当时既不省电、
+    // 也没有任何人问它开没开。
 
     // #8 PIN码Keychain安全存储
     private static let pinKeychainService = "com.carkeeper.pin"
@@ -556,12 +558,14 @@ final class AppStore: @unchecked Sendable {
     // 【已删】`shouldUseDarkMode()` / `isNightMode` / `forceDarkMode` / `forceLightMode` /
     // `nightModeStartHour` / `nightModeEndHour`（2026-09-25 地毯式审核）。
     //
-    // 它们是「现在是不是夜间」的**第二套实现**，而它与 `NightModeManager` 那套的差别还有两处
-    // 实错：① 它把 UserDefaults 读进 `static let`（进程内只读一次，改了也不会变 ——
+    // 它们是「现在是不是夜间」的**第二套实现**，而它当年与 `NightModeManager` 那套的差别
+    // 还有两处实错：① 它把 UserDefaults 读进 `static let`（进程内只读一次，改了也不会变 ——
     // 这正是 `delguard` 盯的那种「看起来在算其实早就算死了」）；② 它在全仓**没有任何调用方**
-    //（`isNightMode` 也没人读）。明暗的唯一出处是 `NightModeManager.schemeOverride`，
-    // `CarKeeperApp` 两个窗口都从那里取 —— 它一度还要与「艺术方向自带的明暗」取一个或，
-    // 那套主题 2026-09-25 已整份删除。
+    //（`isNightMode` 也没人读）。
+    //
+    // 2026-09-25 之后**两套都不在了**：`NightModeManager` 随「设备与模式」删除，
+    // 明暗改由系统决定（App 根部不再设 `preferredColorScheme`）。所以这一条现在的结论
+    // 不再是「明暗只有一个出处，在另一个文件里」，而是「这个 App 不再自己决定明暗」。
 
     // `#17 请求去重`（`inFlightRequests` + `markRequestStarted` / `markRequestFinished`）
     // 已于 2026-09-25 删除：**全仓零调用**（它当年是给「同一时刻两处点着同一个请求」用的，
@@ -923,9 +927,9 @@ final class AppStore: @unchecked Sendable {
         lastParkingTime = nil
         UserDefaults.standard.removeObject(forKey: Self.lastServiceMileageKey)
         UserDefaults.standard.removeObject(forKey: "carkeeper_parking_time")
-        // 家庭成员 / 临时钥匙 / 里程账本 / 保险费 —— 全是跟账号绑定的数据
-        FamilyManager.shared.resetAll()
-        TempKeyManager.shared.resetAll()
+        // 里程账本 / 保险费 —— 跟账号绑定的数据。
+        //（家庭成员与临时钥匙的 resetAll 两行随「共享钥匙 / 家庭管理」删除 ——
+        //  那两个功能连同 `FamilyAndKeySharing.swift` 整份走掉了，用户 2026-09-25 第 7 条。）
         UserDefaults.standard.removeObject(forKey: "carkeeper_mileage_entries")
         UserDefaults.standard.removeObject(forKey: "carkeeper_insurance_policies")
         // 年检记录：它有 **@Published 内存副本**，只删键不够 —— 同一次运行里下一个账号

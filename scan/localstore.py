@@ -71,8 +71,10 @@ HEADER = "| 键 | 它是什么 | 归属 | 退出登录清 |"
 CLEARERS = [
     ("clear", os.path.join(APP, "Services", "HistoryStore.swift"),
      "三条曲线（soc / power / tyre）是账号的车端采样，`clear()` 一起清内存与三个键"),
-    ("resetAll", os.path.join(SERVICES, "FamilyAndKeySharing.swift"),
-     "家庭成员 / 临时钥匙：两处同名 `resetAll()` 各清自己那一个（内存与键一起清）"),
+# 已删登记：`("resetAll", Services/FamilyAndKeySharing.swift, …)` —— 家庭管理与临时钥匙
+# 随用户 2026-09-25 第 7 条一起删除（连同 `carkeeper_family_members` / `carkeeper_temp_keys`
+# 两个键的归零点）。登记表里留着指向已删文件的条目，就是这一仓反复记的那种「清单失真」：
+# 门禁会在读取时直接 `FileNotFoundError`（它是这么被发现的），而不是静默放行。
     ("resetAll", os.path.join(SERVICES, "BillingAndCalendar.swift"),
      "年检记录有 `@Published` 内存副本，只删键的话同一次运行里照样看得见"),
 ]

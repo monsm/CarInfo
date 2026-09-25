@@ -14,7 +14,7 @@
 | 是什么 | 长安车联网官方 App 的 **iOS 原生重写**：车主查看车况、远程车控、充电、行程、保养 |
 | 后端 | **没有自己的后端**。App 直连长安官方接口（`m.iov.changan.com.cn` / `scrm.changan.com.cn`） |
 | 技术栈 | SwiftUI · iOS 26.0+ · `@Observable` · MapKit · Swift Charts · AppIntents · CryptoKit · LocalAuthentication |
-| 规模 | **71 个 Swift 文件 / 21,706 行**（`CarKeeper/` 下），2 个 target（`CarKeeper` + `CarKeeperTests`） |
+| 规模 | **79 个 Swift 文件 / 24,609 行**（`find CarKeeper -name '*.swift'`，2026-09-25 重新量；上一版那个数还是 09-23 的快照，此后每一轮都在加东西而它没动过） |
 | 构建 | **XcodeGen**：`CarKeeper/project.yml` → `CarKeeper.xcodeproj`（`xcodeproj` 不入库） |
 | 交付 | GitHub Actions 出**未签名 ipa** → 侧载工具自签安装（7 天续期） |
 | 参考实现 | `ChangAnMiniProgram/`（微信小程序原版，本次重写的移植来源） |
@@ -504,9 +504,11 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 不在这里的东西：故障码、综合评分 → 体检；**充电账本（花了多少钱）整条链路已删除**（无账单接口，
 算法是本机积分度数 × 手填电价）。
 
-### 4.4 车控档 —— `ControlView`（1103 行）
+### 4.4 车控档 —— `ControlView`（960 行）
 
-- 头部：读数就在车上（一屏不堆卡片）+ `CarTopView` 俯视示意图（薄线描，不着色）。
+- 头部：读数就在车上（一屏不堆卡片）+ **一辆真的三维车**（`CarModelView`，RealityKit：
+  代码搭的车身/座舱/四门/四轮/灯，拖动转车、点部位控车）—— 2026-09-25 第九轮换掉
+  了那张线描俯视图（`CarTopView`，已删，理由见 §20.7）。
 - 车身明细：门 / 窗 / 后备箱 / 锁（`VM.bodyStatus`）。
 - **快捷预设场景**：如「夏天上车」（`OpenAir` + 26℃）、「冬天上车」（18℃）、「离车」（`LockDoor`）。
 - 指令列表 + **执行中**状态 + **记录**（`AppStore.commandHistory`，最多 50 条）。
@@ -583,10 +585,13 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
   无限高、永远滚不动）、页边距（卡 18 + 页 20 = **38pt**，全 App 最窄的一张）、
   页标题（卡头写「应急」，正文再写一遍「紧急求助」）。页边距只属于真正的整页。
   代价说明：从「1 次拖动」变成「1 次拖动 + 1 次点击」，但 SOS 也仍然在地图操作条上。
-- **诊断 `DevView`**：色板 / 字体 / 令牌数值 / 运行状态 / 能力位图（`car.funCode`）+
-  （2026-09-25 同样拆掉 `ScrollView` + 页标题「设计令牌」；滚动归叠叠乐）
-  （同日删掉这里的第一组「艺术主题样张」`ThemeGallerySection` —— 主题只剩原生一种，没有东西可样张）+
-  **消息自检 + 原始日志**（两台仪器并排在同一个 `diagnosticsGroups` 里）。
+- **诊断 `DevView`**：运行状态 / 能力位图（`car.funCode`）+ **消息自检 + 原始日志**
+  （两台仪器并排在同一个 `diagnosticsGroups` 里）。
+  （2026-09-25 拆掉 `ScrollView` + 页标题「设计令牌」，滚动归叠叠乐。）
+  ⚠️ **同日第九轮第 6 条把六组「与界面本身有关」的东西整块删掉**：卡片叠预览
+  （`StackLabView` 整页）、画布与表面色板、语义色色板、字体样张、几何数值、动效数值。
+  那一页的名字叫诊断 —— 诊断回答「这台设备此刻在发生什么」，不是「我们的设计长什么样」。
+  （「艺术主题样张」`ThemeGallerySection` 更早一轮就已删 —— 主题只剩原生一种。）
   它们是为同一类抱怨造的：「消息拿不到数据」。
   · **消息自检**（`MessageProbeSection`，2026-09-24）：一次发三种窗口（30 天一段 /
     30 天分五段 / 7 天一段）、共七次请求，把四个数并排报出来 ——
@@ -643,7 +648,7 @@ Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形�
     （卡 18 + 页 16/20）与「一个东西两个名字」（卡头 + 页标题）的来源。
     真正的整页（登录 / 引导 / 开场）不用它们：它们本来就只有导航栏。
 - **`Design/Theme.swift`**：`AppCanvas`（画布与光**在根部只画一次**）、`StatusDot`、`Pill`、
-  `MonthlyReportSection`、`PowerSavingToggle`。
+  `MonthlyReportSection`。（`PowerSavingToggle` 2026-09-25 第九轮随「设备与模式」删除。）
 - **`Design/Charts.swift`**：`DSTrendChart`（单序列，SOC / 功率共用）、`DSTyreTrendChart`（四条曲线）、
   `DSTrendEmpty`（数据不够时的说明，不是灰块）。
 - **`Design/StackSpec.swift`**：那一叠剩下的那点几何 —— **只有 `Card`（圆角、内边距、
@@ -669,9 +674,10 @@ Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形�
   变体按**底下是什么**选（App 界面 → `.regular`；地图 / 照片这种连续画面 → `.clear`），
   可点的表面交 `interactive`（按压由系统演，不再自己压透明度）。
   守门人是 `scan/glass.py`（编号 28）。
-- **`Design/StackLabView.swift`**：卡片叠预览页（`DevView` → 卡片叠）。它原来叫「叠法对照页」，
-  七选一取消后剩下的那一半仍有意义：卡高参差时的观感、玻璃的层次、条子的两种跟手形态 ——
-  那些只有真机判得了。
+- ~~**`Design/StackLabView.swift`**~~：卡片叠预览页 —— **2026-09-25 第九轮整份删除**。
+  用户第 6 条（「诊断里面删除一切和 UI 相关的」）把它连同四组色板、字体样张、几何与动效
+  数值一起移出了「诊断」：那一页的名字叫诊断，诊断回答的是「这台设备此刻在发生什么」，
+  不是「我们的设计长什么样」（理由见 §20.5）。
 - **六个功能界面共用的三个原语**（阶段 1 的产物，职责分得很硬）：
   `GlassCard`（一张卡的材质与内边距） → `ArcStack`（**只有系统滚动** + 无障碍翻页）
   → `StackPageView`（那一叠 + 页面的个性色） → `DSSwipeStrip`（底部那条相机式模式条，已重写）。
@@ -769,18 +775,11 @@ Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形�
 | `carkeeper_maintenance_photos` | 保养单据照（base64） | 账号 | ✅ |
 | `carkeeper_insurance_policies` | 保单 | 账号 | ✅ |
 | `carkeeper_inspections` | 年检记录 | 账号 | ✅ |
-| `carkeeper_family_members` | 家庭成员 | 账号 | ✅ |
-| `carkeeper_temp_keys` | 临时钥匙 | 账号 | ✅ |
 | `carkeeper_biometric_setup` | 生物识别已设置 | 设备 | ❌ |
 | `carkeeper_home_mode` | 上次停留的档位 | 设备 | ❌ |
 | `carkeeper_map_layer` | 地图「现在」层的子层 | 设备 | ❌ |
 | `carkeeper_home_card_order` | 首页卡片顺序 | 设备 | ❌ |
-| `carkeeper_power_saving` | 省电模式开关 | 设备 | ❌ |
-| `carkeeper_voice_enabled` | 语音播报开关 | 设备 | ❌ |
-| `carkeeper_shake_to_lock` | 摇一摇锁车开关 | 设备 | ❌ |
-| `carkeeper_focus_mode` | 专注模式配置 | 设备 | ❌ |
 | `carkeeper_force_dark_mode` | 明暗偏好：强制深色（唯一出处是「我的 → 夜间模式」） | 设备 | ❌ |
-| `carkeeper_force_light_mode` | 明暗偏好：强制浅色（同上） | 设备 | ❌ |
 | `carkeeper_onboarding_seen` | 引导页看过 | 设备 | ❌ |
 | `carkeeper_wallpaper_source` | 子页壁纸的来源（必应 / Windows 聚焦 / 相册） | 设备 | ❌ |
 | `carkeeper_wallpaper_stamp` | 子页壁纸的日期戳（同一天不重复取） | 设备 | ❌ |
@@ -812,6 +811,11 @@ Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形�
 `carkeeper_checkin_count` / `carkeeper_last_checkin`（「上车打卡」已删）、
 `carkeeper_siri_usage`（Siri 统计已删）、`carkeeper_current_speed`（唯一读者
 `FocusModeManager.isDriving` 已删 —— 它当年读的就是这个**从来没人写**的键）、
+`carkeeper_family_members` / `carkeeper_temp_keys`（家庭管理与临时钥匙，用户第 7 条：
+整块功能删除）、`carkeeper_voice_enabled`（语音播报，同上）、`carkeeper_focus_mode` /
+`carkeeper_shake_to_lock` / `carkeeper_power_saving` / `carkeeper_force_light_mode`
+（「设备与模式」那一节，用户第 4 条：整节删除 —— 四个开关各自的实现文件
+`FocusModeManager` / `GestureEnhancements` / `NightModeManager` 一起删）,
 `carkeeper_dnd_mode` / `carkeeper_charge_complete_notify` / `carkeeper_next_service_date` /
 `carkeeper_last_charge_alert`、`carkeeper_night_start_hour` / `_end_hour`、
 `carkeeper_hist_*`（旧的不带 `_v1` 后缀那批）、充电账本，以及 App Group 里的
@@ -856,9 +860,9 @@ Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形�
 | `Monitoring` | 内存读数（**不落盘**） | 启动后每 10s |
 | ~~`DataEncryption` / `SecureStorage`~~ | 已删（2026-09-25） | 只写不读的加密壳，见 §9.3 |
 | `BiometricLock` / `RemoteLockManager` | FaceID 二次验证 / 后台超时隐藏 | 敏感页 / 启动 |
-| `NightModeManager` / `FocusModeManager` | 夜间时段 / 专注模式 | 启动与设置 |
-| `GestureEnhancements` / `ShakeDetector` | 摇一摇锁车（自己验 PIN 后发 `CentralLock`） | 启动 |
-| `FamilyAndKeySharing` | 家庭成员 / 临时钥匙 | 我的档 |
+| ~~`NightModeManager` / `FocusModeManager`~~ | 夜间时段 / 专注模式 —— **2026-09-25 第九轮删除**（用户第 4 条删「设备与模式」，明暗改由系统决定） | 已无 |
+| ~~`GestureEnhancements` / `ShakeDetector`~~ | 摇一摇锁车 —— **同日删除**（同上） | 已无 |
+| ~~`FamilyAndKeySharing`~~ | 家庭成员 / 临时钥匙 —— **2026-09-25 第九轮删除**（用户第 7 条） | 已无 |
 | `InsuranceManager` | 保单 CRUD | 保养档 |
 | `BillingAndCalendar` | 车辆估值 + 年检日历（估值是**估算**，不是市场价，界面写明） | 保养档 |
 | `UpdateService` | 检查更新（读 GitHub Release `latest`）+ 分享 | 我的档 |
@@ -1623,3 +1627,161 @@ v2.1 那道车底弧**删掉**（040 里没有它）。折进来时与探索稿*
 **对账**（33 个键逐行核对）+ **双向探针**（三条判据各注入一次、还原哈希一致），
 而不是运行时观测。`InspectionCalendar.resetAll()` 是新增的公开方法，
 它的调用点只有 `logout()` 一处 —— 这一类「为清理而新加的方法」是这轮唯一的新 API 面。
+
+---
+
+## 20. 2026-09-25 第九轮：十条（玻璃通透度 / 顶部 / 卡里的灰 / 三处删除 / 三维车 / 地图七处 / 玻璃上的字）
+
+用户一次给了十条，混着**问句**与**改法**，所以先分类再动手：
+
+| 类 | 条 | 这一轮做的事 |
+|---|---|---|
+| 问句 | 1（玻璃是不是最通透那一档）、10（玻璃上的字怎么适配） | 查到 Apple 的两条明文规定，答案是「`.clear` 才是最通透的一档，但它只属于底下是连续画面的控件」与「自适应确实没开 —— 因为我们一直传固定色」 |
+| 一致性 | 2（子页顶部要与地图页一样）、3（卡里那层灰要通透） | `ArcStack` 给滚动内容让出顶部内衬；`fillSubtle` 与 `panel` 改成同一块材质的两个深浅 |
+| 删除 | 4、6、7（+ 5 的一半） | 「设备与模式」整节、诊断里所有 UI 相关项、共享密钥/家庭管理/语音播报 |
+| 重做 | 8（车控的车）、9（地图七处） | 代码搭的真三维车；定位漂移 / 车钉 / 罗盘 / 比例尺 / 抽屉排版 |
+
+### 20.1 液态玻璃到底有几档（第 1 条）
+
+系统给的只有**两档**（`Glass.regular` / `Glass.clear`，`Glass` 是一个没有 case 的
+类型，取用方式就是这两个静态成员）——`.clear` 就是「最通透」的那一档，而
+HIG「Materials」对它的用法有一句硬话：
+
+> “reserve clear Liquid Glass for components over visually rich backgrounds.”
+
+也就是说：**通透度不是一个可以随便往下拧的旋钮，它跟着「底下是什么」走**。
+两个已有的变体常量（`DSGlassVariant.regular` / `.overMedia`）就是这句话的两半：
+
+- 底是**连续的画面**（地图瓦片）→ `.clear`：全 App 三个地方在用，都在地图上
+  （图层胶囊、两枚快速钮、罗盘）。
+- 底是**App 自己的界面**（画布、别的卡、壁纸）→ `.regular`：卡片走它。
+  `.clear` 在这里的代价是**卡里的正文对比度会跟着底下的壁纸走** —— 而卡片是
+  「读的内容」，不是「浮在照片上的控件」。这一条写在 `GlassCard` 的注释里
+  （早在 09-25 那一轮就定了），这一轮只是把它答出来。
+
+### 20.2 玻璃上的字：vibrancy 确实没开（第 10 条）
+
+用户问「是不是没开启自适应文字颜色」——**对，没开启**。原因是这一仓一直在传
+`Color(uiColor: .label)` 这类**已经解析成固定值**的颜色，而系统那个「自动适配」
+只作用于 `foregroundStyle(.primary)` / `.secondary` / `.tertiary` 这类**语义层级样式**
+（WWDC25「Build a SwiftUI app with the new design」原话：*“SwiftUI automatically uses
+a vibrant text color that adapts to maintain legibility against colorful backgrounds.”*；
+HIG「Materials」：*“Help ensure legibility by using vibrant colors on top of materials.”*）。
+
+修法是把「玻璃上的字」收成一个新令牌 `TokensInk`（三档，与 `TokensPalette` 的文字三档
+一一对应，区别只有它们是 `AnyShapeStyle`），然后只换**底下真的是玻璃**的那些调用点：
+模式条（未选中那两档）、卡头、次操作按钮（玻璃胶囊）、轻提示、地图上那三枚圆钮、
+图层胶囊、底条两臂。卡片里的正文**不换** —— 那里的底是 `panel`（标准半透明面），
+要的是确定的对比度，不是跟着底下自调。
+
+### 20.3 子页顶部与地图页对齐（第 2 条）
+
+地图页的内容从时钟下面连续穿过（它整页 `ignoresSafeArea(.top)`），而子页的卡片窗
+停在状态栏**下面**。两条路对齐的办法是给滚动内容加一层顶部内衬：
+
+- `MapSpineView` 量出「屏幕顶到这一层的顶」写进环境（`stackTopInset`）——
+  用 `frame(in: .global).minY` 而不是 `safeAreaInsets`（后者在已被父层让开的视图里读到 0）。
+- `ArcStack` 用 `.contentMargins(.top, topInset)` 让第一张卡静止时仍让开状态栏，
+  并加 `.scrollEdgeEffectStyle(.soft, for: .top)`（iOS 26 给滚动边缘的那层柔化延伸）。
+
+### 20.4 卡里那层灰（第 3 条）
+
+`fillSubtle` 原来读 `quaternarySystemFill` —— 那是系统为**不透明背景**定的灰，
+压在玻璃卡上就是一块灰纱：不折射、不跟着底下的颜色变。现在它与 `panel` 同源
+（都从 `surface` 取，只是更淡：0.22 / 0.34），于是卡片、分组面、控件底成了
+**同一块材质的三个深浅**，而不是三种来路不同的灰。同时把 `panel` 从 0.5 调到 0.34
+（用户在深色 + 彩色壁纸下仍然读得出「一块灰面」）。
+
+### 20.5 删除三条（第 4 / 6 / 7 条）
+
+- **第 4 条「设备与模式」整节删除**：摇一摇锁车 / 省电模式 / 夜间模式 / 专注模式。
+  删的不是四个开关，是**四个功能**：`GestureEnhancements`（`ShakeDetector`）、
+  `NightModeManager`、`FocusModeManager` 三个文件整份删除，`AppStore` 里那个省电模式的
+  成员与 `Theme.swift` 里的 `PowerSavingToggle` 一起走。明暗从此只有一个说话的人：
+  系统（App 根部不再挂 `.preferredColorScheme`，nil 就是跟随系统）。
+- **第 6 条「诊断里删掉一切和 UI 相关的」**：卡片叠预览（`StackLabView` 整页删除）、
+  画布与表面色板、语义色色板、字体样张、几何数值、动效数值 —— 六组。诊断回答的是
+  「这台设备此刻在发生什么」；要报障的人不该先划过一屏设计令牌。
+- **第 7 条「删除共享密钥、家庭管理、语音播报」**：`Services/FamilyAndKeySharing.swift`
+  整份删除（313 行：`TempKeyManager` + `FamilyManager` + 两个页面 + 两行）。
+  「语音播报」那一行删得最干净 —— 它翻转的 `carkeeper_voice_enabled`
+  **全仓没有一个读者**（`VoiceBroadcastManager` 这个类型早就不存在了）：
+  一个只有写者、没有读者的开关，是这个仓库里最贵的一种摆设。
+
+连带：§6 那张本机键表删掉七行（`carkeeper_family_members` / `_temp_keys` /
+`_voice_enabled` / `_focus_mode` / `_shake_to_lock` / `_power_saving` /
+`_force_light_mode`），`scan/localstore.py` 里那条指向已删文件的清理登记也一并删掉 ——
+**删功能就必须同时删表里的行**，否则门禁立刻报「这张清单在说谎」（它就是这么发现的）。
+
+### 20.6 检查更新与那把 key（第 5 条）
+
+用户给的是二选一：「删除检查更新**或者**将 key 直接写在代码中（我之前提供过）」。
+选的是后者，做法：令牌只有**一个**出处 —— 新增 `Services/GithubToken.swift` 的
+`static let value`，`UpdateService.githubToken` 只是它的只读转发（原来那把读存在
+`UserDefaults`，于是**每台设备都要手输一次**，而「检查更新」在输之前什么都不做、
+看起来像坏的）。那个 Token 弹窗（`showToken` / `tokenDraft`）与它的 `@State` 一起删除。
+
+⚠️ 中途有一个值得记的差一点：那一行先是**空的** —— 用户说「我之前提供过」，而
+**全仓与 git 全历史**（`git log --all -S"ghp_"` / `-S"github_pat_"`）里搜不到任何该形状的
+字符串，所以当时只能在文件里留一个空格子并与用户确认。令牌是用户随后在对话里贴过来的
+（`github_pat_` 形状），现在写在 `GithubToken.value` 那一行。
+
+**把账记全（这不是劝阻，是让下一个人知道自己在拿什么换）**：这个字符串会进**仓库历史**、
+也会进 **ipa**，任何人拿到 App 都能读出来 —— 它不是一个秘密；它最好是 fine-grained、
+只读该仓库（`Contents: Read`）、随时可吊销的一把。它为空时不是崩、也不是静默失败：
+「检查更新」会说出一句人话（「没有配访问令牌，暂时无法检查更新」），那条路留着是有用的。
+
+### 20.7 车控那一屏的车（第 8 条）
+
+新增 `Features/Control/CarModelView.swift`（RealityKit）：一辆**代码搭的**三维车 ——
+车身 / 座舱 / 全景玻璃顶 / 前后风挡 / 四门（带把手）/ 四轮（圆柱横过来）/ 后备箱 /
+前灯 / 车头，各是 `MeshResource` 生成的基本体。交互两件：
+
+- **拖动转的是车**（Y 轴自转 + 一点俯仰，转的是模型不是镜头）—— 卡片里那辆车原地转身。
+- **点哪控哪**：车门 / 前灯 / 车头各有碰撞体，`TapGesture().targetedToAnyEntity()`
+  把被点中的实体交回来。⚠️ 可点的**只有**指令表里有的那几件
+  （`LockDoor` / `UnLockDoor` / `FlashLight` / `Whistle`）：后备箱**点不动**，
+  因为它只有状态、没有开合指令 —— 摆一个「点了什么都不发生」的后备箱正是这个仓库
+  一直在删的东西。四门点下去给一个二选一（锁车 / 解锁），不替用户猜。
+
+旧的那张（`CarTopView`）是线描俯视图：不是「不好看」，而是「不是车」——
+一个俯视轮廓回答不了「我的车现在什么样」。整块已删（含 `artSize` / `artAspect` 两个派生量）。
+
+### 20.8 地图页七处（第 9 条）
+
+| 用户看到的 | 根因 | 改法 |
+|---|---|---|
+| 手机位置漂移近 1 公里（「我选了精确定位」） | ① 我们自己只要了 `kCLLocationAccuracyHundredMeters`；② 第一个点直接用（常常是缓存的旧点）；③ 从来没读过 `horizontalAccuracy` | 要 `kCLLocationAccuracyBest`；一批回调里挑**最准**的；够准（≤35 m）就用、不够就等（6 秒后落兜底并标 `coarse`）；精度**如实画出来**（蓝点外那圈淡圆的半径就是它） |
+| 车没有车的图标了 | `MapCarPin.body` **从来没有调用过 `ringStyle`** —— 刻度盘、电量弧、底盘、那个数字全在里面，于是钉上只剩一团虚光和一个小缺口环 | 三样一起画，各说一件事：`ringStyle`（电量的形状）+ `carGlyph`（车本身，按 Heading 转）+ `socBadge`（数字，挂到圆盘下）。缺口环（`headingMark`）删掉：同一个事实不再用两种画法说 |
+| 指南针太上了 | 系统的 `MapCompass` 位置由 MapKit 定（安全区紧下沿的角落），搬不动 | 整个 `.mapControls` 撤掉，罗盘自己画一枚（`Triangle` 红针 + 点一下回正北），挂在**与右侧两枚钮同一行**的位置上 |
+| 比例尺不出现（缩放时该出现） | 唯一的触发者是一条 `.onChange(of: camera)`，而相机绑定的回写并不覆盖每一种手势 | 换 `onMapCameraChange(frequency: .continuous)`（平移与缩放都会来），并加一个门槛：距离没变过 6% 不重露尺子（否则一次拖动会留下上百个 2 秒计时器） |
+| 抽屉里参数不该「框选」、要平铺居中 | 每格一个圆角矩形 + 一圈发丝线 —— 那不是分组，是给每个数各配了一个容器 | 去掉底与描边（数直接贴在卡上），并改成「数与名字两行、各格等宽平分、整行同一中轴」；顺序也换成数字当头（与 Apple 地图那张卡同一套读法） |
+
+### 20.9 顺手治掉的「说谎的指针」
+
+删功能/搬文件时，指向它们的说明不会自己跟着变 —— 这一轮又清出四处：
+
+- `MapNowCard` / `MapSpineReadouts` / `MapSpineView` 三处注释还在把 `spec`（艺术主题的
+  取值表，第六轮已随主题删除）列成「跨文件可见的成员之一」：读者会去找一个不存在的成员。
+- `scan/copy.py` 与 `scan/printguard.py` 给 `DevView` 的豁免**仍然需要**（它真的在界面
+  文案里说「缓存」—— 它正是「清除缓存」那一页），但**理由变了**：它从「设计令牌页」
+  变成「排障页」。豁免名单里留一句过期的理由，与留一个过期条目一样坏。
+- §0 的规模数（「71 个文件 / 21,706 行」）还是 09-23 的快照，此后每轮都在加东西而它没动过；
+  §4.4 说车控档的车是「`CarTopView` 俯视示意图」；§5 的文件清单里躺着 `StackLabView`；
+  §6 的服务表里躺着四个已删的 manager —— 四处一起改现状。
+- `PROTOTYPE-TO-SWIFTUI` 里「入口是 `DevView` → 卡片叠 → 卡片叠预览页」也改成删除记录。
+
+### 验证状态
+
+`python3 scan/all.py` —— **34/34 全绿**（33 条门禁 + `check_style.js`）。这一轮**没有新门禁**，
+但有三处是门禁当场抓出来才修掉的：`copy.py`（三条界面文案超 30 字）、
+`lintcfg.py`（`MapSpineView.swift` 又到 1207 行 → 把「地图上画什么」那一段搬进
+`Map/MapSpineAnnotations.swift`）、`localstore.py`（§6 表里七个键已不存在）。
+另外 `scan.py` 拦下 20 个未登记的 SDK 名字，逐个对着 Apple 文档 JSON 核过之后登记
+（核实里**当场改掉一个真错误**：`SimpleMaterial.init(color:roughness:isMetallic:)` 的
+`roughness` 是 `MaterialScalarParameter` 而不是 `Float` —— 传 Float 变量编译不过）。
+
+本机没有 Swift 工具链，**编译与真实观感只有 CI / 真机能回答**。这一轮风险最高的三处
+（都写在各文件的头注里）：RealityKit 那一段（`RealityView` 是 iOS 18+、`@Sendable` 的
+`make` 闭包里不碰 `self`）、`MapSpineAnnotations.swift` 这次搬移（八个函数从
+`private` 放开）、以及 `scrollEdgeEffectStyle`（iOS 26+，部署目标正好是 26.0）。
