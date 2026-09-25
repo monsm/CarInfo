@@ -2268,4 +2268,34 @@ into one another」* —— 在它眼里「收到 0 宽」是「变小」而不�
 
 **边界**：切段时那一叠的滚动位置不重置（车辆 / 「我的」两档本来也是这样）——
 事件那一段只有 3 张卡、装不下一屏时偏移会被系统夹回 0，所以实际看不太出来；
-真机上若觉得挖挖瘩瘩，下一手是给 `ArcStack` 加一个「换卡表就回项」的输入。
+真机上若觉得疙疙瘩瘩，下一手是给 `ArcStack` 加一个「换卡表就回项」的输入。
+
+### 这一轮的 CI 只红了一条（`MapSpineView.swift:681`）
+
+`run 8a803d9`（2026-09-25T15:34）BUILD FAILED，全日志只有一条错：
+
+```
+MapSpineView.swift:681:62: error: result values in '? :' expression have
+mismatching types 'Color' and 'AnyShapeStyle'
+    .foregroundStyle(current ? TokensPalette.accent : TokensInk.primary)
+```
+
+- **根因**：`TokensInk.primary` 是 `AnyShapeStyle`（装箱的层级样式，见 §20 那一轮
+  「玻璃上的字要自适应」），而 `TokensPalette.accent` 是具体 `Color`。
+  **Swift 的三元要求两个分支同一个类型** —— 这条账是 §20 换字色时留下的：
+  同一次改动的两半各自来自两个类型世界，而本机没有 Swift 工具链，只有 CI 能看见。
+- **修法**：`current ? AnyShapeStyle(TokensPalette.accent) : TokensInk.primary`
+  —— 把具体色装箱到对方那一支的类型上。
+- **为什么不「两边都用 `Color`」**：非当前态那一支走的正是**自适应色**，
+  那是这一枚钮压在真玻璃上要的东西（见 `armLabel` 上面那段）；
+  为了类型好看把它换成 `TokensPalette.primary` 就是悄悄改设计。
+  （`DSSwipeStrip` 那处「选中 / 未选中」确实两边都用 `Color` —— 因为那里
+  §25 已经**明确**把导航字改回实色了，是另一个决定，不是这条规矩的反例。）
+- **顺手全仓查了一遍**：`MapQuickButtons.swift:97`（两支都是 `TokensInk`）与
+  `DSSwipeStrip.swift:440`、`MapSpineReadouts.swift:174`、`ScoreSection.swift:219`
+  这些三元都各自同类型 —— **混类型的只有这一处**。
+- **行数**：这一改把 `MapSpineView.swift` 推到 1202 行（越过 1200，`lintcfg.py` 会红），
+  把注释压到四行后回到 **1199**。
+
+**教训一句话**：这里没有任何一条本机门禁能替 CI 看类型 —— 所以「两个分支来自
+两个类型世界」这种事，写的时候就得自己盯：`TokensInk.*` 旁边不许直接坐一个 `Color`。

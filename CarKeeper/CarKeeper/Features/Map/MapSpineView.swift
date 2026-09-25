@@ -676,9 +676,14 @@ struct MapSpineView: View {
                     .font(TokensTypo.fixed(11, weight: .bold))
                     .foregroundStyle(TokensInk.secondary)
             } else if let icon {
+                //  ⚠️ `AnyShapeStyle(...)` 是**必需**的：三元两个分支必须同一类型，
+                //  而 `TokensInk.primary` 是装箱值、`accent` 是具体 `Color`（CI
+                //  2026-09-25 就红在这一行）。不改成「两边都用 Color」—— 会丢掉
+                //  这一支的自适应色（理由见上）。
                 Image(safeSymbol: icon, fallback: icon)
                     .font(TokensTypo.fixed(17, weight: .medium))
-                    .foregroundStyle(current ? TokensPalette.accent : TokensInk.primary)
+                    .foregroundStyle(current ? AnyShapeStyle(TokensPalette.accent)
+                                             : TokensInk.primary)
             }
         }
         .frame(width: Self.armSize, height: Self.armSize)

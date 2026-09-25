@@ -4090,3 +4090,9 @@ UserDefaults、`parkingHistory` 每条现造 `CLLocation`、`clusterHotspots` �
 「那一段」（指示的是位置，位置换了指示也得分着换）。
 
 验证：`python3 scan/all.py` —— **34/34 全绿**。
+
+接上的一手：这一轮推上去的 CI（`run 8a803d9`）**只红了一条** ——
+`MapSpineView.swift:681` 的三元两个分支类型不同（`TokensPalette.accent` 是 `Color`、
+`TokensInk.primary` 是 `AnyShapeStyle`）。修法是把具体色装箱（`AnyShapeStyle(accent)`），
+**不是**把两支都改成 `Color`（那会丢掉非当前态那一支的自适应色）。全仓混类型的三元只此一处；
+这一改曾把该文件推到 1202 行（越 `lintcfg.py` 的 1200），压注释后回到 1199。
