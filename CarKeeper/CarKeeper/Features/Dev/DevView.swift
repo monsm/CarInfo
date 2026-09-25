@@ -46,29 +46,28 @@ struct DevView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "设计令牌", subtitle: "颜色、字体、间距、圆角、动效的唯一来源")
-                themeEntry
-                stackEntry
-                swatchGroup(title: "画布与表面", footer: "内容层不透明：玻璃只允许出现在导航栏、Tab 栏与弹层。", items: surfaceTokens)
-                swatchGroup(title: "语义色", footer: "颜色只来自系统，且只表达状态；界面里没有装饰性彩色。", items: semanticTokens)
-                typographyGroup
-                kvGroup("几何", geometry, footer: "页边距 20pt、分组圆角 12pt、发丝线 0.5pt 是全 App 定值。")
-                kvGroup("动效", motion, footer: "只有两类：状态变化的弹簧，以及一次性绘制。")
-                kvGroup("运行状态", runtime)
-                capabilityGroups
-                diagnosticsGroups
-                actionsGroup
-                kvGroup("关于", about)
-            }
-            .padding(.top, TokensSpacing.sm)
-            .padding(.bottom, TokensSpacing.xxxl)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        //  正文只提供内容 —— 它住在「我的」那张叫「诊断」的卡里（`StackCard`），
+        //  而那一叠自己就是滚动容器（`ArcStack` 头注：它是自管手势，没有 ScrollView）。
+        //  这里原本还包着一层 `ScrollView`：里外两层都能滚时手势塌给内层，
+        //  而内层拿到的是无限高 —— 它自己永远滚不动，却把这块区域的拖动吃掉了
+        //  （用户 2026-09-25：「每个卡片仔细核对，内容展开后是否拥挤」）。
+        //  页标题也一并删：卡头写着「诊断」，正文再写一遍「设计令牌」是同一个东西
+        //  两个名字（它下面那一节自己还有「艺术主题」的标题）。
+        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+            themeEntry
+            stackEntry
+            swatchGroup(title: "画布与表面", footer: "内容层不透明：玻璃只允许出现在导航栏、Tab 栏与弹层。", items: surfaceTokens)
+            swatchGroup(title: "语义色", footer: "颜色只来自系统，且只表达状态；界面里没有装饰性彩色。", items: semanticTokens)
+            typographyGroup
+            kvGroup("几何", geometry, footer: "页边距 20pt、分组圆角 12pt、发丝线 0.5pt 是全 App 定值。")
+            kvGroup("动效", motion, footer: "只有两类：状态变化的弹簧，以及一次性绘制。")
+            kvGroup("运行状态", runtime)
+            capabilityGroups
+            diagnosticsGroups
+            actionsGroup
+            kvGroup("关于", about)
         }
-        .pageBackground()
-        .scrollBounceBehavior(.basedOnSize)
-        .dsPageTitle("设计令牌")
+        .frame(maxWidth: .infinity, alignment: .leading)
         .fullScreenCover(isPresented: $showStackLab) { StackLabView() }
         .confirmationDialog("清除全部车端缓存？", isPresented: $showClearConfirm, titleVisibility: .visible) {
             Button("清除缓存", role: .destructive) {
@@ -130,8 +129,8 @@ struct DevView: View {
             SWatch(name: "surface", color: TokensPalette.nightSurface, note: "分组表面 · secondarySystemGroupedBackground"),
             SWatch(name: "surfaceRaised", color: TokensPalette.nightSurface,
                     note: "内凹表面 · tertiarySystemGroupedBackground"),
-            SWatch(name: "hairline", color: TokensPalette.glassBorder, note: "发丝分隔线 · UIColor.separator"),
-            SWatch(name: "fill", color: TokensPalette.glassLight, note: "通用填充 · tertiarySystemFill"),
+            SWatch(name: "hairline", color: TokensPalette.hairline, note: "发丝分隔线 · UIColor.separator"),
+            SWatch(name: "fill", color: TokensPalette.fillSubtle, note: "通用填充 · tertiarySystemFill"),
             SWatch(name: "tintSoft", color: TokensPalette.ambient, note: "强调色淡底（选中胶囊）")
         ]
     }
@@ -156,8 +155,8 @@ struct DevView: View {
                             .fill(item.color)
                             .frame(width: 28, height: 28)
                             .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.line))
-                        VStack(alignment: .leading, spacing: 2) {
+                                .strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.line))
+                        VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
                             Text(item.name)
                                 .font(TokensTypo.body)
                                 .foregroundStyle(TokensPalette.primary)
@@ -171,7 +170,7 @@ struct DevView: View {
                             .font(TokensTypo.digits(13))
                             .foregroundStyle(TokensPalette.secondary)
                     }
-                    .padding(.vertical, 6)
+                    .padding(.vertical, TokensSpacing.sm)
                     .accessibilityElement(children: .combine)
                 }
             }
@@ -201,7 +200,7 @@ struct DevView: View {
         DSGroup(title: "文字", trailing: "\(typeTokens.count)", footer: "字号用 iOS 的真实阶梯；仪器感来自字重差，不来自颜色。") {
             ForEach(Array(typeTokens.enumerated()), id: \.element.id) { idx, token in
                 DSGroupRow(showsSeparator: idx < typeTokens.count - 1) {
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: TokensSpacing.xs) {
                         Text(token.sample)
                             .font(token.font)
                             .foregroundStyle(TokensPalette.primary)
@@ -211,7 +210,7 @@ struct DevView: View {
                             .font(TokensTypo.digits(12))
                             .foregroundStyle(TokensPalette.secondary)
                     }
-                    .padding(.vertical, 6)
+                    .padding(.vertical, TokensSpacing.sm)
                     .accessibilityElement(children: .combine)
                 }
             }
@@ -444,7 +443,7 @@ struct DevView: View {
             } else {
                 ForEach(Array(entries.prefix(8).enumerated()), id: \.offset) { idx, e in
                     DSGroupRow(showsSeparator: idx < min(8, entries.count) - 1) {
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
                             Text(Self.logHeadline(e))
                                 .font(TokensTypo.fixed(11, weight: .regular).monospacedDigit())
                                 .foregroundStyle(TokensPalette.primary)

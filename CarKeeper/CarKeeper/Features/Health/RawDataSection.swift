@@ -127,7 +127,7 @@ struct RawDataSection: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: TokensSpacing.xs) {
                 Text(kind.title)
                     .font(TokensTypo.subheadline.weight(.semibold))
                 Image(safeSymbol: "chevron.up.chevron.down", fallback: "chevron.up.chevron.down")

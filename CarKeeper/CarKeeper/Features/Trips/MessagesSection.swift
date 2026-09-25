@@ -29,6 +29,10 @@ struct MessagesSection: View {
     @State private var searchText = ""
     @State private var filterTag: String? = nil
     @State private var showUnreadOnly = false
+    /// 正文长到一屏放不下、被“摊开全部”的那几条（见 `bodyPlan`）
+    @State private var fullBodies: Set<String> = []
+    /// 卡片量到的可用区域（`ArcStack` 写进来的真数；量不到时是 `.zero`）
+    @Environment(\.cardViewport) private var cardViewport
 
     /// 一次画几天的消息 —— **这不是分页，是防处决**。
     ///
@@ -79,8 +83,11 @@ struct MessagesSection: View {
         Group {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
                 // 「全部已读」原来是导航栏按钮，并入之后这一节没有自己的导航栏。
-                DSSectionHeader(title: "车辆消息与事件",
-                                trailing: items.allSatisfy { $0.read } ? nil : "全部已读",
+                //
+                // ⚠️ 标题留空（用户 2026-09-25：「全局看重复内容」）：这一节原来自己写着
+                // 「车辆消息与事件」，而它栖身的那张卡叫「车的事件」—— 同一个东西两个
+                // 名字。卡头已经给它起过名，这一行只剩那个动作。
+                DSSectionHeader(trailing: items.allSatisfy { $0.read } ? nil : "全部已读",
                                 action: items.allSatisfy { $0.read } ? nil : { markAllRead() })
 
                 // 搜索原来挂在 `.searchable` 上（消息 App 的写法）。
@@ -192,7 +199,7 @@ struct MessagesSection: View {
                             tagChip(tag)
                         }
                     }
-                    .padding(.vertical, 2)
+                    .padding(.vertical, TokensSpacing.xxs)
                 }
             }
         }
@@ -210,7 +217,7 @@ struct MessagesSection: View {
                 .foregroundStyle(selected ? TokensPalette.ambient : TokensPalette.secondary)
                 .padding(.horizontal, TokensSpacing.md)
                 .frame(height: 30)
-                .background(Capsule().fill(selected ? TokensPalette.ambient.opacity(0.15) : TokensPalette.glassLight))
+                .background(Capsule().fill(selected ? TokensPalette.ambient.opacity(0.15) : TokensPalette.fillSubtle))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
@@ -252,7 +259,7 @@ struct MessagesSection: View {
                     Circle()
                         .fill(item.read ? Color.clear : TokensPalette.ambient)
                         .frame(width: 8, height: 8)
-                        .padding(.top, 6)
+                        .padding(.top, TokensSpacing.sm)
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: TokensSpacing.xs) {
@@ -278,15 +285,30 @@ struct MessagesSection: View {
                         }
 
                         if !item.body.isEmpty {
-                            Text(item.body)
+                            // 展开后放几行**是算出来的**：正文在这个宽度下真占几行、
+                            // 这一条除了正文还要占多少（标题行 + 明细行）、
+                            // 卡片量到的可用高度是多少 —— 三者相减得行数。
+                            // 见 `bodyPlan`：这不是「大概放得下」那种判断。
+                            let bp = bodyPlan(item, open: isOpen)
+                            Text(bp.text)
                                 .font(TokensTypo.subheadline)
                                 .foregroundStyle(TokensPalette.secondary)
-                                .lineLimit(isOpen ? nil : 2)
+                                .lineLimit(bp.lineLimit)
                                 .fixedSize(horizontal: false, vertical: true)
+                            if bp.restLines > 0 {
+                                DSCardMoreRow(rest: bp.restLines, unit: "行",
+                                              screens: bp.screens, open: false) {
+                                    withAnimation(TokensMotion.count) { fullBodies.insert(item.id) }
+                                }
+                            } else if isOpen, bp.truncatable, fullBodies.contains(item.id) {
+                                DSCardMoreRow.collapse {
+                                    withAnimation(TokensMotion.count) { fullBodies.remove(item.id) }
+                                }
+                            }
                         }
 
                         if isOpen {
-                            VStack(alignment: .leading, spacing: 6) {
+                            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
                                 if !item.plate.isEmpty { detailRow("car.fill", "车辆", item.plate) }
                                 if !item.location.isEmpty { detailRow("mappin.and.ellipse", "位置", item.location) }
                                 if !item.time.isEmpty { detailRow("clock", "时间", item.time) }
@@ -311,7 +333,7 @@ struct MessagesSection: View {
                                         .foregroundStyle(TokensPalette.ambient)
                                     }
                                     .buttonStyle(.plain)
-                                    .padding(.top, 2)
+                                    .padding(.top, TokensSpacing.xxs)
                                 }
                             }
                             .padding(.top, TokensSpacing.xs)
@@ -325,6 +347,76 @@ struct MessagesSection: View {
             .accessibilityLabel(Text("\(item.read ? "已读" : "未读")，\(item.title)"))
             .accessibilityHint(Text(isOpen ? "双击收起详情" : "双击展开详情并标记已读"))
         }
+    }
+
+    // =========================================================================
+    // MARK: 展开后有多挤（CardFit）
+    // =========================================================================
+    //
+    //  用户 2026-09-25：「所有卡片内需要展开的都要严格计算展开后的拥挤程度，完全
+    //  根据数据来，不能猜」。消息这一节的展开量**全在正文里**：标题有 lineLimit(2)、
+    //  明细行最多五行（车牌/位置/时间/状态/地图）都是有界的，只有正文字数无界，
+    //  而这个 App 里的卡片没有内层滚动（叠叠乐自管手势）—— 一条 800 字的通知
+    //  展开后能把卡片变成三屏。
+    //
+    //  所以：展开时正文先按算出来的行数放，剩下的挂在 `DSCardMoreRow` 上；
+    //  那张「还有 N 行」的话里的 N 是 `总行数 − 放得下的行数`，两个都是量出来的。
+
+    /// 卡片内容的真实宽度（视口已扣除叠叠乐左右各 18，这里是卡片自己的左右 18）
+    private var fitWidth: CGFloat { max(0, cardViewport.width - 2 * StackSpec.Card.padH) }
+
+    /// 正文怎么画
+    private struct BodyPlan {
+        var text: String
+        /// 收起时是 2（界面上本来就这么写的），展开时是 nil = 不限行数
+        var lineLimit: Int?
+        /// 被卡在「还有 N 行」后面的行数（0 = 没卡）
+        var restLines: Int
+        /// 这一条展开后占几屏（0 = 视口量不到）
+        var screens: Double
+        /// 这一段本来就长到放不下（哪怕现在正全放着 —— 那也要能收回去）
+        var truncatable: Bool
+    }
+
+    private func bodyPlan(_ item: MessageItem, open: Bool) -> BodyPlan {
+        guard open else {
+            return BodyPlan(text: item.body, lineLimit: 2, restLines: 0,
+                            screens: 0, truncatable: false)
+        }
+        // 判据全在 `CardFit.plan(text:)` 里 —— 消息正文与导出预览那种长正文走的是**同一条**
+        // 规则：放得下就全放，放不下就切在量出来的行边界上。
+        let plan = CardFit.plan(text: item.body, style: .subheadline, width: fitWidth,
+                                viewport: cardViewport, reserved: chromeHeight(item))
+        if fullBodies.contains(item.id) {
+            return BodyPlan(text: item.body, lineLimit: nil, restLines: 0,
+                            screens: plan.screens, truncatable: plan.truncatable)
+        }
+        return BodyPlan(text: plan.text, lineLimit: nil, restLines: plan.restLines,
+                        screens: plan.screens, truncatable: plan.truncatable)
+    }
+
+    /// 这一条**除正文之外**要占的高度：标题行（标题实际能用的宽是量出来的）
+    /// + 行自身的上下内边距 + 展开后逐条算出来的明细行。
+    private func chromeHeight(_ item: MessageItem) -> CGFloat {
+        let right = item.tag.isEmpty ? shortTime(item.time)
+                                     : "\(item.tag) \(shortTime(item.time))"
+        let rightW = CardFit.textWidth(right, style: .footnote)
+        let titleW = max(0, fitWidth - rightW - TokensSize.iconColumn - TokensSpacing.sm)
+        var cost = CardFit.textHeight(item.title, style: .body, width: titleW, cap: 2)
+        cost += TokensSpacing.xs                      // 标题与正文之间（VStack spacing）
+        cost += TokensSpacing.md * 2                  // 行自身的上下内边距
+        cost += TokensSpacing.xs                      // 正文与明细之间（padding(.top)）
+        var rows = 0
+        if !item.plate.isEmpty { rows += 1 }
+        if !item.location.isEmpty { rows += 1 }
+        if !item.time.isEmpty { rows += 1 }
+        if !item.read { rows += 1 }
+        if rows > 0 {
+            cost += CGFloat(rows) * (CardFit.Typo.footnote.lineHeight + TokensSpacing.sm)
+            cost += CGFloat(rows - 1) * TokensSpacing.sm       // 明细行之间的 spacing
+        }
+        if item.coordinate != nil { cost += TokensSpacing.md }  // 「在图上看看」那个入口
+        return cost
     }
 
     private func detailRow(_ icon: String, _ label: String, _ value: String) -> some View {

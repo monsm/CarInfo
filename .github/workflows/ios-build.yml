@@ -6,7 +6,7 @@ on:
     # 只改文档的提交不跑 CI（2026-09-24 加，为转私有后的额度）。
     #
     # 判据是「这次提交里有没有东西会影响构建或门禁」。仓库里没有任何一条门禁读 .md：
-    # check_style.js 只走 Design / Features 下的 .swift，24 项 scan/*.py 里没有一条
+    # check_style.js 只走 Design / Features 下的 .swift，28 项 scan/*.py 里没有一条
     # 打开过文档（这一条是当场核过的，不是猜的）。所以文档改动编译不出任何结果，
     # 而它此前每推一次要花掉一整轮 10 倍计费的 macOS runner。
     #
@@ -116,7 +116,7 @@ jobs:
           # 两次真实事故都是它（`pvValue` 与 `shapeScroll`，各三条 cannot find in scope），
           # 两次都白烧了一整轮 10 倍计费的 macOS runner。
           # 它比的是 HEAD~1（见上面 fetch-depth: 2），所以 CI 与本地是同一套判据。
-          for s in delguard paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps scopeguard paidcap copy lintcfg ternary enumguard; do
+          for s in delguard paths design keys access lexguard scan logic shadowguard scenes targets unreachable futureproof orphans deep eol oneentry traps scopeguard paidcap copy lintcfg ternary enumguard spacing expand printguard glass; do
             echo "::group::$s.py"
             python3 scan/$s.py
             echo "::endgroup::"
@@ -255,107 +255,13 @@ jobs:
           echo "  2. Swift 编译错误（查看 build 日志）"
           echo "  3. 资源缺失"
 
-  # ---------------------------------------------------------------------------
-  # 构建跑完就**保证仓库是私有的**（用户 2026-09-24 的要求）。
-  #
-  # 它判的是**终态**（仓库现在是不是私有），不是「我有没有做动作」：
-  #   · 已经是私有              → 绿，一步不做（所以手动转一次之后，这个 job 不需要任何 token）
-  #   · 读不到可见性              → 红（说不清 ≠ 没问题）
-  #   · 确实是公有、又没配 token  → 红，并把「怎么配」打在日志里
-  #
-  # 2026-09-24 第一版写的是「缺 token 就打一条 ::warning:: 然后绿」，实况证明不够：
-  # 用户是等到自己翻日志才发现仓库还开着（“并没有变成私有库”）。
-  # 一个 **绿着的、什么都没做**的 job，正是本仓库最忌讳的那件事。
-  #
-  # 两个 token 分工（不混用）：
-  #   · 读可见性：GITHUB_TOKEN 就够（它带 metadata: read）—— 所以「是不是私有」这个判据
-  #     与「有没有配 PAT」无关。
-  #   · 转可见性：必须用 PAT。`PATCH /repos/{owner}/{repo}` 要求**仓库级 Administration
-  #     写权限**，而 GITHUB_TOKEN 的 permissions 清单里根本没有 administration 这一项
-  #     （actions / contents / issues / … 里没有它），拿它去调只会拿到 403。
-  #
-  #     配法（值以隐藏输入读入，不经过 shell 历史，也不进仓库）：
-  #         gh secret set REPO_ADMIN_TOKEN --repo monsm/CarInfo
-  #     token 需要 classic PAT 勾 `repo`，或 fine-grained PAT 勾 Administration: Read and write。
-  #
-  # 为什么是 always()：构建红不红，与「这个仓是不是还开着」是两件事。
-  #   构建失败时更不该把源码留在公有状态下 —— 那才是真损失。
-  #
-  # 为什么单独占一个 ubuntu job：它整件事就是一两次 API 调用（几秒），
-  #   挂在 macOS job 末尾要按 10 倍额度计费；ubuntu 是 1 倍，且它碰不到构建产物。
-  #   它也不需要 checkout（gh api 不读工作区）。
-  # ---------------------------------------------------------------------------
-  make-private:
-    name: Make repository private
-    needs: build-unsigned-ipa
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    # 正常 5 秒（一次 API 调用）。封顶只为防「等一个不回话的服务端」把一轮挂很久。
-    timeout-minutes: 5
-    steps:
-      - name: 保证仓库是私有
-        env:
-          # 读用它（metadata: read），写用下面那个 PAT —— 一行一职。
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ADMIN_TOKEN: ${{ secrets.REPO_ADMIN_TOKEN }}
-          REPO: ${{ github.repository }}
-        run: |
-          # ① 先看现在是什么，这一步不碰 PAT。
-          current=$(gh api "repos/$REPO" --jq .visibility 2>/dev/null) || current=""
-
-          if [ "$current" = "private" ]; then
-            echo "已经是私有库，无需改动（这条每次 push 都跑，就是为了保证这一点）。"
-            exit 0
-          fi
-
-          # 读不到就说不清。这里**不能**把「读不到」当成「公有」—— 那正是本仓库反复踩的
-          # 那一类：「没测到」与「测出来是坏的」在输出上长得一样。
-          if [ -z "$current" ]; then
-            echo "::error::读不到 $REPO 的可见性（gh api 失败）—— 无法判断它是不是私有。"
-            echo "        本轮**没有**保证仓库是私有的，去看上面 gh 的报错。"
-            exit 1
-          fi
-
-          echo "当前可见性：$current"
-
-          # ② 走到这里说明：仓库现在是**公有**，而这一轮的要求是「构建跑完它就是私有」。
-          #    做不到就红（不是 warning）—— 绿一个「没做」的 job，就是 2026-09-24 那次
-          #    用户看到的实况：他是等自己翻日志才知道仓库还开着。
-          if [ -z "${ADMIN_TOKEN:-}" ]; then
-            echo "::error::仓库现在是【公有】，而 secret REPO_ADMIN_TOKEN 没配 —— 这次没能把它转私有。"
-            echo "  一行搞定（token 以隐藏输入读入，不经过 shell 历史，也不进仓库）："
-            echo "      gh secret set REPO_ADMIN_TOKEN --repo $REPO"
-            echo "  token 需要：classic PAT 勾 repo，或 fine-grained PAT 勾 Administration: Read and write。"
-            echo "  GITHUB_TOKEN 不行 —— 它没有 administration 权限，调 PATCH 只会拿到 403。"
-            echo "  急用也可以先手动转，转完之后这个 job 每次都直接绿 ——"
-            echo "  它判的是「仓库是不是私有」，不是「我有没有做动作」："
-            echo "      gh repo edit $REPO --visibility private --accept-visibility-change-consequences"
-            exit 1
-          fi
-
-          # ③ 用 --input 送一段字面 JSON，而不是 `-f private=true`：
-          #    `-f` 送的是字符串 "true"，而这个字段是布尔 —— 服务端会以 422 拒绝；
-          #    `-F` 会做类型转换，但「转换规则」不该由一个 PATCH 的成败来验。
-          #    额外说明：这个 PAT **不做**全局 export，只在这一行生效。
-          result=$(printf '{"private": true}' \
-                   | GH_TOKEN="$ADMIN_TOKEN" gh api --method PATCH "repos/$REPO" --input - --jq '.visibility') || {
-            echo "::error::转私有失败 —— REPO_ADMIN_TOKEN 认得出身份，但没权限（403 Resource not accessible）。"
-            echo "  GitHub 对「Update a repository」要求的就是 Administration 写权限，按你的 token 类型对一条："
-            echo "   · fine-grained PAT：Permissions → Repository permissions → Administration = Read and write；"
-            echo "     并且 Repository access 必须包含这个仓（只勾了别的仓会是同一个 403）"
-            echo "   · classic PAT：Scopes 里必须勾 repo（「管理仓库」那一档在它里面）"
-            echo "  权限是改在 token 上的，secret 里那串字符不变 —— 改完直接重跑这个 job 即可。"
-            echo "  不想到处点：手动转一次，之后这个 job 每次都直接绿（它判的是终态）："
-            echo "      gh repo edit $REPO --visibility private --accept-visibility-change-consequences"
-            exit 1
-          }
-
-          # ④ 不信「状态码 200」：读回来的那个字段才是判据。
-          if [ "$result" != "private" ]; then
-            echo "::error::PATCH 没有报错，但读回来的 visibility 是「$result」—— 仓库没变成私有。"
-            exit 1
-          fi
-          echo "已转私有：visibility=$result"
+  # 这里曾有一个 `make-private` job（构建一结束就保证仓库是私有的，用户 2026-09-24
+  # 的要求）。**2026-09-25 按用户要求删除**：为了它要长期养一个带仓库级
+  # Administration 写权限的 PAT（`PATCH /repos/{owner}/{repo}` 用 `GITHUB_TOKEN` 调只会 403），
+  # 而「这个仓是不是私有」是一句**人的决定**，不该由 CI 的终态判据去维持：
+  #   · 想转私有：`gh repo edit <owner>/<repo> --visibility private --accept-visibility-change-consequences`
+  #   · 想转公有：反过来（后果自负：源码与 Release 都对外）
+  # 于是 `REPO_ADMIN_TOKEN` 这个 secret 也不再需要 —— 请手动删掉它，别把它留在仓库设置里。
 
   # 单元测试 job 已删除（2026-09-22，按用户要求）。
   #

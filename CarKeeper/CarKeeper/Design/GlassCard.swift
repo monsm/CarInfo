@@ -44,7 +44,7 @@ struct GlassCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .modifier(CardSurface(glassy: glassy, shape: shape))
             .overlay { accentWashOverlay }
-            .overlay { shape.strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border) }
+            .overlay { shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border) }
             .clipShape(shape)
             // 卡是一片读得到的内容，语音不该把它拆成一句句散读
             .accessibilityElement(children: .contain)
@@ -64,7 +64,11 @@ struct GlassCard<Content: View>: View {
 ///
 /// 两层共用**同一个 shape**，所以开关时轮廓不会变 —— 变的只有后面那层材质。
 /// （`.regular` 是标准厚度：够透（看得见下一张卡），也够实（正文读得清）。
-/// `.clear` 在浅色底图上会把字洗掉。）
+/// `.clear` 在浅色底图上会把字洗掉 —— 卡片底下的内容无论是什么，都是「卡片」这类
+/// 界面，不是照片与地图，所以走 `.regular`，不走 `.overMedia`。）
+///
+/// 材质本身来自 `dsGlass`（`Design/DSGlass.swift`）——**全 App 唯一入口**。
+/// 卡片是它最大的一位用户，但不是例外：玻璃在哪儿、用哪个变体，只该有一个出处。
 private struct CardSurface: ViewModifier {
     let glassy: Bool
     let shape: RoundedRectangle
@@ -72,7 +76,7 @@ private struct CardSurface: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if glassy {
-            content.glassEffect(.regular, in: shape)
+            content.dsGlass(in: shape, hairline: false)
         } else {
             content.background(TokensPalette.surface, in: shape)
         }

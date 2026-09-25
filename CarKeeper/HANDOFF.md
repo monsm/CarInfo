@@ -42,7 +42,8 @@
 **这台开发机上没有 Swift 工具链**（`swift` / `swiftc` / Xcode 都不存在）。因此：
 
 - **编译只在 CI 上发生**。本地唯一能做的验证是静态门禁 + 风格检查 + `bash -n`。
-- 改完必须看 CI 日志才能知道「编不编得过」。这也是仓库里为什么会有 24 项门禁（§8）。
+- 改完必须看 CI 日志才能知道「编不编得过」。这也是仓库里为什么会有 28 条静态门禁
+  （§8；加上 `check_style.js` 共 29 项，`scan/all.py` 一次跑齐）。
 
 ```bash
 # 本机可跑的全部验证（在仓库根）—— 一条命令，别挑着跑
@@ -80,43 +81,31 @@ xcodebuild build \
 
 ### 1.3 CI（`.github/workflows/ios-build.yml`）
 
-三个 job：前两个顺序依赖，第三个等构建结束（红绿都跑）。
+两个 job：第二个依赖第一个（**2026-09-25 起是两条** —— 原来还有第三个 `make-private`）。
 
-1. **`static-gate`**（ubuntu，秒级）：`check_style.js` + 24 项 `scan/*.py`。**任一红即整体失败**。
+1. **`static-gate`**（ubuntu，秒级）：`check_style.js` + 28 项 `scan/*.py`。**任一红即整体失败**。
    （它的 checkout 要 `fetch-depth: 2` —— CI 上工作区干净，`delguard.py` 要拿 `HEAD~1`
    才比得出「这次提交改掉了什么」。）
 2. **`build-unsigned-ipa`**（macos，约 3 分钟，额度按 10 倍计费）：XcodeGen → xcodebuild → 打 `Payload/` zip 成 ipa
    → **IPA 内容体检**（只打印顶层结构，`|| true` 不阻断）→ 上传 artifact → 覆盖发布到 tag `latest` 的 Release（App 内「检查更新」从这里下载）。
-3. **`make-private`**（ubuntu，几秒，1 倍额度）：构建一结束（`if: always()`，红绿都跑）就**保证仓库是私有的**。
-   它判的是**终态**，不是「有没有做动作」：已经是私有 → 绿（不需要任何 token）；读不到可见性 → 红
-   （说不清 ≠ 没问题）；确实是公有、又转不成 → 红。
+> **`make-private` 已于 2026-09-25 删除**（用户：「移除变私库的自动化」）。它原来是第三个 job：
+> 构建一结束（`if: always()`，红绿都跑）就去 `PATCH /repos/{owner}/{repo}` 把仓库改成私有。
+> 删它的理由有两层：
+>   · **代价**：那个 PATCH 需要**仓库级 Administration 写权限**的 PAT（`GITHUB_TOKEN` 的
+>     `permissions:` 清单里根本没有 `administration`，拿它去调只会 403），于是仓库要长期养一个
+>     能改自己设置的密钥 —— 这是整条流水线上权限最高的一个东西。
+>   · **归属**：「这个仓是不是私有」是一句**人的决定**，不该由 CI 的终态判据去维持。
+>     `REPO_ADMIN_TOKEN` 这个 secret 现在没人读了，请手动删掉它。
+> 想转就自己来一次（也可反过来）：`gh repo edit <owner>/<repo> --visibility private --accept-visibility-change-consequences`。
 
-> **两个 token 分工（不混用）**：读可见性用 `GITHUB_TOKEN`（自带 `metadata: read`）—— 所以「是不是私有」
-> 这个判据与「有没有配 PAT」无关；转可见性必须用 PAT。`PATCH /repos/{owner}/{repo}` 要求**仓库级
-> Administration 写权限**，而 `GITHUB_TOKEN` 的 `permissions:` 清单里根本没有 `administration` 这一项
-> （actions / contents / issues / … 里没有它），拿它去调只会是 403。配法（值以隐藏输入读入，
-> 不经过 shell 历史，也不进仓库）：`gh secret set REPO_ADMIN_TOKEN --repo monsm/CarInfo`；
-> token 用 classic PAT 勾 `repo`，或 fine-grained PAT 勾 Administration: Read and write。
->
-> ⚠️ 2026-09-24 第一版这里写的是「缺 token 就打一条 `::warning::` 然后绿」。实况证明它不够：
-> 用户是等到自己翻日志才发现仓库还开着（原话「并没有变成私有库」）—— **一个绿着的、什么都没做的
-> job** 正是本仓库最忌讳的东西。现在：缺 token 且仓库确实公有 = 红，并把 `gh secret set` 那一行
-> 打在日志里。嫌红得烦就手动转一次（转完它每次都直接绿，因为它判的是终态）：
-> `gh repo edit monsm/CarInfo --visibility private --accept-visibility-change-consequences`。
->
-> 单独占一个 ubuntu job 的理由是额度：它整件事就是一次 API 调用，挂在 macOS job 末尾要按 10 倍计费。
->
-> ⚠️ 转私有之后，Actions 额度就从「公有仓库免费」变成「免费 2000 分钟/月，macOS 按 10 倍扣」，
-> 而本仓库每 push 一轮 ≈ 3 分钟 macOS + 秒级 ubuntu；同时 tag `latest` 的 Release 附件下载
-> 也变成必须带 token（App 内「检查更新」本来就是按私库写的，见 `UpdateService`）。
-
-**为额度加的三条（2026-09-24，与 `make-private` 同一轮）：**
+**为额度加的三条（2026-09-24）：**
 
 | 措施 | 省下的是什么 | 代价（写在明处） |
 |---|---|---|
 | `concurrency: cancel-in-progress` | 被下一次 push 取代的那一轮，剩下的时间不再结算 —— 本仓库一天推几十次，这是最大的一条 | 它会在**任意一步**杀 job，包括 `gh release upload --clobber`；被砍在中间时 tag `latest` 可能短暂没有 .ipa，下一次成功的运行补回来 |
 | `paths-ignore: ["**.md"]` | 只改文档的提交完全不跑（已逐条核实：没有任何一条门禁读 .md） | 拿不到那一次的 CI 记录；名单故意只写 .md，其余一律照跑 |
-| `timeout-minutes: 10 / 20 / 5` | 挂死那一次的尾巴：job 默认超时 360 分钟，macOS 按 10 倍扣 = 3600 配额分钟，一次就能吃掉近两个月的免费额度 | 正常 3~4 分钟的构建封在 20 分钟，慢网络下留了 5 倍余量 |
+| （三条的理由原本写着「转私有后的额度」—— 那条自动化已删，而这三条与可见性无关，照旧留着：省的是 runner 时间本身） | | |
+| `timeout-minutes: 10 / 20` | 挂死那一次的尾巴：job 默认超时 360 分钟，macOS 按 10 倍扣 = 3600 配额分钟，一次就能吃掉近两个月的免费额度 | 正常 3~4 分钟的构建封在 20 分钟，慢网络下留了 5 倍余量 |
 
 > 为什么静态门禁值得这么重：一个编译错误要花掉一整轮 macOS runner。**每一条能搬进静态检查的判据，
 > 都把 3 分钟 + 10 倍额度换成一次秒级检查**。§8 的表里每一条都标注了它是哪次真实事故的产物。
@@ -140,7 +129,7 @@ xcodebuild build \
 ├ 状态层  AppStore.swift              @MainActor @Observable 单例：登录态 / caches / 命令历史 / 本机累积
 ├ 设计层  Design/Tokens → ArtTheme → DS → Charts / SkyLight / SkyOverlay / MapStyleSpec / DSSwipeStrip
 ├ 界面层  CarKeeperApp（入口 + NavState）→ MapShellView → MapSpineView（唯一的屏）→ 6 档页面
-└ 服务层  Services/*.swift            通知 / 提醒 / 健康钥匙 / 加密 / 采样 / 天气 / 更新 / 估值……
+└ 服务层  Services/*.swift            通知 / 提醒 / 健康钥匙 / 采样 / 天气 / 更新 / 估值……
 ```
 
 ### 2.2 导航模型：**一个屏 + 一条模式条**
@@ -162,7 +151,12 @@ MapShellView（唯一的屏）
 全局搜索整体删除，右臂现在一键发车控指令。）
 
 **换档不换屏**：地图与纸的位置、高度、底色在 6 档之间完全不变，变的只有纸里装的内容。
-这条是从相机 App 的模式条学来的，`DSSwipeStrip` 就是那条条子（可手拖、跟手、吸附、中心项放大）。
+这条是从相机 App 的模式条学来的，`DSSwipeStrip` 就是那条条子（可手拖、跟手、吸附、选中项放大）。
+2026-09-25 按用户「选中的宽度加大、滑动区变高」+「控件大小都很不 iOS」调过三个数：
+**条高 46 → 54**（两侧圆钮按原型那条关系一起从 50 走到 58；整条底条的命中区现在还包括
+它离底那 26pt 空白带 —— `contentShape(Rectangle())`）、**一档宽 34 → 38**（整条更长）、
+**选中胶囊 = 格宽 × 1.9**（原 1.75；它是选中**指示器**，而各段依旧等宽，所以吸附不会飘）。
+模式条占的纵向空间随之从 86 涨到 94（`barTotal` = 26 + 54 + 14）—— 它是派生量。
 
 > **条子的几何只有一个来源，就是「当前露出几档」**（2026-09-24 第三次修正）：
 > 间距按露出档数算 —— 静止露三档 → 宽裕（节距 68）；展开装全部 → 不够才压。
@@ -210,7 +204,7 @@ NavState.shared.openMode(_ mode: HomeMode, sub: HomeSub? = nil)   // 去功能�
 ### 2.3 数据流（从接口到屏幕）
 
 ```
-用户操作 / 定时器
+用户操作 / 自动刷新的节律循环（RefreshLoop）
    ↓
 APIClient（9 个端点，POST 带 token）── Retrier.global 自动重试（幂等请求）
    ↓  原始 JSON（[String: Any]）
@@ -231,6 +225,24 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 **关键决定：`AppStore.caches` 不是缓存。** 它只装「刚刚那一次接口响应」——
 不做 TTL、不跨启动落盘、失败不保留旧值。因此界面上的每个数字都能追溯到一次真实响应；
 某个源这次没取到，界面就显示自己的空/失败态。
+
+**自动刷新的节律（2026-09-25，用户点名要的）**：**一个循环**（`Services/RefreshLoop.swift`），
+节律由两个输入算出来，两个输入都只有一处出 —— 当前在哪一档（`HomeMode.storageKey`，模式条写的
+那一个键）与车在不在动（最近一次报文里的 `VehicleSpeed`，`AppStore.isCarMoving`）：
+
+| 何时 | 间隔 | 取什么 |
+|---|---|---|
+| 地图页 · 车在动 | **2 s** | `fetchCore()`（车况四项） |
+| 地图页 · 车停着 | **60 s** | `fetchCore()` |
+| 其他五档 | **300 s** | `fetchVehicleData()`（含消息与体检） |
+
+地图页那颗**手动**「全局刷新」（图层面板里）走 `RefreshLoop.refreshAll()` —— 即**全部接口**，
+刷完弹一句反馈（全取到 / 有 N 项没取到，缺项取自 `saveCache` 里值为 nil 的那些键）。
+
+为什么不做成「每页一个定时器」：六页是**同时建出来**的（§4.1 的 `pageDeck`），每页一个 `Timer`
+就是六个循环各按自己的节律问同一个服务端 —— 换一次档会把六份请求都点着。
+三条自我约束写在那个文件头：不并发（一次取数 `await` 完了才睡下一次）、没登录/没车不取、
+进后台不做特殊处理（进程被挂起，`Task.sleep` 随之停摆）。
 
 > 历史上这里有一整套「缓存思维」：`cacheTTL = 180s`、`needsRefresh`、`isCacheExpired`、`staleKeys`、
 > 「网络异常，显示缓存数据」、失败保留旧值。**2026-09-23 全部删除，且不要加回来**——
@@ -269,7 +281,9 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
   实测证明 `refresh_token` **不轮换**（`expires_in: 86400`），泄露即长期可用；而 UserDefaults 会进 iCloud 备份。
   首次读取会把旧 UserDefaults 里的令牌**迁移进 Keychain 并删掉明文**（用户无感）。
 - `TokenStore.clear()` 同时删 Keychain 与旧 UserDefaults 键（退出登录必须两处都删）。
-- `DataEncryption`（CryptoKit AES-GCM + Keychain 密钥）用于车牌等敏感字段；`SecureStorage` 是它的封装。
+- ~~`DataEncryption` / `SecureStorage`~~ **已于 2026-09-25 删除**：它把车牌加密后写进
+  UserDefaults，而全仓没有一处读它（只写不读 + 静默失败）。车牌不属于「被加密保存的敏感字段」
+  —— 它只出现在报文与界面上，本机不另存一份。
 - 人类可读的报文日志走 `RawLogStore`（键 `changan_raw_log`），用于排障。
 
 ### 3.3 重试与刷新
@@ -277,6 +291,8 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 - `Retrier`（指数退避 + 抖动）：默认 4 次 / 1s 起 / ×2 / 上限 8s / 抖动 0.3；另有 `.aggressive`、`.dataReliable`、`.none`。
 - **有副作用的 POST 必须 `retryable: false`**（车控指令、发短信）——重复下发是真实危害。
 - token 刷新用 `AtomicTaskHolder` **并发去重**：同一时刻 N 个请求过期只刷一次。
+- **「多久问一次」不在这里**：那是 `RefreshLoop` 的节律（见 §2.3）。重试管「一次请求失败之后怎么办」，
+  节律管「隔多久发起下一次」—— 两件事分开，谁也不替谁兜底。
 
 ### 3.4 报文解析的两条铁律
 
@@ -291,7 +307,9 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 
 ## 4. 界面逐项
 
-### 4.1 地图主屏（「现在」档）—— 全 App 唯一的屏**文件**：`Features/Map/MapSpineView.swift`（1203 行，骨架：六页同屏 / 底条 / 浮动两卡 / 图层胶囊）、
+### 4.1 地图主屏（「现在」档）—— 全 App 唯一的屏**文件**：`Features/Map/MapSpineView.swift`（**1111 行**，骨架：六页同屏 / 底条 / 浮动两卡 / 图层胶囊；
+2026-09-25 它到过 1201 行、越过了 `lintcfg.py` 的 1200 阈值，于是把「光」表拆成
+`MapSkySheet.swift`（含共用原语 `MapNotice`）—— 拆的是文件，界面一字未改）、
 `MapSpineLayers.swift`（139 行，「现在」那一档四个图层各自的内容 —— 2026-09-23 拆出，
 理由见那里的文件头）、`MapSpineData.swift`（数据层）、`MapCarPin.swift`（车钉）、
 `HomeModeHead.swift`（巨字头：只给**一个**事实 + 一行小字，依据在下面每一张卡里）。
@@ -319,13 +337,24 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 `TokensPalette.canvas.ignoresSafeArea()`；③ `pageBody` 每张非地图子页各自的
 `.background(TokensPalette.canvas.ignoresSafeArea())`。三层全删：非地图子页现在铺的是
 **壁纸图**（`wallpaperLayer()`，来自 `Services/WallpaperService.swift`）。
- iOS 读不到主屏壁纸（无公开 API，壁纸归 SpringBoard 管），所以壁纸图是用户在
-「我的 → 设置 → 应用 → 选一张」里**从相册选的一张本地图**（JPEG 落盘到
-`Documents/carkeeper-wallpaper.jpg`，不依赖网络 —— 2026-09-24 第七轮把最初那版
- Unsplash 在线图废了，因为用户在网络上取不到，深色模式下静默回落的画布就是纯黑，
- 用户原话「没任何变化啊，根本看不清 太暗了」）。没选图（或点了「不铺」）时
- 回落到 `TokensPalette.canvas`（浅色模式浅灰 / 深色模式近黑，随 AppCanvas 的光），
- 观感与删暗层之前相同，但不再是「暗层」。
+ iOS 读不到主屏壁纸（无公开 API，壁纸归 SpringBoard 管），所以「桌面的那张」只能换一种
+拿到方式。**三条路（`WallpaperSource`，2026-09-25）**：
+
+| 图源 | 怎么来 | 要不要钱 / 钥匙 |
+|---|---|---|
+| 相册自选 `photo` | `PhotosPicker` 选一张本地图（JPEG 0.82 落盘） | 不要，也不联网 |
+| 必应每日 `bing` | `HPImageArchive.aspx?format=js&idx=0` 的当天那张 | 不要，免密钥 |
+| Windows 聚焦 `spotlight` | `fd.api.iris.microsoft.com/v4/api/selection?placement=88000820` | 不要，免密钥 |
+
+  「如果需要密钥就算了」是用户给这条功能的边界，所以只有这两家（都是别人给自己产品
+  用的公开只读 JSON）进了代码。两条在线源都是**每天换一张**：取到的图落成
+  `Documents/carkeeper-wallpaper.jpg`（与相册那张同一个文件，铺图只有一条路径），
+  `UserDefaults` 记「取到的是哪一天」（`dayStamp`，UTC 天数）；同一天启动直接读盘，
+  跨天才再去取一次（取图失败保留上一天那张，`failed` 让设置行说一句人话）。
+  没图（没选 / 点「不铺」）时回落到 `TokensPalette.canvas`（浅色模式浅灰 /
+  深色模式近黑，随 AppCanvas 的光），观感与删暗层之前相同，但不再是「暗层」。
+  第一次取图在 `MapSpineView` 的 `.task` 里催（`refreshIfStale()`，故意放在
+  `LaunchFence` 之外：它只往 Documents 落一张 JPEG，不碰车况与地图状态）。
 
 **只有一张大卡**（2026-09-24 第八轮：用户「地图页地下 4 个独立的读数融合进大卡片，
 最上面那行也删掉——和下面重复」）：这一档原本「浮动两卡 + 四格读数」三块，
@@ -334,11 +363,17 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 - 卡头一行只剩**一枚图层胶囊**（`layerMenu`）—— 右对齐。原先那行还写着车牌 + 状态
   + 上报时间，与卡内正文说的是同一件事，已删（重复）。
 - `.now` 分支的正文：地址（大字）→ 巨字**续航**（`DSBigNumber`）→ 副行（表显 · 充不充电）
-  → 光带（`nowMetrics`）→ **四格读数**（`readoutCells`，`MapSpineReadouts.swift`：
-  车速 / 电量 / 胎压（取四轮最低那条）/ 车锁，同一行同一基线，裸 HStack 不另套玻璃壳，
-  直接排在大卡下沿）。
-- `readoutChips`（旧版独立玻璃卡）仍在 `MapSpineReadouts.swift` 里，但地图页不再调用 ——
-  保留只为对照页 / 未来复用，不占屏幕。
+  → 光带（`nowMetrics`）→ **一排读数 + 一个抽屉**（`MapSpineReadouts.swift`）。
+- **读数分两层（2026-09-25：用户「地图页数据用抽屉的方式展示，默认只有续航 电量 车速，
+  其他数据均通过拉开抽屉展示」）**：默认一屏就三个数 —— **续航（巨字）/ 电量 / 车速**
+  （`readoutsPrimary`，两格分一行，比原来四格挤一行宽一倍）；其余读数（`readoutsMore`：
+  胎压取四轮最低那条 / 车锁 / 充电时的「还要充多久」）收在 `moreDrawer` 那道拉手之后。
+  拉手既是按钮（点）也是拖动面（上拖 12pt 开、下拖 12pt 收），命中区 44pt（HIG）。
+  依据是 HIG 的 Layout 那条：“Use progressive disclosure to make layouts cleaner and
+  easier to interact with…reduce how much content to initially display” ——
+  它不是省略，而是把「一瞬」与「细看」各自定一个量。
+- `readoutChips`（旧版独立玻璃卡）：零调用点，已删（2026-09-25 逐卡核对那一轮）——
+  「同一件事有两个写法」在这个仓库里就是下一个事故的种子（文件里那段注释留了去向）。
 
 **图层胶囊同时是这一屏的菜单**（`layerMenu`，`Menu`）：四个地图图层（当前那层带勾）、重取数据、
 此刻的光（`skySheet`）、回到车；iPad 上多一项「新车况窗口」。
@@ -395,6 +430,27 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 - **保养 `MaintenanceMoneyView`**：统计卡 + 即将到期 + 年份筛选 + 时间线 + 添加记录；
   还装着 **`InspectionSection`（年检）**、**`VehicleValuationSection`（车辆估值）**、**`ExportDataSection`（导出）**。
 
+**2026-09-25 逐卡核对（用户：「全局看重复内容…每个卡片仔细核对是否合理，内容展开后是否拥挤」）**：
+这一档是「页面壳套在卡里」的重灾区，三件事一次改完：
+
+- **卡里不再套页面壳**。`HealthDataView` 与 `MaintenanceMoneyView` 原本各自包着
+  `DSPaperPage`（自带一层 `ScrollView` + 一层纸面底 + 自己的左右 16pt + 一行页标题），
+  而它们**只**作为那张卡的内容存在（全仓无第二个调用点）。叠进卡里的后果是：
+  第二层滚动 + 第二层底 + 双重内边距（卡 18 + 页 16 = **34pt**，内容比别人窄一圈），
+  标题也说两遍（卡头「体检」+ 页标题「体检与数据」）。现在两者都改成
+  `VStack(alignment: .leading, spacing: 0) { … }`（间距与那股纸完全一致，只是不再有纸）。
+  它们都是所在那一叠的**末卡**，所以「末尾停在末卡下沿」的规则保证底部读得到。
+- **卡头已经写过名字，正文不再写第二遍**。`DSSectionHeader.title` 现在是可空的
+  （默认 `""`）：`VehicleTipsSection` 的「用车提示」、`MileageJournalSection` 的
+  「里程记账」、`MessagesSection` 的「车辆消息与事件」都改成了空标题 —— 它们栖身的卡
+  分别叫「用车提示」「里程记账」「车的事件」，这三行只剩右侧那个动作（「全部已读」）。
+  （同一条判据上一轮已经用在「常来之地 / 常停之地」与「驾驶评分 / 评分」上。）
+- **一个动作不能挂在永远不显示的工具栏上**。`MaintenanceMoneyView` 的「＋（添加保养
+  记录）」原来只存在于 `.toolbar`，而全 App 的导航栏是隐藏的（地图那一档没有顶栏，
+  子页继承同一个栈）—— 那个入口从未显示过，等于「加一条保养记录」没有入口。
+  现在它是内容里的一个按钮（`addServiceButton`），形状与「里程记账」卡里的
+  「添加记录」一致。
+
 数据来源：`cars` + `control` + `check`（体检）。深链：`.vehicle` / `.health` / `.service`。
 
 ### 4.3 充电档 —— `ChargeView`（2026-09-23 从零重写）
@@ -440,6 +496,12 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 
 **一屏三节**（此前是三个独立页面/深链）：
 
+**行程卡上限 30 段**（2026-09-25，用户：「行程页的最大行程控制在 30 条，其他均以消息显示」）：
+`tripCardCap = 30`，一次仍只建 5 张（`tripCardStep`），由人点「再放 5 段出来」；到 30 之后
+那一行**换成陈述句**（「再往前的 N 段在下面『车的事件』里，按时间列着」），而不是一个按了
+没反应的灰按钮 —— 超出的那些没有丢，点火/熄火事件本来就一条条列在「车的事件」卡里
+（同一份消息的另一种读法）。上限的理由是每张行程卡里是一张**真的** `MiniTripMap`。
+
 **消息窗口：跨度 30 天，形状仍是 7 天一段**（2026-09-24 两次修）：
 `APIClient.messageDays = 30`、`APIClient.messageSliceDays = 7`。
 **「跨度」与「形状」是两件事**：形状 = 抓包里那一次请求的样子（`startTime` 到 `endTime`
@@ -474,13 +536,20 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 - **设置 `MineView`**：Apple Profile 风格身份卡 + 车辆卡（切车 `selectCar`）+ 设置分组（退出登录、
   检查更新） + **家庭管理 `FamilyManagementView`**、**临时钥匙 `TempKeyListView`**、
   **隐私面板 `PrivacySection`**、**月报 `MonthlyReportSection`**、Siri 卡片入口、真开关（低电量省电 / 夜间模式）、
-  **壁纸小卡（`wallpaperRow`，2026-09-24 第六/七轮：非地图子页的背景图）** —— 「应用」组里一行，
-  缩略图 + 「选一张」（`PhotosPicker` 从相册选，本地不联网，JPEG 落盘）+ 「不铺」（清图 + 删文件，回落画布色）。
+  **背景图小卡（`wallpaperRow`，2026-09-24 第六/七轮；2026-09-25 加两个在线源）** ——
+  「应用」组里一行，形如 iOS 设置的值选择器：左边「背景图」，右边 `Picker`（`.menu`）
+  三选一 —— 相册自选 / 必应每日 / Windows 聚焦；下面缩略图（120pt）+ 相册那一档才有
+  的「选一张」（`PhotosPicker`）+ 有图时才有「不铺」+ 一句来源说明；取图失败时多一行
+  「取图没成功，先铺画布底色」，在线图另附图源给的署名。
   它改的是 App 自己的背景，不是系统的（iOS 没有读主屏壁纸的公开 API），所以与
   「设备与模式」组（改系统的：夜间 / 省电 / 专注）不并列。
 - **应急 `EmergencyPanel`**：SOS 按钮 + 快捷操作 + 紧急联系人 + 位置共享 + 紧急叠加层。
+  2026-09-25 拆掉三层页壳：`ScrollView`（里外两层都能滚时手势塌给内层，而内层拿到
+  无限高、永远滚不动）、页边距（卡 18 + 页 20 = **38pt**，全 App 最窄的一张）、
+  页标题（卡头写「应急」，正文再写一遍「紧急求助」）。页边距只属于真正的整页。
   代价说明：从「1 次拖动」变成「1 次拖动 + 1 次点击」，但 SOS 也仍然在地图操作条上。
 - **诊断 `DevView`**：色板 / 字体 / 令牌数值 / 运行状态 / 能力位图（`car.funCode`）+
+  （2026-09-25 同样拆掉 `ScrollView` + 页标题「设计令牌」；滚动归叠叠乐）
   **艺术主题入口 `ThemeGallerySection`**（主题画廊住在这里，不占档位）+
   **消息自检 + 原始日志**（两台仪器并排在同一个 `diagnosticsGroups` 里）。
   它们是为同一类抱怨造的：「消息拿不到数据」。
@@ -510,7 +579,7 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 | `LoginView` | 未登录 | 手机号 + 短信码 + 图形码；`TokenStore.save` 后进主屏 |
 | `GlobalSearchHUD` | 地图工具栏 / 我的 | `fullScreenCover`（不是 sheet）；搜页面、车牌、行程、指令；空态文案分「还没输」与「没匹配」两种情况 |
 | `BiometricLockOverlay` | 敏感页二次验证 | `RemoteLockManager` 后台超时自动隐藏 |
-| `ThemeGallerySection` | 诊断档 | 4 个艺术方向 + 小界面样本，切换立即生效 |
+| `ThemeGallerySection` | 诊断档 | 20 套艺术方向（切换器横向可滑）+ 小界面样本，切换立即生效 |
 | `PrivacyDashboardView` | 我的 | 三类：留在本机的 / 离开本机的 / 没在收集的 |
 
 ---
@@ -523,26 +592,45 @@ VM.energy / VM.bodyStatus / VM.tyreStatus / VM.locStatus / AN.summarize …（�
 Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套取值） → DS 原语（唯一容器/分组形态） → 页面
 ```
 
-- **`Design/Tokens.swift`**：`TokensPalette`（颜色）/ `TokensSpacing`（4 的倍数，页面边距 20）/ `TokensRadius` /
+- **`Design/Tokens.swift`**：`TokensPalette`（颜色）/ `TokensSpacing`（4 的倍数，页面边距 20；
+  2026-09-25 补上缺的一档 **12 = `snug`** —— 原先全 App 有十几处用字面量 `10/11/12` 去凑它）/ `TokensRadius` /
   `TokensTypo`（字号）/ `TokensMotion` / `TokensHaptic` / `TokensHair`（发丝线）/ `TokensSize` / `TokensSerif` / `TokensTracking`。
 - **`Design/DS.swift`**（1077 行）：唯一一套容器与排版原语 —— `DSCanvas`、`DSCard`、`DSGroup`/`DSGroupRow`、
   `DSSection`（唯一的分组形态，inset-grouped）、`DSKeyValueRow`、`DSBigNumber`、`DSLightBar`、`DSStatStrip`、
   `DSSegmented`、`DSChip`、`DSNotice`、`DSPlaceholder`、`DSSkeleton`、`DSExpandGroup`（唯一的折叠）、
-  `DSPaperPage`、`DSPrimaryButtonStyle`、`DSRowButtonStyle`、`DSSurfaceModifier`……
+  `DSPrimaryButtonStyle`、`DSRowButtonStyle`、`DSSurfaceModifier`……
+  · **2026-09-25 删掉的三个**：`DSPaperPage` / `DSPaperPageModifier` / `dsPaperPage()`（全页「纸」外壳）
+    与 `DSPageTitle`（艺术方向下画在版面里的页标题）。它们的用户全是**卡里的正文**
+    （体检 / 保养 / 诊断 / 应急），而卡里的正文不该再套一层页面 —— 那是双重内边距
+    （卡 18 + 页 16/20）与「一个东西两个名字」（卡头 + 页标题）的来源。
+    真正的整页（登录 / 引导 / 开场）不用它们：它们本来就只有导航栏。
 - **`Design/Theme.swift`**：`AppCanvas`（画布与光**在根部只画一次**）、`SkyOverlay` 接入、`StatusDot`、`Pill`、
   `MonthlyReportSection`、`PowerSavingToggle`。
 - **`Design/Charts.swift`**：`DSTrendChart`（单序列，SOC / 功率共用）、`DSTyreTrendChart`（四条曲线）、
   `DSTrendEmpty`（数据不够时的说明，不是灰块）。
-- **`Design/StackSpec.swift`**：叠叠乐的全部手感数字（七种叠法 → `StackMetrics`）
-  + 纯几何（`StackMath`，不碰视图，可单独对）。**手感要调就只改这里**，
-  不要到页面里改一个局部数字。
-  2026-09-24 按用户要求调过的三个数（都写在原处，连同「为什么」）：
-  `directionBias` 0.85 → 1.0（吸附临界点从 47% 移到正好一半）、
-  `flingVelocity` 550 → 900（普通滑动不再多跳一格）、
-  `.arc.shrink` 0.07 → 0.03（滚动中卡片的大小差异减半）、
-  `.arc.fadeBottom` 140 → 44（滑到底时末卡底边贴近卡片窗下沿，不留一个手掌高的空白）。
-- **`Design/StackLabView.swift`**：七种叠法的对照页（`DevView` → 叠叠乐），
-  挑中哪一种写进 `UserDefaults`（`StackSpec.variantKey`），六页立刻跟着换。
+- **`Design/StackSpec.swift`**：叠叠乐的全部手感数字（`StackMetrics`）+ 纯几何（`StackMath`，不碰视图，可单独对）。
+  **手感要调就只改这里**，不要到页面里改一个局部数字。
+  · **叠法只剩一种**（用户 2026-09-24：「叠叠乐只用吸附堆叠（但是要删除吸附）其他都删除」）：
+  `StackVariant` 现在只有 `.sticky` **一个** case，`StackSpec.chosen` 恒等于它、
+  `remember()` 也只写它 —— 旧用户存过的其他值下次打开时被迁移到它（不报错、不静默降级）。
+  原型里 A~G 七种只剩这一种：它不再是「七选一」，而是一个固定值。
+- **`Design/CardFit.swift`**（411 行，2026-09-25 新增）：**「展开后有多挤」的唯一算法** ——
+  行高取自 `UIFont.preferredFont(forTextStyle:).lineHeight`（当前动态字号下的真实值）、
+  折行数取自 `NSString.boundingRect`（真量，不是字数÷每行字数）、可用高度取自
+  `ArcStack` 量到的视口（环境值 `\.cardViewport`）。产出 `Verdict`（占几屏）与
+  `Plan`（`.all` / `.chunk(keep:rest:)`，`keep` 是逐行累加真实高度得出的）。
+  出口只有 `DSCardMoreRow`（「还有 N 条 · 展开后约 M 屏」）—— 摊开与收起来必须是同一行。
+  视口量不到时返回 `.unknown` 并**放弃分块**：不允许把「不知道」当成「放得下」。
+  守门人是 `scan/expand.py`（编号 26）。
+- **`Design/DSGlass.swift`**（2026-09-25 新增，150 行）：**「浮在内容之上」那一层的唯一材质** ——
+  `dsGlass(in:variant:interactive:hairline:)` 与两个便捷写法（胶囊 / 圆角矩形）、
+  以及 `dsGlassLayer(spacing:)`（多块玻璃包成一层，`GlassEffectContainer` 的入口）。
+  三层规则写在文件头：浮层 → 真玻璃；**卡里不玻璃**（叠玻璃会糊成一片）；内容表面不玻璃。
+  变体按**底下是什么**选（App 界面 → `.regular`；地图 / 照片这种连续画面 → `.clear`），
+  可点的表面交 `interactive`（按压由系统演，不再自己压透明度）。
+  守门人是 `scan/glass.py`（编号 28）。
+- **`Design/StackLabView.swift`**：叠法对照页现在只显示「唯一叠法」那个静态说明
+  （七选一已经取消，`DevView` → 叠叠乐 这一条路径保留着 —— 它仍是查看叠法参数的地方）。
 - **五个功能界面共用的三个原语**（阶段 1 的产物，职责分得很硬）：
   `GlassCard`（一张卡的材质与内边距） → `ArcStack`（几何 / 手势 / 消失带 / 无障碍翻页）
   → `StackPageView`（巨字头 + 那一叠） → `DSSwipeStrip`（底部那条相机式模式条，已重写）。
@@ -667,9 +755,10 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | `ServiceReminderManager` | 保养项定义与进度 | 车辆档 |
 | `WeatherService` | open-meteo 实况（TTL 内且没走远不发请求） | 位置变化 / 启动 |
 | `WallpaperService` | 子页面壁纸图（相册选的一张 JPEG，本地存 `Documents/carkeeper-wallpaper.jpg`，不依赖网络） | 「我的→设置」选一张/不铺；启动时读回 |
+| `RefreshLoop` | **自动刷新的节律**（地图 2s/60s、其余档 5 分钟、手动「全局刷新」= 全部接口） | 根视图启动时 `start()`（幂等） |
 | `Retrier` / `NetworkEnhancements` | 退避重试 / 网络质量监控 / 离线模式 | 请求层 |
 | `Monitoring` | 内存读数（**不落盘**） | 启动后每 10s |
-| `DataEncryption` / `SecureStorage` | AES-GCM + Keychain | 车牌等敏感字段 |
+| ~~`DataEncryption` / `SecureStorage`~~ | 已删（2026-09-25） | 只写不读的加密壳，见 §9.3 |
 | `BiometricLock` / `RemoteLockManager` | FaceID 二次验证 / 后台超时隐藏 | 敏感页 / 启动 |
 | `NightModeManager` / `FocusModeManager` | 夜间时段 / 专注模式 | 启动与设置 |
 | `GestureEnhancements` / `ShakeDetector` | 摇一摇锁车（自己验 PIN 后发 `CentralLock`） | 启动 |
@@ -680,13 +769,16 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | `EnhancedToastManager` / `AppStore.ToastManager` | 全局提示 | 全局 |
 | `RawLogStore` | 请求/错误原始日志（排障） | 请求层 |
 | `MD5` | 登录签名 `signF` | 认证 |
-| `NightModeManager` 等 | 见上 | |
 
 ---
 
-## 8. 工程约束与门禁（24 项 + 风格检查）
+## 8. 工程约束与门禁（28 项 + 风格检查）
 
 ### 8.1 门禁表（每一项都是某次真实事故的产物）
+
+编号 = `.github/workflows/ios-build.yml` 里那条 `for s in …` 的**顺序**（`scan/all.py`
+就是照它跑的）。所以新加一条就接在末尾 —— 老记录里「第 N 条」是当时手数的，
+`spacing` 插进清单中段之后全部后移了一位，以这张表为准。
 
 | # | 门禁 | 拦什么 |
 |---|---|---|
@@ -714,6 +806,10 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | 22 | `ternary.py` | 三元运算符的 `?` 不能贴住前一个 token（否则变可选链）—— 见 §11 事故记录 |
 | 23 | `delguard.py` | **删了声明、使用还在**：旧版本里成员级声明过、新版本里没有声明了、代码里还在用它（`pvValue` / `shapeScroll` / `messageWeeks` 三次事故的根因）。**跨文件**：声明在 A、使用在 B 也算（B 里的用法只认带前缀的那种）—— 它自己的两个盲区都是 2026-09-24 当场补的 |
 | 24 | `enumguard.py` | 表驱动调用族的 SDK 枚举简写必须是已核成员（`accessibilityAction` / `textCase` / `accessibilityElement(children:)` / `scrollBounceBehavior`） |
+| 25 | `spacing.py` | 界面代码里的间距必须是 `TokensSpacing` 那一档（字面量只允许 0/1 与四个**几何值** 18/20/40/108，逐条写明理由）。它是 2026-09-25「所有页面的间距布局都很不 iOS」那一轮的守门人：先吸 111 处字面量、补刻度缺的 12（`snug`），再把它固定下来 |
+| 26 | `expand.py` | **展开类内容不许写死高度**：界面代码里不得出现 `frame(height: 数字)`（只给高度、没给宽度的那种；`frame(width: 44, height: 44)` 是形状，不管）。例外表 11 条，键是「文件:值」，每条都写清「为什么这个高度是画出来的」（图表 / 指示线 / 样例色块 / 缩略图），**一条不再成立就报红**。它是 2026-09-25「展开后的拥挤程度要完全根据数据算」那一轮的守门人 |
+| 27 | `printguard.py` | App 与 Services 里不得出现 `print(`（例外只有设计令牌页）。它是 2026-09-25 那一轮的守门人：全仓仅有的两处 `print` 都是「提醒没发出去」——`print` 的问题不是吵，是**没有读者**（那条路径写进了「诊断」在读的日志） |
+| 28 | `glass.py` | **玻璃只有一个入口**：`.glassEffect` / `GlassEffectContainer` 只许出现在 `Design/DSGlass.swift`；玻璃底下不许垫不透明的面（同一条链里 `.fill(TokensPalette.…)` 出现在 `.dsGlass` 之前即报红）；不许再引入旧材质语言（`…Material`）。它是 2026-09-25「全局液态玻璃的质感全项目每个犄角旮旯方方面面都做到位了吗」那一轮的守门人：那一轮查出真玻璃只有 3 处，其余浮层用的都是「名字叫 glass、值等于 `fillSubtle`」的扁平令牌（该别名已删），另有两处把玻璃**垫在不透明的面底下** |
 | + | `check_style.js`（node） | 风格与括号配平 |
 | + | `all.py`（**本地**执行器） | 不判任何东西：把上面这份清单（从工作流解析，不另抄）一次跑齐。CI 不跑它 —— 跑第二遍没有信息量 |
 
@@ -758,7 +854,15 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 - ❌ 不要在根视图挂**无限循环动画**（整棵树反复失效：深色下发暗发黏 + 持续耗电）。
 - ❌ 不要在 `@main` 与 `struct CarKeeperApp` 之间插入任何声明（属性绑定到下一个声明，会静默接管入口）。
 - ❌ 不要把 `Message`/`Data` 之类的系统类型名拿来做自己的类型名（`shadowguard`）。
+  （这一轮真撞上了一次：`CardFit` 里那个字档枚举本来叫 `Text` —— 于是同一个文件里
+  `Text` 既可能是 SwiftUI 的、也可能是字档。已改名 `Typo`。）
+- ❌ 不要给**展开类**内容写固定高度，也不要写「大概放得下几条」（`expand.py`）。
+  高度只有两个来源：内容自己撑出来，或 `CardFit` 按数据算（真实行高 + 真实折行数 +
+  `ArcStack` 量到的视口）。看不清视口时它返回 `.unknown` 并**放弃分块** ——
+  「不知道」不允许被当成「放得下」。
 - ❌ 不要用 `try?` 包住「必须成功」的异步调用（`try?` 会让 `do` 体永不抛错，`catch` 变死代码）。
+- ❌ 不要在页面里自己开定时器取数（每页一条 = 六个循环问同一个服务端）。节律只有
+  `RefreshLoop` 一处；要改「多久一次」就改那里，别在调用点加 `Timer`。
 - ❌ 不要为了「让界面好看」而给缺失数据填默认值。
 
 ### 9.3 已核实的文档/注释漂移（代码是对的，注释旧了）
@@ -766,10 +870,16 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 - ~~`MapSpineView.swift` 头部与 `bottomPanel` 注释写「9 档」、`CarKeeperApp.swift` 写「10 档」~~
   **已改**：`bottomPanel` 这个类型本身已随结构对齐删掉，两处计数注释都改成 6 档。
   留着这条是因为它的成因还没被机制拦住 —— 「注释里的数字」没有任何门禁在盯。
+- **`REDESIGN-STATUS.md` 批 3 那份「仍未做」清单已经过期了一半**（2026-09-25 逐条核过代码）：
+  月报不再写死（`Theme.swift` 自己写着「曾经是 1250 km …」）、`tripHistory` 已有写入点
+  （`AppStore.swift` 的 `insert(record, at: 0)`）、`"Mileage"` 那个键名在仓里已经不存在、
+  `daysUntil` 走的 `parseDate` 解析不了就返回 nil。
+  **没过期的那一条**：车控页还没按 `funCode` 开合控件（见 §9.1 的数据缺口）。
+  教训同上一行：日志类文档写下的「仍未做」没人会回头改 —— 读它的人要自己核一遍代码。
 - `DESIGN-SPEC.md` 的小节标题仍用旧页面名（如「行程页 (TripAnalyticsView)」），实际类型是 `TripsEventsView`。
 - `GlobalSearchHUD` 的空态提示曾写「搜页面、车牌、行程、指令、**充电记录**。」，而充电记录随
   充电账本一起删了（代码里的注释已注明），提示却还在承诺它 —— **已改**。
-  这一类「文案承诺了一个已删除的功能」的漂移，22 项门禁**查不到**：`copy.py` 只管词、长度与复述句式，
+  这一类「文案承诺了一个已删除的功能」的漂移，28 条静态门禁**查不到**：`copy.py` 只管词、长度与复述句式，
   不核对「这句话说的东西还在不在」。写文档时逐屏读才会碰到。
 
 ### 9.4 未验证的部分（必须如实交接）
@@ -891,8 +1001,9 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 |---|---|---|
 | `StackSpec` / `StackMath` | 全部数值与纯判定（焦点、吸附落点、两端硬停） | 不 import SwiftUI 之外的任何东西，不碰视图 |
 | `GlassCard` | 一张卡的外观（玻璃 + 一抹个性色 + 标题行） | 不决定卡在哪儿 |
-| `ArcStack` | 七种叠法的几何、手势、消失带、无障碍翻页 | 不知道卡里装的是什么 |
+| `ArcStack` | 叠叠乐的几何、手势、消失带、无障碍翻页（叠法只有 `.sticky` 一种） | 不知道卡里装的是什么 |
 | `DSSwipeStrip` | 底部那条：胶囊外轨 + 胶囊选中格，静止三档、按下展开、连续跟手，选中那档的字是主题强调色 | 不换屏（它只写回 `homeMode`） |
+| `DSGlass` | 「浮在内容之上」那一层的唯一材质（形状 / 变体 / `interactive` / 多块合成一层） | 不决定哪块表面该是玻璃（那是设计判断，写在它的头注里） |
 
 ### ② 五页的写法已经统一，新加一页就照抄
 
@@ -912,7 +1023,7 @@ var body: some View { StackPageView(accent: mode.accent, label: "…", cards: ca
 - **头卡只给一个事实。** 它曾经还带三行依据（车牌 / 车架号 / 保险 之类），而那三行
   逐条又在下一张卡里再说一遍 —— 已删（2026-09-24）。一条事实只该有一个出处：
   头卡是这一页的标题，依据在下面每一张卡里。
-- **卡高由内容撑**，不写 `frame(height:)`。七种叠法的焦点与吸附全部靠真实高度算，
+- **卡高由内容撑**，不写 `frame(height:)`。焦点与吸附全部靠真实高度算，
   写死高度会让「行程那一叠」与「设置那一叠」手感不一样。
 - **无数据就写一句真话**（`GlassCardEmpty`），不要摆 `--`。读数带时间用 `StackCard.at`。
 
@@ -931,6 +1042,7 @@ var body: some View { StackPageView(accent: mode.accent, label: "…", cards: ca
 
 ### ④ 怎么挑叠法
 
-`我的 → 诊断 → 叠叠乐`。七种叠法在同一个窗口里切换，挑中的那种写进
-`UserDefaults`（`StackSpec.variantKey`），六页立刻跟着换。默认**弧出**。
+`我的 → 诊断 → 叠叠乐`。叠法自 2026-09-24 起**只有一种**（吸附堆叠），
+那个对照页如今只显示这条静态说明 —— 原来的七选一与它的 `UserDefaults` 已删除
+（`StackSpec.variantKey` 保留，旧值读到时迁移到 `.sticky`）。
 这套东西在浏览器里的原型是 `design-preview/stack.html`（那个文件夹是设计过程，不进 App target）。

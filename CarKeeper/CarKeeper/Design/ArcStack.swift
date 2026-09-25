@@ -95,6 +95,14 @@ struct ArcStack: View {
                 // 每张卡自己的额外偏移都是**相对这条基线**的（见 placement）。
                 .offset(y: base - scroll)
                 .frame(maxWidth: .infinity, alignment: .top)
+                // 卡片视口 = 这一叠**量到的**尺寸（卡片的左右各留 `inset`，见 cardView 的 padding）。
+                //
+                // 它只喂一件事：`CardFit` 算「展开后有多挤、放得下几行」。所以这里必须是量出来的
+                // 真数——写一个「大概 800pt」的话，`CardFit` 那套算法就成了拿猜的数字去做除法。
+                // 读不到时环境值是 `.zero`，算法据此说「不知道」并放弃分块（见 CardFit 头注）。
+                .environment(\.cardViewport,
+                             CGSize(width: max(0, geo.size.width - 2 * StackSpec.Card.inset),
+                                    height: vh))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .clipped()

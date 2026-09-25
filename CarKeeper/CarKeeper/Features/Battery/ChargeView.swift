@@ -117,6 +117,14 @@ struct ChargeView: View {
 
     // MARK: - ① 充电（此刻的状态）
 
+    /// 续航那一行有没有可写的东西（三个数都没有就整行不出现 —— 见 `chargeHero` 里那条注）
+    private func hasEnergyLine(_ e: EnergyModel) -> Bool {
+        if e.range != "--" { return true }
+        if let ttf = e.timeToFull, ttf != "--" { return true }
+        if let tte = e.timeToEmpty, tte != "--" { return true }
+        return false
+    }
+
     private func chargeHero(_ e: EnergyModel) -> some View {
         let tint = socTint(e.socPct)
         let fraction = max(0, min(1, Double(e.socPct) / 100.0))
@@ -143,23 +151,33 @@ struct ChargeView: View {
             )
             .padding(.top, e.socWarn.isEmpty ? 0 : TokensSpacing.lg)
 
-            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-                Text(e.range == "--" ? "续航 --" : "续航 \(e.range) km")
-                    .font(TokensTypo.footnote)
-                    .foregroundStyle(TokensPalette.secondary)
-                Spacer(minLength: TokensSpacing.sm)
-                // 充电中报「还要多久」，没充时报「还能跑多久」——两者不会同时出现。
-                if let ttf = e.timeToFull, ttf != "--" {
-                    Text("预计充满 \(ttf)")
-                        .font(TokensTypo.footnote)
-                        .foregroundStyle(TokensPalette.secondary)
-                } else if let tte = e.timeToEmpty, tte != "--" {
-                    Text("可行驶 \(tte)")
-                        .font(TokensTypo.footnote)
-                        .foregroundStyle(TokensPalette.secondary)
+            // 续航 / 剩余时间那一行：**知道才写**。
+            //
+            // 原来左边那格写的是 `e.range == "--" ? "续航 --" : …` —— 无数据时画
+            // 一句「续航 --」：它占着位置、又不说明任何事（README 那条「无数据就写一句
+            // 真话，不要摆 `--`」说的正是这个）。现在两边都没有就不出现整行，
+            // 而不是占一行空话（下方还有 DSStatStrip 在，不会变成空白区）。
+            if hasEnergyLine(e) {
+                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+                    if e.range != "--" {
+                        Text("续航 \(e.range) km")
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.secondary)
+                    }
+                    Spacer(minLength: TokensSpacing.sm)
+                    // 充电中报「还要多久」，没充时报「还能跑多久」——两者不会同时出现。
+                    if let ttf = e.timeToFull, ttf != "--" {
+                        Text("预计充满 \(ttf)")
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.secondary)
+                    } else if let tte = e.timeToEmpty, tte != "--" {
+                        Text("可行驶 \(tte)")
+                            .font(TokensTypo.footnote)
+                            .foregroundStyle(TokensPalette.secondary)
+                    }
                 }
+                .padding(.top, TokensSpacing.md)
             }
-            .padding(.top, TokensSpacing.md)
 
             DSStatStrip(items: [
                 .init("充电功率", power),
@@ -415,14 +433,14 @@ struct ChargeView: View {
     }
 
     private func miniStat(_ k: String, _ v: String, _ unit: String, warn: Bool = false) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: TokensSpacing.xs) {
             Text(k).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
             Text(v).font(TokensTypo.caption.weight(.bold)).monospacedDigit()
                 .foregroundStyle(warn ? TokensPalette.error : TokensPalette.primary)
             Text(unit).font(TokensTypo.caption2).foregroundStyle(TokensPalette.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .padding(.vertical, TokensSpacing.sm)
         .background(TokensPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 

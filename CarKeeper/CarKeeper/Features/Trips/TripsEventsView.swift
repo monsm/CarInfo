@@ -18,6 +18,18 @@ import MapKit
 /// 出行页一次建几张行程卡（见 `TripsEventsView.shownTrips` 的说明）。
 private let tripCardStep: Int = 5
 
+/// 出行页最多建几张行程卡 —— **30 是用户定的上限**（2026-09-25：
+/// 「行程页的最大行程控制在 30 条，其他均以消息显示」）。
+///
+/// 为什么需要一个上限：每张行程卡里是一张**真的** `MiniTripMap`（See `MiniTripMap`），
+/// 而 227 条消息能配出几十段。30 张已经是一次要点开四五次「再放」的量，
+/// 再往上加只会把这一页变成「滑动地图墙」。
+///
+/// 超出的那些**不是丢掉**：点火 / 熄火事件本来就一条条列在下面那张
+/// 「车的事件」卡里（`MessagesSection` 读的是同一份消息），所以本页的规则是
+/// **先按行程看最近 30 段，再往前的按事件看** —— 同一份数据，两种读法。
+private let tripCardCap: Int = 30
+
 /// 出行 —— 每一次出行的时间轴 + 常停的地方 + 车发来的事件。
 ///
 /// 原为「行程」页（`TripsTimelineView`）。批 7 把「消息」吸收进来：
@@ -137,9 +149,29 @@ struct TripsEventsView: View {
     /// 上限由人决定，而不是由「消息里配出了多少行程」决定。
     private var moreTripsRow: some View {
         DSRow(icon: "arrow.down.circle", title: "再放 \(tripCardStep) 段出来") {
-            shownTrips += tripCardStep
+            // 夹在上限里：按到第 6 次时它放 5 段，第 7 次只放到 30 为止，
+            // 而不是「过了上限就当没点」或者「越点越多」。
+            shownTrips = min(shownTrips + tripCardStep, tripCardCap)
             TokensHaptic.select()
         }
+    }
+
+    /// 到上限之后那一行：**不是按钮**，是一句交代。
+    ///
+    /// 它必须是陈述句而不是灰色的按钮 —— 「按了没反应」与「这里没有可按的东西」
+    /// 是两件事，而用户只会把它读成前者。
+    private func restAsMessagesRow(_ rest: Int) -> some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.xs) {
+            Text("再往前的 \(rest) 段在下面「车的事件」里，按时间列着。")
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("每一段在这里都会占一张地图，所以封顶 30 段。")
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// 这一档的叠叠乐。**行程本身是「一组组」的** ——
@@ -151,7 +183,7 @@ struct TripsEventsView: View {
         let list = displayTrips
         // 只把最近的一段交给界面去建（见 `shownTrips`）。汇总仍用整份 list ——
         // 数字要是全部的，卡片才是按需的。
-        let visible = Array(list.prefix(shownTrips))
+        let visible = Array(list.prefix(min(shownTrips, tripCardCap)))
         if list.isEmpty {
             out.append(StackCard(id: "empty", content: AnyView(emptyState)))
         } else {
@@ -167,10 +199,14 @@ struct TripsEventsView: View {
                                      value: String(format: "%.1f km", trip.distanceKm), cls: "ok",
                                      content: AnyView(timelineRow(trip, isLast: isLast))))
             }
-            if visible.count < list.count {
-                // 每多建一段就多一张地图 —— 所以它必须由人点，而不是一次建完。
-                out.append(StackCard(id: "more-trips", title: "还有 \(list.count - visible.count) 段",
+            // 没到上限：「再放 5 段」由人点（每多建一段就多一张地图，不能一次建完）。
+            // 到了上限：同一件事改成一句陈述，而剩下的那些在「车的事件」里仍然读得到。
+            if visible.count < min(list.count, tripCardCap) {
+                out.append(StackCard(id: "more-trips", title: "还有 \(min(list.count, tripCardCap) - visible.count) 段",
                                      content: AnyView(moreTripsRow)))
+            } else if list.count > tripCardCap {
+                out.append(StackCard(id: "rest-as-messages", title: "更早的 \(list.count - tripCardCap) 段",
+                                     content: AnyView(restAsMessagesRow(list.count - tripCardCap))))
             }
             if !hotspots.isEmpty {
                 out.append(StackCard(id: "hotspots", title: "常停之地",
@@ -202,7 +238,9 @@ struct TripsEventsView: View {
             Text("还没有行程记录")
                 .font(TokensTypo.headline)
                 .foregroundStyle(TokensPalette.primary)
-            Text("还没有出行记录")
+            // 这里原来第二行是「还没有出行记录」—— 与上一行的「还没有行程记录」
+            // 是同一句话（`copy.py` 拦的正是这种）。第二行改成**为什么**会有记录。
+            Text("点火与熄火各记一次，配成一段行程。")
                 .font(TokensTypo.footnote)
                 .foregroundStyle(TokensPalette.secondary)
                 .multilineTextAlignment(.center)

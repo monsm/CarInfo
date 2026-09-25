@@ -15,6 +15,10 @@ struct ExportDataSection: View {
     @State private var isExporting = false
     @State private var exportURL: URL?
     @State private var showSuccess = false
+    /// 预览被“摊开全部”了吗（见 `previewPlan`）
+    @State private var previewFull = false
+    /// 卡片量到的可用区域（`ArcStack` 写进来的真数；量不到时是 `.zero`）
+    @Environment(\.cardViewport) private var cardViewport
 
     enum ExportType: String, CaseIterable {
         case trips = "行程记录"
@@ -74,19 +78,52 @@ struct ExportDataSection: View {
                     .font(TokensTypo.caption)
                     .foregroundStyle(TokensPalette.secondary)
 
-                let lines = previewLines
-                ScrollView {
-                    Text(lines.joined(separator: "\n"))
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(TokensPalette.secondary)
-                        .lineLimit(8)
+                // 这里原本是 `ScrollView { Text(…).lineLimit(8) }.frame(height: 100)`，一个人占了
+                // 两件错：① 卡片里再套一层滚动 —— 叠叠乐自管手势（没有 ScrollView），
+                // 内层拿到的又是无限高，于是它永远滚不动、却把拖动吃掉；
+                // ② 那个 100 是拍出来的高度，而这个块里真正有几行由**数据**决定
+                //（一行 CSV 在窄屏上折成几行，取决于那个时间戳字符串有多长）。
+                // 现在整块高度由行数与字号算出来：放得下就全放（内容撑高），
+                // 放不下就切在量出来的行边界上，剩下的挂在那张标准行里。
+                let plan = previewPlan
+                Text(plan.text)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(TokensPalette.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(TokensSpacing.sm)
+                    .background(TokensPalette.fillSubtle)
+                    .clipShape(RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous))
+
+                if plan.restLines > 0 {
+                    DSCardMoreRow(rest: plan.restLines, unit: "行",
+                                  screens: plan.screens, open: false) {
+                        withAnimation(TokensMotion.count) { previewFull = true }
+                    }
+                } else if previewFull, plan.truncatable {
+                    DSCardMoreRow.collapse {
+                        withAnimation(TokensMotion.count) { previewFull = false }
+                    }
                 }
-                .frame(height: 100)
-                .padding(TokensSpacing.sm)
-                .background(TokensPalette.fillSubtle)
-                .clipShape(RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous))
             }
         }
+    }
+
+    /// 预览块的预算：卡片量到的可用高度减去这一块之外的东西（标题行与两处内边距）。
+    /// 宽度同理逐层减：叠叠乐左右 18（`GlassCard`）→ 这张卡自己 16（`DSCard`）→ 块内 8。
+    private var previewPlan: CardFit.TextPlan {
+        let text = previewLines.joined(separator: "\n")
+        let width = max(0, cardViewport.width - 2 * StackSpec.Card.padH
+                        - 2 * TokensSpacing.md - 2 * TokensSpacing.sm)
+        let reserved = CardFit.textHeight("导出预览", style: .caption, width: width)
+            + TokensSpacing.sm * 2
+        let plan = CardFit.plan(text: text, style: .monoCaption, width: width,
+                                viewport: cardViewport, reserved: reserved)
+        if previewFull {
+            return CardFit.TextPlan(text: text, restLines: 0, screens: plan.screens,
+                                    truncatable: plan.truncatable)
+        }
+        return plan
     }
 
     private var previewLines: [String] {

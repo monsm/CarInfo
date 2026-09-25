@@ -61,6 +61,13 @@ ENTRY_MARKERS = [
 WHITELIST = {
     "CarKeeper/CarKeeper/Features/SiriShortcuts.swift":
         "AppIntent 由系统按定义发现（Siri/快捷指令），代码里不需要引用 —— 见该文件头部说明",
+    "CarKeeper/CarKeeper/Design/DSGlass.swift":
+        "玻璃的词汇表。它对外只有四个 `View` 扩展方法（`dsGlass` / `dsGlassCapsule` / "
+        "`dsGlassRounded` / `dsGlassLayer`），跨文件用的是那几个方法 —— 而文件里的"
+        "类型只剩 `DSGlassVariant` 一个，它只作为 `dsGlass(…variant:)` 的**参数类型**"
+        "出现，调用点写的是 `.overMedia`（隐式成员表达式），判据看不见那个类型名。"
+        "代价说明白：以后这个文件里真冒出没人用的类型，这里也不会报 —— 接受它，"
+        "因为该文件只该放材质词汇（现在 150 行），且它的头注就是规则本身",
 }
 
 TOP_TYPE_RE = re.compile(

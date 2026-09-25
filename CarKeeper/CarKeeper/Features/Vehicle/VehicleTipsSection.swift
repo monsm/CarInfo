@@ -150,9 +150,11 @@ struct VehicleTipsSection: View {
     ///
     /// 原来它在导航栏的工具栏里 —— 并入车辆档案之后这一节没有自己的导航栏，
     /// 所以动作必须落在内容里；凭空造一个按钮反而会让这一节看起来又像一个页面。
+    ///
+    /// **不再写「用车提示」四个字**（用户 2026-09-25：「全局看重复内容」）：
+    /// 这张卡叫「用车提示」，卡头已经说了一遍。标题留空，这一行只剩那个动作。
     private var sectionHeader: some View {
-        DSSectionHeader(title: "用车提示",
-                        trailing: tips.isEmpty ? nil : "全部已读",
+        DSSectionHeader(trailing: tips.isEmpty ? nil : "全部已读",
                         action: tips.isEmpty ? nil : { dismissAll() })
     }
 
@@ -179,7 +181,7 @@ struct VehicleTipsSection: View {
                 .frame(width: TokensSize.iconColumn, alignment: .center)
                 .accessibilityLabel(Text(tip.severity.label))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
                 Text(tip.title)
                     .font(TokensTypo.subheadline)
                     .foregroundStyle(TokensPalette.primary)

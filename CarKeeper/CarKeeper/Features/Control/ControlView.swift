@@ -80,7 +80,13 @@ struct ControlView: View {
     // 而且摇一摇锁车与 Siri 指令（它们直接写 AppStore）在里面根本不出现。
     // 现在唯一的来源是 `store.commandHistory`：持久、含所有发起路径、最多 50 条。
     @State private var historyFilter = "all"
-    @State private var expandedRuns: Set<UUID> = []
+    // 下面三个都不是 `private`：`ControlFit.swift`（同目录）要读它们，
+    // 而 `private` 的作用域是**文件**，跨文件看不见（它的头注里有这一条）。
+    @State var expandedRuns: Set<UUID> = []
+    /// 历史列表被“摊开全部”了吗（见 `ControlFit` 里的 `historyPlan`）
+    @State var historyFull = false
+    /// 卡片量到的可用区域（`ArcStack` 写进来的真数；量不到时是 `.zero`）
+    @Environment(\.cardViewport) var cardViewport
 
     @State private var showMoreCommands = false
     /// 一条车控请求。验证、温度、下发都在 `controlCommandFlow` 那道门里 ——
@@ -367,7 +373,11 @@ struct ControlView: View {
                 trunkOpen: trunkIsOpen(),
                 windowsOpen: windowsAreOpen()
             )
-            .frame(height: 286)
+            // 形状定高：320:470 是那块画布自己的比例（`CarTopView.artSize`），
+            // 再用卡片量到的可用高度封顶。原来这里是写死的 286 —— 而画布按 `min` 缩放，
+            // 高度写小了就白拿一圈左右留白（380pt 宽的机器上车只有 195pt 宽）。
+            .aspectRatio(CarTopView.artAspect, contentMode: .fit)
+            .frame(maxHeight: carTopMaxHeight)
             .padding(.vertical, TokensSpacing.sm)
 
             Text(statusLineText())
@@ -392,6 +402,15 @@ struct ControlView: View {
         }
         .buttonStyle(DSPrimaryButtonStyle())
         .accessibilityHint(Text(issue ? "锁车、关窗并折叠后视镜" : "空调设为 18℃ 最强风"))
+    }
+
+    /// 车形图的高度上限：卡片量到的可用高度 × 0.58。
+    ///
+    /// 0.58 是一条**取舍**（车形图不该独占这一屏 —— 下面还有读数与按钮），
+    /// 不是量出来的；量出来的是那个乘数左边的视口。量不到视口时返回 nil =
+    /// 不封顶，让形状自己定高（宁可高一点，也不拿一个想象的屏高去砍）。
+    private var carTopMaxHeight: CGFloat? {
+        cardViewport.height > 0 ? cardViewport.height * 0.58 : nil
     }
 
     /// 四门状态 → ["ok"/"bad"]（左前 / 右前 / 左后 / 右后，与俯视图顺序一致）
@@ -463,11 +482,11 @@ struct ControlView: View {
 
     // MARK: 指令执行中
     private func runningCard(_ run: ControlRun) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: TokensSpacing.snug) {
             ProgressView()
                 .controlSize(.regular)
                 .tint(TokensPalette.ambient)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: TokensSpacing.xs) {
                 Text(run.name).font(TokensTypo.headline)
                 Text(run.progress.isEmpty ? "等待车辆响应…" : run.progress)
                     .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
@@ -607,9 +626,27 @@ struct ControlView: View {
                             .frame(minHeight: TokensSpacing.row)
                     }
                 } else {
-                    ForEach(Array(filteredRuns.enumerated()), id: \.element.id) { idx, item in
-                        DSGroupRow(showsSeparator: idx < filteredRuns.count - 1) {
+                    // 显示几条**是算出来的**（`CardFit`）：一条摊开后要多四行键值，
+                    // 于是「能放几条」随摊开状态一起变。从前这里是全列（历史最长 50 条，
+                    // 摊开四五条就是三屏多），而卡片没有内层滚动 —— 见 `historyPlan`。
+                    let plan = historyPlan
+                    let shown = plan.keep.map { Array(filteredRuns.prefix($0)) } ?? filteredRuns
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { idx, item in
+                        DSGroupRow(showsSeparator: idx < shown.count - 1 || plan.hidden > 0) {
                             historyRow(item)
+                        }
+                    }
+                    if plan.hidden > 0 {
+                        DSGroupRow(showsSeparator: false) {
+                            DSCardMoreRow(rest: plan.hidden, screens: historyScreens, open: false) {
+                                withAnimation(TokensMotion.count) { historyFull = true }
+                            }
+                        }
+                    } else if historyFull, filteredRuns.count > 1 {
+                        DSGroupRow(showsSeparator: false) {
+                            DSCardMoreRow.collapse {
+                                withAnimation(TokensMotion.count) { historyFull = false }
+                            }
                         }
                     }
                 }
@@ -641,7 +678,7 @@ struct ControlView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: TokensSpacing.md) {
                     StatusDot(cls: item.statusCls)
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
                         Text(item.name)
                             .font(TokensTypo.footnote)
                             .foregroundStyle(TokensPalette.primary)
@@ -697,7 +734,7 @@ struct ControlView: View {
     @ViewBuilder
     private var resultSheet: some View {
         if let r = lastResult {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: TokensSpacing.md) {
                 HStack {
                     Text(r.name).font(TokensTypo.title3)
                     Spacer()
@@ -748,6 +785,11 @@ struct CarTopView: View {
     var trunkOpen: Bool
     var windowsOpen: Bool
 
+    /// 画布的原始尺寸 —— 形状（320:470）与所有坐标都是按它写的。
+    /// 调用点靠它推高度（`.aspectRatio`），不再另外写一个高度。
+    static let artSize = CGSize(width: 320, height: 470)
+    static var artAspect: CGFloat { artSize.width / artSize.height }
+
     private func color(_ cls: String) -> Color {
         cls == "bad" ? TokensPalette.warning : TokensPalette.success
     }
@@ -759,9 +801,9 @@ struct CarTopView: View {
 
     var body: some View {
         Canvas { ctx, size in
-            let scale = min(size.width / 320, size.height / 470)
-            let dx = (size.width - 320 * scale) / 2
-            let dy = (size.height - 470 * scale) / 2
+            let scale = min(size.width / Self.artSize.width, size.height / Self.artSize.height)
+            let dx = (size.width - Self.artSize.width * scale) / 2
+            let dy = (size.height - Self.artSize.height * scale) / 2
             let t = CGAffineTransform(translationX: dx, y: dy).scaledBy(x: scale, y: scale)
             func xf(_ p: Path) -> Path { p.applying(t) }
 
@@ -919,13 +961,13 @@ struct PINKeypadView: View {
     private let keys = ["1","2","3","4","5","6","7","8","9","","0","del"]
 
     var body: some View {
-        VStack(spacing: 22) {
+        VStack(spacing: TokensSpacing.lg) {
             Capsule().fill(TokensPalette.secondary.opacity(0.4)).frame(width: 40, height: 5)
-            VStack(spacing: 4) {
+            VStack(spacing: TokensSpacing.xs) {
                 Text("输入控车码").font(TokensTypo.title)
                 Text("6 位数字，输满自动执行").font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
             }
-            HStack(spacing: 10) {
+            HStack(spacing: TokensSpacing.snug) {
                 ForEach(0..<6, id: \.self) { i in
                     Text(i < pin.count ? String(pin[pin.index(pin.startIndex, offsetBy: i)]) : "")
                         .font(TokensTypo.metric(26))
@@ -937,7 +979,9 @@ struct PINKeypadView: View {
                                           lineWidth: i == pin.count ? 2 : 1))
                 }
             }
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()),
+                                GridItem(.flexible())],
+                      spacing: TokensSpacing.snug) {
                 ForEach(keys, id: \.self) { k in
                     Button {
                         onKey(k)
@@ -959,7 +1003,7 @@ struct PINKeypadView: View {
             Button("取消") { dismiss() }
                 .font(TokensTypo.headline)
                 .foregroundStyle(TokensPalette.secondary)
-                .padding(.bottom, 8)
+                .padding(.bottom, TokensSpacing.sm)
         }
         .padding(TokensSpacing.xxl)
         .presentationDetents([.large])
@@ -994,13 +1038,13 @@ struct ACStepperView: View {
     }
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: TokensSpacing.lg) {
             Capsule().fill(TokensPalette.secondary.opacity(0.4)).frame(width: 40, height: 5)
-            VStack(spacing: 4) {
+            VStack(spacing: TokensSpacing.xs) {
                 Text("空调温度").font(TokensTypo.title)
                 Text("17 – 33 ℃").font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
             }
-            HStack(spacing: 32) {
+            HStack(spacing: TokensSpacing.xl) {
                 tempButton("minus", canDo: temp > 17) { temp -= 1 }
                 VStack(spacing: 0) {
                     Text("\(tempDisplayCount)")
@@ -1011,7 +1055,7 @@ struct ACStepperView: View {
                 }
                 tempButton("plus", canDo: temp < 33) { temp += 1 }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, TokensSpacing.sm)
             Button {
                 NotificationCenter.default.post(name: .tempConfirmed, object: temp)
                 dismiss()
@@ -1020,11 +1064,11 @@ struct ACStepperView: View {
                     .font(TokensTypo.title3)
                     .foregroundStyle(TokensPalette.labelOnTint)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
+                    .padding(.vertical, TokensSpacing.md)
                     .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(TokensPalette.ambient))
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 8)
+            .padding(.horizontal, TokensSpacing.sm)
             Button("取消") { dismiss() }
                 .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
         }

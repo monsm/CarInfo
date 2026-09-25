@@ -214,7 +214,7 @@ struct SkyFactTable: View {
         VStack(spacing: 0) {
             ForEach(facts) { f in
                 HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.md) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
                         Text(f.label)
                             .font(TokensTypo.caption)
                             .foregroundStyle(TokensPalette.secondary)

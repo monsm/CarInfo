@@ -58,20 +58,34 @@ struct MaintenanceMoneyView: View {
     }
 
     var body: some View {
-        DSPaperPage {
-            DSPageTitle(title: "保养与钱", subtitle: "保养、保险、估值、导出")
-
+        //  正文只提供内容 —— 页面外壳（滚动 / 纸面底 / 页标题）不在这里，
+        //  它是 `VehicleView` 里那张叫「保养」的卡（邻居 `MileageJournalSection`
+        //  / `VehicleTipsSection` / `ExportDataSection` 同一条约定）。
+        //
+        //  此前这里包着 `DSPaperPage`：叠进卡里的是第二层 ScrollView + 第二层
+        //  纸面底 + 自己的左右内边距（卡 18pt + 纸 16pt = 34pt，内容比别人窄
+        //  一圈）；两层都可滚动时手势塌给内层，而内层拿到的是无限高，永远不会
+        //  滚 —— 用户 2026-09-25：「每个卡片仔细核对，内容展开后是否拥挤」。
+        //
+        //  ⚠️ 与那层纸一起拆掉的还有一个陷阱：添加记录原本只有导航栏工具栏上
+        //  那枚「＋」，而全 App 的导航栏是**隐藏**的（地图那一档没有顶栏，
+        //  子页继承同一个栈）—— 那个入口从未显示过，等于「加一条保养记录」
+        //  没有入口。现在它是内容里的一个按钮（`addServiceButton`）。
+        VStack(alignment: .leading, spacing: 0) {
             // ① 即将到期（保养按里程、年检/保险按日期 —— 两套口径各自一组）
             if !upcomingServices.isEmpty {
                 upcomingCard
             }
             InspectionSection()
 
-            // ② 保养：统计 → 年份 → 时间线
+            // ② 保养：统计 → 年份 → 时间线 → 记一笔
+            //   「保养记录」这四个字留在这里是对的：这张卡里不止一件事（年检 /
+            //   保养 / 估值 / 导出），这一行是**卡内分段**的标题，不是卡的名字。
             DSSectionHeader(title: "保养记录")
             statsCard
             yearFilter
             timelineCard
+            addServiceButton
 
             // ③ 钱：估值（充电账单已搬到「充电」那一档 —— 账本就是充电本身的一部分）
             VehicleValuationSection()
@@ -79,21 +93,22 @@ struct MaintenanceMoneyView: View {
             // ④ 带走你自己的记录
             ExportDataSection()
         }
-        .pageBackground()
-        .dsPageTitle("保养与钱", inline: true)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showAddService = true }) {
-                    Image(safeSymbol: "plus.circle.fill", fallback: "plus.circle.fill")
-                        .foregroundStyle(TokensPalette.ambient)
-                }
-            }
-        }
         .sheet(isPresented: $showAddService) {
             AddServiceView(onSave: addEntry)
                 .dsSheetCanvas()
         }
-        .accessibilityLabel(Text("保养与钱"))
+        .accessibilityLabel(Text("保养"))
+    }
+
+    /// 「记一笔」：保养记录那条动作的**唯一入口**（它原来挂在永不显示的工具栏上）。
+    /// 形状与「里程记账」那张卡里的「添加记录」一致：同一件事不在两处长得不一样。
+    private var addServiceButton: some View {
+        Button { showAddService = true } label: {
+            Label("添加记录", systemImage: "plus.circle.fill")
+                .font(TokensTypo.body.weight(.semibold))
+        }
+        .buttonStyle(DSPrimaryButtonStyle())
+        .padding(.top, TokensSpacing.sm)
     }
 
     // MARK: - 统计卡
@@ -135,7 +150,7 @@ struct MaintenanceMoneyView: View {
                 DSGroupRow {
                     HStack(spacing: TokensSpacing.md) {
                         typeIcon(entry.type)
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
                             Text(entry.type)
                                 .font(TokensTypo.subheadline)
                                 .foregroundStyle(TokensPalette.primary)
@@ -171,14 +186,16 @@ struct MaintenanceMoneyView: View {
             .font(TokensTypo.caption)
             .foregroundStyle(TokensPalette.ambient)
             .frame(width: 28, height: 28)
-            .background(TokensPalette.ambient.opacity(0.1))
-            .cornerRadius(6)
+            // 圆角走令牌（原来是字面量 6；刻度里最接近的是 small = 8）。
+            // `.cornerRadius(_:)` 在 iOS 17 起是弃用写法 —— 形状要显式给出来。
+            .background(TokensPalette.ambient.opacity(0.1),
+                        in: RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous))
     }
 
     // MARK: - 年份筛选
     private var yearFilter: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: TokensSpacing.sm) {
                 let years = Set(entries.map { Calendar.current.component(.year, from: $0.date) })
                     .union([selectedYear])
                     .sorted(by: >)
@@ -186,11 +203,15 @@ struct MaintenanceMoneyView: View {
                     Button(action: { selectedYear = y }) {
                         Text("\(y)年")
                             .font(TokensTypo.caption)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(selectedYear == y ? TokensPalette.ambient.opacity(0.2) : Color.clear)
+                            .padding(.horizontal, TokensSpacing.snug)
+                            .padding(.vertical, TokensSpacing.sm)
+                            // 这一枚是**药丸**：全 App 的标签/筛选胶囊都是 Capsule（见消息页的
+                            // tagChip）。原来用了一个写死的 16 圆角 —— 它在 30pt 高的胶囊上
+                            // 看起来像药丸，但换成别的字号的机器就成了圆角矩形。
+                            .background(Capsule().fill(selectedYear == y
+                                                       ? TokensPalette.ambient.opacity(0.2)
+                                                       : Color.clear))
                             .foregroundStyle(selectedYear == y ? TokensPalette.ambient : TokensPalette.secondary)
-                            .cornerRadius(16)
                     }
                 }
             }
@@ -221,10 +242,10 @@ struct MaintenanceMoneyView: View {
 
     @ViewBuilder
     private func timelineRow(_ entry: ServiceEntry, idx: Int, total: Int) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: TokensSpacing.xs) {
             HStack {
                 typeIcon(entry.type)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
                     Text(entry.type).font(TokensTypo.subheadline).foregroundStyle(TokensPalette.primary)
                     Text(entry.description)
                         .font(TokensTypo.caption)
@@ -245,10 +266,10 @@ struct MaintenanceMoneyView: View {
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, TokensSpacing.snug)
+        .padding(.vertical, TokensSpacing.snug)
         if idx < total - 1 {
-            Divider().padding(.leading, 44)
+            Divider().padding(.leading, TokensSpacing.row)
         }
     }
 

@@ -63,22 +63,20 @@ struct DSCanvas<Content: View>: View {
 
 /// 分组表面：iOS inset-grouped 的卡片面。不透明、无描边、无阴影。
 /// 只有需要"把一组行框在一起"时才用它；单条信息直接落在画布上用发丝线分隔。
+/// ⚠️ `glass` 与 `hero` 两个参数已于 2026-09-25 删除：它们**存下来就没再读过**
+/// （`body` 永远填 `nightSurface`，也从不看 `hero`）。一个叫 `glass` 的参数不产生
+/// 玻璃，是这个仓库最忌讳的那种谎 —— 谁写 `DSCard(glass: true)` 都会以为拿到了材质
+/// 而其实什么都没发生。真玻璃只有一个入口：`dsGlass`（见 `Design/DSGlass.swift`）。
 struct DSCard<Content: View>: View {
     var padding: CGFloat
     var radius: CGFloat
-    var glass: Bool
-    var hero: Bool
     var content: () -> Content
 
     init(padding: CGFloat = TokensSpacing.md,
          radius: CGFloat = TokensRadius.medium,
-         glass: Bool = false,
-         hero: Bool = false,
          @ViewBuilder content: @escaping () -> Content) {
         self.padding = padding
         self.radius = radius
-        self.glass = glass
-        self.hero = hero
         self.content = content
     }
 
@@ -119,7 +117,7 @@ struct DSDivider: View {
     var inset: CGFloat = 0
     var body: some View {
         Rectangle()
-            .fill(TokensPalette.glassBorder)
+            .fill(TokensPalette.hairline)
             .frame(height: TokensHair.line)
             .padding(.leading, inset)
     }
@@ -176,7 +174,7 @@ struct DSGroup<Content: View>: View {
                     .font(TokensTypo.footnote)
                     .foregroundStyle(TokensPalette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 6)
+                    .padding(.top, TokensSpacing.sm)
             }
         }
     }
@@ -232,7 +230,10 @@ struct DSKeyValueRow: View {
 
 /// 分组标题：iOS 的 section header（13pt、二级灰、大写、不加容器）
 struct DSSectionHeader: View {
-    var title: String
+    /// 标题。**可以为空** —— 卡片正文里那一行就是这种情况：卡头已经给这张卡
+    /// 起过名（`GlassCardHead`），正文再写一遍就是同一个东西两个名字。
+    /// 那时候这一行只剩下右侧那个动作（「全部已读」这类），标题留空即可。
+    var title: String = ""
     var trailing: String? = nil
     /// 不为 "na" 时用 `DSChip`（一个语义圆点 + 颜色）代替灰字。
     var trailingCls: String = "na"
@@ -243,10 +244,12 @@ struct DSSectionHeader: View {
         // 它一换成衬线 + 疏排，整套界面的语气就从「App」变成「印刷物」。
         // 原生主题下 `TokensSerif.section` 返回系统字，所以原生 = 现状。
         HStack(alignment: .firstTextBaseline) {
-            Text(title.uppercased())
-                .font(TokensSerif.section(13))
-                .tracking(TokensTracking.label)
-                .foregroundStyle(TokensPalette.secondary)
+            if !title.isEmpty {
+                Text(title.uppercased())
+                    .font(TokensSerif.section(13))
+                    .tracking(TokensTracking.label)
+                    .foregroundStyle(TokensPalette.secondary)
+            }
             Spacer(minLength: TokensSpacing.sm)
             if let trailing {
                 if let action {
@@ -254,6 +257,10 @@ struct DSSectionHeader: View {
                         .font(TokensTypo.footnote)
                         .foregroundStyle(TokensPalette.ambient)
                         .buttonStyle(.plain)
+                        // 命中区 44pt（HIG 最小触控目标）：文字只有 13pt 高，
+                        // 而它旁边没有任何可点区域 —— 不给高度就只能碰运气点到。（2026-09-25）
+                        .frame(minHeight: TokensSpacing.row)
+                        .contentShape(Rectangle())
                 } else if trailingCls != "na" {
                     DSChip(text: trailing, cls: trailingCls)
                 } else {
@@ -263,7 +270,7 @@ struct DSSectionHeader: View {
                 }
             }
         }
-        .padding(.bottom, 6)
+        .padding(.bottom, TokensSpacing.sm)
     }
 }
 
@@ -277,8 +284,8 @@ struct DSBigNumber: View {
     var alignment: HorizontalAlignment = .leading
 
     var body: some View {
-        VStack(alignment: alignment, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
+        VStack(alignment: alignment, spacing: TokensSpacing.sm) {
+            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.xs) {
                 Text(value)
                     .font(TokensTypo.display(size))
                     // 字距 = 按字号算的基准 + 主题的额外收紧。
@@ -305,50 +312,17 @@ struct DSBigNumber: View {
     }
 }
 
-/// 页面大标题（**艺术方向下才有**）：导航栏的字体改不了（系统字体），
-/// 所以「标题的字体」只能画在内容里 —— 这既是代价也是印刷物的做法：
-/// 标题属于版面，不属于系统栏。
-///
-/// 它必须与 `dsPageTitle` **成套**：后者在艺术方向下把导航栏清空，这一支把标题补进版面。
-/// 原生主题下这里什么也不画 —— 否则同一句话会说两遍
-/// （导航栏的大标题 + 内容里的大标题），那不是「原生等于现状」。
-struct DSPageTitle: View {
-    var title: String
-    var subtitle: String? = nil
-
-    @ViewBuilder
-    var body: some View {
-        if TokensPalette.decor == .none {
-            EmptyView()
-        } else {
-            artBody
-        }
-    }
-
-    private var artBody: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(TokensSerif.page(30))
-                .tracking(TokensTracking.title)
-                .foregroundStyle(TokensPalette.primary)
-            if let subtitle {
-                Text(subtitle)
-                    .font(TokensTypo.caption)
-                    .tracking(TokensTracking.label)
-                    .foregroundStyle(TokensPalette.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityAddTraits(.isHeader)
-    }
-}
-
+// 【已删】`DSPageTitle`（页面大标题，艺术方向下画在内容里）。
+//（2026-09-25）它的四个使用者（诊断 / 应急 / 体检 / 保养）**全部是卡里的正文**，
+// 而它们嘴上那张卡自己已经写着名字（卡头 `GlassCardHead`）—— 于是同一屏出现两个名字
+//（「诊断」+「设计令牌」、「应急」+「紧急求助」）。卡头就是标题，正文不再交一份。
 extension View {
     /// 页面标题的两种活法：
     ///   原生      = iOS 大标题留在导航栏（逐像素等于切换前的现状）
     ///   艺术方向  = 导航栏清空，大标题搬进版面（衬线 + 疏排）
-    /// 它必须与 `DSPageTitle` **成套**出现：只清导航栏不补内容，那一屏就没标题了。
+    /// ⚠️ 后者原先靠 `DSPageTitle` 把标题补进版面，那个视图已于 2026-09-25 删掉
+    ///（它的四个使用者都是卡里的正文，标题由卡头负责）。所以艺术方向下这些页
+    /// 目前没有大标题 —— 它们的标题仍然在「卡头」上，而卡头是全 App 统一的。
     /// `inline: true` = 原生下也用行内标题（有些页面本来就一直用行内标题 ——
     /// 原生必须逐像素等于切换前的现状，所以那个选择要保留）。
     func dsPageTitle(_ title: String, inline: Bool = false) -> some View {
@@ -443,12 +417,12 @@ struct DSStatStrip: View {
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
                 if idx > 0 {
                     Rectangle()
-                        .fill(TokensPalette.glassBorder)
+                        .fill(TokensPalette.hairline)
                         .frame(width: TokensHair.line)
                         .frame(maxHeight: .infinity)
                 }
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 4) {
+                VStack(alignment: .leading, spacing: TokensSpacing.xs) {
+                    HStack(spacing: TokensSpacing.xs) {
                         if let icon = item.icon {
                             Image(safeSymbol: icon, fallback: "circle")
                                 .font(TokensTypo.fixed(10, weight: .semibold))
@@ -465,8 +439,8 @@ struct DSStatStrip: View {
                         .minimumScaleFactor(0.7)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 14)
+                .padding(.horizontal, TokensSpacing.md)
+                .padding(.vertical, TokensSpacing.md)
             }
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -483,7 +457,7 @@ struct DSChip: View {
     private var color: Color { TokensPalette.statusColor(cls) }
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: TokensSpacing.sm) {
             if let icon {
                 Image(safeSymbol: icon, fallback: "circle.fill")
                     .font(TokensTypo.fixed(10, weight: .semibold))
@@ -676,8 +650,9 @@ struct DSSecondaryButtonStyle: ButtonStyle {
             .foregroundStyle(TokensPalette.primary)
             .frame(maxWidth: .infinity)
             .frame(height: TokensSize.button)
-            .background(Capsule().fill(TokensPalette.glassLight))
-            .opacity(configuration.isPressed ? 0.65 : 1)
+            // 次操作 = 玻璃胶囊（iOS 26 的次级按钮就是这层材质）。
+            // 不再自己压透明度表现「按下」：玻璃的按压形态由系统演（`interactive`）。
+            .dsGlassCapsule(interactive: true)
             .animation(TokensMotion.press, value: configuration.isPressed)
     }
 }
@@ -689,7 +664,7 @@ struct DSSegmented<T: Hashable>: View {
     @Binding var selection: T
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: TokensSpacing.xxs) {
             ForEach(Array(options.enumerated()), id: \.offset) { _, option in
                 let selected = option.value == selection
                 Button {
@@ -713,7 +688,10 @@ struct DSSegmented<T: Hashable>: View {
             }
         }
         .padding(2)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(TokensPalette.glassLight))
+        // 这一块在**卡里**（规则 ②：卡里不玻璃）——它是分段控件的凹槽，
+        // 用「未选中的底」那个令牌。别名 `glassLight` 已删（见 `Tokens.swift`）：
+        // 名字里带 glass 的扁平色，就是这一轮要找的那类谎。
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(TokensPalette.fillSubtle))
     }
 }
 
@@ -885,7 +863,7 @@ struct DSExpandGroup<Content: View>: View {
                         .foregroundStyle(TokensPalette.tertiary)
                         .rotationEffect(.degrees(expanded ? 180 : 0))
                 }
-                .padding(.bottom, 6)
+                .padding(.bottom, TokensSpacing.sm)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -912,7 +890,7 @@ struct DSExpandGroup<Content: View>: View {
                     .font(TokensTypo.footnote)
                     .foregroundStyle(TokensPalette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 6)
+                    .padding(.top, TokensSpacing.sm)
             }
         }
     }
@@ -961,7 +939,7 @@ struct DSSection<Content: View>: View {
                         .foregroundStyle(TokensPalette.tertiary)
                         .rotationEffect(.degrees(expanded ? 180 : 0))
                 }
-                .padding(.bottom, 6)
+                .padding(.bottom, TokensSpacing.sm)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -977,7 +955,7 @@ struct DSSection<Content: View>: View {
                     .font(TokensTypo.footnote)
                     .foregroundStyle(TokensPalette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 6)
+                    .padding(.top, TokensSpacing.sm)
             }
         }
     }
@@ -986,12 +964,15 @@ struct DSSection<Content: View>: View {
 struct DSSurfaceModifier: ViewModifier {
     var padding: CGFloat
     var radius: CGFloat
-    var glass: Bool
+    /// 要不要「更亮一点的底」。**这不是玻璃**（玻璃是 `dsGlass`）——
+    /// 2026-09-25 材质审核把它从 `glass` 改名，因为那个名字会让调用点以为拿到了材质。
+    /// 它照旧只在卡里用（规则 ②）。
+    var subtle: Bool
 
-    init(padding: CGFloat, radius: CGFloat, glass: Bool) {
+    init(padding: CGFloat, radius: CGFloat, subtle: Bool) {
         self.padding = padding
         self.radius = radius
-        self.glass = glass
+        self.subtle = subtle
     }
 
     func body(content: Content) -> some View {
@@ -1000,7 +981,7 @@ struct DSSurfaceModifier: ViewModifier {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(glass ? TokensPalette.glassLight : TokensPalette.nightSurface)
+                    .fill(subtle ? TokensPalette.fillSubtle : TokensPalette.nightSurface)
             }
             .overlay {
                 if TokensPalette.decor != .none {
@@ -1015,64 +996,19 @@ extension View {
     /// 分组表面外观
     func dsSurface(padding: CGFloat = TokensSpacing.md,
                    radius: CGFloat = TokensRadius.medium,
-                   glass: Bool = false) -> some View {
-        modifier(DSSurfaceModifier(padding: padding, radius: radius, glass: glass))
-    }
-
-    /// 全页「纸」外壳：深潜页的统一容器，与地图主屏的 bottomPanel 视觉同源。
-    ///
-    /// 用法：把整页内容（ScrollView / VStack）包进 `DSPaperPage`，
-    /// 顶部圆角 + 纸面填充 + hairline 顶边，和地图底部那张纸长得一样。
-    /// 这是「地图是家、深潜页是从纸上抽出来展开的那张纸」的语言落地。
-    func dsPaperPage() -> some View {
-        modifier(DSPaperPageModifier())
+                   subtle: Bool = false) -> some View {
+        modifier(DSSurfaceModifier(padding: padding, radius: radius, subtle: subtle))
     }
 }
 
-// 为什么不给这张纸做「已在大卡里就少画一层」的开关（曾经想用自定义 EnvironmentKey）：
-//   ① 门禁 `scan.py` 只认显式核实过的 SDK 名字，`EnvironmentKey` 不在里面 ——
-//      为一个视觉开关去扩白名单，是拿一个真实的编译验证换一个观感上的细节；
-//   ② 而且没必要：大卡与这张纸**填的是同一个 `TokensPalette.surface`**，
-//      两层叠在一起只会多出一条发丝线（就在模式条下方）—— 那条线反而有用，
-//      它把「切换器」与「切换出来的内容」分开。
-struct DSPaperPageModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding(.horizontal, TokensSpacing.md)
-            .padding(.top, TokensSpacing.md)
-            .padding(.bottom, TokensSpacing.sm)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                UnevenRoundedRectangle(
-                    topLeadingRadius: TokensRadius.large,
-                    topTrailingRadius: TokensRadius.large,
-                    style: .continuous
-                )
-                .fill(TokensPalette.surface)
-                .ignoresSafeArea(edges: .top)
-            }
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(TokensPalette.hairline)
-                    .frame(height: TokensHair.line)
-            }
-    }
-}
-
-/// 全页「纸」外壳的显式容器版本（比 modifier 更直观，也方便加标题）。
-struct DSPaperPage<Content: View>: View {
-    var content: () -> Content
-
-    init(@ViewBuilder content: @escaping () -> Content) {
-        self.content = content
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 0) { content() }
-                .dsPaperPage()
-        }
-        .scrollBounceBehavior(.basedOnSize)
-    }
-}
+// 【已删】全页「纸」外壳三件套：`dsPaperPage()` / `DSPaperPageModifier` / `DSPaperPage`
+//（2026-09-25）。它们的用法只有两个：「体检」与「保养」那两张卡的内容
+//（`HealthDataView` / `MaintenanceMoneyView`）—— 那两个视图当初是页面，后来被挂进
+// 车卡里，页面壳没拆。叠进卡里的代价是可算的，而且三样都看得见：
+//   ① 第二层 `ScrollView`：里外两层都能滚时手势塌给内层，而内层拿到的是无限高，
+//      它自己永远滚不动，只是把那一块区域的拖动吃掉（叠叠乐是自管手势）；
+//   ② 第二层纸面底 + 它自己的左右 16pt：叠在卡片的 18pt 上 = 内容距卡边 34pt；
+//   ③ 一行页标题（「体检与数据」）：而卡片头已经写着「体检」。
+// 拆完之后三件套零引用，所以整段删掉 —— 留着它就是「一件已经没有人用的东西」，
+// 而下一个要写页面的人会拿它当模板。
 

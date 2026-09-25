@@ -22,7 +22,7 @@ struct SplashView: View {
                 // 品牌标：入场淡入（一次性，不是常驻呼吸）
                 Image(safeSymbol: "car.side.fill", fallback: "car.side.fill")
                     .font(TokensTypo.fixed(34, weight: .light))
-                    .foregroundColor(TokensPalette.primary)
+                    .foregroundStyle(TokensPalette.primary)
                     .frame(width: 80, height: 80)
                     .background(
                         RoundedRectangle(cornerRadius: TokensRadius.large, style: .continuous)
@@ -34,12 +34,12 @@ struct SplashView: View {
                     Text("长安车管家")
                         // 艺术方向下走衬线（原生下 TokensSerif.page 就是原来的系统字）
                         .font(TokensSerif.page(28))
-                        .foregroundColor(TokensPalette.primary)
+                        .foregroundStyle(TokensPalette.primary)
                         .tracking(TokensTracking.title)
 
                     Text("CHANGAN CONNECT")
                         .font(TokensTypo.caption2)
-                        .foregroundColor(TokensPalette.tertiary)
+                        .foregroundStyle(TokensPalette.tertiary)
                         .tracking(4)
                 }
 

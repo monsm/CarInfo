@@ -84,7 +84,7 @@ struct OnboardingView: View {
     }
 
     private func onboardingPage(_ page: OnboardingPage) -> some View {
-        VStack(spacing: 24) {
+        VStack(spacing: TokensSpacing.lg) {
             // 图标
             ZStack {
                 // 旧版：渐变色圆 + 超大图标。新版：扁平色块（与登录页品牌标同一套语言）。
@@ -97,7 +97,7 @@ struct OnboardingView: View {
             }
 
             // 标题和描述（标题走衬线：艺术方向下「引导页」也是一页纸）
-            VStack(spacing: 12) {
+            VStack(spacing: TokensSpacing.snug) {
                 Text(page.title)
                     .font(TokensSerif.page(28))
                     .foregroundStyle(TokensPalette.primary)

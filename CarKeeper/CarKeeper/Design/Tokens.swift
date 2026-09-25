@@ -93,12 +93,24 @@ enum TokensPalette {
     /// 原来这里是写死的 `Color(uiColor: .quaternarySystemFill)` —— 于是所有输入框
     /// 在四套主题里都是同一块系统灰。现在它读主题（原生主题的值与原来逐值相同）。
     static var fillSubtle: Color { spec.fillSubtle }
-    /// 兼容旧名：`glassLight` 与 `fillSubtle` 本来**是同一个值**（重复声明），
-    /// 合成一个取值、保留两个名字，等于让 ~30 处调用点零改动地跟随主题。
-    static var glassLight: Color { spec.fillSubtle }
-    static var glassBorder: Color { spec.hairline }
-    /// 浮层高光边。原来写死 `Color.white.opacity(0.15)`。
+    // 已删除：`glassBorder`（2026-09-25，与 `glassLight` 同一批）。
+    // 它也是 `spec.hairline` 的重复声明 —— 而 12 位用户里只有 4 位（`dsGlass` /
+    // `GlassCard` / 模式条 / 卡片）真的在给玻璃描边，其余是图表的网格线、读数的
+    // 分隔线、开发页的色板。**分隔线就叫 `hairline`**，它们现在读那个名字。
+    // 于是「带 glass 的名字」只剩 `glassHighlight` 一个，而它是材质内部的高光面
+    // （见下），不是拿来当底的扁平色。
+    /// 玻璃**里面**那一层更亮的底：模式条上被选中的那一枚、透镜。
+    ///
+    /// ⚠️ 它**不是**玻璃，也不该拿去当「浮层」的底 —— 浮层走 `dsGlass`
+    /// （`Design/DSGlass.swift`，那才是真材质）。这个值只用来在**已经是玻璃**的
+    /// 表面上再压一层更亮的形状（规则 ②：一块表面里不再叠第二块玻璃）。
     static var glassHighlight: Color { spec.glassHighlight }
+
+    // 已删除：`glassLight`（2026-09-25）。
+    // 它是 `fillSubtle` 的**重复声明**（同一个值、两个名字），而「名字里带 glass
+    // 的扁平色」正是这一轮材质审核要找的那类谎：谁读到 `glassLight` 都会以为拿到了
+    // 材质，实际拿到的是「未选中的底」那种系统灰。四处调用点已改成 `fillSubtle`，
+    // 于是全仓再没有一个叫 glass 的扁平令牌。
 
     /// 状态类名（ok / warn / charge…）→ 颜色。
     /// 原生主题下与 `ArtTheme.nativeSpec` 的语义色逐个等价（同一套判定），
@@ -132,6 +144,11 @@ enum TokensSpacing {
     static let xxs = CGFloat(2)
     static let xs = CGFloat(4)
     static let sm = CGFloat(8)
+    /// 12 —— iOS 里最常用的一档中间值（芯片内边、两行小字之间、图与字之间）。
+    /// 原来的阶梯是 2/4/8/16/…，缺这一档，于是全 App 有十几处用字面量 `10/11/12`
+    /// 去凑它 —— 2026-09-25 把它补进刻度（用户：「所有页面的间距布局都很不 iOS
+    /// 的标准」）：**能叫出名字的值才是同一个决定**。
+    static let snug = CGFloat(12)
     static let md = CGFloat(16)
     static let lg = CGFloat(24)
     static let xl = CGFloat(32)

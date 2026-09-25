@@ -32,11 +32,11 @@ class FocusModeManager: ObservableObject {
         }
     }
 
-    /// 检测是否正在驾驶（基于速度）
-    var isDriving: Bool {
-        // 简化：检查最近一次上报的车速
-        UserDefaults.standard.double(forKey: "carkeeper_current_speed") > 5
-    }
+    // 【已删】`isDriving`（基于速度判断是否在驾驶）——2026-09-25 地毯式审核。
+    //
+    // 它读的是 `carkeeper_current_speed`，而**全仓没有一处写这个键**：于是它永远
+    // 读回 0，`> 5` 永远不成立 —— 无论怎么写都是 false。它本身也没有调用方。
+    // 车速的真实来源只有一个：`VM.driveStatus(store.caches).speed`（车端报文）。
 
     var defaultConfig: FocusModeConfig {
         FocusModeConfig(

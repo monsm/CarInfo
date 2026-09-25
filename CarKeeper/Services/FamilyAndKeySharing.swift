@@ -206,7 +206,7 @@ struct FamilyMemberRow: View {
                 .fill(TokensPalette.ambient.opacity(0.2))
                 .frame(width: 40, height: 40)
                 .overlay(Text(member.avatar).font(TokensTypo.title3).fontWeight(.bold)
-                .foregroundColor(TokensPalette.ambient))
+                .foregroundStyle(TokensPalette.ambient))
 
             VStack(alignment: .leading) {
                 Text(member.name)
@@ -218,7 +218,7 @@ struct FamilyMemberRow: View {
             Text(member.sharedCars.count > 0 ? "\(member.sharedCars.count) 辆车" : "")
                 .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, TokensSpacing.sm)
     }
 }
 
@@ -246,7 +246,7 @@ struct TempKeyListView: View {
             }
 
             Section("创建新钥匙") {
-                VStack(spacing: 12) {
+                VStack(spacing: TokensSpacing.snug) {
                     TextField(" recipient 姓名", text: $recipientName)
                     HStack {
                         Text("有效期:")
@@ -267,7 +267,7 @@ struct TempKeyListView: View {
                     }
                     .buttonStyle(.borderedProminent)
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, TokensSpacing.sm)
             }
         }
     }
@@ -293,7 +293,7 @@ struct FamilyManagementView: View {
             }
 
             Section("添加成员") {
-                VStack(spacing: 12) {
+                VStack(spacing: TokensSpacing.snug) {
                     TextField("姓名", text: $newName)
                     TextField("手机号", text: $newPhone)
                         .keyboardType(.phonePad)
@@ -306,7 +306,7 @@ struct FamilyManagementView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(newName.isEmpty)
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, TokensSpacing.sm)
             }
         }
     }

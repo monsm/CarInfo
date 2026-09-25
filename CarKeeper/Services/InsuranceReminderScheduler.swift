@@ -86,7 +86,10 @@ class InsuranceReminderScheduler {
         do {
             try await UNUserNotificationCenter.current().add(request)
         } catch {
-            print("Failed to schedule insurance reminder: \(error)")
+            // 同 `MaintenanceReminderScheduler`：排提醒失败要留痕，而 `print` 留不下任何痕。
+            // 这一条尤其重要：用户若没收到到期提醒，唯一能查的就是这本日志。
+            RawLogStore.shared.logError(method: "NOTIFY", url: "insurance",
+                                        message: "安排保险到期提醒失败：\(error)")
         }
     }
 

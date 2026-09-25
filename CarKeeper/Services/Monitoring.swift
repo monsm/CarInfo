@@ -20,14 +20,27 @@ class MemoryMonitor: ObservableObject {
     @Published var warningLevel: Int = 0  // 0=normal, 1=warning, 2=critical
 
     private var lastWarningLevel: Int = 0
+    /// 2026-09-25 地毯式审核：这个定时器从前**没被存下来** —— 返回值直接丢掉，
+    /// 于是谁也无法让它停下，而 `startMonitoring` 被调两次就是两个永远跑的 5 秒循环。
+    /// 现在存下来、并且先判重（同一个进程只需要一个采样循环）。
+    private var timer: Timer?
 
     private init() {}
 
     func startMonitoring(interval: TimeInterval = 5) {
-        Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        guard timer == nil else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.updateMemory()
         }
     }
+
+    /// 停采样（对照页退出 / 关掉内存监控时用）。
+    func stopMonitoring() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    deinit { timer?.invalidate() }
 
     private func updateMemory() {
         var taskInfo = mach_task_basic_info()

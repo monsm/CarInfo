@@ -12,26 +12,25 @@ struct EmergencyPanel: View {
     @State private var activeEmergency = false
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                DSPageTitle(title: "紧急求助", subtitle: "SOS 拨打紧急电话")
+        //  正文只提供内容 —— 它住在「我的」那张叫「应急」的卡里（`StackCard`），
+        //  而那一叠自己就是滚动容器（`ArcStack` 头注：自管手势，没有 ScrollView）。
+        //  三层页壳在这里全部拆掉（用户 2026-09-25：「每个卡片仔细核对，内容展开后
+        //  是否拥挤」）：① 内层 `ScrollView`（手势塌给它，而它拿到无限高、永远滚不动）；
+        //  ② 页边距（卡自己左右各有 18pt，再加一层水平 20pt = 38pt，全 App 最窄的一
+        //  张）；③ 页标题（卡头写「应急」，正文再写一遍「紧急求助」是同一个东西两个名字）。
+        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+            // SOS 紧急呼叫
+            sosButton
 
-                // SOS 紧急呼叫
-                sosButton
+            // 快捷操作
+            quickActions
 
-                // 快捷操作
-                quickActions
+            // 紧急联系人
+            contactCard
 
-                // 紧急联系人
-                contactCard
-
-                // 位置共享
-                locationShareCard
-            }
-            .padding(.horizontal, TokensSpacing.page)
-            .padding(.vertical, TokensSpacing.lg)
+            // 位置共享
+            locationShareCard
         }
-        .dsPageTitle("紧急求助", inline: true)
         .alert("确认拨打", isPresented: $showConfirm) {
             Button("取消", role: .cancel) {}
             Button("拨打 \(emergencyContact)", role: .destructive) { makeCall() }
@@ -61,7 +60,7 @@ struct EmergencyPanel: View {
                     .opacity(activeEmergency ? 0.3 : 1)
                     .animation(.easeInOut(duration: 0.2), value: activeEmergency)
 
-                VStack(spacing: 4) {
+                VStack(spacing: TokensSpacing.xs) {
                     Image(safeSymbol: "exclamationmark.octagon.fill", fallback: "exclamationmark.octagon.fill")
                         .font(TokensTypo.fixed(28))
                         .foregroundStyle(TokensPalette.error)
@@ -158,12 +157,11 @@ struct EmergencyPanel: View {
                     Text("取消")
                         .font(TokensTypo.headline)
                         .foregroundStyle(TokensPalette.labelOnTint)
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 12)
+                        .padding(.horizontal, TokensSpacing.xl)
+                        .padding(.vertical, TokensSpacing.snug)
                         // 原来是写死的「中灰」（#808080 一类）。改用令牌里的中性填充：
                         // 取消本来就是次要动作，它在暗遮罩上比中灰更收敛，且跟随主题。
-                        .background(TokensPalette.track)
-                        .cornerRadius(24)
+                        .background(Capsule().fill(TokensPalette.track))
                 }
             }
         }

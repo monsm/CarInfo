@@ -47,6 +47,13 @@ final class AppStore: @unchecked Sendable {
     /// 某个数据源最后一次真拿到值的时刻。没拿到过就是 nil。
     func cacheTime(_ key: String) -> Date? { cacheTimes[key] }
 
+    /// 最近一次取数里**没取到**的那几个源（键名，已排序）。
+    ///
+    /// 它只服务一件事：手动「全局刷新」之后那一句反馈（见 `RefreshLoop.refreshAll`）。
+    /// 「刷新完了」与「刷新完了但有 3 项没取到」对用户是两件完全不同的事 ——
+    /// 而自动那趟不该弹任何东西（每 2 秒弹一次，那就是噪音）。
+    private(set) var lastMissedSources: [String] = []
+
     // 上一次已经喊过「位置变了」的坐标（`.locationUpdated` 的去重门槛）。
     // 初始是 NaN，所以第一条定位报文一定会被判为「动了」—— 第一次总要喊。
     private var lastPostedLat = Double.nan
@@ -449,11 +456,11 @@ final class AppStore: @unchecked Sendable {
         networkStatus = status
     }
 
-    // #7 夜间模式自动切换
-    static let nightModeStartHour = UserDefaults.standard.integer(forKey: "carkeeper_night_start_hour")
-    static let nightModeEndHour = UserDefaults.standard.integer(forKey: "carkeeper_night_end_hour")
-    static let forceDarkMode = UserDefaults.standard.bool(forKey: "carkeeper_force_dark_mode")
-    static let forceLightMode = UserDefaults.standard.bool(forKey: "carkeeper_force_light_mode")
+    // 【已删】#7 夜间模式自动切换的四个静态量（`nightModeStartHour` / `nightModeEndHour` /
+    // `forceDarkMode` / `forceLightMode`，2026-09-25 地毯式审核）。
+    // 四个都只有「声明 + 一套没人调用的算法」，而且 `static let` 在这里意味着
+    // **进程内只读一次**：用户改了设置也不会变 —— 看起来在算，其实早就算死了。
+    // 夜间模式的唯一实现现在在 `NightModeManager`（它自己读那两个 force 键）。
 
     // #31 省电模式
     static let powerSavingKey = "carkeeper_power_saving"
@@ -546,43 +553,29 @@ final class AppStore: @unchecked Sendable {
         hasBiometricSetup = false
     }
 
-    /// 判断当前是否应使用深色模式
-    func shouldUseDarkMode() -> Bool {
-        if Self.forceDarkMode { return true }
-        if Self.forceLightMode { return false }
-        let hour = Calendar.current.component(.hour, from: Date())
-        let start = Self.nightModeStartHour > 0 ? Self.nightModeStartHour : 21  // 默认 21:00
-        let end = Self.nightModeEndHour > 0 ? Self.nightModeEndHour : 7         // 默认 07:00
-        if start > end {
-            // 跨午夜（如 21:00-07:00）
-            return hour >= start || hour < end
-        } else {
-            return hour >= start && hour < end
-        }
-    }
+    // 【已删】`shouldUseDarkMode()` / `isNightMode` / `forceDarkMode` / `forceLightMode` /
+    // `nightModeStartHour` / `nightModeEndHour`（2026-09-25 地毯式审核）。
+    //
+    // 它们是「现在是不是夜间」的**第二套实现**，而它与 `NightModeManager` 那套的差别还有两处
+    // 实错：① 它把 UserDefaults 读进 `static let`（进程内只读一次，改了也不会变 ——
+    // 这正是 `delguard` 盯的那种「看起来在算其实早就算死了」）；② 它在全仓**没有任何调用方**
+    //（`isNightMode` 也没人读）。明暗的唯一出处现在是 `NightModeManager.schemeOverride`
+    // 与 `ArtThemeStore.current.spec.preferredScheme`，`CarKeeperApp` 两个窗口都从那里取。
 
-    // #NEW-115 夜间模式状态（跟随系统外观）
-    var isNightMode: Bool {
-        shouldUseDarkMode()
-    }
+    // `#17 请求去重`（`inFlightRequests` + `markRequestStarted` / `markRequestFinished`）
+    // 已于 2026-09-25 删除：**全仓零调用**（它当年是给「同一时刻两处点着同一个请求」用的，
+    // 而真出这件事的地方后来各自改成了别的写法）。留着它只有一种效果 —— 下一个人读到
+    // 「这里有一套去重」，于是以为去重已经有人管了。
+    //
+    // 现在「同一件事不并发」只有一处机制，就在 `RefreshLoop` 里：一次取数 `await` 完了
+    // 才睡下一次（见那个文件的 ①）。两套机制管一件事，等于两套都不可信。
 
-    // #17 请求去重：记录正在进行的任务
-    private var inFlightRequests: Set<String> = []
-    private let requestLock = NSLock()
-
-    func markRequestStarted(_ key: String) -> Bool {
-        requestLock.lock()
-        defer { requestLock.unlock() }
-        if inFlightRequests.contains(key) { return false }
-        inFlightRequests.insert(key)
-        return true
-    }
-
-    func markRequestFinished(_ key: String) {
-        requestLock.lock()
-        defer { requestLock.unlock() }
-        inFlightRequests.remove(key)
-    }
+    /// 车在不在**动** —— 最近一次取到的报文里 `VehicleSpeed > 0`。
+    ///
+    /// 它是刷新节律的输入（地图页 2s / 60s 就是照它分的，见 `RefreshLoop`）。
+    /// 解析复用 `VM.driveStatus`：那份模型里的 `isMoving` 原来**没有任何读者**，
+    /// 于是「车在不在动」这件事在界面上一次都没被用过（车速是另一条路取的）。
+    var isCarMoving: Bool { VM.driveStatus(caches).isMoving }
 
     // 这里原有 `pendingQuickCtrl`（首页把指令「穿透」给车控页，由车控页执行）。
     // 已删：**全库没有任何地方写入过它** —— 读它的只有车控页的 onAppear，
@@ -736,6 +729,7 @@ final class AppStore: @unchecked Sendable {
     }
 
     func saveCache(_ patch: [String: Any?]) {
+        lastMissedSources = patch.compactMap { $0.value == nil ? $0.key : nil }.sorted()
         for (k, v) in patch {
             // nil = 这个源本次没取到：清空它。界面自己会说「没取到」，
             // 而不是继续显示上一次的读数（不保留旧值是刻意的 —— 见 caches 上的说明）。
@@ -944,11 +938,12 @@ final class AppStore: @unchecked Sendable {
         car = c
         carId = newId
         UserDefaults.standard.set(newId, forKey: Self.selectedCarIdKey)
-        // #N10 加密保存车牌号
-        // 车牌键是 PlateNumber / plateNumber（Plate / plateNo 在报文里不存在）
-        if let plate = ciString(c, ["PlateNumber", "plateNumber"]) {
-            SecureStorage.shared.savePlate(plate)
-        }
+        // 【已删】#N10「加密保存车牌号」（2026-09-25 地毯式审核）。
+        // 它原本把车牌用 AES-GCM 加密后写进 UserDefaults（`enc_plate`），而**全仓没有
+        // 一处读它**，写入失败还是静默的（密钥取不到就什么都不写、也不报）。
+        // 一个只写不读的备份，加上静默的失败，等于把「敏感数据已加密」变成一句
+        // 没人核过的话 —— 要真保存它，得先有读的那一头（以及“读不到时怎么办”）。
+        // 随之删掉的还有 `Services/DataEncryption.swift` 与它的 `SecureStorage`。
         // 再清除旧缓存，后台异步拉新车数据
         clearCache()
         Task { await fetchVehicleData() }

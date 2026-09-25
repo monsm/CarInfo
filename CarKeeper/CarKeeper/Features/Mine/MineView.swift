@@ -179,9 +179,9 @@ struct MineView: View {
                         .font(TokensTypo.title2.weight(.semibold))
                         .foregroundStyle(TokensPalette.secondary)
                         .frame(width: 64, height: 64)
-                        .background(Circle().fill(TokensPalette.glassLight))
+                        .background(Circle().fill(TokensPalette.fillSubtle))
 
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: TokensSpacing.xs) {
                         Text(um?.name ?? "车主")
                             .font(TokensTypo.title2)
                             .foregroundStyle(TokensPalette.primary)
@@ -227,11 +227,11 @@ struct MineView: View {
     }
 
     private func profileStat(label: String, value: String, unit: String?) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
             Text(label)
                 .font(TokensTypo.caption2.weight(.medium))
                 .foregroundStyle(TokensPalette.tertiary)
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.xxs) {
                 Text(value)
                     .font(TokensTypo.metric(20))
                     .foregroundStyle(TokensPalette.primary)
@@ -263,7 +263,7 @@ struct MineView: View {
                     .frame(width: 48, height: 48)
                     .background(RoundedRectangle(cornerRadius: TokensRadius.small, style: .continuous)
                         .fill(TokensPalette.ambient))
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: TokensSpacing.xs) {
                     Text(sum?.name ?? "未绑定车辆")
                         .font(TokensTypo.headline)
                         .foregroundStyle(TokensPalette.primary)
@@ -417,7 +417,28 @@ struct MineView: View {
     /// 「夜间模式 / 省电模式」那一组（改系统的）不并列，与「语音播报」这组（改 App 行为）并列。
     private var wallpaperRow: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-            // 缩略图：选了就画，没选（或点了「不铺」）就画占位（铺画布，不是黑屏）。
+            // 图源：相册自选 / 必应每日 / Windows 聚焦。
+            // 这是 iOS 设置的「值选择器」行（标签左、值右）—— 与上面夜间模式那一行同形。
+            // 三条里相册那条不联网；另外两条是免密钥的公开取图口，每天自动换一张。
+            HStack {
+                Text("背景图")
+                    .font(TokensTypo.body)
+                    .foregroundStyle(TokensPalette.primary)
+                Spacer(minLength: TokensSpacing.sm)
+                Picker("背景图", selection: Binding(
+                    get: { wallpaper.source },
+                    set: { wallpaper.use($0) }
+                )) {
+                    ForEach(WallpaperSource.allCases) { s in
+                        Text(s.title).tag(s)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+            .frame(minHeight: TokensSpacing.row)
+
+            // 缩略图：铺的就是这一张。没图（没选 / 没取到 / 点了「不铺」）画占位。
             Group {
                 if let img = wallpaper.image {
                     Image(uiImage: img)
@@ -439,30 +460,72 @@ struct MineView: View {
                         }
                 }
             }
-            // 两个小钮：左边「选一张」（打开相册），右边「不铺」（清图 + 删文件）。
-            // 深色模式下选图偏暗会把玻璃卡底下的底也拖暗，所以选图行旁边多给
-            // 一句提示：选偏亮、留白多的图（HIG：背景色应当服务于前景可读性）。
+
+            // 两个小钮：相册那一档才需要「选一张」；有图时才给「不铺」。
             HStack(spacing: TokensSpacing.sm) {
-                PhotosPicker(selection: $wallpaperPickItem, matching: .images) {
-                    Text("选一张")
+                if wallpaper.source == .photo {
+                    PhotosPicker(selection: $wallpaperPickItem, matching: .images) {
+                        Text("选一张")
+                    }
+                    .buttonStyle(.plain)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.accent)
+                    // 三个小钮都按 HIG 的最小触控目标给足 44pt（2026-09-25）：
+                    // 它们原本只有一行 13pt 高的字，按中全靠运气。
+                    .frame(minHeight: TokensSpacing.row)
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .font(TokensTypo.footnote)
-                .foregroundStyle(TokensPalette.accent)
 
                 Spacer(minLength: 0)
 
-                Button("不铺") {
-                    TokensHaptic.tap()
-                    wallpaper.clear()
+                // 取图失败时给一个出口：否则「取图没成功」就是一句没有下文的话。
+                if wallpaper.failed {
+                    Button("重试") {
+                        TokensHaptic.tap()
+                        wallpaper.reload()
+                    }
+                    .buttonStyle(.plain)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.accent)
+                    .frame(minHeight: TokensSpacing.row)
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .font(TokensTypo.footnote)
-                .foregroundStyle(TokensPalette.secondary)
+
+                if wallpaper.image != nil {
+                    Button("不铺") {
+                        TokensHaptic.tap()
+                        wallpaper.clear()
+                    }
+                    .buttonStyle(.plain)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
+                    .frame(minHeight: TokensSpacing.row)
+                    .contentShape(Rectangle())
+                }
             }
-            Text("建议选偏亮、留白多的图（深色模式下玻璃卡压在暗图上读不清）")
+
+            // 一句来源说明 + （相册档才有的）选图提示 + 取图失败时的一句人话。
+            // 深色模式下选图偏暗会把玻璃卡底下的底也拖暗：HIG 说背景色应当服务于
+            // 前景可读性，所以相册那一档多给一句。
+            Text(wallpaper.source.note)
                 .font(TokensTypo.caption2)
                 .foregroundStyle(TokensPalette.tertiary)
+            if wallpaper.source == .photo {
+                Text("选偏亮、留白多的图（深色模式下玻璃卡压在暗图上读不清）")
+                    .font(TokensTypo.caption2)
+                    .foregroundStyle(TokensPalette.tertiary)
+            }
+            if wallpaper.failed {
+                Text("取图没成功，先铺画布底色")
+                    .font(TokensTypo.caption2)
+                    .foregroundStyle(TokensPalette.warning)
+            }
+            if !wallpaper.credit.isEmpty {
+                Text(wallpaper.credit)
+                    .font(TokensTypo.caption2)
+                    .foregroundStyle(TokensPalette.tertiary)
+                    .lineLimit(2)
+            }
         }
         .padding(.horizontal, TokensSpacing.sm)
         .padding(.vertical, TokensSpacing.sm)
@@ -493,7 +556,7 @@ struct MineView: View {
                 Spacer()
             }
             .foregroundStyle(TokensPalette.error)
-            .padding(.vertical, 10)
+            .padding(.vertical, TokensSpacing.snug)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -504,22 +567,22 @@ struct MineView: View {
         // 整块是一行：上面的说明、进度与三个按钮都属于「检查更新」这一件事。
         DSGroup(title: "检查更新") {
             customRow(last: true) {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: TokensSpacing.snug) {
                     Text("下载最新 ipa，分享后用自签工具安装")
                         .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
                     // OTA 检查中：骨架旋转指示器
                     if isChecking {
-                        HStack(spacing: 10) {
+                        HStack(spacing: TokensSpacing.snug) {
                             ProgressView()
                                 .tint(TokensPalette.ambient)
                             Text("正在检查最新版本…")
                                 .font(TokensTypo.caption)
                                 .foregroundStyle(TokensPalette.secondary)
                         }
-                        .padding(.vertical, 8)
+                        .padding(.vertical, TokensSpacing.sm)
                     } else if showDownload {
                         // 下载中：进度条 + 百分比数字
-                        VStack(spacing: 6) {
+                        VStack(spacing: TokensSpacing.sm) {
                             ProgressView(value: downloadPct)
                                 .tint(TokensPalette.ambient)
                             Text("正在下载… \(downloadPctDisplay)%")
@@ -527,7 +590,7 @@ struct MineView: View {
                         }
                     } else if let m = updateMsg {
                         // 错误或提示消息（图标由 updateMsgIsError 决定）
-                        HStack(spacing: 6) {
+                        HStack(spacing: TokensSpacing.sm) {
                             Image(safeSymbol: updateMsgIsError ? "exclamationmark.triangle.fill" : "info.circle.fill",
                                   fallback: "info.circle.fill")
                                 .font(TokensTypo.caption)
@@ -538,7 +601,7 @@ struct MineView: View {
                             Spacer()
                         }
                     }
-                    HStack(spacing: 12) { updateButtons() }
+                    HStack(spacing: TokensSpacing.snug) { updateButtons() }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, TokensSpacing.sm)
@@ -555,7 +618,7 @@ struct MineView: View {
 
     @ViewBuilder
     private func updateButtons() -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: TokensSpacing.snug) {
             mainUpdateButton
             if downloadFile != nil { shareButton }
             tokenButton
@@ -566,13 +629,13 @@ struct MineView: View {
         Button {
             checkUpdate()
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: TokensSpacing.sm) {
                 if updateBusy { ProgressView().controlSize(.mini).tint(TokensPalette.labelOnTint) }
                 Text(updateBusy ? "检查中…" : "检查更新")
                     .font(TokensTypo.caption.weight(.bold))
             }
             .foregroundStyle(TokensPalette.labelOnTint)
-            .padding(.vertical, 10)
+            .padding(.vertical, TokensSpacing.snug)
             .background(Capsule().fill(TokensPalette.ambient))
         }
         .buttonStyle(.plain)
@@ -586,7 +649,7 @@ struct MineView: View {
         } label: {
             Label("分享安装包", systemImage: "square.and.arrow.up")
                 .font(TokensTypo.caption.weight(.bold))
-                .padding(.horizontal, 14).padding(.vertical, 10)
+                .padding(.horizontal, TokensSpacing.md).padding(.vertical, TokensSpacing.snug)
                 .background(TokensPalette.fillSubtle, in: Capsule())
         }
         .buttonStyle(.plain)
@@ -600,7 +663,7 @@ struct MineView: View {
             Label("Token", systemImage: "key.fill")
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.secondary)
-                .padding(.horizontal, 12).padding(.vertical, 10)
+                .padding(.horizontal, TokensSpacing.snug).padding(.vertical, TokensSpacing.snug)
                 .background(TokensPalette.fillSubtle, in: Capsule())
         }
         .buttonStyle(.plain)

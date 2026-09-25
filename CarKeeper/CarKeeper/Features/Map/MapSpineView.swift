@@ -123,6 +123,11 @@ struct MapSpineView: View {
     @State private var skyLive = true
     @State private var skyHour: Double = 12
 
+    /// 「更多读数」抽屉开着没有（默认关着：一屏只留续航 / 电量 / 车速）。
+    /// **不是 `private`**：抽屉的视图住在 `MapSpineReadouts.swift`（与读数同一份文件），
+    /// 而 `private` 的作用域是文件 —— 那个文件看不见它。
+    @State var drawerOpen = false
+
     /// 壁纸状态（非地图子页铺的底）。**必须订阅它**：图是异步到达的，
     /// 不订阅的话 `换一张 / 不铺` 要等到下一次换档才生效（body 才重新求值）。
     /// 与 MineView 那行订阅的是同一个单例，两处的更新永远同步。
@@ -156,14 +161,25 @@ struct MapSpineView: View {
     /// 数据在 main actor 上组装（AppStore 是 @MainActor @Observable）。
     @MainActor private var data: MapSpineData { MapSpineData.build() }
 
-    /// 底条占掉的纵向空间：26（离底）+ 46（条高）+ 14（呼吸位）= 86。
+    /// 底条占掉的纵向空间：26（离底）+ **54（条高）** + 14（呼吸位）= 94。
     /// **同一个数在原型里是 `.stack{bottom:86px}`** —— 页面内容的窗口正好停在条子上沿。
     /// 真机上它从**安全区底**算起（安全区之上再留 26），所以刘海屏与旧机型都是同一个观感。
-    private static let barTotal: CGFloat = 86
+    /// 2026-09-25：条高 46 → 54（用户「滑动区变高」，见 `DSSwipeStrip.barHeight`），
+    /// 所以这里跟着从 86 涨到 94 —— **它是派生量，不是另一个决定**。
+    private static let barTotal: CGFloat = 94
     /// 底条离底多远（原型 `.bottom{bottom:26px}`）
     private static let barGap: CGFloat = 26
-    /// 两侧圆钮的直径（原型 `.arm{width:calc(var(--H) + 4px)}`，H = 46）
-    private static let armSize: CGFloat = 50
+    /// 两侧圆钮的直径（原型 `.arm{width:calc(var(--H) + 4px)}`）——
+    /// 条高从 46 抬到 54（2026-09-25），圆钮按原型那条关系一起走到 58。
+    private static let armSize: CGFloat = 58
+
+    /// 左钮 / 模式条 / 右钮之间的中缝。
+    ///
+    /// 2026-09-25 材质审核：这个 9 原来只在两处出现 —— `HStack(spacing:)` 与
+    /// `DSSwipeStrip` 头注里那句「两侧圆钮各占 50 + 中缝 9×2」。现在它有个名字，
+    /// 因为**玻璃层也要用它**（见 `bottomBar` 的 `dsGlassLayer`）：中缝既是视觉上的
+    /// 「它们是一组」，也是系统判定「多近才算挨着」的距离。两处用同一个值，
+    /// 不能一处改了另一处还在按 9 算宽度。
     /// 底条两侧留白（原型 `.bottom{padding:0 8px}`）
     private static let barPad: CGFloat = 8
     /// 右臂交出的一条车控请求。它由 `controlCommandFlow` 那道门消费 ——
@@ -209,7 +225,16 @@ struct MapSpineView: View {
         // 原来靠它挂着的两件事搬进了页面自己：车控的语音播报在那一叠里（另一张卡），
         // 保养的「添加记录」在那一张卡里（一个动作），见各自文件。
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showSky) { skySheet(d).dsSheetCanvas() }
+        .sheet(isPresented: $showSky) {
+            // 「光」表已拆成独立文件（`MapSkySheet.swift`，2026-09-25）：
+            // 宿主只给它这些 —— 当前数据、两个滑块状态、开合绑定、重取天气那一个动作。
+            MapSkySheet(data: d,
+                        skyHour: $skyHour,
+                        skyLive: $skyLive,
+                        isOpen: $showSky,
+                        retryWeather: { await refreshWeatherIfNeeded(force: true) })
+                .dsSheetCanvas()
+        }
         // 右臂那几条会改车状态的快捷指令走**唯一那道门**：温度 → 生物识别 → 控车码。
         // 它挂在“现在”这一档（右臂就在这里），sheet 盖在地图上 ——
         // 不把用户推到车控页（一条锁车指令不该让人离开地图）。
@@ -226,6 +251,10 @@ struct MapSpineView: View {
                 if layer == .charge { await searchChargersIfNeeded() }
                 await refreshWeatherIfNeeded()
             }
+            // 背景图的那一次取数（子页铺底用）。**故意留在围栏之外**：它只往
+            // Documents 落一张 JPEG，不碰车况/地图状态 —— 与那一轮二分定位的
+            // 「启动就退」不是同一类东西。已取过当天那张时它不发网络请求（同一天缓存）。
+            await wallpaper.refreshIfStale()
             StartupJournal.shared.mark("地图页就绪")
         }
         .onChange(of: layer) { _, new in
@@ -451,7 +480,7 @@ struct MapSpineView: View {
     private var bottomBar: some View {
         // 展开时中缝归零：条子展开后要占满整行（374），两侧各留 9 的中缝就装不下，
         // 而「压间距」正是原型明确否掉的那一件事（同 `ArmSlot` 的说明）。
-        HStack(spacing: barOpen ? 0 : 9) {
+        HStack(spacing: barOpen ? 0 : Self.barSeam) {
             arm(text: plateShort) { nav.openMode(.vehicle) }
                 .accessibilityLabel(Text("车辆"))
 
@@ -475,6 +504,15 @@ struct MapSpineView: View {
         .padding(.horizontal, Self.barPad)
         .padding(.bottom, Self.barGap)
         .frame(maxWidth: .infinity)
+        // 三块玻璃（左钮 / 模式条 / 右钮）是**同一层**里的三个形状：交给
+        // `GlassEffectContainer`（见 `DSGlass.swift`），它们的边缘才会互相折射、
+        // 出现/消失时才变形接上。间距取中缝那 9 —— 那正是它们看起来「挨着」的距离。
+        .dsGlassLayer(spacing: Self.barSeam)
+        // 整条（含离底那 26pt 的空白带）都算**滑动区**（用户 2026-09-25：
+        // 「滑动区变高」）。少了这一条，手指落在条子上下那圈空白上没有任何反应 ——
+        // 而这一圈恰好是拇指自然停放的位置。它不改变任何画出来的东西：
+        // `contentShape` 只管命中测试。
+        .contentShape(Rectangle())
         // 跟手手势挂整条底条（用户 2026-09-24：「不跟手」）：手指按在**整条**上
         //（不只是胶囊条上）就能拖。挂在容器上（而不是 `DSSwipeStrip` 内部）是因为
         // 两侧圆钮是 `Button`，挂条子内部的 `highPriorityGesture` 会被圆钮的 tap 吃掉。
@@ -509,12 +547,13 @@ struct MapSpineView: View {
     /// 圆钮的**外观**（不含行为）：`Menu` 要的是 label 视图，不是 Button。
     private func armLabel(text: String? = nil, icon: String? = nil) -> some View {
         ZStack {
-            Circle()
-                .fill(TokensPalette.glassHighlight)
-                .glassEffect(.regular, in: Circle())
-                .overlay {
-                    Circle().strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border)
-                }
+            // 2026-09-25 材质审核：原先这里先铺一层 `glassHighlight` 再挂玻璃 ——
+            // 那是自己画的「高光」，而**真正的高光正是玻璃材质自己要产生的东西**：
+            // 垫一层假的，系统那层真的就被盖住了。现在只有材质本身，
+            // 且可点（`interactive`）—— 按下去的压缩与折射交给系统演。
+            Color.clear
+                .frame(width: Self.armSize, height: Self.armSize)
+                .dsGlass(in: Circle(), interactive: true)
             if let text {
                 Text(text)
                     .font(TokensTypo.fixed(11, weight: .bold))
@@ -694,18 +733,15 @@ struct MapSpineView: View {
             //
             // 用户 2026-09-24：「全局不要加暗层」+「地图页顶部的信息挪到下面的玻璃卡片」——
             // 这两条是同一件事的两面：`.maptop` 存在的唯一理由是「车牌徽标压在瓦片上要读得出」，
-            // 而徽标已经搬进下面那张玻璃卡（见 `nowHead`）。理由消失，层就跟着走。
+            // 而徽标已经搬进下面那张玻璃卡。理由消失，层就跟着走。
             // 删干净之后地图上只剩两样不是瓦片的东西：地名（自带 textShadow，不吃整屏亮度）
             // 与地图自己的仪表（罗盘 / 比例尺）。
 
-            // `.float{left:16;right:16;bottom:98}`：底边离屏底 98（条子占 86 + 12 呼吸位）。
-            // 用户 2026-09-24：「地图页地下 4 个独立的车速/电量/胎压/车锁 融合进大卡片，
-            // 最上面的位置也删掉（和下面重复）」—— 于是这一档现在**只有一张大卡**：
-            // `nowCard` 内部自己把 4 格读数排进卡片下沿（见 `nowMetrics`），
-            // 卡头那行（车牌 + 图层胶囊 + 状态 + 上报时间）也删掉了 ——
-            // 它说的事（车牌、状态、新鲜度）都在大卡的正文里再说一遍，是重复。
+            // `.float{left:16;right:16;bottom:98}`：底边离屏底（条子占 `barTotal` + 12 呼吸位）。
+            // 这一档**只有一张大卡**，它自己从下往上排：巨字续航 → 副行 → 光带
+            // → 一排读数（电量 / 车速）→ 「更多读数」抽屉（胎压 / 车锁 / 充满）。
             nowCard(d)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, TokensSpacing.md)
                 .padding(.bottom, Self.barTotal + 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -743,11 +779,14 @@ struct MapSpineView: View {
                 }
             }
             Divider()
+            // 「全局刷新」= **全部 API**（车况 + 消息 + 体检），不是自动那趟的加强版。
+            // 用户 2026-09-25：「地图页的全局刷新可以刷新全部 api」—— 所以它走
+            // `RefreshLoop.refreshAll()`（`fetchVehicleData`），而不是页内那个轻的 `refresh()`。
             Button {
                 TokensHaptic.tap()
-                Task { await refresh() }
+                Task { await RefreshLoop.shared.refreshAll() }
             } label: {
-                Label("重取数据", systemImage: "arrow.clockwise")
+                Label("全局刷新", systemImage: "arrow.clockwise")
             }
             Button {
                 TokensHaptic.tap()
@@ -772,7 +811,7 @@ struct MapSpineView: View {
         } label: {
             // 胶囊：当前图层名 + 上下箭头。它比一只齿轮图标好认 ——
             // 「这张卡在回答哪个问题」就写在上面，而不是变成一个要背的图标。
-            HStack(spacing: 4) {
+            HStack(spacing: TokensSpacing.xs) {
                 Text(layer.title)
                     .font(TokensTypo.caption)
                     .tracking(TokensTracking.label)
@@ -780,12 +819,11 @@ struct MapSpineView: View {
                     .font(TokensTypo.micro)
             }
             .foregroundStyle(TokensPalette.secondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background { Capsule().fill(TokensPalette.fillSubtle) }
-            .overlay {
-                Capsule().strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border)
-            }
+            .padding(.horizontal, TokensSpacing.snug)
+            .padding(.vertical, TokensSpacing.xs)
+            // 图层胶囊浮在**地图**上（连续的画面）→ `.overMedia`（`.clear`）：
+            // 画面保持可见，只在边缘留一圈折射。可点 → `interactive`。
+            .dsGlassCapsule(variant: .overMedia, interactive: true)
             .contentShape(Capsule())
         }
         .accessibilityLabel(Text("图层：\(layer.title)"))
@@ -807,16 +845,17 @@ struct MapSpineView: View {
     }
 
     /// 「现在」这一档的浮动首卡。形态与内容都照原型 `.float > .card`：
-    ///   头  `.hd`   = 车牌 + 状态 · 上报时间（原图左上那枚徽标，2026-09-24 搬进卡）
+    ///   卡头      = **只剩一枚图层胶囊**（`layerMenu`，它是控件不是信息）
     ///   地址 `.ch`  = 车端上报的那句地址（大字）
     ///   巨字 `.big` = **续航**（原型大字就是 412 km 续航，不是电量百分比）
     ///   副行 `.sub` = 表显里程 · 充不充电
     ///   光带 `.gain`= 电量（全 App 唯一的形状）
+    ///   读数       = 一排（电量 / 车速）+ 抽屉（胎压 / 车锁 / 充满）
     ///
     /// 一页之内一个事实只有一个出处（用户 2026-09-24：「地图页的信息有很多是重复的」）：
-    /// 电量与胎压都归下面那排四格读数 ── 卡里再说一遍「电量 68%」、
-    /// 再排一行四轮胎压，就是同一句话说两遍。
-    /// 四轮胎压的**逐轮细节**在「车辆 → 体检」里；首页只留一格「最低的那一条」。
+    /// 电量与胎压都归那排读数 ── 卡里再说一遍「电量 68%」、再排一行四轮胎压，
+    /// 就是同一句话说两遍。四轮胎压的**逐轮细节**在「车辆 → 体检」里；
+    /// 首页只留一格「最低的那一条」，而且它在抽屉里（2026-09-25）。
     /// 换了图层（行程 / 停车 / 充电站）时换成那一层的内容 ——
     /// 于是「图上在看哪个问题」与「读它的数」是同一张卡，不必再多一张选择卡。
     @ViewBuilder
@@ -837,8 +876,11 @@ struct MapSpineView: View {
                     } else {
                         nowMetrics(d)
                     }
-                    // 4 格读数（车速/电量/胎压/车锁）融进这张大卡的下沿（不再单铺一层）。
-                    readoutCells(d)
+                    // 读数分两层（用户 2026-09-25：「地图页数据用抽屉的方式展示」）：
+                    // 默认一屏就是**续航（巨字）/ 电量 / 车速**三个数，
+                    // 其余读数（胎压 / 车锁 / 还要充多久）在那道拉手之后（`moreDrawer`）。
+                    readoutRow(readoutsPrimary(d))
+                    moreDrawer(d)
                 case .trips: tripsContent(d)
                 case .holds: holdsContent(d)
                 case .charge: chargeContent(d)
@@ -953,100 +995,13 @@ struct MapSpineView: View {
     //  它是首页那枚药丸搬进车牌菜单之后**唯一**的入口：药丸没了，但「这一屏的光
     //  是怎么算出来的」必须还能被调出来（每一行都是一个可复算的事实）。
 
-    /// 「此刻的光」：样品版里那张表的真机版。
-    /// 它不是「关于」页 —— 它让这一屏的光**可以被争论**：每一行都是一个可复算的事实，
-    /// 而把天文事实翻译成界面数值的那几条规则，都写在值的旁边。
-    private func skySheet(_ d: MapSpineData) -> some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                    if let sky = d.sky(at: skyDate) {
-                        DSSectionHeader(title: "此刻的光")
-                        VStack(alignment: .leading, spacing: 0) {
-                            SkyFactTable(facts: sky.facts)
-                        }
-                        .padding(.horizontal, TokensSpacing.md)
-                        .background(cardBackground)
+    // `skySheet(_:)` 已于 2026-09-25 搬进 `MapSkySheet.swift`：本文件当时 1201 行，越过了
+    // `lintcfg.py` 的 1200 阈值 —— 按那个阈值的用法，是把东西拆出去，不是把文件加进排除清单。
+    // 界面一字未改（拆的是文件，不是设计）。
 
-                        // 时刻滑块 —— 样品里最标志性的那件东西：
-                        // 把「此刻」变成「可以拖的时刻」，一拖就能看完一天的光（深夜→日出→正午→黄昏）。
-                        // 它同时是这一整套光的**证明**：不是配的色，拖一下就自己看见。
-                        DSSectionHeader(title: "看哪一刻的光")
-                        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-                            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-                                Text(skyLive ? "此刻（实时）"
-                                             : String(format: "%02d:00", Int(skyHour.rounded())))
-                                    .font(TokensTypo.digits(20))
-                                    .foregroundStyle(TokensPalette.primary)
-                                Spacer(minLength: 0)
-                                if !skyLive {
-                                    Button("回到此刻") {
-                                        TokensHaptic.tap()
-                                        skyLive = true
-                                    }
-                                    .font(TokensTypo.footnote)
-                                    .foregroundStyle(TokensPalette.accent)
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            Slider(value: $skyHour, in: 0...23)
-                                .tint(TokensPalette.accent)
-                                .onChange(of: skyHour) { _, _ in skyLive = false }
-                            Text("按你所在时区。")
-                                .font(TokensTypo.caption)
-                                .foregroundStyle(TokensPalette.tertiary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(TokensSpacing.md)
-                        .background(cardBackground)
-
-                        if case .failed(let msg) = weather.status {
-                            DSNotice(kind: .warning,
-                                     text: "天气没取到（\(msg)），上面是晴空模型的算法值。")
-                        }
-
-                        Text("太阳高度角与方位角由车的位置算出（NOAA，不联网）。"
-                             + "云量、降水来自 Open-Meteo 实况。"
-                             + "没有实况就退回晴空模型。")
-                            .font(TokensTypo.footnote)
-                            .foregroundStyle(TokensPalette.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    } else {
-                        emptyNotice("不知道车在哪儿")
-                    }
-                }
-                .padding(.top, TokensSpacing.sm)
-                .padding(.bottom, TokensSpacing.xxl)
-            }
-            .pageBackground()
-            .navigationTitle("光")
-            .navigationBarTitleDisplayMode(.inline)
-            .presentationDetents([.medium, .large])
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        Task { await refreshWeatherIfNeeded(force: true) }
-                    } label: {
-                        if weather.status == .loading {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Text("重取天气")
-                        }
-                    }
-                    .font(TokensTypo.footnote)
-                    .disabled(weather.status == .loading)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") { showSky = false }
-                }
-            }
-        }
-    }
-
-    private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-            .fill(TokensPalette.surface)
-    }
+    // `cardBackground` 已于 2026-09-25 删除：它是「卡的面」的第三套实现
+    // （`DSCard` / `GlassCard` / 它自己）。天空面板现在走 `dsSurface(padding: 0)`，
+    // 于是艺术方向下的发丝线不会在这里被漏掉。
 
 
     // =========================================================================
@@ -1054,18 +1009,10 @@ struct MapSpineView: View {
     // =========================================================================
 
     /// 不是 `private`：同上（三个图层内容都用它写「取不到」那一句）。
-    func emptyNotice(_ text: String) -> some View {
-        HStack(alignment: .top, spacing: TokensSpacing.sm) {
-            Image(safeSymbol: "info.circle", fallback: "info.circle")
-                .font(TokensTypo.fixed(13))
-                .foregroundStyle(TokensPalette.tertiary)
-            Text(text)
-                .font(TokensTypo.footnote)
-                .foregroundStyle(TokensPalette.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.vertical, TokensSpacing.sm)
-    }
+    /// 实体已搬到 `MapSkySheet.swift`（`MapNotice`）—— 拆「光」表时它跟着走，
+    /// 因为那一支也要用同一句话。这里留一行**转发**：四个图层与评分段那几处调用点
+    /// 因此一字不改（拆文件不该顺带改调用点）。
+    func emptyNotice(_ text: String) -> some View { MapNotice(text: text) }
 
     private func color(for cls: String) -> Color {
         switch cls {

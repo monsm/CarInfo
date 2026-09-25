@@ -192,8 +192,8 @@ private struct ThemeTile: View {
     // MARK: 小界面样本（用该主题自己的取值画）
 
     private var sample: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: TokensSpacing.snug) {
+            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                 Text("车在这儿")
                     .font(s.usesSerifTitles
                           ? .system(size: 17, weight: .semibold, design: .serif)
@@ -202,13 +202,13 @@ private struct ThemeTile: View {
                 Spacer(minLength: 8)
                 Text("已上锁")
                     .font(.system(size: 11, weight: .medium))
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
+                    .padding(.horizontal, TokensSpacing.sm)
+                    .padding(.vertical, TokensSpacing.xs)
                     .background(Capsule().fill(s.accent))
                     .foregroundStyle(s.onAccent)
             }
 
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.xs) {
                 Text("78")
                     .font(.system(size: 76, weight: s.displayWeight).monospacedDigit())
                     .tracking(-76 * 0.035 + s.displayTracking)
@@ -236,14 +236,14 @@ private struct ThemeTile: View {
                 Rectangle().fill(s.hairline).frame(height: 0.5)
                 row("异常", "1 条", "后备箱 · 14:20")
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
+            .padding(.horizontal, TokensSpacing.snug)
+            .padding(.vertical, TokensSpacing.xs)
             .background {
                 RoundedRectangle(cornerRadius: 12, style: .continuous).fill(s.surface)
             }
 
             // 语义色只有三个点：颜色只表达状态
-            HStack(spacing: 14) {
+            HStack(spacing: TokensSpacing.md) {
                 dot(s.success, "正常")
                 dot(s.warning, "关注")
                 dot(s.error, "异常")
@@ -269,7 +269,7 @@ private struct ThemeTile: View {
     }
 
     private func row(_ key: String, _ value: String, _ note: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.snug) {
             Text(key)
                 .font(.system(size: 13))
                 .foregroundStyle(s.labelSecondary)
@@ -281,11 +281,11 @@ private struct ThemeTile: View {
                 .font(.system(size: 12))
                 .foregroundStyle(s.labelTertiary)
         }
-        .padding(.vertical, 9)
+        .padding(.vertical, TokensSpacing.sm)
     }
 
     private func dot(_ color: Color, _ label: String) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: TokensSpacing.xs) {
             Circle().fill(color).frame(width: 6, height: 6)
             Text(label)
                 .font(.system(size: 11))

@@ -264,7 +264,7 @@ struct MapSpotPin: View {
     var label: String? = nil
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: TokensSpacing.xs) {
             switch kind {
             case .hold(let isLatest):
                 holdPin(isLatest: isLatest)
@@ -309,7 +309,7 @@ struct MapSpotPin: View {
     }
 
     private func chargerPin(distanceText: String) -> some View {
-        VStack(spacing: 3) {
+        VStack(spacing: TokensSpacing.xs) {
             ZStack {
                 Circle()
                     .fill(TokensPalette.surface)
@@ -323,8 +323,8 @@ struct MapSpotPin: View {
             Text(distanceText)
                 .font(TokensTypo.digits(10).weight(.medium))
                 .foregroundStyle(ink)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 1.5)
+                .padding(.horizontal, TokensSpacing.xs)
+                .padding(.vertical, TokensSpacing.xxs)
                 .background {
                     Capsule().fill(TokensPalette.surface.opacity(0.92))
                 }

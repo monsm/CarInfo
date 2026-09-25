@@ -43,10 +43,12 @@ final class ChargingStatusMonitor: ObservableObject {
     /// 本机累计完成的充电次数（进程内计数，不落盘）
     private(set) var completedSessions = 0
 
-    /// 通知开关：与全 App 的语音/通知偏好一致，默认开
-    private var notificationsEnabled: Bool {
-        UserDefaults.standard.object(forKey: "carkeeper_charge_notify") as? Bool ?? true
-    }
+    /// 通知开关 —— **没有这个东西**（2026-09-25 地毯式审核）。
+    ///
+    /// 原来这里读 `carkeeper_charge_notify`，而全仓没有一处写它：也就是说那个
+    /// 「开关」永远只能读到默认值（开）。与其留一个没人能扳的闸，不如把事实写清楚：
+    /// 关掉充电提醒的地方是**系统设置 → 通知 → 车管家**（那是平台层面的真开关，
+    /// 与 App 内再放一个开关相比，二者只会互相打架）。
 
     private var lastCharging: Bool?
     /// 已就「充满」提醒过一次的 SOC，避免每 30 秒重复推
@@ -63,6 +65,18 @@ final class ChargingStatusMonitor: ObservableObject {
 
     func stopMonitoring() {
         lastCharging = nil
+    }
+
+    /// 要发通知就要先有权限。
+    ///
+    /// 只在 `.notDetermined` 时问：已经答过的用户不该被再问一遍（系统也只会弹一次，
+    /// 但重复调用会把返回值变得看不出所以然）。拒绝了的就尊重它 —— 不推通知，也不报错。
+    @discardableResult
+    func requestAuthorization() async -> Bool {
+        let center = UNUserNotificationCenter.current()
+        let status = await center.notificationSettings().authorizationStatus
+        guard status == .notDetermined else { return status == .authorized }
+        return (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
     }
 
     // MARK: 由报文驱动的观察点
@@ -127,7 +141,6 @@ final class ChargingStatusMonitor: ObservableObject {
     }
 
     private func notify(title: String, body: String) {
-        guard notificationsEnabled else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body

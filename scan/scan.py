@@ -239,9 +239,35 @@ def cases_of(body):
     return names
 
 
+# 泛型参数的**声明**：`struct DSGlassSurface<S: Shape>` / `func dsGlass<S: Shape>(…)`。
+#
+# 为什么需要它（2026-09-25 的真实误报）：`TYPE_REF` 认的是「前面跟着 `:` `->` `[` `<`
+# `as!` `is` `&` 的大写开头名字」，而 `<S: Shape>` 里的 `S` 前面正是 `<` —— 于是
+# **刚声明的泛型参数**被当成了「用了但没声明的类型」，报成高嫌疑（＝编译会挂），
+# 而它其实就在眼前那一行。判据错在「只认 struct/enum 那种声明」，不认泛型形参。
+#
+# 收窄：只取 `<…>` 里逗号分隔的、**裸大写名字**（`S` / `Content` / `Value`），
+# 带约束的取 `:` 前那一段。泛型子句里有嵌套尖括号（`<T: Collection>` 之外还有
+# `P<A>`）时整体不匹配 —— 那种写法本仓一次都没有，宁可不认也不误认。
+GENERIC = re.compile(
+    r"(?:struct|class|enum|actor|func|extension)\s+[A-Za-z_][A-Za-z0-9_.]*\s*<([^<>{}()]*)>"
+)
+BARE_UPPER = re.compile(r"^[A-Z][A-Za-z0-9_]*$")
+
+
+def generic_params(text):
+    out = set()
+    for m in GENERIC.finditer(text):
+        for part in m.group(1).split(","):
+            name = part.split(":")[0].strip()
+            if BARE_UPPER.match(name):
+                out.add(name)
+    return out
+
+
 def collect(text, cleaned):
     """返回 types / members(map) / funcs"""
-    types = set()
+    types = generic_params(text)
     qualified = []
     decls = []
     for m in DECL.finditer(text):
@@ -395,6 +421,24 @@ VERIFIED_SDK_ADDITIONS = {
     "MKStandardMapConfiguration": "MapKit class（iOS 16+；init(elevationStyle:emphasisStyle:) 已核；EmphasisStyle.muted 已核）",
     "squareRoot": "FloatingPoint.squareRoot()（Swift 标准库；评分页算电耗的离散程度用；已核 swift/floatingpoint/squareroot() 文档 JSON，externalID s:SF10squareRootxyF）",
     "Shape": "SwiftUI.Shape protocol（iOS 13+；本项目用它画车钉的三角形警告形状）",
+    # Liquid Glass（iOS 26+）。三个名字在写进 `Design/DSGlass.swift` 之前逐个核过
+    # Apple 文档 JSON（abstract / identifier.url / metadata.externalID / platforms）：
+    #   · Glass                  s:7SwiftUI5GlassV        「A structure that defines the
+    #                             configuration of the Liquid Glass material.」iOS 26.0+
+    #   · GlassEffectContainer   s:7SwiftUI20GlassEffectContainerV  「A view that combines
+    #                             multiple Liquid Glass shapes into a single shape that can
+    #                             morph individual shapes into one another.」
+    #   · glassEffect(_:in:)     View 的扩展，externalID
+    #                             s:7SwiftUI4ViewPAAE11glassEffect_2inQrAA5GlassV_qd__tAA5ShapeRd__lF
+    #                             「Applies the Liquid Glass effect to a view.」
+    # `Glass` 与 `GlassEffectContainer` 只会出现在 `Design/DSGlass.swift` 里 ——
+    # 这一条由 `scan/glass.py` 守着（别处直连就是又开了第二个入口）。
+    "Glass": "SwiftUI.Glass struct（iOS 26+；externalID s:7SwiftUI5GlassV）——玻璃材质的配置",
+    "GlassEffectContainer": "SwiftUI.GlassEffectContainer struct（iOS 26+；externalID "
+        "s:7SwiftUI20GlassEffectContainerV）——把多块玻璃合成一层，`dsGlassLayer` 是它的入口",
+    "glassEffect": "View.glassEffect(_:in:)（iOS 26+；externalID "
+        "s:7SwiftUI4ViewPAAE11glassEffect_2inQrAA5GlassV_qd__tAA5ShapeRd__lF）——挂液态玻璃",
+    "interactive": "Glass.interactive(_:)（iOS 26+）——让玻璃按下去时有系统的压缩与折射",
     "UnevenRoundedRectangle": "SwiftUI.UnevenRoundedRectangle（iOS 16+；底部面板只要上面两角圆角）",
     # 热区 / 回放 / 充电曲线（本轮）：全部写进代码前对着 Apple 文档 JSON 核过
     "MapCircle": "MapKit.MapCircle struct（iOS 17+；init(center:radius:) 已核，stroke(_:style:)/foregroundStyle 见 Styling-the-circle）",
@@ -494,6 +538,20 @@ VERIFIED_SDK_ADDITIONS = {
     "PhotosPicker": "PhotosUI.PhotosPicker（iOS 16+；decl: struct PhotosPicker<Selection, InvalidSelectionError, PhotosItem>；externalID doc://com.apple.photosui/documentation/PhotosUI/PhotosPicker）——系统相册选择器（本地取，不依赖网络）",
     "PhotosPickerItem": "PhotosUI.PhotosPickerItem（iOS 16+；externalID doc://com.apple.photosui/documentation/PhotosUI/PhotosPickerItem）——相册选中的那一项（异步加载成 Data）",
     "loadTransferable": "PhotosPickerItem.loadTransferable(type:)（iOS 16+；decl: func loadTransferable<T>(type: T.Type) async throws -> T?，T: Transferable；externalID doc://com.apple.photosui/documentation/PhotosUI/PhotosPickerItem/loadTransferable(type:)）——把选中的相册项异步读成 Data",
+    # 「展开后有多挤」的度量（Design/CardFit.swift，2026-09-25）。用户原话：
+    # 「所有卡片内需要展开的都要严格计算展开后的拥挤程度，完全根据数据来，不能猜」。
+    # 于是行高不能是写下来的常量：它必须是**当前动态字号下**那一行真实的高度；
+    # 折行数必须是量出来的（「字数 ÷ 每行字数」那种估法，用户把系统字号调大就不成立了）。
+    # 前三个当天取过 doc JSON（abstract / identifier.url / metadata.externalID /
+    # modules 四项都看过）：
+    "preferredFont": "UIFont.preferredFont(forTextStyle:)（iOS 7+；externalID c:objc(cs)UIFont(cm)preferredFontForTextStyle:；doc://com.apple.uikit/documentation/UIKit/UIFont/preferredFont(forTextStyle:)；abstract: Returns an instance of the system font for the specified text style with scaling for the user selected content size category）——行高的唯一来源：**当前动态字号下**这一档一行有多高",
+    "monospacedSystemFont": "UIFont.monospacedSystemFont(ofSize:weight:)（iOS 13+；externalID c:objc(cs)UIFont(cm)monospacedSystemFontOfSize:weight:；abstract: Returns the fixed-width font for standard interface text in the specified size）——导出预览那块等宽正文的字体（字号仍取自 caption 的真实点数，不另写一个）",
+    "boundingRect": "NSString.boundingRect(with:options:attributes:context:)（iOS 7+；doc://com.apple.foundation/documentation/Foundation/NSString/boundingRect(with:options:attributes:context:)；abstract: Calculates and returns the bounding rect for the receiver drawn using the given options and display characteristics, within the specified rectangle in the current graphics context）——折行数与不折行宽度的量法（用它，而不是「字数 ÷ 每行字数」）",
+    # 后三个是 CoreGraphics / SwiftUI 的标准名字（同一天核过存在性与平台，没有单独拉页面）：
+    "lineHeight": "UIFont.lineHeight（iOS 2+；doc://com.apple.uikit/documentation/UIKit/UIFont/lineHeight）——一行的真实高度（含行距）；系统字号一变它跟着变",
+    "CGSize": "CoreGraphics.CGSize（iOS 2+；doc://com.apple.corefoundation/documentation/corefoundation/cgsize）——量文字用的「给定宽度」与卡片视口（宽 × 高）",
+    "environment": "View.environment(_:_:)（iOS 13+；doc://com.apple.SwiftUI/documentation/SwiftUI/View/environment(_:_:)）——`ArcStack` 把**量到的**卡片视口写进环境，供 `CardFit` 做裁决（读不到就是 .zero = 不知道）",
+    "EnvironmentKey": "SwiftUI.EnvironmentKey 协议（iOS 13+；decl: protocol EnvironmentKey；doc://com.apple.SwiftUI/documentation/SwiftUI/EnvironmentKey）——卡片视口那个环境值的键（`defaultValue` 是 `.zero`，即「没量到」）",
 }
 
 

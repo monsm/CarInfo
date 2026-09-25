@@ -99,7 +99,7 @@ struct ArtThemeSpec {
     /// 纸面上不允许发光（allowsGlow = false），所以那里它是墨色而不是白色 ——
     /// 否则纸主题会出现一条发光的白条，与「纸张没有发光」自相矛盾。
     var lightSource: Color
-    /// 浅填充：输入框、未选中的底。glassLight / fillSubtle 都读它。
+    /// 浅填充：输入框、未选中的底（`TokensPalette.fillSubtle` 读它）。
     var fillSubtle: Color
     /// 浮层 / 玻璃的高光边（暗底是白光，纸面是淡墨）
     var glassHighlight: Color

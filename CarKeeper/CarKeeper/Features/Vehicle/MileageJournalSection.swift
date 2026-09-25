@@ -110,7 +110,9 @@ struct MileageJournalSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            DSSectionHeader(title: "里程记账")
+            //  这里原来有一行 `DSSectionHeader(title: "里程记账")` —— 而这张卡就叫
+            //  「里程记账」，卡头已经写了名字（用户 2026-09-25：「全局看重复内容」）。
+            //  正文直接从第一件东西（周期分段）开始。
 
             // 周期：三个互斥的口径 → 系统的分段语法
             DSSegmented(options: months.indices.map { (value: $0, title: months[$0]) },
@@ -292,7 +294,7 @@ struct CostEntryRow: View {
                 .background(TokensPalette.ambient.opacity(0.15))
                 .clipShape(Circle())
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
                 Text(entry.type.displayName)
                     .font(TokensTypo.body)
                     .foregroundStyle(TokensPalette.primary)
@@ -305,7 +307,7 @@ struct CostEntryRow: View {
 
             Spacer(minLength: TokensSpacing.sm)
 
-            VStack(alignment: .trailing, spacing: 2) {
+            VStack(alignment: .trailing, spacing: TokensSpacing.xxs) {
                 // 金额走等宽数字：一列金额的右边缘才是齐的
                 Text("-¥\(entry.amount, specifier: "%.2f")")
                     .font(TokensTypo.data)

@@ -22,11 +22,27 @@ struct HealthDataView: View {
     @State private var loading = true
     @State private var errText: String?
     @State private var expandedSystems: Set<String> = []
+    /// 被「摊开全部」的那几个分系统（分块之后要能合回去，见 `DSCardMoreRow`）
+    @State private var fullyOpen: Set<String> = []
     @State private var loadTask: Task<Void, Never>? = nil
+    /// 卡片量到的可用区域（`ArcStack` 写进来的真数；量不到时是 `.zero`）
+    @Environment(\.cardViewport) private var cardViewport
 
     var body: some View {
-        DSPaperPage {
-            DSPageTitle(title: "体检与数据")
+        //  正文只提供内容 —— 页面外壳（滚动 / 纸面底 / 页标题）不在这里，
+        //  它是 `VehicleView` 里那张叫「体检」的卡（邻居 `MileageJournalSection`
+        //  / `VehicleTipsSection` / `ExportDataSection` 同一条约定：一个页面只能
+        //  有一个所有者，而这里的所有者是那张卡）。
+        //
+        //  此前这里包着 `DSPaperPage`，于是叠进卡里的是**第二层 ScrollView +
+        //  第二层纸面底 + 自己的左右内边距**：卡 18pt + 纸 16pt = 内容距卡边
+        //  34pt，比别人窄一圈；而里外两层都可滚动时，手势塌到内层（它拿到的是
+        //  无限高，永远不会滚）—— 用户 2026-09-25：「每个卡片仔细核对，
+        //  内容展开后是否拥挤」。现在只剩卡片自己那一层。
+        //
+        //  随之失效的是 `.refreshable`（它必须挂在 ScrollView 上）：读不到时
+        //  那条「重新加载」是重试入口，它本来就在。
+        VStack(alignment: .leading, spacing: 0) {
             if loading {
                 loadingState
             } else if let model {
@@ -50,14 +66,8 @@ struct HealthDataView: View {
             // 它在 if/else **之外** —— 体检报告读不到时，原始字段往往正是排错要看的东西。
             RawDataSection(kind: .check)
         }
-        .pageBackground()
-        .scrollBounceBehavior(.basedOnSize)
-        .dsPageTitle("体检与数据")
-        .refreshable { await load() }
         .onAppear {
-            if expandedSystems.isEmpty, let m = model {
-                for sys in m.systems where sys.statusCls == "bad" { expandedSystems.insert(sys.name) }
-            }
+            autoOpenBadSystems()
             loadIfNeeded()
         }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
@@ -163,12 +173,150 @@ struct HealthDataView: View {
                 trailing: "\(m.systems.count) 项",
                 footer: m.systems.isEmpty ? "没有分系统数据" : nil) {
             ForEach(Array(m.systems.enumerated()), id: \.element.id) { idx, sys in
-                systemRow(sys, showsSeparator: idx < m.systems.count - 1)
+                systemRow(sys, model: m, showsSeparator: idx < m.systems.count - 1)
             }
         }
     }
 
-    private func systemRow(_ sys: HealthSystem, showsSeparator: Bool) -> some View {
+    // =========================================================================
+    // MARK: 展开后有多挤（CardFit）
+    // =========================================================================
+    //
+    //  用户 2026-09-25：「所有卡片内需要展开的都要严格计算展开后的拥挤程度，
+    //  完全根据数据来，不能猜」。这一节是全文最挤的地方：每个分系统展开后要把
+    //  它**全部**子项与故障码摊开，而子项有几条、每一条带不带检测值与说明，
+    //  全由这一次检测的数据决定 —— 从前那个「有问题就全开」的写法，遇到
+    //  三个各带八个子项的系统，一屏里会摊开 24 行。
+    //
+    //  ★ 下面每一个 Block 都对应 `systemRow` / `childRow` 里**真画出来的那一件**
+    //  （同一个 VStack spacing、同一个 lineLimit、同一条 3pt 光带）。这是 CardFit
+    //  唯一的约定：它量的是版式，版式改了要跟着改。
+    //
+    //  ⚠️ 容差：键值行自带上下 8pt 内边距，这里用 `TokensSpacing.md` 近似 ——
+    //  单行级别的 ±8pt 不改变裁决（裁决是按屏数分的），但「有没有这一行」必须准：
+    //  那才是数据。
+
+    /// 卡片内容的真实宽度（视口已扣除叠叠乐左右各 18，这里是卡片自己的左右 18）
+    private var fitWidth: CGFloat { max(0, cardViewport.width - 2 * StackSpec.Card.padH) }
+
+    /// 展开后要画的一格：子项，或一个故障码
+    private enum Detail: Identifiable {
+        case child(HealthItem)
+        case dtc(HealthItem)
+
+        var id: String {
+            switch self {
+            case .child(let i): return "c:" + i.id
+            case .dtc(let i):   return "d:" + i.id
+            }
+        }
+    }
+
+    private func expandedDetails(_ sys: HealthSystem) -> [Detail] {
+        sys.children.map(Detail.child) + dtcItems(sys).map(Detail.dtc)
+    }
+
+    /// 一格的**高度模型**
+    private func fitRow(_ d: Detail) -> CardFit.Row {
+        switch d {
+        case .child(let item):
+            var blocks: [CardFit.Block] = [
+                .pair(item.name, .subheadline, item.statusText, .subheadline, cap: 2)
+            ]
+            if let v = item.detect, !v.isEmpty {
+                blocks.append(.gap(TokensSpacing.md))
+                blocks.append(.pair("检测值", .footnote, v, .footnote, cap: nil))
+            }
+            if let v = item.suggest, !v.isEmpty {
+                blocks.append(.gap(TokensSpacing.md))
+                blocks.append(.pair("参考范围", .footnote, v, .footnote, cap: nil))
+            }
+            if let v = item.desc, !v.isEmpty {
+                blocks.append(.gap(TokensSpacing.sm))
+                blocks.append(.text(v, .footnote, cap: nil))
+            }
+            return CardFit.Row(blocks, padTop: TokensSpacing.sm, padBottom: TokensSpacing.sm)
+        case .dtc(let code):
+            return .keyValue(code.name, DTCDictionary.translate(code.name))
+        }
+    }
+
+    /// 画出来的一格 —— 与 `fitRow` 一一对应
+    @ViewBuilder
+    private func detailView(_ d: Detail) -> some View {
+        switch d {
+        case .child(let item):
+            childRow(item)
+        case .dtc(let code):
+            DSKeyValueRow(key: code.name,
+                          value: DTCDictionary.translate(code.name),
+                          valueCls: "warn")
+        }
+    }
+
+    /// 一个分系统**收起**时那一行的高度（对应 `systemRow` 收起时画的东西）
+    private func collapsedFitRow(_ sys: HealthSystem) -> CardFit.Row {
+        var blocks: [CardFit.Block] = [.text(sys.name, .body, cap: nil)]
+        if !sys.statusText.isEmpty {
+            blocks.append(.gap(TokensSpacing.xs))
+            blocks.append(.text(sys.statusText, .footnote, cap: nil))
+        }
+        blocks.append(.gap(TokensSpacing.xs))
+        blocks.append(.fixed(3))            // 健康度那条光带
+        return CardFit.Row(blocks, floor: TokensSpacing.row)
+    }
+
+    /// 「检测系统」这一节**固定**要占的高度：节标题 + 每个分系统收起时那一行 + 分隔线。
+    /// 展开的那几块只能在这一节剩下的地方里摊开。
+    private func systemsFixedHeight(_ m: HealthModel) -> CGFloat {
+        var h = CardFit.textHeight("检测系统", style: .footnote, width: fitWidth) + TokensSpacing.sm
+        for sys in m.systems {
+            h += CardFit.height(of: collapsedFitRow(sys), width: fitWidth) + TokensHair.line
+        }
+        return h
+    }
+
+    private func verdictFor(_ details: [Detail], model m: HealthModel) -> CardFit.Verdict {
+        CardFit.verdict(details.map(fitRow), width: fitWidth, viewport: cardViewport,
+                        reserved: systemsFixedHeight(m))
+    }
+
+    private func planFor(_ sys: HealthSystem, model m: HealthModel,
+                         details: [Detail]) -> CardFit.Plan {
+        if fullyOpen.contains(sys.name) { return .all }
+        return CardFit.plan(details.map(fitRow), width: fitWidth, viewport: cardViewport,
+                            reserved: systemsFixedHeight(m))
+    }
+
+    /// 自动展开哪几个分系统：**按算出来的高度**一个个开，开到放不下为止。
+    ///
+    /// 原来这里是「有问题的全开」。现在判据是数据加真实度量：每个系统展开后要多少
+    /// 高度（`fitRow` 逐行量出来）、这一节固定占多少（`systemsFixedHeight`）、
+    /// 卡片量到的可用高度是多少。
+    ///
+    /// 量不到视口时只开**第一个** —— 不猜（宁可少开一个，也不按一个想象的屏高全摊开）。
+    private func autoOpenBadSystems() {
+        guard expandedSystems.isEmpty, let m = model else { return }
+        let bad = m.systems.filter { $0.statusCls == "bad" }
+        guard let first = bad.first else { return }
+        guard cardViewport.height > 0, fitWidth > 0 else {
+            expandedSystems.insert(first.name)
+            return
+        }
+        let fixed = systemsFixedHeight(m)
+        var used = fixed
+        var opened = 0
+        for sys in bad {
+            let h = CardFit.height(of: expandedDetails(sys).map(fitRow), width: fitWidth)
+            if opened > 0, used + h > cardViewport.height { break }
+            expandedSystems.insert(sys.name)
+            used += h
+            opened += 1
+        }
+    }
+
+    private func systemRow(_ sys: HealthSystem, model m: HealthModel,
+                           showsSeparator: Bool) -> some View {
         let isOpen = expandedSystems.contains(sys.name)
         let tint = TokensPalette.statusColor(sys.statusCls)
         return VStack(alignment: .leading, spacing: 0) {
@@ -178,7 +326,7 @@ struct HealthDataView: View {
                         .font(TokensTypo.fixed(TokensSize.icon))
                         .foregroundStyle(tint)
                         .frame(width: TokensSize.iconColumn)
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: TokensSpacing.xs) {
                         Text(sys.name)
                             .font(TokensTypo.body)
                             .foregroundStyle(TokensPalette.primary)
@@ -191,7 +339,7 @@ struct HealthDataView: View {
                                    tint: LinearGradient(colors: [tint, tint],
                                                         startPoint: .leading, endPoint: .trailing))
                             .frame(width: 88)
-                            .padding(.top, 3)
+                            .padding(.top, TokensSpacing.xs)
                     }
                     Spacer(minLength: TokensSpacing.sm)
                     Text("\(sys.healthPct)%")
@@ -211,17 +359,29 @@ struct HealthDataView: View {
             .accessibilityHint(Text(isOpen ? "点击收起明细" : "点击展开明细"))
 
             if isOpen {
+                let details = expandedDetails(sys)
+                let plan = planFor(sys, model: m, details: details)
+                let shown = plan.keep.map { Array(details.prefix($0)) } ?? details
+                let screens = verdictFor(details, model: m).screens
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(sys.children.enumerated()), id: \.element.id) { cIdx, item in
-                        DSGroupRow(showsSeparator: cIdx < sys.children.count - 1 || !dtcItems(sys).isEmpty) {
-                            childRow(item)
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { idx, item in
+                        DSGroupRow(showsSeparator: idx < shown.count - 1
+                                   || plan.hidden > 0
+                                   || fullyOpen.contains(sys.name)) {
+                            detailView(item)
                         }
                     }
-                    ForEach(Array(dtcItems(sys).enumerated()), id: \.element.id) { dIdx, code in
-                        DSGroupRow(showsSeparator: dIdx < dtcItems(sys).count - 1) {
-                            DSKeyValueRow(key: code.name,
-                                          value: DTCDictionary.translate(code.name),
-                                          valueCls: "warn")
+                    if plan.hidden > 0 {
+                        DSGroupRow(showsSeparator: false) {
+                            DSCardMoreRow(rest: plan.hidden, screens: screens, open: false) {
+                                withAnimation(TokensMotion.count) { fullyOpen.insert(sys.name) }
+                            }
+                        }
+                    } else if fullyOpen.contains(sys.name), details.count > 1 {
+                        DSGroupRow(showsSeparator: false) {
+                            DSCardMoreRow.collapse {
+                                withAnimation(TokensMotion.count) { fullyOpen.remove(sys.name) }
+                            }
                         }
                     }
                 }
@@ -233,7 +393,7 @@ struct HealthDataView: View {
     }
 
     private func childRow(_ item: HealthItem) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                 Text(item.name)
                     .font(TokensTypo.subheadline)
@@ -294,7 +454,7 @@ struct HealthDataView: View {
                         .font(TokensTypo.fixed(TokensSize.icon))
                         .foregroundStyle(TokensPalette.ambient)
                         .frame(width: TokensSize.iconColumn)
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
                         Text("检测 ID")
                             .font(TokensTypo.body)
                             .foregroundStyle(TokensPalette.primary)

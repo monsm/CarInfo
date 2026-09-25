@@ -98,6 +98,10 @@ enum SceneID {
 // 但为避免再踩，这里不再往 @main 与 struct 之间放任何东西。
 @main
 struct CarKeeperApp: App {
+    /// 夜间模式的选择（默认「自动」= 交给艺术方向）。
+    /// 它是 `@StateObject` 而不是只读单例：拨动选择器后两个窗口都要立刻重绘
+    /// —— 这正是从前那个开关「拨了不动」的成因（见 `NightModeManager.schemeOverride`）。
+    @StateObject private var nightMode = NightModeManager.shared
     private let store = AppStore.shared
     @StateObject private var nav = NavState.shared
 
@@ -117,8 +121,14 @@ struct CarKeeperApp: App {
     var body: some Scene {
         WindowGroup {
             root
-                // 艺术主题：明暗由主题自带（`.native` = nil，跟随系统，与切换前一致）
-                .preferredColorScheme(ArtThemeStore.current.spec.preferredScheme)
+                // 明暗：**用户的夜间模式选择**压过艺术方向自带的那个值。
+                //
+                // 2026-09-25 地毯式审核：这一行原来只读 `ArtThemeStore.current.spec.preferredScheme`，
+                // 于是「我的 → 夜间模式」那个选择器拨了没有任何变化（它只改自己那一行）。
+                // 现在：选择器选「自动」时 `schemeOverride` 是 nil → 仍由艺术方向决定
+                // （这才是这个 App 的明暗观念，见 `ArtTheme.swift` 的头注）。
+                .preferredColorScheme(nightMode.schemeOverride
+                                      ?? ArtThemeStore.current.spec.preferredScheme)
                 // 令牌是静态计算值，不产生 SwiftUI 依赖 —— 靠 .id 换值重建整棵树，
                 // 否则切主题后界面不会立刻重绘（要等下一次状态变化才生效）。
                 .id(artThemeRaw)
@@ -131,7 +141,8 @@ struct CarKeeperApp: App {
         //    同一份导航状态 —— 同一条路径。即“能同时看两个窗口”，但还不是两块独立画布。
         WindowGroup(id: SceneID.detail) {
             DetailSplitView()
-                .preferredColorScheme(ArtThemeStore.current.spec.preferredScheme)
+                .preferredColorScheme(nightMode.schemeOverride
+                                      ?? ArtThemeStore.current.spec.preferredScheme)
                 .id(artThemeRaw)
         }
     }
@@ -233,9 +244,18 @@ struct CarKeeperApp: App {
                 _ = NetworkQualityMonitor.shared
                 // #N41 离线模式监听
                 _ = OfflineModeManager.shared
-                // #N15-N20 通知权限请求
-                Task { await SmartNotificationManager.shared.requestAuthorization() }
-                SmartNotificationManager.shared.registerCategories()
+                // 通知授权：**向正在发通知的那一条路要**。
+                //
+                // 2026-09-25 地毯式审核删掉了 `SmartNotificationManager`（N15–N20）：
+                // 六个通知类型各自的方法**一处调用都没有**，而它在启动时做的事是
+                // 「弹一次授权 + 注册三个分类」—— 那三个分类的动作（立即充电 /
+                // 稍后充电 / 查看脸压 / 关闭勿扰）全仓又没有 `UNUserNotificationCenterDelegate`，
+                // 点了什么也不会发生。于是它对用户的全部影响就是启动时多一个权限弹窗。
+                // 真正会发通知的三条路各自都在：`ChargingStatusMonitor`（充电开始/结束，
+                // 报文驱动）、`MaintenanceReminderScheduler`（里程保养）、
+                // `InsuranceReminderScheduler`（保险到期）—— 后两条自己申请授权，
+                // 充电那条由下面这一行申请（它读的是同一个系统权限，只会弹一次）。
+                Task { await ChargingStatusMonitor.shared.requestAuthorization() }
                 // #N14 远程锁定监听
                 RemoteLockManager.shared.startMonitoring()
                 // #N46 摇一摇锁车
@@ -255,8 +275,8 @@ struct CarKeeperApp: App {
                 // E40 充电状态监控（此前只写了 `_ = ChargingStatusMonitor.shared`，
                 // 连 startMonitoring 都没调，而那个方法本身也是空的）
                 ChargingStatusMonitor.shared.startMonitoring()
-                // N10 车牌加密初始化
-                DataEncryption.ensureKey()
+                // N10「车牌加密初始化」（`DataEncryption.ensureKey()`）已删：
+                // 它生成的那把密钥没有任何代码去读（见 AppStore 里同一处的说明）。
             }
         }
         .onOpenURL { url in
@@ -384,6 +404,10 @@ struct MapShellView: View {
             StartupJournal.shared.mark("首页外壳出现")
             await store.bootstrap()
             StartupJournal.shared.mark(store.cars.isEmpty ? "首页：车辆列表为空" : "首页：车辆就绪")
+            // 自动刷新的节律循环（一个，见 `RefreshLoop`）：地图页 2s/60s，其余档 5 分钟。
+            // 放在这里而不是各页的 `.task` —— 六页是同时建出来的，每页一个定时器就是六个循环。
+            RefreshLoop.shared.start()
+            StartupJournal.shared.mark("自动刷新已起（节律 \(Int(RefreshLoop.shared.interval))s）")
         }
         // VoiceOver：这是一个「地图 + 底部模式条」的外壳，不再是一条 Tab 栏
         .accessibilityLabel(Text("地图主屏"))
@@ -451,13 +475,16 @@ struct ToastView: View {
     let text: String
     let icon: String?
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: TokensSpacing.sm) {
             if let icon = icon { Image(safeSymbol: icon, fallback: icon) }
             Text(text)
         }
-        .padding(.horizontal, 16).padding(.vertical, 8)
-        .background(TokensPalette.glassLight.opacity(0.9), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .foregroundColor(TokensPalette.primary)
+        .padding(.horizontal, TokensSpacing.md).padding(.vertical, TokensSpacing.sm)
+        // 2026-09-25 材质审核：轻提示浮在**所有内容之上**（它是这一层的定义），
+        // 从前却是一块 90% 不透明的扁平色 —— 底下是什么完全看不见。
+        // 现在走 `dsGlass`：它飘着的时候，下面的界面真的从它后面透出来。
+        .dsGlassRounded(TokensRadius.medium, interactive: false)
+        .foregroundStyle(TokensPalette.primary)
     }
 }
 

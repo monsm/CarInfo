@@ -114,7 +114,11 @@ struct VehicleView: View {
         case .health:
             // 体检与保养是两张整表，拆不开 —— 包成一张卡。
             // 它们与「档案」的区别只是卡有多高，不是两套排版。
+            // `at:` = **这一份读数是什么时候取到的**（`check` 那一份）。
+            // 体检表本身没有时间轴，而它读的报文每 5 分钟才换一次 ——
+            // 不写出时刻，用户没法判断「这条异常是刚才的，还是上周打开 App 时留下的」。
             out.append(StackCard(id: "health", title: "体检",
+                                 at: store.cacheTime("check"),
                                  content: AnyView(HealthDataView())))
         case .service:
             out.append(StackCard(id: "service", title: "保养",
@@ -213,7 +217,7 @@ struct VehicleView: View {
                     .font(TokensTypo.subheadline)
                     .foregroundStyle(TokensPalette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
+                    .padding(.top, TokensSpacing.xxs)
             }
 
             // ② 时效读数：控车码 / 保险 / 服务

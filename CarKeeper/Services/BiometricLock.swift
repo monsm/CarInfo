@@ -23,7 +23,7 @@ struct BiometricLockOverlay: View {
                 VStack(spacing: TokensSpacing.lg) {
                     Image(systemName: "faceid")
                         .font(TokensTypo.fixed(60))
-                        .foregroundColor(TokensPalette.ambient)
+                        .foregroundStyle(TokensPalette.ambient)
                         .symbolEffect(.bounce)
 
                     Text("需要身份验证")

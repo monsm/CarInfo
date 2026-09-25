@@ -56,6 +56,8 @@ class NetworkQualityMonitor: ObservableObject {
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "network.quality.monitor")
     private var lastCheck: Date?
+    /// 延迟采样的定时器（必须存下来才能停 —— 见 `start` 里那条注）
+    private var latencyTimer: Timer?
 
     private init() {
         monitor.pathUpdateHandler = { [weak self] path in
@@ -73,11 +75,23 @@ class NetworkQualityMonitor: ObservableObject {
         }
         monitor.start(queue: queue)
 
-        // 每 30s 测一次延迟
-        Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+        // 每 30s 测一次延迟。
+        // 2026-09-25 地毯式审核：原来这个定时器的返回值同样被丢掉（与 `MemoryMonitor`
+        // 同一处错）：没人能停它，调两次就是两条 30 秒循环各自发包。现在存下来并判重。
+        guard latencyTimer == nil else { return }
+        latencyTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             self?.measureLatency()
         }
     }
+
+    /// 停掉延迟采样。
+    func stop() {
+        latencyTimer?.invalidate()
+        latencyTimer = nil
+        monitor.cancel()
+    }
+
+    deinit { latencyTimer?.invalidate() }
 
     private func measureLatency() {
         guard let url = URL(string: "https://m.iov.changan.com.cn") else { return }

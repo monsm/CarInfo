@@ -90,10 +90,22 @@ SCOPE_DIRS = [
 # 成员级声明：缩进 ≤ 4 空格，且行内有 let / var / func + 名字。
 # 为什么卡缩进：函数体里的局部量缩进 ≥ 8，把它当成「声明」会让判定立刻失真
 #（局部量被改名、成员还在，是最常见的一类假阳性）。
+#
+# 2026-09-25：修饰符表里原来只有裸词，`private(set) var image` 这种**带括号的**
+# 修饰符一个都认不出来 —— 于是把成员从 `var image` 收窄到 `private(set) var image`
+# （同一次改动里只动了可见性）会被判成「声明没了、使用还在」的编译错误。
+# 这是真漏报的反面：**假阳性**，而假阳性会让守门人学会忽略这条门。
+# 括号形式排在裸词前面只是可读性；正则回溯保证两者都能匹配。
+# 成员声明前的修饰符。拆成一个常量是为了让括号配对一个头两个大：
+# 这份名单里的 `private(set)` 自己带括号，直接摆进上面那条正则里时，
+# 人眼很难看出到底少了/多了哪一对。
+MODIFIER = (r"(?:public|internal|private|fileprivate)(?:\(set\))?"
+            r"|open|final|static|class|lazy|nonisolated|weak|unowned"
+            r"|override|mutating")
+
 MEMBER_DECL = re.compile(
     r"^ {0,4}(?:@[A-Za-z_][\w.]*(?:\([^)]*\))?\s+)*"
-    r"(?:(?:public|internal|private|fileprivate|open|final|static|class|lazy|"
-    r"nonisolated|weak|unowned|override|mutating)\s+)*"
+    r"(?:(?:" + MODIFIER + r")\s+)*"
     r"(?:let|var|func)\s+([A-Za-z_]\w*)\b",
     re.M,
 )

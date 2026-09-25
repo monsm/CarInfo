@@ -212,7 +212,7 @@ struct ScoreSection: View {
 
     private func dimRow(_ title: String, _ icon: String, _ value: Int?,
                         _ tint: Color, note: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             HStack(spacing: TokensSpacing.sm) {
                 Image(safeSymbol: icon, fallback: "gauge")
                     .font(TokensTypo.caption)
@@ -306,7 +306,7 @@ struct ScoreSection: View {
 
     // MARK: 这一页量不出来的东西（写在明面上，不装成没这回事）
     private var caveat: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             Text("为什么只有三项")
                 .font(TokensTypo.caption.weight(.semibold))
                 .foregroundStyle(TokensPalette.secondary)

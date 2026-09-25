@@ -102,10 +102,15 @@ struct DSSwipeStrip: View {
     var onExpand: ((Bool) -> Void)? = nil
 
     // ---- 几何（全部由条高推出来，见文件头）----
-    /// 条高。HIG 最小触控目标是 44，这里是 46 —— 截图量出来的比例全部以它为基准。
-    private let barHeight: CGFloat = 46
-    /// 一档的宽度（定宽，见文件头）
-    private let slot: CGFloat = 34
+    /// 条高。HIG 最小触控目标是 44；2026-09-25 从 46 抬到 **54** —— 用户「滑动区变高」，
+    /// 而这条子既是显示、也是它自己唯一的拖动面（合叠乐与底条都没有系统 `ScrollView`），
+    /// 所以「看起来更大」与「更好按」在这件控件上是同一件事。
+    /// 54 也与 iOS 26/27 那批浮动玻璃栏（工具栏 / Tab 栏）同一个量级。
+    private let barHeight: CGFloat = 54
+    /// 一档的宽度（定宽，见文件头）。2026-09-25：34 → **38**（用户：「全界面的控件大小
+    /// 都很不 iOS」）。它与条高一起决定静止条宽（三档装得下）与展开后能不能占满整行 ——
+    /// 所以这一改是把整条做大，而不只是把字放大。
+    private let slot: CGFloat = 38
     /// 标签在透镜里左右各留多少
     private var pillPad: CGFloat { barHeight * 0.37 }
     /// 相邻标签的最大间距
@@ -116,9 +121,14 @@ struct DSSwipeStrip: View {
     /// 于是透镜被封顶成 38：几乎就是字的宽度，看起来「没有玻璃」。
     /// 用户 2026-09-24：「首页 选中的玻璃体太小了，大 50%」。
     ///
-    /// 现在按**格宽**定宽（一格 ×1.75，即 2026-09-24 又放大了一档），按**条高**定高（0.94 × 条高）：
-    /// 高度不能再往上，是因为外轨只有 46 —— 透镜比轨还高就是「逞出来」而不是「更大」。
-    private var loupeWidth: CGFloat { slot * 1.75 }
+    /// 定宽走**格宽**（`slot` × **1.9**；2026-09-24 是 1.75，2026-09-25 用户又说
+    /// 「选中的宽度加大」），定高走**条高**（0.94 × 条高）—— 高度不能再往上：
+    /// 透镜比外轨还高就是「逞出来」而不是「更大」。
+    ///
+    /// 注：「选中的那一格更宽」与 HIG 那条「各段等宽」不矛盾 —— 等宽说的是**分段**
+    ///（它们仍然是同一个 `slot`，所以吸附不会飘），而透镜是**选中指示**，
+    /// 指示器比它盖住的那一段宽，正是 iOS 26/27 玻璃控件里选中态的做法。
+    private var loupeWidth: CGFloat { slot * 1.9 }
     private var loupeHeight: CGFloat { barHeight * 0.94 }
 
     @State private var c: CGFloat = 0            // 行内坐标：条正中对应到行里的位置
@@ -270,12 +280,14 @@ struct DSSwipeStrip: View {
 
     private func bar(width: CGFloat) -> some View {
         // 胶囊（不是圆角矩形）：相机那条外轨的两端是**半圆**。
-        let shape = Capsule()
-        return shape
-            .fill(TokensPalette.fillSubtle)
-            .glassEffect(.regular, in: shape)
-            .overlay { shape.strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border) }
+        //
+        // 2026-09-25 材质审核：这里原本是 `Capsule().fill(fillSubtle).glassEffect(...)` ——
+        // 玻璃底下垫了一块**不透明的扁平色**，于是折射与透光都被它挡掉，看起来是
+        // 「磨砂色块 + 一圈高光」而不是玻璃。现在底下是一块透明的占位（`Color.clear`
+        // 只为给出尺寸），材质本身就是那一层 —— 这正是 `dsGlass` 存在的理由。
+        Color.clear
             .frame(width: width, height: barHeight)
+            .dsGlass(in: Capsule())
             .allowsHitTesting(false)
     }
 
@@ -289,7 +301,7 @@ struct DSSwipeStrip: View {
         let w = min(loupeWidth, max(slot, barW - 2 * TokensSpacing.xs))
         return shape
             .fill(TokensPalette.glassHighlight)
-            .overlay { shape.strokeBorder(TokensPalette.glassBorder, lineWidth: TokensHair.border) }
+            .overlay { shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border) }
             .frame(width: w, height: loupeHeight)
             .position(x: barW / 2, y: barHeight / 2)
             .allowsHitTesting(false)

@@ -30,7 +30,12 @@ class MaintenanceReminderScheduler {
             try await center.requestAuthorization(options: [.alert, .sound, .badge])
             return true
         } catch {
-            print("Notification permission failed: \(error)")
+            // 2026-09-25 地毯式审核：这里原本是 `print(…)` —— 全仓仅有的两个 print 之一。
+            // print 只进 Xcode 控制台（且只在连调试器时），用户看不到、诊断页也看不到，
+            // 等于「请求授权失败了」这件事在任何地方都不存在。改用诊断页正在读的那本日志
+            // （`RawLogStore` 会打码、限长，并同时写一条系统日志）。
+            RawLogStore.shared.logError(method: "NOTIFY", url: "maintenance",
+                                        message: "申请通知授权失败：\(error)")
             return false
         }
     }

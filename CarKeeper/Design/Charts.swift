@@ -76,7 +76,7 @@ struct DSTrendChart: View {
         .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
                 AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                    .foregroundStyle(TokensPalette.glassBorder)
+                    .foregroundStyle(TokensPalette.hairline)
                 AxisValueLabel {
                     if let v = value.as(Double.self) {
                         Text(valueText(v))
@@ -89,7 +89,7 @@ struct DSTrendChart: View {
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 4)) { value in
                 AxisGridLine()
-                    .foregroundStyle(TokensPalette.glassBorder.opacity(0.6))
+                    .foregroundStyle(TokensPalette.hairline.opacity(0.6))
                 AxisValueLabel {
                     if let d = value.as(Date.self) {
                         Text(Self.axisTime(d))
@@ -217,7 +217,7 @@ struct DSTyreTrendChart: View {
             .chartYAxis {
                 AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                        .foregroundStyle(TokensPalette.glassBorder)
+                        .foregroundStyle(TokensPalette.hairline)
                     AxisValueLabel {
                         if let v = value.as(Double.self) {
                             Text(String(format: "%.0f", v))
@@ -230,7 +230,7 @@ struct DSTyreTrendChart: View {
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 4)) { value in
                     AxisGridLine()
-                        .foregroundStyle(TokensPalette.glassBorder.opacity(0.6))
+                        .foregroundStyle(TokensPalette.hairline.opacity(0.6))
                     AxisValueLabel {
                         if let d = value.as(Date.self) {
                             Text(d.formatted(.dateTime.month().day().hour()))

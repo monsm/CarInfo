@@ -179,7 +179,7 @@ struct LoginView: View {
     /// 一行输入 = 小标签 + 输入框（标签在上，值在下；不做内嵌填充框）
     private func fieldColumn<Content: View>(_ label: String,
                                             @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
             Text(label)
                 .font(TokensTypo.caption)
                 .foregroundStyle(TokensPalette.tertiary)
