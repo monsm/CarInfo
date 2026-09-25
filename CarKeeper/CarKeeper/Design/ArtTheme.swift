@@ -130,6 +130,73 @@ struct ArtThemeSpec {
     /// 它是**卡片左上角那一抹**与页内光晕的色，不是文字色，所以不参与对比度约定。
     var pageAccents: [Color]
 
+    // MARK: - 全字段构造（老四套 + 原生的 spec 走它）
+    ///
+    /// 为什么它必须显式写出来：结构体一旦自己声明了任何 `init`，Swift 就不再合成
+    /// 隐式的 memberwise init。下面那个「二十套主题」的便捷 init 是 `75c80ce` 加的，
+    /// 它**顺手把当时四处照旧全字段写的 spec 弄红了**（夜光/纸张/字体/原生）：
+    /// 每次调用都报 “extra arguments at positions #3, #4, #5, #7…”。
+    ///
+    /// 两套入口都是正当的，切不可为修编译而把四处调用改成便捷入口：
+    ///   · 便捷入口 = 「我只告诉你我是什么」（色值由**同一套推导规则**算出来）；
+    ///   · 全字段入口 = 「每一档我都量过」（那四处每个颜色旁边写着对比度实测值，
+    ///     换成推导就等于把量过的值换成算出来的值 —— 那是设计变更，不是修 bug）。
+    ///
+    /// 参数顺序 = 下面存储属性的声明顺序，**不能改**：调用点按标签匹配、按顺序传参。
+    init(canvas: Color,
+         surface: Color,
+         raised: Color,
+         hairline: Color,
+         track: Color,
+         label: Color,
+         labelSecondary: Color,
+         labelTertiary: Color,
+         accent: Color,
+         success: Color,
+         warning: Color,
+         error: Color,
+         info: Color,
+         onAccent: Color,
+         lightBar: [Color],
+         lightSource: Color,
+         fillSubtle: Color,
+         glassHighlight: Color,
+         scrim: Color,
+         decor: CanvasDecor,
+         allowsGlow: Bool,
+         usesSerifTitles: Bool,
+         displayWeight: Font.Weight,
+         displayTracking: CGFloat,
+         preferredScheme: ColorScheme?,
+         pageAccents: [Color]) {
+        self.canvas = canvas
+        self.surface = surface
+        self.raised = raised
+        self.hairline = hairline
+        self.track = track
+        self.label = label
+        self.labelSecondary = labelSecondary
+        self.labelTertiary = labelTertiary
+        self.accent = accent
+        self.success = success
+        self.warning = warning
+        self.error = error
+        self.info = info
+        self.onAccent = onAccent
+        self.lightBar = lightBar
+        self.lightSource = lightSource
+        self.fillSubtle = fillSubtle
+        self.glassHighlight = glassHighlight
+        self.scrim = scrim
+        self.decor = decor
+        self.allowsGlow = allowsGlow
+        self.usesSerifTitles = usesSerifTitles
+        self.displayWeight = displayWeight
+        self.displayTracking = displayTracking
+        self.preferredScheme = preferredScheme
+        self.pageAccents = pageAccents
+    }
+
     // MARK: - 便捷构造（20 套主题，2026-09-24 第八轮）
     ///
     /// 二十套主题全走这一个入口：每个主题**只给「它自己是什么」**（画布 / 表面 /

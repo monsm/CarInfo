@@ -363,6 +363,14 @@ struct HealthDataView: View {
                 let plan = planFor(sys, model: m, details: details)
                 let shown = plan.keep.map { Array(details.prefix($0)) } ?? details
                 let screens = verdictFor(details, model: m).screens
+                // 展开的明细铺在**凹进去的一层**上（卡片底 × 60%）。
+                //
+                // 为什么多一个具名局部量：`Color.opacity` 与 `ShapeStyle.opacity`
+                // 同名，而 `.background(_:)` 的参数是泛型 `S: ShapeStyle` ——
+                // 在那个上下文里两个候选都合法，2026-09-25 的 CI 报的正是
+                // “ambiguous use of 'opacity'”。把**期望类型**写成 `Color` 之后，
+                // 返回 `some ShapeStyle` 的那一支不成立，歧义消失。
+                let inset: Color = TokensPalette.nightSurface.opacity(0.6)
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(shown.enumerated()), id: \.element.id) { idx, item in
                         DSGroupRow(showsSeparator: idx < shown.count - 1
@@ -385,7 +393,7 @@ struct HealthDataView: View {
                         }
                     }
                 }
-                .background(TokensPalette.nightSurface.opacity(0.6))
+                .background(inset)
             }
 
             if showsSeparator { DSSeparator(inset: 0) }

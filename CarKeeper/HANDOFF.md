@@ -43,7 +43,7 @@
 
 - **编译只在 CI 上发生**。本地唯一能做的验证是静态门禁 + 风格检查 + `bash -n`。
 - 改完必须看 CI 日志才能知道「编不编得过」。这也是仓库里为什么会有 28 条静态门禁
-  （§8；加上 `check_style.js` 共 30 项，`scan/all.py` 一次跑齐）。
+  （§8；加上 `check_style.js` 共 31 项，`scan/all.py` 一次跑齐）。
 
 ```bash
 # 本机可跑的全部验证（在仓库根）—— 一条命令，别挑着跑
@@ -814,6 +814,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | 27 | `printguard.py` | App 与 Services 里不得出现 `print(`（例外只有设计令牌页）。它是 2026-09-25 那一轮的守门人：全仓仅有的两处 `print` 都是「提醒没发出去」——`print` 的问题不是吵，是**没有读者**（那条路径写进了「诊断」在读的日志） |
 | 28 | `glass.py` | **玻璃只有一个入口**：`.glassEffect` / `GlassEffectContainer` 只许出现在 `Design/DSGlass.swift`；玻璃底下不许垫不透明的面（同一条链里 `.fill(TokensPalette.…)` 出现在 `.dsGlass` 之前即报红）；不许再引入旧材质语言（`…Material`）。它是 2026-09-25「全局液态玻璃的质感全项目每个犄角旮旯方方面面都做到位了吗」那一轮的守门人：那一轮查出真玻璃只有 3 处，其余浮层用的都是「名字叫 glass、值等于 `fillSubtle`」的扁平令牌（该别名已删），另有两处把玻璃**垫在不透明的面底下** |
 | 29 | `extguard.py` | **extension 的三条铁律**：① 必须在文件层（不许嵌套）；② 直接成员层不许有实例存储属性（`static` 放行）；③ 跨文件不许碰别处的 `private` / `fileprivate` 成员。它是 2026-09-25 那次 CI 红的产物：`MapSpineBottomBar.swift` 一台戏犯了三条（嵌套的 `private extension Double`、`@State` 存储属性、读写四个 `private` 成员），而 29 条门禁一条都没拦住 —— 因为没有任何判据知道「extension 该长什么样」 |
+| 30 | `initguard.py` | **调用点的实参标签必须能被某个声明的 init 接下**。三条收窄（宁可漏，不可噪）：只判「init 写在类型**体内**」的类型（写在 extension 里不会抑制隐式 memberwise init，那时按参数表判会误报）、只判至少两个带标签实参的调用点（`Foo(x)` 与 `init(_:)` 从文本上分不开）、同名类型多处出现就整条跳过（裸名字对应哪一个要看调用点上下文）。它是 2026-09-25 第二批 CI 红的产物：`ArtThemeSpec` 四处「参数全对、却没有任何 init 收得下」——根因是 Swift 那条规则：结构体一旦自己声明了任何 `init`，编译器就不再合成 memberwise init。它诞生当天被自己的**两条误报**教过（嵌套类型的 init 被算到外层；`TripRecord` 同名两个），两条都写在文件头里 |
 | + | `check_style.js`（node） | 风格与括号配平 |
 | + | `all.py`（**本地**执行器） | 不判任何东西：把上面这份清单（从工作流解析，不另抄）一次跑齐。CI 不跑它 —— 跑第二遍没有信息量 |
 
@@ -883,7 +884,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 - `DESIGN-SPEC.md` 的小节标题仍用旧页面名（如「行程页 (TripAnalyticsView)」），实际类型是 `TripsEventsView`。
 - `GlobalSearchHUD` 的空态提示曾写「搜页面、车牌、行程、指令、**充电记录**。」，而充电记录随
   充电账本一起删了（代码里的注释已注明），提示却还在承诺它 —— **已改**。
-  这一类「文案承诺了一个已删除的功能」的漂移，29 条静态门禁**查不到**：`copy.py` 只管词、长度与复述句式，
+  这一类「文案承诺了一个已删除的功能」的漂移，30 条静态门禁**查不到**：`copy.py` 只管词、长度与复述句式，
   不核对「这句话说的东西还在不在」。写文档时逐屏读才会碰到。
 
 ### 9.4 未验证的部分（必须如实交接）
@@ -962,6 +963,7 @@ Tokens（静态令牌，唯一来源） → ArtTheme（20 个方向 = 一整套�
 | 09-24 | `scan/all.py` 在 Windows 上崩 | 控制台是 GBK，`print("  ✅ …")` 直接 `UnicodeEncodeError` —— 保证「本地全跑」的脚本自己先崩 | 只改 `errors` + 符号降级为 `[通过]`/`[红]`（红绿不可混同）；子进程 `PYTHONIOENCODING=utf-8` |
 | 09-24 | 真机闪退**仍然复现**，而且系统里没有日志 | 「没有日志」本身就是判据：应用层错误会留下一份 .ips 报告，什么都没有通常意味的是**系统级终止**（jetsam / 看门狗）—— 那类终止不调用 App 的任何一行代码。而它现在恰好最难看见：自建的崩溃上报已在 09-23 按用户要求删除，系统报告又只在「设置 → 隐私与安全性 → 分析与改进 → 共享 iPhone 分析」打开时才落盘 | 启动轨迹补三样：**心跳**（每秒一行，写在后台队列上，于是最后一行离死亡时刻不超过 1 秒）、**主线程卡住判据**（心跳还在写而主线程 N 秒没回话 = 卡死；心跳自己也停了 = 被处决）、**地图页各步打点**（原来的打点全落在头一两秒，而事故发生在「地图出现后几秒」，正好落在盲区里） |
 | 09-25 | **CI 连红两次：`MapSpineBottomBar.swift:71` 「declaration is only valid at file scope」** | 上一轮为了把 `MapSpineView.swift` 收回 1200 行以内，把「底条整行横拖」搬进新文件，而那个文件**一台戏犯了三个错**：① `private extension Double` 写在 `extension MapSpineView { … }` 体内（Swift 只允许文件层）；② `@State private var barDragBase` 是 extension 里的存储属性；③ 读写 `modePosition` / `barOpen` / `modeIndex` / `barRowWidth` —— 四个都是 `MapSpineView.swift` 里的 `private`（`private` 的作用域是**文件**）。而**29 条门禁全绿**：当时的判据里没有一条知道 extension 该长什么样 | 那个文件整体撤掉，手势与控制它的状态搬回同一个文件；`filteredRuns` 在 `ControlView.swift` 里去掉 `private`（它被 `ControlFit.swift` 用着 —— 同一个错的第二处）。新增第 29 条门禁 `extguard.py`（三条铁律），探针验过：判据 ①② 注入即报、撤掉转绿；判据 ③ 用真事故复现（把 `filteredRuns` 改回 `private`，当场报出 `ControlFit.swift:58/63`）。第一版探针把宿主与扩展写在同一个文件里，③ 因此不报 —— 而那是**对的**（`private` 的作用域是文件，同文件用私有成员合法）：探针不报可能是判据漏了，也可能是探针没造成那个形状，两者必须先分清。教训写进那条门禁的文件头：**「拆文件」不是免费的 —— 它会把「同一个作用域」拆成两个** |
+| 09-25 | **CI 第二批红：一次 26 条、六种形状** | 上一次把语法层那三个错修掉之后，编译器**第一次走过语法层**，于是一口气把「很久没编译过」的账摊开：① `ArtTheme.swift` 四处 `extra arguments at positions #3, #4, #5, #7…`——根因是 Swift 的规则：**结构体一旦自己声明了任何 `init`，就不再合成隐式的 memberwise init**，而 `75c80ce` 给 `ArtThemeSpec` 加的便捷 init 正好把那四处全字段写法弄红（标签与值一个都没错）；② `DSGlass` 的 `S: Shape` 接不住 `strokeBorder`（它只在 `InsettableShape` 上）；③ `HealthDataView` 的 `ambiguous use of 'opacity'`（`Color.opacity` 与 `ShapeStyle.opacity` 同名，而 `.background(_:)` 的参数是泛型 `S: ShapeStyle`）；④ `MapSpineView` 的 `Self.barSeam`——**它从未在任何提交里被声明过**（注释与两个使用点是同一笔写进来的，只有声明那一行没进文件）；⑤ `MapStyleSpec` 十六处裸写静态成员 `mutedSpec`（实例上下文里用静态成员不合法）；⑥ `MessagesSection` 的 `ambiguous use of 'accessibilityHint'`（推断问题，不是语义问题） | `ArtTheme` 那四处调用点**不动**，改为把全字段 init 显式写回来（26 个参数、顺序 = 存储属性声明顺序）——那四套主题每个颜色旁都写着对比度实测值，改用便捷入口＝「把量过的值换成算出来的值」，是设计变更；`dsGlass` 的约束收窄到 `InsettableShape`（三个便捷入口与全部调用点都满足，不损失调用点）；`opacity` 用具名 `let inset: Color` 钉住**期望类型**；`barSeam` 补回声明（那段注释早就写明了这个 9）；`mutedSpec` 十六处改 `Self.mutedSpec`；消息行的按钮拆成 `rowButton(_:isOpen:)`（行为一字未变，无障碍那两句仍挂在同一个 Button 上）。门禁侧补了两个洞：`scan.py` 的「未知成员」判据现在认 `Self.`——此前**所有 `Self.` 引用都在盲区**（`MEMBER_REF` 把 `Self` 当成类型名，判据遇到不在类型表里的名字直接跳过），`barSeam` 就是这么溜过去的；新增第 30 条 `initguard.py`（调用点实参 vs 声明的 init），双向探针验过：**删掉全字段 init 就恰好报出那四处**、补回即绿，当前树 0 处。`initguard` 诞生当天被自己的两条误报教过 —— 嵌套类型的 init 被算到外层、同名类型（`AppStore.TripRecord` 与 `Models/AppDataModel.swift` 的 `TripRecord`）—— 两条都写进了文件头；另有一处是共用件的洞：`extguard.mask` 处理行注释时留下开头那根 `/`，把 4 个最大调用点的标签抽取全弄脏了 |
 | 09-24 | 冷启动把同一件事问了三遍 | 根视图 `onAppear` 里两处 + 地图外壳 `.task` 各自调 `bootstrap()` —— 并发三份 `getCars` + `getUser`，并三次 `cancel` / 重启预加载（每次预加载都是 6 个请求）。冷启动头几秒本来就在抢 CPU 与网络 | `bootstrap()` 合并**同时**在飞的那几趟；串行重复调用（重新登录 / 下拉刷新）照旧各取一次；`logout()` 丢掉句柄，新账号必须另起一趟 |
 
 ---

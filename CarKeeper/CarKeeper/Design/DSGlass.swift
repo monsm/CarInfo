@@ -63,10 +63,16 @@ extension View {
     ///   - interactive: 这个表面可点就传 `true` —— 按下去的压缩与折射交给系统演，
     ///     别自己写 `.scaleEffect`（那只会让玻璃「硬」下去）。
     ///   - hairline: 要不要那圈发丝线。玻璃自己已经有边缘，多层叠在一起时少一圈更好。
-    func dsGlass<S: Shape>(in shape: S,
-                           variant: DSGlassVariant = .regular,
-                           interactive: Bool = false,
-                           hairline: Bool = true) -> some View {
+    /// - Note: 形状约束是 `InsettableShape`（可内缩），不是任意 `Shape`。
+    ///   那圈发丝线走的是 `strokeBorder`（线画在**里面**，玻璃才有厚度感），
+    ///   而 `strokeBorder` 只在 `InsettableShape` 上。2026-09-25 的 CI 就是这条：
+    ///   `value of type 'S' has no member 'strokeBorder'` —— 约束写宽了，
+    ///   编译器要等到用法处才发现。三个便捷入口传的都是可内缩的形状，
+    ///   所以把约束收窄**不损失任何调用点**（将来要传自定义形状，它会自己告诉你）。
+    func dsGlass<S: InsettableShape>(in shape: S,
+                                     variant: DSGlassVariant = .regular,
+                                     interactive: Bool = false,
+                                     hairline: Bool = true) -> some View {
         let base: Glass = variant == .overMedia ? .clear : .regular
         // 写成 `interactive(true)` 而不是 `interactive()`：文档里那个默认值
         // （`_ isEnabled: Bool = true`）在 fragments 里看不到，写死实参就与它无关了。

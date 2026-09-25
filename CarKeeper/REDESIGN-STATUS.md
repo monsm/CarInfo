@@ -3011,3 +3011,65 @@ MapSpineBottomBar.swift:71:13: error: declaration is only valid at file scope
 
 **验证状态**：本地 **30/30 门禁 + 风格检查 0 问题**全绿；**编译仍然只有 CI 能回答**，
 但这一次的错误类型（三条例外全是静态可判的结构错）已经被门禁接管了。
+
+## CI 第二批红：六类编译错一次看清（2026-09-25，第 30 条门禁）
+
+上一次修完 extension 三条铁律之后，CI **第一次走过了语法层** —— 于是编译器拿回了话语权，
+一口气报出 26 条错误、六种形状。这是「这个 App 很久没有编译过」的直接账：
+静态门禁能替代编译器的部分早就用尽了，剩下的全是类型系统的事。
+
+| 处数 | 错 | 根因 | 修法 |
+|---|---|---|---|
+| 4 | `ArtTheme.swift:340/374/410/531` —— `extra arguments at positions #3, #4, #5, #7, …` | **一条 Swift 规则**：结构体一旦自己声明了任何 `init`，编译器就不再合成隐式的 memberwise init。`75c80ce` 给 `ArtThemeSpec` 加了「二十套主题」的便捷 init（11 个参数），而那四处照旧按**全字段成员列表**（26 项）写 —— 每个标签、每个值都没错，却全部接不下 | 把**全字段 init 显式写回来**（26 个参数，顺序 = 存储属性声明顺序）。刻意**没有**改那四处去用便捷入口：夜光/纸张/字体/原生这四套主题，每个颜色旁都写着对比度**实测值**，改用推导规则等于「把量过的值换成算出来的值」—— 那是设计变更，不是修编译 |
+| 1 | `DSGlass.swift:77` —— `value of type 'S' has no member 'strokeBorder'` | 泛型约束写成了 `S: Shape`，而那圈发丝线用的是 `strokeBorder`（线画在**里面**，玻璃才有厚度感）—— 它只在 `InsettableShape` 上。约束写宽了，编译器要等到用法处才发现 | 约束收窄到 `InsettableShape`。三个便捷入口（胶囊 / 圆 / 圆角矩形）与全部六个调用点都满足 —— **不损失任何调用点**，而将来传自定义形状会自己报错 |
+| 1 | `HealthDataView.swift:388` —— `ambiguous use of 'opacity'` | `Color.opacity` 与 `ShapeStyle.opacity` 同名，而 `.background(_:)` 的参数是泛型 `S: ShapeStyle` —— 在那个上下文里两个候选都合法 | 把**期望类型**写成 `Color`（一个具名局部量 `let inset: Color = …`）：返回 `some ShapeStyle` 的那一支就不成立，歧义消失 |
+| 2 | `MapSpineView.swift:489/516` —— `type 'MapSpineView' has no member 'barSeam'` | 那个 `9` **从未在任何提交里被声明过**：整段注释、两个使用点（`HStack(spacing:)` 与 `dsGlassLayer`）都是同一笔写进来的，只有声明那一行没进文件 | 补回 `private static let barSeam: CGFloat = 9` —— 注释早就写明了这个 9 的来历（「中缝既是视觉上的『它们是一组』，也是系统判定『多近才算挨着』的距离」） |
+| 16 | `MapStyleSpec.swift:123…183` —— `static member 'mutedSpec' cannot be used on instance of type 'ArtTheme'` | `mutedSpec` 是 **static**，而用它的 `spec` 是**实例**属性；实例上下文里裸写静态成员不合法 | 十六处全改 `Self.mutedSpec`，并在声明处写清「同一个名字在同一个类型里有两种身份时，写 `Self.` 就是在说清用的是哪一种」 |
+| 1 | `MessagesSection.swift:348` —— `ambiguous use of 'accessibilityHint'` | 同一个方法在 `View` 与 `ModifiedContent` 上各有一份；那条链同时要负责定下 `DSGroupRow{…}` 的泛型 `Content` 与函数的 `some View` —— 是**推断**问题，不是语义问题 | 把行的按钮拆成自己的函数 `rowButton(_:isOpen:)`。行为一字未变（无障碍那两句仍挂在同一个 Button 上），只是每一步的期望类型都明确了 |
+
+### 两条判据被这一次逼出来 —— 都不是「再加一条规则」，是补两个洞
+
+**① `scan.py` 的「项目类型的未知成员」看不见 `Self.`**（`barSeam` 溜过去的原因）
+
+`MEMBER_REF` 把 `Self.barSeam` 认成「类型 `Self` 的成员 `barSeam`」，而判据遇上不在类型表里的
+名字直接 `continue` —— 于是**所有 `Self.` 引用都在盲区里**。现在 `Self.x` 会归到「本文件里
+最内层的那个类型」上，走同一条判据。
+
+**探针（双向）**：把 `barSeam` 的声明临时删掉 → 当场报出 `MapSpineView.barSeam`、退出码 1；
+补回来 → 绿。昨天它什么都没说，现在能抓住。
+
+**② 新门禁 `initguard.py`（第 30 条）：调用点的实参标签必须能被某个声明的 init 接下**
+
+`ArtThemeSpec` 那四处是这个类的典型形态：「参数全对，却没有任何一个 init 收得下」。
+它静态可判，且不依赖类型推导。三条收窄（宁可漏，不可噪）写在文件头：
+只判「init 写在类型**体内**」的类型（写在 extension 里**不会**抑制 memberwise init，
+那时按参数表判会误报）；只判至少两个带标签实参的调用点（`Foo(x)` 与 `init(_:)` 分不开）；
+同名类型出现多处就整条跳过。
+
+**它在诞生当天被自己的两条误报教了一次**（都记进了文件头）：
+
+· `DSSwipeStrip(items:selectedID:follow:)` —— 嵌套的 `struct Item { init(id:title:) }`
+  被算成了外层的 init，而 `DSSwipeStrip` 自己**没有** init（用的是隐式 memberwise）。
+· `AppStore.swift:332` 的 `TripRecord(…)` —— `TripRecord` 有**两个**：`AppStore` 里嵌套的一个、
+  `Models/AppDataModel.swift` 里顶层的一个。按裸名字把两边的 init 合起来，就会把一个合法调用
+  判成接不下。同一条教训的正面写法：**「裸名字对应哪一个」要看调用点上下文，文本层面不猜。**
+
+还有一处是**共用件的洞**：`extguard.mask` 处理行注释时只清后续字符、留下开头那根 `/`，
+于是 `initguard` 认不出紧跟注释之后的 `labelTertiary:`（4 个最大的调用点全被跳过、看起来
+「没问题」）。已在 mask 里清掉，并写明：它不干扰 `extguard` 自己，但会弄脏**任何按表达式切分
+的下游判据**。
+
+**探针（双向）**：当前树 0 处；删掉全字段 init（= 重演 CI 那一幕）→ **恰好报出那四处**
+（353 / 387 / 423 / 544，行号随补齐的注释位移），诊断与编译器同一句；注入假标签 → 也报。
+
+**顺带**：`InsettableShape` 按本仓惯例登记进 `scan.py` 的 `VERIFIED_SDK_ADDITIONS`
+（登记前核过 Apple 文档 JSON：`s:7SwiftUI15InsettableShapeP`、iOS 13.0+、
+abstract「A shape type that is able to inset itself to produce another shape.」）。
+
+**验证状态**：本地 **31/31 门禁 + 风格检查 0 问题**全绿。六类里四类的**形状**是静态可判的，
+已经落成判据；另两处（`opacity` 与 `accessibilityHint` 的歧义）是类型推导的事，静态门禁够不着 ——
+那两处的修法只有 CI 能回答对错。
+
+**这一批说明的事**：CI 的第一次红停在第一行，所以「修完那一条」从来不等于「能编译」。
+真正把边界推出去的办法是让 CI 尽量走到下一步 —— 而它每走一步，都在把「静态门禁替代编译器」
+这层代理的天花板往上顶一寸。

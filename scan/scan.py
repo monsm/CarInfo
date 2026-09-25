@@ -68,6 +68,12 @@ MEMBER_REF = re.compile(r"(?<![A-Za-z0-9_.])([A-Z][A-Za-z0-9_]*)\.([a-z_][A-Za-z
 # 无人引用（当时 grep 只看 `GlassCard(` 这类写法），编译器不这么想。
 # 分析基线时用同一个正则，所以常用容器名会经 bref 进入白名单，不会新增假阳性。
 TRAILING_CLOSURE_REF = re.compile(r"(?m)^[ \t]*([A-Z][A-Za-z0-9_]*)[ \t]*\{")
+# `Self.x`：`MEMBER_REF` 会把 `Self` 当成一个类型名（它确实长得像类型），而下面「项目类型的
+# 未知成员」那条判据遇上不在类型表里的名字就 `continue` —— 于是**所有 `Self.` 引用都在盲区里**。
+# 2026-09-25 的 CI 就是这么红的：`MapSpineView` 里两处 `Self.barSeam`，而声明那一行在同一次
+# 编辑里丢了（注释还在、值不在），四个检查器全绿。
+# 这里把 `Self.x` 归到「本文件里最内层的那个类型声明」上，于是它与 `Type.x` 走同一条判据。
+SELF_MEMBER_REF = re.compile(r"(?<![A-Za-z0-9_.])Self\.([a-z_][A-Za-z0-9_]*)")
 
 
 def read(p):
@@ -303,6 +309,31 @@ def collect(text, cleaned):
     return types, members, funcs
 
 
+def decl_spans(masked):
+    """本文件里所有类型 / extension 声明的 (名字, 体起点, 体终点)。
+
+    只给 `Self.x` 找家用：`Self` 的含义是「当前这个类型」，而那是**位置**决定的。
+    用 `masked` 而不是原文：注释里的 `struct Foo {` 不该算一个候选。
+    """
+    out = []
+    for rx, gi in ((DECL, 2), (EXT, 1)):
+        for m in rx.finditer(masked):
+            brace = masked.find("{", m.end() - 1)
+            if brace < 0:
+                continue
+            out.append((m.group(gi).split(".")[-1], brace, brace + len(body_of(masked, brace))))
+    return out
+
+
+def enclosing_decl(spans, pos):
+    """pos 落在哪个类型的体内（多个命中时取**最内层**的那个）。"""
+    best, name = -1, None
+    for n, s, e in spans:
+        if s < pos < e and s > best:
+            best, name = s, n
+    return name
+
+
 def analyze(paths):
     types, members, funcs = set(), {}, set()
     refs, calls, methods, memrefs = set(), {}, {}, {}
@@ -339,6 +370,12 @@ def analyze(paths):
             methods[m2.group(1)] = methods.get(m2.group(1), 0) + 1
         for m2 in MEMBER_REF.finditer(cleaned):
             memrefs.setdefault(m2.group(1), set()).add(m2.group(2))
+        # `Self.x` → `<本文件里最内层的类型>.x`（理由见 SELF_MEMBER_REF 上面那段）
+        spans = decl_spans(cleaned)
+        for m2 in SELF_MEMBER_REF.finditer(cleaned):
+            owner = enclosing_decl(spans, m2.start())
+            if owner:
+                memrefs.setdefault(owner, set()).add(m2.group(1))
     return types, members, funcs, refs, calls, methods, memrefs, problems
 
 
@@ -421,6 +458,9 @@ VERIFIED_SDK_ADDITIONS = {
     "MKStandardMapConfiguration": "MapKit class（iOS 16+；init(elevationStyle:emphasisStyle:) 已核；EmphasisStyle.muted 已核）",
     "squareRoot": "FloatingPoint.squareRoot()（Swift 标准库；评分页算电耗的离散程度用；已核 swift/floatingpoint/squareroot() 文档 JSON，externalID s:SF10squareRootxyF）",
     "Shape": "SwiftUI.Shape protocol（iOS 13+；本项目用它画车钉的三角形警告形状）",
+    "InsettableShape": "SwiftUI.InsettableShape protocol（iOS 13+；externalID s:7SwiftUI15InsettableShapeP；"
+                       "abstract「A shape type that is able to inset itself to produce another shape.」）"
+                       "—— `dsGlass` 的形状约束：那圈发丝线用的是 strokeBorder，它只在这个协议上（2026-09-25）",
     # Liquid Glass（iOS 26+）。三个名字在写进 `Design/DSGlass.swift` 之前逐个核过
     # Apple 文档 JSON（abstract / identifier.url / metadata.externalID / platforms）：
     #   · Glass                  s:7SwiftUI5GlassV        「A structure that defines the

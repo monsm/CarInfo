@@ -254,99 +254,111 @@ struct MessagesSection: View {
     private func messageRow(_ item: MessageItem, showsSeparator: Bool) -> some View {
         let isOpen = expanded.contains(item.id)
         return DSGroupRow(showsSeparator: showsSeparator) {
-            Button { toggle(item) } label: {
-                HStack(alignment: .top, spacing: TokensSpacing.sm) {
-                    Circle()
-                        .fill(item.read ? Color.clear : TokensPalette.ambient)
-                        .frame(width: 8, height: 8)
-                        .padding(.top, TokensSpacing.sm)
-                        .accessibilityHidden(true)
+            rowButton(item, isOpen: isOpen)
+        }
+    }
 
-                    VStack(alignment: .leading, spacing: TokensSpacing.xs) {
-                        HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-                            Text(item.title)
-                                // 未读靠**字重**而不是颜色（颜色已经全给了语义状态）
-                                .font(TokensTypo.body.weight(item.read ? .regular : .semibold))
-                                .foregroundStyle(TokensPalette.primary)
-                                .lineLimit(2)
-                            if !item.tag.isEmpty {
-                                Text(item.tag)
-                            .font(TokensTypo.caption2.weight(.semibold))
-                            .foregroundStyle(TokensPalette.statusColor(item.tagCls))
-                            }
-                            Spacer(minLength: TokensSpacing.sm)
-                            Text(shortTime(item.time))
-                            .font(TokensTypo.footnote)
+    /// 行的按钮本体（含无障碍那两句）。
+    ///
+    /// 为什么它独立成一个函数：2026-09-25 的 CI 在 `.accessibilityHint` 上报
+    /// “ambiguous use of 'accessibilityHint'” —— 同一个方法同时声明在 `View` 与
+    /// `ModifiedContent` 上；而当**一条链同时要负责定下 `DSGroupRow{…}` 的泛型
+    /// `Content` 与函数的 `some View`** 时，两个候选都合法（是推断问题，不是语义）。
+    /// 拆开之后每一步的期望类型都明确。行为一字未变 —— 无障碍那两句仍然挂在
+    /// 同一个 Button 上，只是它现在有个具名的落点。
+    private func rowButton(_ item: MessageItem, isOpen: Bool) -> some View {
+        Button { toggle(item) } label: {
+            HStack(alignment: .top, spacing: TokensSpacing.sm) {
+                Circle()
+                    .fill(item.read ? Color.clear : TokensPalette.ambient)
+                    .frame(width: 8, height: 8)
+                    .padding(.top, TokensSpacing.sm)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: TokensSpacing.xs) {
+                    HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
+                        Text(item.title)
+                            // 未读靠**字重**而不是颜色（颜色已经全给了语义状态）
+                            .font(TokensTypo.body.weight(item.read ? .regular : .semibold))
+                            .foregroundStyle(TokensPalette.primary)
+                            .lineLimit(2)
+                        if !item.tag.isEmpty {
+                            Text(item.tag)
+                        .font(TokensTypo.caption2.weight(.semibold))
+                        .foregroundStyle(TokensPalette.statusColor(item.tagCls))
+                        }
+                        Spacer(minLength: TokensSpacing.sm)
+                        Text(shortTime(item.time))
+                        .font(TokensTypo.footnote)
+                        .foregroundStyle(TokensPalette.secondary)
+                        Image(safeSymbol: isOpen ? "chevron.up" : "chevron.down",
+                                fallback: isOpen ? "chevron.up" : "chevron.down")
+                            .font(TokensTypo.fixed(11, weight: .semibold))
+                            .foregroundStyle(TokensPalette.tertiary)
+                    }
+
+                    if !item.body.isEmpty {
+                        // 展开后放几行**是算出来的**：正文在这个宽度下真占几行、
+                        // 这一条除了正文还要占多少（标题行 + 明细行）、
+                        // 卡片量到的可用高度是多少 —— 三者相减得行数。
+                        // 见 `bodyPlan`：这不是「大概放得下」那种判断。
+                        let bp = bodyPlan(item, open: isOpen)
+                        Text(bp.text)
+                            .font(TokensTypo.subheadline)
                             .foregroundStyle(TokensPalette.secondary)
-                            Image(safeSymbol: isOpen ? "chevron.up" : "chevron.down",
-                                    fallback: isOpen ? "chevron.up" : "chevron.down")
-                                .font(TokensTypo.fixed(11, weight: .semibold))
-                                .foregroundStyle(TokensPalette.tertiary)
-                        }
-
-                        if !item.body.isEmpty {
-                            // 展开后放几行**是算出来的**：正文在这个宽度下真占几行、
-                            // 这一条除了正文还要占多少（标题行 + 明细行）、
-                            // 卡片量到的可用高度是多少 —— 三者相减得行数。
-                            // 见 `bodyPlan`：这不是「大概放得下」那种判断。
-                            let bp = bodyPlan(item, open: isOpen)
-                            Text(bp.text)
-                                .font(TokensTypo.subheadline)
-                                .foregroundStyle(TokensPalette.secondary)
-                                .lineLimit(bp.lineLimit)
-                                .fixedSize(horizontal: false, vertical: true)
-                            if bp.restLines > 0 {
-                                DSCardMoreRow(rest: bp.restLines, unit: "行",
-                                              screens: bp.screens, open: false) {
-                                    withAnimation(TokensMotion.count) { fullBodies.insert(item.id) }
-                                }
-                            } else if isOpen, bp.truncatable, fullBodies.contains(item.id) {
-                                DSCardMoreRow.collapse {
-                                    withAnimation(TokensMotion.count) { fullBodies.remove(item.id) }
-                                }
+                            .lineLimit(bp.lineLimit)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if bp.restLines > 0 {
+                            DSCardMoreRow(rest: bp.restLines, unit: "行",
+                                          screens: bp.screens, open: false) {
+                                withAnimation(TokensMotion.count) { fullBodies.insert(item.id) }
                             }
-                        }
-
-                        if isOpen {
-                            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-                                if !item.plate.isEmpty { detailRow("car.fill", "车辆", item.plate) }
-                                if !item.location.isEmpty { detailRow("mappin.and.ellipse", "位置", item.location) }
-                                if !item.time.isEmpty { detailRow("clock", "时间", item.time) }
-                                if !item.read { detailRow("envelope.open", "状态", "已标记为已读") }
-                                // 事件自带坐标时才给这个入口：点一下把地图镜头移过去。
-                                // 这里只给「地点」，不给「路径」—— 车端不上传轨迹。
-                                if let c = item.coordinate {
-                                    Button {
-                                        store.mapFocus = AppStore.MapFocus(lat: c.lat, lng: c.lng,
-                                                                           label: item.title)
-                                        // 读单例而不是环境对象：这一节不是页面，
-                                        // 不保证环境里有 NavState（`MapSpineView` 同此约定）。
-                                        NavState.shared.popToRoot()
-                                        TokensHaptic.select()
-                                    } label: {
-                                        HStack(spacing: TokensSpacing.sm) {
-                                            Image(safeSymbol: "map", fallback: "location")
-                                                .font(TokensTypo.fixed(12))
-                                            Text("在图上看看")
-                                                .font(TokensTypo.caption.weight(.semibold))
-                                        }
-                                        .foregroundStyle(TokensPalette.ambient)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .padding(.top, TokensSpacing.xxs)
-                                }
+                        } else if isOpen, bp.truncatable, fullBodies.contains(item.id) {
+                            DSCardMoreRow.collapse {
+                                withAnimation(TokensMotion.count) { fullBodies.remove(item.id) }
                             }
-                            .padding(.top, TokensSpacing.xs)
                         }
                     }
+
+                    if isOpen {
+                        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+                            if !item.plate.isEmpty { detailRow("car.fill", "车辆", item.plate) }
+                            if !item.location.isEmpty { detailRow("mappin.and.ellipse", "位置", item.location) }
+                            if !item.time.isEmpty { detailRow("clock", "时间", item.time) }
+                            if !item.read { detailRow("envelope.open", "状态", "已标记为已读") }
+                            // 事件自带坐标时才给这个入口：点一下把地图镜头移过去。
+                            // 这里只给「地点」，不给「路径」—— 车端不上传轨迹。
+                            if let c = item.coordinate {
+                                Button {
+                                    store.mapFocus = AppStore.MapFocus(lat: c.lat, lng: c.lng,
+                                                                       label: item.title)
+                                    // 读单例而不是环境对象：这一节不是页面，
+                                    // 不保证环境里有 NavState（`MapSpineView` 同此约定）。
+                                    NavState.shared.popToRoot()
+                                    TokensHaptic.select()
+                                } label: {
+                                    HStack(spacing: TokensSpacing.sm) {
+                                        Image(safeSymbol: "map", fallback: "location")
+                                            .font(TokensTypo.fixed(12))
+                                        Text("在图上看看")
+                                            .font(TokensTypo.caption.weight(.semibold))
+                                    }
+                                    .foregroundStyle(TokensPalette.ambient)
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.top, TokensSpacing.xxs)
+                            }
+                        }
+                        .padding(.top, TokensSpacing.xs)
+                    }
                 }
-                .padding(.vertical, TokensSpacing.md)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(DSRowButtonStyle())
-            .accessibilityLabel(Text("\(item.read ? "已读" : "未读")，\(item.title)"))
-            .accessibilityHint(Text(isOpen ? "双击收起详情" : "双击展开详情并标记已读"))
+            .padding(.vertical, TokensSpacing.md)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(DSRowButtonStyle())
+        .accessibilityLabel(Text("\(item.read ? "已读" : "未读")，\(item.title)"))
+        .accessibilityHint(Text(isOpen ? "双击收起详情" : "双击展开详情并标记已读"))
     }
 
     // =========================================================================

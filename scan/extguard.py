@@ -115,6 +115,11 @@ def mask(text):
         nxt = text[i + 1] if i + 1 < n else ""
         if st == CODE:
             if c == "/" and nxt == "/":
+                # ⚠️ 第一根斜杠也要清掉。原来只清后续字符，于是每一行注释开头都留下一个
+                # `/`：它不干扰本文件那几条判据（它们不匹配 `/`），但它会把**任何按
+                # 实参/表达式切分的下游判据**弄脏 —— `initguard.py` 就是因为一个注释行
+                # 开头的 `/` 而认不出紧跟其后的 `labelTertiary:`（那是它的第一次误判）。
+                out[i] = " "
                 st = LINE
             elif c == "/" and nxt == "*":
                 st = BLOCK
