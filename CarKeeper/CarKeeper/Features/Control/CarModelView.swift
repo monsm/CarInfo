@@ -96,11 +96,18 @@ final class CarRig {
     /// 只有实体），所以这张表是「点中了哪一处」的唯一翻译处。
     private var parts: [String: CarPart] = [:]
     /// 门的实体（按 CarPart 的四个 case 索引），状态色改的就是它们。
-    private var doors: [Entity] = []
+    ///
+    /// ⚠️ 类型必须是 **`ModelEntity`**，不能是 `Entity` —— 改状态色走的是
+    /// `HasModel.model`（`var model: ModelComponent?`，Apple 文档
+    /// `s:17RealityFoundation8HasModelPAAE5modelAA0D9ComponentVSgvp`），而 `Entity` **不**符合它。
+    /// 第一版这三处写的是 `Entity`，CI 当场报 `value of type 'Entity' has no member 'model'`
+    /// （三次，全在这一个文件里）—— 这正是本机没有编译器时最该选的类型：
+    /// 它们本来就是 `ModelEntity(...)` 造出来的，写宽了不但丢能力，还要等到 CI 才发现。
+    private var doors: [ModelEntity] = []
     /// 后备箱（不可点，只着色）
-    private var trunk: Entity?
-    /// 前灯（可点，也着色）
-    private var headLights: [Entity] = []
+    private var trunk: ModelEntity?
+    /// 前灯（可点，也着色）—— 目前只着色，没有单独的点选逻辑
+    private var headLights: [ModelEntity] = []
 
     private var built = false
 
