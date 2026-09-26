@@ -279,13 +279,16 @@ struct MapSpineView: View {
     /// 验证与温度都在门里，本页只负责把请求交出去（与车控档同一个 modifier）。
     @State private var quickRequest: ControlRequest?
     /// 这一行能分到多宽（由 `bottomBar` 的背景量出；0 = 还没量到）。
-    ///
-    /// 它是**条子几何的唯一来源**：`DSSwipeStrip` 自己量不到这个数 ——
-    /// 它量到的是「两侧圆钮分剩的那一份」（390 的屏上只有 256）。
     @State private var containerWidth: CGFloat = 0
-    /// 条子的可用宽度 = 整行宽度 − 两侧留白（兜底 374 = 390 屏宽 − 16）
+    /// 整行宽度 = 屏幕宽 − 两侧各 8 的留白（兜底 374 = 390 屏宽 − 16）。
+    /// ⚠️ 它不是条子拿到的宽度（条子拿到的是 `stripLaneWidth`）。
     private var barRowWidth: CGFloat {
         containerWidth > 0 ? max(160, containerWidth - 2 * Self.barPad) : 374
+    }
+    /// 两枚圆钮之间那一段 —— 条子**能动用**的全部宽度（`DSSwipeStrip` 的几何输入）。
+    /// 「只露三档」是**两枚钮在这一行**的后果（相机同款），不是另一个审美选择。
+    private var stripLaneWidth: CGFloat {
+        max(120, barRowWidth - 2 * Self.armSize - 2 * Self.barSeam)
     }
 
     var body: some View {
@@ -550,65 +553,53 @@ struct MapSpineView: View {
     /// 为什么两臂必须在这里：原型那条子**不是**孤零零一根——两边各有一枚玻璃圆钮，
     /// 左边是车、右边是动作。它让「模式条」看起来是相机的那排控件，而不是一根付出代价的浮条。
     private var bottomBar: some View {
-        //  **两行**（用户 2026-09-26：「重新仔细研究相机 app 的逻辑，来重构我们的底部导航」）：
-        //  ① 上面一行 = 两枚圆钮（左 = 车辆那一档的入口，右 = 快捷车控）；
-        //  ② 下面一行 = 模式条，**全宽横带**，选中那一档套一枚玻璃胶囊。
-        //  圆钮为什么要让出这一行：它们此前各占 58pt、与条子同一行，于是条子只剩 256pt
-        //  ——「静止只露三档」的真正原因就是它（**条宽不够，不是屏幕不够宽**）。
-        VStack(spacing: Self.barSeam) {
-            HStack(spacing: 0) {
-                //  左臂原来是**车牌的前两个字**（「鄂A」）。2026-09-25 改成车的图形
-                //（用户：「车牌名删除」）—— 它本来就是用“回到车辆那一档”这一个动作，
-                //  而车牌的两个字既认不出来是按钮、又只在一半车上有意义（未绑定车牌时写的是“车”）。
-                //  同一个动作、换个能认出来的图标；右臂那个搜索图标也是同一种做法。
-                //  它是**唯一不在条子上的那一档**的入口（用户 2026-09-25：「底部导航删除车辆，
-                //  因为左下角已有入口」）。删掉那条链之后留下一个问题：从这枚钮进来时，
-                //  条子上该显示什么？答案是**不选中任何一档**（`DSSwipeStrip` 的 `index` 此时是
-                //  `nil`：透镜淡出、五个字都不高亮）—— 因为「此刻在哪」这个事实现在归这枚钮说，
-                //  它的图形因此换成强调色（`current:`）。屏幕上不出现一个在说谎的条子。
-                //  2026-09-26：它与右臂一起移到条子**上面那一行**（见 `bottomBar` 开头）。
-                arm(icon: "car.fill", current: homeMode == .vehicle) { nav.openMode(.vehicle) }
-                    .accessibilityLabel(Text(homeMode == .vehicle ? "车辆（当前所在）" : "车辆"))
-                Spacer(minLength: Self.barSeam)
-                quickArm
-            }
-
-            //  模式条：这一行**只有它一个孩子**，拿到的就是整行宽度（`barRowWidth`）——
-            //  于是横带与相机那条一样是贴满的（「条宽」不再是变量，见 `DSSwipeStrip.barWidth`）。
+        //  ⚠️ 2026-09-26 改了两遍，第二遍才对（用户：「你并没有仔细看相机底部导航静态
+        //  和动态时的结构」）。第一版把两枚圆钮挤到条子上面那一行，理由是「条子只剩
+        //  240pt」—— 那条推理是反的：相机里两枚钮（缩略图、翻转镜头）**本来就在这一行**，
+        //  正因如此条子才放得下三档（静态量到：只画当前档 ±1，字心距屏幕底 ≈57pt）。
+        //  用户选了「带子跟手、胶囊永远居中」这一种跟手形态（不是相机那种会变高变实的
+        //  动态态），所以这里只有一行、高度恒定，变的只有字的位置。
+        HStack(spacing: Self.barSeam) {
+            //  左臂原来是**车牌的前两个字**（「鄂A」），2026-09-25 改成车的图形
+            //（用户：「车牌名删除」）—— 它本来就是「回到车辆那一档」这一个动作。
+            //  它是**唯一不在条子上的那一档**的入口（用户：「底部导航删除车辆」）：
+            //  从那枚钮进来时条子**不选中任何一档**（`index` 为 `nil`：透镜淡出、
+            //  五个字都不高亮），因为「此刻在哪」这个事实归这枚钮说（图形取强调色）、
+            //  屏幕上不出现一个在说谎的条子。
+            arm(icon: "car.fill", current: homeMode == .vehicle) { nav.openMode(.vehicle) }
+                .accessibilityLabel(Text(homeMode == .vehicle ? "车辆（当前所在）" : "车辆"))
+            //  两个 `Spacer` = 两枚圆钮被推到带子两端（相机就是那么摆的）；中段留给
+            //  条子，而它只画「三档宽的窗口 + 选中胶囊」—— 底玻璃归那条带子（见其头注）。
+            Spacer(minLength: 0)
             DSSwipeStrip(items: HomeMode.stripItems,
                          selectedID: $homeModeRaw,
-                         // 条子的几何只用「这一行有多宽」这一个输入。
-                         availableWidth: barRowWidth,
+                         // 条子的几何只用「两枚圆钮之间那一段有多宽」这一个输入。
+                         availableWidth: stripLaneWidth,
                          // 显式标签：尾随闭包在两个函数参数之间靠扫描规则匹配，
                          // 读的人得翻定义才知道 `{ pos in }` 落在哪个参数上 —— 这正是
                          // `2f088df` 那次 CI 红掉的形态。
                          onPosition: { pos in
                              modePosition = pos
                          },
-                         // 整条上的横拖（含条子上下那圈空白带）。
                          rowDrag: barRowDrag)
+            Spacer(minLength: 0)
+            quickArm
         }
         .padding(.horizontal, Self.barPad)
+        // 通铺的底玻璃：画在**留白之内**那一行后面，靠负 padding 铺到屏幕两边。
+        .background { band }
         .padding(.bottom, Self.barGap)
         .frame(maxWidth: .infinity)
-        // 三块玻璃（左钮 / 模式条 / 右钮）是**同一层**里的三个形状：交给
-        // `GlassEffectContainer`（见 `DSGlass.swift`），它们的边缘才会互相折射、
-        // 出现/消失时才变形接上。间距取中缝那 9 —— 那正是它们看起来「挨着」的距离。
+        // 带子 / 两枚圆钮 / 选中胶囊是**同一层**里的形状：交给 `GlassEffectContainer`
+        // （`DSGlass.swift`），边缘才会互相折射、出现与消失时才变形接上。间距取中缝那 9。
         .dsGlassLayer(spacing: Self.barSeam)
-        // 整条（含离底那 26pt 的空白带）都算**滑动区**（用户 2026-09-25：
-        // 「滑动区变高」）。少了这一条，手指落在条子上下那圈空白上没有任何反应 ——
-        // 而这一圈恰好是拇指自然停放的位置。它不改变任何画出来的东西：
-        // `contentShape` 只管命中测试。
+        // 整行（含离底那 26pt）都算**滑动区**（用户 2026-09-25：「滑动区变高」）——
+        // `contentShape` 只管命中测试，不改变任何画出来的东西。
         .contentShape(Rectangle())
-        // 跟手手势挂整条底条（用户 2026-09-24：「不跟手」）：手指按在**整条**上
-        //（不只是胶囊条上）就能拖。挂在容器上（而不是 `DSSwipeStrip` 内部）是因为
-        // 两侧圆钮是 `Button`，挂条子内部的 `highPriorityGesture` 会被圆钮的 tap 吃掉。
-        // 用 `simultaneousGesture` 让条子自己的拖拽与两侧的 tap 同时生效：
-        // 位移 < 8pt = 点按（圆钮 / 条子），位移 > 8pt = 拖（条子展开跟手）。
+        // 跟手手势挂整行，理由与两个坑都写在 `bottomBarDrag` 的注释里（一处）。
         .simultaneousGesture(bottomBarDrag)
-        // 量这一行（未加留白的宽度）—— 条子的可用宽度从这里来。
-        // 用背景量而不是用 GeometryReader 包住整行：背景不参与布局，
-        // 所以量宽度不会反过来改变底条的位置（那正是条子上一次的错法）。
+        // 量这一行（未加留白的宽度）。用背景量而不是用 `GeometryReader` 包住整行：
+        // 背景不参与布局，所以量宽度不会反过来改变底条的位置（那正是条子上一次的错法）。
         .background {
             GeometryReader { g in
                 Color.clear
@@ -618,7 +609,17 @@ struct MapSpineView: View {
         }
     }
 
-    /// 一枚圆钮（有行为的那两枚用它）。
+    /// 贴底那条**通铺的玻璃带**（相机那条：顶边一条直线，左右铺到屏幕两边）——
+    /// 它是这一行**唯一**的底玻璃。相机那条一直铺到屏幕最下沿，我们停在离底 26pt：
+    /// MapKit 的法律信息与「高德地图」就在这 26pt 里（要铺到底，加一行
+    /// `.padding(.bottom, -Self.barGap)`）。
+    private var band: some View {
+        Color.clear
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .dsGlass(in: Rectangle())
+            .padding(.horizontal, -Self.barPad)
+    }
+
     /// 底条整行的横向拖（用户 2026-09-24：「不跟手」→ 手指按在条子**任意位置**
     /// 都能拖，不只是胶囊上）。
     ///
@@ -635,7 +636,7 @@ struct MapSpineView: View {
     ///
     /// 为什么用 `simultaneousGesture` 而不是 `highPriorityGesture`：两侧圆钮是 `Button`，
     /// 用 `highPriority` 会把圆钮的 tap 也吃掉（点不动了）。`simultaneous` 让两件事并存：
-    /// 轻点（位移 < 8pt）= 圆钮的 tap / 条子的点选；横拖（位移 > 8pt）= 条子展开跟手。
+    /// 轻点（位移 < 8pt）= 圆钮的 tap / 条子的点选；横拖（位移 > 8pt）= 条子跟手。
     /// 手指落在条子上时，条子自己的手势也在跟（它的 `onChanged` 与这条同时发生）——
     /// 那时条子会把这条转发整个作废（`guard cBase == nil`），两边不打架。
     var bottomBarDrag: some Gesture {
@@ -656,14 +657,18 @@ struct MapSpineView: View {
             }
     }
 
-    private func arm(text: String? = nil, icon: String? = nil,
+    /// 一枚圆钮（有行为的那两枚用它）。
+    ///
+    ///  它曾经带一个 `text:` 分支（车牌前两字）。2026-09-26 删：左臂已经改成车的图形，
+    ///  全仓没有调用点，而那个分支里的 `TokensInk.secondary` 正是下面这一段要治的东西。
+    private func arm(icon: String,
                      current: Bool = false,
                      _ run: @escaping () -> Void) -> some View {
         Button {
             TokensHaptic.tap()
             run()
         } label: {
-            armLabel(text: text, icon: icon, current: current)
+            armLabel(icon: icon, current: current)
         }
         .buttonStyle(.plain)
         //  这里曾挂着 `ArmSlot`（展开时把圆钮收到 0 宽）。2026-09-26 与它服务的那
@@ -673,9 +678,15 @@ struct MapSpineView: View {
     /// 圆钮的**外观**（不含行为）：`Menu` 要的是 label 视图，不是 Button。
     /// - Parameter current: 它是不是**此刻所在**的那一档。
     ///   条子上的选中用「玻璃胶囊 + 强调色」说，而车辆不在条子上（见 `bottomBar`）——
-    ///   那个事实就只能由这枚钮自己说：图形取强调色，其余时候是材质自适应色。
-    private func armLabel(text: String? = nil, icon: String? = nil,
-                          current: Bool = false) -> some View {
+    ///   那个事实就只能由这枚钮自己说：图形取强调色，其余时候是正文色。
+    ///
+    /// ⚠️ 2026-09-26：非当前态那一支从 `TokensInk.primary`（自适应墨色 / vibrancy）
+    /// 换成实色 `TokensPalette.primary`。依据不是偏好，是**量出来的**：用户报「左下角
+    /// 那枚钮里什么都没有」之后把截图放大数了一遍 —— 钮内部整片平坦（68…69、起伏 0），
+    /// 而同一行右边那枚实色的钥匙是 251（白）。两枚钮走同一段代码，差别只在颜色。
+    /// 与它同时定的还有模式条那五个字（2026-09-25 就已是实色）—— 于是**底条上的字与
+    /// 图形一律实色，没有例外**；`TokensInk` 仍服务于有大面积材质衬底的卡片与轻提示。
+    private func armLabel(icon: String, current: Bool = false) -> some View {
         ZStack {
             // 2026-09-25 材质审核：原先这里先铺一层 `glassHighlight` 再挂玻璃 ——
             // 那是自己画的「高光」，而**真正的高光正是玻璃材质自己要产生的东西**：
@@ -684,22 +695,11 @@ struct MapSpineView: View {
             Color.clear
                 .frame(width: Self.armSize, height: Self.armSize)
                 .dsGlass(in: Circle(), interactive: true)
-            // 字与图形都走 `TokensInk`：这一枚底是**真玻璃**（上面那行 `dsGlass`），
-            // 而它浮在地图/壁纸之上 —— 固定标签色在这里读不出对比度（用户第 10 条）。
-            if let text {
-                Text(text)
-                    .font(TokensTypo.fixed(11, weight: .bold))
-                    .foregroundStyle(TokensInk.secondary)
-            } else if let icon {
-                //  ⚠️ `AnyShapeStyle(...)` 是**必需**的：三元两个分支必须同一类型，
-                //  而 `TokensInk.primary` 是装箱值、`accent` 是具体 `Color`（CI
-                //  2026-09-25 就红在这一行）。不改成「两边都用 Color」—— 会丢掉
-                //  这一支的自适应色（理由见上）。
-                Image(safeSymbol: icon, fallback: icon)
-                    .font(TokensTypo.fixed(17, weight: .medium))
-                    .foregroundStyle(current ? AnyShapeStyle(TokensPalette.accent)
-                                             : TokensInk.primary)
-            }
+            //  ⚠️ 两个分支现在都是具体 `Color`，不需要 `AnyShapeStyle(...)` 装箱 ——
+            //  2026-09-25 那次 CI 红的正是「`Color` 与 `AnyShapeStyle` 混在一个三元里」。
+            Image(safeSymbol: icon, fallback: icon)
+                .font(TokensTypo.fixed(17, weight: .medium))
+                .foregroundStyle(current ? TokensPalette.accent : TokensPalette.primary)
         }
         .frame(width: Self.armSize, height: Self.armSize)
         .contentShape(Circle())

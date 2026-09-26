@@ -29,16 +29,27 @@ import Foundation
 //  | 何时 | 间隔 | 取什么 | 为什么 |
 //  |---|---|---|---|
 //  | 地图页 · 车在动 | **2 s** | `fetchCore()` | 车速、电量、位置正在变，这一页的读数就是「现在」 |
-//  | 地图页 · 刚停下 | **60 s** | `fetchCore()` | 还在确认它是不是真停了；一分钟够快，也不至于空转 |
-//  | 地图页 · 连着 10 次 0 速度 | **15 s** | `fetchCore()` | 见下（这一条是**变快**的那一条） |
+//  | 地图页 · 车停着 | **2→4→8→16→32→60 s**（每读到一次 0 就翻倍，封顶 60） | `fetchCore()` | 见下 |
 //  | 其他五档 · 轻 | **60 s** | `fetchCore()` | 那几页的骨架是车况四项 |
 //  | 其他五档 · 重 | **300 s** 或**翻到这一页时** | `fetchVehicleData()` | 消息 + 体检是两路重接口，见下 |
 //
-//  ⚠️ 「连着 10 次读到 0 速度 → 15 秒」的方向容易读反：它是**变快**，不是变慢。
-//  60 秒那一档是「刚停下来、还在确认」；连着 10 次都是 0 之后，这一页要回答的问题
-//  变成了「它什么时候再动」—— 而那个时刻只能靠问出来。停着的车多问几次很便宜
-//  （它没有在动、报文也一样），而**漏掉起步**的代价是地图留在原地不动。
-//  数的是**读数**（每一次取数算一次），不是时间 —— 所以它和「多久取一次」是同一个变量的两面。
+//  ── 停着那一档是一条**退避曲线**（用户 2026-09-26：「15 秒久了，改用更智能的
+//     算法吧，直至最高 60 秒」）─────────────────────────────────────────
+//
+//  那句话读起来像矛盾（要更快、又只要到 60），其实是一条曲线的两端：
+//  **刚停下要快，停越久越省**。自变量不另存时钟，就是「连着读到过几次 0 速度」——
+//  每一次取数本身就是一次读数，所以没有「两处都在算时间」的问题。
+//
+//    · 停下后的头几次：**2 → 4 → 8 秒**。红绿灯、临时靠边、下人 —— 都在这一段里。
+//      它们随时可能再动，而「地图要跟着车」最需要接上的就是这一刻。
+//      放在这一档里的东西代价极低（停着的车报文几乎不变），而**漏掉起步**的代价是整张图留在原地。
+//    · 之后 16 → 32 → **60 秒封顶**（用户给的数）：停在车位上十分钟还是一小时，
+//      对我们已经没有区别了 —— 那就按「问一次能省多少」来。
+//      一直停着的车不会比 1 分钟问得更少（这是他与“省接口”之间的那条线）。
+//
+//  ⚠️ 发现起步的代价永远只是**当前这一档的等待**（2…60 秒），而车一动就归零：
+//  下一拍立刻回到 2 秒。所以这条曲线不是在「慢」与「准」之间取舍 ——
+//  它是用停车时长换接口量，而换掉的那部分是**确定不会变**的那一段。
 //
 //  ⚠️ 「重的两路」为什么不跟轻的一起 60 秒一次：`fetchVehicleData()` 多取**消息**与**体检**
 //  两个大接口（`AppStore.gather` 的两个开关），而这两份数据回答的不是「此刻」——
@@ -76,18 +87,19 @@ final class RefreshLoop {
 
     /// 全部节律（秒）。**它们只在这里出现一次** —— 别处再写一个 2 或 300 就是第二份节律。
     enum Cadence {
-        /// 地图页 · 车在动
+        /// 地图页 · 车在动（实时）
         static let moving: Double = 2
-        /// 地图页 · 刚停下（还在确认）
-        static let parked: Double = 60
-        /// 地图页 · **连着读到 10 次 0 速度之后**（见文件头那一段：这一条是变快的那一条）
-        static let parkedConfirmed: Double = 15
+        /// 地图页 · 刚停下（退避曲线的起点 —— 与「车在动」是同一个数，这不是巧合：
+        /// 刚停下时我们**还不知道**它是红灯还是停车位，那时按「还在动」问最安全）
+        static let parkedFloor: Double = 2
+        /// 地图页 · 停久了的封顶（用户 2026-09-26 给的数）
+        static let parkedCeil: Double = 60
+        /// 退避曲线翻几次就封顶（2·2^5 = 64 > 60，所以五步就到顶）
+        static let parkedSteps: Int = 5
         /// 其他五档的**轻**取数（车况四项）
         static let page: Double = 60
         /// 其他五档的**重**取数（消息 + 体检）
         static let heavy: Double = 300
-        /// 「连着读到 10 次 0 速度」里的那个 10
-        static let zeroStreak: Int = 10
     }
 
     private var task: Task<Void, Never>? = nil
@@ -95,7 +107,10 @@ final class RefreshLoop {
     /// 最近一次取数的时刻。给界面回答「这份读数有多新」用（也让人一眼看出循环在不在跑）。
     private(set) var lastTickAt: Date? = nil
 
-    /// 连着读到**几次 0 速度**（只数地图页的读数）。车在动就归零。
+    /// 连着读到过**几次 0 速度**（只数地图页的读数）。车在动就归零。
+    ///
+    /// 它是停着那条退避曲线的**自变量**（不是「确认了几次才认定停着」——
+    /// 那个形状 2026-09-26 当天就被用户否掉了，见文件头）。
     private var zeroStreak = 0
 
     /// 上一次取「重的那两路」（消息 + 体检）的时刻。
@@ -121,10 +136,23 @@ final class RefreshLoop {
     private var modeChanged: Bool { currentModeRaw != lastModeRaw }
 
     /// 下一次该等多久（秒）。**整个节律表就是这两个分支**。
+    /// 车一动的那一秒内它就会变成 2 —— 循环每一拍都重算它（见 `start()`）。
     var interval: Double {
         guard isOnMap else { return Cadence.page }
-        if AppStore.shared.isCarMoving { return Cadence.moving }
-        return zeroStreak >= Cadence.zeroStreak ? Cadence.parkedConfirmed : Cadence.parked
+        return AppStore.shared.isCarMoving ? Cadence.moving : parkedInterval
+    }
+
+    /// 停着时的等待（秒）：**每读到一次 0 就翻倍，封顶 60**。
+    ///
+    /// 曲线本身：`2 → 4 → 8 → 16 → 32 → 60`（第五步就顶到封顶值，
+    /// 因为 2·2⁵ = 64）。`min(zeroStreak, steps)` 那一步只是防溢出：
+    /// 停了一整夜之后这个计数会很大，而 `pow(2, 1000)` 是个没意义的数。
+    ///
+    /// 为什么不用一条时间曲线（比如「停够 1 分钟就 60」）：那要另记一个时刻，
+    /// 而**每一次取数本身就是一次读数**。用读数当自变量，就只有一个变量。
+    var parkedInterval: Double {
+        let steps = min(zeroStreak, Cadence.parkedSteps)
+        return min(Cadence.parkedCeil, Cadence.parkedFloor * pow(2, Double(steps)))
     }
 
     // MARK: 生命周期
@@ -167,8 +195,8 @@ final class RefreshLoop {
         guard store.isLoggedIn, !store.carId.isEmpty else { return }
         if isOnMap {
             await store.fetchCore()
-            // 「连着 10 次读到 0 速度」数的是读数，不是时间：每一次取数算一次。
-            if store.isCarMoving { zeroStreak = 0 } else { zeroStreak += 1 }
+            // 读数 → 曲线：车在动就归零（下一拍立刻回到 2 秒），否则记一次「还是 0」。
+            zeroStreak = store.isCarMoving ? 0 : zeroStreak + 1
         } else {
             // 翻到这一页 / 距上次重取满 5 分钟 → 重的那两路（它已经把车况四项含在里面）。
             // 其余时候只取轻的：重接口不该跟着 60 秒的节律跑。
