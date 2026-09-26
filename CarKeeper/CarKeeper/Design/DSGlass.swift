@@ -45,10 +45,12 @@ import SwiftUI
 //  等于把「一致」寄托在 12 个调用点都记得传对（那正是这一仓反复吃过的那种账）。
 //  于是入口仍然只有这一个，只是它现在多读两格设置。
 //
-//  ⚠️ 这里不留 `ViewModifier` 包装类型（2026-09-25 同日删）：`DSGlassSurface` /
-//  `DSGlassLayer` 只是搬运参数，删掉之后本文件只剩 `DSGlassVariant` 一个类型，
-//  而它是 `dsGlass` 的**参数类型**（调用点写 `.overMedia`，是隐式成员表达式）——
-//  「声明了却没有别人按名字提到」在 `scan/orphans.py` 眼里是孤儿，已在那边登记理由。
+//  ⚠️ `ViewModifier` 包装类型在 2026-09-25 删过一轮：那时的 `DSGlassSurface` 与
+//  `DSGlassLayer` 只是搬运参数，而「搬运」不需要一个类型。
+//  2026-09-26 `DSGlassSurface` 回来了，因为**这一版它有事要做**：读
+//  `accessibilityReduceTransparency` 并换一块自己的实底（理由见下面那条类型）。
+//  一条判据：包装类型只有在「它自己知道什么」时才成立 ——
+//  `View` 扩展函数里读不到 `@Environment`，这就是那件事本身。
 // =============================================================================
 
 /// 玻璃的两种取用，按**底下是什么**选，不按好看选。
@@ -58,6 +60,92 @@ enum DSGlassVariant {
     /// 底下是**连续的画面**（地图、照片）：`.clear` 让画面保持可见，
     /// 只在边缘留一圈折射。文字多的控件别用它（对比度会跟着底下的画面走）。
     case overMedia
+}
+
+//  ===========================================================================
+//  「降低透明度」这一档由我们自己接
+//  ===========================================================================
+//
+//  用户 2026-09-26：「我把系统的液态玻璃变成了最不通透，我们的 app 变成了这样，
+//  而相机的几乎没变 —— 你好好分析下相机的层结构」。
+//
+//  相机的底条为什么几乎不变：那条底子是**它自己画的深色面**（一层半透明黑），
+//  底下没有系统材质 —— 一个「降低透明度」能降的只有材质，所以它没有可降的东西。
+//  我们那一块则相反：`.glassEffect` 在那一档下的表现是**把模糊拿掉、只留一层淡色**
+//  （截图量到的：卡里能看出底下的地图纹理，亮度只比周围高 ~20/255），
+//  而我们的字是白的实色（`TokensPalette.primary` = `.label`）——
+//  白字压在一块淡色上，读不出来；同一屏里每一块玻璃都变成「一块浅色大方块」，
+//  远看像卡片变大了。
+//
+//  所以这一档不能交给系统：**用户要的是「少透一点」，系统的降法（去掉模糊、留淡色）
+//  在这里恰好把文字的可读性也一起拿走了**。HIG 对同一件事的写法是
+//  *「offer solid-fill alternatives at component level」* —— 组件自己给一块实底。
+//  我们这块实底取 `TokensPalette.surface`（不透明的系统面色）：深色下它是 #1C1C1E、
+//  亮色下是白，字与它一起随明暗走（`.label` 也是那套），于是两种明暗下都读得出来，
+//  而这正是相机那条深色底子在同一档下保住的东西。
+//
+//  ⚠️ 为什么必须是一个 `View` 而不是 `dsGlass` 里的一句 `if`：函数里读不到
+//  `@Environment`。玻璃得先是一个 `View`，才能知道用户开了没有。
+//  （这一条与「玻璃是浮层的唯一入口」不冲突：它仍是同一条路的第一个落点，
+//  调用点一个字都没变。）
+
+/// 一块玻璃的本体。唯一的职责：在「降低透明度」开着时换一块**我们自己**的实底。
+///
+/// 参数与 `dsGlass` 一一对应，顺序也一致（本仓的成员初始化器按声明顺序传实参）。
+struct DSGlassSurface<S: InsettableShape>: View {
+    let shape: S
+    let variant: DSGlassVariant
+    let interactive: Bool
+    let hairline: Bool
+
+    /// 用户在「辅助功能 → 显示与文字大小 → 降低透明度」里要的那件事。
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        if reduceTransparency {
+            //  一块**不透明**的面色 + 同一圈发丝线。发丝线留着：它是「这里有一块玻璃」
+            //  这句话在无障碍那一档下的替身，少了它，卡片与它背后的界面就贴在一起了。
+            shape.fill(TokensPalette.surface)
+                .overlay {
+                    if hairline {
+                        shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
+                    }
+                }
+        } else {
+            glassEffect(material, in: shape)
+                .overlay {
+                    if hairline {
+                        shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
+                    }
+                }
+        }
+    }
+
+    /// 用哪一档材质。
+    ///
+    ///  用户 2026-09-26：「全局调整液态玻璃的通透度」——设置里选的那一档
+    ///  **盖过**「按底下是什么选」这条规矩（理由写在 `DisplaySettings.GlassLevel` 上：
+    ///  一个全局开关按不同的地方给不同的结果，就不是一个全局开关）。
+    ///  默认那一档是 `standard`，它走的正是这条规矩本身 —— 所以默认行为一字未改。
+    private var material: Glass {
+        let settings = DisplaySettings.shared
+        let base: Glass
+        switch settings.level {
+        case .clear: base = .clear
+        case .standard: base = variant == .overMedia ? .clear : .regular
+        case .solid: base = .regular
+        }
+        // 「更实」那一档加一层**材质自己的** tint：那正是系统给的「同一档材质更实」
+        // 的形态（`Glass.tint(_:)`），而**不是**在玻璃底下垫一块面 —— 垫面会把材质
+        // 本身挡掉，那件事 `scan/glass.py` 的判据 ③ 正在拦。
+        // 浓淡跟着「界面实度」一起走：两块调节钮说的是同一件观感，就不该各调各的。
+        let tuned: Glass = settings.level == .solid
+            ? base.tint(TokensPalette.surface.opacity(0.35 * settings.fill))
+            : base
+        // 写成 `interactive(true)` 而不是 `interactive()`：文档里那个默认值
+        // （`_ isEnabled: Bool = true`）在 fragments 里看不到，写死实参就与它无关了。
+        return interactive ? tuned.interactive(true) : tuned
+    }
 }
 
 extension View {
@@ -80,33 +168,14 @@ extension View {
                                      variant: DSGlassVariant = .regular,
                                      interactive: Bool = false,
                                      hairline: Bool = true) -> some View {
-        let settings = DisplaySettings.shared
-        //  用户 2026-09-26：「全局调整液态玻璃的通透度」——设置里选的那一档
-        //  **盖过**「按底下是什么选」这条规矩（理由写在 `DisplaySettings.GlassLevel` 上：
-        //  一个全局开关按不同的地方给不同的结果，就不是一个全局开关）。
-        //  默认那一档是 `standard`，它走的正是这条规矩本身 —— 所以默认行为一字未改。
-        let base: Glass
-        switch settings.level {
-        case .clear: base = .clear
-        case .standard: base = variant == .overMedia ? .clear : .regular
-        case .solid: base = .regular
-        }
-        // 「更实」那一档加一层**材质自己的** tint：那正是系统给的「同一档材质更实」
-        // 的形态（`Glass.tint(_:)`），而**不是**在玻璃底下垫一块面 —— 垫面会把材质
-        // 本身挡掉，那件事 `scan/glass.py` 的判据 ③ 正在拦。
-        // 浓淡跟着「界面实度」一起走：两块调节钮说的是同一件观感，就不该各调各的。
-        let tuned: Glass = settings.level == .solid
-            ? base.tint(TokensPalette.surface.opacity(0.35 * settings.fill))
-            : base
-        // 写成 `interactive(true)` 而不是 `interactive()`：文档里那个默认值
-        // （`_ isEnabled: Bool = true`）在 fragments 里看不到，写死实参就与它无关了。
-        let material: Glass = interactive ? tuned.interactive(true) : tuned
-        return glassEffect(material, in: shape)
-            .overlay {
-                if hairline {
-                    shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
-                }
-            }
+        //  这一句曾经就是整块玻璃（材质怎么选、tint 怎么调、发丝线画在哪）——
+        //  2026-09-26 搬进 `DSGlassSurface`：函数里读不到 `@Environment`，
+        //  而「降低透明度」那一档必须由我们自己接（理由写在那条类型上）。
+        //  调用点一个字都没变，参数就是那里的参数。
+        DSGlassSurface(shape: shape,
+                       variant: variant,
+                       interactive: interactive,
+                       hairline: hairline)
     }
 
     /// 常用形状的便捷写法（胶囊：按钮 / 芯片 / 条子）

@@ -75,15 +75,24 @@ struct DSTextGlow: TextRenderer {
         }
     }
 
-    /// 外壳比字宽出去一圈，不告诉 SwiftUI 就会被裁掉。文档给这个属性写的用途正是这一句：
-    /// *「when drawing the text with a shadow this may be used to extend the drawing bounds
-    /// to avoid clipping the shadow」*。四面各留一格（= 半径）。
-    var displayPadding: EdgeInsets {
-        EdgeInsets(top: TokensHalo.radius,
-                   leading: TokensHalo.radius,
-                   bottom: TokensHalo.radius,
-                   trailing: TokensHalo.radius)
-    }
+    /// ⚠️ 2026-09-26（用户：「每个界面的卡片怎么都变大了」）：**这里返回零**。
+    ///
+    /// 它此前返回「四面各留一格 = 外壳半径」。那个数不是凭空来的 —— 文档给这个属性写的
+    /// 用途正是这一句：*「Returns the size of the extra padding added to any drawing layer
+    /// used to rasterize the text. For example when drawing the text with a shadow this may
+    /// be used to extend the drawing bounds to avoid clipping the shadow.」*
+    /// 而「drawing bounds」不是一个内部缓冲，**它就是这段文字的排版尺寸**：
+    /// 于是挂着全局外壳的每一行字都凭空高了 6pt，而**卡片是按内容撑高的** ——
+    /// 全 App 每一张卡片都跟着长（一张五行字的卡长出 ~30pt）。这一条不是猜的：
+    /// 用户报「每个界面的卡片怎么都变大了」，而这一版相对他上一个能装上的包，
+    /// 全局改动只有外壳这一处（`displayPadding` 与 `TokensHalo` 是同一个提交进来的，
+    /// 而那个提交的 CI 是红的 —— 他装到的是修好之后、第一次带着外壳发出去的包）。
+    ///
+    /// 代价如实写在这里：外壳画得比字宽出半径那 3pt，而没有留白，**最外那一圈会被裁掉**
+    ///（字形自己的侧边距还在，所以被裁的是那圈虚光的边缘）。换来的是「发光是绘制，
+    /// 不是排版」—— 一个效果不该把整棵界面的尺寸往下推。
+    /// 真要那圈光完整，办法是让**宿主**留白（卡片内边距本来就有），而不是让每一行字自己撑。
+    var displayPadding: EdgeInsets { EdgeInsets() }
 
     /// 笔画高了，壳要跟着撑开一点 —— 否则大数旁那一圈光看起来像没加（见类型注释）。
     private func haloRadius(for run: Text.Layout.Run) -> CGFloat {

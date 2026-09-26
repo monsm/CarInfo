@@ -64,10 +64,7 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
-//  `ArmSlot`（底条两端那两枚圆钮的「让位」）2026-09-25 搬去了 `Design/DSSwipeStrip.swift`。
-//  搬的理由不是「本文件太长」这一句话，而是它本来就是那个控件的行为：条子展开时
-//  要占满整行，所以两臂让位 —— 这是模式条的状态机上的一件事（见 `DSSwipeStrip` 的
-//  `onExpand` 契约）。搬的是一件事，不是一坨代码。同一次：文件回到 1200 行以内。
+//  （这里曾记着 `ArmSlot` 与 `onExpand` 的去向：两者 2026-09-26 随「按住展开」一起删。）
 struct MapSpineView: View {
     /// 不是 `private`：`MapSpineReadouts.swift` 里的四格读数要用它取车速与车锁。
     let store = AppStore.shared
@@ -97,14 +94,10 @@ struct MapSpineView: View {
     @State private var modePosition: Double = -1
 
     /// 整条底条上那次横拖（`nil` = 手指不在条上）。它只是**转发**给条子：
-    /// 条子仍是位置的唯一计算者（跟手、越界阻尼、吸附都在那里，见 `RowDrag`）。
-    /// 状态与手势必须住在同一个文件里：Swift 的 `private` 作用域是**文件**，
-    /// 把状态拆到另一个文件里的扩展要么看不见它、要么就得把它降级成模块级可见
-    ///（2026-09-25 的 CI 就是这么红的）。
+    /// 条子仍是位置的唯一计算者（见 `RowDrag`）。状态与手势必须住在同一个文件里 ——
+    /// Swift 的 `private` 作用域是**文件**（2026-09-25 的 CI 就是这么红的）。
     @State private var barRowDrag: DSSwipeStrip.RowDrag?
-    //  `barOpen`（底条是否正在展开、两枚圆钮要不要让出宽度）已于 2026-09-26 删：
-    //  它服务的「静止只露三档」那个形态，随两枚圆钮移到条子上面一行而消失（见 `bottomBar`）。
-    //  它剩下的唯一读者是 `deckPos` 那个分支，改成读同一个事实的另一个写法（`barRowDrag != nil`）。
+    //  （`barOpen` 已于 2026-09-26 随「按住展开」一起删，剩下的那个读者改读本条。）
 
     /// 镜头。**不是 `private`**：右侧那两枚快速钮（`MapQuickButtons.swift`）里
     /// 「回到车 / 手机的位置」都要把它移过去 —— 而 `private` 的作用域是**文件**，
@@ -142,9 +135,8 @@ struct MapSpineView: View {
     /// 与 MineView 那行订阅的是同一个单例，两处的更新永远同步。
     @ObservedObject private var wallpaper = WallpaperService.shared
 
-    /// 镜头跟着谁（用户 2026-09-26：「如果选了车的定位 …… 如果是选了人的位置也同样的逻辑显示」）。
-    /// 它不是「上一枚按了哪个钮」，而是一条**持续的意图**：选了手机之后每一次位置刷新
-    /// 都往手机上对（与车那一侧同一个函数、同一套偏移）；车在动时它被盖住（见 `centerOnCar`）。
+    /// 镜头跟着谁（用户 2026-09-26：「选了人的位置也同样的逻辑显示」）。它不是「上一枚按了
+    /// 哪个钮」，而是一条**持续的意图**；车在动时它被盖住（见 `centerOnCar`）。
     /// **不是 `private`**：右侧那两枚钮（`MapQuickButtons.swift`）要写它。
     @State var follow: MapFollowTarget = .car
 
@@ -210,11 +202,8 @@ struct MapSpineView: View {
     ///     取它的 case 下标，而这个下标**恰好等于条子的长度**（见 `HomeMode` 的档序），
     ///     于是条子上那五档全部淡到 0（`fade(i) = |i − 5| ≥ 1`），只剩车辆这一层。
     ///
-    ///  ⚠️ `barRowDrag != nil` 那个分支不是在修饰动效，是在修一个真会看到的东西：
-    ///  手指一旦落到条子上，位置就该归条子管 —— 少了这个分支，从车辆往条子上拖时
-    ///  页面要等松手才动（拖动全过程停在车辆），而那正是「不跟手」。
-    ///  （它此前读的是 `barOpen`。那个状态 2026-09-26 随「按住展开」一起删了，
-    ///    而「手指在不在条子上」这个事实本条转发自己就有 —— 一条状态够了。）
+    ///  ⚠️ `barRowDrag != nil` 那个分支在修一个真会看到的东西：手指一旦落到条子上，
+    ///  位置就该归条子管 —— 少了它，从车辆往条子上拖时页面要等松手才动（即「不跟手」）。
     private var deckPos: Double {
         if homeMode == .vehicle {
             return barRowDrag != nil ? max(0, modePosition) : Double(modeIndex)
@@ -282,7 +271,7 @@ struct MapSpineView: View {
     /// 条子上正在拖（`DSSwipeStrip` 报上来的）—— 两枚圆钮靠它让位。
     @State private var barDragging = false
 
-    /// 整行宽度 = 屏幕宽 − 两侧各 8 的留白（兜底 374 = 390 屏宽 − 16）。
+    /// 整行宽度 = 屏幕宽 − 两侧各 8 的留白（兜底 374）。
     /// ⚠️ 它不是条子拿到的宽度（条子拿到的是 `stripLaneWidth`）。
     private var barRowWidth: CGFloat {
         containerWidth > 0 ? max(160, containerWidth - 2 * Self.barPad) : 374
@@ -293,8 +282,7 @@ struct MapSpineView: View {
         max(120, barRowWidth - 2 * Self.armSize - 2 * Self.barSeam)
     }
 
-    /// 拖动时字可以画到多宽 = **整屏**（相机拖动态：六档铺满、两端被屏幕边切）；
-    /// 首帧还没量到时退回行宽（少 8pt，看不出区别）。
+    /// 拖动时字可以画到多宽 = **整屏**（相机拖动态）；首帧没量到时退回行宽。
     private var stripSpillWidth: CGFloat {
         containerWidth > 0 ? containerWidth : barRowWidth
     }
@@ -565,15 +553,12 @@ struct MapSpineView: View {
         //  `DSSwipeStrip` 文件头）。现在是：两钮之间那一条胶囊 + 相机的动态态。
         HStack(spacing: Self.barSeam) {
             //  左臂原来是**车牌的前两个字**（「鄂A」），2026-09-25 改成车的图形
-            //（用户：「车牌名删除」）—— 它本来就是「回到车辆那一档」这一个动作。
-            //  它是**唯一不在条子上的那一档**的入口（用户：「底部导航删除车辆」）：
-            //  从那枚钮进来时条子**不选中任何一档**（`index` 为 `nil`：透镜淡出、
-            //  五个字都不高亮），因为「此刻在哪」这个事实归这枚钮说（图形取强调色）、
-            //  屏幕上不出现一个在说谎的条子。
+            //（用户：「车牌名删除」）—— 它本来就是「回到车辆那一档」这一个动作，也是
+            //  唯一不在条子上的那一档的入口（用户：「底部导航删除车辆」）：从那枚钮进来时
+            //  条子**不选中任何一档**，因为「此刻在哪」这个事实归这枚钮说（图形取强调色）。
             arm(icon: "car.fill", current: homeMode == .vehicle) { nav.openMode(.vehicle) }
                 .accessibilityLabel(Text(homeMode == .vehicle ? "车辆（当前所在）" : "车辆"))
-            //  两个 `Spacer` = 两枚圆钮被推到带子两端（相机就是那么摆的）；中段留给
-            //  条子，而它只画「三档宽的窗口 + 选中胶囊」—— 底玻璃归那条带子（见其头注）。
+            //  两个 `Spacer` = 两枚圆钮被推到带子两端（相机就是那么摆的）。
             Spacer(minLength: 0)
             DSSwipeStrip(items: HomeMode.stripItems,
                          selectedID: $homeModeRaw,
@@ -594,20 +579,18 @@ struct MapSpineView: View {
             quickArm
         }
         .padding(.horizontal, Self.barPad)
-        //  （这里曾有 `.background { band }`（通铺矩形底玻璃）。2026-09-26 删：底玻璃现在是
-        //   条子自己身上那条胶囊（`DSSwipeStrip.band`），两处各画一次就成了「窄的坐在宽的里」。）
+        //  (这里曾有 `.background { band }`：底玻璃现在是条子自己那条胶囊，见 `band`。)
         .padding(.bottom, Self.barGap)
         .frame(maxWidth: .infinity)
-        // 带子 / 两枚圆钮 / 选中胶囊是**同一层**里的形状：交给 `GlassEffectContainer`
-        // （`DSGlass.swift`），边缘才会互相折射、出现与消失时才变形接上。间距取中缝那 9。
+        // 带子 / 两枚圆钮 / 选中胶囊是**同一层**里的形状（间距取中缝那 9）。
         .dsGlassLayer(spacing: Self.barSeam)
-        // 整行（含离底那 26pt）都算**滑动区**（用户 2026-09-25：「滑动区变高」）——
-        // `contentShape` 只管命中测试，不改变任何画出来的东西。
+        // 整行（含离底那 26pt）都算**滑动区**（用户 2026-09-25：「滑动区变高」）。
         .contentShape(Rectangle())
+        // 两枚圆钮的淡出（它们是被 `if` 拿掉的，见 `arm`）。
+        .animation(TokensMotion.fade, value: barDragging)
         // 跟手手势挂整行，理由与两个坑都写在 `bottomBarDrag` 的注释里（一处）。
         .simultaneousGesture(bottomBarDrag)
-        // 量这一行（未加留白的宽度）。用背景量而不是用 `GeometryReader` 包住整行：
-        // 背景不参与布局，所以量宽度不会反过来改变底条的位置（那正是条子上一次的错法）。
+        // 量这一行：用背景量而不是用 `GeometryReader` 包住整行 —— 背景不参与布局。
         .background {
             GeometryReader { g in
                 Color.clear
@@ -656,20 +639,33 @@ struct MapSpineView: View {
 
     /// 一枚圆钮（有行为的那两枚用它）。
     ///
-    ///  它曾经带一个 `text:` 分支（车牌前两字）。2026-09-26 删：左臂已经改成车的图形，
-    ///  全仓没有调用点，而那个分支里的 `TokensInk.secondary` 正是下面这一段要治的东西。
+    ///  ⚠️ 拖动时它整枚**移出层级**，不是「淡到透明」（用户 2026-09-26：「滚动时俩边的圆
+    ///  胶囊怎么不消失了」）：这一行的玻璃同在一个 `GlassEffectContainer` 里，而容器会把
+    ///  子视图的玻璃**合成成一个形状** —— 透明度 0 在它眼里只是内容不见了，圆底还在。
+    ///  相机那一态里两枚钮是**不在场**，所以就照它做。
+    @ViewBuilder
     private func arm(icon: String,
                      current: Bool = false,
                      _ run: @escaping () -> Void) -> some View {
-        Button {
-            TokensHaptic.tap()
-            run()
-        } label: {
-            armLabel(icon: icon, current: current)
+        if barDragging {
+            armPlaceholder
+        } else {
+            Button {
+                TokensHaptic.tap()
+                run()
+            } label: {
+                armLabel(icon: icon, current: current)
+            }
+            .buttonStyle(.plain)
+            .transition(.opacity)
         }
-        .buttonStyle(.plain)
-        //  这里曾挂着 `ArmSlot`（展开时把圆钮收到 0 宽）。2026-09-26 与它服务的那
-        //  个状态一起删：圆钮尺寸就是 `armLabel` 自己那个 `frame`（`Self.armSize`）。
+    }
+
+    /// 「这两枚钮不在这儿」时占的那一格：尺寸与圆钮同一个数（`Self.armSize`），
+    /// 底玻璃的宽度 = 两钮之间那一段（`stripLaneWidth`），因此一个字都不变。
+    private var armPlaceholder: some View {
+        Color.clear
+            .frame(width: Self.armSize, height: Self.armSize)
     }
 
     /// 圆钮的**外观**（不含行为）：`Menu` 要的是 label 视图，不是 Button。
@@ -677,12 +673,11 @@ struct MapSpineView: View {
     ///   条子上的选中用「玻璃胶囊 + 强调色」说，而车辆不在条子上（见 `bottomBar`）——
     ///   那个事实就只能由这枚钮自己说：图形取强调色，其余时候是正文色。
     ///
-    /// ⚠️ 2026-09-26：非当前态那一支从 `TokensInk.primary`（自适应墨色 / vibrancy）
-    /// 换成实色 `TokensPalette.primary`。依据不是偏好，是**量出来的**：用户报「左下角
-    /// 那枚钮里什么都没有」之后把截图放大数了一遍 —— 钮内部整片平坦（68…69、起伏 0），
-    /// 而同一行右边那枚实色的钥匙是 251（白）。两枚钮走同一段代码，差别只在颜色。
-    /// 与它同时定的还有模式条那五个字（2026-09-25 就已是实色）—— 于是**底条上的字与
-    /// 图形一律实色，没有例外**；`TokensInk` 仍服务于有大面积材质衬底的卡片与轻提示。
+    /// ⚠️ 2026-09-26：非当前态那一支从 `TokensInk.primary`（自适应墨色）换成实色。
+    /// 依据是**量出来的**：用户报「左下角那枚钮里什么都没有」，把截图放大数了一遍 ——
+    /// 钮内部整片平坦（68…69），而同一行右边那枚实色的钥匙是 251。两枚钮走同一段代码，
+    /// 差别只在颜色。于是**底条上的字与图形一律实色**；`TokensInk` 仍服务于有大面积
+    /// 材质衬底的卡片与轻提示。
     private func armLabel(icon: String, current: Bool = false) -> some View {
         ZStack {
             // 2026-09-25 材质审核：原先这里先铺一层 `glassHighlight` 再挂玻璃 ——
@@ -699,9 +694,7 @@ struct MapSpineView: View {
                 .foregroundStyle(current ? TokensPalette.accent : TokensPalette.primary)
         }
         .frame(width: Self.armSize, height: Self.armSize)
-        //  条子上正在拖时它**让位**（用透明的理由写在 `DSSwipeStrip` 文件头）。
-        .opacity(barDragging ? 0 : 1)
-        .animation(TokensMotion.fade, value: barDragging)
+        //  （这里曾有 `.opacity(barDragging ? 0 : 1)` —— 让位现在归 `arm` 的 `if`。）
         .contentShape(Circle())
     }
 
@@ -712,31 +705,37 @@ struct MapSpineView: View {
     /// （切换镜头），所以这里接的也是动作 —— 而且必须是最高频的那一个。
     /// 指令名取自 `ControlView` 里那几条真指令（同一个 key，不另造一套简写）：
     /// 车控页发什么，这里就发什么。
+    ///  它同样在拖动时移出层级（理由见 `arm`）。
+    @ViewBuilder
     private var quickArm: some View {
-        Menu {
-            ForEach(Self.quickCommands, id: \.key) { c in
-                Button {
-                    TokensHaptic.tap()
-                    if c.changesState {
-                        // 会改车状态的那几条 → 交给**唯一那道门**（温度 → 生物识别 → 控车码）。
-                        // 用户 2026-09-24：「右下角的控车选了后不用输入密码？不用选温度？」
-                        // 之前这里直接调 `store.sendControlCommand`（拿 Keychain 里的旧码就发），
-                        // 而车控档要走三步 —— 同一个动作两套强度，安全的那条形同虚设。
-                        quickRequest = ControlRequest(key: c.key, name: c.name)
-                    } else {
-                        Task { await refreshCondition(c) }
+        if barDragging {
+            armPlaceholder
+        } else {
+            Menu {
+                ForEach(Self.quickCommands, id: \.key) { c in
+                    Button {
+                        TokensHaptic.tap()
+                        if c.changesState {
+                            // 会改车状态的那几条 → 交给**唯一那道门**（温度 → 生物识别 → 控车码）。
+                            // 用户 2026-09-24：「右下角的控车选了后不用输入密码？不用选温度？」
+                            // 之前这里直接调 `store.sendControlCommand`（拿 Keychain 里的旧码就发），
+                            // 而车控档要走三步 —— 同一个动作两套强度，安全的那条形同虚设。
+                            quickRequest = ControlRequest(key: c.key, name: c.name)
+                        } else {
+                            Task { await refreshCondition(c) }
+                        }
+                    } label: {
+                        Label(c.name, systemImage: c.symbol)
                     }
-                } label: {
-                    Label(c.name, systemImage: c.symbol)
                 }
+            } label: {
+                armLabel(icon: "key.fill")
             }
-        } label: {
-            armLabel(icon: "key.fill")
+            .buttonStyle(.plain)
+            .transition(.opacity)
+            .accessibilityLabel(Text("快捷车控"))
+            .accessibilityHint(Text("锁车、解锁、闪灯、鸣笛、远程寻车（需控车码）、刷新车况"))
         }
-        .buttonStyle(.plain)
-        //  （这里曾挂着 `ArmSlot`：展开时把圆钮收到 0 宽。2026-09-26 随那个状态一起删。）
-        .accessibilityLabel(Text("快捷车控"))
-        .accessibilityHint(Text("锁车、解锁、闪灯、鸣笛、远程寻车（需控车码）、刷新车况"))
     }
 
     /// 一条快捷指令（key = 真实指令名，与车控页的 `hero` / `moreCommands` 同一套）

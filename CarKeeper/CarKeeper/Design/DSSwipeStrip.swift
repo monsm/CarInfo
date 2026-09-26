@@ -370,10 +370,16 @@ struct DSSwipeStrip: View {
         // 于是「宽度变了」只会表现为吸一下，而不是首帧停在错的地方。
         let cShown = clampC(c, lim: lim, gap: gap)
         ZStack(alignment: .leading) {
-            band(barW: barW)
+            //  拖动中它不在场（见 `band` 的说明）。
+            if !dragging {
+                band(barW: barW)
+                    .transition(.opacity)
+            }
             capsule(barW: barW, gap: gap)
             labels(gap: gap, barW: barW, c: cShown)
         }
+        // 溶解 / 回来那一下的过渡（`if` 拿掉的东西要有人接住，否则是硬闪）。
+        .animation(TokensMotion.fade, value: dragging)
         // 条子**自己就是这个宽度**：它不再是「HStack 挤压出来的弹性视图」，
         // 所以「几何用的宽度」与「渲染出来的宽度」不可能两套（见文件头）。
         .frame(width: barW, height: barHeight)
@@ -406,12 +412,16 @@ struct DSSwipeStrip: View {
     /// 两个数（2026-09-26 的上一版正是「宿主画一条通铺的、条子在里头又画一条窄的」）。
     ///
     /// 拖动时它**溶解掉**（相机图 2 / 图 3 的黑底里量不到它）：这是那个动态态的第一步。
+    ///
+    ///  ⚠️ 2026-09-26：它曾经是 `.opacity(dragging ? 0 : 1)` —— 与两枚圆钮同一版写法，
+    ///  也因此与它们同一个后果：这一整条都在一个 `GlassEffectContainer` 里，
+    ///  容器的职责是把子视图的玻璃**合成成一个形状**，透明度 0 在它眼里只是「内容不见了」，
+    ///  那块底玻璃仍然算在这一层里。现在它由 `body` 里的 `if` 决定在不在，
+    ///  淡出交给 `.transition(.opacity)`（理由与圆钮那两枚写在 `MapSpineView.arm`）。
     private func band(barW: CGFloat) -> some View {
         Color.clear
             .frame(width: barW, height: barHeight)
             .dsGlass(in: Capsule())
-            .opacity(dragging ? 0 : 1)
-            .animation(TokensMotion.fade, value: dragging)
             .allowsHitTesting(false)
     }
 

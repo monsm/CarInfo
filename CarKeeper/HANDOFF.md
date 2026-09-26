@@ -2536,7 +2536,10 @@ mismatching types 'Color' and 'AnyShapeStyle'
   宿主的 `barDragging` 让两枚圆钮让位（`DSSwipeStrip.onDragging` 报上去）。
 - 字画到条子外面是**故意的**：`frame` 不动（布局因此不抖），变的只有那块遮罩。
 
-### 29.3 一处新的取舍：圆钮的让位用**透明**，不是「不在场」
+### 29.3 ⛔ 这一节的结论**已作废**（2026-09-26 当天，见 §30.2 第三条）
+
+「圆钮的让位用透明」是错的：用户装上之后报「滚动时俩边的圆胶囊怎么不消失了」。
+原因与修法写在 §30.2；下面这段保留原样，因为它记的是**当时为什么那样想**。
 
 文件末尾那段历史说「真玻璃上的消失必须是不在场」（`ArmSlot` 那次的教训）。这次**反过来**，
 理由写得进代码：带子的宽度就是「两钮之间那一段」，钮真的不在场就会把这一段撑宽，于是正在
@@ -2545,6 +2548,7 @@ mismatching types 'Color' and 'AnyShapeStyle'
 `GlassEffectContainer`，而不是改宽度。
 
 ### 29.4 一处如实写下的偏离（与 §28.5 同一条的另一半）
+
 
 相机两枚圆钮离屏边 **33pt**，我们仍是 **8pt**（`barPad`，原型 `.bottom{padding:0 8px}` 的值）。
 不照做是算术：我们的条高比相机大 15%（54 / 47），把外边距也放到 33，248pt 的带子会被挤到
@@ -2562,3 +2566,83 @@ mismatching types 'Color' and 'AnyShapeStyle'
 只有真机能验：**字溢出条子会不会被上游裁掉**（`frame` 之外绘制依赖没有别的 `.clipped()`；
 若真机上字在 248pt 处被切，就把遮罩与坐标搬进宿主）、圆钮透明后有没有鬼影、以及
 「拖动时字铺满整屏」在 390pt 上的观感。
+
+---
+
+## §30 第二十轮（2026-09-26）：相机到底拿什么挡住「降低透明度」、卡片变大的账、圆钮真的移出层级
+
+用户这一轮一次说了三件事，而它们分别落在**三处**、根因各不相同：
+
+  1. 「每个界面的卡片怎么都变大了」
+  2. 「把系统的液态玻璃变成了最不通透（辅助功能 → 显示与文字大小 → 降低透明度），
+     我们的 app 变成了这样，而相机的几乎没变 —— 你好好分析下相机的层结构」
+  3. 「现在滚动 俩边的圆胶囊怎么不消失了」
+
+### 30.1 第一条：全局文字外壳的留白**改了排版**
+
+`DSTextGlow.displayPadding` 此前返回「四面各留一格 = 外壳半径（3pt）」。Apple 对这个属性的
+原话是 *「Returns the size of the extra padding added to any drawing layer used to rasterize the
+text. For example when drawing the text with a shadow this may be used to extend the drawing
+bounds to avoid clipping the shadow.」* —— 而那圈留白**就是这段文字的
+排版尺寸**：每行字高 6pt，而卡片是按内容撑高的 → 全 App 每一张卡片都跟着长（一张五行字的卡
+约 +30pt）。
+
+为什么现在才看得见：`displayPadding` 与全局外壳是同一个提交进来的，而那一次 CI 是**红的**
+（编译错，见 §26），所以用户上一个能装的包里还没有外壳 —— 他看到的「变大」就是这一处。
+
+修法：`displayPadding` 返回 `EdgeInsets()`。**发光是绘制，不是排版** —— 一个效果不该把整棵
+界面的尺寸往下推。代价如实写在那里：壳比字宽出 3pt 而没有留白，**最外那一圈会被裁掉**
+（字形自己的侧边距还在）。真机上若嫌壳太弱，正解是让**宿主**留白，而不是让每一行字自己撑。
+
+### 30.2 第二条：相机为什么不变 —— 它那一块面是**它自己画的**
+
+先量再改（用户那张截图 888×542，用他自己的底条当尺子：条高 128px = 54pt → 2.37 px/pt）：
+
+- 卡片内部**能看出底下的地图纹理**（亮度起伏 74…180），整块只比周围的地图亮 ~20/255；
+  → 系统的降法不是「变成不透明的面色」，而是**去掉模糊、只留一层淡色**。
+- 而字是白的：`TokensPalette.primary` = `.label`，深色下就是白 —— **白字压在淡色上**。
+- 同一屏每一块玻璃都是这个形态，所以整屏像被几块浅色大方块盖住（远看就是「卡片变大了」）。
+
+相机为什么几乎没变：**它那条底子底下没有系统材质** —— 那是一层半透明黑（自己画的）。
+「降低透明度」能降的只有材质，没有材质就没有可降的东西。（与 §29 那条「带子是一片均匀的填充、
+看不出底下的草皮纹理」是同一份测量。）
+
+所以「像相机」不是照抄它的形状，而是：**这块面的样子由我们自己保证**。正常档交给
+`.glassEffect`（折射 / 高光 / 按压都归系统），无障碍档自己给一块实底 ——
+HIG 对同一件事的写法就是 *「offer solid-fill alternatives at component level」*。
+
+落下来的：`Design/DSGlass.swift` 多一个 `DSGlassSurface`（`View`，不是 `ViewModifier`），
+读 `@Environment(\.accessibilityReduceTransparency)`，那一档画
+**`TokensPalette.surface` 的不透明实底 + 同一圈发丝线**。为什么必须是一个 `View`：
+扩展函数里读不到 `@Environment`（玻璃得先是一个 `View` 才知道用户开了没有）。
+调用点一个字未改 —— 入口仍然只有 `dsGlass` 一个。
+
+### 30.3 第三条：`GlassEffectContainer` 会把子视图的玻璃合成成一个形状
+
+`barDragging` 的接线一直是通的（`DSSwipeStrip.onDragging` → `MapSpineView.barDragging`），
+而两枚圆钮那版是 `.opacity(barDragging ? 0 : 1)`。这一整行（两钮 + 带子 + 胶囊）在**同一个
+`GlassEffectContainer`** 里，而那个容器的职责就是把子树里的玻璃**合成成一个形状** ——
+透明度 0 在它眼里只是「内容不见了」，那块圆玻璃仍然算在这一层里。
+（§29.3 的结论因此作废：那里写的「用透明而不是不在场」正是这一条的病根。）
+
+修法：`arm(...)` / `quickArm` 改成 `@ViewBuilder` + `if barDragging`（不在场），占位是一块
+**同尺寸**的空视图（`armSize`：底玻璃的宽度 = 两钮之间那一段，它必须一个字不变），淡出交给
+`.transition(.opacity)` + 行上的 `.animation(TokensMotion.fade, value: barDragging)`。
+带子同样处理（`DSSwipeStrip.body` 的 `if !dragging` + `.transition(.opacity)`）。
+
+### 30.4 验证状态
+
+`python3 scan/all.py` —— **34/34 全绿**（`MapSpineView.swift` 1198 行、`DSSwipeStrip.swift` 670 行、
+`DSGlass.swift` 209 行、`InkGlow.swift` 121 行；这一轮没动任何门禁）。
+
+只有 CI 能验：`DSGlassSurface` 的成员初始化器（声明顺序 = 调用点顺序）、`arm` / `quickArm` 的
+`@ViewBuilder` 分支、`@Environment(\.accessibilityReduceTransparency)` 这个名字、
+以及 `if` 里的 `.transition(.opacity)`。
+
+只有真机能验（也是这一轮风险最高的三处）：
+  · **容器还能不能看见包在 `DSGlassSurface` 里的玻璃**（多一层自定义视图之后，两钮 / 带子 /
+    胶囊之间的折射与合并是否照旧）。这是唯一一处「可能白改」；不行就把 `glassEffect` 那半边
+    搬回调用点，只把实底留在包装里。
+  · 圆钮**移出层级**之后，正拖到一半的手指会不会被中断（若中断，退路是回到透明度版本 +
+    把圆钮挪出 `GlassEffectContainer`，而不是改宽度）。
+  · 降低透明度那一档下：实底 + `.label` 的白字 / 黑字读不读得出来、发丝线够不够把卡片与背后分开。
