@@ -249,9 +249,8 @@ struct MapSpineView: View {
     private static let barTotal: CGFloat = 94
     /// 底条离底多远（原型 `.bottom{bottom:26px}`）
     private static let barGap: CGFloat = 26
-    /// 两侧圆钮的直径（原型 `.arm{width:calc(var(--H) + 4px)}`）——
-    /// 条高从 46 抬到 54（2026-09-25），圆钮按原型那条关系一起走到 58。
-    private static let armSize: CGFloat = 58
+    /// 圆钮直径 —— **与条高相等**（2026-09-26 裁图量到圆钮与带子同为 144px；我们条高 54）。
+    private static let armSize: CGFloat = 54
 
     /// 左钮 / 模式条 / 右钮之间的中缝。
     ///
@@ -280,15 +279,24 @@ struct MapSpineView: View {
     @State private var quickRequest: ControlRequest?
     /// 这一行能分到多宽（由 `bottomBar` 的背景量出；0 = 还没量到）。
     @State private var containerWidth: CGFloat = 0
+    /// 条子上正在拖（`DSSwipeStrip` 报上来的）—— 两枚圆钮靠它让位。
+    @State private var barDragging = false
+
     /// 整行宽度 = 屏幕宽 − 两侧各 8 的留白（兜底 374 = 390 屏宽 − 16）。
     /// ⚠️ 它不是条子拿到的宽度（条子拿到的是 `stripLaneWidth`）。
     private var barRowWidth: CGFloat {
         containerWidth > 0 ? max(160, containerWidth - 2 * Self.barPad) : 374
     }
-    /// 两枚圆钮之间那一段 —— 条子**能动用**的全部宽度（`DSSwipeStrip` 的几何输入）。
-    /// 「只露三档」是**两枚钮在这一行**的后果（相机同款），不是另一个审美选择。
+    /// 两枚圆钮之间那一段 —— 条子能动用的全部宽度，**同时也正是它那条底玻璃的宽度**
+    ///（相机量到的那一条 215pt 恰好等于这一段）。「只露三档」是两钮在这一行的后果。
     private var stripLaneWidth: CGFloat {
         max(120, barRowWidth - 2 * Self.armSize - 2 * Self.barSeam)
+    }
+
+    /// 拖动时字可以画到多宽 = **整屏**（相机拖动态：六档铺满、两端被屏幕边切）；
+    /// 首帧还没量到时退回行宽（少 8pt，看不出区别）。
+    private var stripSpillWidth: CGFloat {
+        containerWidth > 0 ? containerWidth : barRowWidth
     }
 
     var body: some View {
@@ -553,12 +561,8 @@ struct MapSpineView: View {
     /// 为什么两臂必须在这里：原型那条子**不是**孤零零一根——两边各有一枚玻璃圆钮，
     /// 左边是车、右边是动作。它让「模式条」看起来是相机的那排控件，而不是一根付出代价的浮条。
     private var bottomBar: some View {
-        //  ⚠️ 2026-09-26 改了两遍，第二遍才对（用户：「你并没有仔细看相机底部导航静态
-        //  和动态时的结构」）。第一版把两枚圆钮挤到条子上面那一行，理由是「条子只剩
-        //  240pt」—— 那条推理是反的：相机里两枚钮（缩略图、翻转镜头）**本来就在这一行**，
-        //  正因如此条子才放得下三档（静态量到：只画当前档 ±1，字心距屏幕底 ≈57pt）。
-        //  用户选了「带子跟手、胶囊永远居中」这一种跟手形态（不是相机那种会变高变实的
-        //  动态态），所以这里只有一行、高度恒定，变的只有字的位置。
+        //  ⚠️ 2026-09-26 改了三遍，差别全在一个地方：底玻璃是什么形状（量到的数与历史见
+        //  `DSSwipeStrip` 文件头）。现在是：两钮之间那一条胶囊 + 相机的动态态。
         HStack(spacing: Self.barSeam) {
             //  左臂原来是**车牌的前两个字**（「鄂A」），2026-09-25 改成车的图形
             //（用户：「车牌名删除」）—— 它本来就是「回到车辆那一档」这一个动作。
@@ -573,8 +577,12 @@ struct MapSpineView: View {
             Spacer(minLength: 0)
             DSSwipeStrip(items: HomeMode.stripItems,
                          selectedID: $homeModeRaw,
-                         // 条子的几何只用「两枚圆钮之间那一段有多宽」这一个输入。
+                         // 两枚圆钮之间那一段（同时就是它那条底玻璃）。
                          availableWidth: stripLaneWidth,
+                         // 拖动时字铺到整屏 —— 条子的 `frame` 不动，变的只是裁字的遮罩。
+                         spillWidth: stripSpillWidth,
+                         // 拖动开始 / 结束 → 两枚圆钮让位（带子溶解、胶囊长高也在条子里）。
+                         onDragging: { now in barDragging = now },
                          // 显式标签：尾随闭包在两个函数参数之间靠扫描规则匹配，
                          // 读的人得翻定义才知道 `{ pos in }` 落在哪个参数上 —— 这正是
                          // `2f088df` 那次 CI 红掉的形态。
@@ -586,8 +594,8 @@ struct MapSpineView: View {
             quickArm
         }
         .padding(.horizontal, Self.barPad)
-        // 通铺的底玻璃：画在**留白之内**那一行后面，靠负 padding 铺到屏幕两边。
-        .background { band }
+        //  （这里曾有 `.background { band }`（通铺矩形底玻璃）。2026-09-26 删：底玻璃现在是
+        //   条子自己身上那条胶囊（`DSSwipeStrip.band`），两处各画一次就成了「窄的坐在宽的里」。）
         .padding(.bottom, Self.barGap)
         .frame(maxWidth: .infinity)
         // 带子 / 两枚圆钮 / 选中胶囊是**同一层**里的形状：交给 `GlassEffectContainer`
@@ -607,17 +615,6 @@ struct MapSpineView: View {
                     .onChange(of: g.size.width) { _, w in containerWidth = w }
             }
         }
-    }
-
-    /// 贴底那条**通铺的玻璃带**（相机那条：顶边一条直线，左右铺到屏幕两边）——
-    /// 它是这一行**唯一**的底玻璃。相机那条一直铺到屏幕最下沿，我们停在离底 26pt：
-    /// MapKit 的法律信息与「高德地图」就在这 26pt 里（要铺到底，加一行
-    /// `.padding(.bottom, -Self.barGap)`）。
-    private var band: some View {
-        Color.clear
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .dsGlass(in: Rectangle())
-            .padding(.horizontal, -Self.barPad)
     }
 
     /// 底条整行的横向拖（用户 2026-09-24：「不跟手」→ 手指按在条子**任意位置**
@@ -702,6 +699,9 @@ struct MapSpineView: View {
                 .foregroundStyle(current ? TokensPalette.accent : TokensPalette.primary)
         }
         .frame(width: Self.armSize, height: Self.armSize)
+        //  条子上正在拖时它**让位**（用透明的理由写在 `DSSwipeStrip` 文件头）。
+        .opacity(barDragging ? 0 : 1)
+        .animation(TokensMotion.fade, value: barDragging)
         .contentShape(Circle())
     }
 

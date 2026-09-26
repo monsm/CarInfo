@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>相机底部导航 · 按三张裁图量出来的静态态与拖动态（2026-09-26）</title>
+<style>
+  :root{
+    --bg:#08080a; --bg2:#131317; --line:#26262c;
+    --yellow:#FFD60A;                 /* 量自截图：选中那一档的字 */
+    --f:"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:#eae8e3;font-family:var(--f)}
+  body{padding:22px 20px 80px}
+  h1{font-size:19px;margin:0 0 6px;font-weight:650}
+  h2{font-size:14px;margin:30px 0 10px;font-weight:600;color:#f2efe9;
+     border-left:3px solid #2f6fe4;padding-left:8px}
+  .lede{color:#9a9aa2;font-size:12.5px;line-height:1.85;max-width:1080px;margin:0 0 14px}
+  .facts{background:var(--bg2);border:1px solid var(--line);border-radius:14px;
+         padding:13px 16px;max-width:1080px;font-size:12.5px;line-height:1.85;color:#c9c8cf}
+  .facts b{color:#f0e6cf}
+  .facts .un{color:#d9a86a}
+  .facts .ok{color:#7fc48a}
+  table{border-collapse:collapse;margin:8px 0 2px;font-size:12px}
+  th,td{border:1px solid var(--line);padding:4px 9px;text-align:left;color:#c9c8cf}
+  th{color:#8f8f98;font-weight:500;background:#0d0d10}
+  .frames{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+  .frame{width:393px;height:300px;position:relative;overflow:hidden;border-radius:16px;
+         border:1px solid var(--line)}
+  .frame .cap{position:absolute;left:10px;top:8px;font-size:11px;color:#8b8b93;z-index:9}
+  .wall{position:absolute;inset:0;
+        background:
+          radial-gradient(120% 80% at 20% 100%, #3b2f24 0%, transparent 60%),
+          radial-gradient(90% 70% at 85% 90%, #1d2a33 0%, transparent 55%),
+          linear-gradient(180deg,#0d0d10 0%, #050506 100%);}
+  .wall::after{content:"";position:absolute;inset:0;
+        background:linear-gradient(180deg, rgba(255,255,255,.05) 0%, transparent 40%);}
+  /* ---- 底条那三块：与 Swift 侧同一套数（47pt 行高、9pt 中缝、33pt 外边距） ---- */
+  /* 两枚圆钮在 in-flow 里被 space-between 推到两端、各自离屏边 33px（量到 102px/3.07）；
+     带子/标签/胶囊/光标都是 absolute，居中在行里，不进 flex 流。 */
+  .row{position:absolute;left:0;right:0;bottom:33px;height:47px;display:flex;
+       align-items:center;justify-content:space-between;padding:0 33px;
+       touch-action:none;user-select:none}
+  .arm{width:47px;height:47px;border-radius:50%;flex:0 0 auto;position:relative;
+       background:rgba(120,120,128,.36);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+       transition:opacity .18s ease}
+  .arm::after{content:"";position:absolute;inset:0;border-radius:50%;
+       box-shadow:inset 0 0 0 .5px rgba(255,255,255,.18)}
+  .thumb{background:linear-gradient(160deg,#8d7a5f 0%, #4a4034 55%, #23201b 100%);
+         overflow:hidden}
+  .thumb i{position:absolute;left:22%;top:18%;width:56%;height:56%;border-radius:50%;
+           background:#f4f2ee;box-shadow:0 0 0 6px rgba(0,0,0,.18)}
+  .glyph{display:flex;align-items:center;justify-content:center;color:#fff;opacity:.95}
+  .glyph svg{width:26px;height:26px}
+  /* 带子：胶囊形（量到两端半圆），只画静态态；拖动时它溶解 */
+  .band{position:absolute;left:50%;transform:translateX(-50%);height:47px;border-radius:23.5px;
+        background:rgba(120,120,128,.22);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+        box-shadow:inset 0 0 0 .5px rgba(255,255,255,.10);
+        transition:opacity .18s ease, width .18s ease;
+        overflow:hidden}
+  /* 拖动时：标签层铺满整屏，两端的档被屏幕边缘切掉 */
+  /* z-index：字在胶囊**之上**（网图 1 里「照片」是在胶囊上面读到的黄色） */
+  .labels{position:absolute;left:0;right:0;top:0;bottom:0;overflow:hidden;z-index:2}
+  .labels span{position:absolute;top:50%;transform:translate(-50%,-50%);
+        font-size:13px;letter-spacing:.4px;white-space:nowrap;color:rgba(255,255,255,.97);
+        font-weight:400;transition:color .12s linear}
+  .labels span.sel{color:var(--yellow)}   /* 最外那一档的变暗是内联的渐变，见 render() */
+  /* 选中胶囊：钉在带子正中，永远不动 */
+  .loupe{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+        width:71px;height:40px;border-radius:20px;pointer-events:none;
+        background:linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.07));
+        box-shadow:inset 0 0 0 1px rgba(255,255,255,.24),
+                   inset 0 1px 0 rgba(255,255,255,.45),
+                   0 1px 6px rgba(0,0,0,.35);
+        backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:1;
+        transition:width .18s ease, height .18s ease, border-radius .18s ease}
+  .caret{position:absolute;top:50%;transform:translate(-50%,-50%);
+        width:2px;height:26px;border-radius:1px;background:#4c9bf5;z-index:3;
+        opacity:0;transition:opacity .12s linear}
+  .hint{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:11px;color:#6e6e77}
+  .note{max-width:1080px;font-size:12.5px;line-height:1.9;color:#c9c8cf;
+        background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 16px}
+  .note b{color:#f0e6cf}
+</style>
+</head>
+<body>
+
+<h1>相机底部导航 · 按三张裁图量出来的两态</h1>
+<p class="lede">
+  这三张是裁出来的（1206 宽 = 393pt 屏，3.07 px/pt），所以能量准。下面每个数都是量出来的，
+  不是看着像；括号里是对应到我们 App 的比例。<b>两处推翻了我自己上一轮的读法</b>，见 ① ②。
+</p>
+
+<div class="facts">
+  <b>量到的（px → pt）</b>
+  <table>
+    <tr><th></th><th>静态（图 1）</th><th>拖动中（图 2 / 图 3）</th></tr>
+    <tr><td>底带</td><td><b>660×144 px</b>（215×47pt），两端<b>半圆</b>（胶囊），悬在<b>两枚圆钮之间</b></td>
+        <td><b>没有了</b>——黑底上量不到任何带子（拖动时它溶掉）</td></tr>
+    <tr><td>可见档数</td><td><b>3</b>：视频 / 照片 / 人像（当前档 ±1）</td>
+        <td><b>6 档铺满整屏</b>，最外那档被屏幕边切掉</td></tr>
+    <tr><td>字距（节距）</td><td colspan="2"><b>190 px = 62pt</b>（≈ 1.32 × 带高；我们 74pt / 54pt = 1.37 ✓ 同量级）</td></tr>
+    <tr><td>字高 / 字号</td><td colspan="2">glyph 40px → <b>13pt</b>（带高 3.6 × 字高；我们 54/15 = 3.6 ✓ 一样）</td></tr>
+    <tr><td>选中胶囊</td><td><b>219×124 px</b>（71×40pt）＝ <b>0.86 × 带高</b></td>
+        <td><b>237×144 px</b>（77×47pt）＝ 长到 <b>满行高</b>，宽 2.5 × 字宽</td></tr>
+    <tr><td>胶囊位置</td><td>带子正中</td>
+        <td><b>仍在正中</b>（两图都量到 603px = 屏正中）——跟着手指的是<b>字</b>，不是胶囊</td></tr>
+    <tr><td>两枚圆钮</td><td>直径 <b>144px（47pt）</b>，与带子<b>等高</b>，在带子两端；中缝 <b>28px = 9pt</b></td>
+        <td><b>不在场</b></td></tr>
+    <tr><td>选中字色</td><td colspan="2">黄（<code>#FFD60A</code> 量级）；其余纯白、无底无边；最外那档被切时约暗到 55–60%</td></tr>
+  </table>
+  <br>
+  <b>两处推翻我上一轮的读法</b><br>
+  ① <span class="un">静态那条带子<b>不是通铺全宽</b></span>：它是<b>两枚圆钮之间</b>的一条<b>胶囊</b>（两端半圆、215×47pt、悬空、与圆钮之间留 9pt）。<br>
+  ② <span class="un">拖动时胶囊<b>不跟手</b></span>：它在两帧里都稳稳居中；跟手的是字，最靠近正中的那一档转黄（图 3 里 照片 偏左、光标在 495px，胶囊仍在 603px）。<br>
+  <span class="ok">✓ 与我们的实现一致的一条</span>：拖的是整行、透镜钉在正中（就是我们 `DSSwipeStrip` 现在的跟手形态，也是你选的那一条）。<br>
+  <span class="ok">✓ 另一条一致</span>：最外的字被切掉那一下<b>不是硬切</b>——量到它同时变暗到 ~57%，像是在窗口边缘渐隐。
+</div>
+
+<h2>三张图各是什么样（按量到的数 1:1 复刻）</h2>
+<div class="frames" id="frames"></div>
+
+<h2>拖一下看看（这一块可以按住左右拖）</h2>
+<div class="frames">
+  <div class="frame" id="live" style="height:300px">
+    <div class="cap">交互 · 按住左右拖</div>
+    <div class="wall"></div>
+    <div class="row" id="liveRow">
+      <div class="arm thumb"><i></i></div>
+      <div class="band" id="liveBand"></div>
+      <div class="labels" id="liveLabels"></div>
+      <div class="loupe" id="liveLoupe"></div>
+      <div class="caret" id="liveCaret"></div>
+      <div class="arm glyph" id="liveFlip"></div>
+    </div>
+    <div class="hint">按下 → 圆钮消失、带子溶解、胶囊长到满高；松手 → 吸回最近一档并复位</div>
+  </div>
+  <div style="width:393px">
+    <div class="note" id="liveNote">当前档：<b>照片</b>（静止）</div>
+  </div>
+</div>
+
+<h2>我们现在的实现 vs 相机（同一个比例画出来）</h2>
+<div class="frames" id="ours"></div>
+<div class="note" style="margin-top:14px">
+  <b>已经按这三张图改完了</b>（Swift 侧，等 CI 编）：底玻璃从「通铺矩形」改成<b>两钮之间那一条胶囊</b>
+  （宽度 = 两枚 54pt 圆钮之间那一段 = 248pt，正是相机那 215pt 的同一个量）；圆钮 58 → <b>54</b>（与带同高）；
+  档距 74 → <b>71</b>（带高 54 × 相机那条 1.32）；胶囊 <b>0.86 × 行高 → 拖动时长到 1.0</b>；
+  拖动时圆钮让位、带子溶解、字铺到整屏、最外那档降到 0.55。唯一没照做的是外边距：相机两钮离屏边 33pt，
+  我们仍是 8pt（条高比相机大 15%，33pt 会把 248 的带子挤到装不下三档）。
+</div>
+
+<script>
+/* ==========================================================================
+   量到的数（px @3.07 px/pt → pt）
+     pitch 190px = 62pt · 带 660×144px = 215×47pt（胶囊，半圆端）
+     胶囊静态 219×124px = 71×40pt（0.86×带高）· 拖动 237×144px = 77×47pt（1.0）
+     圆钮 144px = 47pt（= 带高）· 中缝 28px = 9pt · 字 13pt · 黄 #FFD60A
+   ========================================================================== */
+const MODES = ['电影效果','视频','照片','人像','空间','全景'];
+/* 量到的三个几何常量 —— 静态窗口之所以正好只装得下三档，就是因为 215 < 2×62 + 字宽 */
+const PITCH = 62;      /* 190px / 3.07 */
+const BAND_W = 215;    /* 660px / 3.07（两端半圆的胶囊） */
+const ROW_H = 47;      /* 144px / 3.07，与圆钮等高 */
+
+/* 一个渲染器，四个调用点（三个证据帧 + 一个交互帧）都用它 —— 一处实现，不抄四遍。 */
+function render(row, opts){
+  /* 圆钮在拖动时不在场（图 2/图 3 量不到它们），所以默认值就是 `!dragging` */
+  const { pos, dragging, caret, band=true, arms=!dragging } = opts;
+  const bandEl = row.querySelector('.band');
+  const armsEls = row.querySelectorAll('.arm');
+  const labelsEl = row.querySelector('.labels');
+  const loupeEl = row.querySelector('.loupe');
+  const caretEl = row.querySelector('.caret');
+  const W = row.clientWidth;
+  const pitch = PITCH;
+  const centre = W / 2;
+
+  armsEls.forEach(a => a.style.opacity = arms ? '1' : '0');
+  /* 带子：静态时 215pt 胶囊（两端半圆）；拖动时溶掉（黑底上量不到它） */
+  bandEl.style.opacity = (band && !dragging) ? '1' : '0';
+  bandEl.style.width = BAND_W + 'px';
+  /* 标签层：静态时裁在带子里，拖动时铺满整屏 —— 这就是「只露三档」的机制 */
+  const clip = (band && !dragging) ? BAND_W : W;
+  labelsEl.style.width = clip + 'px';
+  labelsEl.style.left = ((W - clip) / 2) + 'px';
+
+  /* 最靠近正中的那一档 = 选中（拖动中也一样：两帧量到它就在正中） */
+  let best = 0, bestD = 1e9;
+  MODES.forEach((m, i) => {
+    const d = Math.abs(i - pos);
+    if (d < bestD) { bestD = d; best = i; }
+  });
+
+  labelsEl.innerHTML = '';
+  MODES.forEach((m, i) => {
+    /* 静止时只画当前档 ±1，别的一档都不存在（截图 1 里量到的正好是三行字）——
+       与我们 Swift 侧的 `neighbors = 1` 是同一件事，不靠裁剪把多的挡在外面。 */
+    if (band && !dragging && Math.abs(i - pos) > 1.5) return;
+    const x = centre + (i - pos) * pitch - (W - clip) / 2;
+    const s = document.createElement('span');
+    s.textContent = m;
+    s.style.left = x + 'px';
+    if (i === best) s.classList.add('sel');
+    /* 被窗口/屏幕边切掉的那一档变暗（图 2 量到 ~57%） */
+    const half = clip / 2, edge = Math.abs((x + (W - clip) / 2) - centre);
+    if (edge > half - 20) s.classList.add('far');
+    /* 被窗口/屏幕边切掉的那一档渐变变暗（图 2/图 3 量到最外那档约暗到 55–60%） */
+  const off = Math.abs(x - centre);
+  if (off > 110) s.style.opacity = String(Math.max(0.32, 1 - (off - 110) / 90 * 0.68));
+  labelsEl.appendChild(s);
+  });
+
+  loupeEl.style.width = (dragging ? 77 : 71) + 'px';
+  loupeEl.style.height = (dragging ? ROW_H : 40) + 'px';
+  loupeEl.style.borderRadius = (dragging ? 23.5 : 20) + 'px';
+  lonote(row, best, dragging);
+  caretEl.style.left = (centre + (caret || 0)) + 'px';
+  caretEl.style.opacity = (dragging && caret !== undefined) ? '1' : '0';
+}
+function lonote(row, best, dragging){
+  const n = document.querySelector('#liveNote');
+  if (n && row.id === 'liveRow') {
+    n.innerHTML = '当前档：<b>' + MODES[best] + '</b>（' + (dragging ? '拖动中' : '静止') + '）';
+  }
+}
+
+function makeFrame(id, opts, caption){
+  const f = document.createElement('div');
+  f.className = 'frame';
+  f.innerHTML =
+    '<div class="cap">' + caption + '</div>' +
+    '<div class="wall"></div>' +
+    '<div class="row">' +
+      '<div class="arm thumb"><i></i></div>' +
+      '<div class="band"></div>' +
+      '<div class="labels"></div>' +
+      '<div class="loupe"></div>' +
+      '<div class="caret"></div>' +
+      '<div class="arm glyph">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7">' +
+        '<path d="M4.5 9.2a8 8 0 0 1 13.6-2.4"/><path d="M19.5 14.8a8 8 0 0 1-13.6 2.4"/>' +
+        '<path d="M18.6 4.6v2.6h-2.6"/><path d="M5.4 19.4v-2.6h2.6"/></svg>' +
+      '</div>' +
+    '</div>';
+  document.getElementById(id).appendChild(f);
+  const row = f.querySelector('.row');
+  requestAnimationFrame(() => render(row, opts));
+  return f;
+}
+
+/* ---- 三个证据帧：与三张裁图一一对应 ---- */
+/* 图 1：静态、当前档 = 照片（index 2） */
+makeFrame('frames', { pos: 2, dragging: false, caret: 0, band: true }, '图 1 · 静态：视频 照片 人像（两端是圆钮）');
+/* 图 2：拖动中、人像（index 3）正好在正中，光标在正中 */
+makeFrame('frames', { pos: 3, dragging: true, caret: 0 }, '图 2 · 拖动中：人像居中、六档铺满');
+/* 图 3：拖动中、照片（index 2.45）偏左，光标在 −108px */
+makeFrame('frames', { pos: 2.45, dragging: true, caret: -35 }, '图 3 · 拖动中：照片偏左、光标在它左边');
+
+/* ---- 我们**已经落进 Swift** 的 v18：两态各一帧 ----
+   数不是另画一套，全部来自那几个常量：
+     条宽 = 两枚 54pt 圆钮之间那一段 = 248（相机那 215pt 是同一个量）
+     节距 71 = 带高 54 × 1.32 · 字号 15 = 0.277 × 带高（两条都是相机量到的关系）
+     胶囊 82×46（1.15×节距、0.86×带高）→ 拖动 88×54（1.24×节距、1.0×带高）
+     拖动中：圆钮让位、带子溶解、字铺到 390、最外那档降到 0.55 */
+(function oursFrames(){
+  const TABS = ['行程','现在','充电','车控','我的'];
+  const PITCH = 71, LANE = 248, ROW_H = 54, SCREEN = 390;
+  [[false, '我们 v18 · 静止（只当前档 ±1）'], [true, '我们 v18 · 拖动中（圆钮让位、带子溶解）']]
+    .forEach(function (pair) {
+      const drag = pair[0];
+      const f = document.createElement('div');
+      f.className = 'frame';
+      f.style.width = SCREEN + 'px';
+      f.innerHTML = '<div class="cap">' + pair[1] + '</div><div class="wall"></div>';
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.style.bottom = '26px';
+      row.style.height = ROW_H + 'px';
+      row.style.padding = '0 8px';
+      row.innerHTML =
+        '<div class="arm" style="width:' + ROW_H + 'px;height:' + ROW_H + 'px;opacity:' + (drag ? 0 : 1) + '"></div>' +
+        '<div style="flex:1"></div>' +
+        '<div class="arm" style="width:' + ROW_H + 'px;height:' + ROW_H + 'px;opacity:' + (drag ? 0 : 1) + '"></div>';
+      /* 底玻璃：静止 = 两钮之间那一条胶囊（与带同高）；拖动中溶解 */
+      const band = document.createElement('div');
+      band.className = 'band';
+      band.style.cssText = 'width:' + LANE + 'px;height:' + ROW_H + 'px;border-radius:' + (ROW_H / 2) + 'px;' +
+        'opacity:' + (drag ? 0 : 1);
+      row.appendChild(band);
+      /* 选中胶囊：静止 0.86 × 带高，拖动 1.0 */
+      const loupe = document.createElement('div');
+      loupe.className = 'loupe';
+      loupe.style.cssText =
+        'width:' + Math.round(PITCH * (drag ? 1.24 : 1.15)) + 'px;' +
+        'height:' + Math.round(ROW_H * (drag ? 1 : 0.86)) + 'px;' +
+        'border-radius:' + Math.round(ROW_H * (drag ? 0.5 : 0.42)) + 'px;';
+      row.appendChild(loupe);
+      /* 字：拖动中遮罩铺到整屏，静止只在 248 里（`spillWidth` 与条宽两个数） */
+      const maskW = drag ? SCREEN : LANE;
+      const layer = document.createElement('div');
+      layer.className = 'labels';
+      layer.style.width = maskW + 'px';
+      layer.style.left = ((SCREEN - maskW) / 2) + 'px';
+      const pos = drag ? 2.45 : 2;              /* 与相机图 3 同一个偏法 */
+      /* 坐标是「层内」的，所以渐隐也要用层内的中心量（Swift 那边两处同一个坐标系） */
+      const cx = SCREEN / 2 - (SCREEN - maskW) / 2;
+      let best = 0, bestD = 1e9;
+      TABS.forEach(function (t, i) { const d = Math.abs(i - pos); if (d < bestD) { bestD = d; best = i; } });
+      TABS.forEach(function (t, i) {
+        if (!drag && Math.abs(i - pos) > 1.5) return;   /* 静止只画当前档 ±1 */
+        const x = SCREEN / 2 + (i - pos) * PITCH - (SCREEN - maskW) / 2;
+        const s = document.createElement('span');
+        s.textContent = t;
+        s.style.left = x + 'px';
+        if (i === best) s.classList.add('sel');
+        const over = Math.abs(x - cx) - (maskW - 36) / 2;
+        if (over > 0) s.style.opacity = String(Math.max(0.55, 1 - over / PITCH * 0.45));
+        layer.appendChild(s);
+      });
+      row.appendChild(layer);
+      f.appendChild(row);
+      document.getElementById('ours').appendChild(f);
+    });
+})();
+
+/* ---- 交互帧：按住左右拖 ---- */
+(function live(){
+  const row = document.getElementById('liveRow');
+  let pos = 2, base = 0, startX = 0, dragging = false;
+  const flip = document.getElementById('liveFlip');
+  flip.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7">' +
+    '<path d="M4.5 9.2a8 8 0 0 1 13.6-2.4"/><path d="M19.5 14.8a8 8 0 0 1-13.6 2.4"/>' +
+    '<path d="M18.6 4.6v2.6h-2.6"/><path d="M5.4 19.4v-2.6h2.6"/></svg>';
+
+  function draw(caret){ render(row, { pos, dragging, caret: dragging ? caret : undefined }); }
+
+  row.addEventListener('pointerdown', e => {
+    dragging = true; startX = e.clientX; base = pos;
+    row.setPointerCapture(e.pointerId);
+    draw(e.clientX - row.getBoundingClientRect().left - row.clientWidth / 2);
+  });
+  row.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    pos = base - dx / 62;
+    pos = Math.max(0, Math.min(MODES.length - 1, pos));
+    draw(e.clientX - row.getBoundingClientRect().left - row.clientWidth / 2);
+  });
+  function end(){
+    if (!dragging) return;
+    dragging = false;
+    pos = Math.round(pos);
+    draw(undefined);
+  }
+  row.addEventListener('pointerup', end);
+  row.addEventListener('pointercancel', end);
+  draw(undefined);
+})();
+
+window.addEventListener('resize', () => location.reload());
+</script>
+</body>
+</html>
