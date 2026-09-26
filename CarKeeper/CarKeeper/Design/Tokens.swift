@@ -173,6 +173,27 @@ enum TokensPalette {
     /// 表面上再压一层更亮的形状（规则 ②：一块表面里不再叠第二块玻璃）。
     static let glassHighlight: Color = .white.opacity(0.15)
 
+    // ---- 底条自己画的那两层（相机那条横带的做法）----
+    //
+    //  用户 2026-09-26：「当系统玻璃变最不通透后，我们的底部导航也响应了，而相机的
+    //  不会响应」。相机那条横带底下**没有系统材质** —— 它是自己画的一层半透明面。
+    //  「降低透明度」能降的只有材质；没有材质，就没有可降的东西。
+    //  底条照它做：`DSSwipeStrip.band` 与两枚圆钮的底都用下面这两个值 ——
+    //  于是那个开关对底部导航**没有任何影响**（这正是量出来的差别：系统材质会变，
+    //  自己画的面不会）。
+    /// 底条那条底子。亮：白 72%（`.label` 的黑字压在上面读得出来）；
+    /// 暗：近黑 72%（白字读得出来）。
+    static let barFill: Color = tokenDynamic(light: (1, 1, 1),
+                                             dark: (0.11, 0.11, 0.12),
+                                             alpha: 0.72)
+    /// 底条上**被选中**的那一枚（相机里那枚更亮的胶囊）。它坐在 `barFill` 上，
+    /// 所以是「比底子再偏一层明暗」——**不是玻璃**：一块表面里不再叠第二块玻璃
+    /// （见 `DSGlass.swift` 的规则 ②）。亮色下比底子暗、暗色下比底子亮，
+    /// 两种明暗下都读得出「选中在这儿」。
+    static let barSelection: Color = tokenDynamic(light: (0, 0, 0),
+                                                  dark: (1, 1, 1),
+                                                  alpha: 0.14)
+
     // 已删除：`glassLight`（2026-09-25）。
     // 它是 `fillSubtle` 的**重复声明**（同一个值、两个名字），而「名字里带 glass
     // 的扁平色」正是那一轮材质审核要找的那类谎：谁读到 `glassLight` 都会以为拿到了
@@ -471,13 +492,17 @@ private func tokenColor(_ hex: UInt32, alpha: Double = 1) -> Color {
 
 /// 明暗两套取值。系统深色时取 dark，否则取 light。
 /// （原 `ArtTheme.nativeDynamic`，同一段实现、同一批取值。）
+///
+/// `alpha` 只服务底条那两层（`barFill` / `barSelection`）：它们是**半透明**的面
+/// （相机那条横带就是），而其余每一个令牌都是不透明的系统语义值。
 private func tokenDynamic(
     light: (CGFloat, CGFloat, CGFloat),
-    dark: (CGFloat, CGFloat, CGFloat)
+    dark: (CGFloat, CGFloat, CGFloat),
+    alpha: CGFloat = 1
 ) -> Color {
     Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark
-        ? UIColor(red: dark.0, green: dark.1, blue: dark.2, alpha: 1)
-        : UIColor(red: light.0, green: light.1, blue: light.2, alpha: 1)
+        ? UIColor(red: dark.0, green: dark.1, blue: dark.2, alpha: alpha)
+        : UIColor(red: light.0, green: light.1, blue: light.2, alpha: alpha)
     })
 }

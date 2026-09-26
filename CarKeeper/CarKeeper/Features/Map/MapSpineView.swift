@@ -243,51 +243,54 @@ struct MapSpineView: View {
 
     /// 左钮 / 模式条 / 右钮之间的中缝。
     ///
-    /// 2026-09-25 材质审核：这个 9 原来只在两处出现 —— `HStack(spacing:)` 与
-    /// `DSSwipeStrip` 头注里那句「两侧圆钮各占 50 + 中缝 9×2」。现在它有个名字，
-    /// 因为**玻璃层也要用它**（见 `bottomBar` 的 `dsGlassLayer`）：中缝既是视觉上的
-    /// 「它们是一组」，也是系统判定「多近才算挨着」的距离。两处用同一个值，
-    /// 不能一处改了另一处还在按 9 算宽度。
+    /// 它既是视觉上的「它们是一组」，也是条宽算式里的一个加数（`stripLaneWidth(_:)`）——
+    /// 两处用同一个值，不能一处改了另一处还在按 9 算宽度。
     ///
-    /// ⚠️ 2026-09-25 的 CI：`type 'MapSpineView' has no member 'barSeam'`。
-    /// 上面这段注一直在这儿（它与两个使用点都来自 `444ec88`），而**声明那一行不见了** ——
-    /// 同一笔编辑里丢的，于是文件里留下「注释在、值不在」。
-    ///
-    /// 为什么三条现成的判据都没拦住（两道各有一个原因，写在这里免得下一个人以为
-    /// 它们管得住）：
-    ///   · `delguard.py`（专治「声明没了、使用还在」）要求**旧版本里声明过**这个名字 ——
-    ///     而 `barSeam` **从未在任何提交里被声明过**，判据 ① 不成立，它只能绿。
-    ///     它管的是「这次编辑删掉了什么」，管不了「这次编辑以为加上了什么」。
-    ///   · `scan.py` 的「项目类型的未知成员」看不见 `Self.barSeam`：把 `Self` 当作一个
-    ///     类型名之后，那个名字不在类型表里，判据直接跳过。已加固（同一轮）。
+    /// ⚠️ 2026-09-25 的 CI：`type 'MapSpineView' has no member 'barSeam'` —— 注释在、
+    /// 声明那一行不见了（同一笔编辑里丢的），而当时的判据都没拦住：`delguard.py` 只认
+    /// 「旧版本里声明过」的名字（`barSeam` 从未被声明过），`scan.py` 那时看不见 `Self.xxx`。
     private static let barSeam: CGFloat = 9
     /// 底条两侧留白（原型 `.bottom{padding:0 8px}`）
     private static let barPad: CGFloat = 8
     /// 右臂交出的一条车控请求。它由 `controlCommandFlow` 那道门消费 ——
     /// 验证与温度都在门里，本页只负责把请求交出去（与车控档同一个 modifier）。
     @State private var quickRequest: ControlRequest?
-    /// 这一行能分到多宽（由 `bottomBar` 的背景量出；0 = 还没量到）。
-    @State private var containerWidth: CGFloat = 0
+    //  （这里曾有 `@State containerWidth`：底条量自己那一行的宽来算条宽 ——
+    //    一个自引用，见 `deck` 上那段。宽度现在只有 `deck` 外面量到的一个来源。）
     /// 条子上正在拖（`DSSwipeStrip` 报上来的）—— 两枚圆钮靠它让位。
     @State private var barDragging = false
 
-    /// 整行宽度 = 屏幕宽 − 两侧各 8 的留白（兜底 374）。
-    /// ⚠️ 它不是条子拿到的宽度（条子拿到的是 `stripLaneWidth`）。
-    private var barRowWidth: CGFloat {
-        containerWidth > 0 ? max(160, containerWidth - 2 * Self.barPad) : 374
+    /// 整行宽度 = 屏幕宽 − 两侧各 8 的留白。
+    /// ⚠️ 它不是条子拿到的宽度（条子拿到的是 `stripLaneWidth`），
+    /// 而它的输入**只能是屏幕宽**（不能是量自己量出来的数，见 `deck` 上的那一段）。
+    private func barRowWidth(_ pageWidth: CGFloat) -> CGFloat {
+        max(160, pageWidth - 2 * Self.barPad)
     }
-    /// 两枚圆钮之间那一段 —— 条子能动用的全部宽度，**同时也正是它那条底玻璃的宽度**
+    /// 两枚圆钮之间那一段 —— 条子能动用的全部宽度，**同时也正是它那条底的宽度**
     ///（相机量到的那一条 215pt 恰好等于这一段）。「只露三档」是两钮在这一行的后果。
-    private var stripLaneWidth: CGFloat {
-        max(120, barRowWidth - 2 * Self.armSize - 2 * Self.barSeam)
-    }
-
-    /// 拖动时字可以画到多宽 = **整屏**（相机拖动态）；首帧没量到时退回行宽。
-    private var stripSpillWidth: CGFloat {
-        containerWidth > 0 ? containerWidth : barRowWidth
+    private func stripLaneWidth(_ pageWidth: CGFloat) -> CGFloat {
+        max(120, barRowWidth(pageWidth) - 2 * Self.armSize - 2 * Self.barSeam)
     }
 
     var body: some View {
+        // 屏幕宽从**这一层的外面**量：`GeometryReader` 拿到的是 proposal（= 窗口宽），
+        // 子树无论画出多宽都不会改它 —— 这正是切断那个自引用所需要的那个数。
+        GeometryReader { screen in
+            deck(screenWidth: screen.size.width)
+        }
+    }
+
+    /// 这一屏的本体（原来就是 `body` 的正文，一行未改）。
+    ///
+    /// ⚠️ 2026-09-26（用户：「每个界面的卡片怎么都变大了…而不是和屏幕保持一定的距离」）：
+    /// 这一层钉在**量到的屏幕宽**上（量在它外面，见 `body`）。
+    /// 病根是一个**自引用**：底条用 `GeometryReader` 量自己那一行的宽，再用它算条宽，
+    /// 而那一行的理想宽又由条宽决定（`8 + 54 + 9 + 条宽 + 9 + 54 + 8`）——
+    /// 「量到多少 → 行就有多宽 → 下次就量到多少」，`X ≥ 屏宽` 全是稳定不动点。
+    /// 某一帧量到偏大（换档 / 转场 / 六页同屏那一帧），它就**永久闩在那里**：整层比
+    /// 屏幕宽、在屏幕里居中，于是左右各溢出 ~20pt —— 两枚圆钮被屏幕边切掉、正文落在
+    /// 7pt（应为 36）、带子的字与选中胶囊整体偏出窗口（条子里看起来一个字都没有）。
+    private func deck(screenWidth: CGFloat) -> some View {
         // `MapSpineData.build()` 在这一次求值里**只跑一次**（2026-09-25 性能轮）。
         //
         // 改之前它在一个 `let d = data` 里、又在 `.onChange` 的条件里、还在 `nowLayer` 里
@@ -301,13 +304,13 @@ struct MapSpineView: View {
         // 因为它们本来就是同一个函数的返回值。
         ZStack(alignment: .bottom) {
             // ⓪ 六层页面同屏（原型 `.pages > .page{inset:0}` × 6）。
-            pageDeck()
+            pageDeck(pageWidth: screenWidth)
 
             // ① 顶：底条 = 左臂（车牌）｜模式条｜右臂（搜索），贴底 26。
             //    原型 `.bottom{position:absolute;left:0;right:0;bottom:26;gap:9;
             //    height:calc(var(--H) + 14px)}`：模式条就长在**最底**，
             //    内容从它上面长上去 —— 相机就是这么摆的。
-            bottomBar
+            bottomBar(pageWidth: screenWidth)
 
             // ② 顶：Toast 浮层 —— 抬到条子**之上**。
             //    它原来挂在外壳（`MapShellView`）的 `.bottom` 上（那是屏幕底），
@@ -322,6 +325,9 @@ struct MapSpineView: View {
                     .id(t.text)
             }
         }
+        // 整层的宽钉死到屏幕宽：三个子层都已是确定宽，这一行是最后一道保险 ——
+        // 任何子视图的「理想宽」都不许把这一层撑开（撑开就会整层居中、左右溢出）。
+        .frame(width: screenWidth)
         // 底条离底 26、页面窗到「屏底 − 86」：原型的这两个数都是从**屏幕**量的
         // （`.bottom{bottom:26}` / `.stack{bottom:86}`）。安全区底那 34pt 若不排除，
         // 条子会凭空抬高一截 —— 与原型差出一个手指的宽度。
@@ -548,7 +554,7 @@ struct MapSpineView: View {
     ///
     /// 为什么两臂必须在这里：原型那条子**不是**孤零零一根——两边各有一枚玻璃圆钮，
     /// 左边是车、右边是动作。它让「模式条」看起来是相机的那排控件，而不是一根付出代价的浮条。
-    private var bottomBar: some View {
+    private func bottomBar(pageWidth: CGFloat) -> some View {
         //  ⚠️ 2026-09-26 改了三遍，差别全在一个地方：底玻璃是什么形状（量到的数与历史见
         //  `DSSwipeStrip` 文件头）。现在是：两钮之间那一条胶囊 + 相机的动态态。
         HStack(spacing: Self.barSeam) {
@@ -562,10 +568,10 @@ struct MapSpineView: View {
             Spacer(minLength: 0)
             DSSwipeStrip(items: HomeMode.stripItems,
                          selectedID: $homeModeRaw,
-                         // 两枚圆钮之间那一段（同时就是它那条底玻璃）。
-                         availableWidth: stripLaneWidth,
+                         // 两枚圆钮之间那一段（同时就是它那条底子）。
+                         availableWidth: stripLaneWidth(pageWidth),
                          // 拖动时字铺到整屏 —— 条子的 `frame` 不动，变的只是裁字的遮罩。
-                         spillWidth: stripSpillWidth,
+                         spillWidth: pageWidth,
                          // 拖动开始 / 结束 → 两枚圆钮让位（带子溶解、胶囊长高也在条子里）。
                          onDragging: { now in barDragging = now },
                          // 显式标签：尾随闭包在两个函数参数之间靠扫描规则匹配，
@@ -581,23 +587,17 @@ struct MapSpineView: View {
         .padding(.horizontal, Self.barPad)
         //  (这里曾有 `.background { band }`：底玻璃现在是条子自己那条胶囊，见 `band`。)
         .padding(.bottom, Self.barGap)
-        .frame(maxWidth: .infinity)
-        // 带子 / 两枚圆钮 / 选中胶囊是**同一层**里的形状（间距取中缝那 9）。
-        .dsGlassLayer(spacing: Self.barSeam)
+        // 整行宽 = **量到的屏幕宽**（不是自己量的，见 `deck` 上那一段）。
+        .frame(minWidth: pageWidth, maxWidth: pageWidth)
+        //  （这里曾有 `.dsGlassLayer(...)`：底条当时是玻璃，需要容器把三块形状合成一层。
+        //   2026-09-26 删 —— 底条改成自己画的面（见 `DSSwipeStrip.band`），这一层里
+        //   已经没有玻璃；而那个容器把同层的字与选中胶囊一起吞掉了。）
         // 整行（含离底那 26pt）都算**滑动区**（用户 2026-09-25：「滑动区变高」）。
         .contentShape(Rectangle())
         // 两枚圆钮的淡出（它们是被 `if` 拿掉的，见 `arm`）。
         .animation(TokensMotion.fade, value: barDragging)
         // 跟手手势挂整行，理由与两个坑都写在 `bottomBarDrag` 的注释里（一处）。
         .simultaneousGesture(bottomBarDrag)
-        // 量这一行：用背景量而不是用 `GeometryReader` 包住整行 —— 背景不参与布局。
-        .background {
-            GeometryReader { g in
-                Color.clear
-                    .onAppear { containerWidth = g.size.width }
-                    .onChange(of: g.size.width) { _, w in containerWidth = w }
-            }
-        }
     }
 
     /// 底条整行的横向拖（用户 2026-09-24：「不跟手」→ 手指按在条子**任意位置**
@@ -650,52 +650,59 @@ struct MapSpineView: View {
         if barDragging {
             armPlaceholder
         } else {
-            Button {
-                TokensHaptic.tap()
-                run()
-            } label: {
-                armLabel(icon: icon, current: current)
+            ZStack {
+                Button {
+                    TokensHaptic.tap()
+                    run()
+                } label: {
+                    //  Button 的 label **只画底**：图形由下面的 `armGlyph` 画在它外面 ——
+                    //  理由写在 `armGlyph` 上，那是一条量出来的差别。
+                    armDisc
+                }
+                .buttonStyle(.plain)
+                armGlyph(icon: icon, current: current)
             }
-            .buttonStyle(.plain)
             .transition(.opacity)
         }
     }
 
     /// 「这两枚钮不在这儿」时占的那一格：尺寸与圆钮同一个数（`Self.armSize`），
-    /// 底玻璃的宽度 = 两钮之间那一段（`stripLaneWidth`），因此一个字都不变。
+    /// 底的宽度 = 两钮之间那一段，因此一个字都不变。
     private var armPlaceholder: some View {
         Color.clear
             .frame(width: Self.armSize, height: Self.armSize)
     }
 
-    /// 圆钮的**外观**（不含行为）：`Menu` 要的是 label 视图，不是 Button。
-    /// - Parameter current: 它是不是**此刻所在**的那一档。
-    ///   条子上的选中用「玻璃胶囊 + 强调色」说，而车辆不在条子上（见 `bottomBar`）——
-    ///   那个事实就只能由这枚钮自己说：图形取强调色，其余时候是正文色。
+    /// 圆钮的**底**：与底条同一个面（`barFill` + 一圈发丝线，都不是材质）。
+    /// 它从 `.dsGlass(in: Circle(), interactive: true)` 改过来的两个理由都量过：
+    /// 那个开关一翻，系统材质会变、自己画的面不会；而玻璃必须住在一个容器里，
+    /// 那个容器又把同层的内容吞掉了（见 `DSSwipeStrip.band`）。
+    private var armDisc: some View {
+        Circle()
+            .fill(TokensPalette.barFill)
+            .overlay { Circle().strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border) }
+            .frame(width: Self.armSize, height: Self.armSize)
+            .contentShape(Circle())
+    }
+
+    /// 圆钮里的图形。
     ///
-    /// ⚠️ 2026-09-26：非当前态那一支从 `TokensInk.primary`（自适应墨色）换成实色。
-    /// 依据是**量出来的**：用户报「左下角那枚钮里什么都没有」，把截图放大数了一遍 ——
-    /// 钮内部整片平坦（68…69），而同一行右边那枚实色的钥匙是 251。两枚钮走同一段代码，
-    /// 差别只在颜色。于是**底条上的字与图形一律实色**；`TokensInk` 仍服务于有大面积
-    /// 材质衬底的卡片与轻提示。
-    private func armLabel(icon: String, current: Bool = false) -> some View {
-        ZStack {
-            // 2026-09-25 材质审核：原先这里先铺一层 `glassHighlight` 再挂玻璃 ——
-            // 那是自己画的「高光」，而**真正的高光正是玻璃材质自己要产生的东西**：
-            // 垫一层假的，系统那层真的就被盖住了。现在只有材质本身，
-            // 且可点（`interactive`）—— 按下去的压缩与折射交给系统演。
-            Color.clear
-                .frame(width: Self.armSize, height: Self.armSize)
-                .dsGlass(in: Circle(), interactive: true)
-            //  ⚠️ 两个分支现在都是具体 `Color`，不需要 `AnyShapeStyle(...)` 装箱 ——
-            //  2026-09-25 那次 CI 红的正是「`Color` 与 `AnyShapeStyle` 混在一个三元里」。
-            Image(safeSymbol: icon, fallback: icon)
-                .font(TokensTypo.fixed(17, weight: .medium))
-                .foregroundStyle(current ? TokensPalette.accent : TokensPalette.primary)
-        }
-        .frame(width: Self.armSize, height: Self.armSize)
-        //  （这里曾有 `.opacity(barDragging ? 0 : 1)` —— 让位现在归 `arm` 的 `if`。）
-        .contentShape(Circle())
+    /// ⚠️ 2026-09-26（用户：「右边的…都有图标显示，而左边的…不通透就看不见图标」）：
+    /// 两枚钮走的是**同一段颜色代码**（都是 `.label` 实色），而真机上只有左边那枚 ——
+    /// 一个 `Button` —— 在那一档下空了，右边那枚（一个 `Menu`）一直在。差别只剩容器：
+    /// iOS 会替玻璃层上的 `Button` 处理它的 label，那一步在「降低透明度」下把图形吞掉了。
+    /// 所以图形面在 `Button` **之外**（按钮只负责底与命中区），Menu 那侧不需要这一手。
+    /// 依据是截图的对比、不是受控实验：若装上仍看不见，下一个要排的是它与底下那层的对比度。
+    private func armGlyph(icon: String, current: Bool = false) -> some View {
+        //  ⚠️ 两个分支都是具体 `Color`，不需要 `AnyShapeStyle(...)` 装箱 ——
+        //  2026-09-25 那次 CI 红的正是「`Color` 与 `AnyShapeStyle` 混在一个三元里」。
+        Image(safeSymbol: icon, fallback: icon)
+            .font(TokensTypo.fixed(17, weight: .medium))
+            .foregroundStyle(current ? TokensPalette.accent : TokensPalette.primary)
+            // 图形不进读屏：这枚钮的名字在调用点给（`arm` 的调用处与 `quickArm`）。
+            .accessibilityHidden(true)
+            // 它是画在 `Button` 上面的一层：不挡住底下那枚钮的 tap。
+            .allowsHitTesting(false)
     }
 
     /// 右臂：**快捷车控**（一键发指令，不离开地图）。
@@ -729,7 +736,9 @@ struct MapSpineView: View {
                     }
                 }
             } label: {
-                armLabel(icon: "key.fill")
+                //  Menu 的 label 是整枚钮（底 + 图形）：它不需要 `Button` 那一手 ——
+                //  量到的正是「Menu 的图形从来没被吞掉」，见 `armGlyph`。
+                armDisc.overlay { armGlyph(icon: "key.fill") }
             }
             .buttonStyle(.plain)
             .transition(.opacity)
@@ -787,7 +796,7 @@ struct MapSpineView: View {
     /// `style.opacity / transform`。只画当前那一页，换档就只能是「旧的变淡、
     /// 新的啪一下出现」，而「从 96.5% 长出来」那点实体感**恰恰在中间那一段**。
     @ViewBuilder
-    private func pageDeck() -> some View {
+    private func pageDeck(pageWidth: CGFloat) -> some View {
         ZStack {
             // 最底层 = AppCanvas（画布+光）。它**不是暗层**：
             // 它是 App 根上的同一束光（见 `Design/Theme.swift` 的 AppCanvas），
@@ -799,7 +808,10 @@ struct MapSpineView: View {
                 // 围栏（见 LaunchFence）：六页同屏是启动时最大的一笔开销 ——
                 // 关掉时只建当前那一档，其余五档连 body 都不跑（也就没有它们的取数）。
                 if LaunchFence.sixPageDeck || i == modeIndex {
-                    pageBody(HomeMode.allCases[i])
+                    pageBody(HomeMode.allCases[i], pageWidth: pageWidth)
+                        //  页面钉成**确定宽度**（min=max=屏幕宽）：正文比屏幕宽时它自己
+                        //  溢出，推不动这一层，也不会把整层撑开。
+                        .frame(minWidth: pageWidth, maxWidth: pageWidth, alignment: .top)
                         //  这里原来还有原型那句 `scale(1 − a*0.035)` ——“进来的从 96.5% 长出”。
                         //  2026-09-25 删掉（用户：「底部导航点选或滑动，全部页面不需要
                         //  颤抖放大特效，太耗性能」）。
@@ -829,7 +841,7 @@ struct MapSpineView: View {
     ///   · 「现在」＝ `.map{inset:0}` + 浮动两卡，**铺满全屏**（地图画到屏幕最上沿）
     ///   · 其余五档＝ `.stack{top:54;bottom:86}`：不透明的一页，卡片窗停在条子上沿
     @ViewBuilder
-    private func pageBody(_ mode: HomeMode) -> some View {
+    private func pageBody(_ mode: HomeMode, pageWidth: CGFloat) -> some View {
         if mode == .now {
             nowLayer()
                 // 真机轨迹（2026-09-24 第五轮）里，内存从 49 MB 涨到 1.7 GB 只要四秒，
@@ -839,28 +851,16 @@ struct MapSpineView: View {
                 // 地图卡片底下是**瓦片**（连续的画面）→ `.clear`（见 `photoBackdrop`）。
                 .environment(\.photoBackdrop, true)
         } else {
-            // 子页的顶：**背景铺到屏顶，内容留在安全区里**。
-            //
-            // 子页的顶 —— 三代写法，每一代的代价都记在这里：
-            //
-            //  ① `.ignoresSafeArea(edges: .top)`（内容也顶到屏最上沿）：第一张卡的
-            //     圆角正好落在状态栏底下（用户 09-25 第 3 条：「连圆角都看不到」）。
-            //  ②  `.safeAreaPadding(.top, 44)` 想把它推回来：但那个 44 是个字面量，
-            //     而且加的是「子树已经忽略掉的那条安全区」—— 没推回来。
-            //  ③  只让**背景**忽略安全区、内容留在安全区里（上一轮的修法）：圆角回来了，
-            //     代价是这一叠上沿变成一道**硬裁线**，而且顶上永远横着一条空白带 ——
-            //     地图那一档不是这样的（它画到屏幕最上沿）。
-            //
-            //  现在（用户 09-25 第 2 条：「顶部的时间和信号应该和地图页一样，不要遮盖」）：
-            //  **与地图页同一套行为** —— 内容铺到屏顶，所以卡片是从时钟下面连续滑过的，
-            //  不再在半空中被裁断；而静止位置由滚动内容自己的顶部内衬保住
-            //（`stackTopInset` = 量出来的安全区 + 一格呼吸位）。两条要求因此不再对立：
-            //  圆角看得见，且顶上不横着一条空白带。
-            //  顶上那一段的可读性交给系统的滚动边缘效果（`ArcStack` 里那一条），
-            //  而不是我们自己再加一层压暗（用户 09-24：「全局不要加暗层」）。
+            // 子页的顶（用户 09-25 第 2 条：「顶部的时间和信号应该和地图页一样，
+            // 不要遮盖」）：**与地图页同一套行为** —— 内容铺到屏顶，卡片从时钟下面连续
+            // 滑过；静止位置由滚动内容自己的顶部内衬保住（`stackTopInset` = 量出来的
+            // 安全区 + 一格呼吸位），顶上的可读性交给系统的滚动边缘效果（`ArcStack`）。
+            // 两代废案的账（硬裁线 / `.safeAreaPadding(.top, 44)` 没推回来）已在
+            // `ArcStack` 头注里结清，不在这里再抄一遍。
             pageContent(mode)
                 .padding(.bottom, Self.barTotal)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(minWidth: pageWidth, maxWidth: pageWidth,
+                       maxHeight: .infinity, alignment: .top)
                 // 五张子页的底色 = 壁纸图（相册选的一张本地图，不依赖网络）。
                 // 之前这里是 `TokensPalette.canvas`（暗层，用户 2026-09-24 删）；
                 // 现在按「其他页面的背景全部设为当前桌面的背景」的要求：iOS 读不到
@@ -955,15 +955,12 @@ struct MapSpineView: View {
     //   同样是自带、不靠整屏压暗；罗盘仍然是系统控件。）
     /// 卡头上的**图层胶囊**：写着当前在看哪一层，点开是这张地图的那几件事。
     ///
-    /// 它原来是屏幕左上角的车牌徽标（车牌 + 状态 + 上报时间的那个控件），
-    /// 徽标的信息已拆进卡头（车牌一行、状态与上报时间一行），菜单留在这里。
-    /// 菜单里那几件事都是**不常按但必须能到**的：看哪一层（图上四个图层）、
-    /// 重取数据、此刻的光、回到车（iPad 上再加一个新车况窗口）。
+    /// 它原来是屏幕左上角的车牌徽标（信息已拆进卡头）。菜单里那几件事都是
+    /// **不常按但必须能到**的：看哪一层、重取数据、此刻的光、回到车（iPad 再加一窗）。
     /// 收进一个菜单是**结构决定**：它们原来各占一枚 —— 图层一张卡、光一枚药丸、
     /// 回到车一枚浮钮、顶栏三枚（刷新 / 搜索 / 回到车，而且长在**六页每一页**上）。
     /// **不是 `private`**：抽屉的头（`MapSpineReadouts.swift`）要把它摆在拉手那一行的
-    /// 右侧 —— 而 `private` 的作用域是**文件**，另一个文件看不见它。
-    /// 它与 `store` / `camera` 是同一条：一件事只有一个实现，跨文件时不复制第二份。
+    /// 右侧 —— 而 `private` 的作用域是**文件**（同 `store` / `camera` 那一条理由）。
     func layerMenu(_ d: MapSpineData) -> some View {
         Menu {
             ForEach(MapSpineLayer.allCases) { l in

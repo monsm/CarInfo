@@ -41,20 +41,24 @@ import SwiftUI
 //  字心 ≈57pt；动态那张（手指拖到一半）带子顶边抬到 ≈97pt 且更实（白墙 255 → 95，
 //  约 60% 黑）、可见档数从三涨到五档半（最左那档被屏幕边缘切掉）。
 //
-//  于是现在的形态是：**条子 = 三档宽的窗口**，它坐在宿主那条通铺的底玻璃带里，
-//  两枚圆钮在带子的两端（见 `MapSpineView.bottomBar`）。
+//  于是现在的形态是：**两枚圆钮之间那一段就是条子自己的宽**（`availableWidth`），
+//  带子、字号、节距全从它推出来 —— 静止看得见三档是那个宽度的后果，不是输入。
+//
+//  ⚠️ 2026-09-26（第二次改）：带子与选中胶囊都从 `.dsGlass` 换成**自己画的面**
+//（`TokensPalette.barFill` / `barSelection`）。两个原因都量过：
+//    · 相机那条横带底下没有系统材质，所以「降低透明度」对它无效，而系统材质会变
+//      （用户：「我们的底部导航也响应了，而相机的不会响应」）；
+//    · 真材质必须住在一个 `GlassEffectContainer` 里，而那个容器把**同层的字与
+//      选中胶囊一起吞掉了** —— 真机上量到的就是「带子里一个字都没有」。
 //
 //  「按下展开」仍然没有：那是相机**上一个版本**的做法（按下→条子长到全宽→620ms 后收回），
 //  而它的替代品现在有了 —— 相机真正的动态态是下面这一条，它不是「展开」而是「溶解」。
 //  `expand` / `onExpand` / `retractToken` / `ArmSlot` 仍留在历史里：
 //  本条的目的不是抢宽度，所以那套插值时序没有一个是需要的。
 //
-//  ⚠️ 两枚圆钮的让位**用透明而不是「不在场」** —— 这与文件末尾那段历史正好相反，
-//  理由是这里的让位**不能改变布局**：带子的宽度 = 两钮之间那一段（`availableWidth`），
-//  钮真的不在场就会把这一段撑宽，于是溶解到一半的带子位置会跳、胶囊与字也跟着跳。
-//  （相机那边没有这个问题：它拖动时带子本来就不见了。）
-//  代价是「透明之后还可能剩一点形」——真机上若看见鬼影，下一手是把它挪出
-//  `GlassEffectContainer`（见 `MapSpineView` 的 `dsGlassLayer`），而不是改宽度。
+//  两枚圆钮的让位归宿主（`MapSpineView.arm` 的 `if barDragging`）：它们不在条子里，
+//  所以让位**不改变条子的宽**；而占位用的是一块同尺寸的空视图（`armPlaceholder`），
+//  布局因此一个字也不动（这条账在 `arm` 上写着）。
 //
 //  跟手形态**只有一种**：手指拖的是**整行**，透镜钉在条正中、字从它下面滑过去 ——
 //  这是 iOS 26 模式条的默认形态。
@@ -90,7 +94,7 @@ import SwiftUI
 //  用户看到的是一颗几乎贴字的椭圆：「首页 选中的玻璃体太小了，大 50%」。
 //  现在：间距随展开插值（静止按三档算 → 宽裕；展开按全部算 → 不够才压），
 //  透镜尺寸改由**格宽 ×1.5** 与**条高 ×0.94** 推出，**不再与节距挂钩**。
-//  现在宽度由外壳量一整行得出（见 `MapSpineView.bottomBar` 的 `barRowWidth`），
+//  现在宽度由外壳按**屏幕宽**算出这一段（见 `MapSpineView.barRowWidth(_:)`），
 //  条子自己的 frame 就等于算出来的条宽 —— 它不再是被挤压的弹性视图，
 //  几何与渲染因此不可能两套。
 //  （当年顺手加的「透镜宽度按节距封顶」已于 2026-09-24 撤掉 —— 它在静止时把透镜
@@ -142,7 +146,7 @@ struct DSSwipeStrip: View {
     /// 当前档（双向：拖动/点击会写回，外部改它也会滑过去）
     @Binding var selectedID: String
     /// 条子**能动用多宽** = 两侧圆钮之间那一段（宿主算好传进来的，
-    /// 见 `MapSpineView.stripLaneWidth`）—— 不是整行宽度。
+    /// 见 `MapSpineView.stripLaneWidth(_:)`）—— 不是整行宽度。
     ///
     /// ⚠️ 它必须是「容器给的宽度」，**不能**是条子自己被布局分到的宽度（见文件头）。
     /// 兜底 248 = 390 的屏宽减去两侧各 8 的留白、两枚 54 的圆钮与两条 9 的中缝 —— 
@@ -152,7 +156,7 @@ struct DSSwipeStrip: View {
     /// 条子的 frame 就是它，而条子不再是自己画一根窄的坐在一条宽的里。
     var availableWidth: CGFloat = 248
     /// 拖动时字可以画到多宽（相机那张拖动态：六档铺满屏幕、两端被屏幕边切）。
-    /// 宿主给的是整屏宽（见 `MapSpineView.stripSpillWidth`）—— 它比 `availableWidth`
+    /// 宿主给的是整屏宽（`MapSpineView.bottomBar` 传的 `pageWidth`）—— 它比 `availableWidth`
     /// 宽，所以拖动时字会**溢出条子**：`frame` 不变（布局不动），变的是遮罩的宽。
     var spillWidth: CGFloat = 248
     /// 拖动中（相机的动态态）—— 宿主据此让两枚圆钮让位（它们不在这条子里）。
@@ -406,22 +410,30 @@ struct DSSwipeStrip: View {
     // MARK: 三层
     // =========================================================================
 
-    /// 底玻璃：**两枚圆钮之间那一条胶囊**（相机量到的形态，见文件头）。
+    /// 底子：**两枚圆钮之间那一条胶囊**（相机量到的形态，见文件头）。
     ///
     /// 它在这里而不是在宿主里 —— 它的宽度就是条子自己的宽度，两处各画一次就会有
     /// 两个数（2026-09-26 的上一版正是「宿主画一条通铺的、条子在里头又画一条窄的」）。
     ///
     /// 拖动时它**溶解掉**（相机图 2 / 图 3 的黑底里量不到它）：这是那个动态态的第一步。
     ///
-    ///  ⚠️ 2026-09-26：它曾经是 `.opacity(dragging ? 0 : 1)` —— 与两枚圆钮同一版写法，
-    ///  也因此与它们同一个后果：这一整条都在一个 `GlassEffectContainer` 里，
-    ///  容器的职责是把子视图的玻璃**合成成一个形状**，透明度 0 在它眼里只是「内容不见了」，
-    ///  那块底玻璃仍然算在这一层里。现在它由 `body` 里的 `if` 决定在不在，
-    ///  淡出交给 `.transition(.opacity)`（理由与圆钮那两枚写在 `MapSpineView.arm`）。
+    ///  ⚠️ 2026-09-26（第二次改）：它从 `.dsGlass` 换成**自己画的面**（`barFill`）。
+    ///  三条依据都是量出来的：
+    ///    · 相机那条横带底下没有系统材质，所以「降低透明度」对它无效 —— 而我们的
+    ///     会变（用户：「我们的底部导航也响应了，而相机的不会响应」）；
+    ///    · 真材质必须住在一个 `GlassEffectContainer` 里，而**那个容器把同层的字与
+    ///      选中胶囊一起吞掉了**（带子里一个字都没有）；
+    ///    · 半透明的面本身就该带一圈发丝线：少了它，一条半透明的底子会和底下的照片
+    ///      糊在一起（相机那条横带也有一道边缘）。
+    ///  它曾经是 `.opacity(dragging ? 0 : 1)`（透明度 0 在容器眼里只是「内容不见了」）；
+    ///  现在它由 `body` 里的 `if` 决定在不在，淡出交给 `.transition(.opacity)`。
     private func band(barW: CGFloat) -> some View {
-        Color.clear
+        Capsule()
+            .fill(TokensPalette.barFill)
+            .overlay {
+                Capsule().strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
+            }
             .frame(width: barW, height: barHeight)
-            .dsGlass(in: Capsule())
             .allowsHitTesting(false)
     }
 
@@ -436,25 +448,23 @@ struct DSSwipeStrip: View {
         //
         // 宽度也不能比条身还宽（很窄的容器里）：留 6pt，否则它会盖住条的两端圆头。
         let w = min(loupeWidth(pitch(gap)), max(slot, barW - 2 * TokensSpacing.xs))
-        //  这枚胶囊现在是一块**真的玻璃**（用户 2026-09-25 第 4 条：
-        //  「选中入口的选择效果需要一个玻璃胶囊」）。
-        //  它此前是 `Capsule().fill(glassHighlight)` + 一圈发丝线 —— 一个不透明的白面，
-        //  也就是「玻璃的假象」：没有折射、没有反射、不和底下的字发生关系，
-        //  看起来就是一枚半透明的白胶囊（这正是用户看到的那一幕）。
+        //  它是 `barSelection`：**比底子再偏一层明暗**，不是第二块玻璃。
         //
-        //  它现在是**条子这个容器里的第二块形状**，不是叠上去的第二层材质：
-        //  整条底条（左钮 / 模式条 / 右钮）由 `dsGlassLayer` 包成同一个 `GlassEffectContainer`
-        //  （见 `MapSpineView.bottomBar`），所以系统知道它俩换得近 —— 选中格与轨道
-        //  因此会互相折射，也正是 iOS 26 分段控件里「选中」的形态。
-        //  它仍然不是按钮：点选由条子那唯一一个拖动手势判（见 `swipe`），
-        //  所以 `interactive` 不传 —— 一个不会自己动的玻璃不该装成会动。
-        return Color.clear
+        //  这里的两代写法都删掉了，各自的账记在这一段：
+        //    · 第一代 `Capsule().fill(TokensPalette.glassHighlight)` —— 一个半透明白面，
+        //      也就是「玻璃的假象」；
+        //    · 第二代 `.dsGlass(in: Capsule())` —— 真材质，但它必须住在一个
+        //      `GlassEffectContainer` 里才成立，而**那个容器把整条底条的内容吞掉了**：
+        //      真机上量到的是「带子里一个字都没有、选中胶囊也没有」（用户 2026-09-26：
+        //      「静态的和相机差距很大」）。
+        //  底条要的是相机那条横带的做法（自己画的面 + 比底子亮一层的选中格）——
+        //  于是它既不受「降低透明度」影响，也不需要容器。
+        return shape
+            .fill(TokensPalette.barSelection)
             .frame(width: w, height: loupeHeight)
-            .dsGlass(in: shape)
             .opacity(loupeVisible ? 1 : 0)
             .animation(TokensMotion.fade, value: loupeVisible)
             //  拖动时长到满行高（相机量到 40 → 47pt，0.86 → 1.0 × 带高）。
-            //  那一下是**尺寸变形**，而它住在 `GlassEffectContainer` 里正是为了这件事。
             .animation(TokensMotion.settle, value: dragging)
             .position(x: barW / 2, y: barHeight / 2)
             .allowsHitTesting(false)
@@ -487,7 +497,7 @@ struct DSSwipeStrip: View {
                     //  ⚠️ 2026-09-26：底条上的字与图形**一律实色**，没有例外 ——
                     //  左边那枚圆钮里的车图形当月从 `TokensInk.primary` 换成实色，
                     //  依据是量出来的（截图里那一枚内部整片平坦 68…69、起伏 0，
-                    //  而同一行右边那枚实色的钥匙是 251）。两处是同一个决定，见 `armLabel`。
+                    //  而同一行右边那枚实色的钥匙是 251）。两处是同一个决定，见 `armGlyph`。
                     //  `index` 是 `nil`（车辆）时五个字全部走正文色 —— 见它的说明。
                     .foregroundStyle(i == index ? TokensPalette.accent
                                                 : TokensPalette.primary)
@@ -513,12 +523,15 @@ struct DSSwipeStrip: View {
         // 窗口把越界的那半格裁掉（原型 `.strip{overflow:hidden}`）。
         //
         //  遮罩是一个**矩形**（2026-09-26 从圆角矩形改回）：窗口本身不可见，遮罩在这里
-        //  只决定「字在哪里被切」。宽是**两个数**：静止 = 条宽（带子就是它），
+        //  只决定「字在哪里被切」。宽是**两个数**：静止 = **三档宽**（相机静态那张
+        //  只画得出当前 ±1，两端各留一段空气）——不是条宽：条宽从 248 收到 260 之后，
+        //  按条宽裁会让 ±2 露出 6pt 的窄边；按 `pitch × 3` 裁则 ±1 带 17pt 空气、±2
+        //  完全在窗外。
         //  拖动 = `spillWidth`（相机那张拖动态：六档铺满屏幕、切在屏幕边上）。
         //  字画到条子外面是故意的：`frame` 不动，所以布局不抖 —— 变的只是这块遮罩。
         .mask {
             Rectangle()
-                .frame(width: dragging ? max(barW, spillWidth) : barW,
+                .frame(width: dragging ? max(barW, spillWidth) : min(barW, pitch(gap) * 3),
                        height: barHeight)
         }
         .allowsHitTesting(false)

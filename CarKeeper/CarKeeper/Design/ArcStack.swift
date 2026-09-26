@@ -76,11 +76,26 @@ struct ArcStack: View {
                     VStack(spacing: StackSpec.Card.gap) {
                         ForEach(Array(cards.enumerated()), id: \.offset) { i, card in
                             card.render(accent: accent)
+                                //  每一张卡也钉到**这一个宽**上：不钉的话，卡里只要有一件
+                                //  「理想宽」比它大的东西，那张卡就会比这一叠还宽 ——
+                                //  看上去正是「卡片变大了」（用户 2026-09-26）。
+                                //  高度仍是内容自己的（这里只钉宽）。
+                                .frame(width: max(0, geo.size.width - 2 * StackSpec.Card.inset),
+                                       alignment: .top)
                                 .padding(.horizontal, StackSpec.Card.inset)
                                 .id(i)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .top)
+                    //  卡叠的宽 = **量到的视口宽**（不是 `maxWidth: .infinity`）。
+                    //
+                    //  ⚠️ 2026-09-26（用户：「每个界面的卡片怎么都变大了，而不是和屏幕
+                    //  保持一定的距离」）：`maxWidth: .infinity` 报的不是「父层给了多宽」，
+                    //  而是**子视图实际多宽** —— 里面只要有一个比屏幕宽又不换行的东西
+                    //  （一张超宽的图、一排固定宽的芯片），整个 VStack 就跟着比屏幕宽，
+                    //  再在窗口里居中 → 每一张卡片都不再和屏幕保持 18pt。
+                    //  钉在量到的视口上以后，那一个宽的子视图只能自己溢出，
+                    //  推不动其余的卡片。
+                    .frame(width: geo.size.width, alignment: .top)
                     // 卡片视口 = 这一叠**量到的**尺寸（左右各留 `inset`）。
                     //
                     // 它只喂一件事：`CardFit` 算「展开后有多挤、放得下几行」。所以这里必须是
