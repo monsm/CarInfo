@@ -102,18 +102,16 @@ struct MapSpineView: View {
     /// 把状态拆到另一个文件里的扩展要么看不见它、要么就得把它降级成模块级可见
     ///（2026-09-25 的 CI 就是这么红的）。
     @State private var barRowDrag: DSSwipeStrip.RowDrag?
-    /// 底条是否正在展开（手指按在条子上）。
-    /// 它只服务一件事：展开时把两侧的两枚圆钮**让出宽度并淡出** ——
-    /// 原型 `.bottom.open .arm{opacity:0;transform:scale(.86)}`，
-    /// 而“让出宽度”比单单淡出更要紧：条子展开后要 374pt（屏宽 390），
-    /// 留给两枚圆钮就只能把间距压扁，而压间距正是原型明确否掉的那一件事。
-    @State private var barOpen = false
+    //  `barOpen`（底条是否正在展开、两枚圆钮要不要让出宽度）已于 2026-09-26 删：
+    //  它服务的「静止只露三档」那个形态，随两枚圆钮移到条子上面一行而消失（见 `bottomBar`）。
+    //  它剩下的唯一读者是 `deckPos` 那个分支，改成读同一个事实的另一个写法（`barRowDrag != nil`）。
 
     /// 镜头。**不是 `private`**：右侧那两枚快速钮（`MapQuickButtons.swift`）里
     /// 「回到车 / 手机的位置」都要把它移过去 —— 而 `private` 的作用域是**文件**，
     /// 另一个文件里的扩展看不见（2026-09-25 那次 CI 红就是同一个原因）。
     @State var camera: MapCameraPosition = .automatic
-    @State private var didCenterOnce = false
+    /// **不是 `private`**：`centerOnCar` 住在 `MapCameraFollow.swift`（`private` 的作用域是文件）。
+    @State var didCenterOnce = false
     /// 不是 `private`：同上，充电那一层的内容在 `MapSpineLayers.swift` 里读它。
     @State var chargers: [MapCharger] = []
     @State private var chargerCenterKey = ""
@@ -143,6 +141,12 @@ struct MapSpineView: View {
     /// 不订阅的话 `换一张 / 不铺` 要等到下一次换档才生效（body 才重新求值）。
     /// 与 MineView 那行订阅的是同一个单例，两处的更新永远同步。
     @ObservedObject private var wallpaper = WallpaperService.shared
+
+    /// 镜头跟着谁（用户 2026-09-26：「如果选了车的定位 …… 如果是选了人的位置也同样的逻辑显示」）。
+    /// 它不是「上一枚按了哪个钮」，而是一条**持续的意图**：选了手机之后每一次位置刷新
+    /// 都往手机上对（与车那一侧同一个函数、同一套偏移）；车在动时它被盖住（见 `centerOnCar`）。
+    /// **不是 `private`**：右侧那两枚钮（`MapQuickButtons.swift`）要写它。
+    @State var follow: MapFollowTarget = .car
 
     /// 手机自己的位置（右侧那枚钮的图形 + 后面那条 `onChange`）。
     /// **必须订阅它**，理由与 `weather` / `wallpaper` 同一类：坐标与权限是
@@ -206,12 +210,14 @@ struct MapSpineView: View {
     ///     取它的 case 下标，而这个下标**恰好等于条子的长度**（见 `HomeMode` 的档序），
     ///     于是条子上那五档全部淡到 0（`fade(i) = |i − 5| ≥ 1`），只剩车辆这一层。
     ///
-    ///  ⚠️ `barOpen` 那个分支不是在修饰动效，是在修一个真会看到的东西：
+    ///  ⚠️ `barRowDrag != nil` 那个分支不是在修饰动效，是在修一个真会看到的东西：
     ///  手指一旦落到条子上，位置就该归条子管 —— 少了这个分支，从车辆往条子上拖时
     ///  页面要等松手才动（拖动全过程停在车辆），而那正是「不跟手」。
+    ///  （它此前读的是 `barOpen`。那个状态 2026-09-26 随「按住展开」一起删了，
+    ///    而「手指在不在条子上」这个事实本条转发自己就有 —— 一条状态够了。）
     private var deckPos: Double {
         if homeMode == .vehicle {
-            return barOpen ? max(0, modePosition) : Double(modeIndex)
+            return barRowDrag != nil ? max(0, modePosition) : Double(modeIndex)
         }
         return modePosition >= 0 ? modePosition : Double(modeIndex)
     }
@@ -428,6 +434,10 @@ struct MapSpineView: View {
         // 镜头那一动只有一处实现（`MapQuickButtons.swift` 的 `fly(to:)`）。        // 盯的是**画在图上用的那个坐标**（`mapCoordinate` = 换算成 GCJ-02），
             // 不是 CoreLocation 的原始读数：镜头要和蓝点落在同一个点上（见 `ChinaDatum`）。
         .onChange(of: PhoneLocation.shared.mapCoordinate?.latitude) { _, _ in
+            //  只在「此刻跟着手机」时才移过去（`follow`，用户 2026-09-26）：
+            //  手机的位置随时会更新，而**车在动时车优先**（见 `centerOnCar`）——
+            //  少了这道判断，车开着的时候镜头会被手机的每一个定位报点拉走。
+            guard follow == .phone, !store.isCarMoving else { return }
             fly(to: PhoneLocation.shared.mapCoordinate)
         }
     }
@@ -540,39 +550,43 @@ struct MapSpineView: View {
     /// 为什么两臂必须在这里：原型那条子**不是**孤零零一根——两边各有一枚玻璃圆钮，
     /// 左边是车、右边是动作。它让「模式条」看起来是相机的那排控件，而不是一根付出代价的浮条。
     private var bottomBar: some View {
-        // 展开时中缝归零：条子展开后要占满整行（374），两侧各留 9 的中缝就装不下，
-        // 而「压间距」正是原型明确否掉的那一件事（同 `ArmSlot` 的说明）。
-        HStack(spacing: barOpen ? 0 : Self.barSeam) {
-            //  左臂原来是**车牌的前两个字**（「鄂A」）。2026-09-25 改成车的图形
-            //（用户：「车牌名删除」）—— 它本来就是用“回到车辆那一档”这一个动作，
-            //  而车牌的两个字既认不出来是按钮、又只在一半车上有意义（未绑定车牌时写的是“车”）。
-            //  同一个动作、换个能认出来的图标；右臂那个搜索图标也是同一种做法。
-            //  它是**唯一不在条子上的那一档**的入口（用户 2026-09-25：「底部导航删除车辆，
-            //  因为左下角已有入口」）。删掉那条链之后留下一个问题：从这枚钮进来时，
-            //  条子上该显示什么？答案是**不选中任何一档**（`DSSwipeStrip` 的 `index` 此时是
-            //  `nil`：透镜淡出、五个字都不高亮）—— 因为「此刻在哪」这个事实现在归这枚钮说，
-            //  它的图形因此换成强调色（`current:`）。屏幕上不出现一个在说谎的条子。
-            arm(icon: "car.fill", current: homeMode == .vehicle) { nav.openMode(.vehicle) }
-                .accessibilityLabel(Text(homeMode == .vehicle ? "车辆（当前所在）" : "车辆"))
+        //  **两行**（用户 2026-09-26：「重新仔细研究相机 app 的逻辑，来重构我们的底部导航」）：
+        //  ① 上面一行 = 两枚圆钮（左 = 车辆那一档的入口，右 = 快捷车控）；
+        //  ② 下面一行 = 模式条，**全宽横带**，选中那一档套一枚玻璃胶囊。
+        //  圆钮为什么要让出这一行：它们此前各占 58pt、与条子同一行，于是条子只剩 256pt
+        //  ——「静止只露三档」的真正原因就是它（**条宽不够，不是屏幕不够宽**）。
+        VStack(spacing: Self.barSeam) {
+            HStack(spacing: 0) {
+                //  左臂原来是**车牌的前两个字**（「鄂A」）。2026-09-25 改成车的图形
+                //（用户：「车牌名删除」）—— 它本来就是用“回到车辆那一档”这一个动作，
+                //  而车牌的两个字既认不出来是按钮、又只在一半车上有意义（未绑定车牌时写的是“车”）。
+                //  同一个动作、换个能认出来的图标；右臂那个搜索图标也是同一种做法。
+                //  它是**唯一不在条子上的那一档**的入口（用户 2026-09-25：「底部导航删除车辆，
+                //  因为左下角已有入口」）。删掉那条链之后留下一个问题：从这枚钮进来时，
+                //  条子上该显示什么？答案是**不选中任何一档**（`DSSwipeStrip` 的 `index` 此时是
+                //  `nil`：透镜淡出、五个字都不高亮）—— 因为「此刻在哪」这个事实现在归这枚钮说，
+                //  它的图形因此换成强调色（`current:`）。屏幕上不出现一个在说谎的条子。
+                //  2026-09-26：它与右臂一起移到条子**上面那一行**（见 `bottomBar` 开头）。
+                arm(icon: "car.fill", current: homeMode == .vehicle) { nav.openMode(.vehicle) }
+                    .accessibilityLabel(Text(homeMode == .vehicle ? "车辆（当前所在）" : "车辆"))
+                Spacer(minLength: Self.barSeam)
+                quickArm
+            }
 
+            //  模式条：这一行**只有它一个孩子**，拿到的就是整行宽度（`barRowWidth`）——
+            //  于是横带与相机那条一样是贴满的（「条宽」不再是变量，见 `DSSwipeStrip.barWidth`）。
             DSSwipeStrip(items: HomeMode.stripItems,
                          selectedID: $homeModeRaw,
-                         // 条子的几何只用「这一行有多宽」这一个输入 ——
-                         // 它自己量到的是两侧圆钮分剩的那份（见 `barRowWidth`）。
+                         // 条子的几何只用「这一行有多宽」这一个输入。
                          availableWidth: barRowWidth,
-                         // 两个闭包都写显式标签：尾随闭包在两个函数参数之间靠扫描规则匹配，
+                         // 显式标签：尾随闭包在两个函数参数之间靠扫描规则匹配，
                          // 读的人得翻定义才知道 `{ pos in }` 落在哪个参数上 —— 这正是
-                         // `2f088df` 那次 CI 红掉的形态（当时 onExpand 还不存在）。
+                         // `2f088df` 那次 CI 红掉的形态。
                          onPosition: { pos in
                              modePosition = pos
                          },
-                         onExpand: { open in
-                             withAnimation(TokensMotion.fade) { barOpen = open }
-                         },
                          // 整条上的横拖（含条子上下那圈空白带）。
                          rowDrag: barRowDrag)
-
-            quickArm
         }
         .padding(.horizontal, Self.barPad)
         .padding(.bottom, Self.barGap)
@@ -652,7 +666,8 @@ struct MapSpineView: View {
             armLabel(text: text, icon: icon, current: current)
         }
         .buttonStyle(.plain)
-        .modifier(ArmSlot(open: barOpen, size: Self.armSize))
+        //  这里曾挂着 `ArmSlot`（展开时把圆钮收到 0 宽）。2026-09-26 与它服务的那
+        //  个状态一起删：圆钮尺寸就是 `armLabel` 自己那个 `frame`（`Self.armSize`）。
     }
 
     /// 圆钮的**外观**（不含行为）：`Menu` 要的是 label 视图，不是 Button。
@@ -719,7 +734,7 @@ struct MapSpineView: View {
             armLabel(icon: "key.fill")
         }
         .buttonStyle(.plain)
-        .modifier(ArmSlot(open: barOpen, size: Self.armSize))
+        //  （这里曾挂着 `ArmSlot`：展开时把圆钮收到 0 宽。2026-09-26 随那个状态一起删。）
         .accessibilityLabel(Text("快捷车控"))
         .accessibilityHint(Text("锁车、解锁、闪灯、鸣笛、远程寻车（需控车码）、刷新车况"))
     }
@@ -1117,24 +1132,9 @@ struct MapSpineView: View {
         store.mapFocus = nil
     }
 
-    /// 把相机移到车上。
-    ///
-    /// 朝正北（`heading: 0`）—— 看自己的车不该把地图转起来；俯仰角取 `cameraPitch`：
-    /// 2026-09-25 用户第 1 条「默认极限 3D 视角」之后，**三处镜头共用同一个角**
-    /// （这里 / `fly(to:)` / 点充电站聚合点），否则「回到车」与「移到手机」会是两个视角。
-    /// （这一行此前写的是「无俯仰」，而代码已经是 `pitch: cameraPitch` —— 注释当时没跟着改。）
-    @MainActor
-    /// **不是 `private`**：右侧那枚「回到车」在 `MapQuickButtons.swift` 里。
-    func centerOnCar(force: Bool) {
-        guard let c = store.currentLocation?.coordinate else { return }
-        if didCenterOnce && !force { return }
-        didCenterOnce = true
-        withAnimation(TokensMotion.value) {
-            camera = .camera(MapCamera(centerCoordinate: c,
-                                       distance: cameraDistance,
-                                       pitch: cameraPitch))
-        }
-    }
+    //  `centerOnCar(force:)` 2026-09-26 搬去了 `MapCameraFollow.swift`：本文件当时
+    //  1231 行、越过了 `lintcfg.py` 的 1200 阈值，而那个阈值的用法是把**一件事**搬出去
+    //  （不是加排除清单）。搬的正是「镜头」—— 它与「镜头该落在哪儿」本来就是同一件事。
 
     @MainActor
     private func refresh() async {

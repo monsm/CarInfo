@@ -170,12 +170,26 @@ final class AppStore: @unchecked Sendable {
         let avgEfficiency: Double?
         /// 每 1% SOC 跑了多少 km —— **不需要容量**的口径，因此是目前唯一真算得出的能效指标。
         let kmPerPercent: Double?
+
+        /// 起点 / 终点的**位置名**（用户 2026-09-26：「行程页 去掉电量，显示起点和终点位置名」）。
+        ///
+        /// 它们是事件报文里**本来就有的那个地址**（`jumpParam.addrName`，`ingestEvents`
+        /// 与出行页读的是同一个键）—— 不是反查出来的：一段行程由点火 / 熄火两条消息配出，
+        /// 而那两条消息各自带着自己那一刻的地址。取不到时是空串，界面按「没有这个名字」
+        /// 处理（不摆一行 `--` 装成有值）。
+        ///
+        /// 写成**带默认值的 `var`** 而不是 `let`：`TripRecord` 有两个构造点
+        ///（本机 `endTrip` 与出行页现配），默认值让「暂时没有地址」的那一处不必
+        /// 为了新字段而改 —— 新加一个字段不该让别处编译不过。
+        var startAddr: String = ""
+        var endAddr: String = ""
     }
     var tripHistory: [TripRecord] = []
     /// 正在进行的行程。`startMileage` 来自点火那一刻的 `control.totalOdometer`，
     /// 它和熄火时的里程相减就是这一段真跑了多远（没有它就只能猜）。
     private var currentTrip: (startTime: Date, startSoc: Int,
-                              startLocation: CLLocation?, startMileage: Int?)? = nil
+                              startLocation: CLLocation?, startMileage: Int?,
+                              startAddr: String)? = nil
 
     // #NEW-1 停车位置
     var parkingLocation: CLLocation? {
@@ -313,15 +327,16 @@ final class AppStore: @unchecked Sendable {
     /// 为什么带 `at:` / `mileage:`：事件自带**那一刻**的时刻与里程。
     /// 我们是在事后（用户打开 App）才读到这些事件的，用「现在」当起点会把行程算歪。
     func startTrip(_ location: CLLocation? = nil, soc: Int? = nil,
-                   at time: Date? = nil, mileage: Int? = nil) {
+                   at time: Date? = nil, mileage: Int? = nil, addr: String = "") {
         let currentSoc = soc ?? (energyHistory.last?.soc ?? 0)
         currentTrip = (startTime: time ?? Date(), startSoc: currentSoc,
-                       startLocation: location, startMileage: mileage)
+                       startLocation: location, startMileage: mileage, startAddr: addr)
     }
 
     // #NEW-2 结束行程
     func endTrip(distanceKm: Double, endSoc: Int? = nil,
-                 endLocation: CLLocation? = nil, at time: Date? = nil) -> TripRecord? {
+                 endLocation: CLLocation? = nil, at time: Date? = nil,
+                 endAddr: String = "") -> TripRecord? {
         guard let trip = currentTrip else { return nil }
         let endSoc = endSoc ?? (energyHistory.last?.soc ?? 0)
         let socUsed = trip.startSoc - endSoc
@@ -338,7 +353,9 @@ final class AppStore: @unchecked Sendable {
             startSoc: trip.startSoc,
             endSoc: endSoc,
             avgEfficiency: nil,
-            kmPerPercent: kmPerPercent
+            kmPerPercent: kmPerPercent,
+            startAddr: trip.startAddr,
+            endAddr: endAddr
         )
         tripHistory.insert(record, at: 0)
         if tripHistory.count > 50 { tripHistory = Array(tripHistory.prefix(50)) }
@@ -401,7 +418,7 @@ final class AppStore: @unchecked Sendable {
         for e in ordered {
             seen.insert(e.id)
             if e.ignition {
-                startTrip(e.loc, soc: soc, at: e.at, mileage: mileage)
+                startTrip(e.loc, soc: soc, at: e.at, mileage: mileage, addr: e.addr)
             } else {
                 // 里程差只在「点火与熄火发生在同一次会话内」时才真实：
                 // 如果是几天前的历史事件，两端的 currentMileage 都是今天的值，
@@ -412,7 +429,8 @@ final class AppStore: @unchecked Sendable {
                 } else {
                     km = 0
                 }
-                _ = endTrip(distanceKm: km, endSoc: soc, endLocation: e.loc, at: e.at)
+                _ = endTrip(distanceKm: km, endSoc: soc, endLocation: e.loc, at: e.at,
+                            endAddr: e.addr)
                 saveParkingLocation(e.loc, at: e.at, address: e.addr)
             }
         }
@@ -581,6 +599,15 @@ final class AppStore: @unchecked Sendable {
     /// 解析复用 `VM.driveStatus`：那份模型里的 `isMoving` 原来**没有任何读者**，
     /// 于是「车在不在动」这件事在界面上一次都没被用过（车速是另一条路取的）。
     var isCarMoving: Bool { VM.driveStatus(caches).isMoving }
+
+    /// 车头朝向（度，0 = 正北）—— **只服务镜头**（`MapCameraFollow`）。
+    ///
+    /// 用户 2026-09-26：「地图页要随着车的方向实时改变地图朝向」。它与
+    /// `MapSpineData.headingDeg` 是**同一个字段**（`VM.locStatus` 的 `degNum`，
+    /// 报文里的 `Heading`），但不经过 `MapSpineData.build()`：后者要建行程映射、
+    /// 停车点映射与两处聚类，而镜头在车动起来时**每 2 秒**就要问一次朝向
+    ///（节律见 `RefreshLoop.Cadence.moving`）。这一条只读本机已经存着的那份缓存。
+    var carHeadingDeg: Double { Double(VM.locStatus(caches).degNum) }
 
     // 这里原有 `pendingQuickCtrl`（首页把指令「穿透」给车控页，由车控页执行）。
     // 已删：**全库没有任何地方写入过它** —— 读它的只有车控页的 onAppear，

@@ -118,7 +118,10 @@ struct TripsEventsView: View {
                     endLocation: e.loc.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) },
                     distanceKm: dist,
                     startSoc: 0, endSoc: 0,
-                    avgEfficiency: nil, kmPerPercent: nil))
+                    avgEfficiency: nil, kmPerPercent: nil,
+                    // 位置名就是这两条事件各自的 `addrName`（见 `TripRecord.startAddr`）——
+                    // 配对时手里本来就有，没有任何一步是反查。
+                    startAddr: o.ignitionAddr, endAddr: e.addr))
                 open = nil
             }
         }
@@ -144,6 +147,9 @@ struct TripsEventsView: View {
     ///
     /// 规则：**每个时刻只留一条**（按 `startTime` 对齐）；有里程的那条赢，
     /// 两条都是 0 就留本机的（它带 `kmPerPercent` 等更多字段）。
+    /// **位置名从落选的那条补上**（2026-09-26）：一边有里程、另一边有地址是常态
+    ///（本机那条从读数算里程，消息那条带 `addrName`）—— 少了这一步，
+    /// 「合并」恰好会把唯一存在的那两个名字丢掉，而它们是同一段行程的事实。
     /// 展示序：有里程的在前、全是 0 的在后；各按时间倒序（最近的在上面）。
     private var displayTrips: [AppStore.TripRecord] {
         let m = tripsFromMessages
@@ -155,7 +161,13 @@ struct TripsEventsView: View {
                 byStart[t.startTime] = t
                 continue
             }
-            byStart[t.startTime] = (t.distanceKm > 0 && cand.distanceKm <= 0) ? t : cand
+            var winner: AppStore.TripRecord
+            var loser: AppStore.TripRecord
+            if t.distanceKm > 0 && cand.distanceKm <= 0 { winner = t; loser = cand }
+            else { winner = cand; loser = t }
+            if winner.startAddr.isEmpty { winner.startAddr = loser.startAddr }
+            if winner.endAddr.isEmpty { winner.endAddr = loser.endAddr }
+            byStart[t.startTime] = winner
         }
         let all = Array(byStart.values)
         return all.filter { $0.distanceKm > 0 }
@@ -435,10 +447,39 @@ struct TripsEventsView: View {
                     RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
                         .strokeBorder(TokensPalette.hairline, lineWidth: 0.5)
                 )
+            placeNamesRow(trip)
             statsRow(trip)
         }
         // 头贴顶、数字贴底，中间那一段归地图（`alignment: .top` 写在里面就没这个效果了）。
         .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    /// 从哪到哪 —— **位置名**（用户 2026-09-26：「行程页 去掉电量，显示起点和终点位置名」）。
+    ///
+    /// 它取代的正是正面原来那颗「5% 电量」：正面回答的问题是「这段路从哪到哪」，
+    /// 而电量是背面那一行读数的事（那一行也一起删了 —— 用户要求「去掉电量」）。
+    /// 名字来自点火 / 熄火两条事件各自的 `addrName`（见 `TripRecord.startAddr`）。
+    ///
+    /// ⚠️ **两个名字都没有时这一行整个不出现**，不画一个空箭头：
+    /// 「取不到名字」与「这段没有起终点」在界面上必须是同一个样子，
+    /// 摆一行 `→` 只会让人以为两地之间有个位置。
+    @ViewBuilder
+    private func placeNamesRow(_ trip: AppStore.TripRecord) -> some View {
+        if !trip.startAddr.isEmpty || !trip.endAddr.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.xs) {
+                Text(trip.startAddr.isEmpty ? "起点未知" : trip.startAddr)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Image(safeSymbol: "arrow.right", fallback: "arrow.right")
+                    .font(TokensTypo.caption2)
+                    .foregroundStyle(TokensPalette.tertiary)
+                Text(trip.endAddr.isEmpty ? "终点未知" : trip.endAddr)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .font(TokensTypo.caption)
+            .foregroundStyle(TokensPalette.secondary)
+        }
     }
 
     /// 背面：这一段的其余事实（都是这一段行程自己的读数，没有新数据源）。
@@ -465,8 +506,18 @@ struct TripsEventsView: View {
                 DSKeyValueRow(key: "路线长度",
                               value: String(format: "%.1f km", road.distanceMeters / 1000))
             }
-            DSDivider()
-            DSKeyValueRow(key: "电量", value: "\(trip.startSoc)% → \(trip.endSoc)%")
+            // 「电量 60% → 55%」那一行已删（用户 2026-09-26：「行程页 去掉电量，
+            // 显示起点和终点位置名」）。它替掉的这两行回答的是背面这张表本来的问题
+            //（这一段从哪到哪），而 SoC 的差值在充电页有更完整的说法。
+            // 缺名字时不摆一行「--」：那个名字此刻不存在（同 `roadRoute` 那一段的规矩）。
+            if !trip.startAddr.isEmpty {
+                DSDivider()
+                DSKeyValueRow(key: "起点", value: trip.startAddr)
+            }
+            if !trip.endAddr.isEmpty {
+                DSDivider()
+                DSKeyValueRow(key: "终点", value: trip.endAddr)
+            }
             if let kmPerPct = trip.kmPerPercent {
                 DSDivider()
                 DSKeyValueRow(key: "每 1% 电量", value: String(format: "%.2f km", kmPerPct))
@@ -509,9 +560,9 @@ struct TripsEventsView: View {
             Text("直线")
                 .font(TokensTypo.caption2)
                 .foregroundStyle(TokensPalette.tertiary)
-            Text("\(max(0, trip.startSoc - trip.endSoc))% 电量")
-                .font(TokensTypo.caption)
-                .foregroundStyle(TokensPalette.secondary)
+            // 这里原来是「5% 电量」（`startSoc - endSoc`）。用户 2026-09-26：
+            // 「行程页 去掉电量，显示起点和终点位置名」—— 两颗数换成一行名字
+            //（在 `tripFront` 里、地图正下方：起点与终点本来就该贴着那张图）。
             Spacer(minLength: 0)
             // 能效只显示**算得出来**的那个：kWh/100km 需要电池容量（报文里 capacity 是 null），
             // 所以实际先用「每 1% SOC 跑多少 km」——它不需要容量，是行程里真实读到的事实。

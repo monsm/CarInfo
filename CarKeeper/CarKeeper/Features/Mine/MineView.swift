@@ -30,6 +30,10 @@ struct MineView: View {
     /// 设为当前桌面的背景」）。它改的是 App 自己的背景，不是系统的（iOS 没有读
     /// 主屏壁纸的公开 API）。未选图时铺画布（跟随深浅色），不会黑屏。
     @ObservedObject private var wallpaper = WallpaperService.shared
+    /// 「显示」这一组的三格（用户 2026-09-26：文字发光程度 + 玻璃通透度）。
+    /// 它们改的是**全 App** 的观感，所以状态不在这一页（在 `DisplaySettings` 单例里），
+    /// 这里只是订阅 + 写那三个属性 —— 键名一个字都不在这一页出现。
+    @ObservedObject private var display = DisplaySettings.shared
     /// 相册选择器（PhotosPicker）：从相册选一张图铺底（本地，不依赖网络）。
     @State private var wallpaperPickItem: PhotosPickerItem?
 
@@ -252,6 +256,18 @@ struct MineView: View {
                 customRow(last: true) { logoutRow }
             }
 
+            // 「显示」：全 App 的观感（用户 2026-09-26）。
+            //
+            // 为什么自成一节而不是塞进上面那节「应用」：那一节里每一行改的都是
+            // **这个 App 干什么**（背景图 / 开发者工具 / 退出登录），而这三行改的是
+            // **它长什么样**。同一组里的行回答同一个问题，是这一页从 28 个磁贴改成
+            // iOS 设置式分组之后唯一的排序依据。
+            DSGroup(title: "显示") {
+                customRow { glowRow }
+                customRow { glassLevelRow }
+                customRow(last: true) { glassFillRow }
+            }
+
             // 「隐私与数据」以前是一个独立浮层，现在就是这一屏里的一节。
             PrivacySection()
         }
@@ -276,6 +292,83 @@ struct MineView: View {
     }
 
     // MARK: 行内的小组件 / 退出登录（都在 settingsGroups 里用）
+
+    // MARK: 「显示」这三行（都在 settingsGroups 里用）
+
+    /// 文字发光程度（用户 2026-09-26：「设置文字的发光阴影程度」）。
+    ///
+    /// 它调的是一件**已经有理由存在**的事：玻璃上的字会压一圈反色外壳
+    ///（`Design/InkGlow.swift` 的 `DSTextGlow`，2026-09-25 第 8 条）。
+    /// 而「多厚才合适」取决于用户自己在什么底图上用 —— 所以给一个 0…100% 的滑杆，
+    /// 而不是替他定死：**0 就是不画**（半径与浓度同时归零），**50% 就是这一版的原样**
+    ///（默认值，见 `DisplaySettings.glow`）。
+    private var glowRow: some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+            HStack {
+                Text("文字发光")
+                    .font(TokensTypo.body)
+                    .foregroundStyle(TokensPalette.primary)
+                Spacer(minLength: TokensSpacing.sm)
+                Text("\(Int(display.glow * 100))%")
+                    .font(TokensTypo.dataSmall)
+                    .foregroundStyle(TokensPalette.secondary)
+            }
+            Slider(value: $display.glow, in: 0...1)
+                .tint(TokensPalette.accent)
+            Text("50% 为默认。0% 即完全关闭。")
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, TokensSpacing.sm)
+    }
+
+    /// 玻璃通透度：三档（更透 / 标准 / 更实）。
+    ///
+    /// ⚠️ 它换的是**用哪一档系统材质**，不是去拧一个「透明度」的数 —— 那个旋钮
+    /// 系统没有（`DisplaySettings.GlassLevel` 写着这件事）。所以这里用分段控件
+    ///（三档之间选一个）而不是滑杆：滑杆会假装有连续可调的空间。
+    private var glassLevelRow: some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+            Text("玻璃通透度")
+                .font(TokensTypo.body)
+                .foregroundStyle(TokensPalette.primary)
+            DSSegmented(options: DisplaySettings.GlassLevel.allCases
+                            .map { (value: $0, title: $0.title) },
+                        selection: $display.level)
+            Text("更透走 clear 材质，更实走磨砂底。")
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, TokensSpacing.sm)
+    }
+
+    /// 界面实度：App 自己那几层半透明的底（卡里的分组面 / 控件底 / 模式条的底）有多实。
+    ///
+    /// 它与上一行**不是同一件事**，所以它是第二个滑杆而不是并进那一档：
+    /// 前者选材质，后者改我们画的那几层色面。往下调要盯的只有一件 ——
+    /// 卡片里的字还有没有底（顶到 0 时卡里的面会消失，而卡片自己的玻璃仍在）。
+    private var glassFillRow: some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.sm) {
+            HStack {
+                Text("界面实度")
+                    .font(TokensTypo.body)
+                    .foregroundStyle(TokensPalette.primary)
+                Spacer(minLength: TokensSpacing.sm)
+                Text("\(Int(display.fill * 100))%")
+                    .font(TokensTypo.dataSmall)
+                    .foregroundStyle(TokensPalette.secondary)
+            }
+            Slider(value: $display.fill, in: 0...1)
+                .tint(TokensPalette.accent)
+            Text("100% 为默认。调低更通透，调高更实。")
+                .font(TokensTypo.caption)
+                .foregroundStyle(TokensPalette.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, TokensSpacing.sm)
+    }
 
     /// 壁纸小卡：缩略图（当前那张）+ 两个小钮（换一张 / 不铺）。
     ///

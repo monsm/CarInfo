@@ -503,6 +503,9 @@ VERIFIED_SDK_ADDITIONS = {
     "glassEffect": "View.glassEffect(_:in:)（iOS 26+；externalID "
         "s:7SwiftUI4ViewPAAE11glassEffect_2inQrAA5GlassV_qd__tAA5ShapeRd__lF）——挂液态玻璃",
     "interactive": "Glass.interactive(_:)（iOS 26+）——让玻璃按下去时有系统的压缩与折射",
+    "tint": "Glass.tint(_:)（iOS 26+）——在同一档材质上再压一层色，是系统给的「更实」的形态。"
+        "2026-09-26「玻璃通透度」那一档用它，而**不是**在玻璃底下垫一块面（垫面会把材质挡掉，"
+        "`scan/glass.py` 的判据 ③ 正在拦）。同一名字在 Slider 上也有（那是另一件事）。",
     "UnevenRoundedRectangle": "SwiftUI.UnevenRoundedRectangle（iOS 16+；底部面板只要上面两角圆角）",
     # 热区 / 回放 / 充电曲线（本轮）：全部写进代码前对着 Apple 文档 JSON 核过
     "MapCircle": "MapKit.MapCircle struct（iOS 17+；init(center:radius:) 已核，stroke(_:style:)/foregroundStyle 见 Styling-the-circle）",

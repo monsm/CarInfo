@@ -38,6 +38,13 @@ import SwiftUI
 //  系统去演（按下去的压缩与折射变化）—— 自己用 `.scaleEffect` + `opacity` 模拟的
 //  那一套，永远差在「玻璃不被压」。
 //
+//  ⚠️ 2026-09-26（用户：「全局调整液态玻璃的通透度」）：`dsGlass` 从此还读
+//  `DisplaySettings` 的两格 —— 「用哪一档材质」与「更实那一档的 tint 多浓」。
+//  它们**不**是第四个参数：参数说的是「这一块玻璃压在什么上」（几何与内容），
+//  而那两格是**全 App 一致的观感**。把全局的偏好写成每个调用点都要传一遍的参数，
+//  等于把「一致」寄托在 12 个调用点都记得传对（那正是这一仓反复吃过的那种账）。
+//  于是入口仍然只有这一个，只是它现在多读两格设置。
+//
 //  ⚠️ 这里不留 `ViewModifier` 包装类型（2026-09-25 同日删）：`DSGlassSurface` /
 //  `DSGlassLayer` 只是搬运参数，删掉之后本文件只剩 `DSGlassVariant` 一个类型，
 //  而它是 `dsGlass` 的**参数类型**（调用点写 `.overMedia`，是隐式成员表达式）——
@@ -73,10 +80,27 @@ extension View {
                                      variant: DSGlassVariant = .regular,
                                      interactive: Bool = false,
                                      hairline: Bool = true) -> some View {
-        let base: Glass = variant == .overMedia ? .clear : .regular
+        let settings = DisplaySettings.shared
+        //  用户 2026-09-26：「全局调整液态玻璃的通透度」——设置里选的那一档
+        //  **盖过**「按底下是什么选」这条规矩（理由写在 `DisplaySettings.GlassLevel` 上：
+        //  一个全局开关按不同的地方给不同的结果，就不是一个全局开关）。
+        //  默认那一档是 `standard`，它走的正是这条规矩本身 —— 所以默认行为一字未改。
+        let base: Glass
+        switch settings.level {
+        case .clear: base = .clear
+        case .standard: base = variant == .overMedia ? .clear : .regular
+        case .solid: base = .regular
+        }
+        // 「更实」那一档加一层**材质自己的** tint：那正是系统给的「同一档材质更实」
+        // 的形态（`Glass.tint(_:)`），而**不是**在玻璃底下垫一块面 —— 垫面会把材质
+        // 本身挡掉，那件事 `scan/glass.py` 的判据 ③ 正在拦。
+        // 浓淡跟着「界面实度」一起走：两块调节钮说的是同一件观感，就不该各调各的。
+        let tuned: Glass = settings.level == .solid
+            ? base.tint(TokensPalette.surface.opacity(0.35 * settings.fill))
+            : base
         // 写成 `interactive(true)` 而不是 `interactive()`：文档里那个默认值
         // （`_ isEnabled: Bool = true`）在 fragments 里看不到，写死实参就与它无关了。
-        let material: Glass = interactive ? base.interactive(true) : base
+        let material: Glass = interactive ? tuned.interactive(true) : tuned
         return glassEffect(material, in: shape)
             .overlay {
                 if hairline {

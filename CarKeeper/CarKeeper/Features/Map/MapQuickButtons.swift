@@ -138,6 +138,9 @@ extension MapSpineView {
             ToastManager.shared.show("还没收到车的位置", icon: "car")
             return
         }
+        // 这一按不只把镜头挪过去，还把**跟随目标**改成车（用户 2026-09-26）：
+        // 否则之前选过手机时，下一次手机定位报点会把镜头拉回去。
+        follow = .car
         centerOnCar(force: true)
     }
 
@@ -158,10 +161,12 @@ extension MapSpineView {
         case .coarse:
             // 手上是个粗点：先移过去（总比没反应好），同时**再要一次** ——
             // 走两步常常就能拿到准的点。取到之后由那条 `onChange` 再移一次镜头。
+            follow = .phone          // 先记下意图，再移镜头（见 `fly` 的说明）
             phone.request()
             fly(to: phone.mapCoordinate)
             ToastManager.shared.show("位置精度较低，正在再取一次", icon: "location")
         case .found:
+            follow = .phone
             phone.request()          // 重新取一次（它取到就停，所以这次是「刷新」）
             fly(to: phone.mapCoordinate)
         }
@@ -170,20 +175,21 @@ extension MapSpineView {
     /// 把镜头移到手机那里。**不跟**手机的方向 —— iOS 地图那枚钮在没有抬头时
     /// 是把镜头放过去（跟方向是另一次点按的事），这里只做前半件。
     ///
+    /// 偏移与俯仰都走 `MapCameraFollow`（与「回到车」**同一个函数**）：用户
+    /// 2026-09-26：「如果是选了人的位置也同样的逻辑显示」—— 同一个函数是这句话在代码里的形状。
+    /// 「先 `follow = .phone` 再调它」的次序是刻意的：这条镜头移动本身不改跟随目标，
+    /// 否则车在动时一个定位报点就能把它神不知鬼不觉地改掉。
+    ///
     /// **不是 `private`**：`MapSpineView` 的 `body` 里那条 `onChange`
     ///（手机位置取回来就移镜头）要调它 —— 与 `camera` / `cameraDistance` 那两处同一个理由：
     /// 一件事只有一处实现，跨文件时不复制第二份。
     @MainActor
     func fly(to coordinate: CLLocationCoordinate2D?) {
-        guard let c = coordinate else { return }
-        withAnimation(TokensMotion.value) {
-            camera = .camera(MapCamera(centerCoordinate: c,
-                                       distance: cameraDistance,
-                                       heading: 0,
-                                       // 与「回到车」同一个俯仰角（见 `cameraPitch`）——
-                                       // 一次镜头移动不该把用户的视角从 3D 打回平面。
-                                       pitch: cameraPitch))
-        }
+        // 朝向传 0（正北）：手机自己没有「车头」这个概念。
+        guard let pos = MapCameraFollow.camera(on: coordinate, heading: 0,
+                                               distance: cameraDistance,
+                                               pitch: cameraPitch) else { return }
+        withAnimation(TokensMotion.value) { camera = pos }
     }
 
     /// 手机自己在地图上的那一点（iOS 的蓝点：实心圆 + 一圈底色描边）。

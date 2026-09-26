@@ -14,10 +14,24 @@ import SwiftUI
 //    · 选中指示是一枚**胶囊**，高 0.85 × 条高，左右各留 0.37 × 条高
 //    · 选中那一档的字是**主题强调色**（相机里是黄），其余是正文色 —— 相机用「颜色」
 //      而不是「加粗」标出当前那一档，玻璃胶囊已经把「位置」说清楚了
-//    · 相邻标签间距恒定 0.73 × 条高（所以静止只露得下三档）
-//    · 静止时第 4 档的**头一个字母被条自己的圆角边硬裁**掉 ——
-//      这一条决定了整个做法：**静止只露三档是「条宽」造成的，不是屏幕不够宽**。
-//      所以「手一滑就横向全显示」的正确形态是**条向两侧长出去**，而不是把间距压扁。
+//    · 相邻标签间距恒定 0.73 × 条高
+//
+//  ⚠️ 2026-09-26（用户：「你并没有按照相机 app 来设计底部导航，重新仔细研究相机 app
+//  的逻辑，来重构我们的底部导航」）：条子从「静止只露三档、按住才长开的浮胶囊」
+//  改成**贴底的全宽横带** —— 相机那条模式行本来就是全宽的，而它在我们这里只露得下
+//  三档，唯一的理由是**左右各有一枚圆钮在挤它的宽度**。
+//  那一轮把两枚圆钮移到了**它上面的一行**（见 `MapSpineView.bottomBar`），
+//  于是整行宽度归条子，五档一次露全、等距铺开（与相机那张图同一个形状）。
+//
+//  连带的删除（同一个决定的另一半 —— 不删就是留下两套形态）：
+//    · **「按住展开」没有了**：那个形态存在的唯一理由是「静止只露三档」。
+//      现在它一直是全宽的，没有第二种形态可言 —— `expand` / `onExpand` /
+//      `retractToken` / `ArmSlot` 一起删掉（后者的职责是「展开时把两枚圆钮让出去」，
+//      而两枚圆钮已经不在这一行里了）。
+//    · **静止三档的间距插值没有了**：间距只有一种算法（把全部档位都装下）。
+//
+//  留下来的那个形态是下面这一段说的「跟手」，它与展开无关：
+//  手指拖的是整行，透镜钉在条正中、字从它下面滑过去。
 //
 //  跟手形态**只有一种**：手指拖的是**整行**，透镜钉在条正中、字从它下面滑过去 ——
 //  这是 iOS 26 模式条的默认形态。
@@ -59,6 +73,12 @@ import SwiftUI
 //  （当年顺手加的「透镜宽度按节距封顶」已于 2026-09-24 撤掉 —— 它在静止时把透镜
 //   压成一条，而它原本要治的那个病（压住邻居）真正的成因是标签坐标系偏移，已修。）
 
+//  ⚠️ 下面这一段（到 `struct ArmSlot` 为止）是 **2026-09-25 的原文，2026-09-26 已删**：
+//  它描述的 `ArmSlot` 是「展开时把两枚圆钮让出去」的修饰符，而按住展开与它服务的
+//  那个状态一起没有了（见文件头）。**原文留着**，因为它记着两条还在用的教训：
+//  ① 真玻璃上的「消失」必须是**不在场**（住在 `GlassEffectContainer` 里就会被它接住，
+//     当成「变小」而不是消失）；② 一个形状的尺寸不该由别的控件决定。
+//  读它请当成历史，不要当成现状。
 /// 底条两端那两枚圆钮的「让位」——条子展开时要占满整行，所以两臂让位。
 ///
 /// 2026-09-25 从 `MapSpineView.swift` 搬来这里：它是这个控件的**状态机上的一个后果**
@@ -79,22 +99,9 @@ import SwiftUI
 ///  *“morph individual shapes into one another”*），于是「收到 0 宽」在它眼里是「变小」
 ///  而不是消失。现在改成**不在场**（下面的 `if open`）：不存在的东西没法被变形，
 ///  也进不了容器那一层合成（顺带少两枚玻璃的离屏合成 —— 与用户第 2 条同一件事）。
-struct ArmSlot: ViewModifier {
-    let open: Bool
-    let size: CGFloat
 
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if open {
-            // 宽高都是 0：HStack 的间距此时也已经是 0（见 `MapSpineView.bottomBar`），
-            // 所以「不在场」与「在场」的那一帧在排版上完全一致。
-            Color.clear.frame(width: 0, height: 0)
-        } else {
-            content.frame(width: size, height: size)
-        }
-    }
-}
-
+//  （上面那一段 `///` 是**历史**，不是 `DSSwipeStrip` 的文档 —— 它一直跟着的是被删的
+//  `ArmSlot`，所以这里夹一行 `//` 把附着的链条断开。）
 struct DSSwipeStrip: View {
 
     /// 一档。`id` 同时是持久化的键（存在 UserDefaults 里，重启回到上次那一档）。
@@ -122,12 +129,8 @@ struct DSSwipeStrip: View {
     /// 连续位置：`2.0` = 停在第三档，`1.4` = 正拖在第二、三档之间。
     /// 宿主用它做内容的交叉过渡 —— 换模式是渐变，不是闪一下。
     var onPosition: ((Double) -> Void)?
-    /// 条子是否正在展开（手指按下 → 展开；松手 → 收回）。宿主据此让两臂让位。
-    ///
-    /// 展开的**时机与收回的节奏是条子自己的行为**（原型 `pointerdown → targetExpand = 1`、
-    /// 拖过就 620ms 后收回、纯点按立即收回），宿主只消费这个状态 —— 所以它是一条
-    /// 单向通知，而不是宿主反过来指挥条子的参数。
-    var onExpand: ((Bool) -> Void)? = nil
+    //  `onExpand`（条子展开 / 收回时通知宿主）已于 2026-09-26 删。它的唯一读者是
+    //  宿主里那个「让两臂让位」的状态，而两枚圆钮已经不在这一行（见文件头）。
 
     /// 条**以外**的整行拖动：宿主把「手指在整条上的横向增量」转发进来。
     /// 跟手、越界阻尼、吸附**全部仍在条子里** —— 宿主只转发，不换算。
@@ -184,13 +187,10 @@ struct DSSwipeStrip: View {
     private var loupeHeight: CGFloat { barHeight * 0.94 }
 
     @State private var c: CGFloat = 0            // 行内坐标：条正中对应到行里的位置
-    @State private var expand: Double = 0
     @State private var cBase: CGFloat?
     @State private var moved = false
-    /// 收回计时器的代号。松手 620ms 后收回，但**手指若已经回到条子上**就作废 ——
-    /// 原型 `setTimeout(()=>{ if(!this.dragging) targetExpand = 0 }, 620)`。
-    /// 没有这一步，快速连按两下会被旧计时器把第二次展开收走。
-    @State private var retractToken = 0
+    //  `expand`（条宽在静止与展开之间插值）与 `retractToken`（收回计时器的代号）
+    //  2026-09-26 一起删：条子一直是全宽的，没有「收回」这个动作可延迟。
     /// 条外那次拖动按下时条子停在哪儿（`nil` = 条外没有正在进行的拖动）
     @State private var rowBase: CGFloat?
     /// 条外那次拖动的最新预测落点（横向增量，含速度）
@@ -235,30 +235,14 @@ struct DSSwipeStrip: View {
         return min(gapMax, max(6, fits))
     }
 
-    /// 整行的宽度
-    private func rowWidth(gap: CGFloat) -> CGFloat {
-        let n = CGFloat(max(1, items.count))
-        return n * slot + (n - 1) * gap
-    }
-
-    /// 静止条宽：刚好装得下三档（不足三档就是整条）
-    private func restWidth(width: CGFloat, gap: CGFloat) -> CGFloat {
-        let shown = min(CGFloat(max(1, items.count)), 3)
-        let need = (shown - 1) * pitch(gap) + slot + 2 * pillPad
-        return min(width, need)
-    }
-
-    /// 展开后的条宽
-    private func openWidth(width: CGFloat, gap: CGFloat) -> CGFloat {
-        min(width, rowWidth(gap: gap) + 2 * pillPad)
-    }
-
-    /// 当前条宽（`expand` 在静止与展开之间插值）
-    private func barWidth(width: CGFloat, gap: CGFloat) -> CGFloat {
-        let rest = restWidth(width: width, gap: gap)
-        let open = openWidth(width: width, gap: gap)
-        return rest + (open - rest) * CGFloat(expand)
-    }
+    /// 条宽 —— **就是整行宽度**（相机那条模式行本来就是全宽的）。
+    ///
+    /// ⚠️ 它曾经是一个插值（静止三档宽 → 按住长开到全宽），那三个函数
+    ///（`rowWidth` / `restWidth` / `openWidth` / `barWidth` 的插值）2026-09-26 一起删了：
+    /// 「只露三档」这个形态没有了，于是「条宽」不再是变量。
+    /// 把宽度交给容器（而不是自己算）还有一件好处：条子的 frame 与它几何用的宽度
+    /// 永远是同一个数（那个「两套宽度」的错法见文件头）。
+    private func barWidth(width: CGFloat) -> CGFloat { width }
 
     /// 拖动时 `c`（=条正中在行里的位置）的限位：**整行可达范围** ——
     /// 第一档能拖到条正中，最后档也能。
@@ -314,13 +298,12 @@ struct DSSwipeStrip: View {
 
     var body: some View {
         let width = max(120, availableWidth)
-        // 间距随展开插值：静止按「三档装得下」算（宽裕），展开按「全部档位装得下」算
-        //（不够才压）。两个字的名字不变、间距变 —— 于是展开是「散开」，不是「挤紧」。
-        let gapRest = gap(for: width, shown: min(3, items.count))
-        let gapOpen = gap(for: width, shown: items.count)
-        let gap = gapRest + (gapOpen - gapRest) * CGFloat(expand)
+        // 间距只有一种算法：**全部档位都装下**（不够才压）。曾经那对
+        //「静止按三档算 / 展开按全部算」的插值随「按住展开」一起删了（见文件头）——
+        // 全宽横带里没有「只露三档」这种形态，于是间距也就不该有两个数。
+        let gap = gap(for: width, shown: items.count)
         let lim = limits(width: width, gap: gap)
-        let barW = barWidth(width: width, gap: gap)
+        let barW = barWidth(width: width)
         // 显示用的位置：即使 `c` 是上一次几何下的值，也先夹到合法范围再画 ——
         // 于是「宽度变了」只会表现为吸一下，而不是首帧停在错的地方。
         let cShown = clampC(c, lim: lim, gap: gap)
@@ -341,27 +324,10 @@ struct DSSwipeStrip: View {
         // 容器宽度变了（旋转 / iPad 分栏 / 首帧量到宽度）→ 按新间距重新落位。
         // 少了这一步，条子会按旧间距停在旧位置，直到用户碰它一下才归位。
         .onChange(of: availableWidth) { _, _ in settle(animated: false, gap: gap, lim: lim) }
-        // 展开 / 收回也要重新落位 —— 它们改的是**间距**（静止按三档算、展开按全部算）。
-        //
-        // 为什么必须补这一步（用户 2026-09-25 第 3 条：「点选菜单入口时不会出现
-        // 选中框和入口没对准，但是滑动选入口很容易出现对不准」）：`c` 是「行内坐标」里的
-        // 一个数，而同一档在两个间距下的行内坐标**不是同一个数**。间距一变，上次算出来的
-        // `c` 就落在两档之间 —— 透镜钉在条正中不动，而当前那一档的字已经偏到旁边去了。
-        //
-        // 而两条路的时序不一样，所以只有滑动那条会偏 —— 这就是用户看到的不对称：
-        //   · 点选：`pick()` 改档位与 `expand = 0` 发生在同一轮里，于是
-        //     `.onChange(of: selectedID)` 拿到的 `gap` 已经是收回之后的值 → 算对了；
-        //   · 滑动：`snap()` 改档位时条子还**开着**（收回被推到 620ms 之后，
-        //     见 `onEnded`）→ 落位用的是展开的间距；等 620ms 后收回，间距变了，
-        //     **没有谁再算一次 `c`** → 那一档从此偏着，直到用户再碰一下条子。
-        //
-        // 手指正按着时不重算：那一刻 `c` 归手势管（松手会被 `snap` 接过去），
-        // 两者都写同一个量就会打架。收回发生在松手之后（`cBase` 已置 nil），
-        // 所以这条守卫拦不住要治的那个时序。
-        .onChange(of: expand) { _, _ in
-            guard cBase == nil, rowBase == nil else { return }
-            settle(animated: false, gap: gap, lim: lim)
-        }
+        //  （这里曾有 `.onChange(of: expand)`：展开/收回改了间距，`c` 要按新间距重算一遍，
+        //   否则滑动选档之后透镜会与那一档的字错开 —— 用户 2026-09-25 第 3 条报的正是这个。
+        //   2026-09-26 删：间距不再随展开变，也就没有「变了之后要重算」这一步。
+        //   那条时序的正面结论留在 `settle` 上：**改档位的地方必须同时把 `c` 放到位**。）
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("功能"))
     }
@@ -379,7 +345,12 @@ struct DSSwipeStrip: View {
         // 只为给出尺寸），材质本身就是那一层 —— 这正是 `dsGlass` 存在的理由。
         Color.clear
             .frame(width: width, height: barHeight)
-            .dsGlass(in: Capsule())
+            //  形状从**胶囊**改成**圆角矩形**（2026-09-26）：胶囊的两端是半圆，
+            //  那是「一根浮着的条子」的形状；而相机贴在底边的那一条模式行是**横带**
+            //  （两端几乎不回收）。五档全宽铺开之后，半圆的头会把首尾两档的字压得
+            //  很紧，而圆角矩形与它同一高度下的可用宽度是一致的。
+            .dsGlass(in: RoundedRectangle(cornerRadius: TokensRadius.large,
+                                          style: .continuous))
             .allowsHitTesting(false)
     }
 
@@ -460,9 +431,10 @@ struct DSSwipeStrip: View {
         // 少了这一步，半压在条边上的那个字会**漏到条外** ——
         // 而条是带圆角的，露出去的那半截正好把「静止只露三档」这个形态破掉。
         .mask {
-            // 遮罩必须与条子**同一个形状**：条是胶囊，遮罩也得是胶囊，
+            // 遮罩必须与条子**同一个形状**（上面 `bar` 那个圆角矩形），
             // 否则半压在条端的那个字会从圆角外面漏出来。
-            Capsule().frame(width: barW, height: barHeight)
+            RoundedRectangle(cornerRadius: TokensRadius.large, style: .continuous)
+                .frame(width: barW, height: barHeight)
         }
         .allowsHitTesting(false)
     }
@@ -471,19 +443,18 @@ struct DSSwipeStrip: View {
     // MARK: 手势
     // =========================================================================
 
-    /// `minimumDistance: 0` 是为了**按下就展开**（相机的条子也是按住就长开）。
+    /// `minimumDistance: 0` 是为了**按下就能拖**（手指落在条上任何一处都算）。
     /// 代价是点选要自己做 —— 位移小于 8pt 就当成「点了最近的那一档」，
-    /// 而不是让每个标签各挂一个 Button（那样按下展开会晚半拍，而且按下时的
-    /// 展开与点选会打架）。
+    /// 而不是让每个标签各挂一个 `Button`（那样按下那一刻两条手势会打架）。
+    ///
+    /// （它此前还兼着「按下就展开、松手 620ms 后收回」那件事，共两个 620ms 计时器
+    ///   与一个代号。2026-09-26 随展开一起删：条子一直是全宽的，没有收回去的形态。）
     private func swipe(gap: CGFloat, lim: ClosedRange<CGFloat>, barW: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { v in
                 if cBase == nil {
                     cBase = c
                     moved = false
-                    retractToken += 1          // 新触摸作废还没生效的收回
-                    withAnimation(TokensMotion.fade) { expand = 1 }
-                    onExpand?(true)
                 }
                 if abs(v.translation.width) > 8 { moved = true }
                 // 行跟着手指走，透镜钉在正中（唯一的跟手形态，见文件头）
@@ -496,20 +467,6 @@ struct DSSwipeStrip: View {
                     pick(nearest(to: v.location.x, gap: gap, barW: barW))
                 } else {
                     snap(gap: gap, lim: lim, projected: projectedPV(v, gap: gap))
-                }
-                // 松手后再收回，节奏照原型：**拖过**的等 620ms（给眼睛时间看清
-                // 刚才划过哪些档），**没动过**（纯点按）立即收回。
-                // 计时器带代号：生效前若手指已回到条子上，这次收回作废。
-                if moved {
-                    let token = retractToken
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.62) {
-                        guard token == retractToken else { return }
-                        withAnimation(TokensMotion.fade) { expand = 0 }
-                        onExpand?(false)
-                    }
-                } else {
-                    withAnimation(TokensMotion.fade) { expand = 0 }
-                    onExpand?(false)
                 }
                 cBase = nil
             }
@@ -550,33 +507,12 @@ struct DSSwipeStrip: View {
                          projected: pvValue(c: base - rowPredicted, gap: gap))
                 }
             }
-            guard rowMoved else { return }
             rowMoved = false
-            // 收回节奏照原型：**拖过**的等 620ms（给眼睛时间看清划过哪些档），
-            // 没拖过的立即收回。计时器带代号（与条内拖动共用 `retractToken`）——
-            // 手指若已经回到条子上，这次收回作废。
-            let token = retractToken
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.62) {
-                guard token == retractToken else { return }
-                withAnimation(TokensMotion.fade) { expand = 0 }
-                onExpand?(false)
-            }
             return
         }
-        if rowBase == nil {
-            rowBase = c
-            retractToken += 1          // 新触摸作废还没生效的收回
-        }
+        if rowBase == nil { rowBase = c }
         guard let base = rowBase else { return }
-        // 展开只在越过 8pt 之后（纯点按不该把条子长开又缩回 —— 那是一次闪烁；
-        // 条内拖动那边「按下就展开」是因为那一刻手指一定在条上）。
-        if e.moved {
-            rowMoved = true
-            if expand < 1 {
-                withAnimation(TokensMotion.fade) { expand = 1 }
-                onExpand?(true)
-            }
-        }
+        if e.moved { rowMoved = true }
         rowPredicted = e.predicted
         c = clampC(base - e.translation, lim: lim, gap: gap)
         onPosition?(pvValue(c: c, gap: gap))

@@ -130,7 +130,11 @@ enum TokensPalette {
     /// ⚠️ 为什么不干脆改成真材质（`.glassEffect`）：`Design/DSGlass.swift` 三层规则
     /// 第 ② 条 —— **卡里不玻璃**（卡片自己已经是玻璃，里面再摆一块是同一层放两次）。
     /// 这一仓要的「通透」是【半透明】，不是【多一层材质】。
-    static var fillSubtle: Color { surface.opacity(0.22) }
+    ///  2026-09-26：它乘上「设置 → 显示 → 界面实度」（`DisplaySettings.fill`）。
+    ///  默认 1，所以数值一处不变；调到 0 就是「只剩玻璃本身、我们不再往上摆任何面」。
+    ///  为什么这一个数能同时管住全 App 的面：**半透明的底只有这一处出处**
+    ///  （`panel` 是它的另一个深浅），所以「有多透」不可能有两个答案。
+    static var fillSubtle: Color { surface.opacity(0.22 * DisplaySettings.shared.fill) }
 
     /// 卡片**里面**那一层面：分组面、占位面、提示条、搜索框。
     ///
@@ -152,7 +156,9 @@ enum TokensPalette {
     ///  读得出「一块灰面」（用户：「控件显示着不通透的灰色（列表尤甚），我要通透」）。
     ///  往下调要盯的只有一件事：卡片里的字还有没有底 —— 而文字令牌是不透明的
     /// `label` 三档，所以同一个数在这四套（明/暗 × 有色/无色底）下都是安全的。
-    static var panel: Color { surface.opacity(0.34) }
+    ///
+    ///  2026-09-26：与 `fillSubtle` 一起乘上「界面实度」（见那一行）。
+    static var panel: Color { surface.opacity(0.34 * DisplaySettings.shared.fill) }
 
     // 已删除：`glassBorder`（2026-09-25，与 `glassLight` 同一批）。
     // 它也是 `hairline` 的重复声明 —— 而 12 位用户里只有 4 位（`dsGlass` /
@@ -228,19 +234,38 @@ enum TokensInk {
 /// 为什么它必须是一对（而不是 `black` 一个）：外壳要的是「与字相反的那一侧」，
 /// 而字是亮还是暗由系统的深浅色决定 —— 暗色主题下字是亮的，就要压一圈黑的；
 /// 亮色主题下字是暗的，就要提一圈白的。写成动态色之后，调用点一个三元都不用写。
+///
+///  ── 2026-09-26：它变成**可调**的 ──
+///  用户：「设置文字的发光阴影程度」。于是半径与浓度不再是两个定值，而是
+///  `DisplaySettings.glow`（0…1）的函数，而**程度 0.5 恰好等于上面那版的样子**
+///  （半径 3 / 4、浓度 0.45 / 0.65）—— 装上这一版界面一处不变，起点是用户上一步
+///  看到的那张脸。0 = 一点不画（连 `displayPadding` 也归零），1 = 半径翻倍、浓度顶满。
+///  ⚠️ 两处读它的地方（`DSTextGlow` 的 `draw` 与 `displayPadding`）**必须同一个数**：
+///  半径画得比留白大，光就会被裁掉一角（那个属性就是为这件事存在的）。
+///  所以它们都从下面这两个计算属性取，一个都不许在调用点乘自己的系数。
 enum TokensHalo {
-    /// 常规文字（13–17pt）的外壳半径。
-    static let radius: CGFloat = 3
-    /// 标题 / 大数字（20pt 以上）的外壳半径 —— 笔画粗了，壳要跟着撑开一点。
-    static let radiusWide: CGFloat = 4
+    /// 常规文字（13–17pt）的**基准**半径（= 程度 0.5 时的半径）。
+    private static let baseRadius: CGFloat = 3
+    /// 标题 / 大数字（20pt 以上）的基准半径 —— 笔画粗了，壳要跟着撑开一点。
+    private static let baseRadiusWide: CGFloat = 4
+
+    /// 程度 → 倍数：0.5 → ×1（不变），1 → ×2（最重），0 → ×0（不画）。
+    private static var scale: CGFloat { CGFloat(DisplaySettings.shared.glow) * 2 }
+
+    static var radius: CGFloat { baseRadius * scale }
+    static var radiusWide: CGFloat { baseRadiusWide * scale }
 
     /// 反色壳本身。深色主题：白字压黑；浅色主题：黑字提白。
-    /// 不透明度都取低值：它是外壳不是投影，重了就变成一圈脏边。
-    static let ink: Color = Color(uiColor: UIColor { traits in
-        traits.userInterfaceStyle == .dark
-        ? UIColor(white: 0, alpha: 0.45)
-        : UIColor(white: 1, alpha: 0.65)
-    })
+    /// 不透明度都取低值：它是外壳不是投影，重了就变成一圈脏边
+    ///（所以最重那一档也**顶到 1 就不再往上**：再重就不是壳，是描边）。
+    static var ink: Color {
+        let weight = min(1, max(0, DisplaySettings.shared.glow)) * 2
+        return Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+            ? UIColor(white: 0, alpha: min(1, 0.45 * weight))
+            : UIColor(white: 1, alpha: min(1, 0.65 * weight))
+        })
+    }
 }
 
 // MARK: - 间距（4 的倍数，页面边距 20）

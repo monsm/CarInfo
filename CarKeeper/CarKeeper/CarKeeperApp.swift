@@ -100,6 +100,13 @@ enum SceneID {
 struct CarKeeperApp: App {
     private let store = AppStore.shared
     @StateObject private var nav = NavState.shared
+    /// 「设置 → 显示」那三格（文字发光程度 / 玻璃通透度 / 界面实度）。
+    ///
+    /// **根必须订阅它**（用户 2026-09-26 加的这两组设置）：它们改的不是某一页的
+    /// 局部状态，而是 `TokensHalo` 与 `TokensPalette.panel` 这类**计算属性**读到的值 ——
+    /// 读得到、但没有东西会因此重画。这一行就是那个「因此」：任何一格改动 →
+    /// 整棵树重新求值（与 `wallpaper` / `phone` 那几处订阅同一个理由）。
+    @ObservedObject private var display = DisplaySettings.shared
 
     init() {
         // 后台刷新（BGTask）已删：免费开发者账号没有 BGTaskScheduler 权限，
