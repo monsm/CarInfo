@@ -448,6 +448,15 @@ VERIFIED_SDK_ADDITIONS = {
     "stopUpdatingLocation": "CLLocationManager.stopUpdatingLocation()（iOS 2.0+；externalID c:objc(cs)CLLocationManager(im)stopUpdatingLocation）—— 取到就停",
     "Tab": "SwiftUI.Tab（iOS 18+/watchOS 11+，init(value:content:label:) 已核对 interface）",
     "AnyView": "SwiftUI.AnyView（iOS 13+）",
+    # 「降低透明度」那一档（Design/DSGlass.swift，2026-09-26 第二十轮）。
+    # 登记前核过 Apple 文档页 uikit/uiaccessibility/isreducetransparencyenabled
+    # （title + abstract：「A Boolean value that indicates whether the Reduce
+    # Transparency setting is in an enabled state.」）。
+    # 为什么不用 SwiftUI 那个 `@Environment(\.accessibilityReduceTransparency)`：
+    # 它只能在 `View` / `ViewModifier` 里读，而「为读它而加一个泛型 `View`」已经
+    # 让 App 在真机上崩过一次（栈溢出，见 `DSGlass.swift` 文件头上那段）。
+    "UIAccessibility": "UIKit.UIAccessibility（iOS 2.0+）—— 「降低透明度」这一档的唯一读者",
+    "isReduceTransparencyEnabled": "UIAccessibility.isReduceTransparencyEnabled（UIKit；doc://com.apple.uikit/documentation/UIKit/UIAccessibility/isreducetransparencyenabled；abstract: A Boolean value that indicates whether the Reduce Transparency setting is in an enabled state.）",
     "UnitPoint": "SwiftUI.UnitPoint（iOS 13+）",
     "blendMode": "View.blendMode(_:)（iOS 13+）",
     "repeatForever": "Animation.repeatForever(autoreverses:)（iOS 13+）",

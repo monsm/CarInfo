@@ -80,6 +80,17 @@
 
   两条都是「宁可漏，不可噪」那一侧的：一条误报就足以让人开始绕过这个门禁。
 
+  2026-09-26 的第三条假阳性（判据 ⑦）：
+  删掉 `Design/DSGlass.swift` 里那个只为读 `@Environment` 而存在的泛型 `View` 包装
+  （`DSGlassSurface`）时，它那两个存储属性 `variant` / `interactive` 跟着一起没了 ——
+  而同一个函数 `dsGlass(in:variant:interactive:hairline:)` 的**形参**一直叫这两个名字
+  （它们的缩进是 8，`MEMBER_DECL` 只认 ≤ 4，于是「新版本里没有声明」这一条被误判）。
+  本文件把三行报成了编译错误，而它们本来就有一个声明：函数签名里那一行。
+  **形参是声明**，这一点不该由缩进来决定 —— 所以补一条收集器，并把它接在判据 ④
+  那一侧：**使用处所在的文件**自己声明了同名的形参 → 不报。
+  （没接在 `global_new` 上：那一侧是全项目的「有声明就不报」，而形参的名字与类型名
+    一样常见（`style` / `pad` / `row`），放进去会把这一类真错永远遮住。）
+
   2026-09-25 的第二条假阳性（判据 ⑥，同一天加的）：删掉 `MapCarPin.style` /
   `MapSpotPin.style`（车钉那三套艺术样式的选择器）时，它报了六处用法 ——
   全部是**参数标签**：`RoundedRectangle(cornerRadius: 3, style: .continuous)`、
@@ -234,6 +245,43 @@ ANY_DECL_SRC = (
     r"(?:let|var|func|case)\s+%s\b"
 )
 
+# 函数签名（判据 ⑦）：`func 名字`+ 可选的泛型子句 + `(`。
+# 泛型子句的写法与 `scan.py` 的 GENERIC 一致（不带尖括号/括号），本仓就那一种。
+FUNC_SIG = re.compile(
+    r"^[ \t]*(?:@[A-Za-z_][\w.]*(?:\([^)]*\))?\s+)*"
+    r"(?:(?:" + MODIFIER + r")\s+)*"
+    r"func\s+[A-Za-z_]\w*\s*(?:<[^<>{}()]*>)?\(",
+    re.M,
+)
+
+# 形参名：参数表里「标识符 + `:`」的每一个。**故意宽** —— 它只往「新版本声明过」
+# 那一侧加名字（宁可漏，不可噪），所以把 `in shape: S` 里的 `shape` 与默认值里
+# 可能出现的标签一起收进来也没关系；反过来（漏掉一个真形参）就是一条假阳性。
+PARAM_LABEL = re.compile(r"(?<![\w.])([a-z_]\w*)\s*:")
+
+
+def param_names(text):
+    """这个文件里**函数形参**的名字（判据 ⑦）。
+
+    括号配对是逐字符数的（默认值里还会嵌括号，如 `.opacity(0.3)`）—— 与 `scan.py`
+    「不猜」的取法一致：只用到签名里那一个 `(` 与与它配对的 `)` 之间那一段。
+    """
+    body = strip_comments(text)
+    names = set()
+    for m in FUNC_SIG.finditer(body):
+        i = m.end() - 1                      # 签名里那个 `(`
+        depth, j = 0, i
+        while j < len(body):
+            if body[j] == "(":
+                depth += 1
+            elif body[j] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            j += 1
+        names |= set(PARAM_LABEL.findall(body[i + 1:j]))
+    return names
+
 
 def type_names(text):
     """这个文件里声明过的类型名（含嵌套类型）—— 判据 ⑤ 的输入。"""
@@ -373,6 +421,9 @@ def main():
     for text in new_texts.values():
         global_new |= member_names(text)
 
+    # 判据 ⑦ 的输入：每个文件里**函数形参**的名字（一次算好，循环里不再逐名字扫全文）。
+    params_in = {rel: param_names(text) for rel, text in new_texts.items()}
+
     # 判据 ⑤ 的输入：项目里声明过的**全部**类型名（含嵌套类型）。
     project_types = set()
     for text in new_texts.values():
@@ -386,10 +437,14 @@ def main():
                 continue
             # 判据 ④：使用处所在的文件自己声明了同名成员 → 不报。
             hits = []
-            if not declares_anywhere(new_texts.get(rel, ""), name):
+            # 判据 ④ + ⑦：本文件自己声明了同名成员 / 同名形参 → 不报。
+            if not (declares_anywhere(new_texts.get(rel, ""), name)
+                    or name in params_in.get(rel, set())):
                 hits += [(rel, n, t) for n, t in uses_of(name, new_texts.get(rel, ""))]
             for other, text in new_texts.items():
                 if other == rel or declares_anywhere(text, name):
+                    continue
+                if name in params_in.get(other, set()):
                     continue
                 for n, t in qualified_uses_of(name, text, project_types):
                     hits.append((other, n, t))

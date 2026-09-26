@@ -4224,15 +4224,22 @@ MapKit 的法律信息与「高德地图」就在这 26pt 里，盖住它比少 
 2. **「降低透明度」那一档由我们自己接**。量到的是：系统对手写玻璃的降法是**去掉模糊、
    只留一层淡色**（卡里能看出底下的地图纹理，只比周围亮 ~20/255），而字是白的实色 ——
    白字压淡色，同一屏每一块玻璃都变成浅色方块。相机那条底子不变，是因为它**底下没有系统
-   材质**（自己画的半透明黑）。于是 `dsGlass` 多一个落点 `DSGlassSurface`（`View`）：
-   那一档改画**不透明的 `TokensPalette.surface` + 同一圈发丝线**（HIG：
-   *offer solid-fill alternatives at component level*）。调用点一个字未改。
+   材质**（自己画的半透明黑）。于是 `dsGlass` 在这一档改画**不透明的 `TokensPalette.surface`
+   + 同一圈发丝线**（HIG：*offer solid-fill alternatives at component level*），
+   开关读系统属性 `UIAccessibility.isReduceTransparencyEnabled`，两分支交给 `@ViewBuilder`。
+   调用点一个字未改。
+   ⚠️ 第一版把这一档包在 `DSGlassSurface<S: InsettableShape>: View` 里（为了读 `@Environment`）
+   —— **用户装上后启动 1.9 秒即崩**（`EXC_BAD_ACCESS` 栈溢出，栈顶就是它的 `body.getter`，
+   在 `SubstGenericParametersFromMetadata::buildDescriptorPath` 里无限递归）。
+   结论：`glassEffect` 从泛型 `View` 的 `body` 里调会崩，从 `View` 扩展函数里调没事。
 3. **圆钮真的移出层级**。`GlassEffectContainer` 会把子树里的玻璃**合成成一个形状** ——
    透明度 0 在它眼里只是内容不见了（上一轮 §29.3 那条结论作废）。现在 `if barDragging`
    决定在不在（同尺寸占位），淡出交给 `.transition(.opacity)`；带子同样处理。
 
 验证：`scan/all.py` **34/34 全绿**（`MapSpineView.swift` 1198 行、`DSSwipeStrip.swift` 670 行）。
-只有 CI 能验：`DSGlassSurface` 的成员初始化器顺序、两个 `@ViewBuilder` 分支、
-`@Environment(\.accessibilityReduceTransparency)` 这个名字。
+只有 CI 能验：三个 `@ViewBuilder` 分支、`UIAccessibility` 这个名字（已登记进
+`scan/scan.py` 的 `VERIFIED_SDK_ADDITIONS`）。
+另：`scan/delguard.py` 为这次返工补了判据 ⑦（**同名形参也算声明**）—— 删掉那个包装类型时，
+它把 `dsGlass` 的两个形参名报成了「删了声明、使用还在」。
 只有真机能验：**容器还认不认包在包装视图里的玻璃**（唯一一处「可能白改」）、
 圆钮移出层级会不会打断正在进行的拖动、以及实底那一档的观感。

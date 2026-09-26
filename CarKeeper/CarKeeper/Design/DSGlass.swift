@@ -45,12 +45,29 @@ import SwiftUI
 //  等于把「一致」寄托在 12 个调用点都记得传对（那正是这一仓反复吃过的那种账）。
 //  于是入口仍然只有这一个，只是它现在多读两格设置。
 //
-//  ⚠️ `ViewModifier` 包装类型在 2026-09-25 删过一轮：那时的 `DSGlassSurface` 与
-//  `DSGlassLayer` 只是搬运参数，而「搬运」不需要一个类型。
-//  2026-09-26 `DSGlassSurface` 回来了，因为**这一版它有事要做**：读
-//  `accessibilityReduceTransparency` 并换一块自己的实底（理由见下面那条类型）。
-//  一条判据：包装类型只有在「它自己知道什么」时才成立 ——
-//  `View` 扩展函数里读不到 `@Environment`，这就是那件事本身。
+//  ⚠️ 这里不留 `ViewModifier` 包装类型（2026-09-25 删过一次）：`DSGlassSurface` /
+//  `DSGlassLayer` 只是搬运参数，而「搬运」不需要一个类型。`DSGlassVariant` 是 `dsGlass`
+//  的**参数类型**（调用点写 `.overMedia`，是隐式成员表达式）——
+//  「声明了却没有别人按名字提到」在 `scan/orphans.py` 眼里是孤儿，已在那边登记理由。
+//
+//  ⛔⛔ 2026-09-26 当天又试了一次包装类型，**把它拆掉了，别再试** ⛔⛔
+//
+//  为「降低透明度」这一档（下面那段）曾经引入过 `struct DSGlassSurface<S: InsettableShape>: View`
+//  —— 理由看起来无可辩驳：`View` 扩展函数里读不到 `@Environment`，要读就得先是一个 `View`。
+//  用户把它装到真机上，**启动约 1.9 秒即崩**（`bug_type 309`，`EXC_BAD_ACCESS` /
+//  `SIGSEGV`，崩在栈保护区 = 栈溢出）：
+//
+//      栈顶  DSGlassSurface.body.getter                       ← 我们那个泛型 `View`
+//            swift_getOpaqueTypeMetadataImpl                  ← 在建它 `some View` 的元数据
+//            swift_getTypeByMangledName
+//            swift::SubstGenericParametersFromMetadata::buildDescriptorPath   ← 这里自我递归
+//            …（`recursionInfoArray`: depth 906 / originalLength 5572）
+//      寄存器  anonymous descriptor View.glassEffect<A>(_:in:)
+//
+//  也就是说：**把 `glassEffect` 从「泛型 `View` 的 body」里调用**，在 iOS 27.2 上会让
+//  运行时期解析那个扩展成员的元数据时无限递归。同一个调用从 `View` 扩展函数里发出
+//  （`Self` 在调用点已经是具体类型）一直好好的 —— 这就是现在这一版仍然长这样的原因。
+//  所以本文件**只有两个类型**：`DSGlassVariant`（参数）与本文件自己的 `View` 扩展。
 // =============================================================================
 
 /// 玻璃的两种取用，按**底下是什么**选，不按好看选。
@@ -66,87 +83,32 @@ enum DSGlassVariant {
 //  「降低透明度」这一档由我们自己接
 //  ===========================================================================
 //
-//  用户 2026-09-26：「我把系统的液态玻璃变成了最不通透，我们的 app 变成了这样，
-//  而相机的几乎没变 —— 你好好分析下相机的层结构」。
+//  用户 2026-09-26：「我把系统的液态玻璃变成了最不通透（辅助功能 → 显示与文字大小 →
+//  降低透明度），我们的 app 变成了这样，而相机的几乎没变 —— 你好好分析下相机的层结构」。
 //
-//  相机的底条为什么几乎不变：那条底子是**它自己画的深色面**（一层半透明黑），
-//  底下没有系统材质 —— 一个「降低透明度」能降的只有材质，所以它没有可降的东西。
-//  我们那一块则相反：`.glassEffect` 在那一档下的表现是**把模糊拿掉、只留一层淡色**
-//  （截图量到的：卡里能看出底下的地图纹理，亮度只比周围高 ~20/255），
-//  而我们的字是白的实色（`TokensPalette.primary` = `.label`）——
-//  白字压在一块淡色上，读不出来；同一屏里每一块玻璃都变成「一块浅色大方块」，
-//  远看像卡片变大了。
+//  相机那条底条为什么几乎不变：**它底下没有系统材质** —— 那是一层自己画的半透明黑。
+//  「降低透明度」能降的只有材质，没有材质就没有可降的东西。
+//  （与本仓 2026-09-26 第一轮量到的那条一致：那条带子在像素上是一片均匀填充、
+//    看不出底下的草地纹理。而它旁边的系统材质一眼就看得出变化。）
 //
-//  所以这一档不能交给系统：**用户要的是「少透一点」，系统的降法（去掉模糊、留淡色）
-//  在这里恰好把文字的可读性也一起拿走了**。HIG 对同一件事的写法是
-//  *「offer solid-fill alternatives at component level」* —— 组件自己给一块实底。
-//  我们这块实底取 `TokensPalette.surface`（不透明的系统面色）：深色下它是 #1C1C1E、
-//  亮色下是白，字与它一起随明暗走（`.label` 也是那套），于是两种明暗下都读得出来，
-//  而这正是相机那条深色底子在同一档下保住的东西。
+//  我们那一块相反：`.glassEffect` 在那一档下的表现是**把模糊拿掉、只留一层淡色**
+//  （量用户那张截图：卡里能看出底下的地图纹理、亮度起伏 74…180，整块只比周围高 ~20/255），
+//  而我们的字是白的实色（`TokensPalette.primary` = `.label`）—— 白字压在一块淡色上，
+//  读不出来；同一屏里每一块玻璃都变成「一块浅色大方块」，远看像卡片变大了。
 //
-//  ⚠️ 为什么必须是一个 `View` 而不是 `dsGlass` 里的一句 `if`：函数里读不到
-//  `@Environment`。玻璃得先是一个 `View`，才能知道用户开了没有。
-//  （这一条与「玻璃是浮层的唯一入口」不冲突：它仍是同一条路的第一个落点，
-//  调用点一个字都没变。）
-
-/// 一块玻璃的本体。唯一的职责：在「降低透明度」开着时换一块**我们自己**的实底。
-///
-/// 参数与 `dsGlass` 一一对应，顺序也一致（本仓的成员初始化器按声明顺序传实参）。
-struct DSGlassSurface<S: InsettableShape>: View {
-    let shape: S
-    let variant: DSGlassVariant
-    let interactive: Bool
-    let hairline: Bool
-
-    /// 用户在「辅助功能 → 显示与文字大小 → 降低透明度」里要的那件事。
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    var body: some View {
-        if reduceTransparency {
-            //  一块**不透明**的面色 + 同一圈发丝线。发丝线留着：它是「这里有一块玻璃」
-            //  这句话在无障碍那一档下的替身，少了它，卡片与它背后的界面就贴在一起了。
-            shape.fill(TokensPalette.surface)
-                .overlay {
-                    if hairline {
-                        shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
-                    }
-                }
-        } else {
-            glassEffect(material, in: shape)
-                .overlay {
-                    if hairline {
-                        shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
-                    }
-                }
-        }
-    }
-
-    /// 用哪一档材质。
-    ///
-    ///  用户 2026-09-26：「全局调整液态玻璃的通透度」——设置里选的那一档
-    ///  **盖过**「按底下是什么选」这条规矩（理由写在 `DisplaySettings.GlassLevel` 上：
-    ///  一个全局开关按不同的地方给不同的结果，就不是一个全局开关）。
-    ///  默认那一档是 `standard`，它走的正是这条规矩本身 —— 所以默认行为一字未改。
-    private var material: Glass {
-        let settings = DisplaySettings.shared
-        let base: Glass
-        switch settings.level {
-        case .clear: base = .clear
-        case .standard: base = variant == .overMedia ? .clear : .regular
-        case .solid: base = .regular
-        }
-        // 「更实」那一档加一层**材质自己的** tint：那正是系统给的「同一档材质更实」
-        // 的形态（`Glass.tint(_:)`），而**不是**在玻璃底下垫一块面 —— 垫面会把材质
-        // 本身挡掉，那件事 `scan/glass.py` 的判据 ③ 正在拦。
-        // 浓淡跟着「界面实度」一起走：两块调节钮说的是同一件观感，就不该各调各的。
-        let tuned: Glass = settings.level == .solid
-            ? base.tint(TokensPalette.surface.opacity(0.35 * settings.fill))
-            : base
-        // 写成 `interactive(true)` 而不是 `interactive()`：文档里那个默认值
-        // （`_ isEnabled: Bool = true`）在 fragments 里看不到，写死实参就与它无关了。
-        return interactive ? tuned.interactive(true) : tuned
-    }
-}
+//  所以这一档不能交给系统：**用户要的是「少透一点」，系统的降法在这里恰好把可读性
+//  也一起拿走了**。HIG 对同一件事的写法是 *「offer solid-fill alternatives at
+//  component level」* —— 组件自己给一块实底。我们这块实底取 `TokensPalette.surface`
+//  （不透明的系统面色）：深色下它是 #1C1C1E、亮色下是白，而字（`.label`）与发丝线都跟着
+//  同一套明暗走 —— 两种明暗下都读得出来，这正是相机那条深色底子在同一档下保住的东西。
+//
+//  ⚠️ 读的是**系统那个开关本身**（`UIAccessibility.isReduceTransparencyEnabled`，
+//  文档：*「A Boolean value that indicates whether the Reduce Transparency setting is in
+//  an enabled state.」*），不是它的一个镜像：镜像要多一个类型（上面那段刚记过代价）+
+//  一条挂在根上的写入。代价如实写着：这个值在**下一次求值**时才被读到 ——
+//  用户去设置里翻这个开关时 App 在后台，回来时这一屏本来就会重画（刷新节拍 / 场景激活），
+//  所以观感上是立刻生效的；真要「翻开关那一瞬间就重画」，得走 `DisplaySettings` 那条路。
+// ===========================================================================
 
 extension View {
     /// 浮在内容之上的表面 —— 全 App 唯一的真玻璃入口（见本文件头注的三层规则）。
@@ -164,18 +126,64 @@ extension View {
     ///   `value of type 'S' has no member 'strokeBorder'` —— 约束写宽了，
     ///   编译器要等到用法处才发现。三个便捷入口传的都是可内缩的形状，
     ///   所以把约束收窄**不损失任何调用点**（将来要传自定义形状，它会自己告诉你）。
+    /// ⚠️ `@ViewBuilder` 是为了「降低透明度」那两支：它们画出的是两种不同的视图，
+    /// 而一个 `some View` 函数的所有 `return` 必须是**同一个底层类型** —— 写成
+    /// `if … return 面的视图` / `return 玻璃的视图` 根本编译不过（"the return statements
+    /// in its body do not have matching underlying types"）。
+    /// 再加一层保险：这一支是**函数**（`Self` 在调用点已是具体类型），
+    /// 而不是上一版那个会崩的泛型 `View` 的 `body`（见文件头那段）。
+    @ViewBuilder
     func dsGlass<S: InsettableShape>(in shape: S,
                                      variant: DSGlassVariant = .regular,
                                      interactive: Bool = false,
                                      hairline: Bool = true) -> some View {
-        //  这一句曾经就是整块玻璃（材质怎么选、tint 怎么调、发丝线画在哪）——
-        //  2026-09-26 搬进 `DSGlassSurface`：函数里读不到 `@Environment`，
-        //  而「降低透明度」那一档必须由我们自己接（理由写在那条类型上）。
-        //  调用点一个字都没变，参数就是那里的参数。
-        DSGlassSurface(shape: shape,
-                       variant: variant,
-                       interactive: interactive,
-                       hairline: hairline)
+        if UIAccessibility.isReduceTransparencyEnabled {
+            //  「降低透明度」那一档：一块**不透明**的面色 + 同一圈发丝线（理由见文件上部）。
+            //  发丝线留着：它是「这里有一块玻璃」这句话在无障碍那一档下的替身 ——
+            //  少了它，卡片与它背后的界面就贴在一起了。
+            //  这一支**不调用** `glassEffect`：那一档要的正是「没有材质」（也就不花那份合成）。
+            shape.fill(TokensPalette.surface)
+                .overlay {
+                    if hairline {
+                        shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
+                    }
+                }
+        } else {
+            glassEffect(dsGlassMaterial(variant: variant, interactive: interactive), in: shape)
+                .overlay {
+                    if hairline {
+                        shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
+                    }
+                }
+        }
+    }
+
+    /// 「用哪一档材质」的**唯一算法**：`DisplaySettings` 那两格 + `interactive`。
+    ///
+    /// 拆成一个函数只为一件事：上面那支是 `@ViewBuilder`，把 `let` + `switch` 那段
+    /// 计算摆在视图构建里，读的人得自己在脑里分两层（而且结果构建器的诊断会变糊）。
+    private func dsGlassMaterial(variant: DSGlassVariant, interactive: Bool) -> Glass {
+        let settings = DisplaySettings.shared
+        //  用户 2026-09-26：「全局调整液态玻璃的通透度」——设置里选的那一档
+        //  **盖过**「按底下是什么选」这条规矩（理由写在 `DisplaySettings.GlassLevel` 上：
+        //  一个全局开关按不同的地方给不同的结果，就不是一个全局开关）。
+        //  默认那一档是 `standard`，它走的正是这条规矩本身 —— 所以默认行为一字未改。
+        let base: Glass
+        switch settings.level {
+        case .clear: base = .clear
+        case .standard: base = variant == .overMedia ? .clear : .regular
+        case .solid: base = .regular
+        }
+        // 「更实」那一档加一层**材质自己的** tint：那正是系统给的「同一档材质更实」
+        // 的形态（`Glass.tint(_:)`），而**不是**在玻璃底下垫一块面 —— 垫面会把材质
+        // 本身挡掉，那件事 `scan/glass.py` 的判据 ③ 正在拦。
+        // 浓淡跟着「界面实度」一起走：两块调节钮说的是同一件观感，就不该各调各的。
+        let tuned: Glass = settings.level == .solid
+            ? base.tint(TokensPalette.surface.opacity(0.35 * settings.fill))
+            : base
+        // 写成 `interactive(true)` 而不是 `interactive()`：文档里那个默认值
+        // （`_ isEnabled: Bool = true`）在 fragments 里看不到，写死实参就与它无关了。
+        return interactive ? tuned.interactive(true) : tuned
     }
 
     /// 常用形状的便捷写法（胶囊：按钮 / 芯片 / 条子）
@@ -203,6 +211,11 @@ extension View {
     //  贴纸，而不是同一层材质上的两个形状）。
     //  地图那一屏是这个问题最明显的地方：底条 + 那颗圆形按钮 + 图层胶囊同屏，
     //  由 `MapSpineView` 用 `dsGlassLayer` 包成**一层**。
+    //
+    //  ⚠️ 2026-09-26：那个容器也是**「透明度 0 不等于不在场」**的原因 —— 它把子树里的
+    //  玻璃合成成一个形状，于是子视图被淡到 0 时那块玻璃仍然算在这一层里。
+    //  底条那两枚圆钮（`MapSpineView.arm`）与那条带子（`DSSwipeStrip.band`）因此改成
+    //  由 `if` 决定在不在，而不是靠 `.opacity`。
     func dsGlassLayer(spacing: CGFloat = TokensSpacing.lg) -> some View {
         GlassEffectContainer(spacing: spacing) { self }
     }

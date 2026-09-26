@@ -2611,11 +2611,13 @@ bounds to avoid clipping the shadow.」* —— 而那圈留白**就是这段文
 `.glassEffect`（折射 / 高光 / 按压都归系统），无障碍档自己给一块实底 ——
 HIG 对同一件事的写法就是 *「offer solid-fill alternatives at component level」*。
 
-落下来的：`Design/DSGlass.swift` 多一个 `DSGlassSurface`（`View`，不是 `ViewModifier`），
-读 `@Environment(\.accessibilityReduceTransparency)`，那一档画
-**`TokensPalette.surface` 的不透明实底 + 同一圈发丝线**。为什么必须是一个 `View`：
-扩展函数里读不到 `@Environment`（玻璃得先是一个 `View` 才知道用户开了没有）。
-调用点一个字未改 —— 入口仍然只有 `dsGlass` 一个。
+落下来的（**第一版，当晚就崩了，见 §30.5**）：`Design/DSGlass.swift` 多一个
+`DSGlassSurface`（`View`），读 `@Environment(\.accessibilityReduceTransparency)`，
+那一档画 **`TokensPalette.surface` 的不透明实底 + 同一圈发丝线**。
+那一版的理由是：扩展函数里读不到 `@Environment`（玻璃得先是一个 `View`）。
+**现在的那一版不新建任何类型**：`dsGlass` 自己读系统那个属性
+（`UIAccessibility.isReduceTransparencyEnabled`，UIKit），两个分支交给 `@ViewBuilder`
+（一个 `some View` 函数的所有 `return` 必须同一个底层类型 —— 不标它就编译不过）。
 
 ### 30.3 第三条：`GlassEffectContainer` 会把子视图的玻璃合成成一个形状
 
@@ -2635,8 +2637,8 @@ HIG 对同一件事的写法就是 *「offer solid-fill alternatives at componen
 `python3 scan/all.py` —— **34/34 全绿**（`MapSpineView.swift` 1198 行、`DSSwipeStrip.swift` 670 行、
 `DSGlass.swift` 209 行、`InkGlow.swift` 121 行；这一轮没动任何门禁）。
 
-只有 CI 能验：`DSGlassSurface` 的成员初始化器（声明顺序 = 调用点顺序）、`arm` / `quickArm` 的
-`@ViewBuilder` 分支、`@Environment(\.accessibilityReduceTransparency)` 这个名字、
+只有 CI 能验：`dsGlass` 的 `@ViewBuilder` 分支与 `UIAccessibility` 这个名字（已登记进
+`scan/scan.py` 的 `VERIFIED_SDK_ADDITIONS`）、`arm` / `quickArm` 的 `@ViewBuilder` 分支、
 以及 `if` 里的 `.transition(.opacity)`。
 
 只有真机能验（也是这一轮风险最高的三处）：
@@ -2646,3 +2648,33 @@ HIG 对同一件事的写法就是 *「offer solid-fill alternatives at componen
   · 圆钮**移出层级**之后，正拖到一半的手指会不会被中断（若中断，退路是回到透明度版本 +
     把圆钮挪出 `GlassEffectContainer`，而不是改宽度）。
   · 降低透明度那一档下：实底 + `.label` 的白字 / 黑字读不读得出来、发丝线够不够把卡片与背后分开。
+
+### 30.5 当晚返工：那一版**启动就崩**（`EXC_BAD_ACCESS` / 栈溢出）
+
+用户装上 §30.2 那一版后的崩因报告（`bug_type 309`，`incident 9E63FF9E-FBB7-48DF-81AB-9917098721D0`）
+把根因指得很具体 —— **`glassEffect` 不能从「泛型 `View` 的 `body`」里调**：
+
+```
+启动 14:49:52.577 → 崩在 14:49:54.4386（约 1.9 秒）
+EXC_BAD_ACCESS (SIGSEGV) —「Could not determine thread index for stack guard region」
+  即**栈溢出**（`recursionInfoArray`: depth 906 / originalLength 5572，hottest = AG 的 update）
+
+栈顶（imageIndex 0 = 我们的二进制）：
+  DSGlassSurface.body.getter                            ← 那个泛型 `View`
+  swift_getOpaqueTypeMetadataImpl                       ← 在建它 `some View` 的元数据
+  swift_getTypeByMangledName
+  swift::SubstGenericParametersFromMetadata::buildDescriptorPath   ← 自我递归直到栈顶
+寄存器里反复出现：anonymous descriptor View.glassEffect<A>(_:in:) / extension descriptor View
+```
+
+也就是说：**同一个调用，从 `View` 扩展函数里发出（`Self` 在调用点已经是具体类型）
+一直好好的，而那一次被搬进一个泛型 `View` 的 `body` 之后，运行时期解析那个扩展成员的
+元数据时无限递归。** 拆法是取消那个类型（回到「本文件只有 `DSGlassVariant` 一个类型」），
+开关改成读系统属性；两个分支用 `@ViewBuilder`（它是**函数**，与那个崩掉的 `body` 不是
+同一种东西）。这一段写进文档是为了让下一轮的人**不要再试那个包装**。
+
+连带的一笔：`scan/delguard.py` 当场报了三条假阳性（`variant` / `interactive`「声明没了、
+使用还在」）—— 它们本来就有声明，只是那声明是 `dsGlass` 的**形参**（缩进 8，
+而 `MEMBER_DECL` 只认 ≤ 4）。已补判据 ⑦：**使用处所在的文件自己声明了同名形参 → 不报**。
+没接在全项目的 `global_new` 上 —— 形参名（`style` / `pad` / `row`）太常见，
+放进去会把真错永远遮住。
