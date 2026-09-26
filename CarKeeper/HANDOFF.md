@@ -681,12 +681,13 @@ Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形�
   出口只有 `DSCardMoreRow`（「还有 N 条 · 展开后约 M 屏」）—— 摊开与收起来必须是同一行。
   视口量不到时返回 `.unknown` 并**放弃分块**：不允许把「不知道」当成「放得下」。
   守门人是 `scan/expand.py`（编号 26）。
-- **`Design/DSGlass.swift`**（2026-09-25 新增，150 行）：**「浮在内容之上」那一层的唯一材质** ——
-  `dsGlass(in:variant:interactive:hairline:)` 与两个便捷写法（胶囊 / 圆角矩形）、
+- **`Design/DSGlass.swift`**（2026-09-25 新增）：**「浮在内容之上」那一层的唯一材质** ——
+  `dsGlass(in:interactive:hairline:)` 与两个便捷写法（胶囊 / 圆角矩形）、
   以及 `dsGlassLayer(spacing:)`（多块玻璃包成一层，`GlassEffectContainer` 的入口）。
   三层规则写在文件头：浮层 → 真玻璃；**卡里不玻璃**（叠玻璃会糊成一片）；内容表面不玻璃。
-  变体按**底下是什么**选（App 界面 → `.regular`；地图 / 照片这种连续画面 → `.clear`），
-  可点的表面交 `interactive`（按压由系统演，不再自己压透明度）。
+  **材质只有一档 `.clear`**（2026-09-26 第二轮：`variant:` 参数与 `DSGlassVariant` 一起删 ——
+  用户定的「玻璃就默认选更透」，见 §35.3），可点的表面交 `interactive`（按压由系统演，
+  不再自己压透明度）；「降低透明度」那一档由文件里那条 `UIAccessibility` 分支接。
   守门人是 `scan/glass.py`（编号 28）。
 - ~~**`Design/StackLabView.swift`**~~：卡片叠预览页 —— **2026-09-25 第九轮整份删除**。
   用户第 6 条（「诊断里面删除一切和 UI 相关的」）把它连同四组色板、字体样张、几何与动效
@@ -755,7 +756,7 @@ Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形�
 
 ---
 
-## 6. 本机持久化清单（30 个 `carkeeper_*` 键）
+## 6. 本机持久化清单（27 个 `carkeeper_*` 键）
 
 > 判据：**服务端有这个字段吗？** 有 → 不落盘；没有（只能本机攒）→ 落盘，并在文档与界面上说清它是本机的。
 >
@@ -799,9 +800,6 @@ Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形�
 | `carkeeper_wallpaper_source` | 子页壁纸的来源（必应 / Windows 聚焦 / 相册） | 设备 | ❌ |
 | `carkeeper_wallpaper_stamp` | 子页壁纸的日期戳（同一天不重复取） | 设备 | ❌ |
 | `carkeeper_wallpaper_credit` | 子页壁纸的署名（必应/聚焦要求显示） | 设备 | ❌ |
-| `carkeeper_display_glow` | 文字外壳的发光程度（0…1，0.5 = 默认，见 `DisplaySettings`） | 设备 | ❌ |
-| `carkeeper_glass_level` | 玻璃用哪一档材质（更透 / 标准 / 更实） | 设备 | ❌ |
-| `carkeeper_glass_fill` | App 自己那几层半透明的底有多实（0…1，1 = 默认） | 设备 | ❌ |
 
 > 「归属」列的定义：**账号** = 换一个账号登录后它必须消失（否则要么是隐私泄漏，
 > 要么是拿上一个账号的数当自己的用）；**设备** = 这台机器上的偏好，与谁登录无关。
@@ -823,7 +821,11 @@ Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形�
 
 所以这张表现在有门禁；改代码时**先改这张表**（键的归属是设计决定，不是实现细节）。
 
-**已删除、不要加回来的**：`carkeeper_api_stats` / `_page_metrics` / `_home_load_time` /
+**已删除、不要加回来的**：`carkeeper_display_glow` / `carkeeper_glass_level` /
+`carkeeper_glass_fill`（「设置 → 显示」那一节，用户 2026-09-26 第 2、3 条：
+文字发光整块删除、玻璃定为「更透」、界面实度定为 50% —— 三行设置连同唯一的读者
+`DisplaySettings` 一起删，见 `Tokens.swift` 里那两段说明）,
+`carkeeper_api_stats` / `_page_metrics` / `_home_load_time` /
 `_version_logs` / `_crash_log`（诊断统计，用户明确要求删）、`carkeeper_art_theme`
 （随艺术主题整份删除）、`carkeeper_encryption_key` / `carkeeper_key`（PIN 现在在 Keychain）、
 `carkeeper_checkin_count` / `carkeeper_last_checkin`（「上车打卡」已删）、
@@ -1849,7 +1851,9 @@ CarModelView.swift:278:19: error: value of type 'Entity' has no member 'model'
 - 铺照片的那五张子页：`.environment(\.photoBackdrop, wallpaper.image != nil)`
   —— **选了「不铺」或还没选时回落到 `TokensPalette.canvas`（一块纯色），那就是 false**；
 - 地图那一档：`.environment(\.photoBackdrop, true)`（底下是瓦片，连续的画面）；
-- `GlassCard` 按它选 `variant: photoBackdrop ? .overMedia : .regular`。
+- `GlassCard` 按它选变体（`.overMedia` / `.regular`）—— **2026-09-26 第二轮删**：
+  材质定死 `.clear` 之后，「底下是不是照片」这个事实不再影响任何一块玻璃，
+  于是 `photoBackdrop` 环境值与 `GlassCard.frosted` 两个参数一起没了（见 §35.3）。
 
 `Glass` 两个变体的选择规则**是 Apple 定的，不是审美定的**（HIG：*reserve clear Liquid Glass
 for components over visually rich backgrounds*），而 `.clear` 压在纯色上几乎什么都看不见
@@ -2936,8 +2940,11 @@ padding 的全部理由。
 
 | 位置 | 之前 | 现在 |
 |---|---|---|
-| `MapSpineView.armDisc` | `Circle().fill(barFill)` + 发丝线 | `Color.clear.dsGlass(in: Circle(), variant: .overMedia, interactive: true)` |
-| `DSSwipeStrip.capsule` | 自画三层（底渐变 / 边 / 影子） | `Color.clear.dsGlass(in: Capsule(), variant: .regular)` |
+| `MapSpineView.armDisc` | `Circle().fill(barFill)` + 发丝线 | `Color.clear.dsGlass(in: Circle(), interactive: true)` |
+| `DSSwipeStrip.capsule` | 自画三层（底渐变 / 边 / 影子） | `Color.clear.dsGlass(in: Capsule())` |
+
+> 上面两个调用点写着 `variant:` —— 那是**当时**的写法：那个参数与 `DSGlassVariant`
+> 已在同一天的第三批随「玻璃就默认选更透」整份删掉（§35.3）。
 | `DSSwipeStrip.band` | 自画（`barFill` + 发丝线） | **不动** —— 它就是相机那条「不是玻璃」的带子 |
 | `TokensPalette` | `barSelection` / `barSelectionRim` / `barSelectionShadow` | **三个都删**（一个读者都不剩；`barFill` 留着，带子还在用）|
 
@@ -2983,3 +2990,113 @@ padding 的全部理由。
    指同一件东西、其中一个还是旧值 —— 下一个人拿到的就是错的那个（同类：
    `TokensPalette.barSelection` 那三个随伪玻璃一起删）。四条陈旧注释同时改了
    （`barGap` 还是 26 / 离底 60pt / 「含离底那 26pt」两处）。
+
+---
+
+## §35 第二十七轮（2026-09-26）：图源下拉、文字发光整份删除、玻璃只剩一档、
+带子再透一级、事件懒加载、地图车头朝上 + 行驶轨迹 + 跟手抽屉
+
+用户一次给了六条。落下来是六件事，其中三件是**删东西**（第 2、3 条把一个设置整组、
+一份设置类型、一层挂了十几处的壳一起拿掉），一件是换掉一个人称坏掉的控制。
+
+### 35.1 图源下拉：打不开的那一下（第 1 条）
+
+用户原话：「选了必应后可下拉继续选其他，但是选了 windows 聚焦 就无法再下拉选其他了」。
+
+**本机无法复现**（没有编译器、也没有那台设备），所以这里没有「修好了某一条已知机制」的证书，
+而是**换掉那个人称坏掉的控制**：`Picker(.menu)` → 自己写的 `Menu` + 每档一个 `Button`
+（与这一页另外两处菜单同形：`Label(title, systemImage: 勾/圈)` —— 地图的图层胶囊与底条右臂
+用的就是这一种，两个从没被报过打不开）。再加一条：点**当前那一档**不再是「什么都不发生」，
+它变成「再取一次」（`wallpaper.reload()`）—— 即使某一档曾经卡住，它也不再是一个死路口。
+
+代价写在这里：`Menu` 的外观由系统定，与 `Picker` 那种「值右对齐 + 上下箭头」的 iOS 设置行
+**不完全一样**（菜单里多了勾与圆）。这一条是换取「一定能打开」的代价。
+
+### 35.2 文字发光：整份删除（第 2 条）
+
+删掉的东西：`Design/InkGlow.swift` **整个文件**（两个实现：挂在 App 根上给每一行字的
+`DSTextGlow` + 图形一侧的 `dsInkGlow()`）、`DisplaySettings.glow`、那一格 0…100% 的滑杆、
+本机键 `carkeeper_display_glow`、以及十几处调用点上的壳。`scan/scan.py` 的白名单与
+`scan/orphans.py` 的例外表随之清空（没有壳可放行）。
+
+为什么是「整份」而不是「调小一点」：那一层壳不是一层影，它把**每一行字**都换成
+「一层反色外发光」 —— 压在玻璃上时字会自己发光，而卡片会看起来发灰（它盖住的正是
+底下的照片）。删掉之后顶着可读性的只剩两件事：玻璃上的 `TokensInk` 三档自适应文字色
+与 `weight: .bold`。
+
+### 35.3 玻璃只剩一档，界面实度定在 50%（第 3 条）
+
+· **`.clear` 成为唯一材质**：`DSGlassVariant` 与 `dsGlass(variant:)` 一起删（一个永远被忽略的
+  参数正是这一仓反复删的那类东西）；`GlassCard.frosted` 与 `EnvironmentValues.photoBackdrop`
+  也一起删 —— 「底下是不是照片」这个事实不再影响任何一块玻璃。
+· **界面实度**：`TokensPalette.faceFill` 固定 **0.5** → `fillSubtle` = `surface` × 0.11、
+  `panel` = `surface` × 0.17（比上一版更透）。
+· **入口删除**：「我的 → 显示」那一组三个控件（发光程度 / 玻璃三档 / 实度）连同
+  `DisplaySettings.swift` 整份删除；本机键从 30 个减到 **27** 个（第 6 节那张表已同步）。
+
+诚实代价：`.clear` 不磨砂（HIG 把 clear 留给「压在连续画面上」的控件），而卡片是这一档最大的
+用户 → 卡里正文的对比度跟着壁纸走。回退是 `dsGlassMaterial` 里那一个词（`.clear` → `.regular`），
+不是再开一个参数。
+
+### 35.4 带子再透一级（第 4 条）
+
+`TokensPalette.barFill` 的 alpha **0.72 → 0.55**（亮 = 白 55%、暗 ≈ 黑 55%）。
+不是量出来的数：相机那条带子叠在地图上，浓度读不出来 —— 一档 = 16 个百分点，
+与相机那条半透明黑的量级一致。要盯的只有一件事：带子上那三档字的对比度。
+
+### 35.5 事件懒加载（第 5 条）
+
+消息那一节从「点一下『再看早 3 天』」改成**滑到底自己续**：`MessagesSection.shownDays`
+从 `@State` 变 `@Binding`，续的动作搬到宿主 `TripsEventsView.loadMoreEventDays`
+（滚动到没到底只有那一叠知道：`ArcStack.onReachBottom`）。按钮撤了 —— 往下滑本身就是
+「我还要看」的证据，而按钮把同一个意图多问了一遍。
+
+一次三天的步长不变，且它是**必须**的：这一叠是普通 `VStack`（懒容器量不到叠卡的几何，
+见 `ArcStack`），所以「看得见的那几天是整段建出来的」—— 227 行那一次内存事故
+（0.97s 消息到手 → 4.01s 1720 MB → 5.3s 被系统收走）就是这么来的。封顶交给数据：
+`filteredGrouped` 有多少天就画多少天（服务端 7 天窗口）。
+
+### 35.6 地图：车头朝上 + 默认 2D + 行驶轨迹（第 6 条上半）
+
+· **俯仰 65 → 0**：`cameraPitch = 0` 就是 2D（Apple：*a value of 0 results in a camera that
+  points straight down at the map*），`MapStyle` 的 elevation 跟着 `.realistic` → `.flat` ——
+  两件事是同一个决定的两半（立体建筑在 2D 下看不到多少，却最贵）。
+· **朝向 = 总是车头**（`store.carHeadingDeg`）：推翻前一版「停着回正北」。停着也有车头，
+  而在停下那一刻突然翻成北向上，才是真的不可解释。车端还没报过航向时它是 0 = 北向上 —— 不猜。
+· **`DriveTrace`（新服务，`Services/DriveTrace.swift`）**：点火清空成新的一段、熄火封口
+  （点**不清**，线留着）、8 米一个点（GPS 抖动之下不动）、2000 点上限（按 8 米算约 16 km，
+  一趟够用）。落点只有**一处**：`AppStore.saveCache` 里那条定位通知的同一个点上。
+· **画法**：`MapSpineAnnotations.driveTraceLine` 用与行程线同一套（宽而淡的亮晕 + 主线）——
+  同一件东西（一条路径）在地图上只该有一种画法。
+· **模拟开关**在图层胶囊菜单里（「模拟行驶轨迹」）：沿车当前位置向北 33 米/步、东西按 `sin` 摆，
+  1.5 秒一步 —— 真机上想看一眼轨迹长什么样，只有这一条路（否则必须真开一段）。
+
+### 35.7 抽屉：跟手抽出 + 「现在」搬进抽屉（第 6 条下半）
+
+· **跟手**：`drawerReveal`（0…1）= 手指位移 ÷ 正文自然高度，卡片高度 = `drawerBodyHeight × reveal`
+  —— 两态之间那一段也是真的（`MapNowCard` 量正文高度的那一个几何读者就为此而留）。
+· **松手**：先看位置（过一半以位置为准），没过一半才看那一甩的方向
+  （`predictedEndTranslation`）—— 与模式条的吸附、与系统的 sheet 是同一条规矩。
+· **「现在」那一枚图层胶囊搬进抽屉的正文**（`drawerContent` 的最上面）：收起时这张卡只剩
+  一横 + 三个数（用户：「外面只显示 3 个」），拉开时那些事才在。
+
+### 35.8 验证
+
+新门禁 `scan/delguard.py`（编号 **1** —— CI 那份清单的第一条）：比对 HEAD 与本树，
+一个名字「旧版有声明、新版没了、
+还有人在用」即红 —— 那是编译错误，不用等 macOS runner。**它这一轮真抓到一次**：
+`TokensPalette.canvas` 在改名途中被写成 `canvasProbe`，而五个读者还写着旧名。
+它这一轮还补了一条**假阳性**判据（⑧）：`TokensHalo` 整个文件被删之后，它把
+`CarModelView` 里 `body.scale`（RealityKit 实体的系统成员）当成了被删的那个 ——
+两条同时满足才不报：「这个名字在 SDK 符号表里」且「每一次出现都是 `小写值.name`」。
+
+`scan/all.py` **34/34 全绿**；`MapSpineView.swift` **1199** 行（阈值 1200）。
+
+只有 CI 能验：`Menu` 里 `Button` + `Label(…, systemImage:)` 的写法、`@Binding` 的两处传递
+（`MessagesSection(shownDays: $eventDays)` / `ArcStack(onReachBottom:)`）、`MapPolyline` 的
+坐标数组、`pitch: 0` 与 `.mapStyle(…, elevation: .flat)` 的组合、`TimelineView(.periodic(…))`
+闭包里的 actor 归属。
+
+只有真机能验：图源菜单四档都能拉开（第 1 条那件事本机复现不了）；轨迹那条线在真开的路上
+是什么形状（模拟只给形状，不给“它真的在记”）；2D 下车钉落在带子里的位置
+（`MapCameraFollow.spanFactor` 那根回退线）；抽屉跟手的手感；以及 `.clear` 下卡片正文的对比度。

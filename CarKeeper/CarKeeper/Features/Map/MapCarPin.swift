@@ -65,14 +65,15 @@ struct MapCarPin: View {
     private var capsule: some View {
         Image(safeSymbol: "car.fill", fallback: "car.fill")
             .font(TokensTypo.fixed(19, weight: .semibold))
-            // 底是真玻璃、底下是**连续的画面**（地图瓦片）→ `TokensInk`（系统按材质调它），
-            // 再叠一圈反色外发光（用户第 8 条那一件）：浅色瓦片上那辆车也看得见。
+            // 底是真玻璃、底下是**连续的画面**（地图瓦片）→ `TokensInk`（系统按材质调它）。
+            // 那一圈反色外发光已于 2026-09-26 随整个外壳机制一起删（用户：
+            // 「完全删除文字发光和文字发光功能」）—— 浅色瓦片上的对比度现在全靠
+            // 材质自己与 `TokensInk` 的自适应。
             .foregroundStyle(TokensInk.primary)
-            .dsInkGlow()
             .padding(.horizontal, TokensSpacing.snug)
             .padding(.vertical, TokensSpacing.xs)
-            // 胶囊：`.overMedia`（`.clear`，画面保持可见）—— 这一枚钉的底就是瓦片。
-            .dsGlassCapsule(variant: .overMedia)
+            // 胶囊：材质是 `.clear`（全 App 唯一那档，2026-09-26）—— 这一枚钉的底就是瓦片。
+            .dsGlassCapsule()
             .accessibilityHidden(true)
     }
 

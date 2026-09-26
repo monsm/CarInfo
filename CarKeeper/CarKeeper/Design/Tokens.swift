@@ -130,11 +130,15 @@ enum TokensPalette {
     /// ⚠️ 为什么不干脆改成真材质（`.glassEffect`）：`Design/DSGlass.swift` 三层规则
     /// 第 ② 条 —— **卡里不玻璃**（卡片自己已经是玻璃，里面再摆一块是同一层放两次）。
     /// 这一仓要的「通透」是【半透明】，不是【多一层材质】。
-    ///  2026-09-26：它乘上「设置 → 显示 → 界面实度」（`DisplaySettings.fill`）。
-    ///  默认 1，所以数值一处不变；调到 0 就是「只剩玻璃本身、我们不再往上摆任何面」。
-    ///  为什么这一个数能同时管住全 App 的面：**半透明的底只有这一处出处**
-    ///  （`panel` 是它的另一个深浅），所以「有多透」不可能有两个答案。
-    static var fillSubtle: Color { surface.opacity(0.22 * DisplaySettings.shared.fill) }
+    ///  2026-09-26 第二轮：它乘上**界面实度**，而那一档已固定为 50%
+    ///  （用户：「界面实度 默认 50%，删除默认对应的设置入口」）。
+    ///  所以它不再读任何设置（那个开关连同 `DisplaySettings` 一起删了），
+    ///  只有一个写死的数 —— 「有多透」这件事又回到**只有一个答案**。
+    ///  0.22 × 0.5 = 0.11：比原来那一版更透，而卡里的字仍有底
+    ///  （文字令牌是不透明的 `label` 三档，所以这个数在明/暗 × 有色/无色底
+    ///  这四套下都读得出来）。
+    private static let faceFill: Double = 0.5
+    static var fillSubtle: Color { surface.opacity(0.22 * faceFill) }
 
     /// 卡片**里面**那一层面：分组面、占位面、提示条、搜索框。
     ///
@@ -157,8 +161,8 @@ enum TokensPalette {
     ///  往下调要盯的只有一件事：卡片里的字还有没有底 —— 而文字令牌是不透明的
     /// `label` 三档，所以同一个数在这四套（明/暗 × 有色/无色底）下都是安全的。
     ///
-    ///  2026-09-26：与 `fillSubtle` 一起乘上「界面实度」（见那一行）。
-    static var panel: Color { surface.opacity(0.34 * DisplaySettings.shared.fill) }
+    ///  2026-09-26 第二轮：与 `fillSubtle` 一起乘上**那个固定的界面实度**（见那一行）。
+    static var panel: Color { surface.opacity(0.34 * faceFill) }
 
     // 已删除：`glassBorder`（2026-09-25，与 `glassLight` 同一批）。
     // 它也是 `hairline` 的重复声明 —— 而 12 位用户里只有 4 位（`dsGlass` /
@@ -181,11 +185,16 @@ enum TokensPalette {
     //  底条照它做：`DSSwipeStrip.band` 与两枚圆钮的底都用下面这两个值 ——
     //  于是那个开关对底部导航**没有任何影响**（这正是量出来的差别：系统材质会变，
     //  自己画的面不会）。
-    /// 底条那条底子。亮：白 72%（`.label` 的黑字压在上面读得出来）；
-    /// 暗：近黑 72%（白字读得出来）。
+    /// 底条那条底子。亮：白 55%（`.label` 的黑字压在上面读得出来）；
+    /// 暗：近黑 55%（白字读得出来）。
+    ///
+    /// 2026-09-26（用户：「底部导航的带子稍微再透一个等级」）：0.72 → **0.55**。
+    /// 相机那条带子的浓度不可直接读（它是叠在地图上的），所以这不是量出来的数 ——
+    /// 用户上一版看着偏实，`0.72 → 0.55` 是**一档**（16 个百分点，与相机那条
+    /// 半透明黑的量级一致）。再往下调要盯的只有一件事：带子上那三档字的对比度。
     static let barFill: Color = tokenDynamic(light: (1, 1, 1),
                                              dark: (0.11, 0.11, 0.12),
-                                             alpha: 0.72)
+                                             alpha: 0.55)
     // 已删除：`barSelection` / `barSelectionRim` / `barSelectionShadow`
     //（2026-09-26 第三批）。它们是我给「选中那一枚」自画的三层伪玻璃（底渐变 / 边 / 影子），
     // 而用户在下一秒就把话说清了：「准确的是 3 个液态玻璃：左右的球和中间的选中」——
@@ -245,48 +254,14 @@ enum TokensInk {
     static var tertiary: AnyShapeStyle { AnyShapeStyle(HierarchicalShapeStyle.tertiary) }
 }
 
-/// 玻璃上文字的那层「轻微反色发光外壳」（用户 2026-09-25 第 8 条）。
-///
-/// 用它的地方是 `Design/InkGlow.swift` 里那个 `dsInkGlow()`，而取值表在这一处 ——
-/// 与全仓同一条规矩：颜色不写在调用点。单独一个 enum 而不是塞进 `TokensPalette`，
-/// 因为这里装的是**一对互相相反的色**加一个几何量，而 `TokensPalette` 装的是单色。
-///
-/// 为什么它必须是一对（而不是 `black` 一个）：外壳要的是「与字相反的那一侧」，
-/// 而字是亮还是暗由系统的深浅色决定 —— 暗色主题下字是亮的，就要压一圈黑的；
-/// 亮色主题下字是暗的，就要提一圈白的。写成动态色之后，调用点一个三元都不用写。
-///
-///  ── 2026-09-26：它变成**可调**的 ──
-///  用户：「设置文字的发光阴影程度」。于是半径与浓度不再是两个定值，而是
-///  `DisplaySettings.glow`（0…1）的函数，而**程度 0.5 恰好等于上面那版的样子**
-///  （半径 3 / 4、浓度 0.45 / 0.65）—— 装上这一版界面一处不变，起点是用户上一步
-///  看到的那张脸。0 = 一点不画（连 `displayPadding` 也归零），1 = 半径翻倍、浓度顶满。
-///  ⚠️ 两处读它的地方（`DSTextGlow` 的 `draw` 与 `displayPadding`）**必须同一个数**：
-///  半径画得比留白大，光就会被裁掉一角（那个属性就是为这件事存在的）。
-///  所以它们都从下面这两个计算属性取，一个都不许在调用点乘自己的系数。
-enum TokensHalo {
-    /// 常规文字（13–17pt）的**基准**半径（= 程度 0.5 时的半径）。
-    private static let baseRadius: CGFloat = 3
-    /// 标题 / 大数字（20pt 以上）的基准半径 —— 笔画粗了，壳要跟着撑开一点。
-    private static let baseRadiusWide: CGFloat = 4
-
-    /// 程度 → 倍数：0.5 → ×1（不变），1 → ×2（最重），0 → ×0（不画）。
-    private static var scale: CGFloat { CGFloat(DisplaySettings.shared.glow) * 2 }
-
-    static var radius: CGFloat { baseRadius * scale }
-    static var radiusWide: CGFloat { baseRadiusWide * scale }
-
-    /// 反色壳本身。深色主题：白字压黑；浅色主题：黑字提白。
-    /// 不透明度都取低值：它是外壳不是投影，重了就变成一圈脏边
-    ///（所以最重那一档也**顶到 1 就不再往上**：再重就不是壳，是描边）。
-    static var ink: Color {
-        let weight = min(1, max(0, DisplaySettings.shared.glow)) * 2
-        return Color(uiColor: UIColor { traits in
-            traits.userInterfaceStyle == .dark
-            ? UIColor(white: 0, alpha: min(1, 0.45 * weight))
-            : UIColor(white: 1, alpha: min(1, 0.65 * weight))
-        })
-    }
-}
+//  `TokensHalo` 整份已删（2026-09-26）。
+//
+//  用户原话：「完全删除文字发光和文字发光功能」。它指的是同一件事的两种形态 ——
+//  「文字发光」（挂在 App 根上、给每一行字画一圈反色外壳的 `DSTextGlow`）与
+//  「文字发光功能」（设置里那格 0…100% 的滑杆 + `DisplaySettings.glow`）。
+//  两者连同取值表（这个 enum：半径 3/4、浓度 0.45/0.65 的动态色对）与那 4 处
+//  `dsInkGlow()`（图形一侧的外壳）一起删掉，全仓不再有任何一层壳。
+//  `Design/InkGlow.swift` 整个文件、`DisplaySettings.swift` 里的 `glow` 也一并删。
 
 // MARK: - 间距（4 的倍数，页面边距 20）
 enum TokensSpacing {

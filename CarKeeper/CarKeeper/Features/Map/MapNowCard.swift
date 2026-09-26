@@ -38,31 +38,58 @@ extension MapSpineView {
     ///     同一个抽屉只有一个开法（见 `MapSpineReadouts` 头注的三代写法）。
     @ViewBuilder
     func nowCard(_ d: MapSpineData) -> some View {
-        // `frosted:` 收的就是抽屉的开合（用户 2026-09-25 第 3 条）——
-        // 收起时卡片是一层不磨砂的玻璃（地图透出来），拉出来时它变成磨砂的
-        // （卡里现在是一片要读的字）。为什么这个参数只能由调用点给、
-        // 以及它为什么不是「再加一层模糊」，写在 `GlassCard.frosted` 上。
-        GlassCard(accent: HomeMode.now.accent, frosted: drawerOpen) {
+        //  ⚠️ 它此前还给 `GlassCard` 传一个 `frosted: drawerOpen`（收起不磨砂 /
+        //  拉出磨砂）—— 那一个参数随「玻璃默认更透」一起删了（用户 2026-09-26：
+        //  「玻璃就默认选更透」），现在全 App 的玻璃只有一档材质（见 `DSGlass.swift`）。
+        GlassCard(accent: HomeMode.now.accent) {
             VStack(alignment: .leading, spacing: 0) {
                 drawerHead(d)
-                if drawerOpen {
-                    //  2026-09-25「给它一点呼吸」：这一块原来在 `withAnimation` 里是**硬切**的
-                    //（卡片高度在长，而内容一上来就是满不透明）。淡入之后两件事同拍：
-                    // 高度长出来的同时内容显影 —— 与模式条展开同一种手感。
-                    // （不用 `.move` 那一类：抽屉是从卡里长出来的，不是从外面滑进来的。）
+                //  抽屉的正文：**它的高度就是手指走出来的那一段**
+                //（`drawerReveal` 0…1 × 正文的自然高度）。
+                //  用户 2026-09-26：「抽屉和原版地图的抽屉不一样，原版支持跟手抽出，
+                //  现在的只支持点击抽出」—— 于是两态之间那一段也真实存在了。
+                //  `clipped()` 是必须的：正文的高度被压着，没它就会画出卡外。
+                if drawerReveal > 0.001 {
                     drawerContent(d)
-                        .transition(.opacity)
+                        .frame(height: drawerBodyHeight * drawerReveal, alignment: .top)
+                        .clipped()
                 }
             }
+            //  量一遍正文的**自然高度** —— 跟手时的分母（手指走多少 = 拉开多少）。
+            //  它住在 `background` 里：背景不参与父视图的排版，所以这一份既不占位、
+            //  也不出现在版面上（`.hidden()` 连绘制都省了，但它仍然参与布局）。
+            //  ⚠️ 它**总是**建着（不只是拉开的时候）：拉开的第一帧就有分母 ——
+            //  否则高度会先从 0 跳到真值，跟手那一下会先闪一格。
+            .background(alignment: .top) {
+                drawerContent(d)
+                    .background {
+                        GeometryReader { g in
+                            Color.clear
+                                .onAppear { drawerBodyHeight = g.size.height }
+                                .onChange(of: g.size.height) { _, h in drawerBodyHeight = h }
+                        }
+                    }
+                    .hidden()
+                    .allowsHitTesting(false)
+            }
         }
+        //  记住的那一档：拉出来过就还是拉出来的（`drawerOpen` 是持久化的设备键）。
+        //  **动画不出现在这里**：启动那一下应该就是那个样子，不是「从收起长出来」。
+        .onAppear { drawerReveal = drawerOpen ? 1 : 0 }
     }
 
     /// 抽屉拉出来之后的正文。**`switch` 在这里**：图层是本屏的状态（`layer`），
     /// 而三个图层各自的正文本来就在 `MapSpineLayers.swift` 里；
     /// `now` 那一层的一半在 `MapSpineReadouts.swift`。
+    ///
+    ///  ⚠️ 2026-09-26（用户：「下面抽屉的现在选择放到抽屉里面，外面只显示 3 个」）：
+    ///  **图层胶囊搬进来了**（它此前坐在卡头那一行、与拉手同一排）。
+    ///  于是收起时那张卡只剩「拉手 + 三个数」—— 一横，而不再多一件控件；
+    ///  要看图上看哪一层、或换一层，把抽屉拉出来。
     @ViewBuilder
     func drawerContent(_ d: MapSpineData) -> some View {
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
+            layerMenu(d)
             switch layer {
             case .now:
                 if d.hasLocation == false {

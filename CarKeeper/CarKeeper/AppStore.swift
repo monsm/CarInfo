@@ -331,6 +331,9 @@ final class AppStore: @unchecked Sendable {
         let currentSoc = soc ?? (energyHistory.last?.soc ?? 0)
         currentTrip = (startTime: time ?? Date(), startSoc: currentSoc,
                        startLocation: location, startMileage: mileage, startAddr: addr)
+        // 点火 = 地图上那一条轨迹的起点（新的一段从空开始，见 `DriveTrace.begin`）。
+        // 与 `currentTrip` 同一个时机：两者都回答「这段从哪儿算」。
+        DriveTrace.shared.begin()
     }
 
     // #NEW-2 结束行程
@@ -360,6 +363,8 @@ final class AppStore: @unchecked Sendable {
         tripHistory.insert(record, at: 0)
         if tripHistory.count > 50 { tripHistory = Array(tripHistory.prefix(50)) }
         currentTrip = nil
+        // 熄火 = 轨迹封口（用户：「直至车辆熄火」）：点不再增加，线留在图上。
+        DriveTrace.shared.end()
         return record
     }
 
@@ -803,6 +808,11 @@ final class AppStore: @unchecked Sendable {
         // 会把用户手动拖开的镜头一次次拉回去。
         if let loc = patch["location"] as? [String: Any],
            let lat = ciNumber(loc, ["Lat"]), let lng = ciNumber(loc, ["Lng"]) {
+            // 地图上那一条「这一趟开过的路」（用户 2026-09-26）—— 落点的**唯一**
+            // 地方，与下面那条通知同一个位置。「动不动」由车自己的读数说了算，
+            // 而它已包含停车与抖动的门槛（见 `DriveTrace.minStep`）。
+            DriveTrace.shared.ingest(CLLocationCoordinate2D(latitude: lat, longitude: lng),
+                                     moving: isCarMoving)
             let moved = !(abs(lat - lastPostedLat) < 0.00005 && abs(lng - lastPostedLng) < 0.00005)
             if moved {
                 lastPostedLat = lat

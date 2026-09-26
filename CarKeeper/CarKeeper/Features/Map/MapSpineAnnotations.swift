@@ -40,12 +40,37 @@ extension MapSpineView {
         // 手机自己那一点（只在真的拿到位置时出现）—— 与车钉是**两个**点：
         // 「车在哪」与「我在哪」是两个问题（见 `MapQuickButtons.phonePin`）。
         phonePin()
+        driveTraceLine(trace)
         rangeCircle(d)
         tripLines(d)
         hotspotCircles(d)
         holdPins(d)
         chargerPins
         issuePins(d)
+    }
+
+    /// 这一趟**开过的路**（用户 2026-09-26：「车动起来后在地图页画出行驶轨迹……
+    /// 直至车辆熄火」）。
+    ///
+    ///  点从哪来：车端每报一次定位（`AppStore.saveCache`）就往 `DriveTrace` 里落一个，
+    ///  点火清空成新的一段、熄火封口（不再长）。它**不是** `TripRecord` 那条
+    ///  「起终点连线」（那条线是两点之间拼出来的，没有过程）—— 两者共存：
+    ///  这一段是“正在开的这一趟”，而行程卡里那张图是“以前那一趟”。
+    ///
+    ///  画法与行程线同一套（先一道更宽更淡的亮晕，再一条主线）：同一件东西
+    ///  （一条路径）在地图上只该有一种画法。
+    @MapContentBuilder
+    func driveTraceLine(_ t: DriveTrace) -> some MapContent {
+        // 一个点画不出线（`MKPolyline` 要两点起）。它仍然是“真的在记”的证据 ——
+        // 车钉旁边那一点就是刚走这一步。
+        if t.points.count >= 2 {
+            MapPolyline(MKPolyline(coordinates: t.points, count: t.points.count))
+                .stroke(TokensPalette.info.opacity(0.18),
+                        style: StrokeStyle(lineWidth: 11, lineCap: .round))
+            MapPolyline(MKPolyline(coordinates: t.points, count: t.points.count))
+                .stroke(TokensPalette.info,
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round))
+        }
     }
 
     /// 行程：**一条一条的起终点连线**（不是轨迹 —— TripRecord 里没有轨迹点）
@@ -120,8 +145,8 @@ extension MapSpineView {
                     } else {
                         Button {
                             withAnimation(TokensMotion.value) {
-                                // 俯仰角与另两处镜头同一个（见 `cameraPitch`）——
-                                // 点开一个聚合点不该把地图从 3D 打回平面。
+                                // 朝向与俯仰跟另两处镜头同一套（`cameraPitch` = 0，2D）——
+                                // 点开一个聚合点不该把镜头打回 `.automatic` 的取景。
                                 camera = .camera(MapCamera(centerCoordinate: cluster.coordinate,
                                                            distance: 1200,
                                                            pitch: cameraPitch))

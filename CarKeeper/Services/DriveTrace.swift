@@ -1,0 +1,140 @@
+import SwiftUI
+import CoreLocation
+
+// =============================================================================
+//  DriveTrace —— 「这一趟开过的路」（用户 2026-09-26）
+// =============================================================================
+//
+//  用户原话：「车动起来后在地图页画出行驶轨迹（加个模拟测试的，我试试），
+//  直至车辆熄火」。
+//
+//  为什么需要一个新的服务：全仓此前**没有**任何轨迹点。`TripRecord` 只有起终点
+//  两个坐标（车端 `isPrivacyDrvingHistory: 1`，不上传行驶历史），所以行程卡里
+//  那条线一直是「起终点连线」。而“现在这一趟”的轨迹不需要车端给 —— 我们自己
+//  每次收到定位就落一个点，那就是真走过的路。
+//
+//  三个边界，每一个都对着用户那句话里的一个词：
+//    · 「车动起来后」—— 车停着不动时不落点（一次刷新同一个坐标，落进去的就是
+//      一堆重合的点；距离门槛见 `minStep`，5.5 米是秒级抖动的量级，与
+//      `AppStore` 那条「动了才喊」的门槛同一个数）。
+//    · 「直至车辆熄火」—— 熄火（`FLAMEOUT` 事件）之后这一段就**封口**：
+//      点不再增加，图上的线留着（直到下一次点火把它清成新的一段）。
+//    · 「加个模拟测试的」—— `setSimulate(true)` 会沿着车当前位置画一条蛇形的假
+//      轨迹（车钉自己不动）。真机上想看一眼轨迹长什么样，只有这一条路：
+//      否则必须真开一段才看得到。
+//
+//  ⚠️ 落点的地方只有**一处**：`AppStore.saveCache` 里那条定位通知的同一个点上。
+//  与 `.locationUpdated` 一样 —— 「车的位置只从那里进来」（那条通知的头注写着
+//  同一件事：此前它有三个观察者却一个发射点都没有）。
+//
+//  ⚠️ 它是 `ObservableObject` 而不是往 `AppStore` 里塞一个数组：轨迹变化的节奏
+//  与车况完全不同（每个定位一个点 vs 每 2 秒一份报文），而且地图那一屏**必须
+//  订阅它**才会重画（`MapSpineView.trace`）—— 订阅一个专门的单例，比让整棵树
+//  跟着车况变要小得多。
+// =============================================================================
+@MainActor
+final class DriveTrace: ObservableObject {
+    static let shared = DriveTrace()
+
+    /// 这一段的点（地理坐标，按时间顺序）。空 = 还没有轨迹。
+    @Published private(set) var points: [CLLocationCoordinate2D] = []
+    /// 这一段还在长吗（点火之后、熄火之前）。
+    @Published private(set) var active = false
+    /// 模拟开关（调试）。**不持久化**：它是「我现在要看一眼」，不是一种设置
+    ///（下次启动不该自己开始画假轨迹）。
+    @Published private(set) var simulate = false
+
+    /// 两个点至少要隔这么远才落第二个：GPS 抖动与停车都在这个门槛下。
+    ///  5.5 米 = `AppStore` 那条「动了才喊」的门槛（≈5.5 米）—— 同一个量级，
+    ///  但不是同一个数：那一个是「镜头要不要跟」，这一个是「轨迹要不要多一个点」。
+    private let minStep: Double = 8
+    /// 点数的上限。按 8 米一个点算，2000 点 ≈ 16 km —— 一趟够用，
+    /// 而再多就只是把一条线越画越重（内存与渲染都是）。
+    private let maxPoints = 2_000
+
+    private var simTask: Task<Void, Never>? = nil
+
+    private init() {}
+
+    // MARK: - 一段的开始与结束
+
+    /// 点火：新的一段从**空**开始（上一趟的轨迹就此消失，用户那句话的「直至熄火」
+    /// 说的是“这一段”，不是“这一整天”）。
+    func begin() {
+        guard !simulate else { return }
+        points = []
+        active = true
+    }
+
+    /// 熄火：封口。点**不清**（图上的线留着），只是不再增加。
+    func end() {
+        guard !simulate else { return }
+        active = false
+    }
+
+    /// 车端的一次定位（`AppStore.saveCache` 调）。
+    ///
+    ///  没点过火但车在动时，它自己开一段：点火事件是**事后**才从消息流里读到的
+    ///  （用户打开 App 时车可能已经开出去一段了），而轨迹不该等那一条事件。
+    func ingest(_ coordinate: CLLocationCoordinate2D, moving: Bool) {
+        guard !simulate else { return }
+        if !active {
+            guard moving else { return }
+            points = []
+            active = true
+        }
+        append(coordinate)
+    }
+
+    private func append(_ coordinate: CLLocationCoordinate2D) {
+        if let last = points.last {
+            let a = CLLocation(latitude: last.latitude, longitude: last.longitude)
+            let b = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            guard a.distance(from: b) >= minStep else { return }
+        }
+        points.append(coordinate)
+        if points.count > maxPoints {
+            points.removeFirst(points.count - maxPoints)
+        }
+    }
+
+    // MARK: - 模拟（调试）
+
+    /// 开/关模拟。开着时：这一段从空开始，然后每 1.5 秒多一个点 ——
+    /// 沿着车现在的位置向北走，东西向按 `sin` 摆，所以画出来是一条蛇形。
+    ///
+    ///  ⚠️ 它**只动轨迹**，不动车钉：轨迹这一件事与“车在哪”是两件独立的事，
+    ///  而这个开关要回答的只是「轨迹画出来是什么样」。
+    func setSimulate(_ on: Bool) {
+        simTask?.cancel()
+        simTask = nil
+        simulate = on
+        guard on else {
+            active = false
+            return
+        }
+        points = []
+        active = true
+        simTask = Task { [weak self] in
+            var step = 0.0
+            while !Task.isCancelled {
+                guard let self else { return }
+                self.append(self.simulated(step))
+                step += 1
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+            }
+        }
+    }
+
+    /// 第 `step` 步的假坐标：以车（或上一个停车点）为原点，向北 30 米、东西摆动。
+    /// 原点也取不到时用武汉（这个 App 的默认地图中心，见 `ChinaDatum` 那几个常量）。
+    private func simulated(_ step: Double) -> CLLocationCoordinate2D {
+        let origin = AppStore.shared.currentLocation?.coordinate
+            ?? AppStore.shared.parkingLocation?.coordinate
+            ?? CLLocationCoordinate2D(latitude: 30.58, longitude: 114.30)
+        let north = step * 0.00030          // ≈ 33 米/步
+        let east = sin(step / 3) * 0.00060  // 左右各摆出约 60 米
+        return CLLocationCoordinate2D(latitude: origin.latitude + north,
+                                      longitude: origin.longitude + east)
+    }
+}

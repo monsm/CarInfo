@@ -195,22 +195,18 @@ extension MapSpineView {
     // MARK: 抽屉（收起 = 一横，拉出来 = 全部）
     // =========================================================================
 
-    /// 抽屉的头：**那「一横」**（可以拖的拉手，居中）+ 图层胶囊（右侧），
-    /// 下面就是收起时唯一露出来的三个数。
+    /// 抽屉的头：**那「一横」**（一条可以拖、也可以点的拉手）+ 收起时露出来的三个数。
     ///
     /// 两态都长这样：收起时它**就是**整张卡，拉出来时它是卡的头。
-    /// 图层胶囊两态都在 —— 它是换图层的唯一入口，收起时把它藏起来等于把
-    /// 「图上看哪一件事」藏起来（而这一屏的整个骨架就是这个选择）。
+    ///
+    ///  ⚠️ 2026-09-26（用户：「下面抽屉的现在选择放到抽屉里面，外面只显示 3 个」）：
+    ///  头里那一枚**图层胶囊**已搬进抽屉的正文（见 `MapNowCard.drawerContent`）。
+    ///  它在两态都在，只是现在只在拉开时看得见 —— 收起时这张卡就剩下一横，
+    ///  而那一横上只有三个数。
     @MainActor
     func drawerHead(_ d: MapSpineData) -> some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-            ZStack {
-                drawerGrabber()
-                HStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    layerMenu(d)
-                }
-            }
+            drawerGrabber()
             summaryBar(d)
         }
     }
@@ -243,10 +239,10 @@ extension MapSpineView {
                             // 超细字重是这个原语的「仪器感」（见 `TokensTypo.display`），
                             // 但这一行压在通透玻璃上 —— 超细的笔画在瓦片/照片上会散掉。
                             weight: .bold)
-                    //  这三个数下面是什么颜色的瓦片不由我们决定 —— 而它们现在带的是
-                    //  **全局**那一层壳（用户第 2 条：`DSTextGlow` 挂在 App 根上，
-                    //  半径按行高自选，见 `Design/InkGlow.swift`）。这里不再逐处点名：
-                    //  名单是一份会漏的东西，而玻璃的代价是普遍的。
+                    //  这三个数下面是什么颜色的瓦片不由我们决定 —— 它们一度带一层
+                    //  **全局**文字壳（用户第 2 条），而那一层已于 2026-09-26 删掉
+                    //  （用户：「完全删除文字发光和文字发光功能」）。现在靠的是
+                    //  `weight: .bold` 与卡片自己的玻璃。
                     .frame(maxWidth: .infinity, alignment: .center)
             }
         }
@@ -276,19 +272,32 @@ extension MapSpineView {
             .accessibilityAction { toggleDrawer() }
     }
 
-    /// 拉手（以及卡的头那一行）上的那一下拖动。
+    /// 拉手（以及卡的头那一行）上的那一下拖动 —— **现在是跟手的**。
     ///
-    /// 判据只有方向和阈值，**不做连续跟手**：两个落点是固定的（收起 / 拉出），
-    /// 中间没有第三种停法（理由见本文件头注的 ③）。
-    /// 看的是 `predictedEndTranslation`：轻甩一下就该走过去 ——
-    /// 与模式条的吸附、与系统的 sheet 是同一条规矩，只按「松手那一刻的位置」判的话，
-    /// 「甩」与「停」会得到同一个结果（那正是「不跟手」）。
+    ///  用户 2026-09-26：「抽屉和原版地图的抽屉不一样，原版支持跟手抽出，
+    ///  现在的只支持点击抽出」。于是这一版与两代旧写法（① 自己量高度、
+    ///  ② 系统 sheet、③ 两态硬切）都不同：**两态之间那一段也是真的** ——
+    ///  手指走到哪，卡片就长到哪（`drawerReveal` = 手指位移 ÷ 正文自然高度）。
+    ///
+    ///  松手时落在哪个端点：**先看位置**（过一半就以位置为准），没过一半才看
+    ///  那一甩的方向（`predictedEndTranslation`）。与模式条的吸附、与系统的 sheet
+    ///  是同一条规矩：只按「松手那一刻的位置」判的话，「甩」与「停」会得到同一个结果。
     var drawerDrag: some Gesture {
-        DragGesture(minimumDistance: 8)
+        DragGesture(minimumDistance: 4)
+            .onChanged { v in
+                //  分母：正文的自然高度（`MapNowCard` 里量出来的）。
+                //  `max(80, …)` 是一道回退：第一帧还没量到时（高度 0），
+                //  至少让 80pt 的手势位移走完一整段 —— 而不是除零或瞬开。
+                let travel = max(80, drawerBodyHeight)
+                let base: CGFloat = drawerOpen ? 1 : 0
+                drawerReveal = min(1, max(0, base - v.translation.height / travel))
+            }
             .onEnded { v in
                 let dy = v.predictedEndTranslation.height
-                if dy < -60 { setDrawer(open: true) }
-                else if dy > 60 { setDrawer(open: false) }
+                //  过了一半：位置说了算（往下甩不超过 60pt 就算放回原位）。
+                //  没过一半：只有明确那一甩才算（60pt 是模式条用的同一个数）。
+                let wantsOpen = drawerReveal > 0.5 ? (dy <= 60) : (dy < -60)
+                setDrawer(open: wantsOpen)
             }
     }
 
@@ -297,14 +306,21 @@ extension MapSpineView {
         setDrawer(open: !drawerOpen)
     }
 
-    /// 唯一的写点（拉手、点按、换图层三处都走它）。
+    /// 唯一的写点（拉手、点按、拖动、换图层四处都走它）。
     /// 它自己**不出触觉**：点击与拖动各有自己的手感，谁也不该替谁发。
+    ///
+    ///  ⚠️ 它**不能再守「`open` 与 `drawerOpen` 相同就不动」**：跟手拖到一半
+    ///  松手时，目标可能与当前状态相同（拉到 40% 又放回去）—— 而那个中间位置
+    ///  必须归位。所以每次都把 `drawerReveal` 与 `drawerOpen` 一起写到目标。
     func setDrawer(open: Bool) {
-        guard open != drawerOpen else { return }
-        withAnimation(TokensMotion.value) { drawerOpen = open }
+        withAnimation(TokensMotion.value) {
+            drawerOpen = open
+            drawerReveal = open ? 1 : 0
+        }
     }
 
     /// 抽屉里属于「读数」的那一半：一瞬看不出来的那些数。
+    /// （图层胶囊不在这里 —— 它在 `MapNowCard.drawerContent` 的最上面。）
     ///
     /// **不重复收起时那一横上的三个数**（续航 / 电量 / 车速）—— 一个事实一个出处是
     /// 这一仓反复删出来的规矩，而它们此刻就在抽屉头上。
@@ -388,8 +404,8 @@ struct MapRefreshBadge: View {
         }
         .padding(.horizontal, TokensSpacing.sm)
         .padding(.vertical, TokensSpacing.xs)
-        //  它是浮在**连续画面**（地图瓦片）上的一小块 → `.overMedia`。
-        .dsGlassCapsule(variant: .overMedia, hairline: false)
+        //  它是浮在**连续画面**（地图瓦片）上的一小块 —— 材质走全 App 唯一那一档（`.clear`）。
+        .dsGlassCapsule(hairline: false)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text("自动刷新，还剩 \(left(now: now, loop: loop))"))
         //  它是**只读**的一格：不接手势，免得地图上多一块挡住拖动的东西。

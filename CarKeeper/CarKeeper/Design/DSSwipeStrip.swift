@@ -491,7 +491,7 @@ struct DSSwipeStrip: View {
         //  阴影不另加：系统玻璃自带边缘与投影，再加一层就是两层影子。
         return Color.clear
             .frame(width: w, height: loupeHeight)
-            .dsGlass(in: shape, variant: .regular, interactive: false)
+            .dsGlass(in: shape, interactive: false)
             .opacity(loupeVisible ? 1 : 0)
             .animation(TokensMotion.fade, value: loupeVisible)
             //  拖动时长到满行高（相机量到 40 → 47pt，0.86 → 1.0 × 带高）。
@@ -534,10 +534,10 @@ struct DSSwipeStrip: View {
                     //  `index` 是 `nil`（车辆）时五个字全部走正文色 —— 见它的说明。
                     .foregroundStyle(i == index ? TokensPalette.accent
                                                 : TokensPalette.primary)
-                    //  这里原本挂着一层逐处的 `.dsInkGlow()`（用户第 8 条）。
-                    //  2026-09-25 第 2 条之后**文字不需要它了**：外壳现在是全局的
-                    //  （`DSTextGlow` 挂在 App 根上，见 `Design/InkGlow.swift`）——
-                    //  连这行字也在内。两处都挂等于同一圈壳画两遍，只会变浓。
+                    //  这里原本挂着一层逐处的 `.dsInkGlow()`（用户第 8 条）；
+                    //  2026-09-25 它辁成全局的文字外壳，而 2026-09-26 **两者一起删**
+                    //  （用户：「完全删除文字发光和文字发光功能」）—— 这行字现在
+                    //  没有任何壳，靠的是实色与带子自己的底色。
                     //  相机那张拖动态里，最外那一档暗到 ~57%（白墙被屏幕边切掉那一下）——
                     //  这里按「它离开可见带有多远」做同一条渐变：整整跑出一格 = 0.55，
                     //  不再更暗（再暗就读不出来了，而它仍然是可点的一档）。

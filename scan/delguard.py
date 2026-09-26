@@ -91,6 +91,21 @@
   （没接在 `global_new` 上：那一侧是全项目的「有声明就不报」，而形参的名字与类型名
     一样常见（`style` / `pad` / `row`），放进去会把这一类真错永远遮住。）
 
+  2026-09-26 的第四条假阳性（判据 ⑧）：「完全删除文字发光」那一轮把 `TokensHalo`
+  整个删掉，而它里面有一个成员叫 `scale` —— 新版本里唯一还在用 `scale` 的地方是
+  `CarModelView` 的 `body.scale = […]`（`body` 是一个 RealityKit 实体，
+  `Entity.scale` 是**系统的**成员）。本文件把一个同名（而已）的成员当成了
+  「项目里被删的那个」。
+  于是补一条：**这个名字同时是苹果 SDK 的符号名（`scan/sdk_cache.json`），
+  而每一条使用都是 `小写值.name`（`body.scale`）→ 不报**。
+  为什么必须同时满足两条：只有前者的话，几乎每个短名字都是 SDK 名（那张表是整个
+  SDK 的符号），会把真错遮光；只有后者的话，一个叫 `foo.scale` 的项目成员被删
+  （`foo` 是项目类型的一个**值**）也会漏。两条一起，命中面就只剩
+  「这个名字属于某个我们叫不出类型的值」——而那正是本门禁无从判定的东西。
+
+  自测（同一轮实测）：删 `TokensHalo.scale` → 必须**不**报；
+  反面：删 `StackSpec.Card.padBottom` → 必须**报**（它的使用带项目类型前缀）。
+
   2026-09-25 的第二条假阳性（判据 ⑥，同一天加的）：删掉 `MapCarPin.style` /
   `MapSpotPin.style`（车钉那三套艺术样式的选择器）时，它报了六处用法 ——
   全部是**参数标签**：`RoundedRectangle(cornerRadius: 3, style: .continuous)`、
@@ -114,6 +129,8 @@
 """
 
 import argparse
+import io
+import json
 import os
 import re
 import subprocess
@@ -128,6 +145,11 @@ SCOPE_DIRS = [
     "CarKeeper/Models",
     "CarKeeper/Design",
 ]
+
+# 苹果 SDK 的符号名（含成员）。判据 ⑧ 的输入 —— 它只用来把「名字本来就是 SDK 的
+# 一个成员」这一种从误报里摘出去（见文件头那一段）。
+SDK_CACHE = os.path.join(PROJECT_ROOT, "scan", "sdk_cache.json")
+
 
 # 成员级声明：缩进 ≤ 4 空格，且行内有 let / var / func + 名字。
 # 为什么卡缩进：函数体里的局部量缩进 ≥ 8，把它当成「声明」会让判定立刻失真
@@ -209,6 +231,40 @@ def only_argument_labels(line, name):
             continue
         return False
     return True
+
+
+def only_value_member(line, name):
+    """这一行里这个名字的每一次出现都是 `某个小写值.name` 吗（判据 ⑧ 的输入）。
+
+    `body.scale` → 是（那个成员属于 `body` 的类型，本门禁叫不出那个类型）；
+    `TokensHalo.scale` → 不是（前缀是大写的**类型名**，正是本门禁要抓的形状）；
+    裸 `scale` / `scale = 1` → 不是。
+
+    形状学的是 `qualified_uses_of` 那条正则，只是把前缀收窄到小写标识符：
+    大写开头的前缀在这个仓里就是类型名（`TokensPalette` / `StackSpec`…），
+    而类型名正是判据 ⑤ 那一侧管的事。
+    """
+    hits = list(re.finditer(r"\b%s\b" % re.escape(name), line))
+    if not hits:
+        return False
+    for m in hits:
+        #  只看名字**前面**：必须紧跟在 `.` 后面，而且那个 `.` 的接收者是一个
+        # 小写标识符（`body.scale`）。大写开头的前缀是本仓的类型名（`TokensPalette`
+        # / `StackSpec`…）—— 那一种正是本门禁要抓的形状，不能放它走。
+        before = line[:m.start()]
+        if not re.search(r"(?<![A-Za-z0-9_.])[a-z_]\w*\s*\.\s*$", before):
+            return False
+    return True
+
+
+def sdk_member_names():
+    """`scan/sdk_cache.json` 里的名字集合。
+
+    ⚠️ 读不到就当**失败**，不静默放行：这张表是判据 ⑧ 唯一的输入，
+    缺它就等于那条判据不存在 —— 而「没检查」与「没问题」在输出上长得一样。
+    """
+    with io.open(SDK_CACHE, encoding="utf-8") as f:
+        return set(json.load(f))
 
 
 def uses_of(name, text):
@@ -429,6 +485,9 @@ def main():
     for text in new_texts.values():
         project_types |= type_names(text)
 
+    # 判据 ⑧ 的输入：SDK 的符号名。
+    sdk = sdk_member_names()
+
     bad = []
     for rel, old, _new in pairs:
         old_names = member_names(old)
@@ -448,6 +507,10 @@ def main():
                     continue
                 for n, t in qualified_uses_of(name, text, project_types):
                     hits.append((other, n, t))
+            # 判据 ⑧：名字同时是 SDK 的成员名，而**每一条使用**都是 `小写值.name`
+            # （见文件头那一段）→ 那些使用属于某个我们叫不出类型的值。
+            if name in sdk and hits and all(only_value_member(t, name) for _, _, t in hits):
+                hits = []
             if hits:
                 bad.append((rel, name, hits))
 

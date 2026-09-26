@@ -26,7 +26,7 @@ import MapKit
 //  位置由这一列决定 —— 所以这一列的第一件就是系统罗盘本身（我们画的那一枚连同
 //  `resetNorth` 一起删掉，它做的事系统那枚点一下也会做）。
 //
-//  材质：`.overMedia` —— 它们浮在**连续的画面**（地图瓦片）上，不是卡的面。
+//  材质：`.clear`（全 App 唯一那档）—— 它们浮在**连续的画面**（地图瓦片）上，不是卡的面。
 //  可点 → `interactive`：按下去的压缩与折射由系统演（`DSGlass.swift` 的三条规则）。
 extension MapSpineView {
 
@@ -95,12 +95,12 @@ extension MapSpineView {
             // 圆底是真玻璃、底下是**连续的画面**（地图瓦片）→ `TokensInk`：
             // 系统会按材质调它，固定标签色在瓦片上会糊掉（用户第 10 条）。
             .foregroundStyle(dimmed ? TokensInk.tertiary : TokensInk.primary)
-            // 符号外面一圈反色外发光（用户 2026-09-25 第 8 条）：
-            // 这三枚钳底的是地图（`.clear`，不磨砂）—— 白色符号压在雪地/浅色楼盘上时
-            // 就消失了一半。发光不改变符号色，只给它一个与底相反的轮廓。
-            .dsInkGlow()
+            //  这里原本还有一圈反色外发光（用户 2026-09-25 第 8 条）。
+            //  2026-09-26 用户：「完全删除文字发光和文字发光功能」—— 整个外壳机制
+            //  （文字一侧的 `DSTextGlow` + 图形一侧的 `dsInkGlow`）已删。
+            //  代价如实说：这三枚钮的符号现在只靠 `TokensInk` 与材质自己压在瓦片上。
             .frame(width: TokensSize.tap, height: TokensSize.tap)
-            .dsGlass(in: Circle(), variant: .overMedia, interactive: true)
+            .dsGlass(in: Circle(), interactive: true)
             .contentShape(Circle())
     }
 

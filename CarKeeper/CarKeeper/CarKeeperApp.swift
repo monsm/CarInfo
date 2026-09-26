@@ -100,13 +100,6 @@ enum SceneID {
 struct CarKeeperApp: App {
     private let store = AppStore.shared
     @StateObject private var nav = NavState.shared
-    /// 「设置 → 显示」那三格（文字发光程度 / 玻璃通透度 / 界面实度）。
-    ///
-    /// **根必须订阅它**（用户 2026-09-26 加的这两组设置）：它们改的不是某一页的
-    /// 局部状态，而是 `TokensHalo` 与 `TokensPalette.panel` 这类**计算属性**读到的值 ——
-    /// 读得到、但没有东西会因此重画。这一行就是那个「因此」：任何一格改动 →
-    /// 整棵树重新求值（与 `wallpaper` / `phone` 那几处订阅同一个理由）。
-    @ObservedObject private var display = DisplaySettings.shared
 
     init() {
         // 后台刷新（BGTask）已删：免费开发者账号没有 BGTaskScheduler 权限，
@@ -189,17 +182,10 @@ struct CarKeeperApp: App {
                 LoginView()
             }
         }
-        // 文字的「轻微反色发光外壳」全局只包一次（`Design/InkGlow.swift` 的 `DSTextGlow`）。
-        //
-        // 用户 2026-09-25 第 2 条：「全局全部字体都加层发光阴影 看看能不能在液态玻璃中看清」。
-        // 为什么只能挂在这里：`View.textRenderer(_:)` 的文档原文是「any text views
-        // **within it** will use renderer to draw themselves」—— 它管的是这棵子树里
-        // **所有的 `Text`**。挂在根上 = 全 App；挂在某一页上 = 只有那一页，而那正是
-        // `dsInkGlow()` 那四张名单没盖住其余几百行的原因。
-        //
-        // 它与下一行同理：每屏都要的东西在根上画一次，逐屏去加一定会有屏幕漏掉。
-        // 关掉它 = 删掉这一行（代价与回退说明写在 `InkGlow.swift` 里）。
-        .dsTextGlow()
+        //  这里原本是全局的文字外壳（`.dsTextGlow()`，`Design/InkGlow.swift`）。
+        //  用户 2026-09-26：「完全删除文字发光和文字发光功能」—— 那一行、
+        //  那个 `TextRenderer`、它的取值表（`TokensHalo`）与设置里那格滑杆一起删了。
+        //  所以 App 的根现在只包一层画布，而没有对文字的渲染干预。
         // 画布与光在**根部只画一次**（Design/Theme.swift 的 AppCanvas）：
         // 全 App 每一屏共用同一束由车所在地算出的光。逐屏去加，一定会有屏幕漏掉。
         .background { AppCanvas() }

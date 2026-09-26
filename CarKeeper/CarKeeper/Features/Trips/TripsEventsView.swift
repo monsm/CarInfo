@@ -54,6 +54,12 @@ struct TripsEventsView: View {
     /// （主屏上也有一张地图，但它只有一张）。用户的原话就是「点到出行界面就闪退」。
     @State private var shownTrips = tripCardStep
 
+    /// 事件那一段一次画几天。**它在这里而不在 `MessagesSection` 里**：
+    /// 用户 2026-09-26「事件也采用懒加载」之后，续的那个动作发生在**这一叠**上
+    /// （`ArcStack.onReachBottom` → `loadMoreEventDays`），而消息那一节只负责裁。
+    /// 3 与行程那一叠的步长同一个量级：一屏大约就是这么几天。
+    @State private var eventDays = 3
+
     /// 当前翻到背面的那一段（键是它的 `startTime`，理由见 `tripFlip`）。
     /// `nil` = 没有一张是翻过来的 —— 一开始是这个状态，面且**只有一张**能翻：
     /// 它是“我正在看这一段”的标记，不是每一张自己的开关。
@@ -251,8 +257,9 @@ struct TripsEventsView: View {
             // 车的事件：点火 / 熄火 / 控制记录（原「消息」页）。
             // 它单独占一段：这一条流是**按时间列的消息**，与下面那叠地图卡是两种排版，
             // 混在一起时两边都不好看（用户看到的正是那一幕）。
+            //  这里的 `shownDays` 是绑定：续由「滑到底」触发（见 `eventDays`）。
             out.append(StackCard(id: "events", title: "车的事件",
-                                 content: AnyView(MessagesSection())))
+                                 content: AnyView(MessagesSection(shownDays: $eventDays))))
         default:
             out.append(contentsOf: journeyCards)
         }
@@ -307,13 +314,21 @@ struct TripsEventsView: View {
         return out
     }
 
-    /// 滑到底要不要继续放行程卡。
+    /// 滑到底要不要继续放东西出来 —— **两段都有**。
     ///
-    /// 只有「行程」那一段有它（用户第 1 条：滑到底自动续 5 段）——
-    /// 事件那一段是一次列完的消息流，没有「还有更多」这回事，
-    /// 给它挂上这个回调只会让它无缘无故多放出几张卡。
+    ///  用户第 1 条（2026-09-25）先给行程要了它；2026-09-26 又给事件要了一次
+    ///  （「事件也采用懒加载」）。于是它不再是一个只属于行程的回调：
+    ///  按当前那一段分派到各自的「再放一点」——两段都是**只看滚动位置**，
+    ///  不需要谁去按一下（`ArcStack` 只在「从不到底 → 到底」那一刻叫一次）。
     private var reachBottom: (() -> Void)? {
-        tab == .journeys ? { loadMoreTrips() } : nil
+        tab == .journeys ? { loadMoreTrips() } : { loadMoreEventDays() }
+    }
+
+    /// 事件那一段的「再放一点」：多画几天。
+    /// 封顶交给数据自己（`filteredGrouped` 有多少天就画多少天）——
+    /// 一天里能有几十条消息，而天数是**服务端那 7 天窗口**决定的。
+    private func loadMoreEventDays() {
+        eventDays += 3
     }
 
     var body: some View {
@@ -762,7 +777,9 @@ struct MiniTripMap: View {
             .frame(width: 20, height: 20)
             .background(Circle().fill(color))
             .overlay(Circle().strokeBorder(TokensPalette.surface, lineWidth: 2))
-            .dsInkGlow()
+            //  这里原本还有一圈反色外发光（`dsInkGlow()`）—— 2026-09-26 随整个
+            //  外壳机制删除（用户：「完全删除文字发光和文字发光功能」）。
+            //  两个端点仍能区分：字（起/终）+ 颜色 + 那圈 `surface` 描边。
     }
 
     /// 取路线的键（两点；5 位小数与 `RouteService` 的键同一口径）。

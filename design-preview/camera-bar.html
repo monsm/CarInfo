@@ -167,9 +167,9 @@
       <div class="mcard"></div><div class="mcard"></div><div class="mcard"></div>
     </div>
     <div style="position:absolute;left:33px;bottom:33px;display:flex;gap:9px;align-items:center">
-      <div style="width:47px;height:47px;border-radius:50%;background:rgba(28,28,31,.72);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
-      <div style="width:224px;height:47px;border-radius:23.5px;background:rgba(28,28,31,.72);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
-      <div style="width:47px;height:47px;border-radius:50%;background:rgba(28,28,31,.72);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
+      <div style="width:47px;height:47px;border-radius:50%;background:rgba(28,28,31,.55);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
+      <div style="width:224px;height:47px;border-radius:23.5px;background:rgba(28,28,31,.55);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
+      <div style="width:47px;height:47px;border-radius:50%;background:rgba(28,28,31,.55);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
     </div>
   </div>
   <div class="frame" style="width:402px;height:300px">
@@ -179,9 +179,9 @@
       <div class="mcard"></div><div class="mcard"></div><div class="mcard"></div><div class="mcard"></div>
     </div>
     <div style="position:absolute;left:33px;bottom:33px;display:flex;gap:9px;align-items:center">
-      <div style="width:47px;height:47px;border-radius:50%;background:rgba(28,28,31,.72);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
-      <div style="width:224px;height:47px;border-radius:23.5px;background:rgba(28,28,31,.72);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
-      <div style="width:47px;height:47px;border-radius:50%;background:rgba(28,28,31,.72);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
+      <div style="width:47px;height:47px;border-radius:50%;background:rgba(28,28,31,.55);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
+      <div style="width:224px;height:47px;border-radius:23.5px;background:rgba(28,28,31,.55);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
+      <div style="width:47px;height:47px;border-radius:50%;background:rgba(28,28,31,.55);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
     </div>
   </div>
 </div>
@@ -299,16 +299,20 @@ makeFrame('frames', { pos: 3, dragging: true, caret: 0 }, '图 2 · 拖动中：
 /* 图 3：拖动中、照片（index 2.45）偏左，光标在 −108px */
 makeFrame('frames', { pos: 2.45, dragging: true, caret: -35 }, '图 3 · 拖动中：照片偏左、光标在它左边');
 
-/* ---- 我们**已经落进 Swift** 的 v21：四个状态各一帧 ----
+/* ---- 我们**已经落进 Swift** 的 v22：四个状态各一帧 ----
    数不是另画一套，全部来自那几个常量（都是相机量到的**绝对值**）：
      带高 47 · 节距 62（= 1.32 × 带高）· 圆钮 47（= 带高）· 离屏边 33 · 中缝 9
      条宽 = 两枚圆钮之间那一段 = 402 − 33 − 47 − 9 − 9 − 47 − 33 = 224
        （相机那台 393pt 用同一个式子解出 215 —— 正是量到的那条带子）
      胶囊 71×40（1.15×节距、0.86×带高）→ 拖动 77×47（1.24×节距、1.0×带高）
      拖动中：圆钮移出层级、带子溶解、字铺到 402、最外那档降到 0.55
-   ⚠️ 2026-09-26 第三批（v21）：分工与相机**逐块相同** ——
-     · 三块形状是**真玻璃**（`dsGlass`）：两枚圆钮压在连续画面上 → `.overMedia`，
-       选中那一枚坐在带子上 → `.regular`。第一、二帧按玻璃画（模糊），
+   ⚠️ 2026-09-26 第四批（v22）：**材质只剩一档 `.clear`**（用户：「玻璃就默认选更透」
+     —— `DSGlassVariant` 与 `variant:` 参数一起删，「压在什么上」不再改变任何一块玻璃），
+     带子再透一档：`barFill` 的 alpha **0.72 → 0.55**（下面的帧里那一条就是 0.55）。
+   第三批（v21）：分工与相机**逐块相同** ——
+     · 三块形状是**真玻璃**（`dsGlass`）：两枚圆钮压在连续画面上、
+       选中那一枚坐在带子上（当时按底下是什么分 `.overMedia` / `.regular`）。
+       第一、二帧按玻璃画（模糊），
        第三帧画的是「降低透明度」那一档（`dsGlass` 那一步画不透明的 `surface` + 发丝线）；
      · **带子仍自己画**（`TokensPalette.barFill` + 发丝线）—— 所以它在第三帧里
        **逐像素不变**，与相机那条横带共用同一条规矩：能降的只有材质。
@@ -320,10 +324,10 @@ makeFrame('frames', { pos: 2.45, dragging: true, caret: -35 }, '图 3 · 拖动�
   const PITCH = 62, LANE = 224, ROW_H = 47, SCREEN = 402, PAD = 33;
   /* 每一帧：[拖动中, 说明, 是否「降低透明度」那一档, 带子是否也画成玻璃（只作对照）] */
   const SOLID_BG = '#1c1c1e';
-  [[false, '我们 v21 · 静止（相机那几个数：带高 47 / 节距 62 / 圆钮 47 / 离屏边 33）'],
-   [true, '我们 v21 · 拖动中（圆钮移出层级、带子溶解、字铺满屏）'],
-   [false, '我们 v21 · 系统玻璃设成最不通透（三块形状变实底，带子逐像素不变）', true],
-   [false, '我们 v21 · 对照：带子也做成玻璃（真机上会丢掉字的对比度，并开始跟系统那一档走）',
+  [[false, '我们 v22 · 静止（相机那几个数：带高 47 / 节距 62 / 圆钮 47 / 离屏边 33）'],
+   [true, '我们 v22 · 拖动中（圆钮移出层级、带子溶解、字铺满屏）'],
+   [false, '我们 v22 · 系统玻璃设成最不通透（三块形状变实底，带子逐像素不变）', true],
+   [false, '我们 v22 · 对照：带子也做成玻璃（真机上会丢掉字的对比度，并开始跟系统那一档走）',
     false, true]]
     .forEach(function (pair) {
       const drag = pair[0];
@@ -358,7 +362,7 @@ makeFrame('frames', { pos: 2.45, dragging: true, caret: -35 }, '图 3 · 拖动�
       band.style.cssText = 'width:' + LANE + 'px;height:' + ROW_H + 'px;border-radius:' + (ROW_H / 2) + 'px;' +
         (bandGlass
           ? 'background:rgba(120,120,128,.20);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);'
-          : 'background:rgba(28,28,31,.72);backdrop-filter:none;-webkit-backdrop-filter:none;') +
+          : 'background:rgba(28,28,31,.55);backdrop-filter:none;-webkit-backdrop-filter:none;') +
         'box-shadow:inset 0 0 0 .5px rgba(255,255,255,' + (bandGlass ? '.26' : '.14') + ');' +
         'opacity:' + (drag ? 0 : 1);
       row.appendChild(band);

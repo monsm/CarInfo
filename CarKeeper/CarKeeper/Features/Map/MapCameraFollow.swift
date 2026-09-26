@@ -75,9 +75,15 @@ enum MapCameraFollow {
     /// 它与 `spanFactor` 一起把「车钉居中在带子里」这句原话变成一个数。
     static let bandCenter: Double = 0.38
 
-    /// 一屏的纵向覆盖（米）÷ 镜头距离。65° 俯仰下的经验值；
-    /// **这是这一组里唯一需要用真机校一次的数**（改大 = 车钉更靠上）。
-    static let spanFactor: Double = 1.55
+    /// 一屏的纵向覆盖（米）÷ 镜头距离。
+    ///
+    ///  2026-09-26：镜头改成 2D（俯角 0，用户：「默认 2D」）之后这个比值也跟着换 ——
+    ///  它是随俯角变的（正是“斜着看时同样距离能看到更多地”的原因）。
+    ///  0.90 是正向下看时的量级（预设 FOV 下 2·tan(θ/2) ≈ 0.9）；
+    ///  **它是这一组里唯一需要用真机校一次的数**（改大 = 车钉更靠上）。
+    ///  它只影响“车钉落在带的哪儿”：`bandCenter` 那两个条件算下来，
+    ///  偏向的比例与它无关，它决定的是“一屏到底装得下多少米”。
+    static let spanFactor: Double = 0.90
 
     /// 每度纬度多少米（够用即可：这是镜头取景，不是测距）。
     private static let metresPerDegree: Double = 111_320
@@ -133,9 +139,11 @@ extension MapSpineView {
         guard let c = store.currentLocation?.coordinate else { return }
         if didCenterOnce && !force && !store.isCarMoving { return }
         didCenterOnce = true
-        // 朝向：车在动时是**车头朝向**（地图跟着车转，用户第一条要求），
-        // 停着时回正北 —— 停着的地图转起来没有任何参照物解释它为什么转。
-        let heading = store.isCarMoving ? store.carHeadingDeg : 0
+        // 朝向：**总是车头朝向**（用户 2026-09-26：「地图页应该是车头朝上」）。
+        //  这一版推翻了我上一版那条「停着就回正北」的判断：停着也有车头，
+        //  而“车头朝上”这件事在停下那一刻突然翻成北向上，才是真的不可解释。
+        //  车端没报航向时（`carHeadingDeg` = 0）它就是北向上 —— 不猜一个方向。
+        let heading = store.carHeadingDeg
         guard let pos = MapCameraFollow.camera(on: c, heading: heading,
                                                distance: cameraDistance,
                                                pitch: cameraPitch) else { return }

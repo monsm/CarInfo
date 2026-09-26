@@ -72,20 +72,13 @@ ENTRY_MARKERS = [
 WHITELIST = {
     "CarKeeper/CarKeeper/Features/SiriShortcuts.swift":
         "AppIntent 由系统按定义发现（Siri/快捷指令），代码里不需要引用 —— 见该文件头部说明",
-    "CarKeeper/CarKeeper/Design/InkGlow.swift":
-        "玻璃上文字的外壳（`dsInkGlow` / `dsTextGlow`）。它对外只有两个 `View` 扩展方法，"
-        "跨文件用的是那两个方法 —— 而文件里唯一的类型 `DSTextGlow` 是 `TextRenderer`，"
-        "它只作为 `.textRenderer(_:)` 的参数在**本文件内**被构造（系统只给这一种接法，"
-        "没有「在别处引用它」这回事），所以判据看不见那个类型名。"
-        "代价说明白：以后这个文件里真冒出没人用的类型，这里也不会报 —— 接受它，"
-        "因为该文件只该放「玻璃上的字怎么画」（现在 180 行），且它的头注就是规则本身",
-    "CarKeeper/CarKeeper/Design/DSGlass.swift":
-        "玻璃的词汇表。它对外只有四个 `View` 扩展方法（`dsGlass` / `dsGlassCapsule` / "
-        "`dsGlassRounded` / `dsGlassLayer`），跨文件用的是那几个方法 —— 而文件里的"
-        "类型只剩 `DSGlassVariant` 一个，它只作为 `dsGlass(…variant:)` 的**参数类型**"
-        "出现，调用点写的是 `.overMedia`（隐式成员表达式），判据看不见那个类型名。"
-        "代价说明白：以后这个文件里真冒出没人用的类型，这里也不会报 —— 接受它，"
-        "因为该文件只该放材质词汇（现在 150 行），且它的头注就是规则本身",
+    #  `InkGlow.swift` 那一条已删（2026-09-26）：整个文件随「完全删除文字发光和
+    #  文字发光功能」删掉了 —— 白名单里留着一个不存在的文件名，下一个人会以为
+    #  那一套还在。
+    #  `DSGlass.swift` 那一条也一起删：它此前豁免的理由是「文件里只剩一个类型
+    #  `DSGlassVariant`，而它只作为参数类型出现」—— 那个类型随「玻璃默认更透」
+    #  删了（材质固定 `.clear`，不再有变体参数），于是这个文件现在**一个类型都没有**，
+    #  四条 `View` 扩展方法各有读者，判据 ① 在这里无事可判。
 }
 
 TOP_TYPE_RE = re.compile(

@@ -24,27 +24,18 @@ import SwiftUI
 //  的性能妥协，而阅读线与消失带都不存在了（见 `ArcStack` 头注）。留着的后果比性能严重：
 //  同一张卡会因为**滚动位置**换材质，滚过去那一瞬间正是最像贴图的一刻。
 //  现在每张卡都是同一层玻璃，与它在哪儿无关。
+//  ⚠️ 2026-09-26（第二轮）：`frosted` 与 `photoBackdrop` 两个参数一起删。
+//  它们此前决定这张卡用 `Glass` 的哪个变体（`.clear` / `.regular`）——
+//  而用户这一轮把材质定死了（「玻璃就默认选更透」），变体参数从 `dsGlass` 上
+//  整个消失（见 `DSGlass.swift` 头部那一段）。
+//  代价如实写：这张卡现在一律是 `.clear`（不磨砂），卡里正文的对比度会跟着
+//  底下的照片走。真机上若某张照片让某一行读不清，回退是 `dsGlassMaterial` 里
+//  那一个词（`.clear` → `.regular`），而**不是**在这里再开一个参数。
 struct GlassCard<Content: View>: View {
-    /// 底下是不是照片 / 地图（连续的画面）—— 见 `EnvironmentValues.photoBackdrop`。
-    /// 由它决定这张卡用哪个玻璃变体，而不是在这里猜。
-    @Environment(\.photoBackdrop) private var photoBackdrop
-
     /// 这张卡的个性色（页面的艺术方向）。默认取全局强调色。
     var accent: Color = TokensPalette.accent
     /// 个性色的浓度。0 = 完全不要那一抹（纯玻璃）
     var accentWash: Double = 0.16
-    /// 这张卡此刻是不是**一个正在被读的表面**（拉出来的抽屉）。
-    ///
-    /// 用户 2026-09-25 第 3 条：「抽屉打开后加深下模糊，关闭后降低模糊」。
-    /// 这句话在系统材质里有一个**准确**的对应物 —— `Glass` 的两个变体：
-    ///   · `.clear` 不磨砂（底下看得清楚）→ 收起时用：卡片只是一条摘要，让地图透出来
-    ///   · `.regular` 磨砂（底下的画面被揉开）→ 拉出来时用：卡里现在是十几行读数
-    /// 所以这里**不是**加一层自造的模糊（那会变成玻璃底下的第二层材质，
-    /// 被 `scan/glass.py` 判红，也确实会把折射挡掉），而是把变体选择交给调用点：
-    /// 「这张卡在被读」这一个事实，只有调用点知道（抽屉的开合住在 `MapSpineView`）。
-    ///
-    /// 默认 `false` = 只看底下是什么（`photoBackdrop`），与这个参数出现之前逐字一致。
-    var frosted: Bool = false
     @ViewBuilder var content: Content
 
     private var shape: RoundedRectangle {
@@ -58,23 +49,12 @@ struct GlassCard<Content: View>: View {
             .padding(.bottom, StackSpec.Card.padBottom)
             .frame(maxWidth: .infinity, alignment: .leading)
             // 材质本身来自 `dsGlass`（`Design/DSGlass.swift`）——**全 App 唯一入口**。
-            // 卡片是它最大的一位用户，但不是例外：玻璃在哪儿、用哪个变体，只该有一个出处。
+            // 卡片是它最大的一位用户，但不是例外：玻璃在哪儿、用哪一档，只该有一个出处。
             //
-            //  变体按**底下真的是什么**选（用户 2026-09-25：「我追求的就是液态玻璃的美感」）：
-            //  五张子页铺的是相册选的照片、地图那一档底下就是瓦片 —— 都是「连续的画面」，
-            //  按 HIG 该用 `.clear`：那一版**不磨砂**，只在边缘折射，底下是真看得见的。
-            //  没有照片时（用户选了「不铺」或还没选）底下是一块纯色画布 —— `.clear`
-            //  压纯色几乎什么都看不见（卡片像消失），那时回到 `.regular`。
-            //
-            //  ⚠️ 这条规则换过一次：此前一律 `.regular`，理由是「卡片底下是 App 自己的界面，
-            //  不是照片与地图」—— 那句话在半页被壁纸铺满之后就不成立了。
-            //  **代价如实说**：`.clear` 不磨砂，所以卡里正文的对比度会跟着底下的照片走
-            //（卡头已经走 `TokensInk` 自适应，而正文那几百处仍是不透明的标签色）。
-            //  真机上如果某张照片让某一行读不清，回退就是这一行换回 `.regular`。
-            // `hairline: false`：描边在下面那一条 `overlay` 里画，走令牌，不重复画两层。
-            // `frosted` 压过「底下是什么」：正在被读的表面优先要对比度（见参数说明）。
-            .dsGlass(in: shape, variant: (photoBackdrop && !frosted) ? .overMedia : .regular,
-                     hairline: false)
+            //  `hairline: false`：描边在下面那一条 `overlay` 里画，走令牌，不重复画两层。
+            //  （这里此前还要按「底下是照片还是纯色」与「抽屉开着没」选变体，
+            //   两点都已随「更透」那一条消失，见文件头上那一段。）
+            .dsGlass(in: shape, hairline: false)
             .overlay { accentWashOverlay }
             .overlay { shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border) }
             .clipShape(shape)

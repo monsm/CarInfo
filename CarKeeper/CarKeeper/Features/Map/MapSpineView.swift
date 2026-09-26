@@ -130,6 +130,18 @@ struct MapSpineView: View {
     ///  键名只一个出处，`@AppStorage` 里写字面量是这一层唯一被重复过的那种写法。
     @AppStorage(MapSpineView.drawerKey) var drawerOpen = false
 
+    /// 抽屉的**连续**位置（0 = 收起，1 = 拉出）—— 跟手拖出来的就是它。
+    /// 用户 2026-09-26：「原版支持跟手抽出，现在的只支持点击抽出」。
+    /// **不是 `private`**：拉手与拖动住在 `MapSpineReadouts.swift`，卡片在
+    /// `MapNowCard.swift`（与 `drawerOpen` 同一条理由：作用域是文件）。
+    @State var drawerReveal: CGFloat = 0
+    /// 抽屉正文的**自然高度**（`MapNowCard` 量出来的）—— 跟手时的分母。
+    @State var drawerBodyHeight: CGFloat = 0
+
+    /// 这一趟开过的路（用户 2026-09-26：「车动起来后在地图页画出行驶轨迹……
+    /// 直至车辆熄火」）。**订阅它**：轨迹点是每次定位异步落进来的，不订阅不会重画。
+    @ObservedObject var trace = DriveTrace.shared
+
     /// 壁纸状态（非地图子页铺的底）。**必须订阅它**：图是异步到达的，
     /// 不订阅的话 `换一张 / 不铺` 要等到下一次换档才生效（body 才重新求值）。
     /// 与 MineView 那行订阅的是同一个单例，两处的更新永远同步。
@@ -158,19 +170,16 @@ struct MapSpineView: View {
     /// 两处各写一个数就是「同一个几何有两个出处」。
     let cameraDistance: Double = 1_400
 
-    /// 镜头的俯仰角（度）—— 用户 2026-09-25：「地图页默认极限 3D 视角」。
+    /// 镜头的俯仰角（度）—— **0 = 2D**（用户 2026-09-26：「默认 2D」）。
     ///
-    /// 为什么是 65 而不是更大：Apple 的文档里对 `pitch` 写得很清楚 ——
-    /// *“A value of 0 results in a camera that points straight down at the map.
-    /// Angles greater than 0 result in a camera that pitches toward the horizon”*，
-    /// 而**没有固定的上限**（实际能到多少由镜头高度决定，MapKit 自己会夹）。
-    /// 所以“极限”不是写一个更大的数，而是写一个仍然读得清路网的角度：
-    /// 65° 是 Apple 地图那个 3D 视图的量级 —— 一眼看出“这是斜着看的城市”，
-    /// 而街区网格还看得见。再往上，地图会变成一条条水平线。
-    ///
-    /// 三处镜头（回到车 / 移到手机 / 地图上的焦点）**共用这一个值**：
-    /// 同一个几何只有一个出处 —— 否则“回到车”与“移到手机”会是两个不同的视角。
-    let cameraPitch: Double = 65
+    /// Apple 的文档里对 `pitch` 写得很清楚：*“A value of 0 results in a camera
+    /// that points straight down at the map.”* —— 俯角 0 就是正着往下看的那张图。
+    /// 它此前是 65（2026-09-25 那一轮用户要的「默认极限 3D 视角」），已推翻：
+    ///   · 2D 下「车头朝上」才真的可读 —— 斜视时地图会把前方压成一小条；
+    ///   · 3D 立体建筑是 GPU 上最贵的一项，而这一屏是**六页同屏**里的那一页。
+    /// 要想回 3D，改这一个数（65）以及 `mapCanvas` 那一行的 `.flat`/`.realistic`。
+    /// 三处镜头（回到车 / 移到手机 / 地图上的焦点）**共用这一个值**。
+    let cameraPitch: Double = 0
 
     /// 系统那两件仪器（罗盘 / 比例尺）挂在地图上的那条线。
     ///
@@ -374,7 +383,8 @@ struct MapSpineView: View {
             // 地图出现之后的这几步是启动轨迹里原本的盲区（见 StartupJournal 头注）：
             // 用户报的「地图出来以后几秒就退」正落在这里，所以每一步都留个路标。
             StartupJournal.shared.mark("地图页开始取数")
-            //  第一帧就把镜头立起来（用户 2026-09-25 第 1 条：「默认极限 3D 视角」）。
+            //  第一帧就把镜头摆好（朝向 / 距离 / 俯仰三个数一次给齐 —— 俯仰这一轮
+            //  已按「默认 2D」改成 0，见 `cameraPitch`）。
             //
             //  为什么需要这一句：`camera` 的初值是 `.automatic`（MapKit 自己取景），
             //  而**俯仰角是镜头的一个属性** —— `.automatic` 没有它，于是从进页到
@@ -460,34 +470,22 @@ struct MapSpineView: View {
         //  系统那两件仪器（比例尺 / 罗盘）**不挂在这一层**：
         //  地图 `ignoresSafeArea(.top)`，任何挂在它身上的东西都会跟着画到灵动岛底下
         //（第 9 条那枚「自动出现」的罗盘就落在那里 —— 状态栏里，压住电池）。
-        //  两件都挂在下一层（`nowLayer`）—— 那里还在安全区里，所以对齐到“顶”就是
-        //  **灵动岛下沿**（用户 2026-09-25 第 2 条 + 第十一轮「往下调整下」）。
+        //  两件都挂在下一层（`nowLayer`）—— 那里还在安全区里，所以对齐到“顶”就是**灵动岛下沿**。
         Map(position: $camera, scope: mapScope) {
             mapContent(d)
         }
-        //  样式：**写实高程**（`.realistic`）。
-        //
-        //  用户 2026-09-25：「地图页默认极限 3D 视角」。光给镜头加俯仰角（`cameraPitch`）
-        //  只能得到“斜着看的一张平面图”；`.realistic` 才会把建筑立起来、地面有高低 ——
-        //  两个加起来才是 Apple 地图那个 3D 视图。
-        //  元素名对着 Apple 文档核过：`MapStyle.Elevation` 只有三个取值
-        //（`automatic` / `flat` / `realistic`），而这个 App 里本来就有一处用 `.flat`
-        //（出行页那四张小地图：它们只要“看得清两点连线的底图”，不需要立体）。
-        //  ⚠️ 代价如实记：立体建筑比平面瓦片贵（GPU），而这一屏是**六页同屏里那一页**。
-        //  如果真机上觉得卡，回退就是这一行换回 `.mapStyle(.standard)`。
-        .mapStyle(.standard(elevation: .realistic))
+        //  样式：**平面高程**（`.flat`）—— 与镜头那个 0° 俯仰是一件事的两半：
+        //  用户 2026-09-26「默认 2D」，而立体建筑在 2D 下看不到多少、却最贵。
+        //  （元素名对着 Apple 文档核过：`MapStyle.Elevation` = automatic/flat/realistic。）
+        .mapStyle(.standard(elevation: .flat))
         // ── 系统控件：位置由**我们**给，不是 MapKit 定死的 ─────────────────────
         //
         // 第十一轮：这两行把**自动摆放的那一套**关掉 —— 两件仪器改由我们在
         // `nowLayer` 那一层亲手摆（`MapCompass(scope:)` / `MapScaleView(anchorEdge:scope:)`，
-        // 见那两个调用点）。
-        //
-        // 为什么必须显式关：第 9 条那一轮把 `.mapControls { MapCompass() }` 整个撤掉，
-        // 而**撤掉不等于关掉** —— MapKit 的默认控件集里本来就有罗盘，它在地图**转过之后**
-        // 自动出现（Apple 原文：*the default mapControls configuration shows a compass
-        // when the map is rotated*）。地图又是 `ignoresSafeArea(edges: .top)`，
-        // 于是那枚自动罗盘贴在**地图自己的角**上 —— 正好是状态栏里，压住电池
-        //（用户 2026-09-25 的截图：右上角一枚带「西」字的，右列一枚我们画的 —— 两枚罗盘）。
+        // 见那两个调用点）。为什么必须显式关：**撤掉不等于关掉** —— MapKit 的默认控件集里本来就有罗盘，
+        // 它在地图**转过之后**自动出现（Apple 原文：*the default mapControls configuration
+        // shows a compass when the map is rotated*）。地图又是 `ignoresSafeArea(edges: .top)`，
+        // 于是那枚自动罗盘贴在**地图自己的角**上 —— 正好是状态栏里，压住电池。
         //
     // 两行都写在 Map **自己**身上（不是外层容器）：`mapControlVisibility` 是一个
     // 向下传的环境值，挂在容器上会把我们摆在别处的那两件也一起隐藏掉。
@@ -673,12 +671,11 @@ struct MapSpineView: View {
     /// ⚠️ 2026-09-26 第三批（用户：「3 个液态玻璃：左右的球和中间的选中」）：它一度是
     /// 自己画的面（`barFill`），理由是「降低透明度」那个开关 —— 而那条账其实算在
     /// **带子**头上；相机这两枚圆钮**是真玻璃**（缩略图 / 翻转镜头，底下就是现场画面）。
-    /// 现在分工与相机逐块相同：**带子自己画，三块形状是真玻璃** —— 它们压在连续画面上，
-    /// 所以是 `.overMedia`（画面保持可见，只在边缘留一圈折射）。
+    /// 现在分工与相机逐块相同：**带子自己画，三块形状是真玻璃**。
     private var armDisc: some View {
         Color.clear
             .frame(width: Self.armSize, height: Self.armSize)
-            .dsGlass(in: Circle(), variant: .overMedia, interactive: true)
+            .dsGlass(in: Circle(), interactive: true)
             .contentShape(Circle())
     }
 
@@ -846,8 +843,6 @@ struct MapSpineView: View {
                 // 而那一轮**没有一行说得出当时亮的是哪一屏** —— 六页同屏关掉以后
                 // 只建当前那一档，于是「哪一档在建」直接决定了「谁在吃内存」。
                 .onAppear { StartupJournal.shared.mark("亮出屏幕：地图") }
-                // 地图卡片底下是**瓦片**（连续的画面）→ `.clear`（见 `photoBackdrop`）。
-                .environment(\.photoBackdrop, true)
         } else {
             // 子页的顶（用户 09-25 第 2 条：「顶部的时间和信号应该和地图页一样，
             // 不要遮盖」）：**与地图页同一套行为** —— 内容铺到屏顶，卡片从时钟下面连续
@@ -873,10 +868,6 @@ struct MapSpineView: View {
                 // 没选图时（或点了「不铺」）回落到画布底色（`TokensPalette.canvas`），
                 // 观感上和删暗层之前一样 —— 只是从「暗层」变成「App 自己的画布」。
                 .background { MapWallpaperLayer(image: wallpaper.image).ignoresSafeArea() }
-                // 卡片底下是**什么**如实交下去：铺了照片 → 真；回落到纯色画布 → 假。
-                // `GlassCard` 按它选玻璃变体（要的「液态玻璃的美感」在照片上才成立，
-                // 压在一块纯色上会让卡片看起来消失）—— 见 `photoBackdrop` 的说明。
-                .environment(\.photoBackdrop, wallpaper.image != nil)
                 .onAppear { StartupJournal.shared.mark("亮出屏幕：\(mode.title)") }
         }
     }
@@ -992,6 +983,17 @@ struct MapSpineView: View {
             } label: {
                 Label(lightTitle(d), systemImage: "sun.max")
             }
+            //  轨迹的**模拟**（调试）：用户 2026-09-26「加个模拟测试的，我试试」。
+            //  它只往 `DriveTrace` 里画一条假的路（车不动、车钉不动）——
+            //  因为轨迹这一件东西在真车上只能靠「真开一段」才看得到。
+            Button {
+                TokensHaptic.tap()
+                DriveTrace.shared.setSimulate(!DriveTrace.shared.simulate)
+            } label: {
+                Label(DriveTrace.shared.simulate ? "停止模拟轨迹" : "模拟行驶轨迹",
+                      systemImage: DriveTrace.shared.simulate ? "stop.circle"
+                                                              : "point.topleft.down.to.point.bottomright.curvepath")
+            }
             // 「回到车」原来在这里 —— 2026-09-25 搬去地图右侧那枚常驻圆钮
             //（`MapQuickButtons.swift`，用户：「像 ios 地图 app 右侧的图标一样」）。
             // 菜单里不再留一条：同一个动作两个入口就是重复，而「车在哪」是
@@ -1011,21 +1013,17 @@ struct MapSpineView: View {
                 Text(layer.title)
                     .font(TokensTypo.caption)
                     .tracking(TokensTracking.label)
-                //  这一枚是**图形**，不是字：文字那层壳现在是全局的（`DSTextGlow`），
-                //  而渲染器只管 `Text`、碰不到 SF Symbol —— 所以它自己带一层。
-                //  用户 2026-09-25 第 8 条那个诉求（胶囊是 `.clear`，字底下直接是瓦片，
-                //  上一版实测它的名字被瓦片上的地名吃掉了）对字与图形都成立。
+                //  这一枚是图形，与这行的字一样压在瓦片上 —— 两处的反色外壳都于
+                //  2026-09-26 随整个机制删掉（用户：「完全删除文字发光和文字发光功能」）。
                 Image(safeSymbol: "chevron.up.chevron.down", fallback: "chevron.down")
                     .font(TokensTypo.micro)
-                    .dsInkGlow()
             }
             .foregroundStyle(TokensInk.secondary)
-            // 这里原本是整行一层 `.dsInkGlow()`（字与箭头共用）—— 现在只给箭头（上一行）。
             .padding(.horizontal, TokensSpacing.snug)
             .padding(.vertical, TokensSpacing.xs)
-            // 图层胶囊浮在**地图**上（连续的画面）→ `.overMedia`（`.clear`）：
+            // 图层胶囊浮在**地图**上（连续的画面）—— 材质是全 App 唯一那一档（`.clear`）：
             // 画面保持可见，只在边缘留一圈折射。可点 → `interactive`。
-            .dsGlassCapsule(variant: .overMedia, interactive: true)
+            .dsGlassCapsule(interactive: true)
             .contentShape(Capsule())
         }
         .accessibilityLabel(Text("图层：\(layer.title)"))

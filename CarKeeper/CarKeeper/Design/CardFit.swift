@@ -384,28 +384,13 @@ private struct StackBottomInsetKey: EnvironmentKey {
     static let defaultValue: CGFloat = 0
 }
 
-/// 这张卡的**底下是不是一张照片 / 地图**（连续的画面）。
-///
-/// 用户 2026-09-25 第 1 / 10 条之后追加的那一句：「我追求的就是液态玻璃的美感」——
-/// 而 `Glass` 两个变体的**选择规则是 Apple 定的，不是审美定的**：
-///   · 底下是连续的画面（照片、地图）→ `.clear`
-///     （HIG：*reserve clear Liquid Glass for components over visually rich backgrounds*）
-///   · 底下是 App 自己的界面（画布）→ `.regular`
-/// 两种情形在我们这里都真实存在：五张子页铺的是**相册选的照片**
-///（`MapWallpaperLayer`），而用户没选照片时回落到 `TokensPalette.canvas`（一块纯色）。
-/// 一块 `.clear` 玻璃压在纯色上几乎什么都看不见 —— 卡片会像消失。
-/// 所以这个值不是开关，是**事实的传递**：由铺背景的那一层（`MapSpineView`）算出
-/// 「我底下到底是照片还是纯色」，`GlassCard` 照着选。默认 false ＝ 纯色。
-private struct PhotoBackdropKey: EnvironmentKey {
-    static let defaultValue = false
-}
-
-extension EnvironmentValues {
-    var photoBackdrop: Bool {
-        get { self[PhotoBackdropKey.self] }
-        set { self[PhotoBackdropKey.self] = newValue }
-    }
-}
+//  `photoBackdrop` 这个环境值已删（2026-09-26 第二轮）。
+//
+//  它存在的前提是「玻璃按底下是照片还是纯色选两个变体」—— 而用户这一轮把材质
+//  定死了（「玻璃就默认选更透」），变体参数从 `dsGlass` 上整个消失，于是它的
+//  **唯一读者**（`GlassCard`）不再需要它，两个写它的地方（`MapSpineView` 的
+//  地图档与五张子页）也一起删。留着一个没有读者的环境值，下一个人会以为
+//  「玻璃还在按底图分档」。
 
 extension EnvironmentValues {
     var stackTopInset: CGFloat {

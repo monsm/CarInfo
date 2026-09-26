@@ -15,8 +15,10 @@ import Foundation
 //     阅读状态不再只靠颜色：未读有圆点，标题字重也不同（颜色 + 字重双通道）。
 // =============================================================================
 
-/// 消息列表一次画几天（见 `MessagesSection.shownDays` 的说明）。
-private let messageDayStep: Int = 3
+//  「一次画几天」那个常量（`messageDayStep`）已搬去 `TripsEventsView`：
+//  用户 2026-09-26「事件也采用懒加载」之后，「续多少」这个动作发生在**那一叠**上
+//  （`ArcStack.onReachBottom` → 宿主的 `loadMoreEventDays`），
+//  而这一节只负责把 `shownDays` 裁成前 N 天。
 
 struct MessagesSection: View {
     private let store = AppStore.shared
@@ -41,7 +43,12 @@ struct MessagesSection: View {
     /// 227 行于是是一次性全建出来的。真机轨迹（2026-09-24 第五轮）：
     /// 0.97s 消息到手 → 2.01s 673 MB → 4.01s 1720 MB → 5.3s 被系统收走，
     /// 而同一份数据在别的档上一点事都没有。用户的原话：「点到出行界面就闪退」。
-    @State private var shownDays = messageDayStep
+    ///
+    ///  ⚠️ 2026-09-26：它从 `@State` 变成**绑定**—— 用户要求「事件也采用懒加载」
+    /// （与行程卡同一种做法：滑到底自己续，而不是点一下「再看早 N 天」）。
+    /// 续的那个动作住在宿主（`TripsEventsView.loadMoreEventDays`），
+    /// 因为滚动到没到底只有那一叠知道（`ArcStack.onReachBottom`）。
+    @Binding var shownDays: Int
 
     // 本地已读持久化（无服务端 mark-read 接口，用 UserDefaults 记已读消息 ID）。
     private static let readKey = "changan_read_message_ids"
@@ -112,12 +119,14 @@ struct MessagesSection: View {
                                 trailing: group.unread > 0 ? "\(group.unread) 未读" : "\(group.items.count) 条") {
                             ForEach(Array(group.items.enumerated()), id: \.element.id) { idx, item in
                                 messageRow(item, showsSeparator: idx < group.items.count - 1)
-                                    // 这一节是全部页面里最重的一张卡：它不在懒容器里，
-                                    // 于是 227 行是**一次性全建出来**的。真机轨迹
-                                    //（2026-09-24 第五轮）里，内存正是在消息到手之后开始
-                                    // 以每秒半 GB 的速度涨的。所以要在轨迹里留下
-                                    // 「最后一行到底画到了没有」—— 它重复出现也同样是信息
-                                    //（重复 = 这一卡被反复重建，而不是一次性的开销）。
+                                    // 这一叠是普通 `VStack`（`ArcStack`：懒容器量不到
+                                    // 叠卡的几何），所以**看得见的那几天是整段建出来的**
+                                    // —— 这正是 `shownDays` 存在的理由（一次三天，
+                                    // 往下滑再续三天）。真机轨迹（2026-09-24 第五轮）里，
+                                    // 内存正是在消息到手之后开始以每秒半 GB 的速度涨的，
+                                    // 所以要在轨迹里留下「最后一行到底画到了没有」——
+                                    // 它重复出现也同样是信息（重复 = 这一卡被反复重建，
+                                    // 而不是一次性的开销）。
                                     .onAppear {
                                         if item.id == filteredItems.last?.id {
                                             StartupJournal.shared.mark("消息列表画到最后一行")
@@ -127,15 +136,13 @@ struct MessagesSection: View {
                         }
                     }
                     if visibleGrouped.count < filteredGrouped.count {
-                        // 最近的那几天在上面；早的由人点开。理由同 `shownDays`：
-                        // 每一行都要在真机上建出来，而这一页就是这么被处决的。
+                        // 最近的那几天在上面；更早的**接着往下滑就出来**。
+                        // 这里原来是一枚「再看早 N 天」的按钮 —— 用户 2026-09-26：
+                        // 「事件也采用懒加载」。往下滑本身就是「我还要看」的证据，
+                        // 而按钮把同一个意图多问了一遍（与出行页那张卡同一条修正）。
                         DSGroup {
                             DSGroupRow(showsSeparator: false) {
-                                DSRow(icon: "arrow.down.circle",
-                                      title: "再看早 \(messageDayStep) 天") {
-                                    shownDays += messageDayStep
-                                    TokensHaptic.select()
-                                }
+                                moreDaysNote(filteredGrouped.count - visibleGrouped.count)
                             }
                         }
                     }
@@ -520,6 +527,22 @@ struct MessagesSection: View {
         let items: [MessageItem]
         let unread: Int
         let sortKey: String
+    }
+
+    /// 「往下滑，更早的接着出来」—— 与出行页那句是**同一种写法**：
+    /// 它是一句陈述（不是按钮），因为真正的续在宿主的 `onReachBottom` 里。
+    private func moreDaysNote(_ rest: Int) -> some View {
+        HStack(spacing: TokensSpacing.sm) {
+            Image(safeSymbol: "arrow.down.circle", fallback: "arrow.down.circle")
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.tertiary)
+            Text("往下滑，更早的 \(rest) 天接着出来")
+                .font(TokensTypo.footnote)
+                .foregroundStyle(TokensPalette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, TokensSpacing.snug)
     }
 
     private var filteredGrouped: [DayGroup] {

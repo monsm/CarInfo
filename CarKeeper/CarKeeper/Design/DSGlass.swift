@@ -38,17 +38,15 @@ import SwiftUI
 //  系统去演（按下去的压缩与折射变化）—— 自己用 `.scaleEffect` + `opacity` 模拟的
 //  那一套，永远差在「玻璃不被压」。
 //
-//  ⚠️ 2026-09-26（用户：「全局调整液态玻璃的通透度」）：`dsGlass` 从此还读
-//  `DisplaySettings` 的两格 —— 「用哪一档材质」与「更实那一档的 tint 多浓」。
-//  它们**不**是第四个参数：参数说的是「这一块玻璃压在什么上」（几何与内容），
-//  而那两格是**全 App 一致的观感**。把全局的偏好写成每个调用点都要传一遍的参数，
-//  等于把「一致」寄托在 12 个调用点都记得传对（那正是这一仓反复吃过的那种账）。
-//  于是入口仍然只有这一个，只是它现在多读两格设置。
+//  ⚠️ 2026-09-26（用户：「全局调整液态玻璃的通透度」）：`dsGlass` 曾经还读
+//  `DisplaySettings` 的两格；那一轮之后用户把话收紧了（「玻璃就默认选更透，
+//  删除默认对应的设置入口」），于是 `DSGlass.swift` 又回到**只读形状与交互**：
+//  材质固定 `.clear`，全局偏好这一层整个消失（见下面那一段）。
+//  入口仍然只有这一个 —— 12 个调用点写的是同一句话。
 //
 //  ⚠️ 这里不留 `ViewModifier` 包装类型（2026-09-25 删过一次）：`DSGlassSurface` /
-//  `DSGlassLayer` 只是搬运参数，而「搬运」不需要一个类型。`DSGlassVariant` 是 `dsGlass`
-//  的**参数类型**（调用点写 `.overMedia`，是隐式成员表达式）——
-//  「声明了却没有别人按名字提到」在 `scan/orphans.py` 眼里是孤儿，已在那边登记理由。
+//  `DSGlassLayer` 只是搬运参数，而「搬运」不需要一个类型。文件里现在**一个类型都没有**
+//  （`DSGlassVariant` 2026-09-26 随「更透」那一条一起删）—— 只有本文件自己的 `View` 扩展。
 //
 //  ⛔⛔ 2026-09-26 当天又试了一次包装类型，**把它拆掉了，别再试** ⛔⛔
 //
@@ -67,22 +65,30 @@ import SwiftUI
 //  也就是说：**把 `glassEffect` 从「泛型 `View` 的 body」里调用**，在 iOS 27.2 上会让
 //  运行时期解析那个扩展成员的元数据时无限递归。同一个调用从 `View` 扩展函数里发出
 //  （`Self` 在调用点已经是具体类型）一直好好的 —— 这就是现在这一版仍然长这样的原因。
-//  所以本文件**只有两个类型**：`DSGlassVariant`（参数）与本文件自己的 `View` 扩展。
+//  所以本文件**一个类型都没有**（`DSGlassVariant` 已于 2026-09-26 删）—— 只有 `View` 扩展。
 // =============================================================================
 
-/// 玻璃的两种取用，按**底下是什么**选，不按好看选。
-enum DSGlassVariant {
-    /// 底下是 App 自己的界面（卡片、列表、画布）—— 常规玻璃。
-    case regular
-    /// 底下是**连续的画面**（地图、照片）：`.clear` 让画面保持可见，
-    /// 只在边缘留一圈折射。文字多的控件别用它（对比度会跟着底下的画面走）。
-    case overMedia
-}
+//  ===========================================================================
+//  2026-09-26（第二轮）：材质只剩一档 —— 「更透」
+//  ===========================================================================
+//  用户这一轮定了两件事，合起来把上一轮那套「全局通透度」整个收掉：
+//    · 「玻璃就默认选更透」→ 材质一律 `.clear`（不再按底下是什么分两档）
+//    · 「删除默认对应的设置入口」→ `DisplaySettings.GlassLevel` 那三档、它那个
+//      分段控件、以及 `level` 这个键一起删；`.clear` 不再是「某一档设置」，
+//      而是**唯一的材质**。
+//  于是 `DSGlassVariant`（`.overMedia` / `.regular`）与 `dsGlass` 的 `variant:`
+//  参数一起删掉：一个永远被忽略的参数正是这一仓反复删的那类东西
+//  （「写进去了，没有任何读者」）。
+//
+//  ⚠️ 代价如实写在这里：`.clear` 不磨砂，卡里正文的对比度会跟着底下的照片走 ——
+//  而卡片是这一档最大的用户。HIG 的原话是 clear 留给「压在连续画面上」的控件。
+//  真机上若某张照片让某一行读不清，回退就是 `dsGlassMaterial` 里那一个词
+//  （`.clear` → `.regular`）。
+// ===========================================================================
 
 //  ===========================================================================
 //  「降低透明度」这一档由我们自己接
 //  ===========================================================================
-//
 //  用户 2026-09-26：「我把系统的液态玻璃变成了最不通透（辅助功能 → 显示与文字大小 →
 //  降低透明度），我们的 app 变成了这样，而相机的几乎没变 —— 你好好分析下相机的层结构」。
 //
@@ -107,7 +113,8 @@ enum DSGlassVariant {
 //  an enabled state.」*），不是它的一个镜像：镜像要多一个类型（上面那段刚记过代价）+
 //  一条挂在根上的写入。代价如实写着：这个值在**下一次求值**时才被读到 ——
 //  用户去设置里翻这个开关时 App 在后台，回来时这一屏本来就会重画（刷新节拍 / 场景激活），
-//  所以观感上是立刻生效的；真要「翻开关那一瞬间就重画」，得走 `DisplaySettings` 那条路。
+//  所以观感上是立刻生效的；真要「翻开关那一瞬间就重画」，得另接一条通知（那一档
+//  曾经挂在 `DisplaySettings` 上，而那份设置已随「更透 / 50%」两条一起删）。
 // ===========================================================================
 
 extension View {
@@ -116,7 +123,6 @@ extension View {
     /// - Parameters:
     ///   - shape: 玻璃的形状（`Capsule()` / `Circle()` / 圆角矩形）。形状是**物理**的一部分：
     ///     玻璃有厚度，形状决定光在哪儿拐弯。
-    ///   - variant: 按底下是什么选，见 `DSGlassVariant`。
     ///   - interactive: 这个表面可点就传 `true` —— 按下去的压缩与折射交给系统演，
     ///     别自己写 `.scaleEffect`（那只会让玻璃「硬」下去）。
     ///   - hairline: 要不要那圈发丝线。玻璃自己已经有边缘，多层叠在一起时少一圈更好。
@@ -134,7 +140,6 @@ extension View {
     /// 而不是上一版那个会崩的泛型 `View` 的 `body`（见文件头那段）。
     @ViewBuilder
     func dsGlass<S: InsettableShape>(in shape: S,
-                                     variant: DSGlassVariant = .regular,
                                      interactive: Bool = false,
                                      hairline: Bool = true) -> some View {
         if UIAccessibility.isReduceTransparencyEnabled {
@@ -149,7 +154,7 @@ extension View {
                     }
                 }
         } else {
-            glassEffect(dsGlassMaterial(variant: variant, interactive: interactive), in: shape)
+            glassEffect(dsGlassMaterial(interactive: interactive), in: shape)
                 .overlay {
                     if hairline {
                         shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
@@ -158,48 +163,30 @@ extension View {
         }
     }
 
-    /// 「用哪一档材质」的**唯一算法**：`DisplaySettings` 那两格 + `interactive`。
+    /// 材质只有一种：`.clear`（用户这一轮定的「更透」）。
     ///
-    /// 拆成一个函数只为一件事：上面那支是 `@ViewBuilder`，把 `let` + `switch` 那段
-    /// 计算摆在视图构建里，读的人得自己在脑里分两层（而且结果构建器的诊断会变糊）。
-    private func dsGlassMaterial(variant: DSGlassVariant, interactive: Bool) -> Glass {
-        let settings = DisplaySettings.shared
-        //  用户 2026-09-26：「全局调整液态玻璃的通透度」——设置里选的那一档
-        //  **盖过**「按底下是什么选」这条规矩（理由写在 `DisplaySettings.GlassLevel` 上：
-        //  一个全局开关按不同的地方给不同的结果，就不是一个全局开关）。
-        //  默认那一档是 `standard`，它走的正是这条规矩本身 —— 所以默认行为一字未改。
-        let base: Glass
-        switch settings.level {
-        case .clear: base = .clear
-        case .standard: base = variant == .overMedia ? .clear : .regular
-        case .solid: base = .regular
-        }
-        // 「更实」那一档加一层**材质自己的** tint：那正是系统给的「同一档材质更实」
-        // 的形态（`Glass.tint(_:)`），而**不是**在玻璃底下垫一块面 —— 垫面会把材质
-        // 本身挡掉，那件事 `scan/glass.py` 的判据 ③ 正在拦。
-        // 浓淡跟着「界面实度」一起走：两块调节钮说的是同一件观感，就不该各调各的。
-        let tuned: Glass = settings.level == .solid
-            ? base.tint(TokensPalette.surface.opacity(0.35 * settings.fill))
-            : base
+    /// 它不再是「一个开关的某一档」—— `DisplaySettings` 整份已删，所以这里
+    /// 没有可读的设置。`interactive` 仍然要在这里合进去：`.interactive(true)`
+    /// 是 `Glass` 自己的方法，而调用点传的是一个 `Bool`。
+    private func dsGlassMaterial(interactive: Bool) -> Glass {
+        let base: Glass = .clear
         // 写成 `interactive(true)` 而不是 `interactive()`：文档里那个默认值
         // （`_ isEnabled: Bool = true`）在 fragments 里看不到，写死实参就与它无关了。
-        return interactive ? tuned.interactive(true) : tuned
+        return interactive ? base.interactive(true) : base
     }
 
     /// 常用形状的便捷写法（胶囊：按钮 / 芯片 / 条子）
-    func dsGlassCapsule(variant: DSGlassVariant = .regular,
-                        interactive: Bool = false,
+    func dsGlassCapsule(interactive: Bool = false,
                         hairline: Bool = true) -> some View {
-        dsGlass(in: Capsule(), variant: variant, interactive: interactive, hairline: hairline)
+        dsGlass(in: Capsule(), interactive: interactive, hairline: hairline)
     }
 
     /// 常用形状的便捷写法（圆角矩形：轻提示 / 面板）
     func dsGlassRounded(_ radius: CGFloat = TokensRadius.large,
-                        variant: DSGlassVariant = .regular,
                         interactive: Bool = false,
                         hairline: Bool = true) -> some View {
         dsGlass(in: RoundedRectangle(cornerRadius: radius, style: .continuous),
-                variant: variant, interactive: interactive, hairline: hairline)
+                interactive: interactive, hairline: hairline)
     }
 
     // =========================================================================
