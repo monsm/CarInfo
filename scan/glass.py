@@ -28,6 +28,11 @@ glass.py —— 「玻璃只有一个人说了算」
   ③ **玻璃底下不许垫不透明的面**：同一条链里，`.fill(TokensPalette.…)` /
      `.background(TokensPalette.…)` 出现在 `.dsGlass` **之前**就报红。
      （玻璃之后的不算 —— `.dsGlass(...).overlay { … }` 盖在玻璃**上面**是正当的。）
+
+     ⚠️ 2026-09-26：`.clear` 那一支**自己**会在玻璃之下垫一层**半透明**的对比底
+     （Apple 的 dimming layer / `TokensPalette.glassDim`：亮色下白 35%、暗色下黑 35% ——
+     原文见那个令牌上的引文）。它住在唯一入口里面，调用点不各自垫面，
+     只传一个倍率（`dim:`）—— 所以本条一字未改：任何「调用点垫的面」仍然是红的。
   ④ 不许再引入旧材质语言（`ultraThinMaterial` / `regularMaterial` …）：那是
      Liquid Glass 之前的写法，两套材质语言同时在仓里，就没有一套是准的。
 

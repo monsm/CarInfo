@@ -18,6 +18,138 @@ import SwiftUI
 //  它们在骨架里的注释写明了为什么。
 // =============================================================================
 
+// =============================================================================
+//  MapNowDrawer —— 抽屉的**连续那一半**（跟手拖出来的那一段）
+// =============================================================================
+//
+//  用户 2026-09-26 第 2 条：「抽屉太别扭了，原生有没有这种可以展开的，系统地图里面
+//  原生用的啥？你做的拖动的时候闪屏频闪」。三句分别对应三件事：
+//
+//   ① **原生用什么**（先回答，因为它决定了下面这一版的做法）：Apple 地图/查找/股市
+//      里那种「一直挂在下面、能拉高拉低」的卡是 `UISheetPresentationController`，
+//      SwiftUI 里同一台机器叫 `.sheet` + `.presentationDetents([...], selection:)`
+//      （`isPresented: .constant(true)` + `interactiveDismissDisabled()` 让它常驻，
+//      `presentationBackgroundInteraction(.enabled(upThrough:))` 让底下的地图还能用）。
+//      —— 跟手、动量、吸附、橡皮筋、VoiceOver 的收起/展开全是系统做的。
+//   ② **我们为什么不用它**（这不是取舍，是几何上装不下）：系统 sheet 永远是
+//      **窗口底部**的一张面，而这一屏底部是我们自己的入口条（全局导航）。
+//      sheet 会直接盖住它 —— 与 `MapSpineReadouts` 头注里第二代写法（那个 sheet）
+//      被删掉的是同一个理由，只是那一次盖住的是模式条。
+//   ③ **频闪的根因**（这一版真正修的）：连续量此前是 `MapSpineView` 的 `@State`，
+//      而拖动是**每帧**写它 —— 于是 `MapSpineView.body` 每帧重建一次，
+//      而那个 body 里有六页同屏、一张活地图、一条轨迹、底条……
+//      一帧一屏地重建就是用户看到的频闪。状态挪进本视图之后，
+//      一帧里重画的只有这张卡（页面、底条、地图都不再跟着动）。
+//
+//  ⚠️ 它只多收一个 `@State` 家族（`reveal` / `bodyHeight`），不多一个事实：
+//  「拉开多少」仍然只有一个出处，而「记住的那一档」仍然是骨架里那个持久化键。
+// =============================================================================
+
+/// 卡头拿到的那几个把手（只有 `MapNowDrawer` 会造它）。
+///
+/// 为什么不是一个闭包：卡头那份代码（`MapSpineReadouts`）要同时做四件事 ——
+/// 读连续量画拉手、点一下换端点、跟手拖动、报无障碍的收起/展开。
+/// 一个结构体把「这一件事需要的那几个入口」一次交清，比四个参数各自传递好读，
+/// 也比把那段手势搬进本文件好 —— 手势的注释与读数住在同一份文件里。
+struct DrawerHandle {
+    /// 连续量 0…1（跟手拖出来的那一段）。**唯一写点是拖动与落点。**
+    let reveal: Binding<CGFloat>
+    /// 正文的自然高度（跟手时的分母；还没量到时是 0）。
+    let height: CGFloat
+    /// 当前那一档（画无障碍值、算拖动的基准）。
+    let open: Bool
+    /// 点一下拉手：换一个端点。
+    let toggle: () -> Void
+    /// 拖动松手：落到某个端点。
+    let land: (_ open: Bool) -> Void
+}
+
+struct MapNowDrawer<Head: View, Content: View>: View {
+    /// 记住的那一档（持久化在骨架里，`MapSpineView.drawerKey`）。
+    @Binding var open: Bool
+    private let head: (DrawerHandle) -> Head
+    private let content: () -> Content
+
+    /// 拉开多少（0…1）。**只有这个视图读它** —— 这是频闪修好的地方（见头注③）。
+    @State private var reveal: CGFloat = 0
+    /// 正文的自然高度（量出来的，见 `measure`）。
+    @State private var bodyHeight: CGFloat = 0
+
+    init(open: Binding<Bool>,
+         @ViewBuilder head: @escaping (DrawerHandle) -> Head,
+         @ViewBuilder content: @escaping () -> Content) {
+        _open = open
+        self.head = head
+        self.content = content
+    }
+
+    var body: some View {
+        GlassCard(accent: HomeMode.now.accent) {
+            VStack(alignment: .leading, spacing: 0) {
+                head(handle)
+                //  抽屉的正文：**它的高度就是手指走出来的那一段**
+                //（`reveal` 0…1 × 正文的自然高度）。`clipped()` 是必须的：
+                //  正文的高度被压着，没它就会画出卡外。
+                if reveal > 0.001 {
+                    content()
+                        .frame(height: max(0, bodyHeight * reveal), alignment: .top)
+                        .clipped()
+                }
+            }
+            .background(alignment: .top) { measure }
+        }
+        //  记住的那一档：拉出来过就还是拉出来的。**动画不出现在这里** ——
+        //  启动那一下应该就是那个样子，不是「从收起长出来」。
+        .onAppear { reveal = open ? 1 : 0 }
+        //  外部改了那一档（换图层那一下会自动拉出来、或从设置里回来时读回持久化的值）：
+        //  这里补上那一段动画。跟手那一下自己管自己的落点（`land`），走不到这里。
+        .onChange(of: open) { _, want in
+            guard (want ? 1 : 0) != reveal else { return }
+            withAnimation(TokensMotion.value) { reveal = want ? 1 : 0 }
+        }
+    }
+
+    /// 交给卡头的那几个入口（每帧重建一次，所以 `height` 与 `open` 都是当拍的）。
+    private var handle: DrawerHandle {
+        DrawerHandle(reveal: $reveal,
+                     height: bodyHeight,
+                     open: open,
+                     toggle: { land(!open) },
+                     land: { land($0) })
+    }
+
+    /// 落到某一个端点 —— **唯一的写点**（拉手点一下、拖动松手、外部改档都归它）。
+    ///
+    /// 它**不能再守「open 与目标相同就不动」**：跟手拖到一半松手时，目标可能与
+    /// 当前档相同（拉到 40% 又放回去）—— 而那个中间位置必须归位。
+    /// 触觉不在这里：点击与拖动各有自己的手感，谁也不该替谁发。
+    private func land(_ next: Bool) {
+        withAnimation(TokensMotion.value) {
+            open = next
+            reveal = next ? 1 : 0
+        }
+    }
+
+    /// 量一遍正文的**自然高度** —— 跟手时的分母（手指走多少 = 拉开多少）。
+    ///
+    /// 它住在 `background` 里：背景不参与父视图的排版，所以这一份既不占位、
+    /// 也不出现在版面上（`.hidden()` 连绘制都省了，但它仍然参与布局）。
+    /// ⚠️ 它**总是**建着（不只是拉开的时候）：拉开的第一帧就有分母 ——
+    /// 否则高度会先从 0 跳到真值，跟手那一下会先闪一格。
+    private var measure: some View {
+        content()
+            .background {
+                GeometryReader { g in
+                    Color.clear
+                        .onAppear { bodyHeight = g.size.height }
+                        .onChange(of: g.size.height) { _, h in bodyHeight = h }
+                }
+            }
+            .hidden()
+            .allowsHitTesting(false)
+    }
+}
+
 extension MapSpineView {
 
     // =========================================================================
@@ -41,41 +173,15 @@ extension MapSpineView {
         //  ⚠️ 它此前还给 `GlassCard` 传一个 `frosted: drawerOpen`（收起不磨砂 /
         //  拉出磨砂）—— 那一个参数随「玻璃默认更透」一起删了（用户 2026-09-26：
         //  「玻璃就默认选更透」），现在全 App 的玻璃只有一档材质（见 `DSGlass.swift`）。
-        GlassCard(accent: HomeMode.now.accent) {
-            VStack(alignment: .leading, spacing: 0) {
-                drawerHead(d)
-                //  抽屉的正文：**它的高度就是手指走出来的那一段**
-                //（`drawerReveal` 0…1 × 正文的自然高度）。
-                //  用户 2026-09-26：「抽屉和原版地图的抽屉不一样，原版支持跟手抽出，
-                //  现在的只支持点击抽出」—— 于是两态之间那一段也真实存在了。
-                //  `clipped()` 是必须的：正文的高度被压着，没它就会画出卡外。
-                if drawerReveal > 0.001 {
-                    drawerContent(d)
-                        .frame(height: drawerBodyHeight * drawerReveal, alignment: .top)
-                        .clipped()
-                }
-            }
-            //  量一遍正文的**自然高度** —— 跟手时的分母（手指走多少 = 拉开多少）。
-            //  它住在 `background` 里：背景不参与父视图的排版，所以这一份既不占位、
-            //  也不出现在版面上（`.hidden()` 连绘制都省了，但它仍然参与布局）。
-            //  ⚠️ 它**总是**建着（不只是拉开的时候）：拉开的第一帧就有分母 ——
-            //  否则高度会先从 0 跳到真值，跟手那一下会先闪一格。
-            .background(alignment: .top) {
-                drawerContent(d)
-                    .background {
-                        GeometryReader { g in
-                            Color.clear
-                                .onAppear { drawerBodyHeight = g.size.height }
-                                .onChange(of: g.size.height) { _, h in drawerBodyHeight = h }
-                        }
-                    }
-                    .hidden()
-                    .allowsHitTesting(false)
-            }
+        //
+        //  ⚠️ 2026-09-26（用户第 2 条：「你做的拖动的时候闪屏频闪」）：外壳换成
+        //  `MapNowDrawer` —— 连续量住进那个视图（理由写在它头注里）。
+        //  这里只剩「头是什么、正文是什么」两句。
+        MapNowDrawer(open: $drawerOpen) { handle in
+            drawerHead(d, handle: handle)
+        } content: {
+            drawerContent(d)
         }
-        //  记住的那一档：拉出来过就还是拉出来的（`drawerOpen` 是持久化的设备键）。
-        //  **动画不出现在这里**：启动那一下应该就是那个样子，不是「从收起长出来」。
-        .onAppear { drawerReveal = drawerOpen ? 1 : 0 }
     }
 
     /// 抽屉拉出来之后的正文。**`switch` 在这里**：图层是本屏的状态（`layer`），

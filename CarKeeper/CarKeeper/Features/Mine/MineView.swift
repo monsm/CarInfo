@@ -297,49 +297,40 @@ struct MineView: View {
     private var wallpaperRow: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             // 图源：相册自选 / 必应每日 / Windows 聚焦。
-            // 这是 iOS 设置的「值选择器」行（标签左、值右）—— 与上面夜间模式那一行同形。
             // 三条里相册那条不联网；另外两条是免密钥的公开取图口，每天自动换一张。
             //
-            //  ⚠️ 2026-09-26：这里是**我们自己写的菜单**，不再是 `Picker(.menu)`。
-            //  用户报的原话：「选了必应后可下拉继续选其他，但是选了 Windows 聚焦
-            //  就无法再下拉选其他了」。本机没法复现（没有编译器、也没有那台设备），
-            //  所以修的不是某一条已知的机制，而是**换掉那个人称坏掉的控制**：
-            //  这一页另外两处菜单（地图的图层胶囊、底条右臂）用的就是下面这种 `Menu`
-            //  + `Label(…, systemImage: 勾/圈)`，两个都从没被报过打不开。
-            //  另加一条：选**同一档**不再是「什么都不发生」—— 它变成「再取一次」
-            //  （`reload`），于是即使某一档曾经卡住，它也不再是一个死路口。
+            //  ⚠️ 2026-09-26 第一次改：从 `Picker(.menu)` 换成自己写的 `Menu`。
+            //  起因是用户报「选了 Windows 聚焦就无法再下拉选其他了」。
+            //
+            //  ⚠️⚠️ 同一天第二次改（同一句话没修好）：用户补了更完整的复现 ——
+            //  「图源不换页面的情况下可以一直换，但是换了其他页面回来，如果上次是
+            //   windows 聚焦，那就再也点不动，重开软件都不行，只能点不铺，再重新选」。
+            //  两个事实加起来把嫌疑从**那一档**移到了**那一下弹窗**：
+            //    · 「重开软件都不行」= 状态是持久的（`source` 落盘）——所以不是某一次
+            //      手势丢了，而是「一进来就是这个样子」；
+            //    · 「只能点不铺」= 同一张卡里别的按钮还能按 ——所以不是整片被挡住。
+            //  两次换的都是**弹窗**（先是系统的 `Picker` 菜单，后是自己写的 `Menu`）。
+            //  本机没有编译器、也没有那台设备，这个机制我复现不了 —— 所以这一版
+            //  **不再依赖「弹窗能不能打开」**：三个选项直接**摆在行里**，一下就是一下
+            //  （分段控件是系统控件里对「三道门」这件事的标准答案：没有第四种东西
+            //  要弹出来，也就没有「弹不出来」这回事）。
+            //
+            //  代价写在这里：段名只能短（一行装不下三个全名），所以全名留在上面那一行
+            //  的当前值里，而「它是什么」在下面那行说明里（`note`）。
             HStack {
                 Text("背景图")
                     .font(TokensTypo.body)
                     .foregroundStyle(TokensPalette.primary)
                 Spacer(minLength: TokensSpacing.sm)
-                Menu {
-                    ForEach(WallpaperSource.allCases) { s in
-                        Button {
-                            TokensHaptic.select()
-                            if s == wallpaper.source {
-                                wallpaper.reload()
-                            } else {
-                                wallpaper.use(s)
-                            }
-                        } label: {
-                            Label(s.title,
-                                  systemImage: s == wallpaper.source ? "checkmark.circle.fill" : "circle")
-                        }
-                    }
-                } label: {
-                    HStack(spacing: TokensSpacing.xs) {
-                        Text(wallpaper.source.title)
-                            .font(TokensTypo.body)
-                        Image(safeSymbol: "chevron.up.chevron.down", fallback: "chevron.down")
-                            .font(TokensTypo.micro)
-                    }
-                    .foregroundStyle(TokensPalette.accent)
-                }
-                .accessibilityLabel(Text("背景图：\(wallpaper.source.title)"))
-                .accessibilityHint(Text("点开换一种背景来源；已经是这一档时再选一次 = 重新取图"))
+                Text(wallpaper.source.title)
+                    .font(TokensTypo.body)
+                    .foregroundStyle(TokensPalette.secondary)
             }
             .frame(minHeight: TokensSpacing.row)
+            DSSegmented(options: WallpaperSource.allCases.map { (value: $0, title: $0.segmentTitle) },
+                        selection: Binding(get: { wallpaper.source },
+                                           set: { pickSource($0) }))
+                .accessibilityLabel(Text("背景图来源"))
 
             // 缩略图：铺的就是这一张。没图（没选 / 没取到 / 点了「不铺」）画占位。
             Group {
@@ -445,6 +436,14 @@ struct MineView: View {
                 wallpaperPickItem = nil
             }
         }
+    }
+
+    /// 选一档图源。**已经是这一档时**不是「什么都不发生」—— 那是「再取一次」
+    /// （分段控件会把同一个值再写一次，所以「点当前那一档」自然走到这里）。
+    /// 用户第 1 条那句「只能点不铺，再重新选」的另一面就是这个：这一行不该有死路口。
+    private func pickSource(_ s: WallpaperSource) {
+        TokensHaptic.select()
+        if s == wallpaper.source { wallpaper.reload() } else { wallpaper.use(s) }
     }
 
     /// 退出登录。`logout()` 一直存在，但**没有任何按钮调它** —— 它是一段到不了的代码。

@@ -130,13 +130,11 @@ struct MapSpineView: View {
     ///  键名只一个出处，`@AppStorage` 里写字面量是这一层唯一被重复过的那种写法。
     @AppStorage(MapSpineView.drawerKey) var drawerOpen = false
 
-    /// 抽屉的**连续**位置（0 = 收起，1 = 拉出）—— 跟手拖出来的就是它。
-    /// 用户 2026-09-26：「原版支持跟手抽出，现在的只支持点击抽出」。
-    /// **不是 `private`**：拉手与拖动住在 `MapSpineReadouts.swift`，卡片在
-    /// `MapNowCard.swift`（与 `drawerOpen` 同一条理由：作用域是文件）。
-    @State var drawerReveal: CGFloat = 0
-    /// 抽屉正文的**自然高度**（`MapNowCard` 量出来的）—— 跟手时的分母。
-    @State var drawerBodyHeight: CGFloat = 0
+    //  ⚠️ 2026-09-26（用户第 2 条：「你做的拖动的时候闪屏频闪」）：那两个连续量
+    //  （`drawerReveal` / `drawerBodyHeight`）**已从这一屏挤出去**，住进了
+    //  `MapNowDrawer`（见那一份头注的③）。原因就是频闪：拖动是**每帧**写它们，
+    //  而它们住在这里时毎帧重建的是**整个** body —— 六页同屏、一张活地图、
+    //  一条轨迹、底条。现在这一屏只读那个离散的 `drawerOpen`。
 
     /// 这一趟开过的路（用户 2026-09-26：「车动起来后在地图页画出行驶轨迹……
     /// 直至车辆熄火」）。**订阅它**：轨迹点是每次定位异步落进来的，不订阅不会重画。
@@ -420,7 +418,8 @@ struct MapSpineView: View {
             TokensHaptic.select()
             // 选了一层就把抽屉拉出来：**选层这个动作本身就是「我要看这一层的数据」**，
             // 而收起态里只有那三个数 —— 不拉出来会看起来像「换了层却什么都没发生」。
-            setDrawer(open: true)
+            //  只改那一档：跟手那一段由 `MapNowDrawer` 自己动（它盯着这个值）。
+            drawerOpen = true
             if LaunchFence.mapFetches && new == .charge { Task { await searchChargersIfNeeded() } }
         }
         //  这里原本有两条**为自量比例尺服务**的回调：`.onChange(of: camera) { flashScale() }`

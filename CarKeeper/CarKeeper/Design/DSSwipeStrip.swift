@@ -489,9 +489,13 @@ struct DSSwipeStrip: View {
         //    · 第三代数层自画的伪玻璃（底渐变 / 边 / 影子）—— 质感仍差得远（用户）。
         //
         //  阴影不另加：系统玻璃自带边缘与投影，再加一层就是两层影子。
+        //  `dim: 0` —— 它是全 App 唯一一块**坐在我们自己画的面（`band`）上**的玻璃。
+        //  Apple 的判据不是「好不好看」，是「底下的内容够不够暗」（见
+        //  `TokensPalette.glassDim` 那段原文）：这里底下就是那条带子，
+        //  再加一层对比底等于把同一件事做两遍（亮色下会白上加白）。
         return Color.clear
             .frame(width: w, height: loupeHeight)
-            .dsGlass(in: shape, interactive: false)
+            .dsGlass(in: shape, interactive: false, dim: 0)
             .opacity(loupeVisible ? 1 : 0)
             .animation(TokensMotion.fade, value: loupeVisible)
             //  拖动时长到满行高（相机量到 40 → 47pt，0.86 → 1.0 × 带高）。

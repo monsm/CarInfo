@@ -51,6 +51,20 @@ enum WallpaperSource: String, CaseIterable, Identifiable {
         }
     }
 
+    /// 分段控件里那一段的名字。
+    ///
+    /// **必须是短的**：三个段挤在同一行，全名（`title`）在那里装不下 ——
+    /// 2026-09-26 用户第 1 条之后，图源不再是一个弹窗，而是行里那三格（见
+    /// `MineView.wallpaperRow` 那段说明：弹窗两次出过「打不开」的毛病）。
+    /// 全名留在那一行的当前值里与无障碍标签里，所以两个名字都有读者。
+    var segmentTitle: String {
+        switch self {
+        case .photo: return "相册"
+        case .bing: return "必应"
+        case .spotlight: return "聚焦"
+        }
+    }
+
     /// 一句话说清它是什么（设置行里那行小字）。不出现实现词。
     var note: String {
         switch self {

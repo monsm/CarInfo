@@ -82,8 +82,17 @@ import SwiftUI
 //
 //  ⚠️ 代价如实写在这里：`.clear` 不磨砂，卡里正文的对比度会跟着底下的照片走 ——
 //  而卡片是这一档最大的用户。HIG 的原话是 clear 留给「压在连续画面上」的控件。
-//  真机上若某张照片让某一行读不清，回退就是 `dsGlassMaterial` 里那一个词
-//  （`.clear` → `.regular`）。
+//
+//  ⚠️⚠️ 2026-09-26（用户第 3 条：「玻璃通透的情况下，文字怎么能看得清，苹果官方
+//  是怎么解决的」）：**官方有明文答案，不是二选一** —— `clear` 自己不带任何保证，
+//  保证来自它**底下那一层**（dimming layer）。原文见 `TokensPalette.glassDim`
+//  上那一段（HIG「Materials」+ `Glass.clear` 文档，两处同一句话：亮底加 35% 暗层，
+//  底已经够暗就不用加）。
+//  于是 `dsGlass` 在这一版多做了**一件事**：`.clear` 那一支在玻璃**之下**垫一层对比底
+//  （`.background` 挂在 `.glassEffect` 之后 —— 与官方样例逐字同一个顺序）。
+//  它仍然只有一个入口：调用点不各自垫面，只决定要不要（`dim:`），
+//  因为「底下已经有自己画的面」只有调用点知道（底条那三块坐在 `barFill` 上，传 0）。
+//  回退仍然是那一个词（`.clear` → `.regular`：磨砂 + 调亮度，官方给「文字多」的那一支）。
 // ===========================================================================
 
 //  ===========================================================================
@@ -138,10 +147,15 @@ extension View {
     /// in its body do not have matching underlying types"）。
     /// 再加一层保险：这一支是**函数**（`Self` 在调用点已是具体类型），
     /// 而不是上一版那个会崩的泛型 `View` 的 `body`（见文件头那段）。
+    /// - Parameter dim: 对比底的不透明度倍率（`TokensPalette.glassDim` × 它）。
+    ///   默认 `1` = 令牌那一档（亮色下白 35% / 暗色下黑 35%）。
+    ///   传 `0` 只有当**底下已经有我们自己画的面**时才对（底条那三块坐在 `barFill` 上）——
+    ///   官方的判据不是「要不要好看」，是「底下的内容够不够暗」（见令牌那段原文）。
     @ViewBuilder
     func dsGlass<S: InsettableShape>(in shape: S,
                                      interactive: Bool = false,
-                                     hairline: Bool = true) -> some View {
+                                     hairline: Bool = true,
+                                     dim: Double = 1) -> some View {
         if UIAccessibility.isReduceTransparencyEnabled {
             //  「降低透明度」那一档：一块**不透明**的面色 + 同一圈发丝线（理由见文件上部）。
             //  发丝线留着：它是「这里有一块玻璃」这句话在无障碍那一档下的替身 ——
@@ -155,6 +169,14 @@ extension View {
                 }
         } else {
             glassEffect(dsGlassMaterial(interactive: interactive), in: shape)
+                //  对比底：在玻璃**之下**（`.background` 挂在 `.glassEffect` 之后 ——
+                //  与 `Glass.clear` 文档里那个写法逐字同一个顺序）。
+                //  这一层也跟着形状走（`shape.fill`），所以它不会溢出玻璃的边。
+                .background {
+                    if dim > 0 {
+                        shape.fill(TokensPalette.glassDim.opacity(dim))
+                    }
+                }
                 .overlay {
                     if hairline {
                         shape.strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
@@ -177,16 +199,18 @@ extension View {
 
     /// 常用形状的便捷写法（胶囊：按钮 / 芯片 / 条子）
     func dsGlassCapsule(interactive: Bool = false,
-                        hairline: Bool = true) -> some View {
-        dsGlass(in: Capsule(), interactive: interactive, hairline: hairline)
+                        hairline: Bool = true,
+                        dim: Double = 1) -> some View {
+        dsGlass(in: Capsule(), interactive: interactive, hairline: hairline, dim: dim)
     }
 
     /// 常用形状的便捷写法（圆角矩形：轻提示 / 面板）
     func dsGlassRounded(_ radius: CGFloat = TokensRadius.large,
                         interactive: Bool = false,
-                        hairline: Bool = true) -> some View {
+                        hairline: Bool = true,
+                        dim: Double = 1) -> some View {
         dsGlass(in: RoundedRectangle(cornerRadius: radius, style: .continuous),
-                interactive: interactive, hairline: hairline)
+                interactive: interactive, hairline: hairline, dim: dim)
     }
 
     // =========================================================================

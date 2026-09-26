@@ -3100,3 +3100,125 @@ padding 的全部理由。
 只有真机能验：图源菜单四档都能拉开（第 1 条那件事本机复现不了）；轨迹那条线在真开的路上
 是什么形状（模拟只给形状，不给“它真的在记”）；2D 下车钉落在带子里的位置
 （`MapCameraFollow.spanFactor` 那根回退线）；抽屉跟手的手感；以及 `.clear` 下卡片正文的对比度。
+
+---
+
+## §36 第二十八轮（2026-09-26）：图源不再走弹窗、抽屉的频闪找到根因、
+玻璃上的字按官方的 dimming layer 解决
+
+用户三条：图源第三次报同一个毛病（这次给了完整复现）、抽屉“别扭 + 闪屏频闪”
+并直接问「系统地图里原生用的啥」、以及「玻璃通透的情况下文字怎么能看得清，
+苹果官方是怎么解决的」。第三条是一个**要引文的问题**，所以下面全带原文出处。
+
+### 36.1 图源：两代弹窗都被同一个毛病否掉，于是不弹了（第 1 条）
+
+用户这次的复现是完整的，两条线索各指向一个方向：
+
+> 「图源不换页面的情况下可以一直换，但是换了其他页面回来，如果上次是 windows 聚焦，
+>  那就再也点不动，重开软件都不行，只能点不铺，再重新选」
+
+· 「重开软件都不行」→ 状态是**持久的**（`source` 落盘在 `carkeeper_wallpaper_source`），
+  所以不是某一次手势丢了，而是「一进来就是这个样子」；
+· 「只能点不铺」→ 同一张卡里别的按钮还能按，所以不是整片被挡住。
+
+而**两代写法都被同一个毛病否掉过**：先是系统的 `Picker(.menu)`，后是自己写的 `Menu`
+（§35.1）。两次换个的都是**弹窗**，两次坏的都是**弹窗打不开**。本机没有编译器、
+也没有那台设备，这个机制我复现不了 —— 所以这一版把依赖换掉：
+三个选项**直接摆在行里**（`DSSegmented`），没有第四种东西要弹出来，
+也就没有「弹不出来」这回事。
+
+· 行的排版：上「背景图 + 当前全名」，中三格（相册 / 必应 / 聚焦），下是说明与署名。
+  段名短是因为一行装不下三个全名（`WallpaperSource.segmentTitle`），全名留在上面那一行。
+· 点**当前那一档**仍然是「再取一次」（`MineView.pickSource`）：分段控件会把同一个值
+  再写一次，所以「点当前那一档」自然走到 `reload()` —— 那一行没有死路口。
+
+诚实的账：如果真因不是「弹窗」而是**那一格位置的命中**，那么换成行里的控件之后
+它同样会坏（只是不再是“弹窗打不开”）。所以这一条要真机上再确认一次 ——
+它是这一轮唯一**没被证伪也不能被证明**的一件。
+
+### 36.2 抽屉：原生是什么、我们为什么不能用它、频闪的真因（第 2 条）
+
+**原生是什么**（用户问的那一句）：Apple 地图 / 查找 / 股市 里那种「常挂在下面、
+能拉高拉低」的卡是 `UISheetPresentationController`；SwiftUI 里同一台机器叫
+`.sheet` + `.presentationDetents([...], selection:)`，常驻靠 `isPresented: .constant(true)`
++ `interactiveDismissDisabled()`，底下的地图仍可用靠
+`presentationBackgroundInteraction(.enabled(upThrough:))`（Apple 文档：
+*presentationBackgroundInteraction(_:)* —— “On many platforms, SwiftUI automatically
+disables the view behind a sheet”）。跟手、动量、吸附、橡皮筋、VoiceOver 的
+收起/展开**全是系统做的**。
+
+**我们为什么不用它**：这不是取舍，是几何装不下 —— 系统 sheet 永远是**窗口底部**的
+一张面，而这一屏底部是我们自己的入口条（全站唯一的导航）。sheet 会直接盖住它，
+与 `MapSpineReadouts` 头注里第二代写法（那个 sheet）被删是同一个理由，
+只是那一次盖住的是模式条。所以「借系统那台机器」在这里做不到，
+能借的是它**做对的那几件事**（连续跟手 + 单一落点规矩），而它们在四代之前就有了。
+
+**频闪的真因**（这一版真正修的）：连续量（`drawerReveal` / `drawerBodyHeight`）此前是
+`MapSpineView` 的 `@State`，而拖动是**每帧**写它 —— 于是 `MapSpineView.body`
+每帧重建一次，而那个 body 里有六页同屏、一张活地图、一条轨迹、底条。
+一帧一屏地重建就是用户看到的那阵闪。两处改：
+
+① **状态挪进它自己那个视图**（新 `MapNowDrawer`，`MapNowCard.swift`）：一帧里重画的只剩
+   这张卡。骨架那一屏只剩那个**离散**的 `drawerOpen`（持久化键）。
+   卡头（`MapSpineReadouts`）与外壳之间用一个 `DrawerHandle` 交接：连续量、当拍高度、
+   当前档、点一下、落到某个端点 —— 手势的注释与读数因此仍住在同一份文件里。
+② **`highPriorityGesture`**（原来是 `.gesture`）：拉手坐在一个**可滚动**的叠里，
+   两者同时认领同一根竖手指时会互相抢 —— 手指走一段、内容往下滚一段，
+   一抢一放就是那阵闪的另一半。优先级给了拉手（这一格竖着走就是拉抽屉）。
+
+顺手加的一条：`onChanged` 里**只在值真变了才写**（手势系统会把同一个回调重复递几次），
+以及拖动落点仍照老规矩（先看位置，没过一半才看那一甩）。
+
+### 36.3 玻璃上的字：官方有明文答案 —— dimming layer（第 3 条）
+
+两处原文，同一句话：
+
+· **HIG「Materials」**（元数据里 `alert-text: “Updated guidance for Liquid Glass.”`）：
+  *“For optimal contrast and legibility, determine whether to add a **dimming layer**
+  behind components with clear Liquid Glass: If the underlying content is bright,
+  consider adding a **dark dimming layer of 35% opacity** … If the underlying content
+  is sufficiently dark … you don’t need to apply a dimming layer.”*
+· **`Glass.clear` 的文档**：*“When using clear glass, ensure content remains legible by
+  adding a dimming layer or other treatment beneath the glass. For example, you could
+  add a transparent black color beneath your glass …”*，样例代码是
+  `Label(“Flag”, …).padding().glassEffect(.clear).background(.black.opacity(0.3))`。
+
+所以「通透」与「字读得出来」**不是二选一**：`.clear` 自己不带任何保证，
+保证来自它**底下那一层** —— 而那一层是同一个 `.clear` 的**配套件**，不是它的替代品。
+
+落法：新令牌 `TokensPalette.glassDim`（亮色下白 35% / 暗色下黑 35%），
+由 `dsGlass` 在玻璃**之下**垫（`.background` 挂在 `.glassEffect` 之后 —— 与官方样例
+逐字同一个顺序），调用点只传一个倍率 `dim:`。三处决定：
+
+· **颜色取「与字反相」**：官方那个例子的字是白的（媒体控件），所以垫黑；
+  我们这一仓的字是自适应的（亮色下近黑、暗色下纯白）—— 垫黑会在亮色模式下把黑字埋掉。
+· **35% 用的是他给的数**（亮色下白 35% 比黑 35% 更“奶”一点，那是「更透」与
+  「字读得出来」之间那一步的价钱）；`dim` 参数默认 1，**只有底条那一枚**传 0 ——
+  它是全 App 唯一一块坐在我们自己画的面上（`barFill`）的玻璃，垫了就是同一件事做两遍。
+· 「降低透明度」那一档一字未改：它本来就走不透明 `surface` 那条支路（没有材质，也就不用垫）。
+
+**更重的一条（官方另一句话，本轮没动）**：同一页 HIG 写着
+*“Don’t use Liquid Glass in the content layer.”* —— Liquid Glass 是**功能层**的语言
+（导航与控件），而内容层的表面该用 standard materials；而
+*“Use the regular variant when background content might create legibility issues, or when
+components have a significant amount of text, such as alerts, sidebars, or popovers”*。
+我们那几百处读数就在**内容层**，且属于「文字很多」那一类 —— 按官方的分法，
+它们本来该是 `.regular`（磨砂 + 调亮度）或标准材质，而不是 `.clear` + 对比底。
+本轮按用户上一轮的吩咐把材质定死在 `.clear`，所以只落了 dimming layer；
+要改的只是一个词（`dsGlassMaterial` 里的 `.clear` → `.regular`），代价与收益都写在
+`DSGlass.swift` 那段注释里。
+
+### 36.4 验证
+
+`scan/all.py` **34/34 全绿**。`scan/glass.py` 的规则③（玻璃底下不许垫不透明的面）
+一字未改，但文件头补了一句：新的那层对比底住在**唯一入口里面**（调用点只传倍率），
+所以「调用点垫的面」仍然是红的。
+
+只有 CI 能验：`MapNowDrawer` 那个 `init`（`@ViewBuilder` + `@escaping` + 泛型两个）、
+`DrawerHandle` 的 `Binding<CGFloat>` 写法、`DSSegmented` 接一个自定义 `Binding`
+（读 `wallpaper.source`、写 `pickSource`）、`.background { if … { shape.fill(…) } }`
+这个 ViewBuilder 位置。
+只有真机能验：图源三格是不是真的永远点得动（第 1 条唯一没被证实的一件）、
+抽屉跟手还闪不闪（本轮的主修）、空 35% / 黑 35% 加起来在**亮色模式 + 亮壁纸**下
+卡里的字是不是真的更好读（这是本轮唯一可能「改完更差」的地方 —— 觉得发奶就把
+`glassDim` 那一个数往下调）。

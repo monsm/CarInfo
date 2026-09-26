@@ -4394,3 +4394,37 @@ actor 归属。只有真机能验：胶囊的质感、行程是否整条居中�
 只有真机能验：图源菜单四档都能拉开、轨迹那条线的真实形状、2D 下车钉落在带子里的位置
 （`spanFactor` 那根回退线）、抽屉跟手的手感、`.clear` 下卡片正文的对比度。
 细节见 `HANDOFF.md` §35。
+
+## 第二十八轮（2026-09-26）：图源不再走弹窗、抽屉频闪找到根因、玻璃上的字按官方的 dimming layer
+
+用户三条：图源第三次报同一个毛病（这次给了完整复现）、抽屉「别扭 + 闪屏频闪」并直接问
+「系统地图里原生用的啥」、以及「玻璃通透的情况下文字怎么能看得清，苹果官方是怎么解决的」。
+
+1. **图源（第 1 条）**：两代写法都是**弹窗**，两次坏的又都是**弹窗打不开**
+   （先是系统 `Picker(.menu)`，后是自己写的 `Menu`）。新复现的两条线索：
+   「重开软件都不行」→ 状态持久化（一进来就是这个样子）；「只能点不铺」→ 不是整片被挡住。
+   本机复现不了那个机制，于是把依赖换掉：三个选项**直接摆在行里**（`DSSegmented`，
+   相册/必应/聚焦），没有弹窗就没有「弹不出来」。点当前那一档仍然 = 再取一次。
+   诚实的账：若真因是那一格的命中，换成行里的控件同样会坏 —— 真机上再确认一次。
+2. **抽屉（第 2 条）**：**原生是什么** = `UISheetPresentationController`（SwiftUI：`.sheet` +
+   `.presentationDetents(_:selection:)` + `isPresented: .constant(true)` +
+   `interactiveDismissDisabled()` + `presentationBackgroundInteraction(.enabled(upThrough:))`）。
+   **我们为什么不用**：系统 sheet 永远是窗口底部的一张面，而这一屏底部是自己的入口条 ——
+   它会直接盖住全局导航（与第二代那个 sheet 被删掉同一个理由）。
+   **频闪的真因**：连续量住在 `MapSpineView` 上，而拖动每帧写它 → 每帧重建整个 body
+   （六页同屏 + 活地图 + 轨迹 + 底条）。修法：状态挪进新的 `MapNowDrawer` 外壳
+   （一帧里只重画那张卡，卡头与外壳用 `DrawerHandle` 交接）+ 拉手改 `highPriorityGesture`
+   （不再与滚动视图抢同一根竖手指）+ 值没变不重复写。
+3. **玻璃上的字（第 3 条）**：官方有明文答案 —— `clear` 的保证来自它**底下那一层**。
+   HIG「Materials」：“if the underlying content is bright, consider adding a **dark dimming layer
+   of 35% opacity**”；`Glass.clear` 文档：“adding a dimming layer or other treatment beneath
+   the glass”（样例 `…glassEffect(.clear).background(.black.opacity(0.3))`）。
+   落法：新令牌 `TokensPalette.glassDim`（亮色下白 35% / 暗色下黑 35% ——
+   **与字反相**，因为我们的字是自适应的而官方那个例子的字是白的），
+   由 `dsGlass` 在玻璃之下垫，调用点只传倍率 `dim:`（底条那一枚传 0：它底下是我们自己画的 `barFill`）。
+   顺带记下官方更重的一句（本轮未动）：**“Don’t use Liquid Glass in the content layer.”**
+   以及「文字多就用 regular 变体」——按这个分法，我们那几百处读数本该是 `.regular`。
+
+验证：`scan/all.py` **34/34 全绿**。只有真机能验：图源三格是否真的永远点得动、
+抽屉跟手还闪不闪、以及亮色模式 + 亮壁纸下那两层对比底是不是真的把字托住了
+（觉得发奶就调 `glassDim` 那一个数）。细节见 `HANDOFF.md` §36。

@@ -17,7 +17,7 @@ import CoreLocation
 //  不选「把阈值抬到刚够」：贴着阈值的代价是下一次**任何**小改动都要先做一遍取舍，
 //  而 `MapSpineLayers.swift` 的头注里已经写过一次这个账。
 //
-//  注：下面用到的 `store` / `layerMenu` / `drawerOpen` / `toggleDrawer` / `setDrawer`
+//  注：下面用到的 `store` / `layerMenu` / `DrawerHandle`
 //  因此**不是 `private`** ——
 //  `private` 的作用域是文件，跨文件看不见。它们在骨架里的注释写明了为什么。
 //
@@ -33,17 +33,19 @@ import CoreLocation
 //      删掉的理由：系统 sheet 永远是**屏幕底部**的一张新面 —— 它会盖住模式条
 //      （全站唯一的入口），而卡片浮在模式条**上面**；于是「拉开的抽屉」与
 //      「卡片自己」成了两处内容，用户看到的仍不是他要的那张图。
-//   ③ 现在（用户 2026-09-25 第 2 条：「下面的卡片不是抽屉样，不是我发的图片的参考，
+//   ③ 三版（用户 2026-09-25 第 2 条：「下面的卡片不是抽屉样，不是我发的图片的参考，
 //      我再发一次，默认只显示一横，拉出来才是全部」）：**抽屉就是这张卡**。
-//      收起 = 一枚拉手 + 三个数 + 图层胶囊；拉出来 = 卡的全部内容。
+//      收起 = 一枚拉手 + 三个数；拉出来 = 卡的全部内容。
 //      状态因此又回到**一个** `Bool`（`drawerOpen`），而 `readoutsDisclosure`
 //      （那行「其余读数」入口）与 `readoutsSheet` 一起删除：同一个抽屉只有一个开法。
+//      那一版的拖动只认速度（`predictedEndTranslation`），中间那一段不是真的。
 //
-//      为什么这次不做「连续跟手」（① 的 `drawerReveal`）：两个落点是固定的
-//      （收起 / 拉出），中间没有第三种停法。连续跟手要自己算高度、自己夹边界、
-//      自己判方向 —— 那是 ① 删掉的那部分，而它换来的只有「拖动过程中卡片跟着手指长」。
-//      拖动仍然看**速度**（`predictedEndTranslation`），所以轻甩一下就走过去，
-//      与模式条的吸附是同一条规矩。
+//   ④ **现在**（用户 2026-09-26：「原版支持跟手抽出，现在的只支持点击抽出」
+//      与「你做的拖动的时候闪屏频闪」）：① 的连续量回来了，但**只回来一半** ——
+//      它不住在这一屏，住在 `MapNowDrawer` 里（那一段说明了为什么：连续量住在
+//      页面上，拖动就是每帧重建整屏，而那正是频闪）。
+//      两态之间那一段于是是真的（手指走到哪卡片就长到哪），而落点仍然照规矩 ——
+//      先看位置，没过一半才看那一甩。
 // =============================================================================
 
 extension MapSpineView {
@@ -203,10 +205,14 @@ extension MapSpineView {
     ///  头里那一枚**图层胶囊**已搬进抽屉的正文（见 `MapNowCard.drawerContent`）。
     ///  它在两态都在，只是现在只在拉开时看得见 —— 收起时这张卡就剩下一横，
     ///  而那一横上只有三个数。
+    ///
+    ///  ⚠️ 2026-09-26（用户第 2 条）：`handle` 是抽屉外壳（`MapNowDrawer`）交给卡头的
+    ///  几个入口 —— 连续量、点一下、跟手拖、无障碍值。手势与状态分家的理由
+    ///  写在 `DrawerHandle` 上。
     @MainActor
-    func drawerHead(_ d: MapSpineData) -> some View {
+    func drawerHead(_ d: MapSpineData, handle: DrawerHandle) -> some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-            drawerGrabber()
+            drawerGrabber(handle)
             summaryBar(d)
         }
     }
@@ -256,20 +262,27 @@ extension MapSpineView {
     /// 点它与拉它是同一个动作的两种做法 —— 有人会去拉，有人会去点，
     /// 而这个仓库的规矩是「两种都该成立，但只留一个实现」（同一处状态）。
     @MainActor
-    func drawerGrabber() -> some View {
+    func drawerGrabber(_ handle: DrawerHandle) -> some View {
         Capsule()
             .fill(TokensPalette.track)
             .frame(width: 36, height: 5)
             .frame(maxWidth: .infinity)
             .frame(height: TokensSpacing.lg)
             .contentShape(Rectangle())
-            .onTapGesture { toggleDrawer() }
-            .gesture(drawerDrag)
+            .onTapGesture {
+                TokensHaptic.select()
+                handle.toggle()
+            }
+            //  ⚠️ `highPriorityGesture`，不是 `gesture`（用户第 2 条的「频闪」有一半
+            //  出在这里）：卡片坐在一个**可滚动**的叠里，两者同时认领同一根竖手指时
+            //  会互相抢 —— 手指走一段、内容往下滚一段，一抢一放就是那阵闪。
+            //  优先级给了拉手：这一格竖着走就是拉抽屉；卡片其余部分仍然归滚动。
+            .highPriorityGesture(drawerDrag(handle))
             .accessibilityElement()
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel(Text("更多读数"))
-            .accessibilityValue(Text(drawerOpen ? "已展开" : "已收起"))
-            .accessibilityAction { toggleDrawer() }
+            .accessibilityValue(Text(handle.open ? "已展开" : "已收起"))
+            .accessibilityAction { handle.toggle() }
     }
 
     /// 拉手（以及卡的头那一行）上的那一下拖动 —— **现在是跟手的**。
@@ -277,46 +290,34 @@ extension MapSpineView {
     ///  用户 2026-09-26：「抽屉和原版地图的抽屉不一样，原版支持跟手抽出，
     ///  现在的只支持点击抽出」。于是这一版与两代旧写法（① 自己量高度、
     ///  ② 系统 sheet、③ 两态硬切）都不同：**两态之间那一段也是真的** ——
-    ///  手指走到哪，卡片就长到哪（`drawerReveal` = 手指位移 ÷ 正文自然高度）。
+    ///  手指走到哪，卡片就长到哪（`handle.reveal` = 手指位移 ÷ 正文自然高度）。
     ///
     ///  松手时落在哪个端点：**先看位置**（过一半就以位置为准），没过一半才看
     ///  那一甩的方向（`predictedEndTranslation`）。与模式条的吸附、与系统的 sheet
     ///  是同一条规矩：只按「松手那一刻的位置」判的话，「甩」与「停」会得到同一个结果。
-    var drawerDrag: some Gesture {
+    ///
+    ///  ⚠️ 它是**函数**（不是 `var`）了：连续量住在抽屉外壳里，手势在这里、
+    ///  状态在那里 —— 两侧通过 `DrawerHandle` 接上（它每帧重建一次，
+    ///  所以 `height` 与 `open` 都是当拍的）。
+    func drawerDrag(_ handle: DrawerHandle) -> some Gesture {
         DragGesture(minimumDistance: 4)
             .onChanged { v in
-                //  分母：正文的自然高度（`MapNowCard` 里量出来的）。
+                //  分母：正文的自然高度（`MapNowDrawer.measure` 量出来的）。
                 //  `max(80, …)` 是一道回退：第一帧还没量到时（高度 0），
                 //  至少让 80pt 的手势位移走完一整段 —— 而不是除零或瞬开。
-                let travel = max(80, drawerBodyHeight)
-                let base: CGFloat = drawerOpen ? 1 : 0
-                drawerReveal = min(1, max(0, base - v.translation.height / travel))
+                let travel = max(80, handle.height)
+                let base: CGFloat = handle.open ? 1 : 0
+                let next = min(1, max(0, base - v.translation.height / travel))
+                //  只在真的变了才写：手势系统会把同一个 `onChanged` 重复递几次。
+                if next != handle.reveal.wrappedValue { handle.reveal.wrappedValue = next }
             }
             .onEnded { v in
                 let dy = v.predictedEndTranslation.height
                 //  过了一半：位置说了算（往下甩不超过 60pt 就算放回原位）。
                 //  没过一半：只有明确那一甩才算（60pt 是模式条用的同一个数）。
-                let wantsOpen = drawerReveal > 0.5 ? (dy <= 60) : (dy < -60)
-                setDrawer(open: wantsOpen)
+                let wantsOpen = handle.reveal.wrappedValue > 0.5 ? (dy <= 60) : (dy < -60)
+                handle.land(wantsOpen)
             }
-    }
-
-    func toggleDrawer() {
-        TokensHaptic.select()
-        setDrawer(open: !drawerOpen)
-    }
-
-    /// 唯一的写点（拉手、点按、拖动、换图层四处都走它）。
-    /// 它自己**不出触觉**：点击与拖动各有自己的手感，谁也不该替谁发。
-    ///
-    ///  ⚠️ 它**不能再守「`open` 与 `drawerOpen` 相同就不动」**：跟手拖到一半
-    ///  松手时，目标可能与当前状态相同（拉到 40% 又放回去）—— 而那个中间位置
-    ///  必须归位。所以每次都把 `drawerReveal` 与 `drawerOpen` 一起写到目标。
-    func setDrawer(open: Bool) {
-        withAnimation(TokensMotion.value) {
-            drawerOpen = open
-            drawerReveal = open ? 1 : 0
-        }
     }
 
     /// 抽屉里属于「读数」的那一半：一瞬看不出来的那些数。

@@ -195,6 +195,44 @@ enum TokensPalette {
     static let barFill: Color = tokenDynamic(light: (1, 1, 1),
                                              dark: (0.11, 0.11, 0.12),
                                              alpha: 0.55)
+    // ---- 玻璃底下那一层「对比底」（Apple 的 dimming layer）----
+    //
+    //  用户 2026-09-26 第 3 条：「再就是玻璃通透的情况下，文字怎么能看得清，
+    //  苹果官方是怎么解决的」。官方的答案在两处，都是明文：
+    //
+    //   · HIG「Materials」（2025-09-09 按 Liquid Glass 更新）把两个变体的用途分开了：
+    //     * `regular` —— “blurs and adjusts the luminosity of background content to
+    //       maintain legibility of text and other foreground elements … Use the regular
+    //       variant when background content might create legibility issues, or when
+    //       components have a significant amount of text.”
+    //     * `clear` —— “highly translucent … Use this variant for components that float
+    //       above media backgrounds — such as photos and videos.”
+    //     并且给 `clear` 补了一条：*“For optimal contrast and legibility, determine
+    //     whether to add a **dimming layer** behind components with clear Liquid Glass:
+    //     if the underlying content is bright, consider adding a **dark dimming layer of
+    //     35% opacity**; if the underlying content is sufficiently dark … you don’t need
+    //     to apply a dimming layer.”*
+    //   · `Glass.clear` 的文档同一句话，并给了写法：
+    //     `Label(…).glassEffect(.clear).background(.black.opacity(0.3))` ——
+    //     **对比底在玻璃之下**（`.background` 挂在 `.glassEffect` 之后）。
+    //
+    //  所以「通透 + 字看得清」不是二选一：`.clear` 自己不带任何保证，
+    //  保证来自它底下那一层。这一版就把它加上了（`Design/DSGlass.swift`，
+    //  唯一入口，调用点不必各自垫面）。
+    //
+    //  ⚠️ 与 Apple 那一条**不一样的一点，是颜色**：他那个例子的字是白的（媒体控件），
+    //  所以垫的是**黑**。我们这一仓的字是自适应的（亮色下近黑、暗色下纯白，
+    //  见 `TokensPalette.primary`）—— 垫黑会在亮色模式下把**黑字**埋掉。
+    //  于是这一层取「与字反相」：亮色下是白，暗色下是黑。
+    //  35% 用的是他给的那个数（亮色下白 35% 比黑 35% 更“奶”一点 ——
+    //  这是「更透」与「字读得出来」之间那一步的价钱，改这一个数就是改那个天平）。
+    /// 玻璃底下那一层对比底。亮：白 35%；暗：黑 35%。
+    /// 1 = 令牌这一档；0 = 不要这层（底下已经足够暗 / 已经有自己画的面，
+    /// 例如底条那三块坐在 `barFill` 上，它们传 `dim: 0`）。
+    static let glassDim: Color = tokenDynamic(light: (1, 1, 1),
+                                              dark: (0, 0, 0),
+                                              alpha: 0.35)
+
     // 已删除：`barSelection` / `barSelectionRim` / `barSelectionShadow`
     //（2026-09-26 第三批）。它们是我给「选中那一枚」自画的三层伪玻璃（底渐变 / 边 / 影子），
     // 而用户在下一秒就把话说清了：「准确的是 3 个液态玻璃：左右的球和中间的选中」——
@@ -469,8 +507,9 @@ private func tokenColor(_ hex: UInt32, alpha: Double = 1) -> Color {
 /// 明暗两套取值。系统深色时取 dark，否则取 light。
 /// （原 `ArtTheme.nativeDynamic`，同一段实现、同一批取值。）
 ///
-/// `alpha` 只服务底条那一条带子（`barFill`）：它是**半透明**的面（相机那条横带就是），
-/// 而其余每一个令牌都是不透明的系统语义值（三块形状现在走真玻璃，不靠扁平色）。
+/// `alpha` 服务两个**半透明**的令牌：底条那一条带子（`barFill`，相机那条横带就是半透明）
+/// 与玻璃底下那层对比底（`glassDim`，Apple 的 dimming layer 就是一层半透明）。
+/// 其余每一个令牌都是不透明的系统语义值（三块形状现在走真玻璃，不靠扁平色）。
 private func tokenDynamic(
     light: (CGFloat, CGFloat, CGFloat),
     dark: (CGFloat, CGFloat, CGFloat),
