@@ -39,7 +39,7 @@
 // `a = |页下标 − 条子连续位置|`，`a ≥ 0.62` 隐藏；六页从装配起就一直在那里。
 // 三处真错处都是量出来的：横移是原型明确否掉的做法（档距 65.6pt vs 页宽 390pt）、
 // 五页各留着一条空标题的顶栏（把卡片窗压低 44pt，而原型六页都没有顶栏）、
-// 条子按安全区底放在离底 60pt（原型 `bottom:26` 是从**屏幕**量的）。
+// 条子放在离底 `barGap`（原型 `bottom:26` 是从**屏幕**量的）。
 // 与之一起来的改动：地图回到「现在」那一页**里面**（原型 `#page-now` 里的 `.map`），
 // 于是换走时它跟着淡出缩小，而不是「别的页浮在一张活地图上」。
 //
@@ -230,16 +230,19 @@ struct MapSpineView: View {
     /// 键名只有一个出处。
     static let drawerKey = "carkeeper_map_drawer"
 
-    /// 底条占掉的纵向空间：26（离底）+ **54（条高）** + 14（呼吸位）= 94。
+    /// 底条占掉的纵向空间：33（离底）+ **47（条高）** + 14（呼吸位）= 94。
     /// **同一个数在原型里是 `.stack{bottom:86px}`** —— 页面内容的窗口正好停在条子上沿。
-    /// 真机上它从**安全区底**算起（安全区之上再留 26），所以刘海屏与旧机型都是同一个观感。
-    /// 2026-09-25：条高 46 → 54（用户「滑动区变高」，见 `DSSwipeStrip.barHeight`），
-    /// 所以这里跟着从 86 涨到 94 —— **它是派生量，不是另一个决定**。
+    /// 真机上它从**屏幕底**算起（本条忽略安全区，见 `deck` 的 `.ignoresSafeArea`）。
+    /// ⚠️ 2026-09-26：离底 26 → 33、条高 54 → 47（两个都是相机的数）；一加一减，
+    /// 和仍是 94 —— 条子上沿（离屏底 80）与页面内容的窗口**一点没动**。
     private static let barTotal: CGFloat = 94
-    /// 底条离底多远（原型 `.bottom{bottom:26px}`）
-    private static let barGap: CGFloat = 26
-    /// 圆钮直径 —— **与条高相等**（2026-09-26 裁图量到圆钮与带子同为 144px；我们条高 54）。
-    private static let armSize: CGFloat = 54
+    /// 底条离底多远。相机量到带子下沿离屏底 33.5pt、上沿 80.5pt（带高 47）——取整
+    /// 就是 33 + 47 = 80（与相机差 1pt）。它此前是 26，那是与条高 54 **配对**的
+    /// （26 + 54 = 80）：条高回到相机那个数之后，26 必须一起动，否则上沿掉到 73。
+    private static let barGap: CGFloat = 33
+    /// 圆钮直径 —— **就是条高**（相机里两者同高：各 144px = 47pt）；这里读条子那个常量，
+    /// 不再各写一个（2026-09-26 之前是 54/54，两个数靠注释维持相等）。
+    private static let armSize: CGFloat = DSSwipeStrip.barHeight
 
     /// 左钮 / 模式条 / 右钮之间的中缝。
     ///
@@ -250,19 +253,21 @@ struct MapSpineView: View {
     /// 声明那一行不见了（同一笔编辑里丢的），而当时的判据都没拦住：`delguard.py` 只认
     /// 「旧版本里声明过」的名字（`barSeam` 从未被声明过），`scan.py` 那时看不见 `Self.xxx`。
     private static let barSeam: CGFloat = 9
-    /// 底条两侧留白（原型 `.bottom{padding:0 8px}`）
-    private static let barPad: CGFloat = 8
+    /// 底条两侧留白 —— **相机那个数**：两枚圆钮各离屏边 102px = 33pt（用户 2026-09-26：
+    /// 「左右 2 个圆球太贴着边框了，和相机的尺寸距离大小不匹配」；原型写的是 8）。
+    /// 33 也是条宽算式里的一个加数：`33 + 47 + 9 + 车段 + 9 + 47 + 33 = 屏宽` ——
+    /// 相机那台机器（393pt）解出 215pt，正是量到的那条带子。
+    private static let barPad: CGFloat = 33
     /// 右臂交出的一条车控请求。它由 `controlCommandFlow` 那道门消费 ——
     /// 验证与温度都在门里，本页只负责把请求交出去（与车控档同一个 modifier）。
     @State private var quickRequest: ControlRequest?
-    //  （这里曾有 `@State containerWidth`：底条量自己那一行的宽来算条宽 ——
-    //    一个自引用，见 `deck` 上那段。宽度现在只有 `deck` 外面量到的一个来源。）
+    //  （这里曾有 `@State containerWidth`：一个自引用，见 `deck` 上那段。）
     /// 条子上正在拖（`DSSwipeStrip` 报上来的）—— 两枚圆钮靠它让位。
     @State private var barDragging = false
 
-    /// 整行宽度 = 屏幕宽 − 两侧各 8 的留白。
-    /// ⚠️ 它不是条子拿到的宽度（条子拿到的是 `stripLaneWidth`），
-    /// 而它的输入**只能是屏幕宽**（不能是量自己量出来的数，见 `deck` 上的那一段）。
+    /// 整行宽度 = 屏幕宽 − 两侧各 `barPad` 的留白。
+    /// ⚠️ 它不是条子拿到的宽度（那是 `stripLaneWidth`），而它的输入**只能是屏幕宽**
+    ///（不能是量自己量出来的数，见 `deck` 上那一段）。
     private func barRowWidth(_ pageWidth: CGFloat) -> CGFloat {
         max(160, pageWidth - 2 * Self.barPad)
     }
@@ -283,40 +288,31 @@ struct MapSpineView: View {
     /// 这一屏的本体（原来就是 `body` 的正文，一行未改）。
     ///
     /// ⚠️ 2026-09-26（用户：「每个界面的卡片怎么都变大了…而不是和屏幕保持一定的距离」）：
-    /// 这一层钉在**量到的屏幕宽**上（量在它外面，见 `body`）。
-    /// 病根是一个**自引用**：底条用 `GeometryReader` 量自己那一行的宽，再用它算条宽，
-    /// 而那一行的理想宽又由条宽决定（`8 + 54 + 9 + 条宽 + 9 + 54 + 8`）——
-    /// 「量到多少 → 行就有多宽 → 下次就量到多少」，`X ≥ 屏宽` 全是稳定不动点。
-    /// 某一帧量到偏大（换档 / 转场 / 六页同屏那一帧），它就**永久闩在那里**：整层比
-    /// 屏幕宽、在屏幕里居中，于是左右各溢出 ~20pt —— 两枚圆钮被屏幕边切掉、正文落在
-    /// 7pt（应为 36）、带子的字与选中胶囊整体偏出窗口（条子里看起来一个字都没有）。
+    /// 这一层钉在**量到的屏幕宽**上（量在它外面，见 `body`）。病根是一个**自引用**：
+    /// 底条量自己那一行的宽来算条宽，而那一行的理想宽又由条宽决定 ——「量到多少 →
+    /// 行就有多宽 → 下次就量到多少」，`X ≥ 屏宽` 全是稳定不动点，某一帧偏大就**永久
+    /// 闩在那里**（整层比屏幕宽、居中后左右各溢出 ~20pt：圆钮被切、正文落在 7pt）。
     private func deck(screenWidth: CGFloat) -> some View {
-        // `MapSpineData.build()` 在这一次求值里**只跑一次**（2026-09-25 性能轮）。
-        //
-        // 改之前它在一个 `let d = data` 里、又在 `.onChange` 的条件里、还在 `nowLayer` 里
-        // 各算一遍 —— 一次求值建**三套**派生数据。地图页在车动起来时每 2 秒求值一次
-        //（节律见 `RefreshLoop.Cadence.moving`），而 `build()` 里含行程映射、停车点映射、
-        //胎压、异常点与两处聚类 —— 三份就是三倍。现在：
-        //   · 这张 sheet 的那份挪进**闭包**（只有真弹出来时才建）；
-        //   · `.onChange` 盯的是车自己的读数，不再要派生数据；
-        //   · 剩下的唯一一处是 `nowLayer()`（它本来就是地图那一页的内容，必须有）。
-        // 代价为零：三处读的都是同一份状态，不再有“哪一份才算数”的问题 ——
-        // 因为它们本来就是同一个函数的返回值。
+        // `MapSpineData.build()` 在这一次求值里**只跑一次**（2026-09-25 性能轮）：
+        // 改之前它在 `let d = data`、`.onChange` 的条件、`nowLayer` 里各算一遍 ——
+        // 一次求值建三套（地图页车动起来时每 2 秒求值一次，而 `build()` 里含行程映射、
+        // 停车点映射、胎压、异常点与两处聚类）。现在：sheet 那份挪进**闭包**，
+        // `.onChange` 盯车自己的读数，只剩 `nowLayer()`（它本来就是地图页的内容）。
+        // 代价为零：三处读的本来就是同一个函数的返回值。
         ZStack(alignment: .bottom) {
             // ⓪ 六层页面同屏（原型 `.pages > .page{inset:0}` × 6）。
             pageDeck(pageWidth: screenWidth)
 
-            // ① 顶：底条 = 左臂（车牌）｜模式条｜右臂（搜索），贴底 26。
+            // ① 顶：底条 = 左臂（车）｜模式条｜右臂（快捷车控），贴底 `barGap`。
             //    原型 `.bottom{position:absolute;left:0;right:0;bottom:26;gap:9;
-            //    height:calc(var(--H) + 14px)}`：模式条就长在**最底**，
-            //    内容从它上面长上去 —— 相机就是这么摆的。
+            //    height:calc(var(--H) + 14px)}`：模式条长在**最底**，内容从它上面长上去。
             bottomBar(pageWidth: screenWidth)
 
             // ② 顶：Toast 浮层 —— 抬到条子**之上**。
             //    它原来挂在外壳（`MapShellView`）的 `.bottom` 上（那是屏幕底），
             //    而模式条就长在那里，于是「电量低于 20%」正好压住底部导航
             //（用户 2026-09-25 的第 2 条）。抬多高只有这一处答得出：条子自己占
-            //    `barTotal`（26 + 54 + 14），上面再留一格呼吸位。
+            //    `barTotal`（33 + 47 + 14），上面再留一格呼吸位。
             //    `.id(t.text)` 而不是 `.id(UUID())`（外壳那一版是后者）：
             //    后者会让**每一次 body 求值**都换一个新身份，而拖模式条时每帧都在求值。
             if let t = nav.currentToast {
@@ -328,9 +324,9 @@ struct MapSpineView: View {
         // 整层的宽钉死到屏幕宽：三个子层都已是确定宽，这一行是最后一道保险 ——
         // 任何子视图的「理想宽」都不许把这一层撑开（撑开就会整层居中、左右溢出）。
         .frame(width: screenWidth)
-        // 底条离底 26、页面窗到「屏底 − 86」：原型的这两个数都是从**屏幕**量的
-        // （`.bottom{bottom:26}` / `.stack{bottom:86}`）。安全区底那 34pt 若不排除，
-        // 条子会凭空抬高一截 —— 与原型差出一个手指的宽度。
+        // 底条离底 `barGap`、页面窗到「屏底 − 86」：两个数都从**屏幕**量起（原型
+        // `.bottom{bottom:26}` / `.stack{bottom:86}`；我们是 33 + 47 = 80，与原型那对
+        // 26 + 54 = 80 是同一条上沿）。安全区底那 34pt 若不排除，条子会凭空抬高。
         .ignoresSafeArea(edges: .bottom)
         // 量「屏幕顶到这一层的顶」= 系统安全区那一段（灵动岛机型 59、涛海 47、老机型 20）。
         // 它只服务一件事：交给五张子页当**滚动内容的顶部内衬**（`stackTopInset`），
@@ -589,10 +585,10 @@ struct MapSpineView: View {
         .padding(.bottom, Self.barGap)
         // 整行宽 = **量到的屏幕宽**（不是自己量的，见 `deck` 上那一段）。
         .frame(minWidth: pageWidth, maxWidth: pageWidth)
-        //  （这里曾有 `.dsGlassLayer(...)`：底条当时是玻璃，需要容器把三块形状合成一层。
-        //   2026-09-26 删 —— 底条改成自己画的面（见 `DSSwipeStrip.band`），这一层里
-        //   已经没有玻璃；而那个容器把同层的字与选中胶囊一起吞掉了。）
-        // 整行（含离底那 26pt）都算**滑动区**（用户 2026-09-25：「滑动区变高」）。
+        //  ⚠️ 这一行**不包 `dsGlassLayer`**（按 `DSGlass.swift` 规则 ② 本该包）：那个容器把
+        //  同层的字与选中胶囊一起吞掉过一次（真机量到「带子里一个字都没有」）。现在三块玻璃
+        //  从不相变、也不跨块变形，容器能多给的只剩互相折射 —— 真机若看着像贴纸，再包回来。
+        // 整行（含离底那 `barGap`）都算**滑动区**（用户 2026-09-25：「滑动区变高」）。
         .contentShape(Rectangle())
         // 两枚圆钮的淡出（它们是被 `if` 拿掉的，见 `arm`）。
         .animation(TokensMotion.fade, value: barDragging)
@@ -611,7 +607,7 @@ struct MapSpineView: View {
     ///   · 手指按在条子上下的空白带里拖时，**条子一动不动**（`c` 没人碰），
     ///     动的只有页面 —— 而那条空白带正是拇指自然停放的位置；
     ///   · 松手时没有谁写回 `homeModeRaw`，于是几页停在半透明相叠的状态，
-    ///     下一次碰条子才归位（那 26pt 空白带被上一版显式算作「滑动区」，
+    ///     下一次碰条子才归位（那 `barGap` 空白带被上一版显式算作「滑动区」，
     ///     所以这不是一条够不着的路）。
     ///
     /// 为什么用 `simultaneousGesture` 而不是 `highPriorityGesture`：两侧圆钮是 `Button`，
@@ -640,9 +636,8 @@ struct MapSpineView: View {
     /// 一枚圆钮（有行为的那两枚用它）。
     ///
     ///  ⚠️ 拖动时它整枚**移出层级**，不是「淡到透明」（用户 2026-09-26：「滚动时俩边的圆
-    ///  胶囊怎么不消失了」）：这一行的玻璃同在一个 `GlassEffectContainer` 里，而容器会把
-    ///  子视图的玻璃**合成成一个形状** —— 透明度 0 在它眼里只是内容不见了，圆底还在。
-    ///  相机那一态里两枚钮是**不在场**，所以就照它做。
+    ///  胶囊怎么不消失了」）：当时的原因是容器把透明度 0 当成「变小」。容器已撤（见下面
+    ///  那一段），但 `if` 这一手留着 —— 不在场的东西不可能被任何一版合成接住。
     @ViewBuilder
     private func arm(icon: String,
                      current: Bool = false,
@@ -673,15 +668,17 @@ struct MapSpineView: View {
             .frame(width: Self.armSize, height: Self.armSize)
     }
 
-    /// 圆钮的**底**：与底条同一个面（`barFill` + 一圈发丝线，都不是材质）。
-    /// 它从 `.dsGlass(in: Circle(), interactive: true)` 改过来的两个理由都量过：
-    /// 那个开关一翻，系统材质会变、自己画的面不会；而玻璃必须住在一个容器里，
-    /// 那个容器又把同层的内容吞掉了（见 `DSSwipeStrip.band`）。
+    /// 圆钮的**底**：一块真玻璃（`dsGlass` 是唯一入口）。
+    ///
+    /// ⚠️ 2026-09-26 第三批（用户：「3 个液态玻璃：左右的球和中间的选中」）：它一度是
+    /// 自己画的面（`barFill`），理由是「降低透明度」那个开关 —— 而那条账其实算在
+    /// **带子**头上；相机这两枚圆钮**是真玻璃**（缩略图 / 翻转镜头，底下就是现场画面）。
+    /// 现在分工与相机逐块相同：**带子自己画，三块形状是真玻璃** —— 它们压在连续画面上，
+    /// 所以是 `.overMedia`（画面保持可见，只在边缘留一圈折射）。
     private var armDisc: some View {
-        Circle()
-            .fill(TokensPalette.barFill)
-            .overlay { Circle().strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border) }
+        Color.clear
             .frame(width: Self.armSize, height: Self.armSize)
+            .dsGlass(in: Circle(), variant: .overMedia, interactive: true)
             .contentShape(Circle())
     }
 
@@ -839,7 +836,8 @@ struct MapSpineView: View {
 
     /// 一层页面。两个形态与原型的两个 `.page` 形态一一对应：
     ///   · 「现在」＝ `.map{inset:0}` + 浮动两卡，**铺满全屏**（地图画到屏幕最上沿）
-    ///   · 其余五档＝ `.stack{top:54;bottom:86}`：不透明的一页，卡片窗停在条子上沿
+    ///   · 其余五档＝ `.stack{top:54;bottom:86}` 的**内衬**（不是硬裁线）：一页铺满
+    ///     全屏、卡片从底条底下穿过，而最后一张能整张滚到条子上沿之上。
     @ViewBuilder
     private func pageBody(_ mode: HomeMode, pageWidth: CGFloat) -> some View {
         if mode == .now {
@@ -858,9 +856,16 @@ struct MapSpineView: View {
             // 两代废案的账（硬裁线 / `.safeAreaPadding(.top, 44)` 没推回来）已在
             // `ArcStack` 头注里结清，不在这里再抄一遍。
             pageContent(mode)
-                .padding(.bottom, Self.barTotal)
+                //  ⚠️ 2026-09-26：这里曾是 `.padding(.bottom, Self.barTotal)` —— 它把
+                //  **整页**（含滚动视口）截在条子上沿，于是卡片永远到不了条子底下，
+                //  条子背后只有壁纸（用户：「为什么其他的界面都不能穿过底部的导航」）。
+                //  现在底条那一段改由 `ArcStack` 做成**滚动内容的内衬**（`stackBottomInset`）。
                 .frame(minWidth: pageWidth, maxWidth: pageWidth,
                        maxHeight: .infinity, alignment: .top)
+                //  视口铺到屏幕最下沿（与地图那一档同一个行为）：少了它，卡片只能到屏底
+                //  之上 34pt（安全区），底条最下面那一截仍穿不过去；可滚到的位置由内衬说了算。
+                .ignoresSafeArea(edges: .bottom)
+                .environment(\.stackBottomInset, Self.barTotal)
                 // 五张子页的底色 = 壁纸图（相册选的一张本地图，不依赖网络）。
                 // 之前这里是 `TokensPalette.canvas`（暗层，用户 2026-09-24 删）；
                 // 现在按「其他页面的背景全部设为当前桌面的背景」的要求：iOS 读不到
@@ -936,6 +941,10 @@ struct MapSpineView: View {
             // 不是贴底：底下那张卡与模式条已经占满了（见 `MapQuickButtons`）。
             quickMapButtons(d)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+
+            //  自动刷新的倒计时（调试）：用户 2026-09-26「我感觉没刷新一样」。
+            //  位置与理由都在它自己的文件里（`MapSpineReadouts.swift`）。
+            mapRefreshBadge()
         }
         .mapScope(mapScope)
         // `.plate{left:20;top:62}`：车牌徽标挂在安全区下的左上角（62 ≈ 54 + 8）。
@@ -945,14 +954,9 @@ struct MapSpineView: View {
         // 菜单也跟着进去了（卡头上的图层胶囊）—— 它是**控件**，不是信息。
     }
 
-    //  这里原本有 `mapDims`：底图上唯一留的一条顶部压暗（原型 `.maptop`，
-    //  0.38 → 0，200pt 高）。它的两个先辈（`.mapvig` 四角压暗、根画布上的暗角）
-    //  已按「全局不要加暗层」删掉，而它自己服务的那件事 —— 车牌徽标压在瓦片上
-    //  读得出来 —— 也随徽标搬进玻璃卡而消失（用户 2026-09-24）。
-    //
+    //  这里原本有 `mapDims`：底图上唯一留的一条顶部压暗（原型 `.maptop`，0.38 → 0，
+    //  200pt 高）。它随「全局不要加暗层」与「车牌徽标搬进玻璃卡」一起删了（2026-09-24）。
     //  留着它只有一个后果：整屏顶部被压掉 38% 亮度，而顶上已经没有字了。
-    //  （2026-09-25 起比例尺已是我们自己量的，它靠一层与画布同色的阴影读出来 ——
-    //   同样是自带、不靠整屏压暗；罗盘仍然是系统控件。）
     /// 卡头上的**图层胶囊**：写着当前在看哪一层，点开是这张地图的那几件事。
     ///
     /// 它原来是屏幕左上角的车牌徽标（信息已拆进卡头）。菜单里那几件事都是

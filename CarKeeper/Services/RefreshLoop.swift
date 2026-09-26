@@ -111,7 +111,10 @@ final class RefreshLoop {
     ///
     /// 它是停着那条退避曲线的**自变量**（不是「确认了几次才认定停着」——
     /// 那个形状 2026-09-26 当天就被用户否掉了，见文件头）。
-    private var zeroStreak = 0
+    ///
+    ///  `private(set)`：唯一的外部读者是地图上那枚调试倒计时
+    ///（`MapRefreshBadge` —— 它要写「退避走到第几拍」）。读得、写不得。
+    private(set) var zeroStreak = 0
 
     /// 上一次取「重的那两路」（消息 + 体检）的时刻。
     private var lastHeavyAt: Date? = nil

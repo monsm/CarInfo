@@ -370,6 +370,20 @@ private struct StackTopInsetKey: EnvironmentKey {
     static let defaultValue: CGFloat = 0
 }
 
+/// 这一叠**滚动内容**的底部内衬（pt）：底条占掉的那一段（`MapSpineView.barTotal`）。
+///
+/// 它必须是**内容内衬**，不能是页面的 `.padding(.bottom, …)`：用户 2026-09-26
+/// 「地图页和下面的底部导航可以穿过，为什么其他的界面都不能穿过底部的导航」——
+/// 给页面加 padding 等于把滚动视口截在条子上沿，卡片永远到不了条子底下，
+/// 条子背后只剩壁纸（看起来就是一块不透明的板）。内衬则让两件事同时成立：
+/// **卡片从底条下穿过**（与相机里取景框的关系同一种），而最后一张仍能整张
+/// 滚到条子上沿之上（够得着、读得完）。
+///
+/// 默认 0 = 「没有底条」：那一叠完全按系统布局走。
+private struct StackBottomInsetKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
 /// 这张卡的**底下是不是一张照片 / 地图**（连续的画面）。
 ///
 /// 用户 2026-09-25 第 1 / 10 条之后追加的那一句：「我追求的就是液态玻璃的美感」——
@@ -397,6 +411,13 @@ extension EnvironmentValues {
     var stackTopInset: CGFloat {
         get { self[StackTopInsetKey.self] }
         set { self[StackTopInsetKey.self] = newValue }
+    }
+}
+
+extension EnvironmentValues {
+    var stackBottomInset: CGFloat {
+        get { self[StackBottomInsetKey.self] }
+        set { self[StackBottomInsetKey.self] = newValue }
     }
 }
 

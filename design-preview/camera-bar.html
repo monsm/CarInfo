@@ -36,6 +36,10 @@
           linear-gradient(180deg,#0d0d10 0%, #050506 100%);}
   .wall::after{content:"";position:absolute;inset:0;
         background:linear-gradient(180deg, rgba(255,255,255,.05) 0%, transparent 40%);}
+  /* 「穿过」那一格用的卡片块（不是真玻璃：这里的重点是**内容在不在条子后面**） */
+  .mcard{height:56px;border-radius:22px;background:rgba(255,255,255,.10);
+         backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+         box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)}
   /* ---- 底条那三块：与 Swift 侧同一套数（47pt 行高、9pt 中缝、33pt 外边距） ---- */
   /* 两枚圆钮在 in-flow 里被 space-between 推到两端、各自离屏边 33px（量到 102px/3.07）；
      带子/标签/胶囊/光标都是 absolute，居中在行里，不进 flex 流。 */
@@ -100,8 +104,8 @@
         <td><b>没有了</b>——黑底上量不到任何带子（拖动时它溶掉）</td></tr>
     <tr><td>可见档数</td><td><b>3</b>：视频 / 照片 / 人像（当前档 ±1）</td>
         <td><b>6 档铺满整屏</b>，最外那档被屏幕边切掉</td></tr>
-    <tr><td>字距（节距）</td><td colspan="2"><b>190 px = 62pt</b>（≈ 1.32 × 带高；我们 74pt / 54pt = 1.37 ✓ 同量级）</td></tr>
-    <tr><td>字高 / 字号</td><td colspan="2">glyph 40px → <b>13pt</b>（带高 3.6 × 字高；我们 54/15 = 3.6 ✓ 一样）</td></tr>
+    <tr><td>字距（节距）</td><td colspan="2"><b>190 px = 62pt</b>（1.32 × 带高；我们 62pt / 47pt = 1.32 ✓ 一致）</td></tr>
+    <tr><td>字高 / 字号</td><td colspan="2">glyph 40px → <b>13pt</b>（带高 3.6 × 字高；我们 47/13 = 3.6 ✓ 一致）</td></tr>
     <tr><td>选中胶囊</td><td><b>219×124 px</b>（71×40pt）＝ <b>0.86 × 带高</b></td>
         <td><b>237×144 px</b>（77×47pt）＝ 长到 <b>满行高</b>，宽 2.5 × 字宽</td></tr>
     <tr><td>胶囊位置</td><td>带子正中</td>
@@ -144,11 +148,48 @@
 <h2>我们现在的实现 vs 相机（同一个比例画出来）</h2>
 <div class="frames" id="ours"></div>
 <div class="note" style="margin-top:14px">
-  <b>已经按这三张图改完了</b>（Swift 侧，等 CI 编）：底玻璃从「通铺矩形」改成<b>两钮之间那一条胶囊</b>
-  （宽度 = 两枚 54pt 圆钮之间那一段 = 248pt，正是相机那 215pt 的同一个量）；圆钮 58 → <b>54</b>（与带同高）；
-  档距 74 → <b>71</b>（带高 54 × 相机那条 1.32）；胶囊 <b>0.86 × 行高 → 拖动时长到 1.0</b>；
-  拖动时圆钮让位、带子溶解、字铺到整屏、最外那档降到 0.55。唯一没照做的是外边距：相机两钮离屏边 33pt，
+  <b>2026-09-26 第二批：整族数回到相机量到的绝对值</b>（Swift 侧已改，等 CI 编）——
+  带高 54 → <b>47</b>、节距 71 → <b>62</b>（= 1.32 × 带高）、圆钮 54 → <b>47</b>（= 带高；宿主直接读
+  <code>DSSwipeStrip.barHeight</code>，不再各写一个）、离屏边 8 → <b>33</b>、离屏底 26 → <b>33</b>、字号 15 → <b>13</b>。
+  条子上沿仍是离屏底 80（= 33 + 47，与相机差 1pt），所以页面内容的窗口一点没动（<code>barTotal</code> 还是 94）。
+  带子因此 = 402 − 33×2 − 47×2 − 9×2 = <b>224pt</b>（相机在 393pt 上量到 215，两边是同一个算式）。
+  （上一批的账：底玻璃从「通铺矩形」改成两钮之间那一条胶囊；胶囊 0.86 × 行高 → 拖动 1.0；
+  拖动时圆钮让位、带子溶解、字铺到整屏、最外那档降到 0.55。当时唯一没照做的是外边距——
   我们仍是 8pt（条高比相机大 15%，33pt 会把 248 的带子挤到装不下三档）。
+</div>
+
+<h2>底条能不能「穿过」（用户第 3 条：只有地图页穿得过）</h2>
+<div class="frames">
+  <div class="frame" style="width:402px;height:300px">
+    <div class="cap">之前 · 页面加 <code>.padding(.bottom, 94)</code>：滚动视口截在条子上沿</div>
+    <div class="wall"></div>
+    <div style="position:absolute;left:18px;right:18px;bottom:94px;display:flex;flex-direction:column;gap:12px">
+      <div class="mcard"></div><div class="mcard"></div><div class="mcard"></div>
+    </div>
+    <div style="position:absolute;left:33px;bottom:33px;display:flex;gap:9px;align-items:center">
+      <div style="width:47px;height:47px;border-radius:50%;background:rgba(28,28,31,.72);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
+      <div style="width:224px;height:47px;border-radius:23.5px;background:rgba(28,28,31,.72);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
+      <div style="width:47px;height:47px;border-radius:50%;background:rgba(28,28,31,.72);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
+    </div>
+  </div>
+  <div class="frame" style="width:402px;height:300px">
+    <div class="cap">现在 · 底部内衬改成<span style="color:#7fc48a">滚动内容的内衬</span>：卡片从条子下穿过</div>
+    <div class="wall"></div>
+    <div style="position:absolute;left:18px;right:18px;bottom:6px;display:flex;flex-direction:column;gap:12px">
+      <div class="mcard"></div><div class="mcard"></div><div class="mcard"></div><div class="mcard"></div>
+    </div>
+    <div style="position:absolute;left:33px;bottom:33px;display:flex;gap:9px;align-items:center">
+      <div style="width:47px;height:47px;border-radius:50%;background:rgba(28,28,31,.72);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
+      <div style="width:224px;height:47px;border-radius:23.5px;background:rgba(28,28,31,.72);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
+      <div style="width:47px;height:47px;border-radius:50%;background:rgba(28,28,31,.72);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14)"></div>
+    </div>
+  </div>
+</div>
+<div class="note" style="margin-top:14px">
+  两格画的是同一个页面、同一叠卡：左边滚动视口停在条子上沿（卡片永远到不了条子底下，
+  条子背后只有壁纸 —— 看起来就是一块不透明的板）；右边视口铺到屏底，卡片从底条下穿过，
+  能看见它从半透明的面底下过。可滚到的位置由**内容内衬**说了算（`stackBottomInset` = 94），
+  所以最后一张仍能整张滚到条子上沿之上（够得着、读得完）——两条判据同属一个数。
 </div>
 
 <script>
@@ -258,37 +299,53 @@ makeFrame('frames', { pos: 3, dragging: true, caret: 0 }, '图 2 · 拖动中：
 /* 图 3：拖动中、照片（index 2.45）偏左，光标在 −108px */
 makeFrame('frames', { pos: 2.45, dragging: true, caret: -35 }, '图 3 · 拖动中：照片偏左、光标在它左边');
 
-/* ---- 我们**已经落进 Swift** 的 v19：三个状态各一帧 ----
-   数不是另画一套，全部来自那几个常量：
-     条宽 = 两枚 54pt 圆钮之间那一段 = 402 − 16 − 108 − 18 = 260（相机那 215pt 同量）
-     节距 71 = 带高 54 × 1.32 · 字号 15 = 0.277 × 带高（两条都是相机量到的关系）
-     胶囊 82×46（1.15×节距、0.86×带高）→ 拖动 88×54（1.24×节距、1.0×带高）
+/* ---- 我们**已经落进 Swift** 的 v21：四个状态各一帧 ----
+   数不是另画一套，全部来自那几个常量（都是相机量到的**绝对值**）：
+     带高 47 · 节距 62（= 1.32 × 带高）· 圆钮 47（= 带高）· 离屏边 33 · 中缝 9
+     条宽 = 两枚圆钮之间那一段 = 402 − 33 − 47 − 9 − 9 − 47 − 33 = 224
+       （相机那台 393pt 用同一个式子解出 215 —— 正是量到的那条带子）
+     胶囊 71×40（1.15×节距、0.86×带高）→ 拖动 77×47（1.24×节距、1.0×带高）
      拖动中：圆钮移出层级、带子溶解、字铺到 402、最外那档降到 0.55
-   ⚠️ 2026-09-26：带子与两枚圆钮已换成**自己画的面**（`TokensPalette.barFill` /
-   `barSelection`），不是系统玻璃 —— 所以第三帧（系统玻璃设成最不通透）
-   与第一帧逐像素相同；相机的横带也不响应那个开关，因为它同样是自己画的。 */
+   ⚠️ 2026-09-26 第三批（v21）：分工与相机**逐块相同** ——
+     · 三块形状是**真玻璃**（`dsGlass`）：两枚圆钮压在连续画面上 → `.overMedia`，
+       选中那一枚坐在带子上 → `.regular`。第一、二帧按玻璃画（模糊），
+       第三帧画的是「降低透明度」那一档（`dsGlass` 那一步画不透明的 `surface` + 发丝线）；
+     · **带子仍自己画**（`TokensPalette.barFill` + 发丝线）—— 所以它在第三帧里
+       **逐像素不变**，与相机那条横带共用同一条规矩：能降的只有材质。
+   第四帧是**对照**：「带子也做成玻璃」那一版。它只画给你看差别 —— 真机上它会同时
+   丢掉两样东西：① 字压在材质上，对比度就由材质说了算（用户原话「又看不到文字了」）；
+   ② 那条带子会开始跟「降低透明度」那个开关走，而相机的不跟。 */
 (function oursFrames(){
   const TABS = ['行程','现在','充电','车控','我的'];
-  const PITCH = 71, LANE = 260, ROW_H = 54, SCREEN = 402, PAD = 8;
-  [[false, '我们 v19 · 静止（带子 = 两钮之间那一条胶囊，只露当前档 ±1）'],
-   [true, '我们 v19 · 拖动中（圆钮移出层级、带子溶解、字铺满屏）'],
-   [false, '我们 v19 · 系统玻璃设成最不通透（自己画的面：与第一帧一个字不差）']]
+  const PITCH = 62, LANE = 224, ROW_H = 47, SCREEN = 402, PAD = 33;
+  /* 每一帧：[拖动中, 说明, 是否「降低透明度」那一档, 带子是否也画成玻璃（只作对照）] */
+  const SOLID_BG = '#1c1c1e';
+  [[false, '我们 v21 · 静止（相机那几个数：带高 47 / 节距 62 / 圆钮 47 / 离屏边 33）'],
+   [true, '我们 v21 · 拖动中（圆钮移出层级、带子溶解、字铺满屏）'],
+   [false, '我们 v21 · 系统玻璃设成最不通透（三块形状变实底，带子逐像素不变）', true],
+   [false, '我们 v21 · 对照：带子也做成玻璃（真机上会丢掉字的对比度，并开始跟系统那一档走）',
+    false, true]]
     .forEach(function (pair) {
       const drag = pair[0];
+      const solid = pair[2] === true;
+      const bandGlass = pair[3] === true;
       const f = document.createElement('div');
       f.className = 'frame';
       f.style.width = SCREEN + 'px';
       f.innerHTML = '<div class="cap">' + pair[1] + '</div><div class="wall"></div>';
       const row = document.createElement('div');
       row.className = 'row';
-      row.style.bottom = '26px';
+      row.style.bottom = '33px';
       row.style.height = ROW_H + 'px';
       row.style.padding = '0 ' + PAD + 'px';
-      /* 两枚圆钮也是自己画的面（barFill），不是玻璃 —— 拖动中**移出层级**（不是淡到透明：
-         那是上一版错了的地方，容器会把透明当成「内容不见了」） */
+      /* 两枚圆钮是**真玻璃**（`.overMedia`：压在壁纸上）—— 拖动中**移出层级**（不是淡到
+         透明：那是上一版的错，容器会把透明当成「内容不见了」）。`solid` 那一帧画的是
+         「降低透明度」：`dsGlass` 在那一步画不透明的 `surface` + 同一圈发丝线。 */
       const armCss = 'width:' + ROW_H + 'px;height:' + ROW_H + 'px;' +
-        'background:rgba(28,28,31,.72);backdrop-filter:none;-webkit-backdrop-filter:none;' +
-        'box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14);';
+        (solid
+          ? 'background:' + SOLID_BG + ';backdrop-filter:none;-webkit-backdrop-filter:none;'
+          : 'background:rgba(120,120,128,.36);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);') +
+        'box-shadow:inset 0 0 0 .5px rgba(255,255,255,.18);';
       row.innerHTML =
         (drag ? '<div style="width:' + ROW_H + 'px"></div>'
               : '<div class="arm" style="' + armCss + '"></div>') +
@@ -299,8 +356,10 @@ makeFrame('frames', { pos: 2.45, dragging: true, caret: -35 }, '图 3 · 拖动�
       const band = document.createElement('div');
       band.className = 'band';
       band.style.cssText = 'width:' + LANE + 'px;height:' + ROW_H + 'px;border-radius:' + (ROW_H / 2) + 'px;' +
-        'background:rgba(28,28,31,.72);backdrop-filter:none;-webkit-backdrop-filter:none;' +
-        'box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14);' +
+        (bandGlass
+          ? 'background:rgba(120,120,128,.20);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);'
+          : 'background:rgba(28,28,31,.72);backdrop-filter:none;-webkit-backdrop-filter:none;') +
+        'box-shadow:inset 0 0 0 .5px rgba(255,255,255,' + (bandGlass ? '.26' : '.14') + ');' +
         'opacity:' + (drag ? 0 : 1);
       row.appendChild(band);
       /* 选中胶囊：静止 0.86 × 带高，拖动 1.0 */
@@ -309,8 +368,11 @@ makeFrame('frames', { pos: 2.45, dragging: true, caret: -35 }, '图 3 · 拖动�
       loupe.style.cssText =
         'width:' + Math.round(PITCH * (drag ? 1.24 : 1.15)) + 'px;' +
         'height:' + Math.round(ROW_H * (drag ? 1 : 0.86)) + 'px;' +
-        'background:rgba(255,255,255,.14);backdrop-filter:none;-webkit-backdrop-filter:none;' +
-        'box-shadow:inset 0 0 0 .5px rgba(255,255,255,.10);' +
+        (solid
+          ? 'background:' + SOLID_BG + ';backdrop-filter:none;-webkit-backdrop-filter:none;'
+          : 'background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.08));' +
+            'backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);') +
+        'box-shadow:inset 0 0 0 .5px rgba(255,255,255,.28),inset 0 1px 0 rgba(255,255,255,.40);' +
         'border-radius:' + Math.round(ROW_H * (drag ? 0.5 : 0.42)) + 'px;';
       row.appendChild(loupe);
       /* 字：拖动中遮罩铺到整屏，静止只画当前档 ±1（Swift 那边静止的

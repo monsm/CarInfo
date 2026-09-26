@@ -460,6 +460,17 @@ VERIFIED_SDK_ADDITIONS = {
     "UnitPoint": "SwiftUI.UnitPoint（iOS 13+）",
     "blendMode": "View.blendMode(_:)（iOS 13+）",
     "repeatForever": "Animation.repeatForever(autoreverses:)（iOS 13+）",
+    # 地图页那枚刷新倒计时（Features/Map/MapSpineReadouts.swift 的 MapRefreshBadge，
+    # 2026-09-26 第二十五轮）。登记前对着 Apple 文档页核过两个名字的 title/abstract：
+    #   · TimelineView     developer.apple.com/documentation/swiftui/timelineview
+    #     「A view that updates according to a schedule that you provide.」
+    #   · periodic(from:by:)  …/swiftui/timelineschedule/periodic(from:by:)
+    #     「A schedule for updating a timeline view at regular intervals.」
+    # 为什么用秒表而不是自己 `Task.sleep` 一秒一醒：后者要一个 `@State` 加一条循环，
+    # 而这里要的只是「每秒重画这一格」—— 而且**只有这一格**重画（`TimelineView`
+    # 的重画范围就是它的 content），不会把那张活地图拖进来。
+    "TimelineView": "SwiftUI.TimelineView（iOS 15+；doc：swiftui/timelineview，A view that updates according to a schedule that you provide.）—— 地图页那枚刷新倒计时的秒表",
+    "periodic": "TimelineSchedule.periodic(from:by:)（iOS 15+；doc：swiftui/timelineschedule/periodic(from:by:)，A schedule for updating a timeline view at regular intervals.）",
     # 艺术主题（ArtTheme）那一轮登记的四个。2026-09-25 主题只剩原生、ArtTheme.swift
     # 已删，但四个名字**都有别的读者**，所以登记一个都不能撤：
     #   preferredColorScheme / allowsHitTesting —— 还在用（App 根部的明暗、禁点）

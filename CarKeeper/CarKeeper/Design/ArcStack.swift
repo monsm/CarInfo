@@ -69,6 +69,14 @@ struct ArcStack: View {
     /// 0 = 没人量过 —— 那时这一叠完全按系统布局走（默认行为，一个字都不变）。
     @Environment(\.stackTopInset) private var topInset
 
+    /// 滚动内容的底部内衬 = **底条占掉的那一段**（由宿主给，见 `stackBottomInset`）。
+    ///
+    /// 它与顶部那一个不是同一件事的两个方向，而是**两个不同的目的**：顶部那一个
+    /// 只是把静止位置推下来（可读性）；底部这一个决定「卡片能不能从底条下穿过」——
+    /// 它曾经写在宿主那一页的 `.padding(.bottom,…)` 上，那等于把滚动视口截在条子
+    /// 上沿（墙），用户 2026-09-26 报的「其他的界面不能穿过底部的导航」就是它。
+    @Environment(\.stackBottomInset) private var bottomInset
+
     var body: some View {
         GeometryReader { geo in
             ScrollViewReader { proxy in
@@ -124,6 +132,9 @@ struct ArcStack: View {
                 //（那是系统自己的处理，不是我们自造的又一层压暗）。
                 .ignoresSafeArea(edges: .top)
                 .contentMargins(.top, topInset)
+                //  底部内衬（底条那一段）：卡片因此能从条子底下穿过，
+                //  而最后一张仍能整张滚到条子上沿之上（两条判据同属一个数，见 `bottomInset`）。
+                .contentMargins(.bottom, bottomInset)
                 .scrollEdgeEffectStyle(.soft, for: .top)
                 // 「滑到底了」—— 只在这一叠真的能滚时才算数。
                 //

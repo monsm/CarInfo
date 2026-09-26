@@ -149,16 +149,16 @@ struct DSSwipeStrip: View {
     /// 见 `MapSpineView.stripLaneWidth(_:)`）—— 不是整行宽度。
     ///
     /// ⚠️ 它必须是「容器给的宽度」，**不能**是条子自己被布局分到的宽度（见文件头）。
-    /// 兜底 248 = 390 的屏宽减去两侧各 8 的留白、两枚 54 的圆钮与两条 9 的中缝 —— 
+    /// 兜底 212 = 390 的屏宽减去两侧各 33 的留白、两枚 47 的圆钮与两条 9 的中缝 ——
     /// 让「暂时量不到宽度」的那一帧也算得下去（兜底服务的是首帧，不是某一个调用点）。
     ///
-    /// 它也是**这一条胶囊的全部宽度**（相机量到的那 215pt 正是它这个量）：
+    /// 它也是**这一条胶囊的全部宽度**（相机量到的那 215pt 正是它这个量，只差屏宽）：
     /// 条子的 frame 就是它，而条子不再是自己画一根窄的坐在一条宽的里。
-    var availableWidth: CGFloat = 248
+    var availableWidth: CGFloat = 212
     /// 拖动时字可以画到多宽（相机那张拖动态：六档铺满屏幕、两端被屏幕边切）。
     /// 宿主给的是整屏宽（`MapSpineView.bottomBar` 传的 `pageWidth`）—— 它比 `availableWidth`
     /// 宽，所以拖动时字会**溢出条子**：`frame` 不变（布局不动），变的是遮罩的宽。
-    var spillWidth: CGFloat = 248
+    var spillWidth: CGFloat = 212
     /// 拖动中（相机的动态态）—— 宿主据此让两枚圆钮让位（它们不在这条子里）。
     /// 它只报「这一次触摸算不算拖」：轻点不抬，越过 8pt 才抬。
     var onDragging: ((Bool) -> Void)?
@@ -176,7 +176,7 @@ struct DSSwipeStrip: View {
     ///   · 手指按在条子上下的空白带里拖时，页面在换、**条子一动不动**
     ///     （宿主改的是它自己的 `modePosition`，`c` 没人碰）；
     ///   · 松手时没有谁写回档位 —— `fade` 就停在 0.5（两页各半透明地叠着），
-    ///     下一次碰条子才归位。而那 26pt 的空白带正是拇指自然停放的位置
+    ///     下一次碰条子才归位。而那条离底的空白带正是拇指自然停放的位置
     ///     （宿主自己写着「整条都算滑动区」）。
     struct RowDrag: Equatable {
         /// 手指从按下到此刻的横向增量
@@ -192,23 +192,38 @@ struct DSSwipeStrip: View {
     var rowDrag: RowDrag? = nil
 
     // ---- 几何（全部由条高推出来，见文件头）----
-    /// 条高。HIG 最小触控目标是 44；2026-09-25 从 46 抬到 **54** —— 用户「滑动区变高」，
-    /// 而这条子既是显示、也是它自己的拖动面（上下叠叠乐 2026-09-25 起就是系统 `ScrollView`，
-    /// 条子**不能**用：它要的是「整行跟手 + 吸附到档」这一种相机式的滑动，
-    /// 而不是自由滚动），所以「看起来更大」与「更好按」在这件控件上是同一件事。
-    /// 54 也与 iOS 26/27 那批浮动玻璃栏（工具栏 / Tab 栏）同一个量级。
-    private let barHeight: CGFloat = 54
-    /// 一档的宽度（定宽，见文件头）。它只当**标签的排版格**用（字号 15 的两个汉字
-    /// 约 31pt），不再决定条子多宽 —— 条宽现在是 `availableWidth`（见 `barWidth`）。
+    /// 条高 —— **相机那个数**（裁图 144px = 47pt）。条子这一族几何全由它推出来，
+    /// 而宿主那两枚圆钮的直径**就是它**（`MapSpineView.armSize` 直接读这个常量）：
+    /// 相机里圆钮与带子等高，两处各写一个数就是两个数。
+    ///
+    /// ⚠️ 2026-09-26（用户：「左右 2 个圆球太贴着边框了，和相机的尺寸距离大小不匹配」）：
+    /// 2026-09-25 用户说过「滑动区变高」，于是条高 46 → 54。**那一次把整族数一起放大了
+    /// 15%**：节距 62 → 71、选中胶囊 71×40 → 82×46、圆钮 47 → 54 —— 因为这几条式子的
+    /// **比例是照相机定的**（节距 = 1.32 × 带高、胶囊 = 1.15 × 节距 与 0.86 × 带高），
+    /// 带高一换，它们就一起漂。回到 47 之后，四条式子**同时**落回相机量到的绝对值
+    ///（节距 62、胶囊 71×40、圆钮 47、带子 ≈215）—— 那是这组比例本来要给出的答案。
+    /// 而「滑动区」一点没小：整行（含条下那 33pt）仍是滑动区，触摸高度还是 80pt，
+    /// 与条高 54 那一版**逐点相同**。
+    /// 它写成 `static` 是因为宿主也要读它（`MapSpineView.armSize`），而里面每一处都用
+    /// `Self.barHeight` —— 一个数只能有一个出处（同名再声明一份实例属性会让这个名字
+    /// 在实例上下文里指两个东西，读的人每次都得先判断是哪一种）。
+    static let barHeight: CGFloat = 47
+    /// 一档的宽度（定宽，见文件头）。它只当**标签的排版格**用（字号 13 的两个汉字
+    /// 约 27pt），不再决定条子多宽 —— 条宽现在是 `availableWidth`（见 `barWidth`）。
+    /// 它比字宽宽出那几 pt 就是相机量到的「字到透镜边 32pt 空气」里属于格的那一份。
     private let slot: CGFloat = 36
     /// 标签在透镜里左右各留多少（只在「档位太多、得压间距」时用）
-    private var pillPad: CGFloat { barHeight * 0.37 }
-    /// 相邻标签的最大间距。相机量到的是 1.32 × 带高（190px 字距 ÷ 144px 带高）——
-    /// 我们带高 54，于是节距 71 = 格 36 + 间距 35。
+    private var pillPad: CGFloat { Self.barHeight * 0.37 }
+    /// 相邻标签的最大间距。相机量到的是 **1.32 × 带高**（190px 字距 ÷ 144px 带高），
+    /// 而节距 = 格宽 + 间距 —— 所以这里写**减法**：间距 = 1.32 × 带高 − 格宽。
+    ///
+    /// ⚠️ 它曾经写成「0.65 × 带高」（两个式子在带高 54 时给出同一个值，看不出差别）。
+    /// 带高回到相机那个 47 之后两者分开了：0.65 × 47 给出节距 66.6，而相机是 62 ——
+    /// 也就是说那个 0.65 是**凑出来的系数**（为 54 凑的），1.32 才是量到的比例。
     ///
     /// ⚠️ 这个间距**两个状态下是同一个数**：量两张图时字距一样（都是 190px），
     /// 变的只是「露出多少」，所以它不能随形态变。
-    private var gapMax: CGFloat { barHeight * 0.65 }
+    private var gapMax: CGFloat { Self.barHeight * 1.32 - slot }
 
     /// 选中格（透镜）的尺寸。**它不再由节距推出来** —— 那是上一版的病根：
     /// 静止时整行只露三档、但 `gap` 是按「六档能不能装下」算的（节距只有 40），
@@ -224,7 +239,7 @@ struct DSSwipeStrip: View {
     ///（它们仍然是同一个 `slot`，所以吸附不会飘），而透镜是**选中指示**，
     /// 指示器比它盖住的那一段宽，正是 iOS 26/27 玻璃控件里选中态的做法。
     private func loupeWidth(_ pitch: CGFloat) -> CGFloat { pitch * (dragging ? 1.24 : 1.15) }
-    private var loupeHeight: CGFloat { barHeight * (dragging ? 1 : 0.86) }
+    private var loupeHeight: CGFloat { Self.barHeight * (dragging ? 1 : 0.86) }
 
     @State private var c: CGFloat = 0            // 行内坐标：条正中对应到行里的位置
     @State private var cBase: CGFloat?
@@ -305,7 +320,7 @@ struct DSSwipeStrip: View {
     ///      就是为它存在的，2026-09-26 随「按住展开」一起删。
     ///   ② 「三档 + 两条间距」当宽度：那仍然是把观察到的结果（静止看见三档）当成了输入。
     ///      现在宽度归两枚圆钮（它就是那一段，见文件头），**三档是几何自己算出来的**：
-    ///      带宽 = 248、节距 = 71 → 248 ÷ 71 = 3.5，所以当前档 ±1 各自整格在带里、
+    ///      带宽 ≈212、节距 62 → 212 ÷ 62 = 3.4，所以当前档 ±1 各自整格在带里、
     ///      ±2 整个在带外。要挪就挪节距，而节距是从带高推出来的，不是为「装几档」挑的。
     private func barWidth() -> CGFloat {
         max(120, availableWidth)
@@ -386,7 +401,7 @@ struct DSSwipeStrip: View {
         .animation(TokensMotion.fade, value: dragging)
         // 条子**自己就是这个宽度**：它不再是「HStack 挤压出来的弹性视图」，
         // 所以「几何用的宽度」与「渲染出来的宽度」不可能两套（见文件头）。
-        .frame(width: barW, height: barHeight)
+        .frame(width: barW, height: Self.barHeight)
         .contentShape(Rectangle())
         .highPriorityGesture(swipe(gap: gap, lim: lim, barW: barW))
         .onAppear { settle(animated: false, gap: gap, lim: lim) }
@@ -417,6 +432,16 @@ struct DSSwipeStrip: View {
     ///
     /// 拖动时它**溶解掉**（相机图 2 / 图 3 的黑底里量不到它）：这是那个动态态的第一步。
     ///
+    ///  ⚠️ 2026-09-26 第三批：三块形状（两枚圆钮 + 选中那一枚）回到了真玻璃，
+    ///  而**它不跟着回去**（用户自己的两个直觉都对：「带子尽量保持一个液态玻璃试试，
+    ///  但应该不是液态玻璃，要不然又看不到文字了」）：
+    ///    · 它底下没有系统材质 —— 量出来的（相机那条横带就是画的，所以「降低透明度」
+    ///      对它无效）；
+    ///    · 它是选中那一枚**下面**那一层：它变成玻璃，就是「一块表面里叠两块玻璃」
+    ///      （`DSGlass.swift` 规则的 ②），而那条路上一轮把整条的内容吞过一次；
+    ///    · 字压在材质上时，对比度就由材质说了算 —— 那正是「又看不到文字了」，
+    ///      而这条带子上的字是全 App 唯一入口的名字。
+    ///
     ///  ⚠️ 2026-09-26（第二次改）：它从 `.dsGlass` 换成**自己画的面**（`barFill`）。
     ///  三条依据都是量出来的：
     ///    · 相机那条横带底下没有系统材质，所以「降低透明度」对它无效 —— 而我们的
@@ -433,7 +458,7 @@ struct DSSwipeStrip: View {
             .overlay {
                 Capsule().strokeBorder(TokensPalette.hairline, lineWidth: TokensHair.border)
             }
-            .frame(width: barW, height: barHeight)
+            .frame(width: barW, height: Self.barHeight)
             .allowsHitTesting(false)
     }
 
@@ -448,25 +473,30 @@ struct DSSwipeStrip: View {
         //
         // 宽度也不能比条身还宽（很窄的容器里）：留 6pt，否则它会盖住条的两端圆头。
         let w = min(loupeWidth(pitch(gap)), max(slot, barW - 2 * TokensSpacing.xs))
-        //  它是 `barSelection`：**比底子再偏一层明暗**，不是第二块玻璃。
+        //  ⚠️ 2026-09-26 第三批（用户：「准确的是 3 个液态玻璃，左右的球和中间的选中」）：
+        //  它现在是**真玻璃**（`dsGlass`），与两枚圆钮同一套。
         //
-        //  这里的两代写法都删掉了，各自的账记在这一段：
+        //  为什么这一次可以、上一次不行：上一次的障碍是「玻璃必须住在容器里」，
+        //  而那时**带子也是玻璃** —— 两块玻璃叠在一个容器里才需要合成，也才会
+        //  把同层的内容一起吞掉。现在带子是**自己画的面**（`band`，相机就是那样），
+        //  所以这一枚坐在一块**不是玻璃**的面上：一块表面里没有第二块玻璃，
+        //  也就不需要容器。
+        //
+        //  三代写法各自的账（留着，因为每一代都是被一个真实故障否掉的）：
         //    · 第一代 `Capsule().fill(TokensPalette.glassHighlight)` —— 一个半透明白面，
         //      也就是「玻璃的假象」；
-        //    · 第二代 `.dsGlass(in: Capsule())` —— 真材质，但它必须住在一个
-        //      `GlassEffectContainer` 里才成立，而**那个容器把整条底条的内容吞掉了**：
-        //      真机上量到的是「带子里一个字都没有、选中胶囊也没有」（用户 2026-09-26：
-        //      「静态的和相机差距很大」）。
-        //  底条要的是相机那条横带的做法（自己画的面 + 比底子亮一层的选中格）——
-        //  于是它既不受「降低透明度」影响，也不需要容器。
-        return shape
-            .fill(TokensPalette.barSelection)
+        //    · 第二代真材质（那一版带子也是玻璃）—— 真机上量到「带子里一个字都没有」；
+        //    · 第三代数层自画的伪玻璃（底渐变 / 边 / 影子）—— 质感仍差得远（用户）。
+        //
+        //  阴影不另加：系统玻璃自带边缘与投影，再加一层就是两层影子。
+        return Color.clear
             .frame(width: w, height: loupeHeight)
+            .dsGlass(in: shape, variant: .regular, interactive: false)
             .opacity(loupeVisible ? 1 : 0)
             .animation(TokensMotion.fade, value: loupeVisible)
             //  拖动时长到满行高（相机量到 40 → 47pt，0.86 → 1.0 × 带高）。
             .animation(TokensMotion.settle, value: dragging)
-            .position(x: barW / 2, y: barHeight / 2)
+            .position(x: barW / 2, y: Self.barHeight / 2)
             .allowsHitTesting(false)
     }
 
@@ -480,7 +510,10 @@ struct DSSwipeStrip: View {
                 //  画出来再裁的代价可以忽略。少一条判据就少一整类「什么都不显示」的可能，
                 //  裁切本来就有遮罩在做（见本函数末尾的 `.mask`）。
                 Text(item.title)
-                    .font(TokensTypo.fixed(15, weight: .semibold))
+                    //  字号也回到相机那个数（裁图：glyph 40px = 13pt；带高 47 → 3.6 × 字高，
+                    //  与相机逐字相同）。它此前是 15 —— 条高 54 那一族里的数；只换条高、
+                    //  不换字号，静止形态就比相机大一圈（同一条子里的字占的份量）。
+                    .font(TokensTypo.fixed(13, weight: .semibold))
                     .tracking(TokensTracking.label)
                     // 选中 = 主题强调色（相机里那一档是黄），其余 = 正文色。
                     // 两档字的字重与字号**一样** —— 相机也是用颜色而不是加粗区分，
@@ -510,7 +543,7 @@ struct DSSwipeStrip: View {
                     //  不再更暗（再暗就读不出来了，而它仍然是可点的一档）。
                     .opacity(fade(x: x, barW: barW, pitch: pitch(gap)))
                     .frame(width: slot)
-                    .position(x: x, y: barHeight / 2)
+                    .position(x: x, y: Self.barHeight / 2)
                     .accessibilityLabel(Text(item.title))
                     .accessibilityAddTraits(i == index ? [.isSelected, .isButton] : [.isButton])
                     .accessibilityAction { pick(i) }
@@ -519,20 +552,20 @@ struct DSSwipeStrip: View {
         // 标签、透镜、手势同处**条内**坐标系（原点 = 条的左边缘，正中 = barW/2）——
         // 此前把标签装进「全屏宽」的容器再居中，坐标却按条宽算，所有字整体偏
         // (屏宽−条宽)/2，透镜永远压不到当前档的文字。
-        .frame(width: barW, height: barHeight)
+        .frame(width: barW, height: Self.barHeight)
         // 窗口把越界的那半格裁掉（原型 `.strip{overflow:hidden}`）。
         //
         //  遮罩是一个**矩形**（2026-09-26 从圆角矩形改回）：窗口本身不可见，遮罩在这里
         //  只决定「字在哪里被切」。宽是**两个数**：静止 = **三档宽**（相机静态那张
-        //  只画得出当前 ±1，两端各留一段空气）——不是条宽：条宽从 248 收到 260 之后，
-        //  按条宽裁会让 ±2 露出 6pt 的窄边；按 `pitch × 3` 裁则 ±1 带 17pt 空气、±2
-        //  完全在窗外。
+        //  只画得出当前 ±1，两端各留一段空气）——不是条宽：带宽 ≈212、节距 62，
+        //  按条宽裁（±106）会让 ±2 从窗口边缘露出 18pt 的一条边，而 `pitch × 3` = 186
+        //  （±93）则 ±1 带 13pt 空气、±2 完全在窗外。
         //  拖动 = `spillWidth`（相机那张拖动态：六档铺满屏幕、切在屏幕边上）。
         //  字画到条子外面是故意的：`frame` 不动，所以布局不抖 —— 变的只是这块遮罩。
         .mask {
             Rectangle()
                 .frame(width: dragging ? max(barW, spillWidth) : min(barW, pitch(gap) * 3),
-                       height: barHeight)
+                       height: Self.barHeight)
         }
         .allowsHitTesting(false)
     }
@@ -553,6 +586,14 @@ struct DSSwipeStrip: View {
                 if cBase == nil {
                     cBase = c
                     moved = false
+                    //  这一根手指归条子 —— 条外那条通道的**残留**一起清掉。
+                    //  ⚠️ 2026-09-26：`rowBase` 原先只在 `rowDragChanged` 里清，而条外那条
+                    //  手势被接管 / 被系统取消时**不会走 `onEnded`**，`rowBase` 就留下上一次
+                    //  触摸的起点。下一次触摸若先到的是条外那条通道，它算出的 `c` 是
+                    //  「过时的起点 − 本次增量」—— 松手吸附到的就是错的那一档（用户看到的
+                    //  是「放手就去相邻的入口」）。起点与这一根手指的同一条通道绑定。
+                    rowBase = nil
+                    rowMoved = false
                 }
                 if abs(v.translation.width) > 8 { moved = true }
                 // 行跟着手指走，透镜钉在正中（唯一的跟手形态，见文件头）
@@ -616,6 +657,27 @@ struct DSSwipeStrip: View {
         onPosition?(pvValue(c: c, gap: gap))
     }
 
+    /// 松手时**用哪一档**：位置说了算，速度只买一步。
+    ///
+    /// ⚠️ 2026-09-26（用户：「滑动到 A，放手就容易去相邻的入口」）：此前松手直接拿
+    /// `predictedEndTranslation` 去换档位。它是系统按速度算出的「松手后手指将到的地方」，
+    /// 在**一次普通拖动**里通常比手指多走 20–60pt（0.3–0.9 档，节距 62）——
+    /// 用户把 A 对到透镜正中时手上还剩一点速度，那多出来的一截正好把他推过 0.5 档，
+    /// 于是落到邻居。而用户对的是**眼睛看到的**那一档，不是速度预测出来的位置。
+    ///
+    /// 现在：投影比停手的位置多出不到半档 → 完全按位置吸附（速度只是噪声）；超过半档
+    /// 才算「甩」，而甩**最多多走一档** —— 一路甩过三档不是这个控件的手感，
+    /// 相机那条模式条也是「甩一下，走一格」。
+    ///
+    /// 两条通道（条内 / 条外整行）都走这一个函数：松手的结果只能有一个算法。
+    private func landingPV(_ projected: Double?, gap: CGFloat) -> Double {
+        let pos = pvValue(c: c, gap: gap)
+        guard let projected else { return pos }
+        let extra = projected - pos
+        guard abs(extra) > 0.5 else { return pos }
+        return pos + min(max(extra, -1), 1)
+    }
+
     /// 松手时的**预测落点**（连续档位，`pvValue` 的同一量纲）：
     /// 用系统给的 `predictedEndTranslation`，而不是松手那一刻的位置 —— 两者差的就是速度。
     ///
@@ -636,8 +698,9 @@ struct DSSwipeStrip: View {
     /// 的透明度跟着过冲，看起来是「颤抖」，代价是那一叠每一帧重画（用户 2026-09-25 第 2 条）。
     private func snap(gap: CGFloat, lim: ClosedRange<CGFloat>, projected: Double? = nil) {
         let last = Double(max(0, items.count - 1))
-        // 先夹再四舍五入：拖动时可以越出端（`clampC` 的软段），而档位只有 0…last。
-        let pv = min(max(projected ?? pvValue(c: c, gap: gap), 0), last)
+        // 先折算（速度只买一步，见 `landingPV`）再夹、再四舍五入：拖动时可以越出端
+        //（`clampC` 的软段），而档位只有 0…last。
+        let pv = min(max(landingPV(projected, gap: gap), 0), last)
         let i = min(max(Int(pv.rounded()), 0), max(0, items.count - 1))
         guard items.indices.contains(i) else { return }
         if items[i].id == selectedID {

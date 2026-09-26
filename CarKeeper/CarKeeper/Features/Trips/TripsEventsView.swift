@@ -650,13 +650,12 @@ struct MiniTripMap: View {
     /// 前者不该在卡片上写“还没有路线”（那会变成一次闪烁），后者必须说。
     @State private var tried = false
 
+    /// 镜头。**它是状态**，不是 `.constant`（那个形状写在 `fit` 上）。
+    @State private var camera: MapCameraPosition = .automatic
+
     var body: some View {
         if let a = from, let b = to {
-            Map(position: .constant(.camera(MapCamera(
-                centerCoordinate: center(a, b),
-                distance: fitDistance(a, b),
-                heading: 0,
-                pitch: 0)))) {
+            Map(position: $camera) {
                 // 一次算好再画：`line(_:_:)` 在取不到路线时是现拼的数组，
                 // 写两遍就是拼两遍（而它们内容必须一样）—— 一个局部量把它变成一次。
                 let pts = line(a, b)
@@ -671,13 +670,21 @@ struct MiniTripMap: View {
             }
             .mapStyle(.standard(elevation: .flat, emphasis: .muted,
                                 pointsOfInterest: .excludingAll, showsTraffic: false))
+            //  镜头改成状态（上一行）之后，地图本身**会接手势**了 —— 而这张图在一叠卡里，
+            //  手指落在图上就不再滚那一叠（竖向拖动会被 MapKit 吃掉）。它本来就是个「说明图」
+            //  （没有任何控件、POI 全关），所以不接手势：镜头仍然跟着状态走。
+            .allowsHitTesting(false)
             // 取路线：挂在卡片自己身上（卡片被建出来才发请求）。
             // `.task(id:)` 的 id 是两点 ⇒ 行程变了就重新取（同一段不会重复取，
             // 缓存与合流都在服务里，见 `RouteService`）。
             .task(id: routeKey(a, b)) {
                 tried = false
+                //  先按「两点直线」取一次景（第一帧就有画面），路线回来再框一次 ——
+                //  **第二次才是「把行程居中」那一下**（见 `fit`）。
+                camera = fit(a, b)
                 road = await RouteService.shared.route(from: a, to: b)?.points ?? []
                 tried = true
+                camera = fit(a, b)
             }
             .overlay(alignment: .bottomLeading) { fallbackNote }
         } else {
@@ -698,29 +705,37 @@ struct MiniTripMap: View {
         road.count > 1 ? road : [a, b]
     }
 
-    /// 视野中心：有路线时用**路线的中点**（不是两点的中点）——
-    /// 绕行的路线可能整个偏在一侧，按两点中点框会把它裁掉一半。
-    private func center(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> CLLocationCoordinate2D {
-        let pts = line(a, b)
-        return pts[pts.count / 2]
-    }
-
-    /// 把画出来的东西框进画面所需的视距（米）。
-    /// 纬度差按 111 km/度换算；经度差乘 cos(纬度)。
+    /// 把**画出来的那串坐标**框进画面：中心取**包围盒的中心**，视距按它的长边算。
     ///
-    /// 它量的是 `line(_:_:)`（有路线时长得多），而且要把**最远的那一个点**算进去：
-    /// 绕行的路线可能有凸出一大截的部分，只看首尾两端仍会裁掉它。
-    private func fitDistance(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> Double {
+    /// ⚠️ 2026-09-26（用户：「行程页地图应该把行程居中」）—— 此前是
+    /// `Map(position: .constant(…))`，那个值在**第一帧**（`road` 还空着）就定下了：
+    /// 那时画的是两点直线，于是镜头按「两点之间」取景；路线回来之后线换成了绕行的
+    /// 那一条，镜头却不动 —— 看到的就是「行程偏在一边、甚至被裁掉」。两处一起改了：
+    ///
+    ///   · 镜头是**状态**（`camera`），路线回来再框一次（见 `.task`）；
+    ///   · 中心从此取**包围盒的中心**。上一版取「点串正中间那一个点」：
+    ///     采样点按距离均匀时它才约等于中点，而绕行（下高速绕一圈）会让它整个偏到一侧，
+    ///     包围盒的中心与采样无关 —— 它量的是「画出来的形状占在哪一片」这个几何事实。
+    ///   · `2.4` 这个系数**留着**（它此前就在这里：视距 = 跨度的 2.4 倍），
+    ///     只是跨度改成包围盒的**长边**（此前是「离起点最远的那个方向」—— 同一个量，
+    ///     但那是以起点为原点的，路线绕回起点一侧时两个数会差很多）。
+    private func fit(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> MapCameraPosition {
         let pts = line(a, b)
-        var span: Double = 0
-        for p in pts {
-            let latMeters = abs(p.latitude - a.latitude) * 111_000
-            let lngMeters = abs(p.longitude - a.longitude) * 111_000
-                * max(0.2, cos(a.latitude * .pi / 180))
-            span = max(span, max(latMeters, lngMeters))
-        }
-        // 两端重合或几乎没动：退到能看清两个牌的默认视距
-        return max(span * 2.4, 900)
+        let lats = pts.map(\.latitude)
+        let lngs = pts.map(\.longitude)
+        let minLat = lats.min() ?? a.latitude, maxLat = lats.max() ?? a.latitude
+        let minLng = lngs.min() ?? a.longitude, maxLng = lngs.max() ?? a.longitude
+        let midLat = (minLat + maxLat) / 2
+        let midLng = (minLng + maxLng) / 2
+        // 纬度差按 111 km/度换算；经度差乘 cos(纬度)。
+        let spanLat = (maxLat - minLat) * 111_000
+        let spanLng = (maxLng - minLng) * 111_000 * max(0.2, cos(midLat * .pi / 180))
+        return .camera(MapCamera(
+            centerCoordinate: CLLocationCoordinate2D(latitude: midLat, longitude: midLng),
+            // 两端重合或几乎没动：退到能看清两个牌的默认视距。
+            distance: max(max(spanLat, spanLng) * 2.4, 900),
+            heading: 0,
+            pitch: 0))
     }
 
     /// 直线的说明。只在**问过、且没拿到**时才出现（正在取时什么都不说 ——

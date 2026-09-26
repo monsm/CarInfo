@@ -186,13 +186,12 @@ enum TokensPalette {
     static let barFill: Color = tokenDynamic(light: (1, 1, 1),
                                              dark: (0.11, 0.11, 0.12),
                                              alpha: 0.72)
-    /// 底条上**被选中**的那一枚（相机里那枚更亮的胶囊）。它坐在 `barFill` 上，
-    /// 所以是「比底子再偏一层明暗」——**不是玻璃**：一块表面里不再叠第二块玻璃
-    /// （见 `DSGlass.swift` 的规则 ②）。亮色下比底子暗、暗色下比底子亮，
-    /// 两种明暗下都读得出「选中在这儿」。
-    static let barSelection: Color = tokenDynamic(light: (0, 0, 0),
-                                                  dark: (1, 1, 1),
-                                                  alpha: 0.14)
+    // 已删除：`barSelection` / `barSelectionRim` / `barSelectionShadow`
+    //（2026-09-26 第三批）。它们是我给「选中那一枚」自画的三层伪玻璃（底渐变 / 边 / 影子），
+    // 而用户在下一秒就把话说清了：「准确的是 3 个液态玻璃：左右的球和中间的选中」——
+    // 那三块要的是**真玻璃**（`dsGlass`），而真玻璃自己就带边缘与投影。
+    // 三个令牌因此一个读者都不剩：留着它们，下一个读的人会以为选中那一枚还是自画的。
+    // 唯一留在原地的是带子那一个（`barFill`）—— 它不是玻璃，理由写在 `DSSwipeStrip.band`。
 
     // 已删除：`glassLight`（2026-09-25）。
     // 它是 `fillSubtle` 的**重复声明**（同一个值、两个名字），而「名字里带 glass
@@ -451,7 +450,9 @@ enum TokensSize {
     static let tileIcon: CGFloat = 22
     /// 行内图标列宽（iOS 设置行）
     static let iconColumn: CGFloat = 29
-    static let barHeight: CGFloat = 56
+    //  已删除：`barHeight`（2026-09-26）。它是 56 —— 条高还在 54 那一族时留下的数，
+    //  而真正的出处是 `DSSwipeStrip.barHeight`（47）：两个名字指同一件东西、
+    //  其中一个还是旧值，下一个人拿到的就是错的那个（它本来**一个读者都没有**）。
 }
 
 // MARK: - 已删除：`TokensSerif`（2026-09-25，随艺术主题一起删）
@@ -493,8 +494,8 @@ private func tokenColor(_ hex: UInt32, alpha: Double = 1) -> Color {
 /// 明暗两套取值。系统深色时取 dark，否则取 light。
 /// （原 `ArtTheme.nativeDynamic`，同一段实现、同一批取值。）
 ///
-/// `alpha` 只服务底条那两层（`barFill` / `barSelection`）：它们是**半透明**的面
-/// （相机那条横带就是），而其余每一个令牌都是不透明的系统语义值。
+/// `alpha` 只服务底条那一条带子（`barFill`）：它是**半透明**的面（相机那条横带就是），
+/// 而其余每一个令牌都是不透明的系统语义值（三块形状现在走真玻璃，不靠扁平色）。
 private func tokenDynamic(
     light: (CGFloat, CGFloat, CGFloat),
     dark: (CGFloat, CGFloat, CGFloat),
