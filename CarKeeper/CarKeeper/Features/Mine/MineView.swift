@@ -51,8 +51,9 @@ struct MineView: View {
     private var cards: [StackCard] {
         var out = HomeMode.mine.headCards
         out.append(StackCard(id: "tabs", content: AnyView(
-            DSSegmented(options: HomeSub.mineTabs.map { (value: $0, title: $0.title) },
-                        selection: $tab))))
+            DSSegmentPicker(options: HomeSub.mineTabs.map { (value: $0, title: $0.title) },
+                            selection: $tab,
+                            label: "段落"))))
         switch tab {
         case .emergency:
             out.append(StackCard(id: "emergency", title: "应急",
@@ -327,19 +328,53 @@ struct MineView: View {
                     .foregroundStyle(TokensPalette.secondary)
             }
             .frame(minHeight: TokensSpacing.row)
-            DSSegmented(options: WallpaperSource.allCases.map { (value: $0, title: $0.segmentTitle) },
-                        selection: Binding(get: { wallpaper.source },
-                                           set: { pickSource($0) }))
-                .accessibilityLabel(Text("背景图来源"))
+            //  ⚠️⚠️ 2026-09-26 第三次改（前两次都没修好）：用户把「聚焦那一档时点不动」
+            //  又报了一次。前两次换的都是**我们自己写的控件**（先是系统 `Picker(.menu)`、
+            //  后是自己写的 `Menu`、再是 `DSSegmented`）—— 而 `DSSegmented` 是一排
+            //  自己搭的 `Button`：它的命中区、它和滑动叠的关系、它在巨大背景图上的
+            //  排期，三件事都由我们负责。这一条已经试掉三代自造控件了。
+            //  于是换成**系统的分段控件**（`Picker` + `.pickerStyle(.segmented)`，底下
+            //  就是 UIKit 的 `UISegmentedControl`）：命中区、按下反馈、无障碍的
+            //  「可选 / 已选中」全在系统手里，每一代 iOS 都跟着平台走 ——
+            //  用户这一轮的原话：「尽可能的使用 ios27 的原生控件」。
+            //  与 `DSSegmented` 的差别只有外观（原生那一枚有自己的凹槽与滑块）——
+            //  而这一行正是全 App 最不该再拿外观换可靠性的地方。
+            DSSegmentPicker(options: WallpaperSource.allCases.map { (value: $0, title: $0.segmentTitle) },
+                            selection: Binding(get: { wallpaper.source },
+                                               set: { pickSource($0) }),
+                            label: "背景图来源")
 
             // 缩略图：铺的就是这一张。没图（没选 / 没取到 / 点了「不铺」）画占位。
+            //
+            //  ⚠️⚠️ 2026-09-26：「聚焦那一档时图源点不动」的真正原因就在这一格里 ——
+            //  三代控件换下来都没好的原因不是控件，而是**这一张缩略图坐在控件下面一层、
+            //  却把上面那一片命中先拿走了**：
+            //    · `aspectRatio(contentMode: .fill)` 报出来的尺寸是「填满提案」的那个
+            //      尺寸，**不是**下面那个 120pt 的框：竖图（聚焦那张是 1080×1920）
+            //      铺 340×120 的框报的是 **340×604** —— 顶上多出 242pt，
+            //      正好把上面那个分段控件整条盖住；而横图（必应那张 1920×1080）
+            //      多出 35pt，只盖住控件下沿一条 —— 这就是「必应可以、聚焦不行」的差。
+            //    · 命中的是**视图自己的几何**：它是一张图，不接手势，但它仍然把命中
+            //      停在自己身上（SwiftUI 的命中测试到最前面那个可命中视图为止）。
+            //    · `clipShape` 裁的是画，不是命中 —— 所以前两代控件（系统 `Picker`、
+            //      自写 `Menu`）与 `DSSegmented` 在同一张图上都是一样的结果。
+            //  三件事一起才是修：`.frame(..., alignment: .top)` 而不是居中（图从那 120pt
+            //  的**顶部**开始画，溢出的部分一律往下、永远不再向上盖）+ `.clipped()`
+            //  + `.allowsHitTesting(false)`（缩略图不需要命中 —— 图不存在「点它」这件事）。
             Group {
                 if let img = wallpaper.image {
                     Image(uiImage: img)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(height: 120)
+                        //  `.top` 而不是默认的居中：图从那 120pt 的**上沿**开始画，
+                        //  溢出的那部分一律往下 —— 竖图不再往**上**盖住上面那个控件。
+                        .frame(height: 120, alignment: .top)
                         .frame(maxWidth: .infinity)
+                        .clipped()
+                        //  关键的那一行：一张铺底的缩略图**不该在命中链里**。
+                        .allowsHitTesting(false)
+                        //  圆角仍然是画出来的那一层（上面那个 `clipped` 是矩形裁，
+                        //  它保证溢出不会画到卡里其他地方，两件事互不替代）。
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
                     Rectangle()
@@ -438,9 +473,13 @@ struct MineView: View {
         }
     }
 
-    /// 选一档图源。**已经是这一档时**不是「什么都不发生」—— 那是「再取一次」
-    /// （分段控件会把同一个值再写一次，所以「点当前那一档」自然走到这里）。
-    /// 用户第 1 条那句「只能点不铺，再重新选」的另一面就是这个：这一行不该有死路口。
+    /// 选一档图源。**已经是这一档时**不是「什么都不发生」—— 那是「再取一次」。
+    ///
+    /// ⚠️ 换成原生分段控件之后，这一支**只对旧写法成立**：`UISegmentedControl`
+    /// 点已选中的那一段不会再把同一个值写回来（自己搭的那一排 `Button` 会）。
+    /// 所以「取图没成功 → 再试一次」的出口现在是缩略图下面那枚**重试**（`failed` 时
+    /// 才出现，就在同一张卡里）—— 而「不铺 → 再选」也仍然成立。
+    /// 这一支保留着不是多余的：它同时还覆盖「将来有别的入口写同一个值」。
     private func pickSource(_ s: WallpaperSource) {
         TokensHaptic.select()
         if s == wallpaper.source { wallpaper.reload() } else { wallpaper.use(s) }

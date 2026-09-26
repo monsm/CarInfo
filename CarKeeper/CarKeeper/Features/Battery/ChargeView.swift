@@ -472,12 +472,16 @@ struct ChargeView: View {
         //  「车端采样」是**这份曲线的性质**（谁给了这些点），所以它搬到卡头值上，
         //  而不是作为第二个标题留在正文里。
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            //  用 `DSSegmented` 而不是系统 `Picker(.segmented)`（2026-09-25）：
-            //  系统那一条的凹槽与滑块是系统自己的灰，铺在玻璃卡里就是一块不合群的暗块
-            //（用户第 5 条：控件都该有玻璃质感、黑颜色太突兀）。
-            //  现在全 App 只有**一个**分段控件，它的底读 `fillSubtle`、滑块读 `glassHighlight`。
-            DSSegmented(options: TrendPeriod.allCases.map { (value: $0, title: $0.rawValue) },
-                        selection: $trendPeriod)
+            //  ⚠️ 这里曾经写着「用自己搭的分段控件、而不是系统 `Picker(.segmented)`」：
+            //  理由当时成立（2026-09-25 第 5 条：系统那一条的凹槽与滑块是它自己的灰，
+            //  铺在玻璃卡里像一块不合群的暗块）。
+            //  2026-09-26 **同一件事被推翻**（用户第 4 条：「尽可能用 ios27 的原生控件」）：
+            //  那一块灰现在的量级跟着 iOS 26/27 的玻璃化外观走，而自搭那一排要自己负责
+            //  命中区、按下反馈、拖动跟踪与无障碍（见 `DSSegmentPicker` 的文件头）。
+            //  于是这一处现在是**系统那一枚** —— 外观随系统这条代价也写在那个文件里。
+            DSSegmentPicker(options: TrendPeriod.allCases.map { (value: $0, title: $0.rawValue) },
+                            selection: $trendPeriod,
+                            label: "趋势周期")
 
             VStack(alignment: .leading, spacing: TokensSpacing.sm) {
                 HStack(alignment: .firstTextBaseline) {

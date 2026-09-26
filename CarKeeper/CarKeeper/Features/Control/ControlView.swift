@@ -628,7 +628,8 @@ struct ControlView: View {
             } else {
                 // 筛选用系统的分段控件语法，不自造一排药丸
                 DSGroupRow {
-                    DSSegmented(options: historyFilterOptions, selection: $historyFilter)
+                    DSSegmentPicker(options: historyFilterOptions, selection: $historyFilter,
+                                    label: "指令筛选")
                 }
                 DSGroupRow(showsSeparator: false) {
                     HStack(spacing: 0) {

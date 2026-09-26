@@ -107,8 +107,9 @@ struct VehicleView: View {
     private var cards: [StackCard] {
         var out = HomeMode.vehicle.headCards
         out.append(StackCard(id: "tabs", content: AnyView(
-            DSSegmented(options: HomeSub.vehicleTabs.map { (value: $0, title: $0.title) },
-                        selection: $tab))))
+            DSSegmentPicker(options: HomeSub.vehicleTabs.map { (value: $0, title: $0.title) },
+                            selection: $tab,
+                            label: "段落"))))
         switch tab {
         case .health:
             // 体检与保养是两张整表，拆不开 —— 包成一张卡。

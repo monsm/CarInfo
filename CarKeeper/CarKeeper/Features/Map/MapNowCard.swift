@@ -45,6 +45,19 @@ import SwiftUI
 //  「拉开多少」仍然只有一个出处，而「记住的那一档」仍然是骨架里那个持久化键。
 // =============================================================================
 
+/// 抽屉自己报出来的**上沿**（地图右侧那一列的锚）。
+///
+/// 用户 2026-09-26：「车位置 人位置 指南针 都紧挨着抽屉，抽屉展开时，他们也要往上移动」。
+/// 用 `PreferenceKey` 而不是再开一个 `@State`：偏好值只让**读它的那个视图**重画
+///（`.overlayPreferenceValue`），这一页里别的东西（那张活地图、六页、底条）不参与 ——
+/// 与「连续量不许住在页面上」是同一条纪律（见 `MapNowDrawer` 头注的③）。
+struct DrawerTopKey: PreferenceKey {
+    static let defaultValue: [Anchor<CGRect>] = []
+    static func reduce(value: inout [Anchor<CGRect>], nextValue: () -> [Anchor<CGRect>]) {
+        value.append(contentsOf: nextValue())
+    }
+}
+
 /// 卡头拿到的那几个把手（只有 `MapNowDrawer` 会造它）。
 ///
 /// 为什么不是一个闭包：卡头那份代码（`MapSpineReadouts`）要同时做四件事 ——
@@ -91,13 +104,28 @@ struct MapNowDrawer<Head: View, Content: View>: View {
                 //（`reveal` 0…1 × 正文的自然高度）。`clipped()` 是必须的：
                 //  正文的高度被压着，没它就会画出卡外。
                 if reveal > 0.001 {
+                    //  三层各有唯一的作用，少一层就用不了：
+                    //   ① `.fixedSize(vertical:)` —— 正文**不接「当前可见高度」这个提案**，
+                    //      永远按自己的自然高度排版（折行稳定）。
+                    //   ② 里面那个 `frame(height: bodyHeight)` —— 把排版结果钉在量到的自然高度上。
+                    //   ③ 外面那个 `frame(height: bodyHeight * reveal)` + `clipped()` ——
+                    //      手指走出来的可见高度，多余的部分剪掉。
+                    //
+                    //  ⚠️ ①②③ 的顺序就是「不鬼畜」这件事本身（用户 2026-09-26：「还是会鬼畜」）：
+                    //  此前只有 ③，于是正文拿到的提案是「当前可见高度」—— 一涨一缩之间
+                    //  折行的字每帧重新换行，卡片里的内容就像在自己扭。
                     content()
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(height: bodyHeight, alignment: .top)
                         .frame(height: max(0, bodyHeight * reveal), alignment: .top)
                         .clipped()
                 }
             }
+            //  量高那一份在 `background` 里：它不占位、也不参与卡片的排版。
             .background(alignment: .top) { measure }
         }
+        //  把自己那条上沿报出去（地图右侧那一列贴着它、并跟着它上下动）。
+        .anchorPreference(key: DrawerTopKey.self, value: .bounds) { [$0] }
         //  记住的那一档：拉出来过就还是拉出来的。**动画不出现在这里** ——
         //  启动那一下应该就是那个样子，不是「从收起长出来」。
         .onAppear { reveal = open ? 1 : 0 }
@@ -105,7 +133,7 @@ struct MapNowDrawer<Head: View, Content: View>: View {
         //  这里补上那一段动画。跟手那一下自己管自己的落点（`land`），走不到这里。
         .onChange(of: open) { _, want in
             guard (want ? 1 : 0) != reveal else { return }
-            withAnimation(TokensMotion.value) { reveal = want ? 1 : 0 }
+            withAnimation(TokensMotion.settle) { reveal = want ? 1 : 0 }
         }
     }
 
@@ -123,8 +151,11 @@ struct MapNowDrawer<Head: View, Content: View>: View {
     /// 它**不能再守「open 与目标相同就不动」**：跟手拖到一半松手时，目标可能与
     /// 当前档相同（拉到 40% 又放回去）—— 而那个中间位置必须归位。
     /// 触觉不在这里：点击与拖动各有自己的手感，谁也不该替谁发。
+    ///
+    /// ⚠️ 动画取 `TokensMotion.settle`（临界阻尼，不过冲）而不是 `value`：
+    /// 系统的 sheet 落位**不会回弹**，而这里多一下回摆就是「拉开之后又抽一下」。
     private func land(_ next: Bool) {
-        withAnimation(TokensMotion.value) {
+        withAnimation(TokensMotion.settle) {
             open = next
             reveal = next ? 1 : 0
         }
@@ -134,15 +165,27 @@ struct MapNowDrawer<Head: View, Content: View>: View {
     ///
     /// 它住在 `background` 里：背景不参与父视图的排版，所以这一份既不占位、
     /// 也不出现在版面上（`.hidden()` 连绘制都省了，但它仍然参与布局）。
+    ///
+    /// ⚠️ `.fixedSize(horizontal: false, vertical: true)` 是**必须的**，不是修饰：
+    /// `background` 会把「卡片当前的高度」作为提案递给背景内容 —— 而卡片的高度
+    /// 正是被量出来的那个数。不挡住提案就是**反馈环**：量到 400 → 卡片 400 →
+    /// 下一帧又拿 400 去量（内容被压着量出 400）→ …… 表现出来就是卡片在自己抖。
+    /// 写死「按自然高度量」之后，量出来的数不依赖卡片当前的形状。
+    ///
     /// ⚠️ 它**总是**建着（不只是拉开的时候）：拉开的第一帧就有分母 ——
     /// 否则高度会先从 0 跳到真值，跟手那一下会先闪一格。
     private var measure: some View {
         content()
+            .fixedSize(horizontal: false, vertical: true)
             .background {
                 GeometryReader { g in
                     Color.clear
+                        //  只在真的变了才写（差值 < 0.5pt 当没变）：手势系统与布局都会
+                        //  把同一个尺寸重复递几次，而每一次写都会再触发一轮布局。
                         .onAppear { bodyHeight = g.size.height }
-                        .onChange(of: g.size.height) { _, h in bodyHeight = h }
+                        .onChange(of: g.size.height) { _, h in
+                            if abs(h - bodyHeight) > 0.5 { bodyHeight = h }
+                        }
                 }
             }
             .hidden()

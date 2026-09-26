@@ -353,83 +353,13 @@ extension MapSpineView {
 }
 
 // =============================================================================
-//  MapRefreshBadge —— 地图页上那枚自动刷新的倒计时（调试）
+//  已删除：`MapRefreshBadge`（地图页左上角那枚刷新倒计时）
 // =============================================================================
-
-extension MapSpineView {
-    /// 把那枚徽标摆到地图上：左上角、比例尺那一格之下。
-    ///
-    /// 为什么它的位置在这儿而不是在 `MapSpineView.swift`：那一份贴着 `lintcfg.py` 的
-    /// 1200 行门禁（差一行就红），而这一格与「读数」同一类东西（本文件头注的理由）。
-    /// `xxxl`（64）是比例尺那一格（`sm`）+ 它自己的高度之外那一格呼吸位 ——
-    /// 复用间距刻度上的已有档，不新造一个数。
-    func mapRefreshBadge() -> some View {
-        MapRefreshBadge()
-            .padding(.leading, TokensSpacing.md)
-            .padding(.top, TokensSpacing.xxxl)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-}
-
-/// 用户 2026-09-26：「地图页加入刷新倒计时吧，我感觉没刷新一样（调试用）」。
-///
-/// 那句话说的是一件真事：这条循环**没有任何可见的反馈** —— 停着的车报文几乎不变，
-/// 数据不变、界面就不变，于是「在刷」与「没在刷」看起来一模一样。这枚徽标把
-/// 三件事写在脸上：**还剩几秒**、**此刻这一档的节律**、**退避走到第几拍**。
-///
-/// ⚠️ 它读的全是循环自己的数（`interval` / `lastTickAt` / `zeroStreak`），
-/// **不另存**「下次该几点刷」—— 那会是第二个节律（`RefreshLoop` 头注：节律只有一处）。
-/// 秒表由 `TimelineView` 走：它自己不持任何状态，也只有这一格每秒重画，
-/// 整屏（含那张活地图）不会被拖进来。
-struct MapRefreshBadge: View {
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            content(now: ctx.date)
-        }
-    }
-
-    private func content(now: Date) -> some View {
-        let loop = RefreshLoop.shared
-        return HStack(spacing: TokensSpacing.xs) {
-            Image(safeSymbol: "arrow.triangle.2.circlepath", fallback: "arrow.clockwise")
-                .font(TokensTypo.fixed(11, weight: .semibold))
-                .foregroundStyle(TokensPalette.secondary)
-            //  `monospacedDigit`：倒计时是每秒变的数，等宽才不跳。
-            Text(left(now: now, loop: loop))
-                .font(TokensTypo.fixed(11, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(TokensPalette.primary)
-            Text(cadence(loop))
-                .font(TokensTypo.fixed(11, weight: .medium))
-                .foregroundStyle(TokensPalette.tertiary)
-        }
-        .padding(.horizontal, TokensSpacing.sm)
-        .padding(.vertical, TokensSpacing.xs)
-        //  它是浮在**连续画面**（地图瓦片）上的一小块 —— 材质走全 App 唯一那一档（`.clear`）。
-        .dsGlassCapsule(hairline: false)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text("自动刷新，还剩 \(left(now: now, loop: loop))"))
-        //  它是**只读**的一格：不接手势，免得地图上多一块挡住拖动的东西。
-        .allowsHitTesting(false)
-    }
-
-    /// 还剩几秒。
-    ///
-    /// 三种写法各对应一个真实状态（不编数）：
-    ///   · 还没走过第一趟 → **「—」**（启动那一趟归 `bootstrap()`，这儿不该猜）
-    ///   · 到了点而请求还没回来 → **「…」**（在飞，不是在等）
-    ///   · 其余 → 向上取整的秒数
-    private func left(now: Date, loop: RefreshLoop) -> String {
-        guard let last = loop.lastTickAt else { return "—" }
-        let rest = loop.interval - now.timeIntervalSince(last)
-        return rest <= 0 ? "…" : "\(max(1, Int(rest.rounded(.up))))s"
-    }
-
-    /// 此刻这一档的节律（写给人看的那一句）。
-    /// 它读的 `parkedInterval` 就是 `interval` 在停着时用的那个数 —— 同一个出处。
-    private func cadence(_ loop: RefreshLoop) -> String {
-        if AppStore.shared.isCarMoving { return "车在动 · 2s" }
-        let beats = min(loop.zeroStreak, RefreshLoop.Cadence.parkedSteps)
-        return "停 · ×\(beats) → \(Int(loop.parkedInterval))s"
-    }
-}
+//
+//  用户 2026-09-26：「删除刷新调试」。它读循环自己的三个数（`interval` / `lastTickAt` /
+//  `zeroStreak`）画「还剩几秒 / 此刻这一档的节律 / 退避走到第几拍」。
+//
+//  ⚠️ 删完之后循环那一份一字未改（节律仍然只有 `RefreshLoop` 一处），
+//  但两处访问级别跟着收回了：`lastTickAt` 整个删掉（那枚徽标是它唯一的外部读者，
+//  而循环自己从不读它 = 一个只有写者的变量），`zeroStreak` 从 `private(set)`
+//  收回 `private`（它本来就只有循环自己那个退避曲线在读）。

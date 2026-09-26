@@ -16,8 +16,10 @@ import MapKit
 //      地图上只有车（见 `Services/PhoneLocation.swift` 的文件头）。
 //
 //  观感照 iOS 地图右侧那一列：44×44 的圆钮（`TokensSize.tap` = HIG 最小触控目标），
-//  竖着排成一条，间距 12，右边与卡同一条边距（`TokensSpacing.md`），
-//  顶从安全区下 `TokensSpacing.xxxl` 起。
+//  竖着排成一条，间距 12，右边与卡同一条边距（`TokensSpacing.md`）。
+//  顶在哪儿？**由抽屉的上沿说了算**（2026-09-26 起，见 `MapSpineView.followsDrawer`）。
+//  在那之前它是钉在右上角的 —— 而用户这一轮的要求是：
+//  「车位置 人位置 指南针都紧挨着抽屉，抽屉展开时，他们也要往上移动」。
 //
 //  2026-09-25 第 9 条：这一列从**两枚**变成**三枚** —— 罗盘也搬进来了。
 //  第 9 条那一轮以为「系统的 `MapCompass` 位置由 MapKit 定、搬不动」，于是自己画了一枚。
@@ -30,7 +32,56 @@ import MapKit
 //  可点 → `interactive`：按下去的压缩与折射由系统演（`DSGlass.swift` 的三条规则）。
 extension MapSpineView {
 
-    /// 右侧那一列。锚在 `.topTrailing`（由调用点决定），本函数只管这两枚钮。
+    /// 这一列**自己占多高**（三枚钮 + 两格间距）。
+    ///
+    /// 它有一个读者：`followsDrawer`（把这一列摆在抽屉上沿时，不能让它的顶
+    /// 穿过状态栏）—— 量它而不是写死一个数，是因为这三枚钮的尺寸与间距就是
+    /// `TokensSize.tap` / `TokensSpacing.snug`，再写一份“三枚大约 150”就是第二个出处。
+    static let quickColumnHeight: CGFloat =
+        3 * TokensSize.tap + 2 * TokensSpacing.snug
+
+    /// 右侧那一列**摆在哪里** —— 底边贴住抽屉的上沿。
+    ///
+    /// 用户 2026-09-26：「车位置 人位置 指南针 都紧挨着抽屉，抽屉展开时，
+    /// 他们也要往上移动」。于是这一列不再是「钉在右上角」，而是跟着那张卡走：
+    /// 抽屉拉着长高，它整列跟着上移 —— 量上沿的是偏好值（`DrawerTopKey`），
+    /// 而 `.overlayPreferenceValue` 只让**这一个 overlay** 重画
+    ///（那张活地图、六页、底条都不参与 —— 与「连续量不许住在页面上」同一条纪律）。
+    ///
+    /// 两道夹子缺一不可：
+    ///  · `max(0, …)` —— 抽屉收起时它也不该跑到屏幕外；
+    ///  · `min(…, 一列的高度)` —— 抽屉拉到顶时这一列不能顶穿状态栏
+    ///    （这一层的顶就是安全区下沿，见 `MapSpineView.nowLayer`）。
+    /// 还没拿到锚（第一帧）时退回旧位置（右上角，安全区下 `xxxl`）：宁可先摆在
+    /// 老地方一瞬，也不要让它在屏幕外出现再飞进来。
+    ///
+    /// **不是 `private`**：调用点是 `MapSpineView.nowLayer`（跨文件时 `private` 不可见）。
+    @MainActor
+    func followsDrawer(_ d: MapSpineData, top: Anchor<CGRect>?) -> some View {
+        GeometryReader { proxy in
+            //  抽屉上沿到这一层底部的距离 = 那张卡连同它下面那一条占多高。
+            //
+            //  ⚠️ 对齐到 2pt 的整数格再摆：这个偏好值在拖动时**每帧**都变，
+            //  而它下面是三块玻璃（最贵的一层）—— 手指走 300pt 不该让系统重采样 300 次。
+            //  2pt 是肉眼在一条竖线上看不出来的尺度，而重画的次数少一半以上。
+            let raw = top.map { max(0, proxy.size.height - proxy[$0].minY + TokensSpacing.snug) } ?? 0
+            let below = (raw / 2).rounded() * 2
+            let ceiling = max(0, proxy.size.height - Self.quickColumnHeight)
+            quickMapButtons(d)
+                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                       alignment: top == nil ? .topTrailing : .bottomTrailing)
+                .padding(.top, top == nil ? TokensSpacing.xxxl : 0)
+                .padding(.bottom, min(below, ceiling))
+        }
+    }
+
+    /// 右侧那一列（罗盘 / 回到车 / 手机的位置）。
+    ///
+    /// ⚠️ 2026-09-26：这一列的位置**不再由这里决定**。用户：「车位置 人位置 指南针
+    /// 都紧挨着抽屉，抽屉展开时，他们也要往上移动」—— 纵向位置改由调用点
+    /// （`MapSpineView.followsDrawer`）按抽屉上沿给（它要跟着那张卡上下动）；
+    /// 本函数只负责「一排三枚、贴右边缘」（右边那一条边距仍是这里的）。
+    ///
     /// `d` 是调用点手上那一份（跟 `nowCard(d)` / `readoutRow(_:)` 同一个写法）：
     /// 「有没有车的位置」决定第一枚钮亮不亮。
     @MainActor
@@ -71,8 +122,10 @@ extension MapSpineView {
             .accessibilityLabel(Text("手机的位置"))
             .accessibilityHint(Text(phoneHint))
         }
+        //  右边那一格呼吸位仍在函数里：它跟着卡片那 16pt 的内衬对齐，
+        //  而卡片的内衬是这一屏的规格，不该由摆位的人再写一遍。
+        //  纵向的留白已从本函数搬走（见头注 / `followsDrawer`）。
         .padding(.trailing, TokensSpacing.md)
-        .padding(.top, TokensSpacing.xxxl)
         // 三枚钮是**挨着的三块玻璃**（间距就是那个 snug）—— 交给 `GlassEffectContainer`，
         // 它们的边缘才会互相折射、看起来是**同一层材质上的三个形状**，而不是三张各自
         // 画好再贴上去的圆片（见 `DSGlass.swift`）。地图那一屏的另一处（底条 + 两臂）

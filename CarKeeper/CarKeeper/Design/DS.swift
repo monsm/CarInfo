@@ -752,55 +752,21 @@ struct DSSecondaryButtonStyle: ButtonStyle {
 }
 
 
-/// 分段控件：系统分段控件的观感（填充底 + 白色滑块），不自造圆角
-struct DSSegmented<T: Hashable>: View {
-    var options: [(value: T, title: String)]
-    @Binding var selection: T
-
-    var body: some View {
-        HStack(spacing: TokensSpacing.xxs) {
-            ForEach(Array(options.enumerated()), id: \.offset) { _, option in
-                let selected = option.value == selection
-                Button {
-                    withAnimation(TokensMotion.value) { selection = option.value }
-                } label: {
-                    Text(option.title)
-                        .font(TokensTypo.subheadline.weight(selected ? .semibold : .regular))
-                        .foregroundStyle(TokensPalette.primary)
-                        //  固定高 32 的一格：这里的字**绝不能折行**（用户第 5 条）——
-                        //  折了不是变成两行，而是被 32pt 的框**剪掉**（下一行看不见了）。
-                        //  所以先不许折，再允许缩：宁可字小一点，不能出现半个字。
-                        //  两段与三段都在用这个控件（车辆 / 出行 / 我的那三个），段名都是两个字，
-                        //  所以缩到 0.8 这一步在真机上大概用不着 —— 它是护栏，不是常态。
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 32)
-                        .background {
-                            if selected {
-                                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                    // 选中的滑块 = **玻璃里面那一层更亮的底**，与模式条上那枚透镜
-                                    // 是同一个东西，所以用同一个令牌（`glassHighlight`）。
-                                    // 它原来读 `nightSurface` —— 深色模式下那是 (28,28,30)，
-                                    // 比它所在的凹槽（`fillSubtle`）还暗，于是「选中的那一格」
-                                    // 看起来是一个黑洞（用户 2026-09-25 第 5 条截图的「全部 / 未读」）。
-                                    // iOS 深色下选中段本来就该比凹槽**亮**，不是更暗。
-                                    .fill(TokensPalette.glassHighlight)
-                                    .shadow(color: TokensPalette.scrim.opacity(0.12), radius: 3, y: 1)
-                            }
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selected ? [.isSelected] : [])
-            }
-        }
-        .padding(2)
-        // 这一块在**卡里**（规则 ②：卡里不玻璃）——它是分段控件的凹槽，
-        // 用「未选中的底」那个令牌。别名 `glassLight` 已删（见 `Tokens.swift`）：
-        // 名字里带 glass 的扁平色，就是这一轮要找的那类谎。
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(TokensPalette.fillSubtle))
-    }
-}
+// =============================================================================
+//  分段控件 `DSSegmented` —— **已删**（2026-09-26，用户第 4 条）
+// =============================================================================
+//
+//  它在这里立过一堆东西：自画的凹槽（`fillSubtle`）、白色滑块（`glassHighlight`）、
+//  自己算的选中态、自己加的 `.isSelected`、以及一条「字不折行 / 宁可缩」的护栏
+//  （那三条护栏连同它一起消失了 —— 段名现在由系统排）。
+//
+//  删它的理由只有一条：**系统里有一模一样的东西**。全 App 的分段选择器现在是
+//  `Design/DSSegmentPicker.swift`（`Picker` + `.pickerStyle(.segmented)`），
+//  为什么换、以及那条「外观随系统」的代价写在那里。
+//
+//  而在此之前它旁边的这一格刚发生过一件事，值得留在这里：图源那一行连换三代
+//  自造控件都没修好，真因在**别的层**（缩略图的溢出与命中，`HANDOFF.md` §37.2）。
+//  「控件写得再对，也修不了不是控件的问题。」
 
 /// 环形仪表：单色细环 + 轨道（保留给确实需要"环"的少数页面）
 /// 迷你趋势曲线（Canvas 手绘）

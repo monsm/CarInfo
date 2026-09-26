@@ -161,8 +161,9 @@ struct VehicleTipsSection: View {
     // MARK: - 分类筛选
     private var categoryPicker: some View {
         // 五个互斥的分类 → 系统的分段语法（自造药丸撑不住「选中」这个状态）
-        DSSegmented(options: TipCategory.allCases.map { (value: $0, title: $0.rawValue) },
-                    selection: $selectedCategory)
+        DSSegmentPicker(options: TipCategory.allCases.map { (value: $0, title: $0.rawValue) },
+                        selection: $selectedCategory,
+                        label: "分类")
     }
 
     private var filteredTips: [VehicleTip] {

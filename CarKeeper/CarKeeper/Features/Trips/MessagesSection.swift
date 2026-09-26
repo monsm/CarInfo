@@ -196,8 +196,9 @@ struct MessagesSection: View {
 
     private var filterBar: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-            DSSegmented(options: [(value: false, title: "全部"), (value: true, title: "未读")],
-                        selection: $showUnreadOnly)
+            DSSegmentPicker(options: [(value: false, title: "全部"), (value: true, title: "未读")],
+                            selection: $showUnreadOnly,
+                            label: "消息筛选")
                 .padding(.top, TokensSpacing.xs)
 
             if !allTags.isEmpty {

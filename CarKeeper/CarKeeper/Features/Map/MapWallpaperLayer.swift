@@ -31,9 +31,20 @@ struct MapWallpaperLayer: View {
             TokensPalette.canvas
             // 选中的那张（相册本地取，不依赖网络）：铺满全屏，`aspectRatio(.fill)` 裁满。
             if let img = image {
+                //  ⚠️ 2026-09-26（「聚焦那一档时图源点不动」那一轮）——这一格补了
+                //  `.frame(...)` / `.clipped()` / `.allowsHitTesting(false)` 三件。
+                //  **它不是那一轮的病根**（那一层在 `MineView.wallpaperRow` 的缩略图上，
+                //  诊断写在那里），但它是**同一类写法**里的最大一张：`.fill` 报出来的
+                //  尺寸是「填满提案」的那个尺寸（竖图铺 402×874 的屏报 491×874，
+                //  横图报 1554×874）——一大截画在框外，而且没有人裁它。
+                //  两张图的差别就在这里：一张铺底图不需要任何一份命中，
+                //  所以这两句是照「背景装饰」这个事实写的，不是照那一轮的猜测写的。
                 Image(uiImage: img)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .allowsHitTesting(false)
                     .ignoresSafeArea()
             }
         }

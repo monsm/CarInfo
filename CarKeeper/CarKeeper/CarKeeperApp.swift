@@ -390,6 +390,11 @@ struct MapShellView: View {
             // 放在这里而不是各页的 `.task` —— 六页是同时建出来的，每页一个定时器就是六个循环。
             RefreshLoop.shared.start()
             StartupJournal.shared.mark("自动刷新已起（节律 \(Int(RefreshLoop.shared.interval))s）")
+            // 车在动时保持屏幕唤醒（用户 2026-09-26：「车移动的时候要保持屏幕唤醒不睡着」）。
+            // 与刷新循环同一个位置、同一个理由：它读的是**全 App 那一份**
+            // 「车在不在动」（`AppStore.isCarMoving`），不是某一页的事 ——
+            // 而观察装一次就够（之后它自己重装，见 `KeepAwake`）。
+            KeepAwake.shared.start()
         }
         // VoiceOver：这是一个「地图 + 底部模式条」的外壳，不再是一条 Tab 栏
         .accessibilityLabel(Text("地图主屏"))

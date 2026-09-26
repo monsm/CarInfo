@@ -115,8 +115,9 @@ struct MileageJournalSection: View {
             //  正文直接从第一件东西（周期分段）开始。
 
             // 周期：三个互斥的口径 → 系统的分段语法
-            DSSegmented(options: months.indices.map { (value: $0, title: months[$0]) },
-                        selection: $currentPeriod)
+            DSSegmentPicker(options: months.indices.map { (value: $0, title: months[$0]) },
+                            selection: $currentPeriod,
+                            label: "账期")
 
             // 统计：一组键值行，不是一个彩色方块矩阵（口径跟着上面的分段走）
             DSGroup(footer: "与上面同口径") {

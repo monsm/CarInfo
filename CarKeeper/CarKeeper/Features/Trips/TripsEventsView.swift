@@ -250,8 +250,9 @@ struct TripsEventsView: View {
     private var cards: [StackCard] {
         var out = HomeMode.trips.headCards
         out.append(StackCard(id: "tabs", content: AnyView(
-            DSSegmented(options: HomeSub.tripsTabs.map { (value: $0, title: $0.title) },
-                        selection: $tab))))
+            DSSegmentPicker(options: HomeSub.tripsTabs.map { (value: $0, title: $0.title) },
+                            selection: $tab,
+                            label: "段落"))))
         switch tab {
         case .events:
             // 车的事件：点火 / 熄火 / 控制记录（原「消息」页）。

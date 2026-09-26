@@ -104,17 +104,16 @@ final class RefreshLoop {
 
     private var task: Task<Void, Never>? = nil
 
-    /// 最近一次取数的时刻。给界面回答「这份读数有多新」用（也让人一眼看出循环在不在跑）。
-    private(set) var lastTickAt: Date? = nil
+    //  `lastTickAt`（最近一次取数的时刻）曾在这里 —— 已于 2026-09-26 随
+    //  「删除刷新调试」一起删（`MapRefreshBadge` 是它唯一的外部读者，
+    //  而循环自己从不读它）。留着它就是一个只有写者、没有读者的变量。
 
     /// 连着读到过**几次 0 速度**（只数地图页的读数）。车在动就归零。
     ///
     /// 它是停着那条退避曲线的**自变量**（不是「确认了几次才认定停着」——
-    /// 那个形状 2026-09-26 当天就被用户否掉了，见文件头）。
-    ///
-    ///  `private(set)`：唯一的外部读者是地图上那枚调试倒计时
-    ///（`MapRefreshBadge` —— 它要写「退避走到第几拍」）。读得、写不得。
-    private(set) var zeroStreak = 0
+    /// 那个形状 2026-09-26 当天就被用户否掉了，见文件头），也是循环自己读的那个数
+    ///（`parkedInterval`）—— 于是它 `private` 就够（那枚调试倒计时删了之后没有外部读者）。
+    private var zeroStreak = 0
 
     /// 上一次取「重的那两路」（消息 + 体检）的时刻。
     private var lastHeavyAt: Date? = nil
@@ -211,7 +210,6 @@ final class RefreshLoop {
                 await store.fetchCore()
             }
         }
-        lastTickAt = Date()
     }
 
     /// 手动「全局刷新」：**全部 API**（车况 + 消息 + 体检）。
@@ -222,7 +220,6 @@ final class RefreshLoop {
         guard store.isLoggedIn, !store.carId.isEmpty else { return }
         await store.fetchVehicleData()
         lastHeavyAt = Date()
-        lastTickAt = Date()
         // 一颗按下去就没有回音的按钮，用户只会怀疑它没生效 —— 而它其实取完了。
         // 所以刷完说一句：全取到就是一句「好了」，有缺项就**如实说几项**
         //（缺项不是失败：`saveCache` 已经把没取到的源清空，界面自己会显示「没取到」）。

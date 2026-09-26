@@ -926,15 +926,20 @@ struct MapSpineView: View {
                 .padding(.bottom, Self.barTotal + 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            // 地图右侧那一列（系统罗盘 / 回到车 / 手机的位置）—— 用户 2026-09-25：
-            // 「像 ios 地图 app 右侧的图标一样」。它们贴在**右上角**，
-            // 不是贴底：底下那张卡与模式条已经占满了（见 `MapQuickButtons`）。
-            quickMapButtons(d)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            //  地图右侧那一列（系统罗盘 / 回到车 / 手机的位置）**不在这里**：
+            //  它要跟着抽屉的上沿上下动（用户 2026-09-26：「车位置 人位置 指南针
+            //  都紧挨着抽屉，抽屉展开时，他们也要往上移动」），而那个上沿是
+            //  抽屉自己报出来的一个偏好值 —— 不是在 ZStack 里能摆定的东西。
+            //  它现在挂在下面那个 `.overlayPreferenceValue` 上。
 
-            //  自动刷新的倒计时（调试）：用户 2026-09-26「我感觉没刷新一样」。
-            //  位置与理由都在它自己的文件里（`MapSpineReadouts.swift`）。
-            mapRefreshBadge()
+            //  自动刷新的倒计时（调试）曾在这里 —— 2026-09-26 用户：「删除刷新调试」
+            //  （它连同 `MapRefreshBadge` 整个视图一起删了）。
+        }
+        //  右侧那一列：底边**贴住抽屉的上沿**（「车位置 人位置 指南针都紧挨着抽屉」）。
+        //  抽屉拉开时卡片长高、上沿上升 → 它跟着上移。摆法在 `MapQuickButtons`
+        //  （与那一列同一份文件）里 —— 这一页贴着 1200 行门禁，一件事一个家。
+        .overlayPreferenceValue(DrawerTopKey.self) { anchors in
+            followsDrawer(d, top: anchors.first)
         }
         .mapScope(mapScope)
         // `.plate{left:20;top:62}`：车牌徽标挂在安全区下的左上角（62 ≈ 54 + 8）。
@@ -982,17 +987,9 @@ struct MapSpineView: View {
             } label: {
                 Label(lightTitle(d), systemImage: "sun.max")
             }
-            //  轨迹的**模拟**（调试）：用户 2026-09-26「加个模拟测试的，我试试」。
-            //  它只往 `DriveTrace` 里画一条假的路（车不动、车钉不动）——
-            //  因为轨迹这一件东西在真车上只能靠「真开一段」才看得到。
-            Button {
-                TokensHaptic.tap()
-                DriveTrace.shared.setSimulate(!DriveTrace.shared.simulate)
-            } label: {
-                Label(DriveTrace.shared.simulate ? "停止模拟轨迹" : "模拟行驶轨迹",
-                      systemImage: DriveTrace.shared.simulate ? "stop.circle"
-                                                              : "point.topleft.down.to.point.bottomright.curvepath")
-            }
+            // 「模拟行驶轨迹」（调试）曾在这一行 —— 2026-09-26 用户：「删除刷新调试和
+            //  模拟轨迹调试」。它连同 `DriveTrace.setSimulate` 整段删掉：一个只有调试
+            //  才有的开关，留着就是一段没人再走的代码（这条在 `DriveTrace` 头注里也记了）。
             // 「回到车」原来在这里 —— 2026-09-25 搬去地图右侧那枚常驻圆钮
             //（`MapQuickButtons.swift`，用户：「像 ios 地图 app 右侧的图标一样」）。
             // 菜单里不再留一条：同一个动作两个入口就是重复，而「车在哪」是

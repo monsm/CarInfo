@@ -461,7 +461,10 @@ VERIFIED_SDK_ADDITIONS = {
     "blendMode": "View.blendMode(_:)（iOS 13+）",
     "repeatForever": "Animation.repeatForever(autoreverses:)（iOS 13+）",
     # 地图页那枚刷新倒计时（Features/Map/MapSpineReadouts.swift 的 MapRefreshBadge，
-    # 2026-09-26 第二十五轮）。登记前对着 Apple 文档页核过两个名字的 title/abstract：
+    # 2026-09-26 第二十五轮）—— **那个视图已于同一天随「删除刷新调试」删掉**，
+    # 所以下面两个名字现在**没有读者**（与 `MapReader` / `MapProxy` / `convert` 那三条
+    # 同一种情况，按那一处的规矩留着登记、但把话说清楚）。
+    # 登记前对着 Apple 文档页核过两个名字的 title/abstract：
     #   · TimelineView     developer.apple.com/documentation/swiftui/timelineview
     #     「A view that updates according to a schedule that you provide.」
     #   · periodic(from:by:)  …/swiftui/timelineschedule/periodic(from:by:)
@@ -469,8 +472,8 @@ VERIFIED_SDK_ADDITIONS = {
     # 为什么用秒表而不是自己 `Task.sleep` 一秒一醒：后者要一个 `@State` 加一条循环，
     # 而这里要的只是「每秒重画这一格」—— 而且**只有这一格**重画（`TimelineView`
     # 的重画范围就是它的 content），不会把那张活地图拖进来。
-    "TimelineView": "SwiftUI.TimelineView（iOS 15+；doc：swiftui/timelineview，A view that updates according to a schedule that you provide.）—— 地图页那枚刷新倒计时的秒表",
-    "periodic": "TimelineSchedule.periodic(from:by:)（iOS 15+；doc：swiftui/timelineschedule/periodic(from:by:)，A schedule for updating a timeline view at regular intervals.）",
+    "TimelineView": "SwiftUI.TimelineView（iOS 15+；doc：swiftui/timelineview，A view that updates according to a schedule that you provide.）—— **已无读者**（它曾是那枚刷新倒计时的秒表）",
+    "periodic": "TimelineSchedule.periodic(from:by:)（iOS 15+；doc：swiftui/timelineschedule/periodic(from:by:)，A schedule for updating a timeline view at regular intervals.）—— **已无读者**（同上）",
     # 艺术主题（ArtTheme）那一轮登记的四个。2026-09-25 主题只剩原生、ArtTheme.swift
     # 已删，但四个名字**都有别的读者**，所以登记一个都不能撤：
     #   preferredColorScheme / allowsHitTesting —— 还在用（App 根部的明暗、禁点）
@@ -704,6 +707,24 @@ VERIFIED_SDK_ADDITIONS = {
     #  现在全仓只剩注释里提到它。白名单里留着一个没人用的名字 = 另一种清单失真
     #（与上面 accessibilityAction / accessibilityScrollAction 两条同一条规矩）。
     #
+    #  「车在动时不让屏幕自己睡」（2026-09-26 用户）用到的两个名字。
+    #  两个都取过文档 JSON（platforms / externalID / declarations 都看过）：
+    #    · `withObservationTracking` —— `AppStore` 是 `@Observable`（不是 `ObservableObject`），
+    #      没有 `$caches` 那种 Combine 发布者可订；它是**一次性**的观察，回调里要重装
+    #    · `UIApplication.isIdleTimerDisabled` —— 系统那个「别熄屏」的开关本身
+    "withObservationTracking": "Observation.withObservationTracking(_:onChange:)（iOS 17+；decl: func withObservationTracking<T>(_ apply: () -> T, onChange: @autoclosure () -> () -> Void) -> T；externalID s:11Observation04withA8Tracking_8onChangexxyXE_yyYbcyXKtlF）——`KeepAwake` 用它盯 `AppStore.isCarMoving`（回调在**写入之前**触发，所以落状态推到下一个主线程回合）",
+    "isIdleTimerDisabled": "UIApplication.isIdleTimerDisabled（UIKit；decl: var isIdleTimerDisabled: Bool；externalID c:objc(cs)UIApplication(py)idleTimerDisabled）——车在动时的屏幕常亮（`KeepAwake`）",
+    #  抽屉的上沿要报给地图右侧那一列（2026-09-26 用户：「车位置 人位置 指南针
+    #  都紧挨着抽屉，抽屉展开时，他们也要往上移动」）用到的四个 SwiftUI 名字。
+    #  四个都取过文档 JSON（platforms / externalID / declarations 都看过）：
+    #    · `PreferenceKey` iOS 13+、`Anchor` iOS 13+（同一个偏好值机制的两半）
+    #    · `anchorPreference` —— 写：把某一层的 bounds 变成 Anchor 报上去
+    #    · `overlayPreferenceValue` —— 读：只让这一个 overlay 跟着它重画
+    #      （不是再开一个 @State：那会让整页每帧重建，正是「鬼畜」的同一个病）
+    "PreferenceKey": "SwiftUI.PreferenceKey（iOS 13+；decl: protocol PreferenceKey；externalID s:7SwiftUI13PreferenceKeyP）——视图往上申报的一个具名值（这里报的是抽屉的上沿）",
+    "Anchor": "SwiftUI.Anchor<Value>（iOS 13+；decl: struct Anchor<Value>；externalID s:7SwiftUI6AnchorV）——「某一层的某段几何」的不透明引用：写给偏好值，读到的人用自己的坐标空间解它",
+    "anchorPreference": "View.anchorPreference(key:value:transform:)（iOS 13+；decl: func anchorPreference<A, K>(key: K.Type, value: Anchor<A>.Source, transform: (Anchor<A>) -> K.Value) -> some View，K : PreferenceKey；externalID s:7SwiftUI4ViewPAAE16anchorPreference3key5value9transformQrqd_0_m_AA6AnchorV6SourceVyqd___G5ValueQyd_0_AIyqd__GctAA0E3PreferenceKeyRd_0_r0_lF）——抽屉把自己的上沿报出去",
+    "overlayPreferenceValue": "View.overlayPreferenceValue(_:alignment:_:)（iOS 13+；decl: func overlayPreferenceValue<K, V>(_ key: K.Type, alignment: Alignment = .center, @ViewBuilder _ transform: @escaping (K.Value) -> V) -> some View，K : PreferenceKey，V : View；externalID s:7SwiftUI4ViewPAAE22overlayPreferenceValue_9alignment_Qrqd__m_AA9AlignmentVqd_0_0F0Qyd__ctAA0E3KeyRd__AaBRd_0_r0_lF）——地图右侧那一列据此贴着抽屉上沿（抽屉拉开时跟着上移）",
     #  `TextRenderer` / `EdgeInsets` 两条**已删**（2026-09-26）：用户这一轮
     #  「完全删除文字发光和文字发光功能」—— 全局文字外壳（`DSTextGlow`）、它的
     #  取值表（`TokensHalo`）、设置里那格滑杆与四处 `dsInkGlow()` 一起删掉，

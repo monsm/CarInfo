@@ -33,8 +33,9 @@ struct ExportDataSection: View {
                 DSSectionHeader(title: "导出")
 
                 // 选择导出类型（四个互斥选项 → 系统的分段语法）
-                DSSegmented(options: ExportType.allCases.map { (value: $0, title: $0.rawValue) },
-                            selection: $exportType)
+                DSSegmentPicker(options: ExportType.allCases.map { (value: $0, title: $0.rawValue) },
+                                selection: $exportType,
+                                label: "导出类型")
 
                 // 导出内容预览
                 previewCard

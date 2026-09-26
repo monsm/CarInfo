@@ -4428,3 +4428,73 @@ actor 归属。只有真机能验：胶囊的质感、行程是否整条居中�
 验证：`scan/all.py` **34/34 全绿**。只有真机能验：图源三格是否真的永远点得动、
 抽屉跟手还闪不闪、以及亮色模式 + 亮壁纸下那两层对比底是不是真的把字托住了
 （觉得发奶就调 `glassDim` 那一个数）。细节见 `HANDOFF.md` §36。
+
+## 第二十九轮（2026-09-26）：删调试件 · 图源第三次报同一个毛病的**真根因**（缩略图）·
+抽屉的两处布局反馈环 · 右侧那一列跟着抽屉上下
+
+1. **删调试件（第 1 条）**：刷新倒计时那枚徽标（`MapRefreshBadge` + `RefreshLoop` 为它
+   开放的 `zeroStreak`）与模拟轨迹（`DriveTrace.setSimulate` 一整段）都是「试用期结束」
+   的调试开关，一起删干净 —— 一个只有调试期读者的开关，留下来就是下一次误读的来源。
+2. **图源（第 2 条，第三次报同一件事）**：病根不是控件，是同一格里的**缩略图**。
+   `.aspectRatio(contentMode: .fill)` 报的是「填满提案」的尺寸（竖图 1080×1920 铺 340×120
+   的框报 **340×604**，顶上多出 242pt；横图 1920×1080 报 340×191，多出 35pt），
+   而命中的是**视图自己的几何**、`clipShape` 裁的是画不是命中 ——
+   于是竖图（Windows 聚焦）把上面那个分段控件**整条**盖住，横图（必应）只盖住下沿一条。
+   这就是「必应可以、聚焦不行」的全部差别。修：`.frame(height: 120, alignment: .top)`
+   （溢出只往下）+ `.clipped()` + **`.allowsHitTesting(false)`**（真正的刀）。
+   同时按第 4 条把控件换成**系统分段控件**（`Picker` + `.pickerStyle(.segmented)`）——
+   这一行已经试掉三代自造控件。代价：原生那一枚点「已选中」不会再把同一个值写回来，
+   所以「点当前那一档 = 再取一次」实际走不到（出口是同一张卡里的「重试」）。
+   `MapWallpaperLayer` 里的同一类写法也补齐（它是背景、不是这一轮的病根，如实写）。
+3. **抽屉（第 3 条）**：两处**布局反馈环** —— ① 量高那一份拿到的是「卡片当前的高度」
+   （`background` 把父层尺寸当提案递进去，而卡片高度正是被量的数）→ 加 `fixedSize(vertical:)`
+   断掉，且只在变化 > 0.5pt 时才写；② 正文拿到的提案是「当前可见高度」→ 折行的字每帧重排
+   （看起来像内容在自己扭）→ 三层：`fixedSize` 钉自然高度 → 钉在量到的数上 → 按手指高度裁。
+   落位动画换成 `TokensMotion.settle`（临界阻尼、不过冲 —— 系统 sheet 落位不回弹）。
+   原生的那一台机器（`.sheet` + `presentationDetents`）仍然用不了：它的面永远在窗口底部，
+   会盖住我们自己的入口条（§36.2 已否过一次）。
+4. **右侧那一列（第 3 条后半）**：车 / 人 / 指南针不再钉在右上角，而是**贴着抽屉的上沿**，
+   抽屉拉开时整列跟着上移。做法是偏好值（新的 `DrawerTopKey` + `followsDrawer`）：
+   只让读它的那个 overlay 重画（不是再开一个 `@State` —— 那正是鬼畜的同一个病），
+   对齐到 2pt 整格（玻璃是最贵的一层），两道夹子（不跑出屏外 / 不顶穿状态区）。
+   四个新 SDK 名字（`PreferenceKey` / `Anchor` / `anchorPreference` / `overlayPreferenceValue`）
+   都取过 Apple 文档 JSON 再登记进 `scan/scan.py`。
+5. **第 4 条（全项目改用原生控件）**：先问了范围，用户选的是「只换系统里有一模一样东西那一批」
+   （玻璃卡 / 底条 / 抽屉不动）。全项目扫下来**这一批里只有分段控件**：
+   新文件 `Design/DSSegmentPicker.swift`（`Picker` + `.pickerStyle(.segmented)`）
+   + **9 处调用点全部换成它** + `DS.swift` 里那五十多行自搭实现整份删除
+   + `glassHighlight` 令牌随之删（它当时唯一的读者就是那枚滑块）
+   + `scan/expand.py` 例外表里「那个 32」撤条（门禁自己报出来的）。
+   开关 / 菜单 / 加载 / 下拉刷新 / 日期 / 相册本来就是系统的；全仓没有自造的文本框与开关。
+   **`DSExpandGroup` / `DSSection`（13 处）没动**：语义上对应 `DisclosureGroup`，
+   但 `footer`（收起时也在）与 `initiallyExpanded` 在它那里没有对应 —— 是行为变化，
+   不在「一模一样」这一批里，另问。
+
+验证：`scan/all.py` **34/34 全绿**（`MapSpineView.swift` 1193/1200）。只有 CI 能验：
+`Picker` 接自定义 `Binding`、`DrawerTopKey` 那个 `PreferenceKey`、`followsDrawer` 跨文件调用、
+`Anchor<CGRect>?` 作参数类型。只有真机能验：聚焦那一档时图源是不是真的永远点得动
+（这一轮第一次能说出真因，但仍只有设备能证实）、抽屉还抖不抖、右侧那一列与抽屉同步与否。
+细节见 `HANDOFF.md` §37。
+
+## 第三十轮（2026-09-26）：车在动的时候不让屏幕自己睡（`Services/KeepAwake.swift`）
+
+用户一句：「再就是车移动的时候要保持屏幕唤醒不睡着」。机制只有一行 ——
+`UIApplication.shared.isIdleTimerDisabled`（系统给导航/播放器那个开关）。
+
+· **读的是同一份「车在动」**：`AppStore.isCarMoving`（= 最近一次报文 `VehicleSpeed > 0`），
+  与刷新节律（`RefreshLoop` 地图页 2s / 60s）同一个布尔 —— 不另立
+  「多久没动就算停下」的判据（两套判据管一件事 = 两套都不可信）。
+· **为什么用 `withObservationTracking`**：`AppStore` 是 `@Observable`，
+  **没有 `$caches` 那样的 Combine 发布者可订**。两个坑：它是**一次性**的（回调里要重装）；
+  回调在**值改变之前**触发（willSet）→ 落状态推到下一个主线程回合，
+  否则读到的永远是上一份报文（那一版的「车在动」晚一拍）。
+· **三条边界**：只在真的变了才写 UIKit；不加 scenePhase 分支（后台锁屏是系统的规矩）；
+  不开开关（费电是用户明确要的取舍）。启动点在 `CarKeeperApp` 那条 `.task` 里、
+  `RefreshLoop.shared.start()` 旁边；**不进 `LaunchFence`**（那是启动期二分仪器，只减不增）。
+· 两个新 SDK 名字（`withObservationTracking` / `UIApplication.isIdleTimerDisabled`）
+  都取过 Apple 文档 JSON 再登记进 `scan/scan.py`。
+
+验证：34/34 全绿。只有 CI 能验：`withObservationTracking` 那两个闭包（尤其 `onChange`
+的 `@autoclosure` 与 `@Sendable`）能不能接住 `weak self` + `Task { @MainActor }`。
+只有真机能验：车开起来屏幕是不是真的不熄，**以及停车之后会不会放开**
+（后者是这条功能最容易做错的一半）。细节见 `HANDOFF.md` §38。
