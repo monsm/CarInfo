@@ -63,7 +63,11 @@ struct DevView: View {
             kvGroup("运行状态", runtime)
             diagnosticsGroups
             actionsGroup
-            kvGroup("关于", about)
+            //  「关于」那一组（版本 / 构建 / 外观）于 2026-09-27 删（用户：「两处关于的行清理」）：
+            //  版本与构建在「复制诊断信息」那一句里本来就有（报障要的正是它，而且它带走的是
+            //  版本 + 车辆 ID + 缓存 + 网络状态一整份），而「外观」那一行回答的是
+            //  「我们的设计长什么样」—— 这一页的名字叫诊断，它回答「这台设备此刻在发生什么」。
+            //  用户可见的「关于」只有一处：我的 → 关于那张卡。
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         //  延迟只在这一页打开时测一次（原先是一个永远在跑的 30 秒定时器 ——
@@ -263,11 +267,6 @@ struct DevView: View {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
     }
 
-    private var about: [(String, String)] {
-        [
-            ("版本", appVersion),
-            ("构建", buildNumber),
-            ("外观", "跟随系统（浅色 / 深色各一套）")
-        ]
-    }
+    //  这里原有 `about`（给「关于」那一组的三行）—— 随那一组一起删，见 `body` 里那段说明。
+    //  `appVersion` / `buildNumber` 留着：它们还有真读者（复制诊断信息的那一份抬头）。
 }

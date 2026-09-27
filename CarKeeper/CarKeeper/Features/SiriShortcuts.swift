@@ -52,9 +52,11 @@ struct SiriCarController {
     /// 唯一的一条发送路径：验登录 → 验 PIN → 发指令 → 记历史。
     /// （这里曾多一步「记使用次数」—— 那份本机计数已删，见 AppStore 里的说明。）
     ///
-    /// 使用次数的 key 必须与 `SiriShortcutsCard` 里那张表一致：旧代码记的是
+    /// 使用次数的 key 曾与 `SiriShortcutsCard` 里那张表不一致：旧代码记的是
     /// `lock_on` / `lock_off`，而卡片读的是 `lock_true` / `lock_false` ——
-    /// 所以卡片永远显示「还没有用过语音指令」，哪怕你用了一百次。
+    /// 于是卡片永远显示「还没有用过语音指令」，哪怕你用了一百次。
+    /// （两边现在都不在了：计数 2026-09-23 删、卡片 2026-09-27 删；教训留着 ——
+    /// 一个 key 写在两处，就一定有一天会对不上。）
     ///
     /// `temperature` 是非可选，默认值与 `APIClient.sendControlCommand` 一致（17）：
     /// 那个参数**只对 `OpenAir` 生效**（API 只在 `cmd == "OpenAir"` 时把它拼进 URL），
@@ -184,51 +186,14 @@ struct CarKeeperShortcuts: AppShortcutsProvider {
     }
 }
 
-// MARK: - Siri 快捷指令卡片（主 App 内展示）
-
-struct SiriShortcutsCard: View {
-    let store = AppStore.shared
-
-    /// 五条指令。「语音说 X」是提示语，不是数据。
-    private static let shortcuts: [(icon: String, title: String, phrase: String)] = [
-        ("lock.fill", "锁车", "语音说「锁车」"),
-        ("lock.open.fill", "解锁", "语音说「解锁」"),
-        ("fan.fill", "开空调", "语音说「开空调」"),
-        ("wind", "关空调", "语音说「关空调」"),
-        ("speaker.wave.2.fill", "寻车", "语音说「寻车」")
-    ]
-
-    var body: some View {
-        DSGroup(title: "Siri 快捷指令", footer: footer) {
-            ForEach(Self.shortcuts, id: \.title) { s in
-                DSGroupRow {
-                    ShortcutRow(icon: s.icon, title: s.title, subtitle: s.phrase)
-                }
-            }
-        }
-    }
-
-    /// 这里原来还报一句「共 N 次语音指令」——它的计数来自已删除的 Siri 使用统计。
-    /// 现在只剩一句实话：这些短语怎么用。
-    private var footer: String { "短语已注册进「快捷指令」，直接对 Siri 说即可。" }
-}
-
-struct ShortcutRow: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        HStack(spacing: TokensSpacing.md) {
-            Image(safeSymbol: icon, fallback: "car.fill")
-                .font(TokensTypo.title3)
-                .foregroundStyle(TokensPalette.ambient)
-                .frame(width: TokensSize.iconColumn, alignment: .center)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(TokensTypo.body).foregroundStyle(TokensPalette.primary)
-                Text(subtitle).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
-            }
-            Spacer(minLength: TokensSpacing.sm)
-        }
-    }
-}
+// MARK: - App 内的「Siri 快捷指令」卡：已于 2026-09-27 删除
+//
+//  `SiriShortcutsCard`（五条短语的展示卡）+ 它专用的 `ShortcutRow` 一起删了。
+//  它从 2026-09-23 起就不在任何一页上（用户：「控制页不要快捷指令卡」），
+//  车控页当时只留了一句「若以后要恢复：重新把 siri 卡加回来即可」——
+//  而一个**没有入口**的恢复点不是设计，是负担：它连着 `DSGroup` / `DSRow` / 五个图标
+//  与一张表，全仓没有一行会碰它们。想要回来，从 git 历史里拿（这份文件的其他部分
+//  —— `AppIntent` 与 `AppShortcutsProvider` —— 是活的，由系统按定义发现）。
+//
+//  短语本身仍以这里为准。（那条引用 `SiriShortcutsCard` 的注释已于同一轮改成过去时，
+//  所以这一段提醒也随之删了 —— 它本来就是在指一处已经改掉的话。）

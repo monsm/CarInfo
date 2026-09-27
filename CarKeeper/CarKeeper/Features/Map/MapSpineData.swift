@@ -103,7 +103,7 @@ struct MapTripLine: Identifiable {
     /// 起点时刻（`HH:mm`）。
     ///
     /// 它是这一层里最烫的一个字符串：`MapSpineLayers` 为**每一段行程**读它一次，
-    /// 而地图页在车动起来时每 2 秒求值一次（节律见 `RefreshLoop`）—— 原来每读一次
+    /// 而地图页在车动起来时每 1 秒求值一次（节律见 `RefreshLoop`）—— 原来每读一次
     /// 就现造一个 `DateFormatter`，30 段就是 30 个。现在构造器在 `DateText` 的池子里。
     var timeText: String {
         DateText.shared.string(startedAt, "HH:mm")

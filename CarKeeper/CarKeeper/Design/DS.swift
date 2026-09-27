@@ -35,25 +35,9 @@ import UIKit
 enum DS {
 }
 
-// =============================================================================
-// MARK: - 画布
-// =============================================================================
-
-/// 页面画布：单一底色 + 统一 20pt 页面边距。
-struct DSCanvas<Content: View>: View {
-    var content: () -> Content
-
-    init(@ViewBuilder content: @escaping () -> Content) {
-        self.content = content
-    }
-
-    var body: some View {
-        ZStack {
-            TokensPalette.background.ignoresSafeArea()
-            content()
-        }
-    }
-}
+//  `DSCanvas` 于 2026-09-27 删 —— 它是一个零读者的设计原语（页面画布那一层现在只有
+//  根部的 `AppCanvas`，见 `Theme.swift`；页面自己再加一层画布只会多一个“谁在铺底”的答案）。
+//  旧注释里那句「统一 20pt 页面边距」也是错的：这个类型里没有任何一行在做边距。
 
 // =============================================================================
 // MARK: - inset-grouped 表面（v4 唯一的"容器"）
@@ -356,19 +340,8 @@ extension View {
 
 }
 
-/// 关键指标（兼容旧名 DSMetric，渲染同 DSBigNumber）
-struct DSMetric: View {
-    var value: String
-    var unit: String? = nil
-    var caption: String? = nil
-    var size: CGFloat = 72
-    var tint: Color = TokensPalette.primary
-    var alignment: HorizontalAlignment = .leading
-
-    var body: some View {
-        DSBigNumber(value: value, unit: unit, caption: caption, size: size, tint: tint, alignment: alignment)
-    }
-}
+//  `DSMetric` 于 2026-09-27 删 —— 它自己的注释就写着「兼容旧名，渲染同 DSBigNumber」：
+//  一个转发型的旧名字，全仓零读者。巨字只有 `DSBigNumber` 一个来源。
 
 /// 车灯光带 = 电量表（v4 的核心机制）。
 /// 亮起的长度就是电量百分比；`glow` 是同一束光的溢出，不是装饰。
@@ -556,40 +529,8 @@ struct DSChip: View {
     }
 }
 
-/// 标签 + 数值 行（iOS 行排版：左标题、右数值）
-struct DSStatRow: View {
-    var label: String
-    var value: String
-    var valueCls: String = "na"
-    var icon: String? = nil
-
-    var body: some View {
-        HStack(spacing: TokensSpacing.sm) {
-            if let icon {
-                Image(safeSymbol: icon, fallback: "circle")
-                    .font(.system(size: TokensSize.iconSm))
-                    .foregroundStyle(TokensPalette.secondary)
-                    .frame(width: 20)
-            }
-            // 与 `DSKeyValueRow` 同一条（用户第 5 条）：一行一个事实，不折行 ——
-            // 装不下就缩，不把行高变成两行（那看起来是没对齐，不是内容多）。
-            Text(label)
-                .font(TokensTypo.body)
-                .foregroundStyle(TokensPalette.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Spacer(minLength: TokensSpacing.md)
-            Text(value)
-                .font(TokensTypo.data)
-                .foregroundStyle(valueCls == "na" ? TokensPalette.secondary : TokensPalette.statusColor(valueCls))
-                .multilineTextAlignment(.trailing)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(minHeight: TokensSpacing.row)
-        .accessibilityElement(children: .combine)
-    }
-}
+//  `DSStatRow` 于 2026-09-27 删 —— 零读者，而它与真正在用的 `DSKeyValueRow`
+//  （左标题、右数值，带 `valueCls` 语义色）是同一件事的第二个名字。
 
 
 /// 设置式行：图标 + 标题/+ 副标题 + 右侧值 + 箭头（iOS 列表的标准行）
@@ -658,58 +599,8 @@ struct DSRowButtonStyle: ButtonStyle {
     }
 }
 
-/// 快捷操作：图标 + 标签（平铺表面，无图标砖、无描边、无阴影）
-/// 只有"正在生效"的状态才用系统蓝，普通态是纯文字色。
-struct DSTile: View {
-    var icon: String
-    var title: String
-    var subtitle: String? = nil
-    var isActive: Bool = false
-    var cls: String = "acc"
-    var isLoading: Bool = false
-    var action: () -> Void
-
-    private var accent: Color {
-        isActive ? TokensPalette.statusColor(cls) : TokensPalette.primary
-    }
-
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-                HStack(alignment: .center) {
-                    Image(safeSymbol: icon, fallback: "circle")
-                        .font(.system(size: TokensSize.tileIcon, weight: .regular))
-                        .foregroundStyle(accent)
-                    Spacer(minLength: 0)
-                    if isLoading {
-                        ProgressView().controlSize(.small)
-                    }
-                }
-                Text(title)
-                    .font(TokensTypo.body)
-                    .foregroundStyle(accent)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(TokensTypo.footnote)
-                        .foregroundStyle(TokensPalette.secondary)
-                        .lineLimit(1)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(TokensSpacing.lg)
-            .frame(minHeight: 84, alignment: .topLeading)
-            .background {
-                RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                    .fill(TokensPalette.panel)
-            }
-        }
-        .buttonStyle(DSCardButtonStyle())
-        .accessibilityLabel(Text(title))
-        .accessibilityValue(Text(isActive ? "已开启" : "已关闭"))
-    }
-}
+//  `DSTile` 于 2026-09-27 删 —— 零读者的「磁贴」原语（它那一套「图标在上、标题在下」
+//  的平铺卡片是磁贴时代的版式，那批入口随磁贴一起没了；现在能点的一行是 `DSRow`）。
 
 /// 主操作按钮（一屏最多一个）：实心胶囊
 struct DSPrimaryButtonStyle: ButtonStyle {

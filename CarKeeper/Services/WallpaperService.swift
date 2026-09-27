@@ -102,9 +102,14 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
     }
 
     /// 持久化文件（Documents 目录，文件共享没开，用户看不见它）。
-    /// 存**JPEG 数据**而不是 UIImage：UIImage 的 NSCoding 在 4K 图上不小，
-    /// JPEG 压过一遍（0.82 质量）既省磁盘又不会撑爆启动时的解码。
+    /// 存**JPEG 字节**而不是 UIImage：UIImage 的 NSCoding 在 4K 图上不小。
     /// 相册那张与在线那张**共用这一个文件** —— 铺图只有一条路径，不按来源分叉。
+    ///
+    /// ⚠️ 2026-09-27（用户：「现在壁纸是咋设置的，全是颗粒，像素很低」）：
+    /// **在线那两条不再重压一遍** —— 它们给的本来就是 JPEG，此前解码→
+    /// 再 `jpegData(0.82)` 是白丢一代细节，而这一层现在会被放大到整屏
+    ///（见 `MapWallpaperLayer` 里那一笔分辨率账），细节本来就紧。
+    /// 相册那条仍然要转（HEIC/PNG 存不了直出）：质量 0.82 → **0.9**。
     private static let imageFile = "carkeeper-wallpaper.jpg"
 
     /// 两个取图口（免密钥）。写在这里而不是散在函数里：它们是这套功能的外部依赖。
@@ -159,7 +164,7 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
         credit = ""
         failed = false
         UserDefaults.standard.removeObject(forKey: Key.credit)
-        guard let data, let jpeg = UIImage(data: data)?.jpegData(compressionQuality: 0.82) else {
+        guard let data, let jpeg = UIImage(data: data)?.jpegData(compressionQuality: 0.9) else {
             image = nil
             Self.removeDisk()
             return
@@ -229,10 +234,11 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
             for pick in picks.prefix(3) {
                 guard let imgURL = URL(string: pick.url) else { continue }
                 guard let bytes = try? await Self.fetch(imgURL, timeout: Self.imageTimeout),
-                      let decoded = UIImage(data: bytes),
-                      let jpeg = decoded.jpegData(compressionQuality: 0.82) else { continue }
-                Self.writeDisk(jpeg)
-                image = UIImage(data: jpeg)
+                      let decoded = UIImage(data: bytes) else { continue }
+                //  存**原始字节**（不重压）：这两个源给的就是 JPEG ——
+                //  解码→再编码只会白丢一代细节，而这一层要放大到整屏（见文件头那段）。
+                Self.writeDisk(bytes)
+                image = decoded
                 credit = pick.credit
                 UserDefaults.standard.set(today, forKey: Key.stamp)
                 UserDefaults.standard.set(pick.credit, forKey: Key.credit)
@@ -292,7 +298,13 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
 
     /// 必应：`images[0]` 就是当天那张。
     /// `urlbase` 是 `https://www.bing.com/th?id=OHR.xxx_ZH-CN123`，后面接尺寸后缀即可。
-    /// 取 1920×1080 而不是 UHD：铺在卡片背后的一层，UHD 要多下几 MB 换不回来的清晰度。
+    ///
+    /// ⚠️ 2026-09-27：后缀从 `_1920x1080.jpg` 改成 **`_UHD.jpg`（3840×2160）**。
+    /// 当年选 1080p 的理由是「铺在卡片背后的一层，UHD 多下几 MB 换不回来清晰度」——
+    /// **那句话现在不成立**：这一层是**可平移的一整条**，放大倍数是这套设计的成本
+    /// （账写在 `MapWallpaperLayer`），而用户 2026-09-27 报的就是它变成的颗粒。
+    /// 大小差：1080p 约 341 KB、UHD 约 1–3 MB，一天一次。
+    /// （`_UHD.jpg` 这个后缀已验：同一 `urlbase` 拼上它返回的是真图 `image/jpeg`。）
     private static func bingPick(from data: Data) -> RemotePick? {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let images = obj["images"] as? [[String: Any]],
@@ -347,10 +359,17 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
     /// 而必应那一源走的是 `urlbase`（另一条路），所以「必应行、聚焦不行」—— 用户 2026-09-25 报的第 4 条。
     ///
     /// 顺序是**写死的**，不再遍历 `ad.values`：字典遍历顺序在 Swift 里是未定义的，
-    /// 同一份报文可能今天取竖图、明天取横图。竖屏手机上先要竖图（1080×1920），
-    /// 再退横图，最后才扫所有子字典（接口以后再加尺寸也不会失效）。
+    /// 同一份报文可能今天取竖图、明天取横图。最后才扫所有子字典（接口以后再加尺寸也不会失效）。
+    ///
+    /// ⚠️ 2026-09-27：横竖的优先级**反过来了**（`landscapeImage` 先于 `portraitImage`）。
+    /// 两个尺寸差得很远，这是当天真报文里读到的：
+    ///   · `landscapeImage` = `…_3840x2160.jpg`（3840×2160）
+    ///   · `portraitImage`  = `…_1080x1920.jpg`（1080×1920）
+    /// 竖图本来是对的 —— 那时每一屏各铺一份、要的是「填满一块竖屏」。
+    /// 现在这一层是**可平移的一整条**，要的是**宽度**：1080 宽的竖图会被拉成 5 倍多，
+    /// 而 3840 宽的横图只差一点点（这一轮的「全是颗粒」里，聚焦那一档主要就是它）。
     private static func assetURL(in ad: [String: Any]) -> String? {
-        for name in ["portraitImage", "landscapeImage", "squareImage"] {
+        for name in ["landscapeImage", "portraitImage", "squareImage"] {
             if let asset = ad[name] as? [String: Any],
                let s = asset["asset"] as? String, s.hasPrefix("http") {
                 return s

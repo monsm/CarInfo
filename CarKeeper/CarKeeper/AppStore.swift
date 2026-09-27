@@ -51,7 +51,7 @@ final class AppStore: @unchecked Sendable {
     ///
     /// 它只服务一件事：手动「全局刷新」之后那一句反馈（见 `RefreshLoop.refreshAll`）。
     /// 「刷新完了」与「刷新完了但有 3 项没取到」对用户是两件完全不同的事 ——
-    /// 而自动那趟不该弹任何东西（每 2 秒弹一次，那就是噪音）。
+    /// 而自动那趟不该弹任何东西（车在动时每 1 秒弹一次，那就是噪音）。
     private(set) var lastMissedSources: [String] = []
 
     // 上一次已经喊过「位置变了」的坐标（`.locationUpdated` 的去重门槛）。
@@ -234,41 +234,11 @@ final class AppStore: @unchecked Sendable {
     }
     var mapFocus: MapFocus? = nil
 
-    // #驾驶安全评分 — 只由**行程里真有的事实**推出来（0-100）。没有事实就是 nil。
-    // 返回类型是 Int? 是刻意的：早先这里在"没有任何行程"时返回 75，
-    // 于是"不知道"和"中等水平"在界面上长得一模一样。不知道就得是不知道。
-    var drivingScore: Int? {
-        let recent = Array(tripHistory.prefix(10))
-        let efforts = recent.compactMap { $0.avgEfficiency }
-        let kmPerPct = recent.compactMap { $0.kmPerPercent }
-        // 能效分有两套口径，能用哪套取决于我们**真的知道**什么：
-        //   ① kWh/100km（优先）：只有知道电池容量时才算得出 —— 目前算不出。
-        //   ② 每 1% SOC 跑多少 km：不需要容量。但它只能**与自己比**：
-        //      基线取自己最近行程的中位数（车、人、路况、季节都不同，跨车主比没有意义）。
-        let efficiencyScore: Int?
-        if !efforts.isEmpty {
-            // 分母必须是**真有读数的条数**：原来除以 recent.count，
-            // 缺读数的行程会把平均值拉低成一个谁也不认识的数。
-            let avg = efforts.reduce(0.0, +) / Double(efforts.count)
-            efficiencyScore = max(0, min(100, Int(100 - (avg - 15) * 4)))
-        } else if kmPerPct.count >= 2, let latest = kmPerPct.first {
-            let sorted = kmPerPct.sorted()
-            let median = sorted[sorted.count / 2]
-            guard median > 0 else { return nil }
-            // 比自己的中位数跑得更远＝省；±30% 视为满分/零分。
-            let ratio = latest / median
-            efficiencyScore = max(0, min(100, Int((ratio - 0.7) / 0.6 * 100)))
-        } else {
-            // 还没有任何可比的东西 → **不给分**（"不知道"不能长得像"中等水平"）。
-            return nil
-        }
-        guard let efficiencyScore else { return nil }
-        guard !recent.isEmpty else { return nil }
-        // 短途占比：短途多说明这段时期跑得都不远，不完全是"稳"，所以只占一半权重
-        let shortTripRatio = Double(recent.filter { $0.distanceKm < 5 }.count) / Double(recent.count)
-        let stabilityScore = Int(shortTripRatio * 50 + 50)
-        return max(0, min(100, (efficiencyScore + stabilityScore) / 2))
-    }
+    //  #驾驶安全评分（`drivingScore`）于 2026-09-27 删除 —— 它是**评分的第二套算法**，
+    //  唯一的读者是刚刚删掉的月报（`MonthlyReportSection`，零入口）。
+    //  真正在用的那份在「出行」那一页的 `ScoreSection`（它自己从行程算，口径写在那些注释里）。
+    //  留着它的代价很具体：同一个 App 里两个地方各算一个「驾驶评分」，用户哪天看到两个数不一样，
+    //  谁都不知道该信哪一个。
 
     // #NEW-6「Siri 快捷指令使用次数」已删（2026-09-23）：它把每个短语被用过几次
     // 写进 UserDefaults（`carkeeper_siri_usage`），唯一用途是在快捷指令页上
@@ -462,8 +432,10 @@ final class AppStore: @unchecked Sendable {
     //  于是「网络状态」成了这一仓的**第三个**网络判据（网络路径 / 取数结果 / 这个 ping），
     //  而三个里只有它要专门发一趟请求才能回答。
     //  现在它没有写者：答案由两件**已经存在的事实**推出来（都在 `saveCache` 里写）——
-    //    · `isOfflineMode`：本次一个数据源都没取到
-    //    · `lastMissedSources`：本次没取到的那几项
+    //    · `isOfflineMode`：最近一次**整趟**一个数据源都没取到
+    //    · `lastMissedSources`：最近一次**整趟**没取到的那几项
+    //（两者都只由「整趟」那一拍写 —— 见 `saveCache(_:declaresOffline:)`；
+    //  运动时那 1 秒一拍只问一个源，它不算数）
     //  一句话读数：全取到 = 在线，取到一部分 = 弱网，一个都没取到 = 离线 ——
     //  与用户看到的东西（数据出没出来）是同一件事，而不是另一条独立的时间线。
     var networkStatus: NetworkStatus {
@@ -597,11 +569,16 @@ final class AppStore: @unchecked Sendable {
     // 现在「同一件事不并发」只有一处机制，就在 `RefreshLoop` 里：一次取数 `await` 完了
     // 才睡下一次（见那个文件的 ①）。两套机制管一件事，等于两套都不可信。
 
-    /// 车在不在**动** —— 最近一次取到的报文里 `VehicleSpeed > 0`。
+    /// 车在不在**动** —— 最近一份**定位报文**里 `speed > 0`。
     ///
-    /// 它是刷新节律的输入（地图页 2s / 60s 就是照它分的，见 `RefreshLoop`）。
-    /// 解析复用 `VM.driveStatus`：那份模型里的 `isMoving` 原来**没有任何读者**，
-    /// 于是「车在不在动」这件事在界面上一次都没被用过（车速是另一条路取的）。
+    /// 它是刷新节律的输入（地图页 1s / 停着那条退避曲线就是照它分的，见 `RefreshLoop`），
+    /// 也是 `KeepAwake`（车在动就屏幕常亮）的输入。
+    ///
+    /// ⚠️ 2026-09-27：读的不再是 control 的 `VehicleSpeed` —— 车在动时那一拍只取
+    /// **定位那一份**报文，速度读数必须住在那一份里（两个字段在 `API-FIELD-MAP.md`
+    /// §4.4 里核过是同一个量，见 `VM.driveStatus`）。
+    /// 解析复用 `VM.driveStatus` —— 它同时给出车速读数，两者是同一份报文里的同一个字段
+    ///（2026-09-27 起都是定位报文；此前 `isMoving` 与车速读数确实分过家）。
     var isCarMoving: Bool { VM.driveStatus(caches).isMoving }
 
     /// 车头朝向（度，0 = 正北）—— **只服务镜头**（`MapCameraFollow`）。
@@ -609,7 +586,7 @@ final class AppStore: @unchecked Sendable {
     /// 用户 2026-09-26：「地图页要随着车的方向实时改变地图朝向」。它与
     /// `MapSpineData.headingDeg` 是**同一个字段**（`VM.locStatus` 的 `degNum`，
     /// 报文里的 `Heading`），但不经过 `MapSpineData.build()`：后者要建行程映射、
-    /// 停车点映射与两处聚类，而镜头在车动起来时**每 2 秒**就要问一次朝向
+    /// 停车点映射与两处聚类，而镜头在车动起来时**每 1 秒**就要问一次朝向
     ///（节律见 `RefreshLoop.Cadence.moving`）。这一条只读本机已经存着的那份缓存。
     var carHeadingDeg: Double { Double(VM.locStatus(caches).degNum) }
 
@@ -726,6 +703,29 @@ final class AppStore: @unchecked Sendable {
         saveCache(results)
     }
 
+    /// 只取「会一秒一变」的那一份：**定位报文**（`cardata/getCarLocation`）。
+    ///
+    /// 用户 2026-09-27 第 2 条：「地图页的刷新，运动情况下是否可以做到 1 秒刷新一次，
+    /// 再就是这 1 秒中只取车速和定位，哪个 api 可以一次就获取到，不要浪费请求。」
+    /// 答案就是这一个接口：它一份报文里同时带着 `lat` / `lng`（GCJ-02）、`speed`（km/h）、
+    /// `heading`、`gpsTime`、`addrDesc`（服务端逆地理地址）—— 见 `API-FIELD-MAP.md` §4.4。
+    /// 于是那一拍**只发一个请求**，而地图上会一秒一变的东西（位置、车速、航向、地址）
+    /// 全在这一个请求里。它是全库**唯一**一处「只取一个源」的取数：其余都走 `gather`。
+    ///
+    /// ⚠️ 它 **`declaresOffline: false`**：这一拍只有一个数据源，它失败说明不了「网络断了」
+    ///（否则外壳上那枚弱网提示会每秒闪一次）。网络判定仍然只在「整趟」那一拍做 ——
+    /// 一个判据一处判。
+    func fetchMotion() async {
+        guard !carId.isEmpty else { return }
+        //  三行而不是一行字典字面量：这一仓在**类型推断**上丢过 CI 轮次
+        //（`DevView` 里那条 2026-09-24 的教训就是同一类 —— 看上去显然的表达式，
+        //  编译器在 macOS runner 上给出的是另一种答案），所以把 `[String: Any?]`
+        //  写清楚、值也是赋进去（赋值给 `Any?` 没有歧义）。
+        var patch: [String: Any?] = [:]
+        patch["location"] = try? await APIClient.shared.getLocation(carId: carId)
+        saveCache(patch, declaresOffline: false)
+    }
+
     /// 并行拉取多个数据源。使用 withTaskGroup，子任务失败单独吞掉，
     /// 返回成功的那些键值对（统一装进 [String: Any?]）。`includeMessages`/`includeCheck` 控制是否拉全部。
     private func gather(carId: String, includeMessages: Bool, includeCheck: Bool) async -> [String: Any?] {
@@ -766,8 +766,14 @@ final class AppStore: @unchecked Sendable {
         }
     }
 
-    func saveCache(_ patch: [String: Any?]) {
-        lastMissedSources = patch.compactMap { $0.value == nil ? $0.key : nil }.sorted()
+    /// - Parameter declaresOffline: 这一拍有没有资格判定「网络怎么样」。
+    ///   **只有整趟（四个源起）有**：那种情况下「一个都没取到」才是信息的；
+    ///   而运动时那一拍只有一个源（`fetchMotion`），它失败只能说明这一趟失败 ——
+    ///   让它参与判定，外壳上那枚弱网提示就会随着每一次丢包闪一下。
+    func saveCache(_ patch: [String: Any?], declaresOffline: Bool = true) {
+        if declaresOffline {
+            lastMissedSources = patch.compactMap { $0.value == nil ? $0.key : nil }.sorted()
+        }
         for (k, v) in patch {
             // nil = 这个源本次没取到：清空它。界面自己会说「没取到」，
             // 而不是继续显示上一次的读数（不保留旧值是刻意的 —— 见 caches 上的说明）。
@@ -791,11 +797,14 @@ final class AppStore: @unchecked Sendable {
             }
         }
         // #NEW-3 离线判定：真正断网（本次一个数据源都没拿到）且已登录时才提示
-        let anySuccess = patch.values.contains { $0 != nil }
-        if anySuccess {
-            isOfflineMode = false
-        } else if !patch.isEmpty && isLoggedIn {
-            isOfflineMode = true
+        //（只由「整趟」那一拍来判 —— 理由见这个函数的 `declaresOffline`）
+        if declaresOffline {
+            let anySuccess = patch.values.contains { $0 != nil }
+            if anySuccess {
+                isOfflineMode = false
+            } else if !patch.isEmpty && isLoggedIn {
+                isOfflineMode = true
+            }
         }
         // 「车的位置变了」必须真有人喊出来。
         //

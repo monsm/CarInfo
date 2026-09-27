@@ -7,9 +7,16 @@
 > 状态标记：✅ 已核实（报文可自证）｜❓ 未核实（含义待真机/官方文档确认，**界面必须显示原文，不许编中文**）｜🚫 我们代码读不到（见 §6）
 
 **口径声明（重要）**：这份日志来自**参考实现**（`bin/Debug`，桌面版），不是我们 iOS 包的日志。
-所以 §1 里的「1.5 秒轮询」是**参考实现的行为**；我们的 App **目前完全不轮询**（已核实：全库没有定位轮询循环，
-`CarKeeperApp.swift:154` 的 1.5 s 只是启动闪屏延时，`275/331` 是 30 s 网络监测）。
-**但报文结论对我们同样成立** —— 车端在 07:19:28 之后停报，服务端回放同一份快照，所以"主动轮询"本身在这里就是无效的。
+所以 §1 里的「1.5 秒轮询」是**参考实现的行为**。我们的 App 2026-09-27 起也有一条 1 秒的定位轮询：
+**车在动时**地图页每 1 秒取一次 `cardata/getCarLocation`（**只取这一份** ——
+`RefreshLoop.Cadence.moving` + `AppStore.fetchMotion`；车速也改从这份报文的 `speed` 读，
+见 §4.4），车停着时走退避曲线（2→4→…→60 s，不轮询）。
+**但报文结论对我们同样成立**：抓包那次车**已熄火** → 车端停报、服务端回放同一份快照，
+所以「轮询」本身不产生新数据 —— 判据是报文里的 `gpsTime` 有没有前进
+（`CarKeeperApp.swift` 里那个 1.5 s 只是启动闪屏延时）。
+⚠️ 行驶中车端多久上报一次，我们**没有实测数字**：若它比 1 秒慢，那 1 秒一拍会读到同一份快照
+（`gpsTime` 不变）—— 要验只在真机上（诊断页的原始日志）。真要更省，下一步看 §「刷新车辆状态
+(TBOX)」那一行：它才是「让车立刻上报」的手段，而不是把节律再调快。
 
 ---
 
@@ -783,7 +790,7 @@ POST {base}/api/car/control?pin={控制码}&cmd={Command}&carId={carId}&phoneTyp
 | `VM.healthModel` | 1（体检页） | `Status`×4、`CheckTime`、`CheckHistoryId`×2、`NormalCount`、`RiskCount`、`FaultCount`、`CarDataUpdateTime` | 体检页三个计数恒 `--`、时间空白；**服务端算好的 100 分用不上** |
 | `VM.userModel` | 1（我的） | `UserFullname`、`UserNickname`×3、`Mobile`、`Gender`、`LastLoginTime`、`Source`、`Birthday` | 账号卡片姓名/手机/性别/生日空白 |
 | `VM.vehicleSummary` | **4**（车辆档案、搜索、我的） | `Pin`×2、`InsuranceEndDate`×2、`TserviceEndtime`×2、`CarName`、`PlateNumber`、`Vin`、`Color`、`ModelCode`、`ConfName`、`IsNev` | **车辆档案页显示「未绑定车牌」「未绑定车辆」**、VIN `--`、车型不显示、控车码 `--`、保险/服务到期不显示 |
-| `VM.driveStatus` | **0（死代码）** | `VehicleSpeed`×2、`TotalOdometer`、`ShiftPosition`×3 | 无（但**它曾是我们以为的"里程读数"来源**，事实是它从未被调用） |
+| `VM.driveStatus` | ~~0（死代码）~~ | `VehicleSpeed`×2、`TotalOdometer`、`ShiftPosition`×3 | 无（但**它曾是我们以为的"里程读数"来源**，事实是它从未被调用）。⚠️ **2026-09-26 起不再成立**：`AppStore.isCarMoving` 就是它的读者（刷新节律与屏幕常亮都用它）；⚠️ **2026-09-27 起车速与「在不在动」改读定位报文的 `speed`**（§4.4）——`VehicleSpeed` 两个读点因此只剩 `TotalOdometer`/`ShiftPosition` 还在用 control |
 | `AN.summarize`（充电子域等） | 2（电池页、体检原始数据） | `InsuranceEndDate`、`TserviceEndtime`、`ChrgStatus`、`RemainPower`、`RemainedPowerMile`、`ChargDeltMins`、`ChargeStarttime/Stoptime`、`ReservationUseVehicleTime` | 电池页/原始数据里充电域全 `--` |
 
 **已兜底（5 处，不算 bug）**：`carSel` 的 `["CarId"] ?? ["carId"]`、`["CarName"] ?? ["carName"]`、`["PlateNumber"] ?? ["plateNumber"]`、`energy` 里同款 2 处。
@@ -799,6 +806,10 @@ POST {base}/api/car/control?pin={控制码}&cmd={Command}&carId={carId}&phoneTyp
 **另一个"注释说谎"**：`AppStore.swift:672` 写着"车况每 60 秒轮询一次"，但全库**没有任何车辆轮询循环**
 （已核实：只有 `CommandCenter` 的指令结果轮询、短信倒计时、以及 `BackgroundTaskManager` 的 15/30 分钟 BG 刷新）。
 注释把行为说成比现实更勤快，跟界面上"在线"永远亮着是一类错。
+
+> **后续（2026-09-25 至 09-27）**：车况节律后来真的建起来了 —— `Services/RefreshLoop.swift`（全 App 唯一
+> 一处决定「多久取一次数」的地方：地图页车在动 **1 秒**、只取定位那一份；停着走退避曲线；
+> 其余档 60 s 轻 + 300 s 重）。所以上面那条「注释说谎」**已经不成立**：那句话现在是行为本身。
 
 ---
 

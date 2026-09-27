@@ -31,7 +31,7 @@ struct HealthDataView: View {
     var body: some View {
         //  正文只提供内容 —— 页面外壳（滚动 / 纸面底 / 页标题）不在这里，
         //  它是 `VehicleView` 里那张叫「体检」的卡（邻居 `MileageJournalSection`
-        //  / `VehicleTipsSection` / `ExportDataSection` 同一条约定：一个页面只能
+        //  / `ExportDataSection` 同一条约定：一个页面只能
         //  有一个所有者，而这里的所有者是那张卡）。
         //
         //  此前这里包着 `DSPaperPage`，于是叠进卡里的是**第二层 ScrollView +

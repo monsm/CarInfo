@@ -8,10 +8,10 @@ import Foundation
 //
 //  `DateFormatter` 的构造很贵（它要现装一套 ICU 格式化器），而**每次构造出来的都一样**。
 //  在这之前全仓有 9 处 `let f = DateFormatter()`，其中三处落在「每次界面求值都会跑」的
-//  路径上，而地图页在车动起来时是**每 2 秒**求值一次（节律见 `RefreshLoop.Cadence`）：
+//  路径上，而地图页在车动起来时是**每 1 秒**求值一次（节律见 `RefreshLoop.Cadence`）：
 //
 //    · `MapTripLine.timeText` —— 「行程」图层里每一枚钉的标题（`MapSpineLayers` 的一行
-//      `Text`）。30 段行程 = 30 次构造，**每 2 秒重来一遍**；
+//      `Text`）。30 段行程 = 30 次构造，**每 1 秒重来一遍**；
 //    · `VM.parseDate(_:)` —— 一次调用最多构造 **7 个**（它按 7 种格式挨个试），
 //      而它读的是每条记录上的日期串；
 //    · `RawLogStore.now()` / `VM.nowText()` —— 每次记一条日志都构造一个。

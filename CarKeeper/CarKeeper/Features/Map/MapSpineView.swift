@@ -302,7 +302,7 @@ struct MapSpineView: View {
     private func deck(screenWidth: CGFloat) -> some View {
         // `MapSpineData.build()` 在这一次求值里**只跑一次**（2026-09-25 性能轮）：
         // 改之前它在 `let d = data`、`.onChange` 的条件、`nowLayer` 里各算一遍 ——
-        // 一次求值建三套（地图页车动起来时每 2 秒求值一次，而 `build()` 里含行程映射、
+        // 一次求值建三套（地图页车动起来时每 1 秒求值一次，而 `build()` 里含行程映射、
         // 停车点映射、胎压、异常点与两处聚类）。现在：sheet 那份挪进**闭包**，
         // `.onChange` 盯车自己的读数，只剩 `nowLayer()`（它本来就是地图页的内容）。
         // 代价为零：三处读的本来就是同一个函数的返回值。
@@ -796,9 +796,10 @@ struct MapSpineView: View {
             //  这里读的就是条子报出来的那个位置（`deckPos`，拖动时每帧都在变）。
             //  五份各自铺底做不到这件事（五份图的偏移量各自独立，拖动只能交叉淡出）——
             //  而且那样同一张图要画五遍。
+            //  可平移多长由**图自己**说了算（`MapWallpaperLayer.coverWidth`）：
+            //  这里只报「现在停在哪个位置（0…1）」。
             MapWallpaperLayer(image: wallpaper.image,
-                              position: HomeMode.wallpaperPosition(deckPos),
-                              screens: HomeMode.wallpaperScreens)
+                              position: HomeMode.wallpaperPosition(deckPos))
             ForEach(HomeMode.allCases.indices, id: \.self) { i in
                 let a = fade(i)
                 //  六页同屏（原型 `.pages > .page{inset:0}` × 6）：每一档一直在那里，

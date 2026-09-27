@@ -69,7 +69,8 @@ class ServiceReminderManager {
     ///     而代码用了 `!` → 同样炸。
     ///
     /// 2026-09-23 的真机崩溃报告就是这条（`EXC_BREAKPOINT`，栈：
-    /// `VehicleTipsSection.body → tips → ServiceReminderManager.reminders → defaultReminders`）：
+    /// `VehicleTipsSection.body → tips → ServiceReminderManager.reminders → defaultReminders`
+    /// —— 那张卡 2026-09-27 已删，这条栈是真机报告里的原文，一字未改）：
     /// 它把「切到车辆档」变成了一次闪退。注意它崩在**默认值**上 ——
     /// 只要用户没存过提醒（也就是绝大多数人），进那一档就必崩。
     ///

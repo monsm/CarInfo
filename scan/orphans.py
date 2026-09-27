@@ -29,6 +29,7 @@
   `ArtTheme.nativeDynamic`，2026-09-25 随艺术主题删除搬进 `Tokens.swift`）。
   探针：注入 `extension Double { func probeDeadMember() }` → 当场报出；
   还原后文件哈希与注入前一致、转绿。收窄三条写在判据 ② 的注释里。
+
   • 一个文件里的**顶层类型声明**（列 0 的 struct/class/enum/actor）如果在
     **其它任何文件**里一次都没被提到，就算孤儿。
   • 跳过入口类文件：含 `@main` / `PreviewProvider` / `#Preview` /
@@ -36,6 +37,16 @@
     `UIApplicationDelegate` 的文件。
   • 白名单在下面，每条必须写清理由 —— 白名单是给「确实不需要外部引用」用的，
     不是给「暂时懒得接」用的。
+
+  判据 ③（2026-09-27 补）：**顶层 View 从来没有被构造过**。
+  起因是判据 ① 是**按文件**判的：它把文件里的顶层类型名当成一张名单，名单里只要有
+  **一个**名字在别处出现过，整个文件就算「有人引用」。于是同一份文件里只要有一样东西
+  是活的，零读者的类型就全搭它的便车：`Theme.swift` 里的月报
+  （`MonthlyReportSection` / `MonthlyReportCard`：行驶统计 + 驾驶评分 + 生成 HTML 再分享，
+  约 170 行）零入口、零读者，34 条门禁一条都没说话 —— 它被发现，靠的是一次性脚本。
+  探针：临时文件 `_GateProbe.swift` 里注入一个没有构造点的 `: View` → 当场报出；
+  删掉临时文件、改成没有构造点那一侧 → 转绿。
+  判据与三条收窄写在下面对应的那一节。
 
 退出码：0 = 无孤儿；1 = 有孤儿（或扫描失败）。
 """
@@ -172,6 +183,65 @@ def extension_member_orphans(texts):
     return hits
 
 
+# =============================================================================
+#  判据 ③：**顶层 View 从来没有被构造过**（2026-09-27 加）
+# =============================================================================
+#
+#  为什么需要它：判据 ① 是**按文件**判的 —— 它把「这个文件里的顶层类型名」当成一
+#  张名单，只要名单里**任何一个**名字在别的文件出现过，整个文件就算「有人引用」。
+#  于是一份文件里只要有一样东西是活的，同文件里零读者的类型就全搭了便车：
+#  2026-09-27 的月报（`MonthlyReportSection` / `MonthlyReportCard`：行驶统计 + 驾驶评分
+#  + 生成 HTML 再分享，约 170 行）正是这样活了很久：**零入口、零读者**，而 34 条门禁
+#  一条都没说话（`Theme.swift` 里 `SafeSymbol` / `AppCanvas` 是活的，那个文件就放行了）
+#  —— 发现它靠的是一次性脚本。
+#
+#  判据：顶层 `struct` 声明了 `: View`，而**整个仓库**（含它自己的文件）里
+#  一次都没有出现「构造它 / 把它当类型用」的形状：
+#      Name( · Name< · <Name> 或 <Name, · Name.self
+#  → 报红。
+#
+#  只挑 `: View` 是故意的：这是「能被人看见的东西」的判据，也是误报最少的一条。
+#    · `enum`（命名空间）/ `PreferenceKey` 那类 struct / 模型不参与；
+#    · 交给系统发现的（`@main` / `AppIntent` / `_Previews`）由 `ENTRY_MARKERS`
+#      与 `_Previews` 后缀挡掉；
+#    · ⚠️ 保守方向与判据 ①② 一样：**注释里出现一次 `Foo()` 也算有人构造**（宁漏不噪）。
+#  确实不需要被代码构造的（系统按注册发现等）→ 写进 VIEW_WHITELIST 并说明理由。
+VIEW_MIN_NAME = 6
+VIEW_DECL_RE = re.compile(
+    r"^(?:public |internal |private |fileprivate |final |open )*struct\s+([A-Za-z_][A-Za-z0-9_]*)"
+    r"(?:\s*<[^>\n]*>)?\s*:[^\n{]*\bView\b",
+    re.M,
+)
+VIEW_WHITELIST: dict[str, str] = {}
+
+
+def view_orphans(texts, in_scope):
+    """返回 [(文件, 类型名)]：声明了 `: View` 却全仓没被构造过的顶层结构体。"""
+    readable = {q: t for q, t in texts.items() if "DerivedData" not in q}
+    hits = []
+    for path in in_scope:
+        text = readable.get(path)
+        if text is None:
+            continue
+        if any(marker in text for marker in ENTRY_MARKERS):
+            continue
+        for m in VIEW_DECL_RE.finditer(text):
+            name = m.group(1)
+            if len(name) < VIEW_MIN_NAME or name.endswith("_Previews"):
+                continue
+            key = f"{path}:{name}"
+            if key in VIEW_WHITELIST:
+                continue
+            pat = re.compile(
+                r"\b" + re.escape(name) + r"\s*[\(<]"                       # 构造 / 显式泛型
+                r"|<\s*" + re.escape(name) + r"\s*(?:,|>)"                  # 当类型参数
+                r"|\b" + re.escape(name) + r"\.self\b"                      # 当类型用
+            )
+            if not any(pat.search(t) for t in readable.values()):
+                hits.append((path, name))
+    return hits
+
+
 def all_swift_files(root):
     out = []
     for dirpath, _, filenames in os.walk(os.path.join(PROJECT_ROOT, root)):
@@ -262,6 +332,21 @@ def main():
         print("   确实不需要被代码引用的，写进 EXT_WHITELIST 并说明理由。")
         return 1
     print(f"\n✅ 系统类型扩展里的成员都有读者（例外表 {len(EXT_WHITELIST)} 条）")
+
+    # ---- 判据 ③：顶层 View 全仓没有被构造过 ------------------------------
+    view_hits = view_orphans(texts, in_scope)
+    hard_view = [h for h in view_hits if f"{h[0]}:{h[1]}" not in VIEW_WHITELIST]
+    if hard_view:
+        print("\n❌ 写了却没有人构造的 View（声明在、全仓没有一处 `TypeName(`）：")
+        for path, name in hard_view:
+            print(f"   {path} → {name}")
+        print("\n   两种修法（都要选一种，不能留着）：")
+        print("     ① 接上入口 —— 让某处真的把它建起来；")
+        print("     ② 删掉 —— 一个从来不出现的界面，等于没有，但它一直占着维护成本")
+        print("        （2026-09-27 的月报就是这样被找出来的）。")
+        print("   确实不需要被构造的，写进 VIEW_WHITELIST 并说明理由。")
+        return 1
+    print(f"\n✅ 每个 `: View` 的顶层结构体都有人构造（例外表 {len(VIEW_WHITELIST)} 条）")
     return 0
 
 

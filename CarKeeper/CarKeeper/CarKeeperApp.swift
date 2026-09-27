@@ -45,8 +45,11 @@ enum Deeplink: Hashable, CaseIterable {
     case vehicle, health, battery, dev, control, dashboard
     // `.commands`（指令历史页）已删：历史就是车控页里「做过什么」那一节，
     // 同一件事不再有两个界面（详情见 ControlView 的 historyCard 注释）。
-    // `.tips`（车辆提示页）已删：提示是从这辆车的读数推出来的，已并入车辆档案
-    // （`VehicleTipsSection`），不再单占一个深链。
+    // `.tips`（车辆提示页）已删：提示是从这辆车的读数推出来的，已并入车辆档案。
+    //  ⚠️ 2026-09-27：并进去的那张「用车提示」卡自己也删了（用户：「能删除就删除」）——
+    //  它说的每件事别的页都已经在说（电量低 → 充电页与地图那一横；故障 / 胎压 → 体检与地图抽屉；
+    //  门窗 → 车控车身卡；保养 → 保养页），而「忽略」只在本次运行内生效。
+    //  于是这条深链与那一页（以及那一整台「建议引擎」）一起没了。
     // `.export`（导出数据页）已并入保养与钱（`ExportDataSection`）。
     case trips, service, parking, emergency, score
     /// 「车与账号」（原「我的」Tab 的根页）。设置类内容的去处 —— 它不是功能目录，
@@ -377,8 +380,8 @@ struct MapShellView: View {
         .tint(TokensPalette.ambient)
         .task {
             await store.bootstrap()
-            // 自动刷新的节律循环（一个，见 `RefreshLoop`）：地图页 2s（车在动）/
-            // 2→4→8→16→32→60s（停着），其余档 60s（轻）+ 300s（重，翻到那一页时当场取一次）。
+            // 自动刷新的节律循环（一个，见 `RefreshLoop`）：地图页 1s（车在动，只取定位那一份，
+            // 每 10 拍一整趟）/ 2→4→8→16→32→60s（停着），其余档 60s（轻）+ 300s（重，翻到那一页时当场取一次）。
             // 放在这里而不是各页的 `.task` —— 六页是同时建出来的，每页一个定时器就是六个循环。
             RefreshLoop.shared.start()
             // 车在动时保持屏幕唤醒（用户 2026-09-26：「车移动的时候要保持屏幕唤醒不睡着」）。

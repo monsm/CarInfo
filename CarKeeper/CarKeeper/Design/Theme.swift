@@ -1,8 +1,4 @@
 import SwiftUI
-import MapKit
-import CoreHaptics
-import AVFoundation
-import Photos
 
 // =============================================================================
 // SafeSymbol —— SF Symbol 名称兜底
@@ -39,12 +35,16 @@ extension Image {
 // 那些都已删除，因为它们全部有第四代（`Tokens.swift` + `DS.swift`）的对应物：
 // 同一个 App 里同一件事有两个名字，就一定会有人用错那一个。
 //
-// 现在这里只剩三类，每一类都只有一份：
+// 现在这里只剩两类，每一类都只有一份：
 //   ① 全 App 唯一的画布（AppCanvas）
 //   ② 全 App 唯一的小零件（StatusDot / Pill）
-//   ③ 被「车与账号」直接使用的两个视图（月报、省电开关）
+// 第三类（「被车与账号直接使用的两个视图」：月报、省电开关）2026-09-27 整类删了 ——
+// 见文件末尾那一段。
 // `Theme` 与 `Color(hex:)` 也一并删了：字体一律从 `TokensTypo` 出，
 // 颜色一律从 `TokensPalette` 出，不再保留第二个入口。
+//
+// ⚠️ 四个 `import`（MapKit / CoreHaptics / AVFoundation / Photos）也一起删了（2026-09-27）：
+// 它们是这一份文件还是「第二代设计系统」时留下的，而现在这个文件里没有一行用到它们。
 // =============================================================================
 
 // =============================================================================
@@ -154,183 +154,19 @@ struct Pill: View {
 // ImagePicker / pickImageFromPhotoLibrary / ImagePickerCoordinator 已删：
 // 用 `UIImagePickerController` 自己 present 是 UIKit 时代的写法（还得靠一个全局强引用来防止
 // delegate 被提前释放）；照片入口走 SwiftUI 的 `PhotosPicker`，不再自己拼这一套。
-//
-// =============================================================================
-// MARK: - 从 63decaa 被误删的实现（月报 / 省电开关）
-// 注意：这一节原来还包括"充电站地图"与"驾驶评分"，两者已删 ——
-// 它们各自是第二、第三套实现：充电站搜的是写死的北京坐标，评分用报文里
-// 根本不存在的急加速/急刹车键名（永远 0 次 + 100 分）。现在两者都归到
-// 地图主屏的「充电」层与评分页，那里才是唯一那份实现。
-// =============================================================================
 
 // =============================================================================
-// MonthlyReportSection — #39 驾驶报告月报
-// 「我的」那一屏里的一节（展开后才算），可再导出一个 HTML 文件去分享
-// （标题里曾写着「（PDFKit）」—— 它从来没有生成过 PDF，`import PDFKit` 也没用过）
+// MARK: - 「从 63decaa 被误删的实现」这一节：**整节已空**（2026-09-27）
 // =============================================================================
-struct MonthlyReportSection: View {
-    @State private var expanded = false
-    @State private var reportData: ReportData?
-    
-    /// 报表数据全部来自**本机真实记录**：行程历史（由点火/熄火事件自动生成）+ 评分。
-    /// 每一项都可能算不出来 —— 那就显示「—」，不编。
-    ///
-    /// ⚠️ 这里原有 `chargeSessions` / `chargeKWh` 两行（充电次数与度数）。
-    ///    充电账本 2026-09-23 整条删除，报表里那两行也随之去掉 ——
-    ///    剩下的四项全是行程与评分，都是 App 记录的真实事件算出来的。
-    struct ReportData {
-        /// 例：2026年9月
-        let monthLabel: String
-        let tripCount: Int
-        let totalMileage: Double
-        /// 每 1% SOC 的续航（km）。不需要电池容量，所以是目前唯一算得出的能效口径。
-        let kmPerPercent: Double?
-        /// 平均电量：来自本机的 SOC 采样（**不是你整月的平均** —— 采样只保留最近一小段）。
-        let avgSoc: Int?
-        let driveScore: Int?
-
-        /// 本月一条真记录都没有。这时不该画一张空表，而要直说为什么。
-        var hasAnyRecord: Bool { tripCount > 0 }
-        var mileageText: String { tripCount > 0 ? String(format: "%.1f km", totalMileage) : "—" }
-        var tripText: String { tripCount > 0 ? "\(tripCount) 段" : "—" }
-        var efficiencyText: String {
-            kmPerPercent.map { String(format: "每 1%% 电量 %.1f km", $0) } ?? "—"
-        }
-        var avgSocText: String { avgSoc.map { "\($0)%" } ?? "—" }
-        var scoreText: String { driveScore.map { "\($0) 分" } ?? "—" }
-        var scoreGrade: String {
-            guard let s = driveScore else { return "还没有足够的读数" }
-            switch s {
-            case 90...: return "S"
-            case 80..<90: return "优秀"
-            case 70..<80: return "良好"
-            case 60..<70: return "一般"
-            default: return "偏低"
-            }
-        }
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: TokensSpacing.md) {
-            DSGroup {
-                DSGroupRow(showsSeparator: false) {
-                    DSRow(icon: "doc.text.fill",
-                          title: "本月驾驶报告",
-                          subtitle: "里程 / 能耗 / 评分",
-                          value: expanded ? "收起" : nil,
-                          showsChevron: true) { toggle() }
-                }
-            }
-            if expanded, let d = reportData {
-                MonthlyReportCard(data: d)
-            }
-        }
-    }
-
-    /// 展开时才真的去算 —— 不必为一个没人看的报表在每次重绘都跑一遍行程统计。
-    /// 它以前是拉起一个浮层；浮层是另一屏，现在就是这一屏往下多几行。
-    private func toggle() {
-        if expanded { expanded = false; return }
-        reportData = generateReport()
-        expanded = true
-    }
-
-    private func generateReport() -> ReportData {
-        // 这里**曾经**是写死的 1250 km / 14.5 kWh / 8 次 / 65% / 85 分（注释写着「模拟生成」）。
-        // 一份编造的月报比没有月报坏得多 —— 用户会拿它判断自己的车。
-        let store = AppStore.shared
-        let cal = Calendar.current
-        let now = Date()
-        let trips = store.tripHistory.filter {
-            cal.isDate($0.startTime, equalTo: now, toGranularity: .month)
-        }
-        let distance = trips.reduce(0.0) { $0 + $1.distanceKm }
-        // 每 1% SOC 的续航：把本月所有行程的里程与百分点各自求和再相除
-        // （不能用「各段 km/% 的平均」——短途段的读数会被放大）。
-        let socUsed = trips.reduce(0) { $0 + max(0, $1.startSoc - $1.endSoc) }
-        let samples = HistoryStore.shared.soc.suffix(240).map { $0.v }
-        let data = ReportData(
-            monthLabel: DateText.shared.string(now, "yyyy年M月"),
-            tripCount: trips.count,
-            totalMileage: distance,
-            kmPerPercent: socUsed > 0 ? distance / Double(socUsed) : nil,
-            avgSoc: samples.isEmpty ? nil : Int(samples.reduce(0, +) / Double(samples.count)),
-            driveScore: store.drivingScore
-        )
-        return data
-    }
-}
-
-/// 月报本体。它不再是浮层 —— 没有自己的导航栏、没有「关闭」按钮，
-/// 因为它是「我的」那一屏往下多出来的几行（调用点就在上面那个展开动作里）。
-struct MonthlyReportCard: View {
-    let data: MonthlyReportSection.ReportData
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            Text(data.monthLabel)
-                .font(TokensTypo.subheadline)
-                .foregroundStyle(TokensPalette.secondary)
-
-            if !data.hasAnyRecord {
-                DSNotice(kind: .info, text: "本月还没有行程记录。")
-            }
-
-            DSGroup(title: "行驶统计") {
-                DSGroupRow { DSKeyValueRow(key: "行程段数", value: data.tripText) }
-                DSGroupRow { DSKeyValueRow(key: "总里程", value: data.mileageText) }
-                // kWh/100km 需要电池容量（报文里 capacity 是 null），所以这里用口径说清楚的 km/1%
-                DSGroupRow { DSKeyValueRow(key: "能效", value: data.efficiencyText) }
-                DSGroupRow(showsSeparator: false) {
-                    DSKeyValueRow(key: "平均电量（近期采样）", value: data.avgSocText)
-                }
-            }
-
-            DSGroup(title: "驾驶评分") {
-                DSGroupRow { DSKeyValueRow(key: "综合评分", value: data.scoreText) }
-                DSGroupRow(showsSeparator: false) {
-                    DSKeyValueRow(key: "评价", value: data.scoreGrade)
-                }
-            }
-
-            Button("分享报告") { shareReport() }
-                .buttonStyle(DSPrimaryButtonStyle())
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func shareReport() {
-        // 生成一份 HTML 再分享（这里曾写着「生成 PDF 并分享」—— 它从来没生成过 PDF）
-        let html = generateHTMLReport()
-        let url = saveHTMLToTemp(html: html)
-        let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-            vc.popoverPresentationController?.sourceView = scene.windows.first
-            scene.windows.first?.rootViewController?.present(vc, animated: true)
-        }
-    }
-    
-    private func generateHTMLReport() -> String {
-        return """
-        <html><body style="font-family:system-ui;padding:20px;">
-        <h1>月度驾驶报告</h1>
-        <h2>行驶统计（\(data.monthLabel)）</h2>
-        <ul>
-        <li>行程段数: \(data.tripText)</li>
-        <li>总里程: \(data.mileageText)</li>
-        <li>能效: \(data.efficiencyText)</li>
-        <li>平均电量（近期采样）: \(data.avgSocText)</li>
-        </ul>
-        <h2>驾驶评分</h2>
-        <p>综合评分: \(data.scoreText) - \(data.scoreGrade)</p>
-        </body></html>
-        """
-    }
-    
-    private func saveHTMLToTemp(html: String) -> URL {
-        let filename = "monthly_report_\(Date().timeIntervalSince1970).html"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-        try? html.write(to: url, atomically: true, encoding: .utf8)
-        return url
-    }
-}
+// 这一节曾经装着四件事：充电站地图、驾驶评分、月报、省电开关。追查之后四件都不是
+// 「被误删」—— 它们各自是**第二、第三套实现**，而每一件真正的家都在别处：
+//   · 充电站地图 —— 搜的是写死的北京坐标 → 归地图主屏的「充电」层；
+//   · 驾驶评分 —— 用的是报文里根本不存在的急加速 / 急刹车键名（永远 0 次 + 100 分）
+//     → 归「出行」那一页的「评分」卡；
+//   · 月报（`MonthlyReportSection` / `MonthlyReportCard`：行驶统计 + 驾驶评分 +
+//     生成 HTML 再分享）—— **零入口、零读者**，2026-09-27 删。它连的
+//     `AppStore.drivingScore`（评分的第二套算法，只服务它）也一起走；
+//   · 省电开关 —— 早随那一批「整组删」一起走。
+// 留下这一小段只是为了让下一个人知道：这里曾经有东西，而且为什么现在没有 ——
+// 而不是让他在 git 历史里猜。
+// =============================================================================

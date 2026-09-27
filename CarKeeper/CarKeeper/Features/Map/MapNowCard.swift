@@ -243,7 +243,20 @@ extension MapSpineView {
     @ViewBuilder
     func drawerContent(_ d: MapSpineData) -> some View {
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            layerMenu(d)
+            //  抽屉的第一行：**车的那一行**（表显里程 · 充电状态）+ 右端的图层开关。
+            //
+            //  ⚠️ 2026-09-27（用户第 1 条：「现在的选择可以和表显 充电状态 放一行」）：
+            //  这一行把两件事并成一行，而它成立的理由比「省一行」大：
+            //    · 「表显 53,766 km · 未充电」回答的是**车**的事，不是「现在这一层」的事
+            //      —— 换成出行 / 停车 / 充电三层它同样成立，所以它本来就该在抽屉的
+            //      第一行，而不是「现在」那一层正文里的第二行；
+            //    · 图层开关此前自己占一整行（它会变的那一个字就是当前层名）。
+            //  于是抽屉比上一版少一行，而少的那一行没有丢任何东西。
+            HStack(alignment: .center, spacing: TokensSpacing.sm) {
+                drawerSub(d)
+                Spacer(minLength: TokensSpacing.sm)
+                layerMenu(d)
+            }
             switch layer {
             case .now:
                 if d.hasLocation == false {
@@ -279,7 +292,6 @@ extension MapSpineView {
                 .foregroundStyle(TokensPalette.primary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        nowSub(d)
         // 光带 = 电量（全 App 唯一的形状，在地图上它是「车钉外面那圈弧」的展开）
         // `showsGlow` 不再传：它以前读「当前艺术方向允不允许发光」（纸上不允许 —— 纸张没有
         // 发光）。主题只剩原生之后那是常真，于是这一处回到 `DSLightBar` 的默认值（true），
@@ -289,13 +301,19 @@ extension MapSpineView {
                    tint: TokensPalette.lightBar)
     }
 
-    /// 副行。空段直接丢掉（不摆占位）—— 「表显 53,766 km · 未充电」里任何一个字
+    /// 抽屉第一行左半边：**车的那一行**（表显里程 · 充电状态）。
+    ///
+    /// 它从「现在」那一层的正文里提上来了（2026-09-27，用户：「现在的选择可以和表显
+    /// 充电状态 放一行」）—— 两件事并成一行，同时这一行变成了**四层共用**的：
+    /// 「表显 … · 未充电」说的是车，不是哪一层。
+    ///
+    /// 空段直接丢掉（不摆占位）—— 「表显 53,766 km · 未充电」里任何一个字
     /// 取不到，那一句就不出现，而不是留一个 `--`。
     ///
     /// 它曾经从「电量 68%」开头 —— 那个数已经是下面读数里的「电量」那一格，
     /// 而电量在这张卡里还有第三种说法（光带）。一个 68% 说三遍不是信息多，是没精简。
     @ViewBuilder
-    func nowSub(_ d: MapSpineData) -> some View {
+    func drawerSub(_ d: MapSpineData) -> some View {
         let mileage = VM.vehicleSummary(store.car, store.controlCache)?.mileage
         let line = Self.join([mileage.map { "表显 \($0) km" },
                               d.chargeText])

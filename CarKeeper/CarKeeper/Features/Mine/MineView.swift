@@ -488,19 +488,20 @@ struct MineView: View {
     //  用户 2026-09-27：「删除更新相关」—— 三个文件（`Services/UpdateService.swift`、
     //  `Services/GithubToken.swift`、以及本页这一块与它那 11 个 `@State`）一起走了。
     //
-    //  留下来的是一个**真的属于"关于"的"关于"**：这个包是什么版本、走哪条网络通道。
+    //  留下来的是一个**真的属于"关于"的"关于"**：这个包是什么版本。
     //  版本是用户报障时唯一能自报的东西，而它以前只藏在两个地方：一个**没人点得开**的
     //  弹窗（`showAboutAlert` 全仓没有写处 —— 一个只有读者没有写者的状态）
-    //  与诊断页里。现在它在那一张卡上。
+    //  与诊断页里。现在它在那一张卡上（诊断页那一组与「网络通道」那一行 2026-09-27 一起删，
+    //  于是全 App 只剩两处能看到版本：这一行，与「复制诊断信息」正文的抬头）。
     private var aboutCard: some View {
         DSGroup(title: "关于",
                 footer: "车况数据实时来自车辆车联网服务，仅用于本人车辆管理。") {
-            DSGroupRow {
+            DSGroupRow(showsSeparator: false) {
                 DSKeyValueRow(key: "版本", value: "\(appVersion) (\(buildNumber))", mono: false)
             }
-            DSGroupRow(showsSeparator: false) {
-                DSKeyValueRow(key: "网络通道", value: "直连（iOS 原生）", mono: false)
-            }
+            //  「网络通道：直连（iOS 原生）」那一行于 2026-09-27 删（用户：「两处关于的行清理」）：
+            //  它是一句静态说明 —— 用户从这一行得不到任何可行动的信息，而它要回答的
+            //  「数据往哪儿走」在「我的 → 隐私与数据」里是有一整节在真回答的。
         }
     }
 

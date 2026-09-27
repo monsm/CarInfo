@@ -356,6 +356,15 @@ enum VM {
     static func driveStatus(_ cache: [String: Any?]) -> DriveModel {
         let control = ciVal(cache, "control")
         let hasCtrl = control != nil
+        //  ⚠️ 2026-09-27：**车速**与「在不在动」改读**定位报文**（`location.speed`），
+        //  不再读 control 的 `VehicleSpeed`。两条报文里是同一个量
+        //（`API-FIELD-MAP.md` §4.4 写着「`speed` … 与 control `speed`/`vehicleSpeed`
+        //  一致」，抓包逐字核过），而车在动时那一拍**只取定位这一份**
+        //（`RefreshLoop` 的 1 秒节律）——读数必须住在**那一份真的在取的报文**里。
+        //  否则地图上的车速会整趟冻在「开始动」那一刻的值上，而它看起来是活的
+        //（比读数慢更糟：慢看得见，假看不见）。
+        let location = ciVal(cache, "location")
+        let speedRaw = ciPick(location, ["speed"])
 
         // ⚠️ 报文中 DriveMotorData / MotorData 是「数组」（小程序取 [0]，batteryModel 里也是数组），
         // 之前按对象解析 → 永远取不到 → 首页/车况页的电机温度恒为 "--"。
@@ -389,14 +398,14 @@ enum VM {
         let fireCN: [String: String] = ["1": "启动", "2": "熄火"]
         let fireStatus = fireSt.isEmpty ? "" : (fireCN[fireSt] ?? fireSt)
         return DriveModel(
-            speed: hasCtrl ? (n0(ciPick(control, ["VehicleSpeed"])) ?? "--") : "--",
+            speed: location != nil ? (n0(speedRaw) ?? "--") : "--",
             mile: hasCtrl ? (n0(ciPick(control, ["TotalOdometer"])) ?? "--") : "--",
             gear: hasCtrl ? (num(ciPick(control, ["ShiftPosition"])) == 0 ? "P" : "D") : "--",
             gearSub: hasCtrl ? (num(ciPick(control, ["ShiftPosition"])) == 0 ? "驻车" : "行驶") : "",
             gearCls: gearCls,
             motorTemp: motor == nil ? "--" : "\(n0(t) ?? "--")℃ / \(n0(ct) ?? "--")℃",
             batteryNote: note,
-            isMoving: hasCtrl && num(ciPick(control, ["VehicleSpeed"])) > 0,
+            isMoving: location != nil && num(speedRaw) > 0,
             fireStatus: fireStatus
         )
     }

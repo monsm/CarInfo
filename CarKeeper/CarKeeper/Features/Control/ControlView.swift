@@ -254,8 +254,9 @@ struct ControlView: View {
         DSSectionHeader(title: t)
     }
     /// 这一档的叠叠乐。顺序就是它的信息架构：
-    /// **车身 → 现在该做的 → 指令 → 场景 → 记录 → 快捷指令**。
-    /// 旧版是一条平铺的卡片堆，上下滑到底；现在它们是六张独立的卡散文，
+    /// **车身 → 指令 → 场景 → 记录**（「现在该做的」与「快捷指令」两张卡分别于
+    /// 2026-09-27、2026-09-23 删，各自的原因写在下面）。
+    /// 旧版是一条平铺的卡片堆，上下滑到底；现在它们是几张独立的卡散文，
     /// 滑过去的是一张一张，而不是一整屏。
     @MainActor
     private var cards: [StackCard] {
@@ -268,13 +269,12 @@ struct ControlView: View {
                 controlHeader
                 if let bd = bodyDetail { bodyDetailCard(bd) }
             })))
-        // ② 现在该做的一件事：实心胶囊（状态有问题时它就是「锁车关窗」）
-        out.append(StackCard(id: "todo", title: "现在该做的", content: AnyView(
-            VStack(alignment: .leading, spacing: TokensSpacing.md) {
-                primarySceneButton
-                if let run = running { runningCard(run) }
-            })))
-        // ③ 还能做什么 → ④ 一键场景 → ⑤ 做过什么（按用到它们的频率从高到低）
+        //  「现在该做的」那一张卡于 2026-09-27 删（用户：「能合并就合并」）。它里面是一枚
+        //  实心胶囊：车况有问题时发 `LockDoor`（锁车关窗）、没事时发「极速降温 18℃」——
+        //  而这两个动作**各自都有一整行**（前者是「指令」里的锁车，后者是「一键场景」里的
+        //  同一个场景）。同一件事的第二个入口，正是这一仓反复删的那种重复；
+        //  它带的那一段「执行中」状态挪进了下面「指令」卡（那才是它的家：卡头本来就写着「执行中」）。
+        //  ② 还能做什么 → ③ 一键场景 → ④ 做过什么（按用到它们的频率从高到低）
         out.append(StackCard(id: "commands", title: "指令",
                              value: running == nil ? nil : "执行中", cls: "acc",
                              content: AnyView(commandCard)))
@@ -284,7 +284,8 @@ struct ControlView: View {
                              content: AnyView(historyCard)))
         // 「快捷指令」从卡表里拿掉（用户 2026-09-23：控制页不要快捷指令卡）：
         // Siri 快捷方式仍由 `SiriShortcuts.swift` 注册，界面只是不再摆这张卡。
-        // 若以后要恢复：重新把 `siri` 卡加回这里即可（`SiriShortcutsCard` 还留着）。
+        // 若以后要恢复：连那张卡一起从 git 历史里拿 —— `SiriShortcutsCard` 自己也删了
+        // （2026-09-27，见 `SiriShortcuts.swift` 尾部的说明）。
         return out
     }
 
@@ -401,21 +402,8 @@ struct ControlView: View {
     }
 
     /// 一屏唯一的实心胶囊：状态有问题时就是“锁车关窗”，否则是降温场景
-    private var primarySceneButton: some View {
-        let issue = bodyDetail?.cls == "bad"
-        return Button {
-            TokensHaptic.tap()
-            if issue {
-                onCmd("LockDoor")
-            } else if let scene = presetScenes.first(where: { $0.key == "summerCool" }) {
-                onPresetScene(scene)
-            }
-        } label: {
-            Text(issue ? "锁车关窗" : "极速降温 18℃")
-        }
-        .buttonStyle(DSPrimaryButtonStyle())
-        .accessibilityHint(Text(issue ? "锁车、关窗并折叠后视镜" : "空调设为 18℃ 最强风"))
-    }
+    //  `primarySceneButton`（那枚「锁车关窗 / 极速降温 18℃」的实心胶囊）于 2026-09-27 删，
+    //  理由写在 `cards` 里那一段：它发的那两个动作各自都有一整行。
 
     /// 车形图的高度上限：卡片量到的可用高度 × 0.58。
     ///
@@ -519,7 +507,18 @@ struct ControlView: View {
     }
 
     // MARK: 指令列表
+    /// 「指令」这一张卡：高频指令 + 可折叠的低频指令 + **正在执行的那一段**。
+    ///
+    /// ⚠️ 2026-09-27：正在执行的那一段从「现在该做的」卡搬来这里（那张卡删了，
+    /// 理由见 `cards`）—— 卡头本来就写着「执行中」，它的进度属于这一张卡。
+    @ViewBuilder
     private var commandCard: some View {
+        if let run = running { runningCard(run) }
+        commandGroup
+    }
+
+    /// 「指令」那一组本身（高频 + 折叠的低频）。
+    private var commandGroup: some View {
         DSGroup(title: "还能做什么",
                 trailing: busy || running != nil ? "执行中" : nil,
                 trailingCls: "acc",
