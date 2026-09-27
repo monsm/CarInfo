@@ -24,7 +24,8 @@ on:
 #
 # 代价写在明处：`cancel-in-progress` 会在**任意一步**杀掉正在跑的 job，包括
 # `gh release upload --clobber`。`--clobber` 是先删旧附件再传新的，所以被砍在中间的那一瞬，
-# tag `latest` 上可能短暂没有 .ipa（App 内「检查更新」会失败一次，下一次成功的运行会补回来）。
+# tag `latest` 上可能短暂没有 .ipa（手机上侧载时会下载失败一次，下一次成功的运行会补回来）。
+# （App 内那个「检查更新」入口 2026-09-27 已删：这个 Release 现在是纯粹的侧载源。）
 # 要完全避开这个窗口就得把 main 排除掉：
 #     cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 # 但 main 正是最需要取消的那一条，所以这里选择接受它。
@@ -230,10 +231,11 @@ jobs:
             CarKeeper/CarKeeper-unsigned.zip
           retention-days: 30
 
-      # 上传 ipa 到固定 tag=latest 的 GitHub Release（每次构建覆盖），
-      # 供 App 内「检查更新」直接下载分享。私库需要带 token。
-      # 上传 ipa 到固定 tag=latest 的 GitHub Release（每次构建追加附件）。
-      # 供 App 内「检查更新」直接下载分享。
+      # 上传 ipa 到固定 tag=latest 的 GitHub Release（每次构建覆盖 / 追加附件）。
+      # 供**侧载安装**用（手机上把这个 ipa 下下来自签）。
+      # ⚠️ 这个 Release 曾经是 App 内「检查更新」的下载源，而那条链 2026-09-27 已删
+      #（`Services/UpdateService.swift` 与 `GithubToken.swift` 一起走）—— 上传这一步
+      # 留下是因为侧载本来就靠它。私库需要带 token。
       - name: Upload Release (tag=latest)
         run: |
           cd CarKeeper

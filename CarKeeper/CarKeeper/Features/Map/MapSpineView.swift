@@ -378,9 +378,6 @@ struct MapSpineView: View {
         // 不把用户推到车控页（一条锁车指令不该让人离开地图）。
         .controlCommandFlow($quickRequest)
         .task {
-            // 地图出现之后的这几步是启动轨迹里原本的盲区（见 StartupJournal 头注）：
-            // 用户报的「地图出来以后几秒就退」正落在这里，所以每一步都留个路标。
-            StartupJournal.shared.mark("地图页开始取数")
             //  第一帧就把镜头摆好（朝向 / 距离 / 俯仰三个数一次给齐 —— 俯仰这一轮
             //  已按「默认 2D」改成 0，见 `cameraPitch`）。
             //
@@ -400,19 +397,14 @@ struct MapSpineView: View {
                                            heading: 0,
                                            pitch: cameraPitch))
             }
-            // 围栏（见 LaunchFence）：地图页自己的三条取数（车况 / 充电桩 / 天气）。
-            if LaunchFence.mapFetches {
-                await refresh()
-                StartupJournal.shared.mark("地图页取数结束")
-                centerOnCar(force: true)
-                if layer == .charge { await searchChargersIfNeeded() }
-                await refreshWeatherIfNeeded()
-            }
-            // 背景图的那一次取数（子页铺底用）。**故意留在围栏之外**：它只往
-            // Documents 落一张 JPEG，不碰车况/地图状态 —— 与那一轮二分定位的
-            // 「启动就退」不是同一类东西。已取过当天那张时它不发网络请求（同一天缓存）。
+            // 地图页自己的三条取数（车况 / 充电桩 / 天气）。
+            await refresh()
+            centerOnCar(force: true)
+            if layer == .charge { await searchChargersIfNeeded() }
+            await refreshWeatherIfNeeded()
+            // 背景图那一张也在这时催一次（子页铺底用）。它只往 Documents 落一张 JPEG，
+            // 不碰车况/地图状态；已取过当天那张时它不发网络请求（同一天缓存）。
             await wallpaper.refreshIfStale()
-            StartupJournal.shared.mark("地图页就绪")
         }
         .onChange(of: layer) { _, new in
             TokensHaptic.select()
@@ -420,7 +412,7 @@ struct MapSpineView: View {
             // 而收起态里只有那三个数 —— 不拉出来会看起来像「换了层却什么都没发生」。
             //  只改那一档：跟手那一段由 `MapNowDrawer` 自己动（它盯着这个值）。
             drawerOpen = true
-            if LaunchFence.mapFetches && new == .charge { Task { await searchChargersIfNeeded() } }
+            if new == .charge { Task { await searchChargersIfNeeded() } }
         }
         //  这里原本有两条**为自量比例尺服务**的回调：`.onChange(of: camera) { flashScale() }`
         //  与 `.onMapCameraChange(frequency: .continuous) { … }`（后者喂镜头朝向 / 中心 /
@@ -796,36 +788,50 @@ struct MapSpineView: View {
             // 换主题/换光方向都跟着 AppCanvas 走，不会自己又写一套。
             // 之前这里铺过 `TokensPalette.canvas`（用户 2026-09-24：「其他页面的暗层也删除」）
             // 已删 —— 现在过渡期间透出的是画布+光（AppCanvas），不是「上一页的鬼影」。
+            //
+            //  ⚠️ 2026-09-27：壁纸搬到**这一层**（从每一张子页的 `.background` 上）。
+            //  用户：「因为壁纸基本都是横向的，所以我们能做成 5 屏显示壁纸连贯的不同
+            //  位置吗？（地图不需要可跳过）」—— 五屏要看的是一整条横图上**连贯的**
+            //  五段，所以它必须只有一份、并且由一个**连续量**说了算：
+            //  这里读的就是条子报出来的那个位置（`deckPos`，拖动时每帧都在变）。
+            //  五份各自铺底做不到这件事（五份图的偏移量各自独立，拖动只能交叉淡出）——
+            //  而且那样同一张图要画五遍。
+            MapWallpaperLayer(image: wallpaper.image,
+                              position: HomeMode.wallpaperPosition(deckPos),
+                              screens: HomeMode.wallpaperScreens)
             ForEach(HomeMode.allCases.indices, id: \.self) { i in
                 let a = fade(i)
-                // 围栏（见 LaunchFence）：六页同屏是启动时最大的一笔开销 ——
-                // 关掉时只建当前那一档，其余五档连 body 都不跑（也就没有它们的取数）。
-                if LaunchFence.sixPageDeck || i == modeIndex {
-                    pageBody(HomeMode.allCases[i], pageWidth: pageWidth)
-                        //  页面钉成**确定宽度**（min=max=屏幕宽）：正文比屏幕宽时它自己
-                        //  溢出，推不动这一层，也不会把整层撑开。
-                        .frame(minWidth: pageWidth, maxWidth: pageWidth, alignment: .top)
-                        //  这里原来还有原型那句 `scale(1 − a*0.035)` ——“进来的从 96.5% 长出”。
-                        //  2026-09-25 删掉（用户：「底部导航点选或滑动，全部页面不需要
-                        //  颤抖放大特效，太耗性能」）。
-                        //
-                        //  它不只是观感问题：`scaleEffect` 是一个**非整数缩放**，
-                        //  而这一层里有地图、有卡片玻璃 —— 系统为了把整棵子树重画一遍，
-                        //  要把它先渲染到离屏缓冲再缩放合成。而它**每一帧都在变**
-                        //  （`a` 跟着手指的连续位置走）。于是拖模式条那些帧里，
-                        //  最贵的合成正在做一件“看不出来”的事（3.5% 的缩放）。
-                        //  交叉过渡本身留着（下一行那个 opacity）—— 那才是“换页”的反馈。
-                        //
-                        //  原型那一句到此为止：它描述的是**样品**的动效，而真机上那一层
-                        //  代价由六页同屏（含一张活地图）承担，不是原型里几个 div。
-                        // 原型 render()：`opacity = a ≥ 0.62 ? 0 : 1 − 1.6a`
-                        //（0.62 正是 `1 − 1.6a` 到 0 的位置，不夹会算出负数）。
-                        .opacity(a >= 0.62 ? 0 : 1 - a * 1.6)
-                        // 隐掉的层不吃事件、也不给读屏读：视觉上只有一页，
-                        // 读屏却读出六页内容，是六层同屏唯一真正的代价，必须自己挡住。
-                        .allowsHitTesting(i == modeIndex)
-                        .accessibilityHidden(i != modeIndex)
-                }
+                //  六页同屏（原型 `.pages > .page{inset:0}` × 6）：每一档一直在那里，
+                //  交叉过渡由条子的连续位置直接驱动 —— 过渡是**原地**发生的，不换页。
+                //  （启动期的二分实验 `LaunchFence.sixPageDeck` 曾能把它关成一屏，
+                //   那套临时仪器随诊断页的「上一次启动」一起删了，2026-09-27。）
+                pageBody(HomeMode.allCases[i], pageWidth: pageWidth)
+                    //  页面钉成**确定宽度**（min=max=屏幕宽）：正文比屏幕宽时它自己
+                    //  溢出，推不动这一层，也不会把整层撑开。
+                    .frame(minWidth: pageWidth, maxWidth: pageWidth, alignment: .top)
+                    //  这里原来还有原型那句 `scale(1 − a*0.035)` ——“进来的从 96.5% 长出”。
+                    //  2026-09-25 删掉（用户：「底部导航点选或滑动，全部页面不需要
+                    //  颤抖放大特效，太耗性能」）。
+                    //
+                    //  它不只是观感问题：`scaleEffect` 是一个**非整数缩放**，
+                    //  而这一层里有地图、有卡片玻璃 —— 系统为了把整棵子树重画一遍，
+                    //  要把它先渲染到离屏缓冲再缩放合成。而它**每一帧都在变**
+                    //  （`a` 跟着手指的连续位置走）。于是拖模式条那些帧里，
+                    //  最贵的合成正在做一件“看不出来”的事（3.5% 的缩放）。
+                    //  交叉过渡本身留着（下一行那个 opacity）—— 那才是“换页”的反馈。
+                    //
+                    //  原型那一句到此为止：它描述的是**样品**的动效，而真机上那一层
+                    //  代价由六页同屏（含一张活地图）承担，不是原型里几个 div。
+                    // 原型 render()：`opacity = a ≥ 0.62 ? 0 : 1 − 1.6a`
+                    //（0.62 正是 `1 − 1.6a` 到 0 的位置，不夹会算出负数）。
+                    .opacity(a >= 0.62 ? 0 : 1 - a * 1.6)
+                    //  子页**不再各自铺底**（2026-09-27）：那张横图已搬到上面那一层
+                    //（一张、一道偏移量）。这里若再各铺一份，就等于在同一个位置上
+                    //  画两张错开 1/5 的图。
+                    // 隐掉的层不吃事件、也不给读屏读：视觉上只有一页，
+                    // 读屏却读出六页内容，是六层同屏唯一真正的代价，必须自己挡住。
+                    .allowsHitTesting(i == modeIndex)
+                    .accessibilityHidden(i != modeIndex)
             }
         }
     }
@@ -838,10 +844,6 @@ struct MapSpineView: View {
     private func pageBody(_ mode: HomeMode, pageWidth: CGFloat) -> some View {
         if mode == .now {
             nowLayer()
-                // 真机轨迹（2026-09-24 第五轮）里，内存从 49 MB 涨到 1.7 GB 只要四秒，
-                // 而那一轮**没有一行说得出当时亮的是哪一屏** —— 六页同屏关掉以后
-                // 只建当前那一档，于是「哪一档在建」直接决定了「谁在吃内存」。
-                .onAppear { StartupJournal.shared.mark("亮出屏幕：地图") }
         } else {
             // 子页的顶（用户 09-25 第 2 条：「顶部的时间和信号应该和地图页一样，
             // 不要遮盖」）：**与地图页同一套行为** —— 内容铺到屏顶，卡片从时钟下面连续
@@ -860,14 +862,9 @@ struct MapSpineView: View {
                 //  之上 34pt（安全区），底条最下面那一截仍穿不过去；可滚到的位置由内衬说了算。
                 .ignoresSafeArea(edges: .bottom)
                 .environment(\.stackBottomInset, Self.barTotal)
-                // 五张子页的底色 = 壁纸图（相册选的一张本地图，不依赖网络）。
-                // 之前这里是 `TokensPalette.canvas`（暗层，用户 2026-09-24 删）；
-                // 现在按「其他页面的背景全部设为当前桌面的背景」的要求：iOS 读不到
-                // 主屏壁纸（无公开 API），只能从相册选一张本地图铺底（见 WallpaperService）。
-                // 没选图时（或点了「不铺」）回落到画布底色（`TokensPalette.canvas`），
-                // 观感上和删暗层之前一样 —— 只是从「暗层」变成「App 自己的画布」。
-                .background { MapWallpaperLayer(image: wallpaper.image).ignoresSafeArea() }
-                .onAppear { StartupJournal.shared.mark("亮出屏幕：\(mode.title)") }
+                //  底色是**共用那一张**（`pageDeck` 最底层，2026-09-27 搬走）：
+                //  这一张纸从此是透的 —— 内容直接压在横图那一段上。
+                //  没选图（或点了「不铺」）时那一层铺的是画布底色，观感与之前一致。
         }
     }
 
@@ -1009,17 +1006,27 @@ struct MapSpineView: View {
                 Text(layer.title)
                     .font(TokensTypo.caption)
                     .tracking(TokensTracking.label)
-                //  这一枚是图形，与这行的字一样压在瓦片上 —— 两处的反色外壳都于
-                //  2026-09-26 随整个机制删掉（用户：「完全删除文字发光和文字发光功能」）。
                 Image(safeSymbol: "chevron.up.chevron.down", fallback: "chevron.down")
                     .font(TokensTypo.micro)
             }
-            .foregroundStyle(TokensInk.secondary)
+            //  ⚠️ 2026-09-27（用户第 3 条：「切换开关颜色不容易看见」）：这一枚换掉了
+            //  两样东西，都是它的**位置**变了之后的遗留：
+            //   ① 它不再是一块玻璃。2026-09-26 它从卡头搬进抽屉的正文，于是从
+            //      「浮在地图上」变成「住在卡里」—— 而 `DSGlass.swift` 三层规则的
+            //      第 ② 条写得很清楚：**卡里不玻璃**（卡片自己已经是玻璃，
+            //      里面再摆一块就是同一层放两次）。玻璃叠玻璃在真机上就是一层淡色，
+            //      这正是「不容易看见」的第一个成因。
+            //   ② 字不再取 `TokensInk.secondary`。那是（同一份文件里）给**玻璃上**
+            //      的文字用的自适应色，而这一枚底下已经没有材质了 —— 现在它是
+            //      卡里的一件控件：强调色的字 + `fillSubtle` 的面 + 一圈发丝线，
+            //      与「更多指令」那一行、`DSSegmentPicker` 同一套读法（强调色
+            //      在这个 App 里就是「这里可以点」）。
+            .foregroundStyle(TokensPalette.accent)
             .padding(.horizontal, TokensSpacing.snug)
             .padding(.vertical, TokensSpacing.xs)
-            // 图层胶囊浮在**地图**上（连续的画面）—— 材质是全 App 唯一那一档（`.clear`）：
-            // 画面保持可见，只在边缘留一圈折射。可点 → `interactive`。
-            .dsGlassCapsule(interactive: true)
+            .background(Capsule().fill(TokensPalette.fillSubtle))
+            .overlay(Capsule().strokeBorder(TokensPalette.hairline,
+                                            lineWidth: TokensHair.border))
             .contentShape(Capsule())
         }
         .accessibilityLabel(Text("图层：\(layer.title)"))
@@ -1054,7 +1061,7 @@ struct MapSpineView: View {
         // 车辆档自带三段（档案 / 健康 / 保养）—— 它们回答的是同一个问题，
         // 所以是同一张纸里的三段，不是条子上的三格。
         // 注意：分段控件与那一叠卡就住在下面这个视图里，没有外壳 ——
-        // 分段的**状态**（照片、OTA…）在它内部，卡表就必须在同一个视图里。
+        // 分段的**状态**（车辆照片、保养记录…）在它内部，卡表就必须在同一个视图里。
         case .vehicle: VehicleView()
         case .charge: ChargeView()
         case .control: ControlView()
@@ -1147,14 +1154,12 @@ struct MapSpineView: View {
     @MainActor
     private func searchChargersIfNeeded(force: Bool = false) async {
         guard let car = store.currentLocation else {
-            // 「没有车的位置」不是「搜到 0 个」：两者在界面上都是空的，只有轨迹分得开。
-            StartupJournal.shared.mark("充电站搜索：还没有车的位置")
+            // 「没有车的位置」不是「搜到 0 个」：两者在界面上都是空的。
             return
         }
         let key = String(format: "%.4f,%.4f", car.coordinate.latitude, car.coordinate.longitude)
         if !force, key == chargerCenterKey, !chargers.isEmpty { return }
         chargerCenterKey = key
-        StartupJournal.shared.mark("充电站搜索开始")
 
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = "充电站"
@@ -1165,7 +1170,6 @@ struct MapSpineView: View {
         // 用 async 重载（SDK 26 起有，返回类型与回调版一致）——
         // 我们本来就在 async 上下文里，少一层完成回调，也少一次绕回主线程的往返。
         guard let response = try? await search.start() else {
-            StartupJournal.shared.mark("充电站搜索失败")
             return
         }
         let found: [MapCharger] = response.mapItems.enumerated().map { idx, item in
@@ -1181,7 +1185,6 @@ struct MapSpineView: View {
         // 不再只取最近 12 个：那是权宜之计（画不全、也说不清为什么是 12）。
         // 取回全部（上限 60 = 一次搜索的实际返回量），由聚合决定画成一个圈还是几个圈。
         chargers = Array(sorted.prefix(60))
-        StartupJournal.shared.mark("充电站搜索结束 \(chargers.count) 个")
     }
 }
 

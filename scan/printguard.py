@@ -24,8 +24,9 @@ printguard.py —— 「失败要留在能被看到的地方」
     （`Features/Dev/DevView.swift`）自己那份调试输出。
   · 注释与字符串里的 `print(` 不算（先抹掉再查 —— 判据只认代码位置）。
 
-该往哪写：`RawLogStore.shared`（诊断页在读的那本，会打码与限长，同时写一条系统日志）；
-启动阶段的路标写 `StartupJournal.shared.mark(_:)`。两者都在 `Services/`。
+该往哪写：`RawLogStore.shared`（诊断页在读的那本，会打码与限长，同时写一条系统日志）。
+（另一条出口「启动阶段的路标写 `StartupJournal.shared.mark(_:)`」已随那个文件一起
+删于 2026-09-27 —— 诊断页的「上一次启动」与它一起走了。）
 
 退出码：0 = 全部通过；1 = 有 print(。
 """
@@ -101,7 +102,6 @@ def main():
             print(f"      {code[:100]}")
         print("\n   失败要写进能被看到的地方：")
         print("   · 运行期错误 → `RawLogStore.shared.logError(method:url:message:)`（诊断页在读）")
-        print("   · 启动阶段路标 → `StartupJournal.shared.mark(_:)`")
         print("   · 要让人当场知道 → `EnhancedToastManager` / `ToastManager`")
         print("   真需要标准输出（设计令牌页那类），把文件加进本文件的 ALLOWED 并写明理由。")
         return 1

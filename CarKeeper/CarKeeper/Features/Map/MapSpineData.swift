@@ -196,7 +196,6 @@ struct MapSpineData {
     var chargeCls: String
     var charging: ChargingSession?
     var timeToFull: String?
-    var avgConsumption: String?
 
     // 车辆本身
     var carName: String
@@ -366,7 +365,6 @@ struct MapSpineData {
             chargeCls: e.chargeCls,
             charging: e.charging,
             timeToFull: e.timeToFull,
-            avgConsumption: e.avgConsumption,
             carName: e.carName.isEmpty ? "我的车" : e.carName,
             online: e.online,
             updated: e.updated,

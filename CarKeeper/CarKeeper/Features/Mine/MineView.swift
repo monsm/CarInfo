@@ -4,22 +4,14 @@ import PhotosUI
 // 我的：用户卡 + 车辆卡 + 常用入口 + 退出登录
 struct MineView: View {
     private let store = AppStore.shared
-    @State private var showAboutAlert = false
-    // 检查更新状态
-    @State private var updateBusy = false
-    @State private var updateMsg: String? = nil
-    /// 提示是否为错误。原来是把 "❌" 拼进字符串再用 hasPrefix 反解 —— 用 emoji 当状态码，
-    /// 既不可本地化也无法换图标；改成显式布尔值，图标交给系统 symbol。
-    @State private var updateMsgIsError = false
-    @State private var downloadPct: Double = 0
-    @State private var downloadPctDisplay: Int = 0    // 下载进度数字滚动计数
-    @State private var showDownload = false
-    @State private var downloadFile: URL? = nil
-    @State private var shareItems: [Any] = []
-    @State private var shareSheetFlag = false
+    //  「检查更新」那一整套状态（`updateBusy` / `updateMsg` / `downloadPct` /
+    //  `downloadFile` / `shareItems` / `isChecking`…）与那个"关于"弹窗的 `showAboutAlert`
+    //  已删（2026-09-27 用户：「删除更新相关」）：连同 `Services/UpdateService.swift`
+    //  （检查 Release + 下载 ipa + 分发的 `ShareSheet`）与 `Services/GithubToken.swift`
+    //  （那个仓库令牌）一起走。这一页现在只剩两个真正属于它自己的开关状态：
+    //  退出确认与下拉刷新。
     @State private var isRefreshing = false     // 下拉刷新进行中标志
-    @State private var isChecking = false        // OTA 检查中（不含下载）
-    /// 退出登录二次确认（按钮在 tilesCard 的「应用」组里）
+    /// 退出登录二次确认（按钮在「应用」组里）
     @State private var logoutConfirm = false
     // 这一页里的「去做某件事」全部走 `nav.openMode(...)`（拨到那一档 / 那段），
     // 不再保留一堆从未绑定 sheet 的 @State（此前 7 个磁贴设了状态却没人监听 = 死按钮）。
@@ -97,7 +89,7 @@ struct MineView: View {
             StackCard(id: "profile", title: "账号", content: AnyView(profileCard))
         ]
         out.append(StackCard(id: "settings", title: "设置", content: AnyView(settingsGroups)))
-        out.append(StackCard(id: "about", title: "关于", content: AnyView(updateCard)))
+        out.append(StackCard(id: "about", title: "关于", content: AnyView(aboutCard)))
         return out
     }
 
@@ -108,28 +100,11 @@ struct MineView: View {
             .accessibilityHint(Text("账号、设置、应急、诊断、关于"))
         .onAppear { consumeHint() }
         .onChange(of: nav.homeSub) { _, _ in consumeHint() }
-        .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
-            // 其他 Tab 退出登录时，重置 OTA 状态，避免残留下载进度
-            updateBusy = false
-            updateMsg = nil
-            updateMsgIsError = false
-            downloadPct = 0
-            downloadPctDisplay = 0
-            showDownload = false
-            downloadFile = nil
-            shareItems = []
-        }
         .refreshable {
             isRefreshing = true
             try? await Task.sleep(nanoseconds: 600_000_000)  // 0.6s 模拟刷新延迟
             isRefreshing = false
         }
-        .alert("关于 长安车管家", isPresented: $showAboutAlert) {
-            Button("关闭", role: .cancel) { }
-        } message: {
-            Text(aboutText)
-        }
-        .sheet(isPresented: $shareSheetFlag) { ShareSheet(items: shareItems) }
         .alert("退出登录", isPresented: $logoutConfirm) {
             Button("退出", role: .destructive) { logout() }
             Button("取消", role: .cancel) { }
@@ -254,8 +229,12 @@ struct MineView: View {
                 // 本地图铺底 —— 不依赖网络，选完落盘，下次启动还在）。
                 // 它是一张小卡（不是 DSRow）：上面是缩略图，下面两个小钮（换一张 / 不铺）。
                 customRow { wallpaperRow }
-                // 「诊断」是「我的」这一档里的第三段（不是另一个页面，也不再是条子上一格）。
-                actionRow("wrench.adjustable", "开发者工具") { nav.openMode(.mine, sub: .dev) }
+                //  「开发者工具」那一行已删（2026-09-27 用户：「删除开发者入口」）：
+                //  它就是 `nav.openMode(.mine, sub: .dev)` 这一个动作 —— 而「我的」档的
+                //  三个分段（设置 / 应急 / 诊断）本来就在上面那枚分段控件上，
+                //  这一行是同一个目的地的**第二个入口**（同一页两个入口正是这一仓
+                //  反复删掉的那种重复）。诊断那一页自己还在（它经过分段控件到达），
+                //  而它里面属于开发者的两组也一并删了（见 `DevView` 文件头）。
                 customRow(last: true) { logoutRow }
             }
 
@@ -266,15 +245,13 @@ struct MineView: View {
         }
     }
 
-    // MARK: 行的三种写法（与全 App 其余 20 屏同一套 DS 原语）
+    // MARK: 行的写法（与全 App 其余 20 屏同一套 DS 原语）
 
-    /// 动作行（开浮层 / 切图层 / 触发一件事）：图标 + 标题 + 箭头
-    private func actionRow(_ icon: String, _ title: String, last: Bool = false,
-                           _ action: @escaping () -> Void) -> some View {
-        DSGroupRow(showsSeparator: !last) {
-            DSRow(icon: icon, title: title, showsChevron: true, action: action)
-        }
-    }
+    //  这里原有 `actionRow`（图标 + 标题 + 箭头的一行）：2026-09-27 删 —— 它唯一的
+    //  调用点是「开发者工具」那一行，而那一行本身也删了（见 `settingsGroups`）。
+    //  一个私有函数没有调用点，就是这个仓库反复删的那类东西：它下一个人看了会以为
+    //  “这一页还有一行带箭头的动作”。（`scan/orphans.py` 看不见它 —— 它的盲区就是
+    //  项目自己的普通成员，这一条只能靠人。）
 
     /// 自定义行（开关 / 选择器 / 第三方视图）：只借用分组的内缩与分隔线
     /// content 必须 @escaping：DSGroupRow 的 content 是存储属性闭包（会逃逸），
@@ -503,144 +480,40 @@ struct MineView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: 检查更新
-    private var updateCard: some View {
-        // 整块是一行：上面的说明、进度与三个按钮都属于「检查更新」这一件事。
-        DSGroup(title: "检查更新") {
-            customRow(last: true) {
-                VStack(alignment: .leading, spacing: TokensSpacing.snug) {
-                    Text("下载最新 ipa，分享后用自签工具安装")
-                        .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
-                    // OTA 检查中：骨架旋转指示器
-                    if isChecking {
-                        HStack(spacing: TokensSpacing.snug) {
-                            ProgressView()
-                                .tint(TokensPalette.ambient)
-                            Text("正在检查最新版本…")
-                                .font(TokensTypo.caption)
-                                .foregroundStyle(TokensPalette.secondary)
-                        }
-                        .padding(.vertical, TokensSpacing.sm)
-                    } else if showDownload {
-                        // 下载中：进度条 + 百分比数字
-                        VStack(spacing: TokensSpacing.sm) {
-                            ProgressView(value: downloadPct)
-                                .tint(TokensPalette.ambient)
-                            Text("正在下载… \(downloadPctDisplay)%")
-                                .font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)
-                        }
-                    } else if let m = updateMsg {
-                        // 错误或提示消息（图标由 updateMsgIsError 决定）
-                        HStack(spacing: TokensSpacing.sm) {
-                            Image(safeSymbol: updateMsgIsError ? "exclamationmark.triangle.fill" : "info.circle.fill",
-                                  fallback: "info.circle.fill")
-                                .font(TokensTypo.caption)
-                                .foregroundStyle(updateMsgIsError ? TokensPalette.error : TokensPalette.ambient)
-                            Text(m)
-                                .font(TokensTypo.caption)
-                                .foregroundStyle(TokensPalette.secondary)
-                            Spacer()
-                        }
-                    }
-                    HStack(spacing: TokensSpacing.snug) { updateButtons() }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, TokensSpacing.sm)
+    //  MARK: 关于
+    //
+    //  这里原本是「检查更新」整块（一行说明 + 检查/下载两个按钮 + 进度条 + 分享安装包），
+    //  而它下面连着 `UpdateService`（查 GitHub 仓库 tag=latest 的 Release、把 ipa
+    //  下载到沙盒、用 `UIActivityViewController` 分发）与 `GithubToken`（那个仓库令牌）。
+    //  用户 2026-09-27：「删除更新相关」—— 三个文件（`Services/UpdateService.swift`、
+    //  `Services/GithubToken.swift`、以及本页这一块与它那 11 个 `@State`）一起走了。
+    //
+    //  留下来的是一个**真的属于"关于"的"关于"**：这个包是什么版本、走哪条网络通道。
+    //  版本是用户报障时唯一能自报的东西，而它以前只藏在两个地方：一个**没人点得开**的
+    //  弹窗（`showAboutAlert` 全仓没有写处 —— 一个只有读者没有写者的状态）
+    //  与诊断页里。现在它在那一张卡上。
+    private var aboutCard: some View {
+        DSGroup(title: "关于",
+                footer: "车况数据实时来自车辆车联网服务，仅用于本人车辆管理。") {
+            DSGroupRow {
+                DSKeyValueRow(key: "版本", value: "\(appVersion) (\(buildNumber))", mono: false)
             }
-        }
-        // 下载进度数字滚动：从当前 display 值弹性过渡到目标百分比
-        .onChange(of: downloadPct) { _, pct in
-            let target = max(0, min(100, Int(pct * 100)))
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0.5)) {
-                downloadPctDisplay = target
+            DSGroupRow(showsSeparator: false) {
+                DSKeyValueRow(key: "网络通道", value: "直连（iOS 原生）", mono: false)
             }
         }
     }
 
-    @ViewBuilder
-    private func updateButtons() -> some View {
-        HStack(spacing: TokensSpacing.snug) {
-            mainUpdateButton
-            if downloadFile != nil { shareButton }
-        }
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
     }
 
-    private var mainUpdateButton: some View {
-        Button {
-            checkUpdate()
-        } label: {
-            HStack(spacing: TokensSpacing.sm) {
-                if updateBusy { ProgressView().controlSize(.mini).tint(TokensPalette.labelOnTint) }
-                Text(updateBusy ? "检查中…" : "检查更新")
-                    .font(TokensTypo.caption.weight(.bold))
-            }
-            .foregroundStyle(TokensPalette.labelOnTint)
-            .padding(.vertical, TokensSpacing.snug)
-            .background(Capsule().fill(TokensPalette.ambient))
-        }
-        .buttonStyle(.plain)
-        .disabled(updateBusy)
-    }
-
-    private var shareButton: some View {
-        Button {
-            shareItems = [downloadFile as Any]
-            shareSheetFlag = true
-        } label: {
-            Label("分享安装包", systemImage: "square.and.arrow.up")
-                .font(TokensTypo.caption.weight(.bold))
-                .padding(.horizontal, TokensSpacing.md).padding(.vertical, TokensSpacing.snug)
-                .background(TokensPalette.fillSubtle, in: Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var aboutText: String {
-        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
-        return "长安车管家 v\(v) (\(b))\n网络通道：直连（iOS 原生）\n\n车况数据实时来自车辆车联网服务，仅用于本人车辆管理。"
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
     }
 
     private func logout() {
         store.logout()
         // RootView 监听 isLoggedIn 变化后自动切回登录页
-    }
-
-    private func checkUpdate() {
-        updateBusy = true
-        isChecking = true
-        updateMsgIsError = false
-        updateMsg = "正在检查最新构建…"
-        shareItems = []
-        downloadPct = 0
-        downloadPctDisplay = 0
-        showDownload = false
-        Task { @MainActor in
-            do {
-                //  这里原本有一道「令牌为空就先退出」的早返回（一句「没有配访问令牌」）。
-                //  2026-09-25 第 9 条实测后删掉：仓库是**公开库**，匿名就能读 Release
-                //（`curl` 的返回记在 `GithubToken.swift`），所以令牌为空是**默认状态**，
-                //  不是一种失败。留着那一道，按钮按下去就只会吐一句话，而明明能办成。
-                let rel = try await UpdateService.fetchLatestRelease(token: UpdateService.githubToken)
-                updateMsgIsError = false
-                updateMsg = "发现构建 \(rel.name) · \(rel.displaySize)，开始下载…"
-                isChecking = false
-                showDownload = true
-                let file = try await UpdateService.downloadIPA(url: rel.ipaUrl) { pct in downloadPct = pct }
-                downloadFile = file
-                updateMsg = nil
-                showDownload = false
-                shareItems = [file as Any]
-                shareSheetFlag = true
-                ToastManager.shared.show("下载完成，点分享安装", icon: "checkmark.circle.fill")
-            } catch {
-                updateMsgIsError = true
-                updateMsg = error.localizedDescription
-                showDownload = false
-                ToastManager.shared.show(error.localizedDescription, icon: "xmark.circle.fill")
-            }
-            isChecking = false
-            updateBusy = false
-        }
     }
 }

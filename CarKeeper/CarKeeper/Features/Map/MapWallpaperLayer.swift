@@ -1,7 +1,7 @@
 import SwiftUI
 
 // =============================================================================
-//  MapWallpaperLayer —— 五张子页（非地图）铺的底色
+//  MapWallpaperLayer —— 子页（非地图）铺的那张横图
 // =============================================================================
 //
 //  从 `MapSpineView.swift` 搬来这里（2026-09-25）：那个文件涨到 1211 行，越过了
@@ -12,41 +12,76 @@ import SwiftUI
 //  设为当前桌面的背景」）：iOS 没有读主屏壁纸的公开 API（壁纸归 SpringBoard 管，
 //  App 进程拿不到）。能做到的最接近的一版是让用户从相册选一张（见 WallpaperService）。
 //
-//  观感：图片 `resizable + aspectRatio(.fill)` 铺满全屏，`ignoresSafeArea()`；
-//  取图失败（或用户点了「不铺」）就回落到 `TokensPalette.canvas` —— 观感上等于删暗层
-//  之前那层 `TokensPalette.canvas`，只是现在它是 AppCanvas 透出来的画布，不再是「暗层」。
+//  ===========================================================================
+//  2026-09-27：从「每屏各铺一份」改成「一整条横图，五屏各看自己那 1/5」
+//  ===========================================================================
+//  用户原话：「因为壁纸基本都是横向的，所以我们能做成 5 屏显示壁纸连贯的不同位置吗？
+//  （地图不需要可跳过）」
 //
-//  调用点只有一个：`MapSpineView.pageBody` 里那五张子页的
-//  `.background { MapWallpaperLayer(image: wallpaper.image).ignoresSafeArea() }`。
-//  外层还要 `.ignoresSafeArea()` 一次，是因为**铺到屏顶的是背景、内容要留在安全区里**
-//（用户 2026-09-25 第 3 条：子页顶部的圆角被状态栏切掉了）。
+//  上一版是**每一屏各自铺一份同样的裁切**（`aspectRatio(.fill)` 铺满该屏、居中裁）——
+//  五屏看到的是同一块画面，所以从一档拖到下一档时，底下那张图是「原地不动、页面淡出」。
+//  现在这里画的是一整条**横图**：宽 = 屏宽 × `screens`（5），高 = 屏高，图按 `.fill`
+//  铺满它，然后**开一个屏宽的窗口**停在 `position` 指的那一段上（0 = 最左，1 = 最右）。
+//  于是「这一屏显示的是那张图的哪一块」只由一个连续量说了算 —— 拖动时它跟着条子的
+//  连续位置走，五屏之间是**一次平移**，不再是五次换图。
+//
+//  代价如实写（这是这一版的取舍，不是副产品）：
+//    · 一条横图铺 5 屏宽，图就至少被放大到「铺满 5 屏」那个比例 —— 比单屏 `.fill`
+//      横向图大约再放大 1.3–1.7 倍（16:9 约 1.26、4:3 约 1.68）。低分辨率的在线图
+//      （必应/聚焦那两张）会比以前更软一点；
+//    · 竖图放大得最多（3 倍上下）：它的横向余量是「铺满 5 屏」逼出来的，不是它自己
+//      带的 —— 五屏仍然各不相同（`.fill` 保证不露底），只是每屏看到的是很窄的一条。
+//      用户说「壁纸基本都是横向的」，所以这一版按横向图定；竖图不会露底、也不会
+//      五屏同一块，取景最紧而已。
+//
+//  调用点只有一个：`MapSpineView.pageDeck` 的最底层（在那五张子页**之下**）。
+//  它此前挂在每一张子页的 `.background` 上 —— 那样没法平移（五份图各自独立），
+//  而且同一张图要画五遍。搬到六页同屏那一层之后：只画一次、只存一份偏移量。
+//  地图那一档铺自己的瓦片（铺满、不透明），所以它把这一层整个盖住 —— 用户说的
+//  「地图不需要可跳过」在几何上就是这句话。
 struct MapWallpaperLayer: View {
-    /// 相册选中的那张（`nil` = 没选 / 点了「不铺」）
+    /// 相册/在线选中的那张（`nil` = 没选 / 点了「不铺」）
     let image: UIImage?
+    /// 这一段站在横图的哪儿：`0` = 最左（第一屏），`1` = 最右（最后一屏）。
+    /// 它是**连续量**（拖动时每帧都在变）—— 见 `HomeMode.wallpaperPosition(_:)`。
+    let position: Double
+    /// 横图铺成几屏宽（`HomeMode.wallpaperScreens`）。写成参数而不是字面量：
+    /// 「除地图之外有几档」只有 `HomeMode` 答得出，这里不该再抄一份。
+    var screens: Int = 5
 
     var body: some View {
-        ZStack {
-            // 底色兜底：没选图（或点了「不铺」）就铺画布（跟随系统深浅色 ——
-            // 浅色模式浅灰、深色模式近黑，但那是 AppCanvas 的颜色，不再是「暗层」）。
-            TokensPalette.canvas
-            // 选中的那张（相册本地取，不依赖网络）：铺满全屏，`aspectRatio(.fill)` 裁满。
-            if let img = image {
-                //  ⚠️ 2026-09-26（「聚焦那一档时图源点不动」那一轮）——这一格补了
-                //  `.frame(...)` / `.clipped()` / `.allowsHitTesting(false)` 三件。
-                //  **它不是那一轮的病根**（那一层在 `MineView.wallpaperRow` 的缩略图上，
-                //  诊断写在那里），但它是**同一类写法**里的最大一张：`.fill` 报出来的
-                //  尺寸是「填满提案」的那个尺寸（竖图铺 402×874 的屏报 491×874，
-                //  横图报 1554×874）——一大截画在框外，而且没有人裁它。
-                //  两张图的差别就在这里：一张铺底图不需要任何一份命中，
-                //  所以这两句是照「背景装饰」这个事实写的，不是照那一轮的猜测写的。
-                Image(uiImage: img)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .allowsHitTesting(false)
-                    .ignoresSafeArea()
+        GeometryReader { g in
+            let w = max(1, g.size.width)
+            let h = max(1, g.size.height)
+            //  横图的总宽 = 屏宽 × 屏数。窗口在它上面的行程 = 总宽 − 一个屏宽
+            //  （走到两头时，最左/最右那一段正好填满窗口）。
+            let total = w * CGFloat(max(1, screens))
+            let travel = max(0, total - w)
+            ZStack(alignment: .leading) {
+                // 底色兜底：没选图（或点了「不铺」）就铺画布（跟随系统深浅色）。
+                TokensPalette.canvas
+                if let img = image {
+                    //  ⚠️ 2026-09-26（「聚焦那一档时图源点不动」那一轮）留下的三件：
+                    //  `.frame(...)` / `.clipped()` / `.allowsHitTesting(false)`。
+                    //  这里的两层 `clipped()` 各有各的用：里层把 `.fill` 报出来的
+                    //  「填满提案」的溢出裁在横图自己的框里（竖图会报得比框高），
+                    //  外层把窗口以外的那四屏裁掉。
+                    Image(uiImage: img)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: total, height: h)
+                        .clipped()
+                        .offset(x: -CGFloat(min(1, max(0, position))) * travel)
+                }
             }
+            //  窗口：宽一个屏、高一个屏，锚在左边（`alignment: .leading`）——
+            //  横图比窗口宽，锚点决定「0 那一屏看的是哪一段」。
+            .frame(width: w, height: h, alignment: .leading)
+            .clipped()
         }
+        // 铺底图不需要任何一份命中（它是背景装饰，见 `MapSpineView.pageDeck`）。
+        .allowsHitTesting(false)
+        // 铺到屏顶、屏底（状态栏那一段也铺）——调用点不必再管安全区。
+        .ignoresSafeArea()
     }
 }

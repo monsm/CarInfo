@@ -122,16 +122,7 @@ struct MessagesSection: View {
                                     // 这一叠是普通 `VStack`（`ArcStack`：懒容器量不到
                                     // 叠卡的几何），所以**看得见的那几天是整段建出来的**
                                     // —— 这正是 `shownDays` 存在的理由（一次三天，
-                                    // 往下滑再续三天）。真机轨迹（2026-09-24 第五轮）里，
-                                    // 内存正是在消息到手之后开始以每秒半 GB 的速度涨的，
-                                    // 所以要在轨迹里留下「最后一行到底画到了没有」——
-                                    // 它重复出现也同样是信息（重复 = 这一卡被反复重建，
-                                    // 而不是一次性的开销）。
-                                    .onAppear {
-                                        if item.id == filteredItems.last?.id {
-                                            StartupJournal.shared.mark("消息列表画到最后一行")
-                                        }
-                                    }
+                                    // 往下滑再续三天）。
                             }
                         }
                     }
@@ -641,14 +632,9 @@ struct MessagesSection: View {
             return
         }
         loading = true
-        // 启动轨迹：消息取数是启动后**最晚**回来的那一段（五段窗口并行），
-        // 而用户报的闪退就发生在“载入不到 10 秒”。这一前一后两行路标，
-        // 下一次它再死时就能分清「死在取数中」还是「死在取数之后」。
-        StartupJournal.shared.mark("消息取数开始")
         do {
             let list = try await APIClient.shared.getMessages()
             apply(list)
-            StartupJournal.shared.mark("消息取数结束 \(list.count) 条")
             // 「成功，只是区间里没有事件」**不是错误**。这里原先把这句也写进 `lastError`，
             // 于是空状态的标题显示成「消息获取失败」—— 与事实相反的一句话。
             // 用户 2026-09-24「消息接口拿不到数据」那几次判断，就是照着这句话下的。
@@ -669,7 +655,6 @@ struct MessagesSection: View {
             // 失败时保留已渲染的缓存内容（与小程序一致），并明确告知，而不是悄悄清空。
             // 把真实错误留在页面上：只弹一个 2 秒的 Toast，用户回头看到的还是空页，
             // 分不清「没消息」和「没拉到」——这正是之前反复误判的原因。
-            StartupJournal.shared.mark("消息取数失败")
             lastError = error.localizedDescription
             NSLog("loadMessages: \(error.localizedDescription)")
             ToastManager.shared.show("消息获取失败", icon: "wifi.exclamationmark")

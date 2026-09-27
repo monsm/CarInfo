@@ -155,8 +155,9 @@ struct EnergyModel {
     var timeToFull: String? = nil
     // #2 SOC耗尽预测（未充电时显示预计剩余行驶时间）
     var timeToEmpty: String? = nil
-    // #23 百公里能耗（kWh/100km）
-    var avgConsumption: String? = nil
+    //  #23 百公里能耗（kWh/100km）的字段已删（2026-09-27）：它从来不是车端报的，
+    //  而是「socPct ÷ 续航 × 15」估出来的，唯一的读者是地图抽屉里那一格 ——
+    //  用户这一轮把那格删了（「地图页抽屉去掉平均功耗」），于是整条链一起走。
 }
 
 struct ChargingSession {

@@ -889,7 +889,8 @@ POST {base}/api/car/control?pin={控制码}&cmd={Command}&carId={carId}&phoneTyp
 ## 10. 行动清单（按"代价低 × 收益高"排序）
 
 > **状态（2026-09-22 第三轮）**：1–10 **全部已落地**（逐条对应见 §11.1b 与
-> `DESIGN-UNIFY.md` §8 的两张表）。第 5 条是唯一的例外：能力位图已接（`VM.capabilities`），
+> `DESIGN-UNIFY.md` §8 的两张表）。第 5 条是唯一的例外（⚠️ **2026-09-27 起不再是例外**：
+> 它随诊断页里那一组一起删了，`funCode` 从此**不被解析**，见表 §4.2）：能力位图曾已接（`VM.capabilities`），
 > 但**没有**拿它隐藏控件 —— 理由见 §11.1b #17。下面保留原始清单以便核对口径。
 
 1. **修读层大小写**（§6，72 处）：`VM`/`AN` 的直接下标 → `ci*` 系列；顺手删掉死代码 `VM.driveStatus` 或接到界面上。加一条 `scan/` 门禁禁止 `["Capitalized"]` 下标。→ 一次性修好「未绑定车牌 / 恒已锁 / 恒离线 / 体检计数 `--` / 空调暂无数据」。
@@ -969,7 +970,7 @@ POST {base}/api/car/control?pin={控制码}&cmd={Command}&carId={carId}&phoneTyp
 | 14 | 体检与数据页的「依据透明」（服务端 5 项 + `carDataUpdateTime`） |
 | 15 | `MessagesSection`：`stubId` 去重 + 红点用 `new` + `jumpParam` 坐标 → 地图 fly-to |
 | 16 | **部分落地**：保险（`insuranceCompany`/`insurancePhone`，到期日哨兵 → 「未登记」）、车联网服务到期（`tserviceEndtime`，修复了带时分秒的日期解析）、控车码 `pin`。仍未接：`realnameAuthStatus`、`isPrivacyDrvingHistory`（后者就是“为什么没有轨迹”的解释） |
-| 17 | **刻意不落地**：`funCode` 已解析（`VM.capabilities`）并显示在开发者工具，但**不隐藏控件** —— 两组同名开关互相矛盾（本车 `remoteBaseControl.airBtn = 1` vs `remoteBaseControl_XNY.airBtn = 0`），按可能是错的值隐藏会藏掉真能用的功能。理由全文见 `DESIGN-UNIFY.md` §8「第三轮」 |
+| 17 | **刻意不落地**：`funCode` **不隐藏控件** —— 两组同名开关互相矛盾（本车 `remoteBaseControl.airBtn = 1` vs `remoteBaseControl_XNY.airBtn = 0`），按可能是错的值隐藏会藏掉真能用的功能。理由全文见 `DESIGN-UNIFY.md` §8「第三轮」。（其中「已解析（`VM.capabilities`）并显示在开发者工具」那一半 **2026-09-27 已删**：解析链与诊断页那一组能力位图一起走了，上面的表（§4.2）仍是那份位图的权威版） |
 
 ### 11.2 B 组：方向明确，但需要新抓包（我们手上没有的接口）
 

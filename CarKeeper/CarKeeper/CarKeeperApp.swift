@@ -105,13 +105,12 @@ struct CarKeeperApp: App {
         // 后台刷新（BGTask）已删：免费开发者账号没有 BGTaskScheduler 权限，
         // 调用 register 会抛 ObjC 异常直接杀进程。若将来升级付费账号再恢复。
         //
-        // 启动轨迹：**最早的一步**就在这里。用户 2026-09-24 报「载入不到 10 秒就闪退、
-        // 系统里没有日志」—— 那类终止不会调用 App 的任何代码，所以路标要在死之前写好。
-        StartupJournal.shared.begin()
-        // 信号捕获（临时仪器，见 LaunchFence）：与轨迹配套装在这里。
-        // 1 秒心跳只能说明「进程在某一秒没了」，纸条才能说明
-        // 「是我们自己的代码崩的（带调用栈）还是被系统拿走的（什么都没有）」。
-        StartupJournal.shared.catchSignalDeaths()
+        // 这里原本还装着**启动轨迹**的第一笔（`StartupJournal.shared.begin()`）与
+        // 信号捕获（`catchSignalDeaths()`）—— 它们为「载入不到 10 秒就自己退出、
+        // 系统里没有日志」那次二分定位服务（用户 2026-09-24 报的现象）。
+        // 2026-09-27 与诊断页里那一组一起删掉（用户：「诊断中删除无用的」）：
+        // 那套仪器自己的头注写着「查完就删」，而它当初要回答的问题已经有了答案 ——
+        // 结论留在 `HANDOFF.md` 里，仪器不再需要常驻在每一次启动上。
     }
 
     var body: some Scene {
@@ -135,9 +134,9 @@ struct CarKeeperApp: App {
         }
     }
 
-    // #NEW-112 启动画面控制
-    // 围栏控制（见 LaunchFence）：关掉时直接进主界面，少一次整棵树重建。
-    @State private var showSplash = LaunchFence.splash
+    // #NEW-112 启动画面：开着（那一轮二分启动实验的围栏已随诊断页一起删，
+    // 而它的四个开关当时全是「开」—— 所以这里回到它唯一的一个值）。
+    @State private var showSplash = true
     @State private var isAppLoading = false
     // #NEW-113 Onboarding 引导状态
     @AppStorage("carkeeper_onboarding_seen") private var onboardingSeen = false
@@ -164,7 +163,6 @@ struct CarKeeperApp: App {
                         // 模拟加载延迟后显示主界面
                         try? await Task.sleep(nanoseconds: 1_500_000_000)
                         showSplash = false
-                        StartupJournal.shared.mark("启动动画结束")
                     }
             } else if !onboardingSeen && !store.isLoggedIn {
                 // #NEW-113 Onboarding 引导
@@ -190,17 +188,11 @@ struct CarKeeperApp: App {
         // 全 App 每一屏共用同一束由车所在地算出的光。逐屏去加，一定会有屏幕漏掉。
         .background { AppCanvas() }
         .onAppear {
-            StartupJournal.shared.mark("根视图出现")
-            // 启动阶段 = 12 秒：走完才在轨迹里写收尾标记。
-            // 没有收尾标记 = 上一次没走完 —— 那一条会显示在「我的 → 诊断 → 上一次启动」。
-            StartupJournal.shared.scheduleFinish()
             // 启动时若已登录但数据未加载，异步拉取一次数据。
             // ⚠️ 不阻塞 UI：用户可以先看到地图壳，数据在后头悄悄补上。
             if store.isLoggedIn && store.cars.isEmpty {
                 Task {
-                    StartupJournal.shared.mark("取车辆列表开始")
                     await store.bootstrap()
-                    StartupJournal.shared.mark(store.cars.isEmpty ? "取车辆列表没拿到" : "车辆就绪")
                 }
                 // bootstrap 是异步的：如果它因 token 过期失败了（已处理 logout），
                 // 或者因为网络慢还没完成，用户可能先进入了出行页看到空白消息。
@@ -218,50 +210,51 @@ struct CarKeeperApp: App {
             // 取不到就退回「晴空模型」，界面上照实写明 —— 不拿默认值冒充实况。
             if let c = store.currentLocation?.coordinate {
                 Task {
-                    StartupJournal.shared.mark("取天气开始")
                     await WeatherService.shared.refreshIfNeeded(coordinate: c)
-                    StartupJournal.shared.mark("取天气结束")
                 }
             }
             // #N38 崩溃上报（CrashReporter）已删：它把崩溃历史写进 UserDefaults
             // 只为给「诊断」页看，用户明确要求把这类本机统计一并去掉。
-            if LaunchFence.launchServices {
-                // #N39 内存监控启动（不落盘，只是此刻的读数）
-                MemoryMonitor.shared.startMonitoring(interval: 10)
-                // #N37 网络质量监控（`NetworkQualityMonitor`）与 #N41 离线模式监听
-                // （`OfflineModeManager`）这两行已删（2026-09-26 第三十一轮审核）：
-                // 后者整份删除（它与前者的 `isReachable` 是同一个事实的第二个名字），
-                // 前者改成**谁读谁建** —— 它唯一的下游是「诊断」页那三行读数，
-                // 而 `shared` 本来就是懒建：打开诊断页时它自己会建起来（并开始收路径事件）。
-                // 于是启动期少两件事、少一条永远在跑的 30 秒定时器。
-                // 通知授权：**向正在发通知的那一条路要**。
-                //
-                // 2026-09-25 地毯式审核删掉了 `SmartNotificationManager`（N15–N20）：
-                // 六个通知类型各自的方法**一处调用都没有**，而它在启动时做的事是
-                // 「弹一次授权 + 注册三个分类」—— 那三个分类的动作（立即充电 /
-                // 稍后充电 / 查看脸压 / 关闭勿扰）全仓又没有 `UNUserNotificationCenterDelegate`，
-                // 点了什么也不会发生。于是它对用户的全部影响就是启动时多一个权限弹窗。
-                // 真正会发通知的三条路各自都在：`ChargingStatusMonitor`（充电开始/结束，
-                // 报文驱动）、`MaintenanceReminderScheduler`（里程保养）、
-                // `InsuranceReminderScheduler`（保险到期）—— 后两条自己申请授权，
-                // 充电那条由下面这一行申请（它读的是同一个系统权限，只会弹一次）。
-                Task { await ChargingStatusMonitor.shared.requestAuthorization() }
-                // #N14 远程锁定监听
-                RemoteLockManager.shared.startMonitoring()
-                // #NEW-118/N119 维保+保险提醒调度器初始化
-                _ = MaintenanceReminderScheduler.shared
-                _ = InsuranceReminderScheduler.shared
-                // #NEW-120 Siri/快捷指令：真正的 AppIntent 在 Features/SiriShortcuts.swift。
-                // 旧的那份 `AppIntentsManager`（空桩）已删；旧的 INIntent 子类也没有
-                // Intent Extension target 去注册，永远不可能被唤起。
-                // E47 性能监控（PerformanceTracker）已删：页面耗时与接口成功率两项
-                // 都是写进 UserDefaults 给「诊断」页看的本机统计，属这一轮要删的东西。
-                // E40 充电状态监控（此前只写了 `_ = ChargingStatusMonitor.shared`，
-                // 连 startMonitoring 都没调，而那个方法本身也是空的）
-                ChargingStatusMonitor.shared.startMonitoring()
-                // N10「车牌加密初始化」（`DataEncryption.ensureKey()`）已删：
-                // 它生成的那把密钥没有任何代码去读（见 AppStore 里同一处的说明）。
-            }
+            //  ── 启动期要起的那几个服务 ────────────────────────────────────
+            //  ⚠️ 2026-09-27：这一批此前包在 `if LaunchFence.launchServices { }` 里 ——
+            //  那是 2026-09-24 那轮二分实验的开关，而四个开关当时全是「开」，
+            //  所以删仪器时这一层 `if` 跟着走了：下面就是唯一的形态。
+            // #N39 内存监控启动（不落盘，只是此刻的读数）
+            MemoryMonitor.shared.startMonitoring(interval: 10)
+            // #N37 网络质量监控（`NetworkQualityMonitor`）与 #N41 离线模式监听
+            // （`OfflineModeManager`）这两行已删（2026-09-26 第三十一轮审核）：
+            // 后者整份删除（它与前者的 `isReachable` 是同一个事实的第二个名字），
+            // 前者改成**谁读谁建** —— 它唯一的下游是「诊断」页那三行读数，
+            // 而 `shared` 本来就是懒建：打开诊断页时它自己会建起来（并开始收路径事件）。
+            // 于是启动期少两件事、少一条永远在跑的 30 秒定时器。
+            //
+            // 通知授权：**向正在发通知的那一条路要**。
+            //
+            // 2026-09-25 地毯式审核删掉了 `SmartNotificationManager`（N15–N20）：
+            // 六个通知类型各自的方法**一处调用都没有**，而它在启动时做的事是
+            // 「弹一次授权 + 注册三个分类」—— 那三个分类的动作（立即充电 /
+            // 稍后充电 / 查看脸压 / 关闭勿扰）全仓又没有 `UNUserNotificationCenterDelegate`，
+            // 点了什么也不会发生。于是它对用户的全部影响就是启动时多一个权限弹窗。
+            // 真正会发通知的三条路各自都在：`ChargingStatusMonitor`（充电开始/结束，
+            // 报文驱动）、`MaintenanceReminderScheduler`（里程保养）、
+            // `InsuranceReminderScheduler`（保险到期）—— 后两条自己申请授权，
+            // 充电那条由下面这一行申请（它读的是同一个系统权限，只会弹一次）。
+            Task { await ChargingStatusMonitor.shared.requestAuthorization() }
+            // #N14 远程锁定监听
+            RemoteLockManager.shared.startMonitoring()
+            // #NEW-118/N119 维保+保险提醒调度器初始化
+            _ = MaintenanceReminderScheduler.shared
+            _ = InsuranceReminderScheduler.shared
+            // #NEW-120 Siri/快捷指令：真正的 AppIntent 在 Features/SiriShortcuts.swift。
+            // 旧的那份 `AppIntentsManager`（空桩）已删；旧的 INIntent 子类也没有
+            // Intent Extension target 去注册，永远不可能被唤起。
+            // E47 性能监控（PerformanceTracker）已删：页面耗时与接口成功率两项
+            // 都是写进 UserDefaults 给「诊断」页看的本机统计，属这一轮要删的东西。
+            // E40 充电状态监控（此前只写了 `_ = ChargingStatusMonitor.shared`，
+            // 连 startMonitoring 都没调，而那个方法本身也是空的）
+            ChargingStatusMonitor.shared.startMonitoring()
+            // N10「车牌加密初始化」（`DataEncryption.ensureKey()`）已删：
+            // 它生成的那把密钥没有任何代码去读（见 AppStore 里同一处的说明）。
         }
         .onOpenURL { url in
             openDeeplink(url)
@@ -383,14 +376,11 @@ struct MapShellView: View {
         mapStack
         .tint(TokensPalette.ambient)
         .task {
-            StartupJournal.shared.mark("首页外壳出现")
             await store.bootstrap()
-            StartupJournal.shared.mark(store.cars.isEmpty ? "首页：车辆列表为空" : "首页：车辆就绪")
             // 自动刷新的节律循环（一个，见 `RefreshLoop`）：地图页 2s（车在动）/
             // 2→4→8→16→32→60s（停着），其余档 60s（轻）+ 300s（重，翻到那一页时当场取一次）。
             // 放在这里而不是各页的 `.task` —— 六页是同时建出来的，每页一个定时器就是六个循环。
             RefreshLoop.shared.start()
-            StartupJournal.shared.mark("自动刷新已起（节律 \(Int(RefreshLoop.shared.interval))s）")
             // 车在动时保持屏幕唤醒（用户 2026-09-26：「车移动的时候要保持屏幕唤醒不睡着」）。
             // 与刷新循环同一个位置、同一个理由：它读的是**全 App 那一份**
             // 「车在不在动」（`AppStore.isCarMoving`），不是某一页的事 ——

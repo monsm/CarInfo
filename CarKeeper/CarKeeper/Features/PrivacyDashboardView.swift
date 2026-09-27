@@ -72,20 +72,21 @@ struct PrivacySection: View {
             }
 
             // 离开本机的数据：「数据去了哪」是隐私披露里最该说清、也最容易被含糊过去的一节。
-            // 三处都是代码里真实存在的域名（APIConfig / WeatherService.host / UpdateService）。
+            // 两处（就两个）都是代码里真实存在的域名：`APIConfig` 与 `WeatherService.host`。
+            //
+            //  ⚠️ 2026-09-27：第三行「GitHub（版本检查）」删掉了 —— 用户这一轮
+            //  把更新相关的东西整体拿走（`UpdateService` / `GithubToken`），
+            //  这一个 App 从此**不再访问那一个域名**。一张写着「我们不去那儿」的
+            //  披露表比一张少一行的表更糟：它是关于"现在"的陈述，而那句话已经过期。
             DSGroup(title: "离开本机的数据",
-                    footer: "天气只给两位小数的经纬度，三处都不带车辆标识。") {
+                    footer: "天气只给两位小数的经纬度，两处都不带车辆标识。") {
                 DSGroupRow {
                     DSRow(icon: "car.fill", title: "长安车联网",
                           subtitle: "只在你用这些功能时")
                 }
-                DSGroupRow {
+                DSGroupRow(showsSeparator: false) {
                     DSRow(icon: "cloud.sun.fill", title: "Open-Meteo（天气实况）",
                           subtitle: "车的位置（两位小数）")
-                }
-                DSGroupRow(showsSeparator: false) {
-                    DSRow(icon: "arrow.down.circle", title: "GitHub（版本检查）",
-                          subtitle: "只在你点「检查更新」时")
                 }
             }
 

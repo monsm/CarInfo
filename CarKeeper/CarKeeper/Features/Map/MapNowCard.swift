@@ -101,28 +101,38 @@ struct MapNowDrawer<Head: View, Content: View>: View {
             VStack(alignment: .leading, spacing: 0) {
                 head(handle)
                 //  抽屉的正文：**它的高度就是手指走出来的那一段**
-                //（`reveal` 0…1 × 正文的自然高度）。`clipped()` 是必须的：
-                //  正文的高度被压着，没它就会画出卡外。
-                if reveal > 0.001 {
-                    //  三层各有唯一的作用，少一层就用不了：
-                    //   ① `.fixedSize(vertical:)` —— 正文**不接「当前可见高度」这个提案**，
-                    //      永远按自己的自然高度排版（折行稳定）。
-                    //   ② 里面那个 `frame(height: bodyHeight)` —— 把排版结果钉在量到的自然高度上。
-                    //   ③ 外面那个 `frame(height: bodyHeight * reveal)` + `clipped()` ——
-                    //      手指走出来的可见高度，多余的部分剪掉。
-                    //
-                    //  ⚠️ ①②③ 的顺序就是「不鬼畜」这件事本身（用户 2026-09-26：「还是会鬼畜」）：
-                    //  此前只有 ③，于是正文拿到的提案是「当前可见高度」—— 一涨一缩之间
-                    //  折行的字每帧重新换行，卡片里的内容就像在自己扭。
-                    content()
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(height: bodyHeight, alignment: .top)
-                        .frame(height: max(0, bodyHeight * reveal), alignment: .top)
-                        .clipped()
-                }
+                //（`reveal` 0…1 × 正文的自然高度）。
+                //
+                //  ⚠️ 2026-09-27（用户第 2 条：「手动慢慢拉开还是不顺滑，还是有抽动频闪」）：
+                //  这一份**从两份减到一份**。此前是「可见的那一份 + `background` 里
+                //  另建一份 `.hidden()` 的测量副本」—— 拖动是每帧写 `reveal`，
+                //  所以每帧要把**整份正文建两遍**（部件少的时候看不出，正文里有图层菜单、
+                //  两排读数与三层的正文，而拖动时它就在手指底下）。
+                //  现在量高那一份是**同一份**的 `background`（不占位、不参与排版），
+                //  一帧里只建一份。
+                //
+                //  三层各有唯一的作用，少一层就用不了：
+                //   ① `.fixedSize(vertical:)` —— 正文**不接「当前可见高度」这个提案**，
+                //      永远按自己的自然高度排版（折行稳定）。
+                //   ② `.background { measure }` —— 量到的就是这个自然高度（①之后的位置）。
+                //   ③ 那个 `frame(height: bodyHeight * reveal)` + `clipped()` ——
+                //      手指走出来的可见高度，多余的部分剪掉。
+                //
+                //  ⚠️ ①②③ 的顺序就是「不鬼畜」这件事本身（用户 2026-09-26：「还是会鬼畜」）：
+                //  此前只有 ③，于是正文拿到的提案是「当前可见高度」—— 一涨一缩之间
+                //  折行的字每帧重新换行，卡片里的内容就像在自己扭。
+                //
+                //  ⚠️ 那个 `if reveal > 0.001`（收起时干脆不建正文）也一起删了：
+                //  它省下的是「一份正文的构建」，但代价是**手指一动才建** ——
+                //  于是每一次拉开的第一帧都要现建整份正文，那一下正是「慢拖时开头一卡」。
+                //  现在正文一直在（高度 0 时被上面那个 `frame` 夹住、被 `clipped()` 剪掉，
+                //  看不见也不接事件）—— 与以前那个总是建着的测量副本是同一份成本。
+                content()
+                    .fixedSize(horizontal: false, vertical: true)
+                    .background(alignment: .top) { measure }
+                    .frame(height: max(0, bodyHeight * reveal), alignment: .top)
+                    .clipped()
             }
-            //  量高那一份在 `background` 里：它不占位、也不参与卡片的排版。
-            .background(alignment: .top) { measure }
         }
         //  把自己那条上沿报出去（地图右侧那一列贴着它、并跟着它上下动）。
         .anchorPreference(key: DrawerTopKey.self, value: .bounds) { [$0] }
@@ -163,8 +173,9 @@ struct MapNowDrawer<Head: View, Content: View>: View {
 
     /// 量一遍正文的**自然高度** —— 跟手时的分母（手指走多少 = 拉开多少）。
     ///
-    /// 它住在 `background` 里：背景不参与父视图的排版，所以这一份既不占位、
-    /// 也不出现在版面上（`.hidden()` 连绘制都省了，但它仍然参与布局）。
+    /// 它住在 `background` 里：背景不参与父视图的排版，所以它既不占位、
+    /// 也不出现在版面上（2026-09-27 起它量的是**正文自己那一份**，见 `body` 上面
+    /// 那一段 —— 此前这里另建了一份 `.hidden()` 的副本）。
     ///
     /// ⚠️ `.fixedSize(horizontal: false, vertical: true)` 是**必须的**，不是修饰：
     /// `background` 会把「卡片当前的高度」作为提案递给背景内容 —— 而卡片的高度
@@ -175,21 +186,15 @@ struct MapNowDrawer<Head: View, Content: View>: View {
     /// ⚠️ 它**总是**建着（不只是拉开的时候）：拉开的第一帧就有分母 ——
     /// 否则高度会先从 0 跳到真值，跟手那一下会先闪一格。
     private var measure: some View {
-        content()
-            .fixedSize(horizontal: false, vertical: true)
-            .background {
-                GeometryReader { g in
-                    Color.clear
-                        //  只在真的变了才写（差值 < 0.5pt 当没变）：手势系统与布局都会
-                        //  把同一个尺寸重复递几次，而每一次写都会再触发一轮布局。
-                        .onAppear { bodyHeight = g.size.height }
-                        .onChange(of: g.size.height) { _, h in
-                            if abs(h - bodyHeight) > 0.5 { bodyHeight = h }
-                        }
+        GeometryReader { g in
+            Color.clear
+                //  只在真的变了才写（差值 < 0.5pt 当没变）：手势系统与布局都会
+                //  把同一个尺寸重复递几次，而每一次写都会再触发一轮布局。
+                .onAppear { bodyHeight = g.size.height }
+                .onChange(of: g.size.height) { _, h in
+                    if abs(h - bodyHeight) > 0.5 { bodyHeight = h }
                 }
-            }
-            .hidden()
-            .allowsHitTesting(false)
+        }
     }
 }
 

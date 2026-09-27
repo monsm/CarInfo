@@ -87,7 +87,11 @@ struct ControlView: View {
     /// 卡片量到的可用区域（`ArcStack` 写进来的真数；量不到时是 `.zero`）
     @Environment(\.cardViewport) var cardViewport
 
-    @State private var showMoreCommands = false
+    /// 低频指令那一节**默认展开**（用户 2026-09-27 第 5 条：「车控指令默认展开」）。
+    /// 收到 `false` 那一版的理由是「这一页已经够长了」——而真机上它的实际效果是
+    /// 一排指令被折到只剩两条，用户得先找到「更多指令」再点开（那一步没有任何信息，
+    /// 他并不知道里面剩下的是什么）。折叠本身留着（按钮还在，点一下收起）。
+    @State private var showMoreCommands = true
     /// 一条车控请求。验证、温度、下发都在 `controlCommandFlow` 那道门里 ——
     /// 这一页只负责把请求交出去。用户 2026-09-24 指出的两套强度就出在这里：
     /// 地图右臂直接调 `AppStore.sendControlCommand`（拿 Keychain 里的旧码就发），

@@ -136,43 +136,18 @@ enum VM {
         return ml
     }
 
-    // ---------- 能力位图（car.funCode） ----------
-    /// `getMyCars[].funCode` 是一个字符串形式的 JSON：
-    /// `{ 分组: { "#开关": 0|1 } }`。本次抓包 7 个分组、43 个开关。
-    ///
-    /// **为什么只搬运、不隐藏界面**：43 个缩写里只有少数能自证含义
-    /// （`#StateWindow` 车窗、`#airBtn` 空调按钮、`#Statelock` 门锁），其余
-    /// （`zjcsStatusRC`、`openPJ`、`openBY`、`isFence`、`#18`/`#26`…）没有任何
-    /// 可核实的依据 —— 参考实现也零引用。更关键的是**两组同名开关互相矛盾**
-    /// （本车 `control/remoteBaseControl.#airBtn = 1` 而
-    /// `control/remoteBaseControl_XNY.#airBtn = 0`），无从判断哪一组作准。
-    ///
-    /// 在这种前提下「按 0 隐藏控件」会藏掉可能真能用的功能（比多显示一个按钮更糟），
-    /// 所以只把位图原文摆进开发者工具当证据；等到某一组位与真实车控失败一一对应，
-    /// 再让 `Capability.on` 去驱动界面。
-    struct Capability {
-        let group: String
-        let key: String
-        let on: Bool
-    }
-
-    static func capabilities(_ carRaw: [String: Any]?) -> [Capability] {
-        guard let raw = ciPick(carRaw, ["FunCode"]) as? String,
-              let data = raw.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
-        var out: [Capability] = []
-        // 按键名排序再排分组：两次运行的行序一致，截图能对比。
-        for group in obj.keys.sorted() {
-            guard let switches = obj[group] as? [String: Any] else { continue }
-            for key in switches.keys.sorted() {
-                guard let n = vnum(switches[key]) else { continue }
-                out.append(Capability(group: group,
-                                      key: key.hasPrefix("#") ? String(key.dropFirst()) : key,
-                                      on: n != 0))
-            }
-        }
-        return out
-    }
+    // ---------- 已删除：能力位图（car.funCode）的解析 ----------
+    //
+    //  2026-09-27（用户：「删除开发者入口，诊断中删除无用的」→ 勾了「能力位图」）：
+    //  `VM.capabilities(_:)` 与 `VM.Capability` **整段删了**，它唯一的读处是
+    //  诊断页里那 7 组 43 个原始开关。删了之后的账要写清：
+    //    · `getMyCars[].funCode` 从此**不被解析**（也没人再读）——而它本来就是
+    //      「只搬运、不驱动界面」的证据（当时写下它的那句话还在 `API-FIELD-MAP.md`
+    //      的 §17）；
+    //    · 为什么证据不再需要一块常驻的界面：那一段的结论（「按 0 隐藏控件可能藏掉
+    //      真能用的功能」）已经写进文档，而**位图本身是快照**——要看它拿一份报文
+    //      对照即可，不必在 App 里养一条只有开发者读的链。
+    //  这一段的取值依据与两组同名开关互相矛盾那件事，留在 `API-FIELD-MAP.md` §17。
 
     // ---------- 车控回执的成败（唯一判定） ----------
     /// 返回 `nil` 表示：车端确实回执了，但那个状态值我们**不认识**。
@@ -311,12 +286,12 @@ enum VM {
             }
         }
         // #2 SOC耗尽预测：基于当前续航估算行驶时间（假设平均时速40km/h）
+        //  （同一段里原本还有一个「百公里能耗」的估算 —— 按「socPct ÷ 续航 × 15」
+        //   推出来的，而它的唯一读者是地图抽屉里那一格。用户 2026-09-27：
+        //   「地图页抽屉去掉平均功耗」，于是估算与那个字段一起删了：一个自己估的数
+        //   摆在一排车端读数里，比不摆更坏。）
         var timeToEmpty: String? = nil
-        var avgCons: String? = nil
         if let r = Double(range), r > 0, socPct > 0 {
-            // 百公里能耗 = socPct / range * 15 (假设电池容量约15kWh，估算)
-            let cons = (Double(socPct) / r * 15 * 10).rounded() / 10
-            avgCons = "\(cons) kWh/100km"
             let hoursToEmpty = Int(r / 40.0)
             if hoursToEmpty > 0 {
                 timeToEmpty = "约\(hoursToEmpty)小时" // 按40km/h平均时速估算
@@ -331,8 +306,7 @@ enum VM {
             charging: charging, volt: volt, amp: amp, battTemp: battTemp, insulate: insulate,
             online: online, updated: updated, carName: carName,
             timeToFull: timeToFull,
-            timeToEmpty: timeToEmpty,
-            avgConsumption: avgCons
+            timeToEmpty: timeToEmpty
         )
     }
 

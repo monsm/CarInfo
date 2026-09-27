@@ -622,24 +622,13 @@ VERIFIED_SDK_ADDITIONS = {
     "GeometryProxy": "SwiftUI.GeometryProxy（iOS 13+；externalID s:7SwiftUI13GeometryProxyV；doc://com.apple.SwiftUI/documentation/SwiftUI/GeometryProxy）——拿到容器尺寸的那个结构体。**注意它与 MapCompass 一起被登记，但两者缘由不同**：GeometryProxy 一直都在用（`pageLayer(_ geo:)`），而 scan.py 的「未声明的类型」判据是拿**冻结提交的缓存**比 —— 基线里那一个只出现在 `members` / `calls` 里、没进 `refs`，于是本机跑（有 scan/baseline/ 目录）与 CI 跑（用提交进仓库的 baseline_cache.json）结果不一样。这一条就是把「到底认不认它」写成一个显式名字，两种跑法都对得上",
     "MapCompass": "MapKit.MapCompass（iOS 17+；decl: struct MapCompass；externalID s:15_MapKit_SwiftUI0A7CompassV；doc://com.apple.mapkit/documentation/MapKit/MapCompass，relatedModules: SwiftUI，abstract: A view that reflects the current orientation of the associated map；init(scope:) 已核：externalID s:15_MapKit_SwiftUI0A7CompassV5scopeAC0cD09NamespaceV2IDVSg_tcfc）——原型 `.compass`（右上角那枚罗盘）的真机对应物：它是地图自己的仪器（回答「哪边是北」）。**2026-09-25 第十一轮起当独立视图挂在 `MapQuickButtons` 那一列的第一格**（`MapCompass(scope: mapScope)` + 容器上的 `.mapScope(_:)`），不再放进 `.mapControls { }`（那条路的位置由 MapKit 定，会贴在状态栏里）",
     "toolbar": "View.toolbar(_:for:)（iOS 16+；decl: func toolbar(_ visibility: Visibility, for bars: ToolbarPlacement...) -> some View；externalID s:7SwiftUI4ViewPAAE7toolbar_3forQrAA10VisibilityO_AA16ToolbarPlacementVdtF；doc://com.apple.SwiftUI/documentation/SwiftUI/View/toolbar(_:for:)）——按可见性控制某一条栏。首页用它把导航栏收掉（`.toolbar(.hidden, for: .navigationBar)`）：原型里**首页根本没有顶栏**，地图一直画到屏幕最上沿。⚠️ 这个名字在 **iOS 27.2 起被改名为 `toolbarVisibility(_:for:)`**（文档 JSON 里 `renamed: toolbarVisibility(_:for:)`、`deprecatedAt: 27.2`）—— 本项目的部署目标是 iOS 26.0、用 iPhoneOS26.5 SDK 编译，所以现在不产生弃用警告；等 SDK 升到 27.2 之后要改用它",
-    # 启动轨迹的心跳（Services/StartupJournal.swift，2026-09-24 第二轮）。
-    # 背景：轨迹原本在 2–12 秒之间是瞎的（打点全在头一两秒），而用户报的
-    # 「地图出来以后几秒就退」正落在盲区里。补心跳时选了 GCD 的定时器，
-    # 而不用 `Timer.scheduledTimer`：后者跑在调用它的 run loop 上，
-    # 主线程一卡它自己也停了 —— 于是「卡死」与「被处决」又分不开了。
-    # 三个名字都对着 Apple 文档核过（dispatchsourcetimer 一页列出
-    # `schedule(deadline:repeating:leeway:)`，makeTimerSource(queue:) 返回它）：
-    "DispatchSourceTimer": "Dispatch.DispatchSourceTimer（iOS 8+；doc://com.apple.dispatch/documentation/Dispatch/DispatchSourceTimer；由 DispatchSource.makeTimerSource(queue:) 返回）",
-    "makeTimerSource": "DispatchSource.makeTimerSource(queue:)（iOS 8+；doc://com.apple.dispatch/documentation/Dispatch/DispatchSource/makeTimerSource(queue:flags:)）",
-    "schedule": "DispatchSourceTimer.schedule(deadline:repeating:leeway:)（iOS 8+；doc://com.apple.dispatch/documentation/Dispatch/DispatchSourceTimer/schedule(deadline:repeating:leeway:)）——心跳的 1 秒节拍",
-    # 启动轨迹的判据（Services/StartupJournal.swift，2026-09-24 第三轮）。
-    # 背景：轨迹原本只记**常驻内存**（320 MB），而那个数单独看没有判据 ——
-    # 4 GB 与 8 GB 的机器、前台与后台，额度完全不同。用户的反馈是一句猜测：
-    # 「没闪退，我感觉是因为内存占用太多被系统杀了」。补的就是那句猜测缺的数。
-    # 两个名字都对着 Apple 文档 JSON 核过（`abstract` / `metadata.modules` /
-    # `metadata.externalID` / `platforms` 四项都打印出来看过）：
-    "os_proc_available_memory": "os 框架（iOS 13+；decl: extern size_t os_proc_available_memory(void)；externalID c:@F@os_proc_available_memory；doc://com.apple.os/documentation/os/os_proc_available_memory；abstract: Determines the amount of memory available to the current app）——系统还可给本进程多少字节。它是「距被处决还剩多远」的**唯一**读数（RSS 单独看回答不了「这算不算高」），也是轨迹里 `距上限 X MB` 那一栏的来源。它返回 0 时按「没测到」处理（写成 `—`），不能当成「一兆不剩」",
-    "didReceiveMemoryWarningNotification": "UIApplication.didReceiveMemoryWarningNotification（UIKit；externalID c:@UIApplicationDidReceiveMemoryWarningNotification；doc://com.apple.uikit/documentation/UIKit/UIApplication/didReceiveMemoryWarningNotification；abstract: A notification that posts when the app receives a warning from the operating system about low memory availability）——被内存处决之前通常会先响这一声；有与没有指向的不是同一件事，所以它随轨迹一起出去（`内存警告 N 次`）",
+    #  已删（2026-09-27）：启动轨迹的那五个 SDK 名字（`DispatchSourceTimer` /
+    #  `makeTimerSource` / `schedule` / `os_proc_available_memory` /
+    #  `didReceiveMemoryWarningNotification`）—— 它们唯一的用户是
+    #  `Services/StartupJournal.swift`，而那个文件随诊断页的「上一次启动」
+    #  一起删了（用户：「诊断中删除无用的」）。
+    #  这张表只登记**项目真的在用**的名字：留着一串没人用的登记项，下一个人会以为
+    #  某处还在用 GCD 定时器量心跳（那就是这个仓库反复清掉的那种「声明在、没有读者」）。
     # 壁纸（Services/WallpaperService.swift，2026-09-24 第六轮：子页面背景）。
     # 背景：iOS 没有读取主屏壁纸的公开 API（壁纸归 SpringBoard 进程管，App 拿不到），
     # 能做到的最接近「当前桌面的背景」的一版是：铺一张在线风景图（Unsplash 官方直链），

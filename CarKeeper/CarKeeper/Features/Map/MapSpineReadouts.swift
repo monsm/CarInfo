@@ -134,17 +134,20 @@ extension MapSpineView {
     /// 抽屉里的第二排：**其余读数里还有的那几个**。
     ///
     /// 用户 2026-09-25 要的是 iOS 地图那种抽屉：「仅显示重要项，拉开抽屉就是剩余数据」——
-    /// 只多一排（胎压/车锁/充满）不算兑现「剩余」。这三个都是 `MapSpineData` 里
+    /// 只多一排（胎压/车锁/充满）不算兑现「剩余」。这两个都是 `MapSpineData` 里
     /// **真实存在**的字段，推不出来就整格不出现：
-    ///   · 平均电耗（`avgConsumption`）—— 车端报的，不是我们算的
     ///   · 航向（`headingText`）—— 车头朝哪儿，地图上那个钉子在转，但看不到度数
     ///   · GPS（`gpsText`）—— 定位质量；它不好时上面每个数都该打折看
+    ///
+    ///  ⚠️ 2026-09-27（用户第 3 条：「地图页抽屉去掉平均功耗」）：**「平均电耗」那一格
+    ///  走了**。它不是一个读数的取舍 —— 删它之后那条链上一个读者都不剩，所以
+    ///  `MapSpineData.avgConsumption`、`VM.EnergyModel.avgConsumption` 与算出它的
+    ///  那段估算（「按电池约 15 kWh 估」）一起删了：那个数本来就**不是车端报的**，
+    ///  是按「socPct ÷ 续航 × 15」推出来的（上一版注释里写着「车端报的」，
+    ///  那句话本身是错的）—— 一个自己估的数摆在一排车端读数里，比不摆更坏。
     @MainActor
     func readoutsRest(_ d: MapSpineData) -> [Readout] {
         var out: [Readout] = []
-        if let avg = d.avgConsumption, !avg.isEmpty, avg != "--" {
-            out.append(Readout(id: "avg", key: "平均电耗", value: avg))
-        }
         if !d.headingText.isEmpty, d.headingText != "--" {
             out.append(Readout(id: "heading", key: "航向", value: d.headingText))
         }
@@ -274,9 +277,15 @@ extension MapSpineView {
                 handle.toggle()
             }
             //  ⚠️ `highPriorityGesture`，不是 `gesture`（用户第 2 条的「频闪」有一半
-            //  出在这里）：卡片坐在一个**可滚动**的叠里，两者同时认领同一根竖手指时
+            //  出在这里）：这一格坐在一个**可滚动**的叠里，两者同时认领同一根竖手指时
             //  会互相抢 —— 手指走一段、内容往下滚一段，一抢一放就是那阵闪。
             //  优先级给了拉手：这一格竖着走就是拉抽屉；卡片其余部分仍然归滚动。
+            //
+            //  ⚠️ 2026-09-27 修正这句旧话：这里的「可滚动的叠」是这张卡**当初**的处境
+            //  （它那时住在叠叠乐里）。它现在挂在地图那一层的底部 —— 脚下没有滚动视图，
+            //  只有那张地图。优先级照旧留着，理由换成了一条**没量过**的：同一块区域上
+            //  压着底下的地图（UIKit 侧自带拖动识别器），而 UIKit 与 SwiftUI 的手势
+            //  仲裁不归我们这几行管 —— 实测之前不把这条保险拆掉。
             .highPriorityGesture(drawerDrag(handle))
             .accessibilityElement()
             .accessibilityAddTraits(.isButton)
@@ -300,7 +309,19 @@ extension MapSpineView {
     ///  状态在那里 —— 两侧通过 `DrawerHandle` 接上（它每帧重建一次，
     ///  所以 `height` 与 `open` 都是当拍的）。
     func drawerDrag(_ handle: DrawerHandle) -> some Gesture {
-        DragGesture(minimumDistance: 4)
+        //  ⚠️ 2026-09-27（用户第 2 条：「手动慢慢拉开还是不顺滑，还是有抽动频闪」）：
+        //  **坐标空间从 `.local` 改成 `.global`** —— 这是那阵抽动的根因。
+        //
+        //  这条手势挂在一个**自己会动的东西**上：拉手住在卡片的头上，卡片从**下往**
+        //  上长，所以手指把它拉高多少，拉手自己就往上走了多少。而 `.local` 是
+        //  「以这个视图自己的坐标系量」——尺子跟着被量的东西一起跑：
+        //  手指往上走 10pt、拉手也往上走 10pt，于是量出来的位移还是约 0，
+        //  卡片就不动了；下一帧位移又积累一点、卡片再动一点 —— 一停一动就是
+        //  用户说的「抽动」。拖得快时手带动量压住它（甩一下就开），慢拖时它最明显。
+        //
+        //  `.global`（屏幕/窗口那一层）不随任何子视图动：手指走多少就是多少。
+        //  ⚠️ 别再改回默认值 —— 默认就是 `.local`。
+        DragGesture(minimumDistance: 4, coordinateSpace: .global)
             .onChanged { v in
                 //  分母：正文的自然高度（`MapNowDrawer.measure` 量出来的）。
                 //  `max(80, …)` 是一道回退：第一帧还没量到时（高度 0），
