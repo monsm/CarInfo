@@ -29,7 +29,10 @@ BASELINE_CACHE = REPO / "scan" / "baseline_cache.json"
 # 「重复声明: 0 / 幽灵构造: 0」。**一个恒为 0 的绿灯不算绿灯**：它让「检查过」与
 # 「没检查」无法区分。将来真重新引入扩展 target，要同时把 WIDGET 这类别加回来 ——
 # `scan/paidcap.py` 会拦住「悄悄把扩展加回来」这种做法。
-APP = ["CarKeeper", "Design", "Services", "Models"]
+#  顶层的 `"Models"` 项随 `AppDataModel.swift` 一起删（2026-09-26 第三十一轮审核）：
+#  这份清单走 `target_files`，而它对不存在的目录是**立即失败**的 ——
+#  同一类“恒为 0 的绿灯”在那一段注释里已经写过一次（WIDGET）。
+APP = ["CarKeeper", "Design", "Services"]
 
 KEYWORDS = {
     "func", "var", "let", "case", "if", "else", "static", "in", "for", "while",

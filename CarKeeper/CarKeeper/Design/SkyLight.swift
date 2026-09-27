@@ -204,12 +204,9 @@ struct SkyLight {
         return names[idx] + " " + "\(Int(azimuth.rounded()))°"
     }
 
-    /// 天气的一句话（没有数据就是 nil —— 调用方据此决定显不显示）
-    func weatherNote(at now: Date) -> String? {
-        guard let w = weather else { return nil }
-        let wet = w.precipitation > 0.05 ? " · \(w.precipitationText)" : ""
-        return "\(w.codeText) \(w.cloudText) 云\(wet)"
-    }
+    //  `weatherNote(at:)`（天气的一句话）已删（2026-09-26 第三十一轮审核）：零个读者。
+    //  「光」表里的每一行都有自己的天气依据（云量、降水），而这一句是给一块
+    //  后来没做出来的牌子准备的 —— 它摆在这里会让人以为「光表上面还有一句天气」。
 
     /// 界面上的「光」表。**一行一行都是可复算的**，规则也写在值旁边。
     var facts: [SkyFact] { facts(at: Date()) }

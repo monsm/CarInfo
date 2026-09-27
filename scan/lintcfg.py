@@ -50,8 +50,10 @@ CONFIG = os.path.join(ROOT, "CarKeeper", ".swiftlint.yml")
 # SwiftLint 解析 included/excluded 的基准 = 配置文件所在目录
 CONFIG_DIR = os.path.dirname(CONFIG)
 SWIFT_ROOT = os.path.join("CarKeeper", "CarKeeper")
-# 顶层还有一棵 CarKeeper/Design · Services · Models（见 project.yml 的 sources）
-SWIFT_EXTRA_ROOTS = ["Design", "Services", "Models", "Tests"]
+# 顶层还有一棵 CarKeeper/Design · Services（见 project.yml 的 sources）。
+# （顶层的 `Models` 项在 2026-09-26 去掉了：`AppDataModel.swift` 整份删除之后那个
+#  目录不存在，而这份清单是给 glob 用的 —— 不存在的目录只会静默返回空。）
+SWIFT_EXTRA_ROOTS = ["Design", "Services", "Tests"]
 
 
 def swift_files():

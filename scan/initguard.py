@@ -57,10 +57,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _roots import assert_roots  # noqa: E402
 from extguard import mask, body_span  # noqa: E402
 
+#  顶层的 `CarKeeper/Models` 已删（2026-09-26，`AppDataModel.swift` 整份走掉）——
+#  本清单走 `assert_roots`，对不存在的目录立即失败。
+#  它与此文件 205 行那条“同名类型”的教训直接相关：那次误报的一半就是
+#  `Models/AppDataModel.swift` 里那个 `TripRecord`，而它现在已经不在了。
 ROOTS = [
     os.path.join("CarKeeper", "CarKeeper"),
     os.path.join("CarKeeper", "Services"),
-    os.path.join("CarKeeper", "Models"),
     os.path.join("CarKeeper", "Design"),
 ]
 

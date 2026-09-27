@@ -8,7 +8,7 @@ import UIKit
 //  ① 令牌按类分组：画布与表面 / 文字 / 语义色 / 几何 / 动效
 //     —— 每个色块都带 HEX，每种字体都用自己的字号渲染出来（不是写一句话描述它）
 //  ② 运行状态：加载耗时、指令数、能耗记录数、缓存条目、网络状态
-//     —— 还包括那批「启动了但从来没人看」的监控（内存 / 网络质量 / 离线 /
+//     —— 还包括那批「启动了但从来没人看」的监控（内存 / 网络质量 /
 //        性能 / 崩溃 / 充电状态 / 摇一摇 / 维保里程）。它们本来就跑着，
 //        只是输出没有任何界面在显示 —— 那就等于没有。
 //  ③ 操作：复制诊断信息 / 清除缓存（带确认）
@@ -23,8 +23,10 @@ struct DevView: View {
     // 内存每 10 秒刷新一次、网络质量也是周期性的 —— 不订阅就永远停在打开那一瞬的值。
     @ObservedObject private var memory = MemoryMonitor.shared
     @ObservedObject private var networkQuality = NetworkQualityMonitor.shared
-    @ObservedObject private var offline = OfflineModeManager.shared
     @ObservedObject private var chargeMonitor = ChargingStatusMonitor.shared
+    //  （这里原有 `@ObservedObject private var offline = OfflineModeManager.shared`：
+    //   那个类只是 `networkQuality.isReachable` 取反后的第二个名字，已整份删除 ——
+    //   见 `Services/NetworkEnhancements.swift` 的文件头。下面那一行读的就是它的原值。）
 
     var body: some View {
         //  正文只提供内容 —— 它住在「我的」那张叫「诊断」的卡里（`StackCard`），
@@ -50,6 +52,9 @@ struct DevView: View {
             kvGroup("关于", about)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        //  延迟只在这一页打开时测一次（原先是一个永远在跑的 30 秒定时器 ——
+        //  见 `NetworkQualityMonitor` 的文件头）：没人看着这一行的时候，它没有意义。
+        .task { networkQuality.measureLatency() }
         .confirmationDialog("清除全部车端缓存？", isPresented: $showClearConfirm, titleVisibility: .visible) {
             Button("清除缓存", role: .destructive) {
                 store.clearCache()
@@ -109,7 +114,7 @@ struct DevView: View {
             ("网络延迟", networkQuality.latency > 0
                 ? String(format: "%.0f ms", networkQuality.latency) + " · \(networkQuality.connectionType)"
                 : "未测出"),
-            ("离线模式", offline.isOffline ? "已开启" : "关闭"),
+            ("网络可达", networkQuality.isReachable ? "可达" : "不可达"),
             ("充电监控", chargeMonitor.summary),
             ("车端里程", mileage > 0 ? "\(mileage) km" : "未取到"),
             // 保养计划：这里要看得出「数字从哪来」—— 服务端字段（20000 / 20100）

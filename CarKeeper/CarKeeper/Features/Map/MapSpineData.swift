@@ -74,8 +74,11 @@ extension MapSpineLayer {
     /// 所以"从别处把地图开到某一层"有正式入口 —— 不需要每个页面再各写一份充电站列表。
     static let storageKey = "carkeeper_map_layer"
 
-    /// 把地图主屏切到这一层（只改意图，不负责跳转）
-    func makeCurrent() { UserDefaults.standard.set(rawValue, forKey: Self.storageKey) }
+    //  `makeCurrent()`（把地图切到这一层）已删（2026-09-26 第三十一轮审核）：
+    //  **零个调用点** —— 切层的那一处是地图自己的 `@AppStorage` 绑定
+    // （`MapSpineView.layerRaw`，图层胶囊点一下写它）。留着这个方法的代价很具体：
+    //  读到这里的人会以为「从别的页面把地图开到充电层」有一条现成的入口，
+    //  而那条路一直没接上。
 }
 
 // MARK: - 图上元素
@@ -213,8 +216,8 @@ struct MapSpineData {
     /// 有没有位置：没有位置时所有"地方类"内容都必须退场，不能画在(0,0)
     var hasLocation: Bool { carCoordinate != nil }
 
-    /// 最近一次上报到现在（用于"数据有多新"）
-    var updatedText: String { updated.isEmpty ? "--" : updated }
+    //  `updatedText`（"最近一次上报到现在"那一句）已删（2026-09-26 第三十一轮审核）：
+    //  零个读者 —— 画面上讲「数据有多新」的是 `updated` 自己那一行，不是它包一层。
 
     /// 剩余续航（**米**，地图画圈用）。
     ///

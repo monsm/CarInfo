@@ -78,17 +78,9 @@ class MileageTracker : ObservableObject {
         }
     }
 
-    func totalThisMonth() -> Double {
-        let now = Date()
-        let cal = Calendar.current
-        // 取不到月初就算「今天起」：宁可少算几天，也不让记账页闪退。
-        let startOfMonth = cal.date(from: cal.dateComponents([.year, .month], from: now)) ?? now
-        return entries.filter { $0.date >= startOfMonth }.map { $0.amount }.reduce(0, +)
-    }
-
-    func totalByType(_ type: TripCostType) -> Double {
-        entries.filter { $0.type == type }.map { $0.amount }.reduce(0, +)
-    }
+    //  `totalThisMonth()` 与 `totalByType(_:)` 已删（2026-09-26 第三十一轮审核）：
+    //  全仓零个读者 —— 里程账本那一屏只列明细，没有「本月合计」那一行。
+    //  留着它们的代价是下一个人会以为「已经有地方在算合计数了」（而屏幕上一个也没有）。
 
     /// 清空全部记录。按键上的「清空历史」此前是个**空闭包**（点了什么都不发生），
     /// 现在真的能清，且调用方必须先确认。

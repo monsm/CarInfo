@@ -1,7 +1,9 @@
 # HANDOFF —— 长安车管家（iOS 原生版）
 
 > 这份文档写给**下一个接手的人**（人或 agent）。目标：不读代码也能知道「现在有什么、东西在哪、
-> 为什么这么做、改的时候会踩什么」。所有数字与路径都是 2026-09-23 在 `main` 上核对过的实测值。
+> 为什么这么做、改的时候会踩什么」。所有数字与路径都是 **2026-09-26** 在 `main` 上核对过的实测值。
+> 每个数字都带着「它是哪一天量的」—— 一旦没写日期，就该当它是上一轮的快照（这份文档此前两次
+> 吃过亏：规模那一行与「启动期服务」那一行都停在写它们的那一天，而代码早就不在那一刻了）。
 >
 > 它不替代那几份专门文档（见 §12 文档地图），而是把它们串成一条可执行的路径。
 
@@ -14,7 +16,7 @@
 | 是什么 | 长安车联网官方 App 的 **iOS 原生重写**：车主查看车况、远程车控、充电、行程、保养 |
 | 后端 | **没有自己的后端**。App 直连长安官方接口（`m.iov.changan.com.cn` / `scrm.changan.com.cn`） |
 | 技术栈 | SwiftUI · iOS 26.0+ · `@Observable` · MapKit · Swift Charts · AppIntents · CryptoKit · LocalAuthentication |
-| 规模 | **79 个 Swift 文件 / 24,609 行**（`find CarKeeper -name '*.swift'`，2026-09-25 重新量；上一版那个数还是 09-23 的快照，此后每一轮都在加东西而它没动过） |
+| 规模 | **85 个 Swift 文件 / 26,881 行**（`find CarKeeper -name '*.swift'`，2026-09-26 重新量：其中 App target 84 个 / 26,504 行，`Tests/` 那 1 个 377 行。上一版那个 79 / 24,609 还是 09-25 的快照 —— 此后每一轮都在加东西而它没动过） |
 | 构建 | **XcodeGen**：`CarKeeper/project.yml` → `CarKeeper.xcodeproj`（`xcodeproj` 不入库） |
 | 交付 | GitHub Actions 出**未签名 ipa** → 侧载工具自签安装（7 天续期） |
 | 参考实现 | `ChangAnMiniProgram/`（微信小程序原版，本次重写的移植来源） |
@@ -1510,7 +1512,7 @@ v2.1 那道车底弧**删掉**（040 里没有它）。折进来时与探索稿*
 | 事实 | 出处 | 结论 |
 |---|---|---|
 | 地图页在车动起来时 **每 2 秒** 求值一次 | `RefreshLoop.Cadence.moving`（用户 2026-09-25 定的节律） | 每次求值里的任何浪费，× 0.5 Hz |
-| 六页同屏**是关着的**（`LaunchFence.sixPageDeck = false`） | `Services/LaunchFence.swift` | 树里只有当前那一档 → 只需优化「当前页」的路（**这一行的前提第十轮被推翻了**：用户要求正常启动 → 四个开关全开，见 §21.2） |
+| 六页同屏**当时是关着的**（`LaunchFence.sixPageDeck = false`） | `Services/LaunchFence.swift` | 树里只有当前那一档 → 只需优化「当前页」的路。⚠️ **这条前提第十轮就被推翻了**：用户要求「正常启动试一次」→ 四个开关全开（见 §21.2），所以此刻它是 `true`，热路径是六页 |
 | 手机定位：百米精度、取到就停 | `Services/PhoneLocation.swift` | 不是热路径，不动 |
 | 历史库上限 soc 2000 / power 1500 / tyre 760 | `Services/HistoryStore.swift` 的 cap | 全表扫描只有 3 个读者、都带窗口 → 不是热路径 |
 | 壁纸只在载入/刷新时解码一次 | `Services/WallpaperService.swift` | 不是热路径 |
@@ -2144,10 +2146,10 @@ Apple 自己的蓝点不偏，是因为它内部替我们换了；第三方 App 
 | 3 | `MapSpineData.build()` | 每次求值一次：`parkingHistory` 每条现造一个 `CLLocation`、`parkingLocation` 每次读要 unarchive UserDefaults、`clusterHotspots` O(n²)、一堆字符串 | 每次求值都算 | 按「输入的版本号」缓存一份；或把 `parkingLocation` 读出来放进 `AppStore` 的 `@Published`（它现在每次读都解档） |
 | 4 | `.realistic` 立体高程 | 3D 建筑，GPU | 本轮开 | 真机觉得卡就换回 `.standard`（一行） |
 | 5 | 玻璃 | 11 处真材质 + 3 个 `GlassEffectContainer`；列表里**逐张卡**一层 | 开 | 卡片多的页面（车辆 / 出行 / 我的）把列表卡从玻璃退回 `panel`（用户第 6 条「尽量少用多级玻璃」的下一步） |
-| 6 | `dsInkGlow` | 5 处（模式条那几行字在拖动时每帧位置都在变） | 本轮新增 | 它换来的是「瓦片上的字看得清」，先留着；若真机烫手，模式条那几处可以只留选中那一档 |
+| 6 | ~~`dsInkGlow`~~ | 5 处（模式条那几行字在拖动时每帧位置都在变） | 本轮新增 | **2026-09-26 整个机制已删**（用户：「完全删除文字发光和文字发光功能」）—— 这一行留着是为了说清它当时为什么被加进来，**它现在不在代码里** |
 | 7 | 行程卡 | 每张 = **一张真 `Map`** + 两面向时存在（背面 14 行）+ 一张路线请求 | 本轮改 | 懒加载已经把同屏张数压到 5–10；再往下要「正面用静态缩略图、点了才建 Map」 |
-| 8 | `RefreshLoop` | 2 s（车在动）/ 15 s（停着）/ 60 s 轻 + 300 s 重（其他档） | 开 | 已经在闸门里（`LaunchFence.mapFetches`）；2 s 那档可考虑「车在动**且**地图在前台」 |
-| 9 | 启动那一批服务 | 通知授权 / 里程与充电监测 / 保养与保险排程 / 内存与网络质量监控 / 后台超时隐藏 | 开 | 都在 `LaunchFence.launchServices` 后面，二分实验用得到 |
+| 8 | `RefreshLoop` | 2 s（车在动）/ **2→4→8→16→32→60 s**（停着，退避曲线）/ 60 s 轻 + 300 s 重（其他档） | 开 | 已经在闸门里（`LaunchFence.mapFetches`）；2 s 那档可考虑「车在动**且**地图在前台」。（这一格里原来写的是「15 s（停着）」—— 那是被封顶值取代掉的那个定值，见 §29） |
+| 9 | 启动那一批服务 | 通知授权 / 里程与充电监测 / 保养与保险排程 / 内存监控 / 后台超时隐藏（**网络质量与离线监听 2026-09-26 已挪出启动期**：改成「谁读谁建」，见 §39） | 开 | 都在 `LaunchFence.launchServices` 后面，二分实验用得到 |
 | 10 | 一趟 14 个子视图的 `VStack` | `TripsEventsView.tripBack` | `logic.py` 只在日志里提一句 | 本 SDK 不报错（沿用 §#7 那条证据）；只为可读性，不急 |
 
 清单里 **1 / 3 / 5 / 7** 是真金白银，**2 / 4 / 6** 是「观感换性能」的取舍，
@@ -3431,3 +3433,127 @@ Combine 发布者可以订阅**（这一点在 `AppStore` 自己的头注里就�
 **只有真机能验**：车开起来之后屏幕是不是真的不熄（这是本轮唯一的验收点），
 以及停车之后**会不会放开**（那是这条功能最容易做错的一半 —— 常亮写得对、
 放开写得错的话，用户看到的仍然是「屏幕永远不熄」）。
+
+## §39 第三十一轮（2026-09-26）：地毯式对抗审核 —— 只删不加
+
+用户：「再全项目 各维度 地毯式 对抗式 审核 找出违和 不和谐 不合理，修正」。
+这一轮不改外观、不加功能。三条判据贯穿全部改动：**同一件事两处说法 → 收回一处**、
+**只有写者没有读者 → 删**、**文档停在旧日期 → 补当天的事实**。
+（REDESIGN-STATUS 那一轮记的是同一批，两份文档互为索引。）
+
+### 39.1 最大的一处：「网络」在这棵树里有四个判据
+
+| # | 判据 | 怎么判 | 每小时请求 | 处置 |
+|---|---|---|---|---|
+| ① | `NWPathMonitor`（`NetworkQualityMonitor`） | 系统给的路径状态 | 0（事件驱动） | 留 |
+| ② | `AppStore.saveCache` | 本次真实取数一个源都没拿到 → `isOfflineMode` | 0（搭在本来就有的取数上） | 留 |
+| ③ | 外壳 `Timer.publish(every: 30)` + `getCars()` | ping 一次 → `networkStatus` | **120** | 删 |
+| ④ | `NetworkQualityMonitor` 的 30 秒延迟采样 | 向网关发一个 HTTP 请求 | **120** | 删定时器 |
+
+③ 与 ① 还会互相打脸：WiFi 连着、服务端在维护时，路径说「在线」而取数说「离线」。
+留下的那一个是 ② —— 它回答的才是用户真正在问的那句（「数据为什么没出来」）。
+
+- `AppStore.networkStatus` 从**存储属性**变成**算出来的**：全取到 = 在线，
+  取到一部分 = 弱网，一个都没取到 = 离线。这是全仓第一个**没有写者**的状态量
+  （它此前唯一的写者就是被删掉的那条定时器），两个读者（外壳那枚提示、诊断页一行）
+  一字未改。`updateNetworkStatus(_:)` 随之删掉。
+- ③ 删掉还有第二个理由：`RefreshLoop` 的文件头写着「全 App 唯一一处决定多久取一次数」，
+  而这条 30 秒定时器让那句话**不成立** —— 本轮把那句话重新变成真的。
+- ④ 改成**谁读谁调**（诊断页 `.task` 里测一次）。依据是用户自己定的规矩：
+  「api 压力大的可采取用户查看时再加载」—— 没人看着那一行的时候，那个数没有意义。
+- `OfflineModeManager` **整份删除**：它只做一件事 —— 把 `isReachable` 取反、改名叫
+  `isOffline`、再写回 `AppStore.isOfflineMode`（同一件事的第二个名字 + 第二个写者）。
+  它的读者（诊断页那一行「离线模式」）改成直接读 `networkQuality.isReachable`。
+- `AppStore.offlineMessage` 与 `OfflineModeManager.offlineMessage` 一并删：
+  **四个写者、零个读者**（`saveCache` 两处、`resetAll` 一处、那个已删的离线监听一处；
+  界面上从来没有显示过它）。
+
+净效果：**每小时少 240 次请求**（原来比地图页停着时的上限 60 次/小时还多），
+启动期少两件事（那两行原本在 `LaunchFence.launchServices` 里；现在 `shared` 懒建）。
+
+### 39.2 文档里停在旧日期的数字
+
+逐条列在 `REDESIGN-STATUS.md` 那一轮的 ② 里（表格）。一句话概括它们的共同形状：
+**同一句话说过两遍，而只有一处会跟着代码改** —— 例如「第一次取数在 2/15/60/300 秒之后」
+出现在两个文件的注释里，而 15 这个定值早被退避曲线取代了。
+本轮顺手给 §0 那一行补上了「哪天量的」，并在文档抬头写明：**没写日期的数字一律当旧快照看**。
+
+### 39.3 逐维度审过、当场就是干净的（写下来，省得下一轮再查）
+
+- **无障碍**：每个 `Button` 要么带文字标签（系统自己读得出来），要么带
+  `.accessibilityLabel`；自定义手势（抽屉拉手、模式条那一行）都接了 `.accessibilityAction`；
+  地图上两个自画的东西（充电站聚合点、手机蓝点）各有标签。
+- **失败路径**：全仓**没有一个空的 `catch {}`** —— 每一条都有下文（返回值、页面上的一行错误、
+  或一条说得出原因的 Toast）。`try?` 全在本机落盘那一侧（写不成不致命，也不该弹东西）。
+- **本机键**：`scan/localstore.py` 那张表已经是唯一真值且全绿，不需要再人工对账。
+- **每帧重建**：连续量（`drawerReveal`）只住在抽屉外壳里，右侧那一列走
+  `DrawerTopKey` + 2pt 量化；没找到第二处把连续量写进页面状态的地方。
+
+### 39.4 这一轮**没动**的（各有它自己的理由，不在这轮的判据里）
+
+1. **`DSExpandGroup` / `DSSection` 换 `DisclosureGroup`**：footer 在收起时也在，
+   不是精确等价 —— 等用户点头（上一轮就记着这一条）。
+2. **内容层读数从 `.clear` 改回 `regular`**：Apple 的 HIG 明说「文字多的组件用 regular」，
+   而这一屏的卡是读数 —— 但用户上一轮明确选了「更透」。要改是**用户的一个选择**，不是审核能定的。
+3. **`LaunchFence` / `StartupJournal` 这套启动仪器**：它自己写着「查完就把本文件与它的四个
+   使用点一起删掉」，而「查完了没有」只有那台设备答得出 —— 这是这一轮**留给用户的那一个决定**
+   （“现在还退吗”）。退了的话删起来是一次机械操作：两个文件 + `project.yml` 里没有的东西 + 
+   几处文档（`delguard.py` 会盯着「删了声明、使用还在」）。
+
+### 39.5 「声明在、没有读者」—— 清出来的 21 个成员 + 一整份文件
+
+`scan/orphans.py` 只管**顶层类型**与**系统类型扩展里的成员**，所以普通类型里
+「声明了但全仓零个读者」的成员一直靠人看。本轮用一次全仓词频扫出下面这些，逐条核过
+（每一条都是**声明 + 零个提及**，连注释与文档都不提）后删掉：
+
+| 位置 | 删掉的成员 | 为什么它在那儿（真假都写） |
+|---|---|---|
+| `AppStore` | `quickStatus()` + `struct CCQuickStatus` | 控制中心扩展的输出（那个扩展随免费账号清理删除），5 Tab 骨架一没就没人读了 |
+| `HistoryStore` | `tyreSeries` / `socCount` / `powerCount` / `tyreCount` / `firstSample` | 胎压曲线没人画（充电页只画 SOC 与功率），三个计数与「第一条样本」没人显示 |
+| `CostTracker`（里程账本） | `totalThisMonth()` / `totalByType(_:)` | 那一屏只列明细，没有「本月合计」那一行 |
+| `MapSpineLayer` | `makeCurrent()` | 切层的是地图自己的 `@AppStorage` 绑定（图层胶囊）—— 「从别处把地图开到充电层」那条路一直没接上 |
+| `MapSpineData` | `updatedText` | 画面上讲「数据有多新」的是 `updated` 自己，不是包一层 |
+| `SkyLight` | `weatherNote(at:)` | 给一块后来没做出来的牌子准备的（「光」表每一行自带天气依据） |
+| `Models/AppDataModel.swift` | 整份文件 | 它不是「一个死成员」—— 是一整套从来没接上的 SwiftData 模型，见 39.6 第 3 条 |
+| `CardFit.Verdict` | `crowded` | 调用点直接读 `screens` 自己 |
+| `InsuranceManager` | `expiringPolicies` / `expiredPolicies` / `totalPremium` | 到期提醒走 `InsuranceReminderScheduler`（另一条链），保单屏没有「即将到期」分组，也没有保费合计 |
+| `ServiceReminderManager` | `saveReminders` / `addReminder` / `completeService` / `serviceIntervalMonths` | 见 39.6 —— 这一条不是「多三行死码」，是一条**从头到尾没接上过的链** |
+| `AppStore` | `offlineMessage` | 四个写者、零个读者（见 39.1） |
+
+### 39.6 两处**不是死码，是接不上的链**（要拍板，不能自己定）
+
+这两处的共同形状：**代码写全了，但把它打开的入口不存在** —— 于是它对用户等于不存在，
+而它对读代码的人等于「已经有了」。删和接都是决定，不能由一次审核自己定：
+
+1. **生物识别车控（FaceID/TouchID）。** `ControlCommandFlow` 那三步门
+   （温度 → 生物识别 → 控车码）里的第二步永远进不去：它的条件是
+   `store.canUseBiometric() && store.hasBiometricSetup`，而 `hasBiometricSetup` 读的
+   `carkeeper_biometric_setup` **全仓没有任何写入点** —— 唯一的两个写者
+   （`enableBiometric()` / `disableBiometric()`）从加进来那一天起就没有调用点
+   （`git log -S enableBiometric` 只有那一个提交）。界面侧只剩隐私页一行
+   「生物识别：未启用」在如实地说这件事。两种收法：**接一个入口**
+   （「我的 → 隐私」一行开关，写入那一个键）或**整条删掉**（连同
+   `Services/BiometricLock.swift` 的浮层与 `.biometric` 那一档）。
+2. **`LaunchFence` / `StartupJournal`**（见 39.4 第 3 条）：它自己写着「查完就删」，
+   而「查完了没有」（现在还会不会载入不到 10 秒就退）只有那台设备答得出。
+3. **顶层 `Models/AppDataModel.swift`（已在这一轮删掉）—— 上一轮留下它的理由写错了。**
+   那个文件是一整套 SwiftData 仓储的残余：四个 Repository 早在删死代码那一批就走了，
+   而它自己被留下的理由是「`TripRecord` 保留，它是活的」。**活的 `TripRecord` 是
+   `AppStore` 里那个嵌套类型**（`AppStore.TripRecord`，行程页与地图读的都是它）；
+   外面这个 `@Model class TripRecord` 全仓**零引用**，也没有任何 `ModelContainer`，
+   唯一的作用是与那个活的类型**同名** —— 这份同名骗过 `initguard.py` 一次
+   （那次误报写在那条判据的文件头里）。删掉之后两处同名只剩一处。
+   跟着一起改的是四处“清单必须等于现实”的地方（不改它们当场红）：
+   `project.yml` 的 `- path: Models`、`scan/_roots.py` 的 `EXISTING_ROOTS`、`scan/scan.py`
+   与 `scan/targets.py` 的源码根、`scan/{copy,printguard,initguard,extguard,lexguard,
+   futureproof,shadowguard}.py` 各自的根目录清单；`enumguard.py` 读的是 `_roots`，跟着好。
+   顺带删掉 `project.yml` 里那条**重复声明** `- path: CarKeeper/Models`
+   （上面 `- path: CarKeeper/` 已经把整个主体递归收进了编译）。
+
+### 39.7 验证边界
+
+`scan/all.py` **34/34 全绿**。**只有 CI 能验**：`DevView` 那条 `.task { … }` 里调
+`measureLatency()` 的 actor 隔离（与原来 Timer 闭包同一种调用形状，但调用点是新的），
+以及 `networkStatus` 变成计算属性后那两个读者的类型推断。
+**只有真机能验**：断网/弱网时那条提示出现的时机（判据换了来源，从此跟着取数结果走：
+地图页 2 秒一次，其余档最长 60 秒一次）。

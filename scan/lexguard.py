@@ -44,7 +44,8 @@ from pathlib import Path
 from _roots import swift_files
 
 # 源码根目录，逐项必须存在（见 `_roots.py` 的说明）。
-TK = ["CarKeeper/CarKeeper", "CarKeeper/Services", "CarKeeper/Models",
+#  顶层 `CarKeeper/Models` 已删（2026-09-26）—— 本清单走 `swift_files`，对不存在的目录立即失败。
+TK = ["CarKeeper/CarKeeper", "CarKeeper/Services",
       "CarKeeper/Design", "CarKeeper/Tests"]
 
 

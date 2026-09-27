@@ -20,7 +20,9 @@ from _roots import swift_files
 # 原来这张表里还列着 `Shared` / `Widgets` / `WatchApp` / `HealthKit`，那四个目录
 # 都已随扩展与死代码删除，而 `rglob` 对不存在的目录只是返回空 ——
 # 于是「检查范围变小」表现得和「0 个问题」一模一样。
-TK = ["CarKeeper/CarKeeper", "CarKeeper/Services", "CarKeeper/Models",
+# （2026-09-26 顶层的 `CarKeeper/Models` 也走了同一条路：它唯一的文件
+#  `AppDataModel.swift` 已整份删除。）
+TK = ["CarKeeper/CarKeeper", "CarKeeper/Services",
       "CarKeeper/Design", "CarKeeper/Tests"]
 
 # 项目自己声明的类型名（从 Kansei/DS 等令牌与常见模型里来），用于区分「自有枚举」

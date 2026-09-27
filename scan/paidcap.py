@@ -60,7 +60,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCAN_DIRS = [
     "CarKeeper/CarKeeper",
     "CarKeeper/Services",
-    "CarKeeper/Models",
+    #  顶层 `CarKeeper/Models` 已删（2026-09-26，`AppDataModel.swift` 整份走掉）。
     "CarKeeper/Design",
 ]
 

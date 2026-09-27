@@ -215,8 +215,12 @@ final class AppStore: @unchecked Sendable {
     // 没有任何界面读它。一个没有人看的计数就是这一轮要清的东西。
 
     // #NEW-3 离线模式标记
+    //
+    //  ⚠️ 这里原有 `offlineMessage`（配套的一句人话），2026-09-26 第三十一轮审核删掉：
+    //  **四个写者、零个读者**（`saveCache` 的两处、`resetAll` 一处，外加
+    //  `NetworkEnhancements` 里那个已删的离线监听）。界面上从来没有人显示过它 ——
+    //  留着它只会让下一个人以为「离线时会有一句话，去找那句话说在哪」。
     var isOfflineMode: Bool = false
-    var offlineMessage: String = ""
 
     /// 跨面交接：出行面点「在图上看看」→ 地图把镜头移到这里（地图消费后清空）。
     /// 用结构体而不是元组：`.onChange(of:)` 需要 `Equatable`。
@@ -445,39 +449,34 @@ final class AppStore: @unchecked Sendable {
     // `unreadMessageCount` 已删：它**永远返回 0**，而且全仓零个读取点 ——
     // 未读数由消息那一节自己按本地已读状态算（`MessagesSection`）。
 
-    // #NEW-7 控制中心快速车况数据（供 ControlCenter 扩展使用）
-    struct CCQuickStatus {
-        var soc: Int = 0
-        var range: String = "--"
-        var locked: Bool = true
-        var cabinTemp: String = "--"
-        var charging: Bool = false
-        var online: String = "--"
-    }
-    func quickStatus() -> CCQuickStatus {
-        guard let charge = caches["charge"] as? [String: Any],
-              let soc = ciNumberInt(charge, ["RemainPower"]) else { return CCQuickStatus() }
-        let rangeStr = ciString(charge, ["RemainedPowerMile"]) ?? "--"
-        let ctrl = caches["control"] as? [String: Any]
-        // ⚠️ 官方报文里没有 DoorLocked / InteriorTemperature（小程序 0 处引用）：
-        // 锁止状态是 DriverDoorLock（0 = 已锁），车内温度在 pm25 报文的 VehicleTemperature 里。
-        // 原来读不存在的键 → 恒显示「已锁」+ 温度 "--"。
-        let locked = ciNumber(ctrl, ["DriverDoorLock"]).map { $0 == 0 } ?? true
-        let temp = VM.n0(ciPick(caches["pm25"] as? [String: Any], ["VehicleTemperature"])) ?? "--"
-        let charging = isCharging
-        return CCQuickStatus(soc: soc, range: rangeStr, locked: locked, cabinTemp: "\(temp)℃", charging: charging, online: "在线")
-    }
+    //  这里原有 `#NEW-7 控制中心快速车况数据` 那一对：`struct CCQuickStatus`（车况四项
+    //  归一成一份快照）与返回它的 `quickStatus()`。2026-09-26 第三十一轮审核删掉：
+    //  **零个调用点**，连文档都不提它 —— 那块牌子随 5 Tab 骨架一起没了
+    // （那时它是「控制中心扩展」的输出，而那个扩展与其他扩展一起随免费账号清理删除）。
+    //  它旁边 `isCharging` / `carHeadingDeg` 这些各自有真读者，所以只删它这一份。
 
     // #4 网络状态追踪
-    var networkStatus: NetworkStatus = .online
+    //
+    //  ⚠️ 2026-09-26（第三十一轮地毯式审核）：它从**存储属性**变成了**算出来的**。
+    //  此前它的唯一写者是外壳里那个每 30 秒 `getCars()` 一次的定时器（已删）——
+    //  于是「网络状态」成了这一仓的**第三个**网络判据（网络路径 / 取数结果 / 这个 ping），
+    //  而三个里只有它要专门发一趟请求才能回答。
+    //  现在它没有写者：答案由两件**已经存在的事实**推出来（都在 `saveCache` 里写）——
+    //    · `isOfflineMode`：本次一个数据源都没取到
+    //    · `lastMissedSources`：本次没取到的那几项
+    //  一句话读数：全取到 = 在线，取到一部分 = 弱网，一个都没取到 = 离线 ——
+    //  与用户看到的东西（数据出没出来）是同一件事，而不是另一条独立的时间线。
+    var networkStatus: NetworkStatus {
+        if isOfflineMode { return .offline }
+        return lastMissedSources.isEmpty ? .online : .weak
+    }
     enum NetworkStatus: String {
         case online = "在线"
         case weak = "弱网"
         case offline = "离线"
     }
-    func updateNetworkStatus(_ status: NetworkStatus) {
-        networkStatus = status
-    }
+    //  `updateNetworkStatus(_:)` 随那条定时器一起删：一个只被一个调用点调用的 setter，
+    //  而那个调用点已经不在了。
 
     // 【已删】#7 夜间模式自动切换的四个静态量（`nightModeStartHour` / `nightModeEndHour` /
     // `forceDarkMode` / `forceLightMode`，2026-09-25 地毯式审核）。
@@ -633,18 +632,20 @@ final class AppStore: @unchecked Sendable {
     /// 正在飞的那一趟 `bootstrap()`（合并并发调用用，见下）。
     private var bootstrapTask: Task<Void, Never>? = nil
 
-    // #28 Dynamic Island / Live Activity 状态
+    /// 车此刻在不在充电（`ChrgStatus` 1/2）。
+    ///
+    /// ⚠️ 这一行原本标着「#28 Dynamic Island / Live Activity 状态」—— 那一整套
+    ///（小组件 / 灵动岛 / 共享快照）已随免费账号清理整份删除，而标题没跟着变。
+    /// 现在读它的是充电页与地图那一屏的读数。
     var isCharging: Bool {
         guard let charge = caches["charge"] as? [String: Any] else { return false }
         // ciString 同时兼容字符串 "1" 与数字 1 两种返回，避免服务端改类型后状态恒为 false
         let status = ciString(charge, ["ChrgStatus"]) ?? ""
         return status == "1" || status == "2"
     }
-    var chargingProgress: Double {
-        guard let charge = caches["charge"] as? [String: Any] else { return 0 }
-        let soc = ciNumber(charge, ["RemainPower"]) ?? 0
-        return min(1.0, max(0.0, soc / 100.0))
-    }
+    //  这里原有 `chargingProgress`（`RemainPower` 归一化到 0…1，为实时活动那条进度条
+    //  准备的）。2026-09-26 第三十一轮审核删掉：**全仓零个读者**（连文档都不提它）——
+    //  进度条随实时活动一起不存在了，而它比 `pendingQuickCtrl` 多活了整整一轮。
 
     /// 启动取数（车辆列表 + 用户）。**同时飞的那几趟合并成一趟**。
     ///
@@ -793,10 +794,8 @@ final class AppStore: @unchecked Sendable {
         let anySuccess = patch.values.contains { $0 != nil }
         if anySuccess {
             isOfflineMode = false
-            offlineMessage = ""
         } else if !patch.isEmpty && isLoggedIn {
             isOfflineMode = true
-            offlineMessage = "网络异常"
         }
         // 「车的位置变了」必须真有人喊出来。
         //
@@ -959,7 +958,6 @@ final class AppStore: @unchecked Sendable {
         // 趋势曲线同样是这个账号的车端数据：不清理会留给下一个登录的账号
         HistoryStore.shared.clear()
         isOfflineMode = false
-        offlineMessage = ""
         parkingLocation = nil
         lastParkingTime = nil
         UserDefaults.standard.removeObject(forKey: Self.lastServiceMileageKey)

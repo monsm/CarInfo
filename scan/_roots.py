@@ -31,15 +31,17 @@ from pathlib import Path
 # 这份清单由 `scan/lintcfg.py` 与 `project.yml` 的 sources 对齐：
 #   CarKeeper/CarKeeper  —— App 主体（Features / Design / Services / Models）
 #   CarKeeper/Services   —— 顶层 Services（保险、夜间、提醒等）
-#   CarKeeper/Models     —— 顶层 Models（AppDataModel）
 #   CarKeeper/Design     —— 顶层 Design（Charts）
+#
+# （顶层 `CarKeeper/Models` 已从这份清单里去掉：它唯一的文件 `AppDataModel.swift`
+#   在 2026-09-26 第三十一轮审核里整份删除，目录也不存在了。注释不删掉下面那一行的
+#   话，这份“确实存在”的清单就在说谎 —— 而它正是被用来说“范围没被悄悄掉空”的。）
 #   CarKeeper/Tests      —— 纯函数测试
 #
 # ⚠️ 删掉一个目录时，这里也要改 —— 否则 CI 会拦下你（这是故意的）。
 EXISTING_ROOTS = [
     "CarKeeper/CarKeeper",
     "CarKeeper/Services",
-    "CarKeeper/Models",
     "CarKeeper/Design",
     "CarKeeper/Tests",
 ]

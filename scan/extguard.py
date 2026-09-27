@@ -56,7 +56,7 @@ APP = os.path.join("CarKeeper", "CarKeeper")
 SCOPE_DIRS = [
     APP,
     os.path.join("CarKeeper", "Services"),
-    os.path.join("CarKeeper", "Models"),
+    #  顶层 `CarKeeper/Models` 已删（2026-09-26）—— 本清单走 `assert_roots`。
     os.path.join("CarKeeper", "Design"),
 ]
 

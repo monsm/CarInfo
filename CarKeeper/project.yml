@@ -17,8 +17,24 @@ targets:
     - path: CarKeeper/
     - path: Design
     - path: Services
-    - path: Models
-    - path: CarKeeper/Models
+    # ⚠️ 这里原有两行：`- path: Models`（顶层的那个 Models/）与
+    # `- path: CarKeeper/Models`（App 主体里的那个）。2026-09-26 第三十一轮审核：
+    #   · `- path: CarKeeper/Models` 删掉 —— 它**是重复声明**：上面 `- path: CarKeeper/`
+    #     已经把整个 `CarKeeper/CarKeeper/` 递归收进了编译，而 `CarKeeper/CarKeeper/Models/`
+    #     就在它里面（Model 层那三个文件一行都没少编）。同一个决定写两遍，读的人
+    #     会以为 `Models` 与 `CarKeeper/Models` 是两套东西。
+    #   · `- path: Models` 删掉，因为那个目录的唯一文件
+    #     `Models/AppDataModel.swift` 已整份删除（见下面那段）。
+    #     空目录不许留在声明里：XcodeGen 会以「missing source directory」直接失败，
+    #     而 git 不跟踪空目录 —— 本地一切正常，只有干净检出会挂（与 HealthKit 那次同形）。
+    # ⚠️ 这里曾声明 `- path: Models`（顶层那个）。它唯一的文件 `Models/AppDataModel.swift`
+    # 是一整套 SwiftData 仓储的残余：四个 Repository 早在删死代码那一批就走了，
+    # 而它自己留了下来，理由是当时记的「`TripRecord` 保留，它是活的」—— **那句话是错的**。
+    # 活的 `TripRecord` 是 `AppStore` 里那个**嵌套**类型（`AppStore.TripRecord`），
+    # 外面这个 `@Model class TripRecord` 全仓零引用、也没有任何 `ModelContainer`，
+    # 它唯一的作用是与那个活的类型**同名**（`scan/initguard.py` 就被这对同名骗过一次，
+    # 那次误报写在那条判据的文件头里）。现在两处同名只剩一处。
+    #
     # ⚠️ 这里曾声明 `- path: HealthKit`。那个目录的唯一文件 HealthKitManager.swift
     # 在「删死代码」那一批里被删掉了，而 git 不跟踪空目录 —— 于是它在干净检出里
     # 不存在，XcodeGen 直接以「missing source directory」失败：整轮 CI 连编译都没开始。

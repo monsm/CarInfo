@@ -139,21 +139,16 @@ final class HistoryStore {
 
     func socSeries(hours: Double) -> [Point] { filter(soc, hours: hours) }
     func powerSeries(hours: Double) -> [Point] { filter(power, hours: hours) }
-    func tyreSeries(hours: Double) -> [TyrePoint] {
-        guard let cut = Calendar.current.date(byAdding: .second, value: Int(-hours * 3600), to: Date()) else { return tyre }
-        return tyre.filter { $0.t >= cut }
-    }
+    //  `tyreSeries(hours:)`、`socCount` / `powerCount` / `tyreCount`、`firstSample`
+    //  五个成员已删（2026-09-26 第三十一轮审核）：三者都是**全仓零个读者**的查询口。
+    //  胎压那条曲线没人画（充电页只画 SOC 与功率两条），三个计数与
+    //  「第一条样本是什么时候」也没人显示 —— 而它们摆在这里，下一个人会以为
+    //  「已经有地方在看采样量了」。要用的时候再加，加的时候会有读者。
 
     private func filter(_ points: [Point], hours: Double) -> [Point] {
         guard let cut = Calendar.current.date(byAdding: .second, value: Int(-hours * 3600), to: Date()) else { return points }
         return points.filter { $0.t >= cut }
     }
-
-    var socCount: Int { soc.count }
-    var powerCount: Int { power.count }
-    var tyreCount: Int { tyre.count }
-
-    var firstSample: Date? { [soc.first?.t, power.first?.t, tyre.first?.t].compactMap { $0 }.min() }
 
     // MARK: - 清理（退出登录用：这些同样绑定账号）
 

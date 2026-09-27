@@ -40,9 +40,11 @@ from _roots import assert_roots
 APP = os.path.join("CarKeeper", "CarKeeper")
 SERVICES = os.path.join("CarKeeper", "Services")
 DESIGN = os.path.join("CarKeeper", "Design")
-MODELS = os.path.join("CarKeeper", "Models")
+#  顶层的 `CarKeeper/Models` 项随 `AppDataModel.swift` 一起删（2026-09-26）：
+#  这个清单走 `assert_roots`，而它对不存在的目录是**立即失败** ——
+#  删目录时忘了改这里，这条门禁当场红（那是故意的）。
 
-SCAN_DIRS = [APP, SERVICES, DESIGN, MODELS]
+SCAN_DIRS = [APP, SERVICES, DESIGN]
 
 # 以文件为键：这里的标准输出是它自己要的东西（排障页的调试输出）。
 # ⚠️ 理由 2026-09-25 第九轮改过一次：那一页不再是「设计令牌页」（色板与字体样张已删），

@@ -63,7 +63,7 @@
 | `DeveloperTools.swift`（148，7 个类型） | **删除**：与 `DevView` 重复，且零引用 |
 | `PlatformFeatures.swift`（171，7 个类型） | **删除**：锁屏/手表/Mac 三个壳子零引用；iPad 分栏入口改挂在地图主屏工具栏（常规宽度才出现） |
 | `SOCDetailSheet` / `CarSwitchGesture` / `InspectorCard` 等 12 个零引用组件 | **删除**（`DSStatTile`、`FluidTempHero`、`EnhancedToastView`、`CarSel`、`MapKitConfigurator`、`InspectionCard`、`InsuranceCard`、`ServiceReminderRow`、`FocusModeHomeView`、`FocusModeSettingsView`） |
-| `AppDataModel` 里 8 个类型（4 个 Repository + 4 个 Model） | **删除**：整套 SwiftData 仓储从未被调用（`TripRecord` 保留，它是活的） |
+| `AppDataModel` 里 8 个类型（4 个 Repository + 4 个 Model） | **删除**：整套 SwiftData 仓储从未被调用（`TripRecord` 保留，它是活的）—— ⚠️ **2026-09-26 更正：这句「保留」的后半句是错的**。活的是 `AppStore` 里那个**嵌套**的 `TripRecord`；外面这个 `@Model` 版零引用、也没有任何 `ModelContainer`，它已随第三十一轮审核整份删除（目录与 `project.yml` 的 `- path: Models` 一并清掉）。 |
 | `L10n` + `I18n`（两套本地化，158 行） | **删除**：无人调用，且 `en.lproj`/`zh-hans.lproj` 一个 `.strings` 都没有 |
 
 ## 4. 数据诚实规则（这一版真正的地基）
@@ -3736,7 +3736,7 @@ v2.1 那道车底弧**删掉**（040 里没有它）。折进来时与探索稿*
 | 事实 | 出处 | 结论 |
 |---|---|---|
 | 地图页在车动起来时 **每 2 秒**求值一次 | `RefreshLoop.Cadence.moving` | 每次求值里的浪费 × 0.5 Hz |
-| 六页同屏**是关着的** | `LaunchFence.sixPageDeck = false` | 树里只有当前档 → 只优化当前页 |
+| 六页同屏**当时是关着的** | `LaunchFence.sixPageDeck = false` | 树里只有当前档 → 只优化当前页。（⚠️ 第十轮四个开关就全开了 —— 见后面那一轮；这一行是当时的前提，不是现状） |
 | 手机定位百米精度、取到就停 | `PhoneLocation` | 非热路径 |
 | 历史库上限 soc 2000 / power 1500 / tyre 760 | `HistoryStore` 的 cap | 只有 3 个读者、都带窗口 → 非热路径 |
 | 壁纸只在载入/刷新时解码 | `WallpaperService` | 非热路径 |
@@ -4498,3 +4498,107 @@ actor 归属。只有真机能验：胶囊的质感、行程是否整条居中�
 的 `@autoclosure` 与 `@Sendable`）能不能接住 `weak self` + `Task { @MainActor }`。
 只有真机能验：车开起来屏幕是不是真的不熄，**以及停车之后会不会放开**
 （后者是这条功能最容易做错的一半）。细节见 `HANDOFF.md` §38。
+
+## 2026-09-26 第三十一轮：地毯式对抗审核（各维度，只删不加）
+
+用户：「再全项目 各维度 地毯式 对抗式 审核 找出违和 不和谐 不合理，修正」。
+这一轮**不改外观、不加功能**：只找「同一件事有两处说法 / 有人在写没有人在读 / 文档停在
+旧日期」这三类，并把每一处收回到一个出处。逐条如下。
+
+### ① 三个「网络」判据挤在同一屏上（本轮最大的一处）
+
+「网络好不好」在这棵树里原本有**四条**判据，其中两条每小时各发 120 次请求：
+
+| # | 判据 | 怎么判 | 后来 |
+|---|---|---|---|
+| ① | `NWPathMonitor`（`NetworkQualityMonitor`） | 系统给的路径状态 | 留（事件驱动、不花流量），但它的 `OfflineModeManager` 那层包装删掉 |
+| ② | `AppStore.saveCache` | 本次**真实取数**一个源都没拿到 → `isOfflineMode` | 留 —— 它回答的才是用户的问题（数据为什么没出来） |
+| ③ | 外壳里 `Timer.publish(every: 30)` + `getCars()` | ping 一次 → `networkStatus` | **删**（每小时 120 次，比地图页停着时的上限还多） |
+| ④ | `NetworkQualityMonitor` 的 30 秒延迟采样 | 向网关发一个 HTTP 请求 | **删定时器**，改成诊断页打开时测一次 |
+
+③ 与 ① 还会**打架**：WiFi 连着而服务端在维护时，路径说「在线」、取数说「离线」，
+屏幕上那条提示就在两者之间闪。修完只剩 ② 在判断，而 `networkStatus` 从存储属性
+变成**算出来的**（全取到 = 在线 / 取到一部分 = 弱网 / 一个都没取到 = 离线）——
+这是这一仓第一个「没有写者」的状态量：答案直接由两件已经在手边的事实推出来。
+
+`OfflineModeManager` 整份删除（它做的只有一件事：把 `isReachable` 取反、改个名字、
+再写回 `AppStore.isOfflineMode` —— 同一件事的第二个名字 + 第二个写者）。
+`AppStore.offlineMessage` 与它的 `offlineMessage` 一并删：**四个写者、零个读者**。
+
+④ 那条改成「谁读谁调」，依据是用户自己定的规矩：**「api 压力大的可采取用户查看时再加载」**
+—— 诊断页那一行没人看着的时候，那个数没有意义。
+
+净效果：每小时少 240 次请求；启动期少两件事（那两行原本在 `LaunchFence.launchServices` 里，
+现在改用 `shared` 的懒建）。
+
+### ② 文档里停在旧日期的数字（逐条改掉）
+
+| 哪一处 | 原来写的 | 事实 |
+|---|---|---|
+| `HANDOFF.md` §0 规模 | 79 个 Swift / 24,609 行（09-25 量的） | **85 / 26,881**（App target 84 / 26,504，`Tests/` 1 / 377） |
+| `HANDOFF.md` §18.1 | 「六页同屏**是关着的**」 | 第十轮就全开了；这一行是写它那天的前提 |
+| `HANDOFF.md` §24.3 第 6 行 | `dsInkGlow` 5 处「先留着」 | 那个机制**已整个删除**（用户：「完全删除文字发光」） |
+| `HANDOFF.md` §24.3 第 8 行 | `RefreshLoop` 停着 15 s | 退避曲线 2→4→8→16→32→60 s |
+| `HANDOFF.md` §24.3 第 9 行 | 启动服务含「网络质量监控」 | 已挪出启动期（本轮 ① ） |
+| `RefreshLoop` 文件头 | 第一次取数在 2/**15**/60/300 秒之后 | 2 秒（地图页）/ 60 秒（其他档）—— 15 是已经不存在的那个定值 |
+| `CarKeeperApp` `.task` | 「其余档 5 分钟」 | 60 s（轻）+ 300 s（重）—— 5 分钟只管重的那两路 |
+| `MapQuickButtons` 抬头 | 「两枚快速钮」 | 第九轮起就是三枚（罗盘 / 回到车 / 手机） |
+
+### ③ 逐维度审过、但当场就是干净的几处（写下来，省得下一轮再查一遍）
+
+· **无障碍**：每个 `Button` 要么带文字标签（系统自己读得出来），要么带
+  `.accessibilityLabel`；自定义手势（抽屉拉手、模式条那一行）都接了 `.accessibilityAction`；
+  地图上那两个自画的东西（聚合点、蓝点）也各自有标签。
+· **失败路径**：全仓**没有一个空的 `catch {}`** —— 每一条都有下文（返回值、页面上的错误行、
+  或一条说得出原因的 Toast）。`try?` 的地方全是本机落盘（写不成不致命，也不该弹东西）。
+· **本机键**：`scan/localstore.py` 那张表已经是唯一真值且全绿，不需要再人工对一遍。
+· **每帧重建**：连续量（`drawerReveal`）只住在抽屉外壳里，右侧那一列走 `DrawerTopKey` +
+  2pt 量化 —— 本轮没再找到第二处把连续量写进页面状态的地方。
+· 其余那些维度（三元表达式 `?:`、深层嵌套、定时器返回值、SDK 新名字白名单）
+  本来就有门禁盯着，全绿。
+
+### ④ 「声明在、没有读者」清出来的 21 个成员 + 一整份文件
+
+`scan/orphans.py` 只管**顶层类型**与**系统类型扩展里的成员**，普通类型里
+「声明了但全仓零个读者」的成员一直靠人看。本轮用一次全仓词频扫出它们，逐条核过
+（每一条都是**声明 + 零个提及**，连注释与文档都不提）后删掉：`AppStore.quickStatus()`
+与 `struct CCQuickStatus`（控制中心扩展的输出，那个扩展早随免费账号清理删除）、
+`HistoryStore` 的 `tyreSeries` / `socCount` / `powerCount` / `tyreCount` / `firstSample`、
+里程账本的 `totalThisMonth()` / `totalByType(_:)`、`MapSpineLayer.makeCurrent()`、
+`MapSpineData.updatedText`、`SkyLight.weatherNote(at:)`、`TripRecord.socChange`、
+`CardFit.Verdict.crowded`、`InsuranceManager` 的 `expiringPolicies` / `expiredPolicies` /
+`totalPremium`、`ServiceReminderManager` 的 `saveReminders` / `addReminder` /
+`completeService` / `serviceIntervalMonths`、`AppStore.offlineMessage`（两处）。
+
+其中一条不是「多三行死码」：`ServiceReminderManager` 那三个写入器一删，
+`carkeeper_service_reminders` 这个键就**从来没有被写过**（`reminders` 读到的永远是出厂周期表）；
+反过来说清：**「这保养做完了」在全 App 没有入口**。
+
+文件级的那一条更大：顶层 `Models/AppDataModel.swift` 整份删除。它是一整套 SwiftData 仓储的残余，
+上一轮留下的理由是「`TripRecord` 保留，它是活的」—— **那句的后半句是错的**：
+活的是 `AppStore` 里的**嵌套** `TripRecord`，外面这个 `@Model` 版零引用、无 `ModelContainer`，
+唯一的作用是与那个活的类型**同名**（`initguard.py` 曾被这对同名骗过一次）。
+它一走，四处「清单必须等于现实」的门禁也跟着改（`project.yml` 的 `- path: Models`、
+`_roots.py`、`scan.py` / `targets.py` 的源码根、以及七八个脚本各自的根目录清单）——
+不改当场红，那是故意的。
+
+### ⑤ 还有两处**不是死码、是接不上的链**（要拍板，没自己动）
+
+1. **生物识别车控**：`ControlCommandFlow` 第二步的条件是
+   `store.canUseBiometric() && store.hasBiometricSetup`，而 `hasBiometricSetup` 读的
+   `carkeeper_biometric_setup` **全仓没有写入点**（唯一的两个写者 `enableBiometric()` /
+   `disableBiometric()` 从加进来那天起就零调用点，`git log -S enableBiometric` 只有一个提交）。
+   于是那道门永远进不去，隐私页只剩一行「生物识别：未启用」在如实地说这件事。
+   两种收法：接一个入口（「我的 → 隐私」一行开关）或整条删掉（连 `BiometricLockOverlay`）。
+2. **`LaunchFence` / `StartupJournal`**：它自己写着「查完就删」，而「现在还会不会
+   载入不到 10 秒就退」只有那台设备答得出。
+
+### ⑥ 这一轮的验证边界
+
+`scan/all.py` **34/34 全绿**。**只有 CI 能验**：`DevView.task { … }` 里调
+`measureLatency()` 会不会有 actor 隔离问题（它是非隔离方法，与原来那个 Timer 闭包同一个调用形状）；
+`networkStatus` 变成计算属性之后那两个读者（`NetworkStatusIndicator` / `DevView`）的推断。
+**只有真机能验**：断网/弱网时那条提示是不是还在该出现的时候出现（判据换了来源，
+它从此跟着**取数结果**走：非地图档最长 60 秒一次，地图页 2 秒一次）。
+**改不到的一类**（本轮明确不动）：`DSExpandGroup` / `DSSection` 能不能换 `DisclosureGroup`
+（footer 收起时也在，不是精确等价），以及内容层读数要不要从 `.clear` 改回官方推荐的 `regular`。

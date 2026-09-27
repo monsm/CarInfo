@@ -240,8 +240,8 @@ enum CardFit {
             return Double(height / limit)
         }
 
-        /// 是否超过一屏（超过就是「挤」）
-        var crowded: Bool { isKnown && screens > 1 }
+        //  `crowded`（是否超过一屏）已删（2026-09-26 第三十一轮审核）：零个读者 ——
+        //  调用点读的是 `screens` 自己（与判据面上那个数同一个）。
     }
 
     static func verdict(_ rows: [Row], width: CGFloat,

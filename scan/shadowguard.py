@@ -19,7 +19,9 @@ STRICT = "--strict" in sys.argv
 ARGV = [a for a in sys.argv[1:] if not a.startswith("--")]
 
 # 源码根目录，逐项必须存在（见 `_roots.py` 的说明）。
-TK = ["CarKeeper/CarKeeper", "CarKeeper/Services", "CarKeeper/Models",
+# （顶层的 `CarKeeper/Models` 于 2026-09-26 随 `AppDataModel.swift` 一起删 ——
+#  本清单走 `swift_files`，对不存在的目录是立即失败。）
+TK = ["CarKeeper/CarKeeper", "CarKeeper/Services",
       "CarKeeper/Design", "CarKeeper/Tests"]
 
 # 已核实的「现存」SDK / 标准库类型名 —— 嵌套同名 = 真遮蔽（默认即报错）。

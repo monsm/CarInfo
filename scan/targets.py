@@ -17,7 +17,9 @@ from scan import (read, target_files, DECL, EXT, TYPE_REF, CALL_REF, MEMBER_REF,
 
 # target -> project.yml 里的 sources
 TARGETS = {
-    "CarKeeper": ["CarKeeper", "Design", "Services", "Models"],
+    #  顶层的 `Models` 于 2026-09-26 随 `AppDataModel.swift` 一起删（project.yml 里那条
+    #  `- path: Models` 也删了）—— 两边必须同时改，否则这里报「声明的源码路径不存在」。
+    "CarKeeper": ["CarKeeper", "Design", "Services"],
     # CarPlay / AppClip / WidgetBundle / WatchApp / WatchKitApp 四个 target 与
     # HealthKit 目录都已删（免费账号无法配置所需能力，或代码早已不存在）——
     # 这里不保留“幽灵 target”，否则门禁会去追一批不存在的目录。

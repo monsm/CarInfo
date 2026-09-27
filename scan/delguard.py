@@ -142,7 +142,8 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCOPE_DIRS = [
     "CarKeeper/CarKeeper",
     "CarKeeper/Services",
-    "CarKeeper/Models",
+    #  顶层 `CarKeeper/Models` 已删（2026-09-26）。它下面的 `os.walk` 对不存在的目录
+    #  不报错 —— 那就是这份清单最容易变成“恒为 0 的绿灯”的地方。
     "CarKeeper/Design",
 ]
 

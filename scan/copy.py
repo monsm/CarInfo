@@ -40,13 +40,14 @@ from _roots import assert_roots
 APP = os.path.join("CarKeeper", "CarKeeper")
 SERVICES = os.path.join("CarKeeper", "Services")
 DESIGN = os.path.join("CarKeeper", "Design")
-MODELS = os.path.join("CarKeeper", "Models")
+#  `MODELS = CarKeeper/Models`（顶层那个）随 `AppDataModel.swift` 一起删掉了
+#（2026-09-26 第三十一轮审核）。主体里的 `CarKeeper/CarKeeper/Models/` 仍在 `APP` 之下。
 
 # 这份清单曾包含 SHARED / WIDGETS / WATCH 三项 —— 那三个目录随小组件体系一起删了，
 # 而它们在这里**不会报错**：不存在的目录只是被安静跳过。
 # 于是「检查范围缩小」与「这一片没有界面文案」在输出上完全一样。
 # `_roots.swift_files` 现在把这种沉默变成立即失败。
-SCAN_DIRS = [APP, SERVICES, DESIGN, MODELS]
+SCAN_DIRS = [APP, SERVICES, DESIGN]
 
 # 排障页：它的正文里「缓存」是**用户要做的动作**（那一页有「清除缓存」与它的确认句），
 # 不是我们内部实现的名词 —— 不能按「开发词」判。⚠️ 这一条的理由在 2026-09-25 第九轮

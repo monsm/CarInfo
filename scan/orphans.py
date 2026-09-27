@@ -50,7 +50,9 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCOPE_DIRS = [
     "CarKeeper/CarKeeper",
     "CarKeeper/Services",
-    "CarKeeper/Models",
+    #  `CarKeeper/Models`（顶层）随 `AppDataModel.swift` 于 2026-09-26 删除，
+    #  所以从这里去掉；下面的 `Shared` / `HealthKit` 是同一种历史（已删的目录，
+    #  靠 `isdir` 守卫静默跳过），留着它们不是本轮要处理的事。
     "CarKeeper/Design",
     "CarKeeper/Shared",
     "CarKeeper/HealthKit",

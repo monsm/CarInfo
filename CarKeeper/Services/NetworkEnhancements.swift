@@ -1,5 +1,5 @@
 // =============================================================================
-// N37 网络质量实时监控
+// N37 网络质量监控 —— **系统的那一台**（NWPathMonitor）
 // =============================================================================
 //
 //  这里原本还有一段「N36 指数退避重试」：`RetryConfig` + `URLSession.dataTaskRetryable`。
@@ -9,24 +9,43 @@
 //  读的人以为网络层有两套策略 —— 两套实现里先看到的那一套看起来就是真的。
 //  发现它的是 `scan/orphans.py` 判据 ②（系统类型扩展里没人读的成员）：
 //  那条判据是这一轮加的，加完当场报到它。
+//
+//  2026-09-26（第三十一轮地毯式审核）又删掉两件，判据是同一个：
+//  **「App 的网络好不好」这件事全仓有四个判据，而其中两个是多余的、且会互相打脸。**
+//
+//    · `OfflineModeManager` 整份删除。它做的事只有一件：把
+//      `NetworkQualityMonitor.isReachable` 取反、改名叫 `isOffline`、再写回
+//      `AppStore.isOfflineMode` —— 于是同一个布尔有两个写者，一个看网络路径
+//      （NWPathMonitor），一个看**真实取数有没有拿到东西**（`AppStore.saveCache`：
+//      本次一个源都没取到才算离线）。两个写者就有两个答案：WiFi 连着、服务端在维护时，
+//      路径说「在线」而取数说「离线」，屏幕上那条提示就在两者之间闪。
+//      留下的那一个是取数那个 —— 它回答的才是用户真正在问的问题
+//      （「数据为什么没出来」）；路径那一份仍然读得到，但它只是**诊断页的一行读数**，
+//      不再参与判断。它的 `offlineMessage` 一并删除：一个写者、**零个读者**
+//      （`AppStore.offlineMessage` 同样删掉 —— 那个是四个写者、零个读者）。
+//    · 30 秒一次的延迟采样删除，改成 `measureLatency()`（**谁读谁调**：目前只有
+//      「诊断」页，它打开时测一次）。原来那是一个永远在跑的 30 秒 HTTP 请求
+//      （120 次/小时），而它的唯一下游是诊断页里的一行读数 ——
+//      这正是用户自己定的那条规矩（「api 压力大的可采取用户查看时再加载」）
+//      最该用上的地方：没有人看着这一行的时候，那个数没有意义。
+//
+//  留在这里的是 NWPathMonitor 本身：它事件驱动、不花流量，也只有它答得出
+//  「走的是 WiFi 还是蜂窝」。
 
 import Foundation
 import Network
 import Combine
 
-// MARK: - N37 网络质量实时监控
+// MARK: - N37 网络质量监控
 class NetworkQualityMonitor: ObservableObject {
     static let shared = NetworkQualityMonitor()
 
-    @Published var latency: Double = 0          // ms
+    @Published var latency: Double = 0          // ms（`measureLatency()` 测出来的那一次）
     @Published var isReachable: Bool = false
     @Published var connectionType: String = "unknown"
 
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "network.quality.monitor")
-    private var lastCheck: Date?
-    /// 延迟采样的定时器（必须存下来才能停 —— 见 `start` 里那条注）
-    private var latencyTimer: Timer?
 
     private init() {
         monitor.pathUpdateHandler = { [weak self] path in
@@ -43,26 +62,14 @@ class NetworkQualityMonitor: ObservableObject {
             }
         }
         monitor.start(queue: queue)
-
-        // 每 30s 测一次延迟。
-        // 2026-09-25 地毯式审核：原来这个定时器的返回值同样被丢掉（与 `MemoryMonitor`
-        // 同一处错）：没人能停它，调两次就是两条 30 秒循环各自发包。现在存下来并判重。
-        guard latencyTimer == nil else { return }
-        latencyTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            self?.measureLatency()
-        }
     }
 
-    /// 停掉延迟采样。
-    func stop() {
-        latencyTimer?.invalidate()
-        latencyTimer = nil
-        monitor.cancel()
-    }
+    //  `stop()` 与那个存下来的 `latencyTimer` 随定时器一起删（2026-09-26）：
+    //  没有定时器要停，而 `stop()` 本身全仓一个调用点都没有 ——
+    //  它就是「一个只写了、没有人读」的同一类东西。
 
-    deinit { latencyTimer?.invalidate() }
-
-    private func measureLatency() {
+    /// 测一次到车联网网关的往返耗时（毫秒）。**谁读谁调**，没有定时器（见文件头）。
+    func measureLatency() {
         guard let url = URL(string: "https://m.iov.changan.com.cn") else { return }
         let start = CFAbsoluteTimeGetCurrent()
         URLSession.shared.dataTask(with: url) { [weak self] _, _, _ in
@@ -70,32 +77,4 @@ class NetworkQualityMonitor: ObservableObject {
             DispatchQueue.main.async { self?.latency = elapsed }
         }.resume()
     }
-}
-
-// MARK: - N41 离线模式
-class OfflineModeManager: ObservableObject {
-    static let shared = OfflineModeManager()
-
-    @Published var isOffline: Bool = false
-    @Published var offlineMessage: String = ""
-
-    private let monitor = NetworkQualityMonitor.shared
-
-    private init() {
-        monitor.$isReachable
-            .sink { [weak self] reachable in
-                guard let self = self else { return }
-                self.isOffline = !reachable
-                let message = reachable ? "" : "网络连接已断开"
-                self.offlineMessage = message
-                // 更新 AppStore 离线状态（AppStore 是 MainActor 隔离的）
-                Task { @MainActor in
-                    AppStore.shared.isOfflineMode = !reachable
-                    AppStore.shared.offlineMessage = message
-                }
-            }
-            .store(in: &cancellables)
-    }
-
-    private var cancellables = Set<AnyCancellable>()
 }

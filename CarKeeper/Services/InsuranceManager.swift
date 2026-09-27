@@ -39,24 +39,10 @@ class InsuranceManager {
         savePolicies(list)
     }
 
-    /// 获取即将到期的保险（60天内）
-    var expiringPolicies: [InsurancePolicy] {
-        let now = Date()
-        // 窗口算不出来就退回「此刻」→ 这一栏为空：
-        // 不产生一条并不存在的到期提醒（宁可少报，不误报）。
-        let sixtyDays = Calendar.current.date(byAdding: .day, value: 60, to: now) ?? now
-        return policies.filter { $0.endDate >= now && $0.endDate <= sixtyDays }
-            .sorted { $0.endDate < $1.endDate }
-    }
-
-    /// 获取已过期保险
-    var expiredPolicies: [InsurancePolicy] {
-        policies.filter { $0.endDate < Date() }
-    }
-
-    /// 计算总保费
-    var totalPremium: Double {
-        policies.map { $0.premium }.reduce(0, +)
-    }
+    //  `expiringPolicies`（60 天内到期）/ `expiredPolicies` / `totalPremium` 已删
+    //  （2026-09-26 第三十一轮审核）：三个都**零个读者**。
+    //  到期提醒走的是另一条链 —— `InsuranceReminderScheduler` 自己算窗口并发本地通知，
+    //  保单那一屏只列「保单」与「到期日」，没有「即将到期」分组，也没有保费合计。
+    //  留着它们的代价是下一个人会以为界面上已经有这两栏（而屏幕上一个也没有）。
 }
 

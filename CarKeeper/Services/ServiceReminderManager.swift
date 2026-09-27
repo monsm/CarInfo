@@ -50,30 +50,15 @@ class ServiceReminderManager {
         return defaultReminders
     }
 
-    func saveReminders(_ reminders: [ServiceReminder]) {
-        if let data = try? JSONEncoder().encode(reminders) {
-            UserDefaults.standard.set(data, forKey: "carkeeper_service_reminders")
-        }
-    }
-
-    func addReminder(_ reminder: ServiceReminder) {
-        var list = reminders
-        list.append(reminder)
-        saveReminders(list)
-    }
-
-    func completeService(_ id: UUID, currentMileage: Double, currentDate: Date) {
-        var list = reminders
-        if let idx = list.firstIndex(where: { $0.id == id }) {
-            var r = list[idx]
-            r.lastMileageKm = currentMileage
-            r.lastDate = currentDate
-            r.nextMileageKm = currentMileage + serviceIntervalMiles(r.type).km
-            r.nextDate = Calendar.current.date(byAdding: .month, value: serviceIntervalMonths(r.type), to: currentDate) ?? currentDate
-            list[idx] = r
-            saveReminders(list)
-        }
-    }
+    //  `saveReminders` / `addReminder` / `completeService` 三个写入器已删
+    //  （2026-09-26 第三十一轮审核）：**全仓零个调用点**。
+    //  这条链的后果比「多三行死码」重：`carkeeper_service_reminders` 这个键
+    //  因此**从来没有被写过** —— 上面 `reminders` 读到的永远是 `defaultReminders`
+    //  （出厂周期表）。界面上的「上次/下次保养」是**别的**来源（车厂计划的字段
+    //  加本机那一对里程键，见 `AppStore.maintenancePlan`），与这份提醒表不是同一件事。
+    //  ⚠️ 反过来说清楚：**「这保养做完了」这个动作在全 App 没有入口**。
+    //  要把它做出来，是接一个调用点（一句确认 + 一次 `completeService`），
+    //  不是把这三行留着 —— 留着只会让读的人以为已经有人在做这件事。
 
     /// 默认维保周期（用户还没有任何记录时的那份底）。
     ///
@@ -119,8 +104,8 @@ class ServiceReminderManager {
         }
     }
 
-    private func serviceIntervalMonths(_ type: ServiceType) -> Int {
-        serviceIntervalMiles(type).months
-    }
+    //  `serviceIntervalMonths(_:)` 随着它唯一的调用者（`completeService`，上面那段）
+    //  一起删（2026-09-26 第三十一轮审核）。同一条周期表的 `.months` 那一半仍在上面的
+    //  元组里（`defaultReminders` 用得到）—— 删的是包一层的那两行，不是周期表本身。
 }
 

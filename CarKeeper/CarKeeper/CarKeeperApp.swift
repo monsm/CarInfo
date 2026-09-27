@@ -228,10 +228,12 @@ struct CarKeeperApp: App {
             if LaunchFence.launchServices {
                 // #N39 内存监控启动（不落盘，只是此刻的读数）
                 MemoryMonitor.shared.startMonitoring(interval: 10)
-                // #N37 网络质量监控
-                _ = NetworkQualityMonitor.shared
-                // #N41 离线模式监听
-                _ = OfflineModeManager.shared
+                // #N37 网络质量监控（`NetworkQualityMonitor`）与 #N41 离线模式监听
+                // （`OfflineModeManager`）这两行已删（2026-09-26 第三十一轮审核）：
+                // 后者整份删除（它与前者的 `isReachable` 是同一个事实的第二个名字），
+                // 前者改成**谁读谁建** —— 它唯一的下游是「诊断」页那三行读数，
+                // 而 `shared` 本来就是懒建：打开诊断页时它自己会建起来（并开始收路径事件）。
+                // 于是启动期少两件事、少一条永远在跑的 30 秒定时器。
                 // 通知授权：**向正在发通知的那一条路要**。
                 //
                 // 2026-09-25 地毯式审核删掉了 `SmartNotificationManager`（N15–N20）：
@@ -336,7 +338,16 @@ struct MapShellView: View {
     /// 低电量只提醒一次：跌破 20% 时给一条 Toast，回到 20% 以上才重新武装。
     /// （旧写法是 Tab 上的角标 —— 角标随 Tab 栏一起不存在了，改挂在既有的 Toast 上。）
     @State private var lowBatteryArmed = true
-    private let networkMonitorTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+    //  （这里原有 `networkMonitorTimer`：`Timer.publish(every: 30, …)`，每 30 秒
+    //   `api.getCars()` 一次、用结果写 `store.networkStatus`。2026-09-26 第三十一轮
+    //   地毯式审核删掉，三个理由各自成立：
+    //     · 它是**第二个节律** —— 全 App「多久取一次数」只有 `RefreshLoop` 一处
+    //       （那个文件头就是这么写的，而这条定时器让那句话不成立）；
+    //     · 它每小时 120 次请求，比地图页停着时的上限（60 次/小时）还多，
+    //       而它换来的信息只是一个布尔 —— 系统的事件驱动 API 早就答过那件事；
+    //     · `.weak` 的判据写的是「`URLError` 或 `APIError`」，那既不是弱网也不是离线，
+    //       而是「这一趟没成」。真实取数的结果自己就说得清，而它一直就在手边
+    //       （见 `AppStore.networkStatus`：现在是个算出来的属性。））
 
     // 这里原有 `deeplinkDestination(_:)`（深链 → push 一份页面）。已删：
     // 现在每个深链都落到模式条上的某一档 + 档内某一段（`HomeMode.destination`），
@@ -363,19 +374,8 @@ struct MapShellView: View {
                     lowBatteryArmed = true
                 }
             }
-            .onReceive(networkMonitorTimer) { _ in
-                // #4 简单网络检测：尝试 ping 一个已知端点
-                let api = APIClient.shared
-                Task { @MainActor in
-                    do {
-                        _ = try await api.getCars()
-                        store.updateNetworkStatus(.online)
-                    } catch {
-                        let networkError = error is URLError || (error as? APIError) != nil
-                        store.updateNetworkStatus(networkError ? .weak : .offline)
-                    }
-                }
-            }
+            //  （这里原有那条每 30 秒 ping 一次的网络检测 —— 见 `networkMonitorTimer`
+            //   上面那段注：它随 `updateNetworkStatus` 一起删了。）
     }
 
     var body: some View {
@@ -386,7 +386,8 @@ struct MapShellView: View {
             StartupJournal.shared.mark("首页外壳出现")
             await store.bootstrap()
             StartupJournal.shared.mark(store.cars.isEmpty ? "首页：车辆列表为空" : "首页：车辆就绪")
-            // 自动刷新的节律循环（一个，见 `RefreshLoop`）：地图页 2s/60s，其余档 5 分钟。
+            // 自动刷新的节律循环（一个，见 `RefreshLoop`）：地图页 2s（车在动）/
+            // 2→4→8→16→32→60s（停着），其余档 60s（轻）+ 300s（重，翻到那一页时当场取一次）。
             // 放在这里而不是各页的 `.task` —— 六页是同时建出来的，每页一个定时器就是六个循环。
             RefreshLoop.shared.start()
             StartupJournal.shared.mark("自动刷新已起（节律 \(Int(RefreshLoop.shared.interval))s）")
@@ -401,10 +402,13 @@ struct MapShellView: View {
         .accessibilityHint(Text("底部的模式条可以到达每个功能界面"))
         .accessibilitySortPriority(0)
         // #4 网络状态指示器 + #NEW-3 离线模式提示
+        //
+        //  条件只剩一条：`networkStatus` **自己就把「离线」含在里面**了（它是算出来的，
+        //  见 `AppStore`）。此前拆成两半判（`networkStatus` 与 `isOfflineMode`）是因为
+        //  「离线」当时还有一个来自网络路径的写者 —— 那个写者与它一起删了。
         .overlay(alignment: .top) {
-            if store.networkStatus != .online || store.isOfflineMode {
-                NetworkStatusIndicator(status: store.isOfflineMode ? .offline : store.networkStatus)
-                    .padding(.top, 0)
+            if store.networkStatus != .online {
+                NetworkStatusIndicator(status: store.networkStatus)
             }
         }
         // Toast 浮层**已搬进 `MapSpineView`**（2026-09-25 用户第 2 条：
