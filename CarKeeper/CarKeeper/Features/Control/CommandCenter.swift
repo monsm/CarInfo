@@ -91,8 +91,8 @@ final class CommandCenter: ObservableObject {
                 let handleCode = ciString(d, ["HandleCode", "handleCode"]) ?? ""
                 let finishTime = ciString(d, ["CmdFinishTime", "cmdFinishTime"]) ?? ""
 
-                if !finishTime.isEmpty || !handleCode.isEmpty {
-                    let outcome = VM.controlOutcome(status: status, handleCode: handleCode)
+                let outcome = VM.controlOutcome(status: status, handleCode: handleCode)
+                if !finishTime.isEmpty || outcome != nil {
                     finish(run,
                            ok: outcome == true,
                            text: VM.controlOutcomeText(outcome),
