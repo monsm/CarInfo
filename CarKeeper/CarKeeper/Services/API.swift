@@ -484,7 +484,7 @@ final class APIClient: @unchecked Sendable {
 
             var texts: [String] = []
             var firstError: APIError?
-            await withTaskGroup(of: Result<String, APIError>.self) { group in
+            await withTaskGroup(of: Result<[String], APIError>.self) { group in
                 for w in windows {
                     group.addTask {
                         do { return .success(try await api.messagesPages(from: w.start, to: w.end)) }

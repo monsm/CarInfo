@@ -383,12 +383,12 @@ func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
         durMin: VM.n0(ciPick(charge, ["ChargDeltMins"])) ?? "--",
         start: VM.s(ciPick(charge, ["ChargeStarttime"])) ?? "--",
         end: VM.s(ciPick(charge, ["ChargeStoptime"])) ?? "--",
-        powerLine: Self.triState(ciNumber(charge, ["PowerLineStatus"]),
-                                 on: "正常", off: "异常"),
-        heating: Self.triStateBool(ciNumber(charge, ["BatteryHeatingStatus"]),
-                                   on: "开启", off: "关闭"),
-        reservation: Self.triStateBool(ciNumber(charge, ["ChargeReservationStatus"]),
-                                       on: "已预约", off: "未预约"),
+        powerLine: AN.triState(ciNumber(charge, ["PowerLineStatus"]),
+                               on: "正常", off: "异常"),
+        heating: AN.triStateBool(ciNumber(charge, ["BatteryHeatingStatus"]),
+                                 on: "开启", off: "关闭"),
+        reservation: AN.triStateBool(ciNumber(charge, ["ChargeReservationStatus"]),
+                                     on: "已预约", off: "未预约"),
         reserveTime: VM.s(ciPick(charge, ["ReservationUseVehicleTime"])) ?? "--"
     )
 
