@@ -389,6 +389,8 @@ def load_baseline_cache():
 
 
 VERIFIED_SDK_ADDITIONS = {
+    "UNNotification": "UserNotifications.UNNotification（iOS 10+）—— 前台展示本地通知时读取通知内容",
+    "UNUserNotificationCenter": "UserNotifications.UNUserNotificationCenter（iOS 10+）—— 设置前台通知代理",
     "TimeZone": "Foundation.TimeZone（iOS 2.0+）—— 服务端时间戳是北京时间，DateText 里显式按 Asia/Shanghai 解释，避免用设备本地时区解析无时区的服务器时间",
     "SecItemUpdate": "Security.SecItemUpdate(_:_:)（iOS 2.0+；externalID c:objc(CS)SecItemUpdate）—— Keychain 更新：避免「先删后增」那个窗口内读取返回 nil；在项不存在时回退到 SecItemAdd",
     "TimeInterval": "Foundation.TimeInterval（iOS 2.0+，Double 的 typealias）—— TokenStore 主动刷新的时间裕量参数",
