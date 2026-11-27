@@ -150,7 +150,7 @@
 | `refreshToken` | `FfrA…` | = `refresh_token` |
 | `name` / `lastName` | `某用户` | 真实姓名（**日志里未打码**） |
 | `head` / `modulus` / `smsKey` / `resultCode` / `bindToken` | 全 `null` | |
-| `tel` | `138****0000` | **未打码** |
+| `tel` | `***` | **未打码** |
 | `isExternalOwner` | `0` | ❓ |
 | `cardNum` | `"000000000"` | = `cycid` |
 | `thirdFlag` / `thirdUid` / `thirdOpenid` / `thirdNickname` / `thirdAvatar` | 全 `null` | 第三方（微信）绑定，未绑定 |
@@ -160,7 +160,7 @@
 | 字段 | 样例 | 备注 |
 |---|---|---|
 | `userId` | `1573133715280646145` | **雪花 ID（int64）**，与 iov 的 UUID `userId` 不是一套 |
-| `userName` / `phonenumber` | `138****0000` | 手机号即账号 |
+| `userName` / `phonenumber` | `***` | 手机号即账号 |
 | `nickName` / `sidName` / `lastName` | `某用户` | 三处同值 |
 | `userType` | `"01"` | ❓ |
 | `sex` | `"1"` | ⚠️ **与 iov 报文 `gender:"f"` 冲突**（见 §5.4） |
@@ -200,9 +200,9 @@
 | `openId` | `00000000000000000000000000000000` | **= scrm 的 uid**，两套身份的唯一桥 |
 | `tenantId` | `""` | 空串 |
 | `userName` | `""` | 空串（用户名没设） |
-| `userNickname` | `138****0000` | **服务端已打码的手机昵称** |
+| `userNickname` | `***` | **服务端已打码的手机昵称** |
 | `userFullname` | `某用户` | 实名 |
-| `mobile` | `138****0000` | 手机号（明文） |
+| `mobile` | `***` | 手机号（明文） |
 | `contactsName` / `contactsMobile` | `null` | 紧急联系人（未填） |
 | `countryId` / `provinceId` / `cityId` / `distId` | `null` | 行政区 ID |
 | `country` / `province` / `city` / `dist` / `community` | `""` | 地址（全空） |
