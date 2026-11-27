@@ -48,9 +48,10 @@ enum VM {
     }
 
     private static func parseDate(_ t: String) -> Date? {
-        let formats = ["yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss", "yyyy/MM/dd HH:mm:ss",
-                       "yyyy/M/d", "yyyy.MM.dd", "yyyyMMdd", "yyyy年M月d日"]
-        return DateText.shared.date(t, formats: formats, locale: "zh_CN")
+        let formats = ["yyyy-MM-dd HH:mm:ss", "yyyy/MM/dd HH:mm:ss",
+                       "yyyy-MM-dd", "yyyy/M/d", "yyyy.MM.dd", "yyyyMMdd", "yyyy年M月d日"]
+        return DateText.shared.date(t, formats: formats, locale: "zh_CN",
+                                     timeZone: DateText.serverTimeZone)
     }
 
     static func carSel(_ cars: [[String: Any]], _ carId: String) -> (options: [(id: String, name: String)], index: Int, car: [String: Any]?, count: Int) {
@@ -422,6 +423,24 @@ enum VM {
         )
     }
 
+    static func isMovingFast(_ cache: [String: Any?]) -> Bool {
+        guard let location = ciVal(cache, "location") else { return false }
+        return num(ciPick(location, ["speed"])) > 0
+    }
+
+    static func headingDegFast(_ cache: [String: Any?]) -> Double {
+        let locRaw = ciVal(cache, "location")
+        let loc: [String: Any]? = {
+            guard let locRaw else { return ciObject(ciVal(cache, "pm25"), ["CarLocationResp", "carLocationResp"]) }
+            let hasAddr = !((ciString(locRaw, ["AddrDesc"]) ?? "").isEmpty)
+            let hasCoord = ciNumber(locRaw, ["Lat"]) != nil && ciNumber(locRaw, ["Lng"]) != nil
+            if hasAddr || hasCoord { return locRaw }
+            return ciObject(ciVal(cache, "pm25"), ["CarLocationResp", "carLocationResp"]) ?? locRaw
+        }()
+        guard let heading = ciNumber(loc, ["Heading"]) else { return 0 }
+        return norm360(heading)
+    }
+
     static func norm360(_ v: Double) -> Double {
         let n = v.truncatingRemainder(dividingBy: 360)
         return n < 0 ? n + 360 : n
@@ -448,7 +467,7 @@ enum VM {
                 let st = (ciPick(it, ["Status"]) as? String ?? "").lowercased()
                 let m: [String: String]
                 if let found = map[st] { m = found }
-                else if ciPick(it, ["Status"]) == nil { m = ["cls": "ok", "cn": "正常"] }
+                else if ciPick(it, ["Status"]) == nil { m = ["cls": "na", "cn": "未知"] }
                 else { m = ["cls": "warn", "cn": s(ciPick(it, ["Status"])) ?? ""] }
                 let name: String
                 if let sn = s(ciPick(it, ["ItemName"])) { name = sn } else { name = "" }
@@ -463,10 +482,13 @@ enum VM {
             }
             let hasBad = children.contains { $0.statusCls == "bad" }
             let hasWarn = children.contains { $0.statusCls == "warn" }
+            let allUnknown = !children.isEmpty && children.allSatisfy { $0.statusCls == "na" }
+            let sysCls = hasBad ? "bad" : (hasWarn ? "warn" : (allUnknown ? "na" : "ok"))
+            let sysText = hasBad ? "故障" : (hasWarn ? "预警" : (allUnknown ? "未知" : "正常"))
             return HealthSystem(
                 name: s(ciPick(s2, ["ItemName"])) ?? "",
-                statusCls: hasBad ? "bad" : (hasWarn ? "warn" : "ok"),
-                statusText: hasBad ? "故障" : (hasWarn ? "预警" : "正常"),
+                statusCls: sysCls,
+                statusText: sysText,
                 children: children,
                 open: hasBad
             )

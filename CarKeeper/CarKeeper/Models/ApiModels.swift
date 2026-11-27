@@ -89,19 +89,14 @@ func cacheObject(_ cache: [String: Any?], _ key: String) -> [String: Any]? {
 }
 
 func jsonToAny(_ text: String) -> [String: Any]? {
-    guard let data = text.data(using: .utf8),
-          let any = try? JSONSerialization.jsonObject(with: data, options: [.allowFragments])
-    else { return nil }
-    return any as? [String: Any]
+    jsonValue(text) as? [String: Any]
 }
 
-func jsonArray(_ text: String) -> [[String: Any]]? {
+func jsonValue(_ text: String) -> Any? {
     guard let data = text.data(using: .utf8),
           let any = try? JSONSerialization.jsonObject(with: data, options: [.allowFragments])
     else { return nil }
-    if let arr = any as? [[String: Any]] { return arr }
-    if let arr = any as? [Any] { return arr.compactMap { $0 as? [String: Any] } }
-    return nil
+    return any
 }
 
 
@@ -110,6 +105,7 @@ struct TokenConfig: Codable {
     var refreshToken: String
     var mobile: String
     var updateTime: String?
+    var expiresAt: Date?
 }
 
 
@@ -192,14 +188,6 @@ enum DTCDictionary {
     static func translate(_ code: String) -> String {
         if let dtc = lookup(code) { return dtc.description }
         return "未知故障码（\(code)）"
-    }
-
-    static func severityColor(_ severity: String) -> String {
-        switch severity {
-        case "bad": return "bad"
-        case "warn": return "warn"
-        default: return "na"
-        }
     }
 }
 

@@ -24,6 +24,16 @@ enum AN {
         return v.map { String(format: "%.\(digits)f", $0) } ?? "--"
     }
 
+    static func triState(_ value: Double?, on: String, off: String) -> String {
+        guard let value else { return "--" }
+        return value == 0 ? on : off
+    }
+
+    static func triStateBool(_ value: Double?, on: String, off: String) -> String {
+        guard let value else { return "--" }
+        return value == 1 ? on : off
+    }
+
     static func barsOf(_ arr: [Double], maxBars: Int = 128) -> [Double] {
         let step = max(1, Int(ceil(Double(arr.count) / Double(maxBars))))
         var out: [Double] = []
@@ -373,9 +383,12 @@ func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
         durMin: VM.n0(ciPick(charge, ["ChargDeltMins"])) ?? "--",
         start: VM.s(ciPick(charge, ["ChargeStarttime"])) ?? "--",
         end: VM.s(ciPick(charge, ["ChargeStoptime"])) ?? "--",
-        powerLine: ciNumber(charge, ["PowerLineStatus"]) == 0 ? "正常" : (hasChg ? "异常" : "--"),
-        heating: ciNumber(charge, ["BatteryHeatingStatus"]) == 1 ? "开启" : (hasChg ? "关闭" : "--"),
-        reservation: ciNumber(charge, ["ChargeReservationStatus"]) == 1 ? "已预约" : (hasChg ? "未预约" : "--"),
+        powerLine: Self.triState(ciNumber(charge, ["PowerLineStatus"]),
+                                 on: "正常", off: "异常"),
+        heating: Self.triStateBool(ciNumber(charge, ["BatteryHeatingStatus"]),
+                                   on: "开启", off: "关闭"),
+        reservation: Self.triStateBool(ciNumber(charge, ["ChargeReservationStatus"]),
+                                       on: "已预约", off: "未预约"),
         reserveTime: VM.s(ciPick(charge, ["ReservationUseVehicleTime"])) ?? "--"
     )
 
