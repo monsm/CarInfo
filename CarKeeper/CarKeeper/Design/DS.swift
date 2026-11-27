@@ -558,6 +558,35 @@ struct DSSkeleton: View {
     }
 }
 
+struct DSLoadingSkeleton: View {
+    var message: String = "加载中…"
+    var heights: [CGFloat]
+    var label: String? = nil
+
+    var body: some View {
+        if let label {
+            stack.accessibilityLabel(Text(label))
+        } else {
+            stack
+        }
+    }
+
+    private var stack: some View {
+        VStack(alignment: .leading, spacing: TokensSpacing.md) {
+            HStack(spacing: TokensSpacing.sm) {
+                ProgressView().controlSize(.small)
+                Text(message)
+                    .font(TokensTypo.footnote)
+                    .foregroundStyle(TokensPalette.secondary)
+            }
+            ForEach(Array(heights.enumerated()), id: \.offset) { _, h in
+                DSSkeleton(height: h)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 
 
 

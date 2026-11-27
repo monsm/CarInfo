@@ -44,19 +44,8 @@ struct HealthDataView: View {
 
 
     private var loadingState: some View {
-        VStack(alignment: .leading, spacing: TokensSpacing.md) {
-            HStack(spacing: TokensSpacing.sm) {
-                ProgressView().controlSize(.small)
-                Text("加载中…")
-                    .font(TokensTypo.footnote)
-                    .foregroundStyle(TokensPalette.secondary)
-            }
-            DSSkeleton(height: 96)
-            DSSkeleton(height: 64)
-            DSSkeleton(height: 44)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text("正在读取健康报告"))
+        DSLoadingSkeleton(message: "加载中…", heights: [96, 64, 44],
+                          label: "正在读取健康报告")
     }
 
 

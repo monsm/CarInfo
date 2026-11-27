@@ -118,20 +118,10 @@ struct VehicleView: View {
     }
 
     private var loadingState: some View {
-        VStack(alignment: .leading, spacing: TokensSpacing.md) {
-            HStack(spacing: TokensSpacing.sm) {
-                ProgressView().controlSize(.small)
-                Text("加载中…")
-                    .font(TokensTypo.footnote)
-                    .foregroundStyle(TokensPalette.secondary)
-            }
-            DSSkeleton(height: 96)
-            DSSkeleton(height: 132)
-        }
-        .padding(.horizontal, TokensSpacing.page)
-        .padding(.top, TokensSpacing.xl)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        DSLoadingSkeleton(message: "加载中…", heights: [96, 132])
+            .padding(.horizontal, TokensSpacing.page)
+            .padding(.top, TokensSpacing.xl)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
 

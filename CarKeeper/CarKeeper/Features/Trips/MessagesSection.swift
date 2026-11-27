@@ -140,18 +140,7 @@ struct MessagesSection: View {
     }
 
     private var loadingState: some View {
-        VStack(alignment: .leading, spacing: TokensSpacing.md) {
-            HStack(spacing: TokensSpacing.sm) {
-                ProgressView().controlSize(.small)
-                Text("正在加载消息…")
-                    .font(TokensTypo.footnote)
-                    .foregroundStyle(TokensPalette.secondary)
-            }
-            DSSkeleton(height: 88)
-            DSSkeleton(height: 88)
-            DSSkeleton(height: 88)
-        }
-        .accessibilityElement(children: .combine)
+        DSLoadingSkeleton(message: "正在加载消息…", heights: [88, 88, 88])
     }
 
     private var emptyHint: String {

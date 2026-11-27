@@ -116,18 +116,7 @@ struct RawDataSection: View {
 
 
     private var loadingState: some View {
-        VStack(alignment: .leading, spacing: TokensSpacing.md) {
-            HStack(spacing: TokensSpacing.sm) {
-                ProgressView().controlSize(.small)
-                Text("正在整理 \(kind.title)…")
-                    .font(TokensTypo.footnote)
-                    .foregroundStyle(TokensPalette.secondary)
-            }
-            DSSkeleton(height: 44)
-            DSSkeleton(height: 132)
-            DSSkeleton(height: 88)
-        }
-        .accessibilityElement(children: .combine)
+        DSLoadingSkeleton(message: "正在整理 \(kind.title)…", heights: [44, 132, 88])
     }
 
     private var footerText: String {
