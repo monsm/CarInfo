@@ -113,6 +113,7 @@ struct MapSpineData {
     var socPct: Int
     var socCls: String
     var rangeText: String
+    let rangeMeters: Double?
     var chargeText: String
     var chargeCls: String
     var charging: ChargingSession?
@@ -130,17 +131,6 @@ struct MapSpineData {
 
     var hasLocation: Bool { carCoordinate != nil }
 
-
-    @MainActor
-    var rangeMeters: Double? {
-        let cache = AppStore.shared.caches
-        for key in ["charge", "control"] {
-            if let n = ciNumber(ciVal(cache, key), ["RemainedPowerMile"]), n > 0 {
-                return n * 1_000
-            }
-        }
-        return nil
-    }
 
     @MainActor
     var sky: SkyLight? { sky(at: Date()) }
@@ -172,6 +162,14 @@ struct MapSpineData {
 
         let issues = spineIssues(car: car, chips: chips)
 
+        var rangeMeters: Double?
+        for key in ["charge", "control"] {
+            if let n = ciNumber(ciVal(cache, key), ["RemainedPowerMile"]), n > 0 {
+                rangeMeters = n * 1_000
+                break
+            }
+        }
+
         let tyreList = tyres(cache)
 
         let hotspots = clusterHotspots(from: store.parkingHistory,
@@ -188,6 +186,7 @@ struct MapSpineData {
             socPct: e.socPct,
             socCls: e.socCls,
             rangeText: e.range,
+            rangeMeters: rangeMeters,
             chargeText: e.chargeText,
             chargeCls: e.chargeCls,
             charging: e.charging,
