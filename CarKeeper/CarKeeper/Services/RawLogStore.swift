@@ -11,7 +11,7 @@ final class RawLogStore: @unchecked Sendable {
 
     private static let sensitiveKeys = [
         "token", "pin", "refreshtoken", "refresh_token", "accesstoken", "access_token",
-        "password", "pwd", "csrfToken".lowercased()
+        "password", "pwd", "csrftoken", "smscode", "piccode", "pickey"
     ]
 
     private static let sensitiveValueKeys = [
@@ -29,52 +29,43 @@ final class RawLogStore: @unchecked Sendable {
     private static let locationKeys = [
         "addrdesc", "addrname", "address", "community", "dist", "location"
     ]
-    private static let coordinateKeys = ["lat", "lng"]
 
     private static let infraKeys = ["containername"]
 
-    private init() {}
+    private static let rules: [(NSRegularExpression, String)] = {
+        var out: [(NSRegularExpression, String)] = []
 
+        func add(_ pattern: String, _ template: String) {
+            if let re = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
+                out.append((re, template))
+            }
+        }
+
+        for key in sensitiveKeys + sensitiveValueKeys {
+            let quoted = NSRegularExpression.escapedPattern(for: key)
+            add("(\"\(quoted)\"\\s*:\\s*\")([^\"]*)", "$1***")
+            add("(\\b\(quoted)=)([^&\\s\"',}]+)", "$1***")
+        }
+        for key in piiKeys + locationKeys + infraKeys {
+            let quoted = NSRegularExpression.escapedPattern(for: key)
+            add("(\"\(quoted)\"\\s*:\\s*\")([^\"]*)", "$1***")
+        }
+        for key in ["lat", "lng"] {
+            add("(\"\(key)\"\\s*:\\s*)(-?[0-9]+)(\\.[0-9]+)?", "$1$2")
+        }
+        add("(authorization:\\s*bearer\\s+)(\\S+)", "$1***")
+        add("(?<![0-9])1[3-9][0-9]{9}(?![0-9])", "1**********")
+        return out
+    }()
+
+    private init() {}
 
     func redact(_ input: String) -> String {
         var out = input
-
-        for key in Self.sensitiveKeys + Self.sensitiveValueKeys {
-            let pattern = "(?i)(\\b" + NSRegularExpression.escapedPattern(for: key) + "=)([^&\\s\"',}]+)"
-            out = out.replacingOccurrences(of: pattern, with: "$1***", options: .regularExpression)
+        for (re, template) in Self.rules {
+            let range = NSRange(out.startIndex..<out.endIndex, in: out)
+            out = re.stringByReplacingMatches(in: out, options: [], range: range, withTemplate: template)
         }
-
-        for key in Self.sensitiveKeys + Self.sensitiveValueKeys {
-            let pattern = "(?i)(\"" + NSRegularExpression.escapedPattern(for: key) + "\"\\s*:\\s*\")([^\"]*)"
-            out = out.replacingOccurrences(of: pattern, with: "$1***", options: .regularExpression)
-        }
-
-        for key in Self.piiKeys {
-            let pattern = "(?i)(\"" + NSRegularExpression.escapedPattern(for: key) + "\"\\s*:\\s*\")([^\"]*)"
-            out = out.replacingOccurrences(of: pattern, with: "$1***", options: .regularExpression)
-        }
-
-        for key in Self.locationKeys + Self.infraKeys {
-            let pattern = "(?i)(\"" + NSRegularExpression.escapedPattern(for: key) + "\"\\s*:\\s*\")([^\"]*)"
-            out = out.replacingOccurrences(of: pattern, with: "$1***", options: .regularExpression)
-        }
-
-        for key in Self.coordinateKeys {
-            let pattern = "(?i)(\"" + key + "\"\\s*:\\s*)(-?[0-9]+)(\\.[0-9]+)?"
-            out = out.replacingOccurrences(of: pattern, with: "$1$2", options: .regularExpression)
-        }
-
-        out = out.replacingOccurrences(
-            of: "(?i)(authorization:\\s*bearer\\s+)(\\S+)",
-            with: "$1***",
-            options: .regularExpression
-        )
-
-        out = out.replacingOccurrences(
-            of: "(?<![0-9])1[3-9][0-9]{9}(?![0-9])",
-            with: "1**********",
-            options: .regularExpression
-        )
         return out
     }
 
@@ -103,7 +94,7 @@ final class RawLogStore: @unchecked Sendable {
 
     func logRequest(method: String, url: String, body: Data?) {
         let bodyText = body.map { String(data: $0, encoding: .utf8) ?? "[二进制 \($0.count)B]" } ?? "nil"
-        let entry = "[\(now())] REQ \(method) \(redact(url))\nbody=\(clip(redact(bodyText), maxChars))\nheaders=Authorization=…(已打码)"
+        let entry = "[\(now())] REQ \(method) \(redact(url))\nbody=\(clip(redact(clip(bodyText, maxChars * 2)), maxChars))\nheaders=Authorization=…(已打码)"
         push(entry)
         NSLog("[CarKeeper] REQ %@ %@", method, shortURL(url))
     }
@@ -111,7 +102,7 @@ final class RawLogStore: @unchecked Sendable {
     func logResponse(status: Int, url: String, body: Data, contentType: String) {
         let isBinary = contentType.hasPrefix("image/") || contentType.contains("octet-stream")
         let bodyText = isBinary ? "[二进制 \(body.count)B, \(contentType)]" : (String(data: body, encoding: .utf8) ?? "")
-        let entry = "[\(now())] RES \(status) \(redact(url))\nbody=\(clip(redact(bodyText), maxChars))"
+        let entry = "[\(now())] RES \(status) \(redact(url))\nbody=\(clip(redact(clip(bodyText, maxChars * 2)), maxChars))"
         push(entry)
         NSLog("[CarKeeper] RES %d %@", status, shortURL(url))
     }
@@ -129,14 +120,5 @@ final class RawLogStore: @unchecked Sendable {
 
     func joined() -> String {
         allEntries().joined(separator: "\n\n──────────\n\n")
-    }
-
-    func clear() {
-        lock.lock(); logEntries.removeAll(); lock.unlock()
-    }
-
-    func count() -> Int {
-        lock.lock(); defer { lock.unlock() }
-        return logEntries.count
     }
 }

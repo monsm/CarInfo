@@ -17,9 +17,6 @@ struct RetryPolicy {
     }
 
     static let `default` = RetryPolicy(maxAttempts: 4, baseDelay: 1.0, backoff: 2.0, maxDelay: 8.0, jitter: 0.3)
-    static let none = RetryPolicy(maxAttempts: 1, baseDelay: 0, backoff: 1, maxDelay: 0, jitter: 0)
-    static let aggressive = RetryPolicy(maxAttempts: 6, baseDelay: 0.5, backoff: 1.8, maxDelay: 12.0, jitter: 0.5)
-    static let dataReliable = RetryPolicy(maxAttempts: 3, baseDelay: 2.0, backoff: 2.0, maxDelay: 8.0, jitter: 0.2)
 }
 
 enum Retryable {
@@ -59,17 +56,14 @@ struct Retrier {
     @discardableResult
     func retrying<T>(
         _ action: @escaping (Int) async throws -> T,
-        label: String = "request",
-        maxAttemptsOverride: Int? = nil
+        label: String = "request"
     ) async throws -> T {
-        let maxAttempts = max(1, maxAttemptsOverride ?? policy.maxAttempts)
+        let maxAttempts = max(1, policy.maxAttempts)
 
-        var lastError: Error?
         for attempt in 1...maxAttempts {
             do {
                 return try await action(attempt)
             } catch {
-                lastError = error
                 let isRetryable = Retryable.isRetryable(error)
                 if !isRetryable || attempt == maxAttempts {
                     throw error
@@ -87,7 +81,7 @@ struct Retrier {
                 }
             }
         }
-        throw lastError ?? APIError(message: "重试失败")
+        throw APIError(message: "重试失败")
     }
 
     func run<T>(_ body: @escaping () async throws -> T, label: String = "request") async throws -> T {

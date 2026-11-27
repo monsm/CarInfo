@@ -13,11 +13,26 @@ enum APIConfig {
 
 let tokenStorageKey = "car_token_config"
 let cacheStorageKey = "car_data_cache"
-let rawLogStorageKey = "changan_raw_log"
 
 enum TokenStore {
     private static let service = "com.you.CarKeeper.token"
     private static let account = "car_token_config"
+
+    private static let lock = NSLock()
+    private static var cached: TokenConfig?
+    private static var didLoad = false
+    private static var generation: UInt64 = 0
+
+    static func sessionGeneration() -> UInt64 {
+        lock.lock()
+        defer { lock.unlock() }
+        return generation
+    }
+
+    static func isExpiringSoon(margin: TimeInterval = 300) -> Bool {
+        guard let cfg = read(), let exp = cfg.expiresAt else { return false }
+        return exp.timeIntervalSinceNow <= margin
+    }
 
     private static func baseQuery() -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
@@ -35,35 +50,66 @@ enum TokenStore {
     }
 
     private static func writeKeychain(_ data: Data) {
-        var q = baseQuery()
-        SecItemDelete(q as CFDictionary)
-        q[kSecValueData as String] = data
-        q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        SecItemAdd(q as CFDictionary, nil)
+        let query = baseQuery()
+        let attrs: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+        ]
+        let updated = SecItemUpdate(query as CFDictionary, attrs as CFDictionary)
+        if updated == errSecItemNotFound {
+            var add = query
+            add.merge(attrs) { _, new in new }
+            SecItemAdd(add as CFDictionary, nil)
+        }
     }
 
     static func clear() {
         SecItemDelete(baseQuery() as CFDictionary)
         UserDefaults.standard.removeObject(forKey: tokenStorageKey)
+        lock.lock()
+        cached = nil
+        didLoad = true
+        generation &+= 1
+        lock.unlock()
     }
 
     static func read() -> TokenConfig? {
+        lock.lock()
+        if didLoad {
+            let hit = cached
+            lock.unlock()
+            return hit
+        }
+        lock.unlock()
+
+        var loaded: TokenConfig?
         if let legacy = UserDefaults.standard.data(forKey: tokenStorageKey) {
             writeKeychain(legacy)
             UserDefaults.standard.removeObject(forKey: tokenStorageKey)
-            return try? JSONDecoder().decode(TokenConfig.self, from: legacy)
+            loaded = try? JSONDecoder().decode(TokenConfig.self, from: legacy)
+        } else if let data = readKeychain() {
+            loaded = try? JSONDecoder().decode(TokenConfig.self, from: data)
         }
-        guard let data = readKeychain() else { return nil }
-        return try? JSONDecoder().decode(TokenConfig.self, from: data)
+        lock.lock()
+        cached = loaded
+        didLoad = true
+        lock.unlock()
+        return loaded
     }
 
     static func write(_ cfg: TokenConfig) {
         guard let data = try? JSONEncoder().encode(cfg) else { return }
         writeKeychain(data)
+        lock.lock()
+        cached = cfg
+        didLoad = true
+        lock.unlock()
     }
+
     static func currentToken() -> String {
-        TokenStore.read()?.accessToken ?? ""
+        read()?.accessToken ?? ""
     }
+
     static func save(_ cfg: TokenConfig) {
         TokenStore.write(cfg)
         let logged = !cfg.accessToken.isEmpty
@@ -83,6 +129,12 @@ struct APIError: LocalizedError {
     var statusCode: Int? = nil
 
     var errorDescription: String? { message }
+
+    var isAuthFailure: Bool {
+        if expired || noRefresh { return true }
+        if let code = statusCode { return code == 401 || code == 403 }
+        return false
+    }
 }
 
 
@@ -102,13 +154,70 @@ final class APIClient: @unchecked Sendable {
 
     struct Response {
         let status: Int
-        let headers: [String: String]
         let body: Data
         var text: String { String(data: body, encoding: .utf8) ?? "" }
     }
 
+    struct Envelope {
+        var ok: Bool
+        var code: Int?
+        var message: String
+        var data: Any?
+        var expired: Bool
+    }
+
+    static func decodeEnvelope(_ text: String) -> Envelope {
+        guard let dict = jsonToAny(text) else {
+            return Envelope(ok: false, code: nil, message: "响应解析失败", data: nil, expired: false)
+        }
+        let success = ciBool(dict, ["Success"])
+        let code = ciNumber(dict, ["Code", "code"]).map { Int($0) }
+        let message = ciString(dict, ["Msg", "msg", "Message", "message"]) ?? ""
+        var data = ciPick(dict, ["Data", "data"])
+        if let s = data as? String, let parsed = jsonValue(s) { data = parsed }
+
+        var ok: Bool
+        if let success {
+            ok = success
+        } else if let code {
+            ok = (code == 0 || code == 200)
+        } else {
+            ok = true
+        }
+
+        let lowered = message.lowercased()
+        let expired = code == 401
+            || (code == 2 && (lowered.contains("token")
+                              || lowered.contains("expired")
+                              || lowered.contains("登录")
+                              || lowered.contains("失效")))
+        return Envelope(ok: ok, code: code, message: message, data: data, expired: expired)
+    }
+
+    private static func classifyResponse(status: Int, text: String, envelope: Envelope) -> APIError? {
+        if status == 401 || status == 403 || envelope.expired {
+            var err = APIError(message: envelope.message.isEmpty ? "token expired" : envelope.message)
+            err.expired = true
+            err.statusCode = status
+            return err
+        }
+        if text.range(of: "token expired", options: .caseInsensitive) != nil {
+            var err = APIError(message: "token expired")
+            err.expired = true
+            err.statusCode = status
+            return err
+        }
+        if !(200..<300).contains(status) {
+            let redacted = RawLogStore.shared.redact(String(text.prefix(400)))
+            var err = APIError(message: "HTTP \(status): \(redacted.prefix(200))")
+            err.statusCode = status
+            return err
+        }
+        return nil
+    }
+
     func request(url: String, method: String = "POST", body: Any? = nil, token: String? = nil,
-                 raw: Data? = nil, retryable: Bool = true) async throws -> Response {
+                 retryable: Bool = true) async throws -> Response {
         guard let u = URL(string: url) else {
             throw APIError(message: "非法 URL：\(url)")
         }
@@ -120,10 +229,7 @@ final class APIClient: @unchecked Sendable {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
-        if let raw {
-            req.httpBody = raw
-            req.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
-        } else if let body {
+        if let body {
             let data: Data
             switch body {
             case let s as String: data = s.data(using: .utf8) ?? Data()
@@ -140,44 +246,36 @@ final class APIClient: @unchecked Sendable {
             guard let http = resp as? HTTPURLResponse else {
                 throw APIError(message: "无效的 HTTP 响应")
             }
-            var hdrs: [String: String] = [:]
-            for (k, v) in http.allHeaderFields {
-                hdrs[String(describing: k)] = String(describing: v)
-            }
-            let ct = hdrs.first(where: { $0.key.lowercased() == "content-type" })?.value ?? ""
+            let ct = (http.value(forHTTPHeaderField: "Content-Type")) ?? ""
             RawLogStore.shared.logResponse(status: http.statusCode, url: url, body: data, contentType: ct)
 
             let text = String(data: data, encoding: .utf8) ?? ""
-            if text.range(of: "token expired", options: .caseInsensitive) != nil {
-                var err = APIError(message: "token expired")
-                err.expired = true
-                err.statusCode = http.statusCode
-                throw err
+            if let failure = Self.classifyResponse(status: http.statusCode,
+                                                   text: text,
+                                                   envelope: Self.decodeEnvelope(text)) {
+                throw failure
             }
-            guard (200..<300).contains(http.statusCode) else {
-                var e = APIError(message: "HTTP \(http.statusCode): \(text.prefix(200))")
-                e.statusCode = http.statusCode
-                throw e
-            }
-            return Response(status: http.statusCode, headers: hdrs, body: data)
+            return Response(status: http.statusCode, body: data)
         }
 
         if retryable {
-            let op = "\(method) \(url)"
+            let op = "\(method) \(Self.redactedURL(url))"
             return try await Retrier.global.run(oneShot, label: op)
         }
         return try await oneShot()
     }
 
+    static func redactedURL(_ url: String) -> String {
+        var out = url
+        let token = TokenStore.currentToken()
+        if token.count >= 8 { out = out.replacingOccurrences(of: token, with: "***") }
+        if let q = out.firstIndex(of: "?") { out = String(out[..<q]) }
+        return out
+    }
 
-    func unpack(_ text: String, expectData: Bool = true) -> (ok: Bool, data: Any?, msg: String) {
-        guard let dict = jsonToAny(text) else { return (false, nil, "响应解析失败") }
-        let code = ciNumber(dict, ["Code", "code"])
-        let success = ciBool(dict, ["Success"])
-        let ok = (success == true) || (code == 200) || (code == 0)
-        let data = ciPick(dict, ["Data", "data"])
-        let msg = ciString(dict, ["Msg", "msg", "Message", "message"]) ?? ""
-        return (ok, data, msg)
+    func unpack(_ text: String) -> (ok: Bool, data: Any?, msg: String) {
+        let env = Self.decodeEnvelope(text)
+        return (env.ok, env.data, env.message)
     }
 
 
@@ -233,7 +331,7 @@ final class APIClient: @unchecked Sendable {
                 try await Task.sleep(nanoseconds: 600_000_000)
                 res = try await sendOnce()
             }
-            let (ok, _, msg) = unpack(res.text, expectData: false)
+            let (ok, _, msg) = unpack(res.text)
             if ok { return (true, false, "短信发送成功") }
             let raw = String(res.text.prefix(160))
             let noRecord = isNoRecordResp(res.text)
@@ -265,7 +363,7 @@ final class APIClient: @unchecked Sendable {
 
     func login(phone: String, smsCode: String, picCode: String) async throws -> String {
         let params = buildParams(phone: phone, extra: ["smsCode": smsCode, "picCode": picCode, "picKey": "null", "code": "null"])
-        let res = try await request(url: "\(APIConfig.authURL)/appLogin", method: "POST", body: params)
+        let res = try await request(url: "\(APIConfig.authURL)/appLogin", method: "POST", body: params, retryable: false)
         let (ok, data, msg) = unpack(res.text)
         guard ok, let d = data else {
             throw APIError(message: "登录失败：\(msg.isEmpty ? "接口返回无效Token" : msg)")
@@ -281,91 +379,94 @@ final class APIClient: @unchecked Sendable {
     }
 
     func isNoRecordResp(_ text: String) -> Bool {
-        let head = String(text.prefix(200))
-        return head.contains("\"msg\":null") && head.range(of: #"\"code\"\s*:\s*500"#, options: .regularExpression) != nil
+        let env = Self.decodeEnvelope(text)
+        let lowered = env.message.lowercased()
+        return env.code == 500 && (lowered.isEmpty || lowered == "null")
+    }
+
+    private func authenticated(_ path: String, query: [String: String] = [:],
+                               method: String = "POST", retryable: Bool = true) async throws -> Response {
+        if TokenStore.isExpiringSoon() {
+            try? await refreshOnce()
+        }
+        var comps = URLComponents(string: APIConfig.baseURL + path)
+        var items = [URLQueryItem(name: "token", value: TokenStore.currentToken())]
+        for (k, v) in query.sorted(by: { $0.key < $1.key }) {
+            items.append(URLQueryItem(name: k, value: v))
+        }
+        comps?.queryItems = items
+        guard let url = comps?.url?.absoluteString else {
+            throw APIError(message: "非法 URL：\(path)")
+        }
+        return try await request(url: url, method: method, body: [:],
+                                 token: TokenStore.currentToken(), retryable: retryable)
+    }
+
+    private func getEntity(_ path: String, query: [String: String] = [:]) async throws -> [String: Any]? {
+        try await withRefresh { [self] in
+            let res = try await authenticated(path, query: query)
+            let env = Self.decodeEnvelope(res.text)
+            guard env.ok else { throw APIError(message: env.message.isEmpty ? "请求失败" : env.message) }
+            return unwrapEntity(env.data)
+        }
     }
 
 
     func getCars() async throws -> [[String: Any]] {
         try await withRefresh { [self] in
-            let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/car/getMyCars?isNev=1&token=\(TokenStore.currentToken())",
-                                        method: "POST", body: [:])
-            let (ok, data, msg) = unpack(res.text)
-            guard ok else { throw APIError(message: msg.isEmpty ? "获取车辆列表失败" : msg) }
-            if let arr = data as? [[String: Any]] { return arr }
-            if let arr = data as? [Any] { return arr.compactMap { $0 as? [String: Any] } }
-            return []
+            let res = try await authenticated("/appserver/api/car/getMyCars", query: ["isNev": "1"])
+            let env = Self.decodeEnvelope(res.text)
+            guard env.ok else { throw APIError(message: env.message.isEmpty ? "获取车辆列表失败" : env.message) }
+            if let arr = env.data as? [[String: Any]] { return arr }
+            if let arr = env.data as? [Any] { return arr.compactMap { $0 as? [String: Any] } }
+            let keys = (jsonToAny(res.text)?.keys.sorted() ?? []).joined(separator: ",")
+            throw APIError(message: "车辆列表格式异常（顶层键：\(keys)）")
         }
     }
 
     func getUser() async throws -> [String: Any]? {
         try await withRefresh { [self] in
-            let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/user/getUserInfoByToken?token=\(TokenStore.currentToken())",
-                                        method: "POST", body: [:])
-            let (ok, data, msg) = unpack(res.text)
-            guard ok else { throw APIError(message: msg.isEmpty ? "获取用户信息失败" : msg) }
-            if let arr = data as? [Any], let first = arr.first as? [String: Any] { return first }
-            return data as? [String: Any]
+            let res = try await authenticated("/appserver/api/user/getUserInfoByToken")
+            let env = Self.decodeEnvelope(res.text)
+            guard env.ok else { throw APIError(message: env.message.isEmpty ? "获取用户信息失败" : env.message) }
+            if let arr = env.data as? [Any], let first = arr.first as? [String: Any] { return first }
+            if let obj = env.data as? [String: Any] { return obj }
+            throw APIError(message: "用户信息格式异常")
         }
     }
 
     func getCarCheck(carId: String) async throws -> [String: Any]? {
-        try await withRefresh { [self] in
-            let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/carcheck/getCheckResult?carId=\(carId)&isNev=1&token=\(TokenStore.currentToken())",
-                                        method: "POST", body: [:])
-            let unpacked = unpack(res.text)
-            return unpacked.ok ? unwrapEntity(unpacked.data) : nil
-        }
+        try await getEntity("/appserver/api/carcheck/getCheckResult",
+                            query: ["carId": carId, "isNev": "1"])
     }
 
     func getCarPm25(carId: String) async throws -> [String: Any]? {
-        try await withRefresh { [self] in
-            let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/car/pm/getCarPm25ByCarId?carId=\(carId)&token=\(TokenStore.currentToken())",
-                                        method: "POST", body: [:])
-            let unpacked = unpack(res.text)
-            return unpacked.ok ? unwrapEntity(unpacked.data) : nil
-        }
+        try await getEntity("/appserver/api/car/pm/getCarPm25ByCarId", query: ["carId": carId])
     }
 
     func getCharge(carId: String) async throws -> [String: Any]? {
-        try await withRefresh { [self] in
-            let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/charge/info?carId=\(carId)&token=\(TokenStore.currentToken())",
-                                        method: "POST", body: [:])
-            let unpacked = unpack(res.text)
-            return unpacked.ok ? unwrapEntity(unpacked.data) : nil
-        }
+        try await getEntity("/appserver/api/charge/info", query: ["carId": carId])
     }
 
     func getControl(carId: String) async throws -> [String: Any]? {
-        try await withRefresh { [self] in
-            let res = try await request(url: "\(APIConfig.baseURL)/api/car/getControlStatus?carId=\(carId)&token=\(TokenStore.currentToken())",
-                                        method: "POST", body: [:])
-            let unpacked = unpack(res.text)
-            return unpacked.ok ? unwrapEntity(unpacked.data) : nil
-        }
+        try await getEntity("/api/car/getControlStatus", query: ["carId": carId])
     }
 
     func getControlInfo(carId: String, taskId: String) async -> (ok: Bool, data: [String: Any]?, msg: String) {
         do {
             let res = try await withRefresh { [self] in
-                try await request(url: "\(APIConfig.baseURL)/api/car/getControlInfo?carId=\(carId)&id=\(taskId)&token=\(TokenStore.currentToken())",
-                                  method: "POST", body: [:])
+                try await authenticated("/api/car/getControlInfo", query: ["carId": carId, "id": taskId])
             }
-            let (ok, data, msg) = unpack(res.text)
-            return (ok, data as? [String: Any], msg)
+            let env = Self.decodeEnvelope(res.text)
+            return (env.ok, env.data as? [String: Any], env.message)
         } catch {
             return (false, nil, error.localizedDescription)
         }
     }
 
     func getLocation(carId: String) async throws -> [String: Any]? {
-        try await withRefresh { [self] in
-            let res = try await request(url: "\(APIConfig.baseURL)/appserver/api/cardata/getCarLocation?carId=\(carId)&mapType=GCJ02&token=\(TokenStore.currentToken())",
-                                        method: "POST", body: [:])
-            let unpacked = unpack(res.text)
-            guard unpacked.ok, let d = unwrapEntity(unpacked.data) else { return nil }
-            return d
-        }
+        try await getEntity("/appserver/api/cardata/getCarLocation",
+                            query: ["carId": carId, "mapType": "GCJ02"])
     }
 
     static let messageDays = 30
@@ -386,14 +487,14 @@ final class APIClient: @unchecked Sendable {
             await withTaskGroup(of: Result<String, APIError>.self) { group in
                 for w in windows {
                     group.addTask {
-                        do { return .success(try await api.messagesText(from: w.start, to: w.end)) }
+                        do { return .success(try await api.messagesPages(from: w.start, to: w.end)) }
                         catch let e as APIError { return .failure(e) }
                         catch { return .failure(APIError(message: error.localizedDescription)) }
                     }
                 }
                 for await r in group {
                     switch r {
-                    case .success(let t): texts.append(t)
+                    case .success(let t): texts.append(contentsOf: t)
                     case .failure(let e):
                         if firstError == nil || (e.expired && !(firstError?.expired ?? false)) {
                             firstError = e
@@ -401,6 +502,7 @@ final class APIClient: @unchecked Sendable {
                     }
                 }
             }
+            if let e = firstError, e.expired { throw e }
             if texts.isEmpty, let e = firstError { throw e }
             let batches = texts.map { Self.parseMessages($0, cars: cars) }
             return Self.mergeMessages(batches)
@@ -422,18 +524,35 @@ final class APIClient: @unchecked Sendable {
         return out
     }
 
-    private func messagesText(from start: Date, to end: Date) async throws -> String {
-        let res = try await request(url: messagesURL(from: start, to: end), method: "POST", body: [:],
-                                    token: TokenStore.currentToken())
-        return res.text
+    private func messagesPages(from start: Date, to end: Date) async throws -> [String] {
+        var texts: [String] = []
+        var page = 1
+        while page <= 10 {
+            let res = try await request(url: messagesURL(from: start, to: end, page: page),
+                                        method: "POST", body: [:], token: TokenStore.currentToken())
+            texts.append(res.text)
+            guard Self.messageHasMore(res.text) else { break }
+            page += 1
+        }
+        return texts
     }
 
-    private func messagesURL(from start: Date, to end: Date) -> String {
+    static func messageHasMore(_ text: String) -> Bool {
+        guard let dict = jsonToAny(text),
+              let shell = ciObject(dict, ["data", "Data"]) else { return false }
+        let last = ciBool(shell, ["last"]) ?? true
+        let size = ciNumber(shell, ["size"]).map { Int($0) } ?? 0
+        let count = ciNumber(shell, ["numberOfElements"]).map { Int($0) } ?? 0
+        return !last && size > 0 && count >= size
+    }
+
+    private func messagesURL(from start: Date, to end: Date, page: Int = 1) -> String {
         let f: (Date) -> String = { d in
             DateText.shared.string(d, "yyyy-MM-dd HH:mm:ss", locale: "en_US_POSIX")
         }
         let enc: (String) -> String = { s in s.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? s }
-        return "\(APIConfig.baseURL)/appserver/api/information/pageReceiverInfoByTime?actionType=2&page=&limit=2000&startTime=\(enc(f(start)))&endTime=\(enc(f(end)))&token=\(TokenStore.currentToken())"
+        let pageParam = page <= 1 ? "" : String(page)
+        return "\(APIConfig.baseURL)/appserver/api/information/pageReceiverInfoByTime?actionType=2&page=\(pageParam)&limit=2000&startTime=\(enc(f(start)))&endTime=\(enc(f(end)))&token=\(TokenStore.currentToken())"
     }
 
 
@@ -526,10 +645,8 @@ final class APIClient: @unchecked Sendable {
         }
         return content.map { m in
             var copy = m
-            if let id = ciString(m, ["realReceiverId"]) {
-                if let p = plateOf[id] {
-                    copy["realReceiverId"] = p
-                }
+            if let id = ciString(m, ["realReceiverId"]), let plate = plateOf[id] {
+                copy["receiverPlate"] = plate
             }
             return copy
         }
@@ -557,12 +674,12 @@ final class APIClient: @unchecked Sendable {
 
     func sendControlCommand(cmd: String, carId: String, pin: String, temperature: Int = 17) async throws -> [String: Any]? {
         try await withRefresh { [self] in
-            var url = "\(APIConfig.baseURL)/api/car/control?pin=\(pin)&cmd=\(cmd)&carId=\(carId)&phoneType=&phoneId=&token=\(TokenStore.currentToken())"
-            if cmd == "OpenAir" { url += "&temperature=\(temperature)" }
-            let res = try await request(url: url, method: "POST", body: [:], retryable: false)
-            let (ok, data, msg) = unpack(res.text)
-            guard ok else { throw APIError(message: msg.isEmpty ? "执行失败" : msg) }
-            return data as? [String: Any]
+            var query = ["pin": pin, "cmd": cmd, "carId": carId, "phoneType": "", "phoneId": ""]
+            if cmd == "OpenAir" { query["temperature"] = String(temperature) }
+            let res = try await authenticated("/api/car/control", query: query, retryable: false)
+            let env = Self.decodeEnvelope(res.text)
+            guard env.ok else { throw APIError(message: env.message.isEmpty ? "执行失败" : env.message) }
+            return env.data as? [String: Any]
         }
     }
 
@@ -574,30 +691,69 @@ final class APIClient: @unchecked Sendable {
             e.noRefresh = true
             throw e
         }
+        let generation = TokenStore.sessionGeneration()
         try await refreshInFlight.runOnce { [self] in
             let res = try await request(url: "\(APIConfig.authURL)/refresh", method: "POST",
-                                        body: ["refreshToken": cfg.refreshToken])
-            let unpacked = unpack(res.text)
-            guard unpacked.ok, let d = unpacked.data else {
-                throw APIError(message: "Token 刷新失败：\(unpacked.msg.isEmpty ? "未知错误" : unpacked.msg)")
+                                        body: ["refreshToken": cfg.refreshToken], retryable: false)
+            let env = Self.decodeEnvelope(res.text)
+            guard env.ok, let d = env.data as? [String: Any] else {
+                var e = APIError(message: "Token 刷新失败：\(env.message.isEmpty ? "未知错误" : env.message)")
+                e.noRefresh = true
+                throw e
             }
-            let dict = d as? [String: Any] ?? [:]
-            let newAccess = ciString(dict, ["access_token", "accessToken", "access_Token"])
-            guard let t = newAccess, !t.isEmpty else {
-                throw APIError(message: "Token 刷新失败：响应中未找到 access_token")
+            let statusCode = ciNumber(d, ["status_code", "statusCode"]).map { Int($0) }
+            if let statusCode, statusCode != 0 {
+                var e = APIError(message: "Token 刷新失败：\(ciString(d, ["message", "msg"]) ?? "status \(statusCode)")")
+                e.noRefresh = true
+                throw e
             }
-            let newRefresh = ciString(dict, ["refresh_token", "refreshToken"]) ?? cfg.refreshToken
-            TokenStore.save(TokenConfig(accessToken: t, refreshToken: newRefresh, mobile: cfg.mobile, updateTime: Date().description))
+            guard let t = ciString(d, ["access_token", "accessToken", "access_Token"]), !t.isEmpty else {
+                var e = APIError(message: "Token 刷新失败：响应中未找到 access_token")
+                e.noRefresh = true
+                throw e
+            }
+            guard TokenStore.sessionGeneration() == generation else {
+                var e = APIError(message: "登录状态已变更")
+                e.noRefresh = true
+                throw e
+            }
+            let newRefresh = ciString(d, ["refresh_token", "refreshToken"]) ?? cfg.refreshToken
+            let expiresIn = ciNumber(d, ["expires_in", "expiresIn"]).map { TimeInterval($0) }
+            TokenStore.save(TokenConfig(accessToken: t,
+                                        refreshToken: newRefresh,
+                                        mobile: cfg.mobile,
+                                        updateTime: Date().description,
+                                        expiresAt: expiresIn.map { Date().addingTimeInterval($0) }))
         }
     }
 
     private func withRefresh<T>(_ fn: @escaping () async throws -> T) async throws -> T {
         do {
             return try await fn()
-        } catch let err as APIError {
-            guard err.expired else { throw err }
-            try await refreshOnce()
-            return try await fn()
+        } catch let err as APIError where err.expired {
+            do {
+                try await refreshOnce()
+            } catch {
+                if let e = error as? APIError, e.noRefresh || e.expired {
+                    invalidateSession()
+                }
+                throw error
+            }
+            do {
+                return try await fn()
+            } catch let retryErr as APIError where retryErr.expired {
+                invalidateSession()
+                throw retryErr
+            }
+        }
+    }
+
+    private func invalidateSession() {
+        TokenStore.clear()
+        NotificationCenter.default.post(name: .didLogout, object: nil)
+        Task { @MainActor in
+            AppStore.shared.isLoggedIn = false
+            ToastManager.shared.show("登录已过期，请重新登录", icon: "exclamationmark.triangle.fill")
         }
     }
 }
