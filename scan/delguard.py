@@ -310,8 +310,31 @@ def type_names(text):
 
 
 def declares_anywhere(text, name):
-    """这个文件自己声明了同名成员吗（任意缩进）—— 判据 ④ 的输入。"""
-    return re.search(ANY_DECL_SRC % re.escape(name), strip_comments(text), re.M) is not None
+    """这个文件自己声明了同名成员吗（任意缩进）—— 判据 ④ 的输入。
+
+    含 `case`（枚举的关联值/非关联 case，**逗号分隔的多项也认**：
+    `case title3, headline, callout` 里 callout 也是这个文件的声明，
+    使用处与声明同文件时不该报 —— 判据 ④ 的本意）。
+    """
+    body = strip_comments(text)
+    if re.search(ANY_DECL_SRC % re.escape(name), body, re.M):
+        return True
+    return name in case_names(body)
+
+
+CASE_MULTI = re.compile(r"^[ \t]*(?:indirect )?case[ \t]+(.+?)\s*$", re.M)
+
+
+def case_names(text):
+    """这个文件里声明的枚举 case 名集合（`case a, b, c` 逐项拆出）。"""
+    names = set()
+    for m in CASE_MULTI.finditer(text):
+        for part in m.group(1).split(","):
+            part = part.strip()
+            m2 = re.match(r"([A-Za-z_]\w*)\b", part)
+            if m2:
+                names.add(m2.group(1))
+    return names
 
 
 def qualified_uses_of(name, text, project_types):

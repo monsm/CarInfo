@@ -389,6 +389,11 @@ def load_baseline_cache():
 
 
 VERIFIED_SDK_ADDITIONS = {
+    "TimeZone": "Foundation.TimeZone（iOS 2.0+）—— 服务端时间戳是北京时间，DateText 里显式按 Asia/Shanghai 解释，避免用设备本地时区解析无时区的服务器时间",
+    "SecItemUpdate": "Security.SecItemUpdate(_:_:)（iOS 2.0+；externalID c:objc(CS)SecItemUpdate）—— Keychain 更新：避免「先删后增」那个窗口内读取返回 nil；在项不存在时回退到 SecItemAdd",
+    "TimeInterval": "Foundation.TimeInterval（iOS 2.0+，Double 的 typealias）—— TokenStore 主动刷新的时间裕量参数",
+    "merge": "Collection.merge(_:_:uniquingKeysWith:)（Swift 标准库）—— 合并 Keychain 查询条件与写入属性，避免手写 for 循环覆盖键",
+    "stringByReplacingMatches": "Foundation.NSRegularExpression.stringByReplacingMatches(_:range:withTemplate:)（iOS 7+）—— RawLogStore 脱敏：预先编译正则，替代每条日志都重编译 ~30 个正则",
     "CLLocationManager": "CoreLocation.CLLocationManager（iOS 2.0+；externalID c:objc(cs)CLLocationManager）—— 手机自己的位置，按需取一次",
     "requestWhenInUseAuthorization": "CLLocationManager.requestWhenInUseAuthorization()（iOS 8+；externalID c:objc(cs)CLLocationManager(im)requestWhenInUseAuthorization）",
     "startUpdatingLocation": "CLLocationManager.startUpdatingLocation()（iOS 2.0+；externalID c:objc(cs)CLLocationManager(im)startUpdatingLocation）",

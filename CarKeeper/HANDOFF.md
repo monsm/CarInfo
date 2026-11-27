@@ -777,7 +777,7 @@ Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形�
 
 ---
 
-## 6. 本机持久化清单（27 个 `carkeeper_*` 键）
+## 6. 本机持久化清单（24 个 `carkeeper_*` 键）
 
 > 判据：**服务端有这个字段吗？** 有 → 不落盘；没有（只能本机攒）→ 落盘，并在文档与界面上说清它是本机的。
 >
@@ -797,14 +797,11 @@ Tokens（静态令牌，唯一来源） → DS 原语（唯一容器/分组形�
 | `carkeeper_selected_car_id` | 上次选中的车（重启后回到那一辆） | 账号 | ✅ |
 | `carkeeper_hist_soc_v1` | SOC 曲线（5 分钟一个 ≈ 7 天） | 账号 | ✅ |
 | `carkeeper_hist_power_v1` | 充电功率曲线（1 分钟一个 ≈ 25 小时） | 账号 | ✅ |
-| `carkeeper_hist_tyre_v1` | 胎压曲线（30 分钟一个 ≈ 16 天） | 账号 | ✅ |
 | `carkeeper_processed_event_ids` | 行程去重台账（服务端每次返回同一个 7 天窗口） | 账号 | ✅ |
 | `carkeeper_parking_loc` | 最近一次停车位置 | 账号 | ✅ |
 | `carkeeper_parking_time` | 最近一次停车时刻 | 账号 | ✅ |
 | `carkeeper_parking_points` | 停车点序列（≥2 次成「常停热区」） | 账号 | ✅ |
 | `carkeeper_last_service_mileage` | 上次保养里程（本机记录） | 账号 | ✅ |
-| `carkeeper_service_reminders` | 保养项与上次/下次（清掉回落到出厂周期表） | 账号 | ✅ |
-| `carkeeper_service_timestamp` | 维保时间戳 | 账号 | ✅ |
 | `carkeeper_current_mileage` | 里程（上一次取到的那个数） | 账号 | ✅ |
 | `carkeeper_total_mileage` | 总里程（保养计划的基线） | 账号 | ✅ |
 | `carkeeper_mileage_entries` | 里程账本 | 账号 | ✅ |
