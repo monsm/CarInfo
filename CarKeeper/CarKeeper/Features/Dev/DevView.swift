@@ -154,20 +154,12 @@ struct DevView: View {
     }
 
     private var diagnostics: String {
-        var lines = ["【CarKeeper 诊断信息】", "版本 \(appVersion) (\(buildNumber))"]
+        var lines = ["【CarKeeper 诊断信息】", "版本 \(AppInfo.versionLine)"]
         lines.append("车辆 ID：\(store.carId.isEmpty ? "未绑定" : store.carId)")
         lines.append("登录状态：\(store.isLoggedIn ? "已登录" : "未登录")")
         lines.append("网络状态：\(networkText)")
         for row in runtime { lines.append("\(row.0)：\(row.1)") }
         return lines.joined(separator: "\n")
-    }
-
-    private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
-    }
-
-    private var buildNumber: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
     }
 
 }

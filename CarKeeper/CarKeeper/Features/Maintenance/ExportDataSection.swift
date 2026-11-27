@@ -37,14 +37,16 @@ struct ExportDataSection: View {
                         }
                     }
                     .buttonStyle(DSPrimaryButtonStyle())
+                    .disabled(isExporting)
 
-                    Button(action: exportAsPDF) {
+                    Button(action: exportAsHTML) {
                         HStack(spacing: TokensSpacing.sm) {
                             Image(safeSymbol: "doc.richtext", fallback: "doc.richtext")
-                            Text("导出 PDF")
+                            Text("导出 HTML")
                         }
                     }
                     .buttonStyle(DSSecondaryButtonStyle())
+                    .disabled(isExporting)
                 }
             }
         }
@@ -144,13 +146,13 @@ struct ExportDataSection: View {
         }
     }
 
-    private func exportAsPDF() {
+    private func exportAsHTML() {
         isExporting = true
         Task {
             defer { isExporting = false }
             let html = pdfHTMLContent
-            let filename = "\(exportType.rawValue)_\(Date().formatted(date: .abbreviated, time: .standard)).pdf"
-            if let url = saveHTMLAsPDF(html, filename: filename) {
+            let filename = "\(exportType.rawValue)_\(Date().formatted(date: .abbreviated, time: .standard)).html"
+            if let url = saveHTML(html, filename: filename) {
                 exportURL = url
                 showSuccess = true
             }
@@ -221,12 +223,15 @@ struct ExportDataSection: View {
         return fileURL
     }
 
-    private func saveHTMLAsPDF(_ html: String, filename: String) -> URL? {
+    private func saveHTML(_ html: String, filename: String) -> URL? {
         let tempDir = FileManager.default.temporaryDirectory
-        let htmlURL = tempDir.appendingPathComponent("export.html")
-        try? html.write(to: htmlURL, atomically: true, encoding: .utf8)
-
-        return htmlURL
+        let fileURL = tempDir.appendingPathComponent(filename)
+        do {
+            try html.write(to: fileURL, atomically: true, encoding: .utf8)
+            return fileURL
+        } catch {
+            return nil
+        }
     }
 
     private func shareExportedFile() {

@@ -32,15 +32,6 @@ struct DSCard<Content: View>: View {
     }
 }
 
-struct DSCardButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .opacity(configuration.isPressed ? 0.55 : 1)
-            .animation(TokensMotion.press, value: configuration.isPressed)
-    }
-}
-
-
 struct DSDivider: View {
     var inset: CGFloat = 0
     var body: some View {
@@ -329,7 +320,9 @@ struct DSStatStrip: View {
                     if let second = item.second {
                         Text(second)
                             .font(TokensTypo.data)
-                            .foregroundStyle(item.cls == "na" ? TokensPalette.primary : TokensPalette.statusColor(item.cls))
+                            .foregroundStyle(item.cls == "na"
+                                             ? TokensPalette.primary
+                                             : TokensPalette.statusColor(item.cls))
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }

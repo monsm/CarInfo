@@ -3,7 +3,6 @@ import PhotosUI
 
 struct MineView: View {
     private let store = AppStore.shared
-    @State private var isRefreshing = false
     @State private var logoutConfirm = false
     @EnvironmentObject var nav: NavState
     @State private var tab: HomeSub = .settings
@@ -53,9 +52,7 @@ struct MineView: View {
         .onAppear { consumeHint() }
         .onChange(of: nav.homeSub) { _, _ in consumeHint() }
         .refreshable {
-            isRefreshing = true
-            try? await Task.sleep(nanoseconds: 600_000_000)
-            isRefreshing = false
+            await store.fetchVehicleData()
         }
         .alert("退出登录", isPresented: $logoutConfirm) {
             Button("退出", role: .destructive) { logout() }
@@ -302,17 +299,9 @@ struct MineView: View {
         DSGroup(title: "关于",
                 footer: "车况数据实时来自车辆车联网服务，仅用于本人车辆管理。") {
             DSGroupRow(showsSeparator: false) {
-                DSKeyValueRow(key: "版本", value: "\(appVersion) (\(buildNumber))", mono: false)
+                DSKeyValueRow(key: "版本", value: AppInfo.versionLine, mono: false)
             }
         }
-    }
-
-    private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
-    }
-
-    private var buildNumber: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
     }
 
     private func logout() {

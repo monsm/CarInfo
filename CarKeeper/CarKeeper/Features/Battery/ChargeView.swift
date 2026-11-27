@@ -460,10 +460,6 @@ struct ChargeView: View {
             errText = ""
         } catch {
             errText = error.localizedDescription
-            let desc = error.localizedDescription.lowercased()
-            if desc.contains("未找到") || desc.contains("登录") || desc.contains("token") {
-                AppStore.shared.logout()
-            }
         }
         loading = false
     }

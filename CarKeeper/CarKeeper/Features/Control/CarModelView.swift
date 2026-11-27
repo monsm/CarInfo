@@ -43,7 +43,8 @@ final class CarRig {
 
     private var built = false
 
-    private func paint(_ color: Color, roughness: MaterialScalarParameter = 0.35, metallic: Bool = true) -> SimpleMaterial {
+    private func paint(_ color: Color, roughness: MaterialScalarParameter = 0.35,
+                       metallic: Bool = true) -> SimpleMaterial {
         SimpleMaterial(color: UIColor(color), roughness: roughness, isMetallic: metallic)
     }
 

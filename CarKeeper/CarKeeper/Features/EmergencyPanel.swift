@@ -157,22 +157,22 @@ struct EmergencyPanel: View {
     }
 
     private func lockCar() async {
-        _ = await store.sendControlCommand("lock")
+        _ = await store.sendControlCommand("LockDoor")
         ToastManager.shared.show("锁车指令已发送", icon: "lock.fill")
     }
 
     private func honkCar() async {
-        _ = await store.sendControlCommand("honk")
+        _ = await store.sendControlCommand("Whistle")
         ToastManager.shared.show("鸣笛中...", icon: "speaker.wave.3.fill")
     }
 
     private func flashLights() async {
-        _ = await store.sendControlCommand("flash")
+        _ = await store.sendControlCommand("FlashLight")
         ToastManager.shared.show("闪灯中...", icon: "lightbulb.fill")
     }
 
     private func turnOnAC() async {
-        _ = await store.sendControlCommand("ac_on")
+        _ = await store.sendControlCommand("OpenAir")
         ToastManager.shared.show("空调已开启", icon: "fan.fill")
     }
 

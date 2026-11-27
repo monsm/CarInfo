@@ -18,12 +18,12 @@ struct ArcStack: View {
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
                     VStack(spacing: StackSpec.Card.gap) {
-                        ForEach(Array(cards.enumerated()), id: \.offset) { i, card in
+                        ForEach(cards) { card in
                             card.render(accent: accent)
                                 .frame(width: max(0, geo.size.width - 2 * StackSpec.Card.inset),
                                        alignment: .top)
                                 .padding(.horizontal, StackSpec.Card.inset)
-                                .id(i)
+                                .id(card.id)
                         }
                     }
                     .frame(width: geo.size.width, alignment: .top)
@@ -56,11 +56,11 @@ struct ArcStack: View {
     private func step(_ delta: Int, proxy: ScrollViewProxy) {
         let last = max(0, cards.count - 1)
         let next = min(max(current + delta, 0), last)
-        guard next != current else { return }
+        guard next != current, cards.indices.contains(next) else { return }
         current = next
         TokensHaptic.select()
         withAnimation(StackSpec.settle) {
-            proxy.scrollTo(next, anchor: next == last ? .bottom : .top)
+            proxy.scrollTo(cards[next].id, anchor: next == last ? .bottom : .top)
         }
     }
 }

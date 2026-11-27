@@ -22,7 +22,7 @@ extension Image {
 
 struct AppCanvas: View {
     var body: some View {
-        TokensPalette.canvasGradient
+        TokensPalette.canvas
             .ignoresSafeArea()
             .allowsHitTesting(false)
     }

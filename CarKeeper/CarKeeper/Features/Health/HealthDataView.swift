@@ -153,7 +153,7 @@ struct HealthDataView: View {
     }
 
 
-    private var fitWidth: CGFloat { max(0, cardViewport.width - 2 * StackSpec.Card.padH) }
+    private var fitWidth: CGFloat { CardFit.contentWidth(cardViewport) }
 
     private enum Detail: Identifiable {
         case child(HealthItem)
@@ -302,7 +302,7 @@ struct HealthDataView: View {
                 let plan = planFor(sys, model: m, details: details)
                 let shown = plan.keep.map { Array(details.prefix($0)) } ?? details
                 let screens = verdictFor(details, model: m).screens
-                let inset: Color = TokensPalette.nightSurface.opacity(0.6)
+                let inset: Color = TokensPalette.surface.opacity(0.6)
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(shown.enumerated()), id: \.element.id) { idx, item in
                         DSGroupRow(showsSeparator: idx < shown.count - 1
@@ -501,10 +501,6 @@ struct HealthDataView: View {
         } catch {
             errText = error.localizedDescription
             if model == nil { loading = false }
-            let errDesc = error.localizedDescription.lowercased()
-            if errDesc.contains("未找到") || errDesc.contains("登录") || errDesc.contains("token") {
-                AppStore.shared.logout()
-            }
         }
         loading = false
     }

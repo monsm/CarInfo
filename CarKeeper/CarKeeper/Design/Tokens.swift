@@ -4,7 +4,6 @@ import UIKit
 enum TokensPalette {
     static let canvas: Color = Color(uiColor: UIColor.systemGroupedBackground)
     static let surface: Color = Color(uiColor: UIColor.secondarySystemGroupedBackground)
-    static let raised: Color = Color(uiColor: .tertiarySystemGroupedBackground)
     static let hairline: Color = Color(uiColor: UIColor.separator)
     static let track: Color = Color(uiColor: .quaternaryLabel)
     static let labelOnTint: Color = .white
@@ -18,10 +17,6 @@ enum TokensPalette {
                                 blue],
                        startPoint: .leading, endPoint: .trailing)
     }
-    static var canvasGradient: LinearGradient {
-        LinearGradient(colors: [canvas, canvas], startPoint: .top, endPoint: .bottom)
-    }
-
     static let primary: Color = Color(uiColor: .label)
     static let secondary: Color = Color(uiColor: .secondaryLabel)
     static let tertiary: Color = Color(uiColor: .tertiaryLabel)
@@ -40,8 +35,6 @@ enum TokensPalette {
     static let info: Color = tokenDynamic(light: (0.000, 0.780, 0.745),
                                           dark: (0.400, 0.839, 1.000))
 
-    static var nightSurface: Color { surface }
-    static var background: Color { canvas }
     private static let faceFill: Double = 0.5
     static var fillSubtle: Color { surface.opacity(0.22 * faceFill) }
 
@@ -90,7 +83,6 @@ enum TokensSpacing {
     static let xl = CGFloat(32)
     static let xxl = CGFloat(48)
     static let xxxl = CGFloat(64)
-    static let huge = CGFloat(88)
     static let page = CGFloat(20)
     static let row = CGFloat(44)
 }
@@ -103,21 +95,17 @@ enum TokensRadius {
 }
 
 enum TokensTypo {
-    static let largeTitle = Font.largeTitle.weight(.bold)
     static let title = Font.title.weight(.semibold)
     static let title2 = Font.title2.weight(.semibold)
     static let title3 = Font.title3.weight(.semibold)
     static let headline = Font.headline
     static let body = Font.body
-    static let callout = Font.callout
     static let subheadline = Font.subheadline
     static let footnote = Font.footnote
     static let caption = Font.caption
     static let caption2 = Font.caption2
     static let sectionLabel = Font.footnote
 
-    static var hero: Font { Font.system(size: 48, weight: .light).monospacedDigit() }
-    static var heading: Font { Font.system(size: 24, weight: .semibold) }
     static var subtitle: Font { Font.system(size: 17, weight: .regular) }
     static var micro: Font { Font.system(size: 11, weight: .regular) }
 
@@ -139,12 +127,10 @@ enum TokensTypo {
 
 enum TokensMotion {
     static let tap = Animation.spring(response: 0.25, dampingFraction: 0.7)
-    static let page = Animation.spring(response: 0.5, dampingFraction: 0.8)
     static let count = Animation.spring(response: 0.4, dampingFraction: 0.6)
     static let settle = Animation.spring(response: 0.34, dampingFraction: 1.0)
     static let press = Animation.spring(response: 0.30, dampingFraction: 0.86)
     static let value = Animation.spring(response: 0.36, dampingFraction: 0.88)
-    static let screen = Animation.spring(response: 0.42, dampingFraction: 0.90)
     static let fade = Animation.easeOut(duration: 0.20)
     static let draw = Animation.easeOut(duration: 1.1)
 }
@@ -170,14 +156,11 @@ enum TokensHair {
 enum TokensSize {
     static let tap: CGFloat = 44
     static let button: CGFloat = 50
-    static let iconSm: CGFloat = 13
     static let icon: CGFloat = 17
-    static let tileIcon: CGFloat = 22
     static let iconColumn: CGFloat = 29
 }
 
 enum TokensTracking {
-    static let place: CGFloat = 6
     static let label: CGFloat = 0.6
     static let title: CGFloat = -0.2
 }

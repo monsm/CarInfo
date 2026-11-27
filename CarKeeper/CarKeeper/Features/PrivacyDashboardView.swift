@@ -21,7 +21,7 @@ struct PrivacySection: View {
                 ("SOC 采样", "\(store.energyHistory.count) 条", "本机"),
                 ("行程记录", "\(store.tripHistory.count) 条", "本机"),
                 ("控制命令", "\(store.commandHistory.count) 条", "本机"),
-                ("维保记录", "\(store.serviceTimestamp != 0 ? "有" : "无")", "本机")
+                ("维保记录", "累计 \(store.totalMileage) km", "本机")
             ]
         ),
         (
@@ -134,18 +134,15 @@ struct PrivacyCategorySection: View {
 
 extension AppStore {
     func clearAllData() {
-        let domain = UserDefaults.standard.persistentDomain(forName: Bundle.main.bundleIdentifier!)
-        domain?.keys.forEach { key in
-            if key.hasPrefix("carkeeper_") || key == tokenStorageKey || key == cacheStorageKey {
-                UserDefaults.standard.removeObject(forKey: key)
+        let defaults = UserDefaults.standard
+        if let domain = defaults.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "") {
+            for key in domain.keys where key.hasPrefix("carkeeper_") || key == tokenStorageKey {
+                defaults.removeObject(forKey: key)
             }
         }
 
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Bundle.main.bundleIdentifier ?? "com.you.CarKeeper"
-        ]
-        SecItemDelete(query as CFDictionary)
+        TokenStore.clear()
+        deletePin()
 
         isLoggedIn = false
         phone = ""
@@ -156,6 +153,7 @@ extension AppStore {
         energyHistory = []
         tripHistory = []
         commandHistory = []
+        clearCache()
 
         NotificationCenter.default.post(name: .didLogout, object: nil)
     }

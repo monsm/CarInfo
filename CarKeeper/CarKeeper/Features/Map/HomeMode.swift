@@ -21,17 +21,6 @@ enum HomeMode: String, CaseIterable, Identifiable {
         }
     }
 
-    var deeplink: Deeplink? {
-        switch self {
-        case .now: return nil
-        case .vehicle: return .vehicle
-        case .charge: return .battery
-        case .control: return .control
-        case .trips: return .trips
-        case .mine: return .mine
-        }
-    }
-
     static func destination(for link: Deeplink) -> (mode: HomeMode, sub: HomeSub?) {
         switch link {
         case .vehicle: return (.vehicle, .profile)

@@ -4,6 +4,10 @@ import UIKit
 
 enum CardFit {
 
+    static func contentWidth(_ viewport: CGSize) -> CGFloat {
+        max(0, viewport.width - 2 * StackSpec.Card.padH)
+    }
+
     enum Typo {
         case title3, headline, body, callout, subheadline, footnote, caption, caption2
         case fixed(CGFloat)

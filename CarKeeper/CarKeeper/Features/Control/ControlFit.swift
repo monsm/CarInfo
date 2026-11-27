@@ -3,7 +3,7 @@ import SwiftUI
 
 extension ControlView {
 
-    var fitWidth: CGFloat { max(0, cardViewport.width - 2 * StackSpec.Card.padH) }
+    var fitWidth: CGFloat { CardFit.contentWidth(cardViewport) }
 
     func historyFitRow(_ item: AppStore.HistoryEntry) -> CardFit.Row {
         var blocks: [CardFit.Block] = [

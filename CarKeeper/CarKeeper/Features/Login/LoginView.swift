@@ -17,7 +17,6 @@ struct LoginView: View {
     @State private var countdown: Int = 0
     @State private var countdownTask: Task<Void, Never>? = nil
     @State private var biometricAvailable = false
-    @State private var biometricAuthPending = false
     @State private var showBiometricPrompt = false
 
     private enum Field: Hashable { case phone, pic, sms }
@@ -192,7 +191,7 @@ struct LoginView: View {
             .disabled(busy || !canSubmit)
             .opacity(canSubmit ? 1 : 0.45)
 
-            if biometricAvailable {
+            if biometricAvailable && hasStoredCredential {
                 Button { showBiometricPrompt = true } label: {
                     Label("用 Face ID 登录", systemImage: "faceid")
                 }
@@ -303,20 +302,33 @@ struct LoginView: View {
 
     private func checkBiometric() {
         biometricAvailable = AppStore.shared.canUseBiometric()
-        if biometricAvailable && AppStore.shared.hasBiometricSetup {
-            showBiometricPrompt = true
-        }
+        guard biometricAvailable, AppStore.shared.hasBiometricSetup, hasStoredCredential else { return }
+        showBiometricPrompt = true
+    }
+
+    private var hasStoredCredential: Bool {
+        guard let cfg = TokenStore.read() else { return false }
+        return !cfg.refreshToken.isEmpty || !cfg.accessToken.isEmpty
     }
 
     private func biometricLogin() async {
-        biometricAuthPending = true
+        guard hasStoredCredential else {
+            showStatus("没有可用的登录凭证，请用短信验证码登录", isErr: true)
+            return
+        }
         let success = await AppStore.shared.authenticateWithBiometrics(reason: "验证身份以登录账号")
-        biometricAuthPending = false
-        if success {
-            AppStore.shared.isLoggedIn = true
-            await AppStore.shared.bootstrap()
-        } else {
+        guard success else {
             showStatus("验证失败，请用短信验证码登录", isErr: true)
+            return
+        }
+        let outcome = await AppStore.shared.bootstrap()
+        switch outcome {
+        case .success:
+            AppStore.shared.isLoggedIn = true
+        case .sessionExpired:
+            showStatus("登录凭证已失效，请用短信验证码登录", isErr: true)
+        case .networkFailure:
+            showStatus("网络异常，请稍后重试", isErr: true)
         }
     }
 }

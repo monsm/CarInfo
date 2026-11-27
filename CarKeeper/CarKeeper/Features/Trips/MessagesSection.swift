@@ -281,7 +281,7 @@ struct MessagesSection: View {
     }
 
 
-    private var fitWidth: CGFloat { max(0, cardViewport.width - 2 * StackSpec.Card.padH) }
+    private var fitWidth: CGFloat { CardFit.contentWidth(cardViewport) }
 
     private struct BodyPlan {
         var text: String
@@ -521,7 +521,7 @@ struct MessagesSection: View {
             return MessageItem(
                 id: id, title: title, body: body, location: location,
                 time: ciString(m, ["CreatedAt", "createdAt"]) ?? "",
-                plate: ciString(m, ["realReceiverId"]) ?? "",
+                plate: ciString(m, ["receiverPlate"]) ?? ciString(m, ["realReceiverId"]) ?? "",
                 read: serverRead || readSet.contains(id), tag: cat.tag, tagCls: cat.cls,
                 coordinate: coord
             )

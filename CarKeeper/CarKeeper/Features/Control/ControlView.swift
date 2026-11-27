@@ -54,7 +54,6 @@ struct ControlView: View {
     @State private var showMoreCommands = true
     @State private var request: ControlRequest?
     @State private var doorPart: CarPart?
-    @State private var isRefreshing = false
 
     private var bodyDetail: (
         summary: String, cls: String,

@@ -6,9 +6,6 @@ import Foundation
 struct ScoreSection: View {
     private let store = AppStore.shared
 
-    static let baselineEfficiency = 15.0
-
-
     private var efforts: [Double] {
         store.tripHistory.compactMap { $0.avgEfficiency }
     }
@@ -17,59 +14,16 @@ struct ScoreSection: View {
         store.tripHistory.compactMap { $0.kmPerPercent }
     }
 
-    private var usesPercent: Bool { efforts.isEmpty }
+    private var score: DriveScore { DriveScore(efforts: efforts, percents: percents) }
 
-    private var metric: [Double] { usesPercent ? percents : efforts }
-
-    private var baseline: Double? {
-        if !usesPercent { return Self.baselineEfficiency }
-        guard percents.count >= 2 else { return nil }
-        let sorted = percents.sorted()
-        return sorted[sorted.count / 2]
-    }
-
-    private var energyScore: Int? {
-        guard let baseline, !metric.isEmpty else { return nil }
-        let avg = metric.reduce(0, +) / Double(metric.count)
-        return Self.efficiencyPoints(avg, baseline: baseline, lowerIsBetter: !usesPercent)
-    }
-
-    private var steadyScore: Int? {
-        guard metric.count >= 3 else { return nil }
-        let mean = metric.reduce(0, +) / Double(metric.count)
-        guard mean > 0 else { return nil }
-        let variance = metric.reduce(0.0) { $0 + ($1 - mean) * ($1 - mean) } / Double(metric.count)
-        let cv = variance.squareRoot() / mean
-        return Self.clamp(Int(100 - cv * 200))
-    }
-
-    private var hitScore: Int? {
-        guard let baseline, !metric.isEmpty else { return nil }
-        let hit: Int
-        if usesPercent {
-            hit = metric.filter { $0 >= baseline * 0.9 }.count
-        } else {
-            hit = metric.filter { $0 <= baseline }.count
-        }
-        return Self.clamp(Int(Double(hit) / Double(metric.count) * 100))
-    }
-
-    private var overallScore: Int? {
-        let dims = [energyScore, steadyScore, hitScore].compactMap { $0 }
-        guard !dims.isEmpty else { return nil }
-        return Int(Double(dims.reduce(0, +)) / Double(dims.count))
-    }
-
-    private var grade: String? {
-        guard let s = overallScore else { return nil }
-        switch s {
-        case 90...: return "S"
-        case 80..<90: return "A"
-        case 70..<80: return "B"
-        case 60..<70: return "C"
-        default: return "D"
-        }
-    }
+    private var usesPercent: Bool { score.usesPercent }
+    private var metric: [Double] { score.metric }
+    private var baseline: Double? { score.baseline }
+    private var energyScore: Int? { score.energy }
+    private var steadyScore: Int? { score.steady }
+    private var hitScore: Int? { score.hit }
+    private var overallScore: Int? { score.overall }
+    private var grade: String? { score.grade }
 
     private var scoreTint: Color {
         guard let s = overallScore else { return TokensPalette.tertiary }
@@ -79,14 +33,6 @@ struct ScoreSection: View {
         case 40..<60: return TokensPalette.warning
         default: return TokensPalette.error
         }
-    }
-
-    private static func clamp(_ v: Int) -> Int { max(0, min(100, v)) }
-
-    private static func efficiencyPoints(_ v: Double, baseline: Double, lowerIsBetter: Bool) -> Int {
-        guard baseline > 0 else { return 0 }
-        if lowerIsBetter { return clamp(Int(100 - (v - baseline) * 4)) }
-        return clamp(Int((v / baseline - 0.7) / 0.6 * 100))
     }
 
 
@@ -132,7 +78,7 @@ struct ScoreSection: View {
 
             Text(usesPercent
                  ? "每 1% SOC 的续航，基准是自己的中位数"
-                 : "基准 \(Int(Self.baselineEfficiency)) kWh/100km · 每高出 1 度扣 4 分")
+                 : "基准 \(Int(DriveScore.baselineEfficiency)) kWh/100km · 每高出 1 度扣 4 分")
                 .font(TokensTypo.caption2)
                 .foregroundStyle(TokensPalette.tertiary)
         }
@@ -204,7 +150,7 @@ struct ScoreSection: View {
             let v = usesPercent ? t.kmPerPercent : t.avgEfficiency
             guard let v else { return nil }
             return ScorePoint(id: idx + 1,
-                              v: Self.efficiencyPoints(v, baseline: base,
+                              v: DriveScore.efficiencyPoints(v, baseline: base,
                                                       lowerIsBetter: !usesPercent))
         }
         if points.count >= 2 {

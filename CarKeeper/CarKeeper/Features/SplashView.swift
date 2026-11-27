@@ -2,11 +2,10 @@ import SwiftUI
 
 struct SplashView: View {
     @State private var progress: CGFloat = 0
-    @State private var showMain = false
     @State private var dissolved = false
     @State private var brandGlow: CGFloat = 0
 
-    let duration: TimeInterval = 2.0
+    let duration: TimeInterval = 1.1
 
     var body: some View {
         ZStack {
@@ -57,9 +56,6 @@ struct SplashView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
                 withAnimation(.easeOut(duration: 0.4)) {
                     dissolved = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    showMain = true
                 }
             }
         }

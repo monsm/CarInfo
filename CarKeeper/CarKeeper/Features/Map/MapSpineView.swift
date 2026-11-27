@@ -174,13 +174,6 @@ struct MapSpineView: View {
 
 
 
-    private func statusDot(_ online: OnlineState) -> some View {
-        Circle()
-            .fill(color(for: online.cls))
-            .frame(width: 6, height: 6)
-    }
-
-
     private func bottomBar(pageWidth: CGFloat) -> some View {
         HStack(spacing: Self.barSeam) {
             arm(icon: "car.fill", current: homeMode == .vehicle) { nav.openMode(.vehicle) }
@@ -447,16 +440,6 @@ struct MapSpineView: View {
 
 
     func emptyNotice(_ text: String) -> some View { MapNotice(text: text) }
-
-    private func color(for cls: String) -> Color {
-        switch cls {
-        case "ok": return TokensPalette.success
-        case "warn": return TokensPalette.warning
-        case "bad": return TokensPalette.error
-        case "charge": return TokensPalette.info
-        default: return TokensPalette.tertiary
-        }
-    }
 
     @MainActor
     private func focusOn(_ f: AppStore.MapFocus) {
