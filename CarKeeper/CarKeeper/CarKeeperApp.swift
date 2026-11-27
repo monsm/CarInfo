@@ -65,7 +65,6 @@ struct CarKeeperApp: App {
     }
 
     @State private var showSplash = true
-    @State private var isAppLoading = false
     @AppStorage("carkeeper_onboarding_seen") private var onboardingSeen = false
 
     private func openDeeplink(_ url: URL) {
@@ -79,7 +78,6 @@ struct CarKeeperApp: App {
             if showSplash {
                 SplashView()
                     .ignoresSafeArea()
-                    .onAppear { isAppLoading = true }
                     .task {
                         try? await Task.sleep(nanoseconds: 1_500_000_000)
                         showSplash = false
@@ -103,14 +101,9 @@ struct CarKeeperApp: App {
         .onAppear {
             if store.isLoggedIn && store.cars.isEmpty {
                 Task {
-                    await store.bootstrap()
-                }
-                Task {
-                    await store.bootstrap()
-                    if store.isLoggedIn && store.cars.isEmpty {
-                        Task { @MainActor in
-                            ToastManager.shared.show("数据加载失败，请检查网络后重试", icon: "wifi.exclamationmark")
-                        }
+                    let outcome = await store.bootstrap()
+                    if outcome == .networkFailure {
+                        ToastManager.shared.show("数据加载失败，请检查网络后重试", icon: "wifi.exclamationmark")
                     }
                 }
             }

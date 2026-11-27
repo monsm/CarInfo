@@ -9,18 +9,30 @@ final class KeepAwake {
     private init() {}
 
     private var applied: Bool? = nil
+    private var started = false
 
     func start() {
+        guard !started else { return }
+        started = true
+        apply()
         arm()
     }
 
+    func stop() {
+        started = false
+        applied = nil
+        UIApplication.shared.isIdleTimerDisabled = false
+    }
+
     private func arm() {
+        guard started else { return }
         withObservationTracking {
             _ = AppStore.shared.isCarMoving
         } onChange: { [weak self] in
             Task { @MainActor in
-                self?.apply()
-                self?.arm()
+                guard let self, self.started else { return }
+                self.apply()
+                self.arm()
             }
         }
     }

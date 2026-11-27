@@ -2,12 +2,7 @@ import SwiftUI
 import Observation
 import Foundation
 import CoreLocation
-import Intents
-import UserNotifications
 import LocalAuthentication
-import CoreHaptics
-import AVFoundation
-import Photos
 
 
 @MainActor
@@ -101,13 +96,6 @@ final class AppStore: @unchecked Sendable {
         let range: Int
     }
     var energyHistory: [EnergyRecord] = []
-
-    struct ChargingPowerRecord: Identifiable {
-        let id = UUID()
-        let time: Date
-        let power: Double
-    }
-    var chargingPowerHistory: [ChargingPowerRecord] = []
 
     struct TripRecord: Identifiable {
         let id = UUID()
@@ -380,19 +368,9 @@ final class AppStore: @unchecked Sendable {
         }
     }
 
-    func enableBiometric() {
-        hasBiometricSetup = true
-    }
+    var isCarMoving: Bool { VM.isMovingFast(caches) }
 
-    func disableBiometric() {
-        hasBiometricSetup = false
-    }
-
-
-
-    var isCarMoving: Bool { VM.driveStatus(caches).isMoving }
-
-    var carHeadingDeg: Double { Double(VM.locStatus(caches).degNum) }
+    var carHeadingDeg: Double { VM.headingDegFast(caches) }
 
 
     private init() {
@@ -405,7 +383,7 @@ final class AppStore: @unchecked Sendable {
 
     private var preloadTask: Task<Void, Never>? = nil
 
-    private var bootstrapTask: Task<Void, Never>? = nil
+    private var bootstrapTask: Task<BootstrapOutcome, Never>? = nil
 
     var isCharging: Bool {
         guard let charge = caches["charge"] as? [String: Any] else { return false }
@@ -413,18 +391,25 @@ final class AppStore: @unchecked Sendable {
         return status == "1" || status == "2"
     }
 
-    func bootstrap() async {
+    enum BootstrapOutcome: Equatable {
+        case success
+        case networkFailure
+        case sessionExpired
+    }
+
+    @discardableResult
+    func bootstrap() async -> BootstrapOutcome {
         if let running = bootstrapTask {
-            await running.value
-            return
+            return await running.value
         }
         let task = Task { await runBootstrap() }
         bootstrapTask = task
-        await task.value
+        let outcome = await task.value
         bootstrapTask = nil
+        return outcome
     }
 
-    private func runBootstrap() async {
+    private func runBootstrap() async -> BootstrapOutcome {
         let api = APIClient.shared
         do {
             let carsRes = try await api.getCars()
@@ -443,17 +428,19 @@ final class AppStore: @unchecked Sendable {
                     await fetchVehicleData()
                 }
             }
+            return .success
         } catch {
             let apiErr = error as? APIError
-            if apiErr?.expired == true || error.localizedDescription.contains("token expired") {
+            if apiErr?.isAuthFailure == true || error.localizedDescription.contains("token expired") {
                 NSLog("bootstrap: token expired — forcing logout")
                 logout()
                 Task { @MainActor in
                     ToastManager.shared.show("登录已过期，请重新登录", icon: "exclamationmark.triangle.fill")
                 }
-            } else {
-                NSLog("bootstrap: \(error.localizedDescription)")
+                return .sessionExpired
             }
+            NSLog("bootstrap: \(error.localizedDescription)")
+            return .networkFailure
         }
     }
 
@@ -519,9 +506,16 @@ final class AppStore: @unchecked Sendable {
         if declaresOffline {
             lastMissedSources = patch.compactMap { $0.value == nil ? $0.key : nil }.sorted()
         }
+        var changedSources = Set<String>()
         for (k, v) in patch {
-            caches[k] = v
-            if v == nil { cacheTimes[k] = nil } else { cacheTimes[k] = Date() }
+            if let v {
+                caches[k] = v
+                cacheTimes[k] = Date()
+                changedSources.insert(k)
+            }
+        }
+        if changedSources.contains("charge") || changedSources.contains("control") {
+            recordHistory()
         }
         if let msgs = patch["messages"] as? [[String: Any]] {
             ingestEvents(msgs)
@@ -552,7 +546,6 @@ final class AppStore: @unchecked Sendable {
                 NotificationCenter.default.post(name: .locationUpdated, object: nil)
             }
         }
-        recordHistory()
     }
 
     private func recordHistory() {
@@ -562,35 +555,22 @@ final class AppStore: @unchecked Sendable {
 
         let pow = VM.chargePowerKW(ciVal(caches, "charge"), control)
 
-        if isCharging, let p = pow, p > 0.1 {
-            let due = chargingPowerHistory.last.map { Date().timeIntervalSince($0.time) >= 60 } ?? true
-            if due {
-                chargingPowerHistory.append(ChargingPowerRecord(time: Date(), power: p))
-                if chargingPowerHistory.count > 240 {
-                    chargingPowerHistory.removeFirst(chargingPowerHistory.count - 240)
-                }
-            }
-        }
-
-        let tyres: [Double?] = ["LfTyrePressure", "RfTyrePressure", "LrTyrePressure", "RrTyrePressure"]
-            .map { ciNumber(control, [$0]) }
-
-        HistoryStore.shared.record(socPct: e.socPct, charging: isCharging, powerKW: pow, tyres: tyres)
+        HistoryStore.shared.record(socPct: e.socPct, charging: isCharging, powerKW: pow)
 
         ChargingStatusMonitor.shared.observe(soc: e.socPct, charging: isCharging, powerKW: pow)
 
         if let km = ciNumber(control, ["TotalOdometer"]), km > 0 {
             let intKm = Int(km.rounded())
             let previous = UserDefaults.standard.integer(forKey: Self.currentMileageKey)
+            if totalMileage != intKm { totalMileage = intKm }
             if previous != intKm {
                 UserDefaults.standard.set(intKm, forKey: Self.currentMileageKey)
-                if totalMileage != intKm { totalMileage = intKm }
-            }
-            if let plan = maintenancePlan, previous != intKm {
-                Task { await MaintenanceReminderScheduler.shared.scheduleMaintenanceReminder(
-                    lastServiceMileage: plan.last,
-                    currentMileage: plan.current,
-                    interval: plan.interval) }
+                if let plan = maintenancePlan {
+                    Task { await MaintenanceReminderScheduler.shared.scheduleMaintenanceReminder(
+                        lastServiceMileage: plan.last,
+                        currentMileage: plan.current,
+                        interval: plan.interval) }
+                }
             }
         }
     }
@@ -598,6 +578,9 @@ final class AppStore: @unchecked Sendable {
 
     func clearCache() {
         caches = ["charge": nil, "pm25": nil, "location": nil, "control": nil, "check": nil, "messages": nil]
+        cacheTimes = [:]
+        lastMissedSources = []
+        isOfflineMode = false
     }
 
     static let cardOrderKey = "carkeeper_home_card_order"
@@ -610,19 +593,25 @@ final class AppStore: @unchecked Sendable {
 
     var cardOrder: [String] {
         get {
-            if let saved = UserDefaults.standard.array(forKey: Self.cardOrderKey) as? [String] {
-                let filtered = saved.filter { Self.knownCardIds.contains($0) }
-                return filtered.isEmpty ? Self.knownCardIds : filtered
-            }
-            return Self.knownCardIds
+            Self.normalizeCardOrder(UserDefaults.standard.array(forKey: Self.cardOrderKey) as? [String],
+                                    known: Self.knownCardIds)
         }
         set { UserDefaults.standard.set(newValue, forKey: Self.cardOrderKey) }
+    }
+
+    nonisolated static func normalizeCardOrder(_ saved: [String]?, known: [String]) -> [String] {
+        guard let saved else { return known }
+        let kept = saved.filter { known.contains($0) }
+        let missing = known.filter { !kept.contains($0) }
+        return kept + missing
     }
 
 
     func logout() {
         cancelPreload()
         bootstrapTask = nil
+        RefreshLoop.shared.stop()
+        KeepAwake.shared.stop()
         TokenStore.clear()
         UserDefaults.standard.removeObject(forKey: cacheStorageKey)
         UserDefaults.standard.removeObject(forKey: Self.selectedCarIdKey)
@@ -637,7 +626,6 @@ final class AppStore: @unchecked Sendable {
         tripHistory = []
         currentTrip = nil
         energyHistory = []
-        chargingPowerHistory = []
         commandHistory = []
         HistoryStore.shared.clear()
         isOfflineMode = false
@@ -649,9 +637,8 @@ final class AppStore: @unchecked Sendable {
         UserDefaults.standard.removeObject(forKey: "carkeeper_insurance_policies")
         InspectionCalendar.shared.resetAll()
         for key in ["carkeeper_parking_points", "carkeeper_processed_event_ids",
-                    "carkeeper_maintenance_photos", "carkeeper_service_reminders",
-                    "carkeeper_current_mileage", "carkeeper_total_mileage",
-                    "carkeeper_service_timestamp"] {
+                    "carkeeper_maintenance_photos",
+                    "carkeeper_current_mileage", "carkeeper_total_mileage"] {
             UserDefaults.standard.removeObject(forKey: key)
         }
         NotificationCenter.default.post(name: .didLogout, object: nil)
@@ -711,11 +698,6 @@ final class AppStore: @unchecked Sendable {
     var controlCache: [String: Any]? { ciVal(caches, "control") }
 
     var maintenancePlan: VM.MaintenancePlan? { VM.maintenancePlan(car, ciVal(caches, "control")) }
-
-    var serviceTimestamp: TimeInterval {
-        get { UserDefaults.standard.double(forKey: "carkeeper_service_timestamp") }
-        set { UserDefaults.standard.set(newValue, forKey: "carkeeper_service_timestamp") }
-    }
 }
 
 
