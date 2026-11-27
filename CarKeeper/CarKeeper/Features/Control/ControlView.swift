@@ -501,7 +501,7 @@ struct ControlView: View {
                 HStack {
                     Text(r.name).font(TokensTypo.title3)
                     Spacer()
-                    Pill(text: r.resultText, cls: r.resultCls, dot: false)
+                    DSChip(text: r.resultText, cls: r.resultCls)
                 }
                 if !r.progress.isEmpty {
                     Text(r.progress).font(TokensTypo.caption).foregroundStyle(TokensPalette.secondary)

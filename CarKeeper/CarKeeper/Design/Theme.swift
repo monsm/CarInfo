@@ -39,17 +39,3 @@ struct StatusDot: View {
             .opacity(cls == "na" ? 0.35 : 1)
     }
 }
-
-struct Pill: View {
-    let text: String
-    let cls: String
-    var dot: Bool = true
-
-    var body: some View {
-        DSChip(text: text, cls: cls)
-    }
-}
-
-
-
-

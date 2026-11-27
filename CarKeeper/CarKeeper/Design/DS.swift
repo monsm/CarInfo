@@ -2,12 +2,6 @@ import SwiftUI
 import UIKit
 
 
-
-enum DS {
-}
-
-
-
 struct DSCard<Content: View>: View {
     var padding: CGFloat
     var radius: CGFloat
@@ -22,13 +16,7 @@ struct DSCard<Content: View>: View {
     }
 
     var body: some View {
-        content()
-            .padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(TokensPalette.panel)
-            }
+        content().dsSurface(padding: padding, radius: radius)
     }
 }
 
@@ -596,6 +584,7 @@ struct DSExpandGroup<Content: View>: View {
     var trailingCls: String = "na"
     var footer: String? = nil
     var initiallyExpanded: Bool = false
+    var panel: Bool = true
     @ViewBuilder var content: () -> Content
 
     @State private var expanded: Bool
@@ -605,12 +594,14 @@ struct DSExpandGroup<Content: View>: View {
          trailingCls: String = "na",
          footer: String? = nil,
          initiallyExpanded: Bool = false,
+         panel: Bool = true,
          @ViewBuilder content: @escaping () -> Content) {
         self.title = title
         self.trailing = trailing
         self.trailingCls = trailingCls
         self.footer = footer
         self.initiallyExpanded = initiallyExpanded
+        self.panel = panel
         self.content = content
         _expanded = State(initialValue: initiallyExpanded)
     }
@@ -643,12 +634,16 @@ struct DSExpandGroup<Content: View>: View {
             .accessibilityValue(Text(expanded ? "已展开" : "已收起"))
 
             if expanded {
-                VStack(spacing: 0) { content() }
-                    .background {
-                        RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
-                            .fill(TokensPalette.panel)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous))
+                if panel {
+                    VStack(spacing: 0) { content() }
+                        .background {
+                            RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
+                                .fill(TokensPalette.panel)
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous))
+                } else {
+                    VStack(spacing: 0) { content() }
+                }
             }
 
             if let footer {
@@ -663,66 +658,23 @@ struct DSExpandGroup<Content: View>: View {
 }
 
 struct DSSection<Content: View>: View {
-    var title: String
-    var trailing: String? = nil
-    var trailingCls: String = "na"
-    var footer: String? = nil
-    @ViewBuilder var content: () -> Content
-
-    @State private var expanded: Bool = false
+    private let inner: DSExpandGroup<Content>
 
     init(title: String,
          trailing: String? = nil,
          trailingCls: String = "na",
          footer: String? = nil,
          @ViewBuilder content: @escaping () -> Content) {
-        self.title = title
-        self.trailing = trailing
-        self.trailingCls = trailingCls
-        self.footer = footer
-        self.content = content
+        inner = DSExpandGroup(title: title,
+                              trailing: trailing,
+                              trailingCls: trailingCls,
+                              footer: footer,
+                              initiallyExpanded: false,
+                              panel: false,
+                              content: content)
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button {
-                TokensHaptic.select()
-                withAnimation(TokensMotion.value) { expanded.toggle() }
-            } label: {
-                HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
-                    Text(title.uppercased())
-                        .font(TokensTypo.fixed(13))
-                        .tracking(TokensTracking.label)
-                        .foregroundStyle(TokensPalette.secondary)
-                    Spacer(minLength: TokensSpacing.sm)
-                    if let trailing, !trailing.isEmpty {
-                        DSChip(text: trailing, cls: trailingCls)
-                    }
-                    Image(systemName: "chevron.down")
-                        .font(TokensTypo.fixed(11, weight: .semibold))
-                        .foregroundStyle(TokensPalette.tertiary)
-                        .rotationEffect(.degrees(expanded ? 180 : 0))
-                }
-                .padding(.bottom, TokensSpacing.sm)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text(title))
-            .accessibilityValue(Text(expanded ? "已展开" : "已收起"))
-
-            if expanded {
-                VStack(spacing: 0) { content() }
-            }
-
-            if let footer {
-                Text(footer)
-                    .font(TokensTypo.footnote)
-                    .foregroundStyle(TokensPalette.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, TokensSpacing.sm)
-            }
-        }
-    }
+    var body: some View { inner }
 }
 
 struct DSSurfaceModifier: ViewModifier {
