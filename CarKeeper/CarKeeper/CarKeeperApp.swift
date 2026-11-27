@@ -53,6 +53,7 @@ struct CarKeeperApp: App {
     @StateObject private var nav = NavState.shared
 
     init() {
+        NotificationPresenter.shared.install()
     }
 
     var body: some Scene {
@@ -111,7 +112,6 @@ struct CarKeeperApp: App {
             }
             MemoryMonitor.shared.startMonitoring(interval: 10)
             Task { await ChargingStatusMonitor.shared.requestAuthorization() }
-            RemoteLockManager.shared.startMonitoring()
             _ = MaintenanceReminderScheduler.shared
             _ = InsuranceReminderScheduler.shared
             ChargingStatusMonitor.shared.startMonitoring()
