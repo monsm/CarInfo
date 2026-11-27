@@ -640,3 +640,61 @@ final class TripBuilderTests: XCTestCase {
         XCTAssertEqual(merged[0].endAddr, "E")
     }
 }
+
+
+final class MapSpineHelpersTests: XCTestCase {
+
+    private func coord(_ lat: Double, _ lng: Double) -> CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: lat, longitude: lng)
+    }
+
+    func testSpineTripsSkipsTripsWithoutBothEnds() {
+        let withCoords = TripLog(id: UUID(), startTime: Date(), endTime: Date(),
+                                startLocation: CLLocation(coordinate: coord(30, 114)),
+                                endLocation: CLLocation(coordinate: coord(30.01, 114)),
+                                distanceKm: 5, startSoc: 80, endSoc: 60,
+                                avgEfficiency: nil, kmPerPercent: nil)
+        let noEnds = TripLog(id: UUID(), startTime: Date(), endTime: nil,
+                            startLocation: nil, endLocation: nil,
+                            distanceKm: 0, startSoc: 0, endSoc: 0,
+                            avgEfficiency: nil, kmPerPercent: nil)
+        let lines = MapSpineData.spineTrips(from: [withCoords, noEnds])
+        XCTAssertEqual(lines.count, 1)
+        XCTAssertEqual(lines.first?.distanceKm, 5)
+        XCTAssertEqual(lines.first?.startSoc, 80)
+    }
+
+    func testSpineHoldsMarksLatestAndDropsNearRecords() {
+        let latest = CLLocation(coordinate: coord(30.0, 114.0))
+        let history = [ParkingVisit(id: UUID(), location: CLLocation(coordinate: coord(30.0005, 114.0)),
+                                    time: Date(), address: "near"),
+                       ParkingVisit(id: UUID(), location: CLLocation(coordinate: coord(30.05, 114.0)),
+                                    time: Date(), address: "far")]
+        let holds = MapSpineData.spineHolds(latest: latest, history: history,
+                                           lastParkingTime: Date(timeIntervalSince1970: 100))
+        XCTAssertEqual(holds.count, 2)
+        XCTAssertTrue(holds.first?.isLatest == true)
+        XCTAssertEqual(holds.first?.address, "near")
+        XCTAssertEqual(holds.last?.address, "far")
+    }
+
+    func testSpineHoldsWithNoLatestStillListsHistory() {
+        let history = [ParkingVisit(id: UUID(), location: CLLocation(coordinate: coord(30, 114)),
+                                    time: Date(), address: "A")]
+        let holds = MapSpineData.spineHolds(latest: nil, history: history, lastParkingTime: nil)
+        XCTAssertEqual(holds.count, 1)
+        XCTAssertFalse(holds[0].isLatest)
+    }
+
+    func testSpineIssuesUsesCarCoordinateForFailedChips() {
+        let good = StatusChip(label: "ok", ok: true, text: "", cls: "ok")
+        let bad = StatusChip(label: "刹车", ok: false, text: "异常", cls: "bad")
+        let withCar = MapSpineData.spineIssues(car: CLLocation(coordinate: coord(30, 114)),
+                                              chips: [good, bad])
+        XCTAssertEqual(withCar.count, 1)
+        XCTAssertEqual(withCar.first?.title, "刹车 · 异常")
+        XCTAssertEqual(withCar.first?.cls, "bad")
+        XCTAssertEqual(withCar.first?.coordinate, coord(30, 114))
+        XCTAssertTrue(MapSpineData.spineIssues(car: nil, chips: [bad]).isEmpty)
+    }
+}
