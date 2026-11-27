@@ -2,7 +2,8 @@ import Foundation
 import SwiftUI
 import CoreLocation
 
-struct HistoryEntry: Identifiable {
+
+struct CommandRecord: Identifiable {
     let id = UUID()
     let cmd: String
     let name: String
@@ -35,14 +36,14 @@ struct HistoryEntry: Identifiable {
     }
 }
 
-struct EnergyRecord: Identifiable {
+struct EnergySample: Identifiable {
     let id = UUID()
     let timestamp: Date
     let soc: Int
     let range: Int
 }
 
-struct TripRecord: Identifiable {
+struct TripLog: Identifiable {
     let id = UUID()
     let startTime: Date
     let endTime: Date?
@@ -62,28 +63,28 @@ struct TripRecord: Identifiable {
     var endAddr: String = ""
 }
 
-struct ParkingPoint: Codable {
+struct ParkingMark: Codable {
     let lat: Double
     let lng: Double
     let time: Date
     let address: String
 }
 
-struct ParkingRecord: Identifiable {
+struct ParkingVisit: Identifiable {
     let id = UUID()
     let location: CLLocation
     let time: Date
     let address: String
 }
 
-struct MapFocus: Equatable, Identifiable {
+struct MapTarget: Equatable, Identifiable {
     let lat: Double
     let lng: Double
     let label: String
     var id: String { "\(lat),\(lng)" }
 }
 
-enum NetworkStatus: String {
+enum LinkStatus: String {
     case online = "在线"
     case weak = "弱网"
     case offline = "离线"
@@ -100,11 +101,11 @@ enum TripTracker {
 
     static func makeRecord(_ open: Open, distanceKm: Double, endSoc: Int,
                            endLocation: CLLocation?, at time: Date,
-                           endAddr: String) -> TripRecord {
+                           endAddr: String) -> TripLog {
         let socUsed = open.startSoc - endSoc
         let kmPerPercent: Double? = (socUsed > 0 && distanceKm > 0)
             ? distanceKm / Double(socUsed) : nil
-        return TripRecord(
+        return TripLog(
             startTime: open.startTime,
             endTime: time,
             startLocation: open.startLocation,
@@ -129,7 +130,7 @@ enum TripTracker {
 enum ParkingTracker {
     static let minSeparation = 120.0
 
-    static func shouldSkip(last: ParkingPoint?, new: CLLocationCoordinate2D) -> Bool {
+    static func shouldSkip(last: ParkingMark?, new: CLLocationCoordinate2D) -> Bool {
         guard let last else { return false }
         let d = CLLocation(latitude: last.lat, longitude: last.lng)
             .distance(from: CLLocation(latitude: new.latitude, longitude: new.longitude))
@@ -140,7 +141,7 @@ enum ParkingTracker {
 enum CommandHistoryTracker {
     static let cap = 50
 
-    static func insert(_ entry: HistoryEntry, into list: [HistoryEntry]) -> [HistoryEntry] {
+    static func insert(_ entry: CommandRecord, into list: [CommandRecord]) -> [CommandRecord] {
         var out = list
         out.insert(entry, at: 0)
         if out.count > cap { out = Array(out.prefix(cap)) }

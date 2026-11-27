@@ -563,7 +563,7 @@ final class AppDomainTests: XCTestCase {
     }
 
     func testParkingDedupeWithin120m() {
-        let last = ParkingPoint(lat: 30.0, lng: 114.0, time: Date(), address: "")
+        let last = ParkingMark(lat: 30.0, lng: 114.0, time: Date(), address: "")
         XCTAssertTrue(ParkingTracker.shouldSkip(last: last,
                                                 new: CLLocationCoordinate2D(latitude: 30.0005, longitude: 114.0)))
         XCTAssertFalse(ParkingTracker.shouldSkip(last: last,
@@ -573,9 +573,9 @@ final class AppDomainTests: XCTestCase {
     }
 
     func testCommandHistoryKeepsNewestAndCaps() {
-        var list: [HistoryEntry] = []
+        var list: [CommandRecord] = []
         for i in 0..<60 {
-            let e = HistoryEntry(cmd: "c", name: "n\(i)", startedAt: Date(),
+            let e = CommandRecord(cmd: "c", name: "n\(i)", startedAt: Date(),
                                  finishedAt: Date(), success: true, confirmed: true, duration: 1)
             list = CommandHistoryTracker.insert(e, into: list)
         }

@@ -22,15 +22,15 @@ final class AppStore: @unchecked Sendable {
         "control": nil, "check": nil, "messages": nil
     ]
 
-    typealias HistoryEntry = AppDomain.HistoryEntry
-    typealias EnergyRecord = AppDomain.EnergyRecord
-    typealias TripRecord = AppDomain.TripRecord
-    typealias ParkingPoint = AppDomain.ParkingPoint
-    typealias ParkingRecord = AppDomain.ParkingRecord
-    typealias MapFocus = AppDomain.MapFocus
-    typealias NetworkStatus = AppDomain.NetworkStatus
+    typealias HistoryEntry = CommandRecord
+    typealias EnergyRecord = EnergySample
+    typealias TripRecord = TripLog
+    typealias ParkingPoint = ParkingMark
+    typealias ParkingRecord = ParkingVisit
+    typealias MapFocus = MapTarget
+    typealias NetworkStatus = LinkStatus
 
-    typealias OpenTrip = AppDomain.TripTracker.Open
+    typealias OpenTrip = TripTracker.Open
 
     private var cacheTimes: [String: Date] = [:]
 
