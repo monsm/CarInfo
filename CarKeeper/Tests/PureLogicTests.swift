@@ -311,3 +311,117 @@ final class MessageWindowTests: XCTestCase {
         XCTAssertEqual(APIClient.mergeMessages([many]).count, APIClient.messageCap)
     }
 }
+
+
+final class APIEnvelopeTests: XCTestCase {
+
+    func testTokenExpiredEnvelopeIsDetected() {
+        let text = #"{"code":"2","data":"{}","msg":"token expired"}"#
+        let env = APIClient.decodeEnvelope(text)
+        XCTAssertFalse(env.ok)
+        XCTAssertTrue(env.expired)
+        XCTAssertEqual(env.code, 2)
+    }
+
+    func testSuccessEnvelopeWins() {
+        let text = #"{"success":true,"code":0,"data":{"soc":66}}"#
+        let env = APIClient.decodeEnvelope(text)
+        XCTAssertTrue(env.ok)
+        XCTAssertFalse(env.expired)
+        XCTAssertEqual((env.data as? [String: Any])?["soc"] as? Int, 66)
+    }
+
+    func testSuccessFalseBeatsZeroCode() {
+        let text = #"{"success":false,"code":0,"msg":"nope"}"#
+        XCTAssertFalse(APIClient.decodeEnvelope(text).ok)
+    }
+
+    func testDataAsJSONStringIsDecoded() {
+        let text = "{\"code\":0,\"data\":\"[1,2]\"}"
+        let env = APIClient.decodeEnvelope(text)
+        XCTAssertEqual((env.data as? [Any])?.count, 2)
+    }
+
+    func testNonJSONIsFailure() {
+        let env = APIClient.decodeEnvelope("<html>oops</html>")
+        XCTAssertFalse(env.ok)
+        XCTAssertFalse(env.expired)
+    }
+
+    func testBusinessCodeTwoWithoutTokenMessageIsNotExpired() {
+        let text = #"{"code":"2","data":"{}","msg":"some other error"}"#
+        let env = APIClient.decodeEnvelope(text)
+        XCTAssertFalse(env.ok)
+        XCTAssertFalse(env.expired)
+    }
+
+    func testMessageHasMoreOnlyWhenFullPageAndNotLast() {
+        let more = #"{"data":{"size":20,"numberOfElements":20,"last":false}}"#
+        let short = #"{"data":{"size":2000,"numberOfElements":56,"last":false}}"#
+        let last = #"{"data":{"size":20,"numberOfElements":20,"last":true}}"#
+        XCTAssertTrue(APIClient.messageHasMore(more))
+        XCTAssertFalse(APIClient.messageHasMore(short))
+        XCTAssertFalse(APIClient.messageHasMore(last))
+    }
+}
+
+
+final class PureHelpersTests: XCTestCase {
+
+    func testTriStateTreatsMissingAsUnknown() {
+        XCTAssertEqual(AN.triState(nil, on: "正常", off: "异常"), "--")
+        XCTAssertEqual(AN.triState(0, on: "正常", off: "异常"), "正常")
+        XCTAssertEqual(AN.triState(1, on: "正常", off: "异常"), "异常")
+    }
+
+    func testTriStateBool() {
+        XCTAssertEqual(AN.triStateBool(nil, on: "开启", off: "关闭"), "--")
+        XCTAssertEqual(AN.triStateBool(1, on: "开启", off: "关闭"), "开启")
+        XCTAssertEqual(AN.triStateBool(0, on: "开启", off: "关闭"), "关闭")
+    }
+
+    func testCardOrderKeepsUserOrderAndAppendsNewCards() {
+        let known = ["a", "b", "c", "d"]
+        XCTAssertEqual(AppStore.normalizeCardOrder(nil, known: known), known)
+        XCTAssertEqual(AppStore.normalizeCardOrder(["c", "a"], known: known), ["c", "a", "b", "d"])
+        XCTAssertEqual(AppStore.normalizeCardOrder(["gone", "b"], known: known), ["b", "a", "c", "d"])
+    }
+
+    func testHeadingIsNormalizedIntoRange() {
+        let cache: [String: Any?] = ["location": ["Heading": 550.4]]
+        let deg = VM.headingDegFast(cache)
+        XCTAssertGreaterThanOrEqual(deg, 0)
+        XCTAssertLessThan(deg, 360)
+        XCTAssertEqual(deg, 190.4, accuracy: 0.01)
+    }
+}
+
+
+final class DriveScoreTests: XCTestCase {
+
+    func testEffortModeUsesFixedBaseline() {
+        let s = DriveScore(efforts: [15, 15, 15], percents: [])
+        XCTAssertFalse(s.usesPercent)
+        XCTAssertEqual(s.baseline, 15.0)
+        XCTAssertEqual(s.energy, 100)
+        XCTAssertEqual(s.hit, 100)
+    }
+
+    func testPercentModeUsesMedianBaseline() {
+        let s = DriveScore(efforts: [], percents: [10, 12, 14])
+        XCTAssertTrue(s.usesPercent)
+        XCTAssertEqual(s.baseline, 12.0)
+    }
+
+    func testEfficiencyPointsClampToRange() {
+        XCTAssertEqual(DriveScore.efficiencyPoints(30, baseline: 15, lowerIsBetter: true), 40)
+        XCTAssertEqual(DriveScore.efficiencyPoints(5, baseline: 15, lowerIsBetter: true), 100)
+        XCTAssertEqual(DriveScore.efficiencyPoints(30, baseline: 15, lowerIsBetter: true) >= 0, true)
+    }
+
+    func testEmptyInputsProduceNoScore() {
+        let s = DriveScore(efforts: [], percents: [])
+        XCTAssertNil(s.overall)
+        XCTAssertNil(s.grade)
+    }
+}
