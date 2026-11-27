@@ -220,7 +220,6 @@ struct MessagesSection: View {
                                 Button {
                                     store.mapFocus = AppStore.MapFocus(lat: c.lat, lng: c.lng,
                                                                        label: item.title)
-                                    NavState.shared.popToRoot()
                                     TokensHaptic.select()
                                 } label: {
                                     HStack(spacing: TokensSpacing.sm) {

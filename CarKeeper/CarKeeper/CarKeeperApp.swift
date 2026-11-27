@@ -90,9 +90,6 @@ struct CarKeeperApp: App {
                     .onReceive(ToastManager.shared.$currentItem) { item in
                         nav.currentToast = item
                     }
-                    .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
-                        nav.path = []
-                    }
             } else {
                 LoginView()
             }
@@ -131,18 +128,14 @@ struct CarKeeperApp: App {
 
 final class NavState: ObservableObject, @unchecked Sendable {
     static let shared = NavState()
-    @Published var path: [Deeplink] = []
     @Published var currentToast: (text: String, icon: String)? = nil
     @Published var homeSub: HomeSub? = nil
 
     private init() {}
 
-    func popToRoot() { path = [] }
-
     func openMode(_ mode: HomeMode, sub: HomeSub? = nil) {
         UserDefaults.standard.set(mode.rawValue, forKey: HomeMode.storageKey)
         homeSub = sub
-        path = []
     }
 
     func openMode(for link: Deeplink) {
@@ -160,7 +153,7 @@ struct MapShellView: View {
 
 
     private var mapStack: some View {
-        NavigationStack(path: $nav.path) {
+        NavigationStack {
             MapSpineView()
         }
             .onReceive(NotificationCenter.default.publisher(for: .locationUpdated)) { _ in
