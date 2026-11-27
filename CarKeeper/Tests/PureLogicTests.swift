@@ -540,7 +540,7 @@ final class AppDomainTests: XCTestCase {
         let record = TripTracker.makeRecord(open, distanceKm: 60, endSoc: 60,
                                             endLocation: nil, at: Date(timeIntervalSince1970: 3600),
                                             endAddr: "B")
-        XCTAssertEqual(record.kmPerPercent, 3.0, accuracy: 0.0001)
+        XCTAssertEqual(record.kmPerPercent ?? -1, 3.0, accuracy: 0.0001)
         XCTAssertEqual(record.distanceKm, 60)
         XCTAssertEqual(record.startAddr, "A")
         XCTAssertEqual(record.endAddr, "B")
@@ -649,12 +649,12 @@ final class MapSpineHelpersTests: XCTestCase {
     }
 
     func testSpineTripsSkipsTripsWithoutBothEnds() {
-        let withCoords = TripLog(id: UUID(), startTime: Date(), endTime: Date(),
-                                startLocation: CLLocation(coordinate: coord(30, 114)),
-                                endLocation: CLLocation(coordinate: coord(30.01, 114)),
+        let withCoords = TripLog(startTime: Date(), endTime: Date(),
+                                startLocation: CLLocation(latitude: 30, longitude: 114),
+                                endLocation: CLLocation(latitude: 30.01, longitude: 114),
                                 distanceKm: 5, startSoc: 80, endSoc: 60,
                                 avgEfficiency: nil, kmPerPercent: nil)
-        let noEnds = TripLog(id: UUID(), startTime: Date(), endTime: nil,
+        let noEnds = TripLog(startTime: Date(), endTime: nil,
                             startLocation: nil, endLocation: nil,
                             distanceKm: 0, startSoc: 0, endSoc: 0,
                             avgEfficiency: nil, kmPerPercent: nil)
@@ -665,10 +665,10 @@ final class MapSpineHelpersTests: XCTestCase {
     }
 
     func testSpineHoldsMarksLatestAndDropsNearRecords() {
-        let latest = CLLocation(coordinate: coord(30.0, 114.0))
-        let history = [ParkingVisit(id: UUID(), location: CLLocation(coordinate: coord(30.0005, 114.0)),
+        let latest = CLLocation(latitude: 30.0, longitude: 114.0)
+        let history = [ParkingVisit(location: CLLocation(latitude: 30.0005, longitude: 114.0),
                                     time: Date(), address: "near"),
-                       ParkingVisit(id: UUID(), location: CLLocation(coordinate: coord(30.05, 114.0)),
+                       ParkingVisit(location: CLLocation(latitude: 30.05, longitude: 114.0),
                                     time: Date(), address: "far")]
         let holds = MapSpineData.spineHolds(latest: latest, history: history,
                                            lastParkingTime: Date(timeIntervalSince1970: 100))
@@ -679,7 +679,7 @@ final class MapSpineHelpersTests: XCTestCase {
     }
 
     func testSpineHoldsWithNoLatestStillListsHistory() {
-        let history = [ParkingVisit(id: UUID(), location: CLLocation(coordinate: coord(30, 114)),
+        let history = [ParkingVisit(location: CLLocation(latitude: 30, longitude: 114),
                                     time: Date(), address: "A")]
         let holds = MapSpineData.spineHolds(latest: nil, history: history, lastParkingTime: nil)
         XCTAssertEqual(holds.count, 1)
@@ -689,12 +689,43 @@ final class MapSpineHelpersTests: XCTestCase {
     func testSpineIssuesUsesCarCoordinateForFailedChips() {
         let good = StatusChip(label: "ok", ok: true, text: "", cls: "ok")
         let bad = StatusChip(label: "刹车", ok: false, text: "异常", cls: "bad")
-        let withCar = MapSpineData.spineIssues(car: CLLocation(coordinate: coord(30, 114)),
+        let withCar = MapSpineData.spineIssues(car: CLLocation(latitude: 30, longitude: 114),
                                               chips: [good, bad])
         XCTAssertEqual(withCar.count, 1)
         XCTAssertEqual(withCar.first?.title, "刹车 · 异常")
         XCTAssertEqual(withCar.first?.cls, "bad")
-        XCTAssertEqual(withCar.first?.coordinate, coord(30, 114))
+        XCTAssertEqual(withCar.first?.coordinate?.latitude ?? 0, 30, accuracy: 0.0001)
+        XCTAssertEqual(withCar.first?.coordinate?.longitude ?? 0, 114, accuracy: 0.0001)
         XCTAssertTrue(MapSpineData.spineIssues(car: nil, chips: [bad]).isEmpty)
+    }
+}
+
+
+final class TripBuilderEdgeTests: XCTestCase {
+
+    private func message(kind: String, lat: Double, lng: Double, addr: String) -> [String: Any] {
+        let jump = "{\"action\":\"INNER_JUMP\",\"uriParams\":{\"gpsTime\":\"2026-09-22 07:08:25\","
+            + "\"lat\":\(lat),\"lng\":\(lng),\"addrName\":\"\(addr)\"}}"
+        return ["infoTypeId": kind, "createdAt": "2026-09-22 07:08:25", "jumpParam": jump]
+    }
+
+    /// 展示路径历来接受没有 StubId/Id 的事件；解码器不能再把它们丢掉。
+    func testEventsKeepRowsWithoutId() {
+        let events = TripBuilder.events(from: [message(kind: "IGNITION", lat: 30, lng: 114, addr: "A")])
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events[0].id, "")
+    }
+
+    func testDisplayTripsPairsIdlessEvents() {
+        let msgs = [message(kind: "IGNITION", lat: 30.0, lng: 114.0, addr: "A"),
+                    message(kind: "FLAMEOUT", lat: 30.01, lng: 114.0, addr: "B")]
+        XCTAssertEqual(TripBuilder.displayTrips(from: TripBuilder.events(from: msgs)).count, 1)
+    }
+
+    /// 日分组标签按本机时区解析同一个日期串，今天必须判成今天。
+    func testDayLabelTodayUsesConsistentTimeZone() {
+        let now = Date()
+        let key = DateText.shared.string(now, "yyyy-MM-dd")
+        XCTAssertEqual(MessageGrouping.dayLabel(key, now: now), "今天")
     }
 }

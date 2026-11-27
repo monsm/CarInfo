@@ -167,7 +167,6 @@ enum TripBuilder {
             guard let kind = ciString(m, ["InfoTypeId", "infoTypeId"])?.uppercased(),
                   kind == "IGNITION" || kind == "FLAMEOUT" else { return nil }
             let id = ciString(m, ["StubId", "stubId"]) ?? ciString(m, ["Id", "id"]) ?? ""
-            guard !id.isEmpty else { return nil }
             let p = AppStore.jumpParams(m)
             guard let at = VM.serverDate(p["gpsTime"])
                     ?? VM.serverDate(ciPick(m, ["CreatedAt", "createdAt"])) else { return nil }

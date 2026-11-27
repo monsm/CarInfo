@@ -169,7 +169,8 @@ final class AppStore: @unchecked Sendable {
     func ingestEvents(_ messages: [[String: Any]]) {
         guard !carId.isEmpty else { return }
         var seen = processedEventIds
-        let ordered = TripBuilder.events(from: messages).filter { !seen.contains($0.id) }
+        let ordered = TripBuilder.events(from: messages)
+            .filter { !$0.id.isEmpty && !seen.contains($0.id) }
         guard !ordered.isEmpty else { return }
 
         let soc = ciNumberInt(ciVal(caches, "charge"), ["RemainPower"])

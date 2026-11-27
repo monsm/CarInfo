@@ -99,8 +99,7 @@ enum MessageGrouping {
 
     static func dayLabel(_ key: String, now: Date = Date()) -> String {
         guard !key.isEmpty else { return "更早" }
-        guard let d = DateText.shared.date(key, formats: ["yyyy-MM-dd"],
-                                           timeZone: DateText.serverTimeZone) else { return "更早" }
+        guard let d = DateText.shared.date(key, formats: ["yyyy-MM-dd"]) else { return "更早" }
         let cal = Calendar.current
         let diff = cal.dateComponents([.day], from: d, to: now).day ?? 0
         switch diff {

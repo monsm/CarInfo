@@ -255,7 +255,6 @@ struct MapSpineData {
         }
     }
 
-    @MainActor
     static func spineTrips(from trips: [AppStore.TripRecord]) -> [MapTripLine] {
         trips.compactMap { t in
             guard let a = t.startLocation?.coordinate, let b = t.endLocation?.coordinate else {
@@ -275,7 +274,6 @@ struct MapSpineData {
         }
     }
 
-    @MainActor
     static func spineHolds(latest: CLLocation?, history: [AppStore.ParkingRecord],
                           lastParkingTime: Date?) -> [MapHoldPoint] {
         var holds: [MapHoldPoint] = []
