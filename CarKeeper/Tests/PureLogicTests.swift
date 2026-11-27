@@ -583,3 +583,60 @@ final class AppDomainTests: XCTestCase {
         XCTAssertEqual(list.first?.name, "n59")
     }
 }
+
+
+final class TripBuilderTests: XCTestCase {
+
+    private func message(kind: String, id: String, lat: Double, lng: Double, addr: String) -> [String: Any] {
+        let jump = "{\"action\":\"INNER_JUMP\",\"uriParams\":{\"gpsTime\":\"2026-09-22 07:08:25\","
+            + "\"lat\":\(lat),\"lng\":\(lng),\"addrName\":\"\(addr)\"}}"
+        return ["infoTypeId": kind, "stubId": id,
+                "createdAt": "2026-09-22 07:08:25", "jumpParam": jump]
+    }
+
+    func testEventsDecodeBothKinds() {
+        let msgs = [message(kind: "IGNITION", id: "a", lat: 30.0, lng: 114.0, addr: "A"),
+                    message(kind: "FLAMEOUT", id: "b", lat: 30.01, lng: 114.0, addr: "B"),
+                    ["infoTypeId": "OTHER", "stubId": "c"]]
+        let events = TripBuilder.events(from: msgs)
+        XCTAssertEqual(events.count, 2)
+        XCTAssertTrue(events[0].ignition)
+        XCTAssertFalse(events[1].ignition)
+        XCTAssertEqual(events[1].addr, "B")
+        XCTAssertNotNil(events[0].coordinate)
+    }
+
+    func testDisplayTripsPairsAndComputesDistance() {
+        let msgs = [message(kind: "IGNITION", id: "a", lat: 30.0, lng: 114.0, addr: "A"),
+                    message(kind: "FLAMEOUT", id: "b", lat: 30.01, lng: 114.0, addr: "B")]
+        let trips = TripBuilder.displayTrips(from: TripBuilder.events(from: msgs))
+        XCTAssertEqual(trips.count, 1)
+        XCTAssertGreaterThan(trips[0].distanceKm, 1.0)
+        XCTAssertEqual(trips[0].startAddr, "A")
+        XCTAssertEqual(trips[0].endAddr, "B")
+    }
+
+    func testOpenIgnitionProducesUnfinishedTrip() {
+        let msgs = [message(kind: "IGNITION", id: "a", lat: 30.0, lng: 114.0, addr: "A")]
+        let trips = TripBuilder.displayTrips(from: TripBuilder.events(from: msgs))
+        XCTAssertEqual(trips.count, 1)
+        XCTAssertNil(trips[0].endTime)
+        XCTAssertEqual(trips[0].distanceKm, 0)
+    }
+
+    func testMergePrefersStoredDistanceAndFillsAddresses() {
+        let stored = TripLog(startTime: Date(timeIntervalSince1970: 100), endTime: nil,
+                             startLocation: nil, endLocation: nil, distanceKm: 5,
+                             startSoc: 0, endSoc: 0, avgEfficiency: nil, kmPerPercent: nil,
+                             startAddr: "S", endAddr: "")
+        let fromMsg = TripLog(startTime: Date(timeIntervalSince1970: 100), endTime: nil,
+                              startLocation: nil, endLocation: nil, distanceKm: 0,
+                              startSoc: 0, endSoc: 0, avgEfficiency: nil, kmPerPercent: nil,
+                              startAddr: "M", endAddr: "E")
+        let merged = TripBuilder.merge(fromMessages: [fromMsg], stored: [stored])
+        XCTAssertEqual(merged.count, 1)
+        XCTAssertEqual(merged[0].distanceKm, 5)
+        XCTAssertEqual(merged[0].startAddr, "S")
+        XCTAssertEqual(merged[0].endAddr, "E")
+    }
+}

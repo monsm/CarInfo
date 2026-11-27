@@ -169,22 +169,7 @@ final class AppStore: @unchecked Sendable {
     func ingestEvents(_ messages: [[String: Any]]) {
         guard !carId.isEmpty else { return }
         var seen = processedEventIds
-        let events = messages.compactMap { m -> (id: String, ignition: Bool, at: Date,
-                                                  loc: CLLocation?, addr: String)? in
-            guard let kind = ciString(m, ["InfoTypeId", "infoTypeId"])?.uppercased(),
-                  kind == "IGNITION" || kind == "FLAMEOUT" else { return nil }
-            let id = ciString(m, ["StubId", "stubId"]) ?? ciString(m, ["Id", "id"]) ?? ""
-            guard !id.isEmpty, !seen.contains(id) else { return nil }
-            let p = Self.jumpParams(m)
-            guard let at = VM.serverDate(p["gpsTime"])
-                    ?? VM.serverDate(ciPick(m, ["CreatedAt", "createdAt"])) else { return nil }
-            var loc: CLLocation?
-            if let lat = VM.vnum(p["lat"]), let lng = VM.vnum(p["lng"]) {
-                loc = CLLocation(latitude: lat, longitude: lng)
-            }
-            return (id, kind == "IGNITION", at, loc, (p["addrName"] as? String) ?? "")
-        }
-        let ordered = events.sorted { $0.at < $1.at }
+        let ordered = TripBuilder.events(from: messages).filter { !seen.contains($0.id) }
         guard !ordered.isEmpty else { return }
 
         let soc = ciNumberInt(ciVal(caches, "charge"), ["RemainPower"])
@@ -192,12 +177,12 @@ final class AppStore: @unchecked Sendable {
         for e in ordered {
             seen.insert(e.id)
             if e.ignition {
-                startTrip(e.loc, soc: soc, at: e.at, mileage: mileage, addr: e.addr)
+                startTrip(e.location, soc: soc, at: e.at, mileage: mileage, addr: e.addr)
             } else {
                 let km = TripTracker.tripKm(open: currentTrip, endMileage: mileage)
-                _ = endTrip(distanceKm: km, endSoc: soc, endLocation: e.loc, at: e.at,
+                _ = endTrip(distanceKm: km, endSoc: soc, endLocation: e.location, at: e.at,
                             endAddr: e.addr)
-                saveParkingLocation(e.loc, at: e.at, address: e.addr)
+                saveParkingLocation(e.location, at: e.at, address: e.addr)
             }
         }
         processedEventIds = seen

@@ -28,81 +28,11 @@ struct TripsEventsView: View {
 
     private var tripsFromMessages: [AppStore.TripRecord] {
         let raw = store.caches["messages"] as? [[String: Any]] ?? []
-        guard !raw.isEmpty else { return [] }
-        let events: [(ignition: Bool, at: Date, loc: CLLocationCoordinate2D?, addr: String)] = raw
-            .compactMap { m -> (Bool, Date, CLLocationCoordinate2D?, String)? in
-                guard let kind = ciString(m, ["InfoTypeId", "infoTypeId"])?.uppercased(),
-                      kind == "IGNITION" || kind == "FLAMEOUT" else { return nil }
-                let p = AppStore.jumpParams(m)
-                let fallbackAt = VM.serverDate(ciPick(m, ["CreatedAt", "createdAt"]))
-                guard let at = VM.serverDate(p["gpsTime"]) ?? fallbackAt else { return nil }
-                var loc: CLLocationCoordinate2D?
-                if let lat = VM.vnum(p["lat"]), let lng = VM.vnum(p["lng"]) {
-                    loc = CLLocationCoordinate2D(latitude: lat, longitude: lng)
-                }
-                let addr = (p["addrName"] as? String) ?? ""
-                return (kind == "IGNITION", at, loc, addr)
-            }
-            .sorted { $0.at < $1.at }
-
-        var out: [AppStore.TripRecord] = []
-        var open: (ignitionAt: Date, ignitionLoc: CLLocationCoordinate2D?, ignitionAddr: String)?
-        for e in events {
-            if e.ignition {
-                open = (e.at, e.loc, e.addr)
-            } else if let o = open {
-                let dist: Double = {
-                    guard let a = o.ignitionLoc, let b = e.loc else { return 0 }
-                    let m1 = CLLocation(latitude: a.latitude, longitude: a.longitude)
-                    let m2 = CLLocation(latitude: b.latitude, longitude: b.longitude)
-                    return m1.distance(from: m2) / 1000
-                }()
-                out.append(AppStore.TripRecord(
-                    startTime: o.ignitionAt, endTime: e.at,
-                    startLocation: o.ignitionLoc.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) },
-                    endLocation: e.loc.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) },
-                    distanceKm: dist,
-                    startSoc: 0, endSoc: 0,
-                    avgEfficiency: nil, kmPerPercent: nil,
-                    startAddr: o.ignitionAddr, endAddr: e.addr))
-                open = nil
-            }
-        }
-        if let o = open {
-            out.append(AppStore.TripRecord(
-                startTime: o.ignitionAt, endTime: nil,
-                startLocation: o.ignitionLoc.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) },
-                endLocation: nil,
-                distanceKm: 0,
-                startSoc: 0, endSoc: 0,
-                avgEfficiency: nil, kmPerPercent: nil))
-        }
-        return out
+        return TripBuilder.displayTrips(from: TripBuilder.events(from: raw))
     }
 
     private var displayTrips: [AppStore.TripRecord] {
-        let m = tripsFromMessages
-        guard !m.isEmpty else { return trips }
-        var byStart: [Date: AppStore.TripRecord] = [:]
-        for t in m { byStart[t.startTime] = t }
-        for t in trips {
-            guard let cand = byStart[t.startTime] else {
-                byStart[t.startTime] = t
-                continue
-            }
-            var winner: AppStore.TripRecord
-            var loser: AppStore.TripRecord
-            if t.distanceKm > 0 && cand.distanceKm <= 0 { winner = t; loser = cand }
-            else { winner = cand; loser = t }
-            if winner.startAddr.isEmpty { winner.startAddr = loser.startAddr }
-            if winner.endAddr.isEmpty { winner.endAddr = loser.endAddr }
-            byStart[t.startTime] = winner
-        }
-        let all = Array(byStart.values)
-        return all.filter { $0.distanceKm > 0 }
-            .sorted { $0.startTime > $1.startTime }
-            + all.filter { $0.distanceKm == 0 }
-                .sorted { $0.startTime > $1.startTime }
+        TripBuilder.merge(fromMessages: tripsFromMessages, stored: trips)
     }
 
     private func loadMoreTrips() {
