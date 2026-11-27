@@ -39,7 +39,9 @@ struct ACStepperView: View {
                     .foregroundStyle(TokensPalette.labelOnTint)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, TokensSpacing.md)
-                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(TokensPalette.ambient))
+                    .background(RoundedRectangle(cornerRadius: TokensRadius.medium,
+                                                 style: .continuous)
+                        .fill(TokensPalette.ambient))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, TokensSpacing.sm)

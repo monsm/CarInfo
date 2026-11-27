@@ -5,7 +5,7 @@ import Charts
 
 struct DSTrendChart: View {
     struct Point: Identifiable {
-        let id = UUID()
+        var id: String { "\(t.timeIntervalSince1970)-\(v)" }
         let t: Date
         let v: Double
     }

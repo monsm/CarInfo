@@ -19,9 +19,10 @@ struct PINKeypadView: View {
                     Text(i < pin.count ? String(pin[pin.index(pin.startIndex, offsetBy: i)]) : "")
                         .font(TokensTypo.metric(26))
                         .frame(width: 42, height: 54)
-                        .background(TokensPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 12, style:
- .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .background(TokensPalette.fillSubtle,
+                                    in: RoundedRectangle(cornerRadius: TokensRadius.medium,
+                                                         style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
                             .strokeBorder(i == pin.count ? TokensPalette.ambient : Color(.systemGray4),
                                           lineWidth: i == pin.count ? 2 : 1))
                 }
@@ -40,8 +41,9 @@ struct PINKeypadView: View {
                         }
                         .font(TokensTypo.metric(26))
                         .frame(maxWidth: .infinity, minHeight: 56)
-                        .background(TokensPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 14, style:
- .continuous))
+                        .background(TokensPalette.fillSubtle,
+                                    in: RoundedRectangle(cornerRadius: TokensRadius.medium,
+                                                         style: .continuous))
                         .foregroundStyle(TokensPalette.primary)
                     }
                     .buttonStyle(.plain)

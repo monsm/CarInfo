@@ -2,11 +2,15 @@ import SwiftUI
 
 enum SafeSymbol {
     private static var cache: [String: String] = [:]
+    private static let lock = NSLock()
 
     static func name(_ requested: String, fallback: String = "questionmark.circle.fill") -> String {
-        if let hit = cache[requested] { return hit }
+        let key = requested + "|" + fallback
+        lock.lock()
+        defer { lock.unlock() }
+        if let hit = cache[key] { return hit }
         let resolved = UIImage(systemName: requested) != nil ? requested : fallback
-        cache[requested] = resolved
+        cache[key] = resolved
         return resolved
     }
 }

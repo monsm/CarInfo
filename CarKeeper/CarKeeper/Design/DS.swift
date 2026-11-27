@@ -262,7 +262,7 @@ struct DSRing<Content: View>: View {
 
 struct DSStatStrip: View {
     struct Item: Identifiable {
-        let id = UUID()
+        var id: String { label }
         var label: String
         var value: String
         var second: String? = nil

@@ -375,7 +375,9 @@ struct ChargeView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, TokensSpacing.sm)
-        .background(TokensPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(TokensPalette.fillSubtle,
+                    in: RoundedRectangle(cornerRadius: TokensRadius.medium,
+                                         style: .continuous))
     }
 
 

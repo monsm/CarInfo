@@ -39,7 +39,8 @@ struct GlassCardHead: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
             Text(title)
-                .font(TokensTypo.sectionLabel)
+                .font(TokensTypo.fixed(13))
+                .tracking(TokensTracking.label)
                 .foregroundStyle(TokensInk.secondary)
                 .textCase(.uppercase)
             Spacer(minLength: TokensSpacing.sm)

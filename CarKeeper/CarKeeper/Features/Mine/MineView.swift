@@ -185,13 +185,13 @@ struct MineView: View {
                         .frame(maxWidth: .infinity)
                         .clipped()
                         .allowsHitTesting(false)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium))
                 } else {
                     Rectangle()
                         .fill(TokensPalette.fillSubtle)
                         .frame(height: 120)
                         .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium))
                         .overlay {
                             Text("没有选图（铺画布底色）")
                                 .font(TokensTypo.caption)

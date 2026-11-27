@@ -3,7 +3,7 @@ import SwiftUI
 enum StackSpec {
 
     enum Card {
-        static let radius = CGFloat(26)
+        static let radius = TokensRadius.card
         static let padH = CGFloat(18)
         static let padTop = CGFloat(17)
         static let padBottom = CGFloat(16)

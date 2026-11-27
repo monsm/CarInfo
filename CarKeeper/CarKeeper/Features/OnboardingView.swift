@@ -78,7 +78,7 @@ struct OnboardingView: View {
     private func onboardingPage(_ page: OnboardingPage) -> some View {
         VStack(spacing: TokensSpacing.lg) {
             ZStack {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: TokensRadius.large, style: .continuous)
                     .fill(TokensPalette.ambient)
                     .frame(width: 96, height: 96)
                 Image(safeSymbol: page.icon, fallback: "car.fill")
