@@ -28,6 +28,7 @@ final class HistoryStore {
     private var dirty = false
     private var lastSave = Date.distantPast
     private let saveThrottle: TimeInterval = 20
+    private let saveQueue = DispatchQueue(label: "carkeeper.history.save", qos: .utility)
 
     private init() {
         load()
@@ -70,8 +71,10 @@ final class HistoryStore {
     func clear() {
         soc = []
         power = []
-        UserDefaults.standard.removeObject(forKey: socKey)
-        UserDefaults.standard.removeObject(forKey: powerKey)
+        saveQueue.sync {
+            UserDefaults.standard.removeObject(forKey: socKey)
+            UserDefaults.standard.removeObject(forKey: powerKey)
+        }
     }
 
 
@@ -87,10 +90,16 @@ final class HistoryStore {
     }
 
     private func save() {
-        let enc = JSONEncoder()
-        enc.dateEncodingStrategy = .secondsSince1970
-        if let d = try? enc.encode(soc) { UserDefaults.standard.set(d, forKey: socKey) }
-        if let d = try? enc.encode(power) { UserDefaults.standard.set(d, forKey: powerKey) }
+        let socSnapshot = soc
+        let powerSnapshot = power
+        let socKey = self.socKey
+        let powerKey = self.powerKey
+        saveQueue.async {
+            let enc = JSONEncoder()
+            enc.dateEncodingStrategy = .secondsSince1970
+            if let d = try? enc.encode(socSnapshot) { UserDefaults.standard.set(d, forKey: socKey) }
+            if let d = try? enc.encode(powerSnapshot) { UserDefaults.standard.set(d, forKey: powerKey) }
+        }
     }
 
     private func load() {

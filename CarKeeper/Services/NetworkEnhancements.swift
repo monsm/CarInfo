@@ -16,18 +16,31 @@ class NetworkQualityMonitor: ObservableObject {
     private init() {
         monitor.pathUpdateHandler = { [weak self] path in
             guard let self = self else { return }
-            self.isReachable = path.status == .satisfied
+            let reachable = path.status == .satisfied
+            let type: String
             if path.usesInterfaceType(.wifi) {
-                self.connectionType = "WiFi"
+                type = "WiFi"
             } else if path.usesInterfaceType(.cellular) {
-                self.connectionType = "蜂窝"
+                type = "蜂窝"
             } else if path.usesInterfaceType(.wiredEthernet) {
-                self.connectionType = "有线"
+                type = "有线"
             } else {
-                self.connectionType = "未知"
+                type = "未知"
+            }
+            DispatchQueue.main.async {
+                self.isReachable = reachable
+                self.connectionType = type
             }
         }
         monitor.start(queue: queue)
+    }
+
+    func stop() {
+        monitor.cancel()
+    }
+
+    deinit {
+        monitor.cancel()
     }
 
 

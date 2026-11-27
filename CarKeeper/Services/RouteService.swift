@@ -14,6 +14,8 @@ final class RouteService: ObservableObject {
     private static let base = "https://router.project-osrm.org/route/v1/driving/"
 
     private var cache: [String: Route] = [:]
+    private var cacheOrder: [String] = []
+    private let cacheCap = 64
     private var inflight: [String: Task<Route?, Never>] = [:]
     @Published private(set) var revision: Int = 0
 
@@ -21,7 +23,10 @@ final class RouteService: ObservableObject {
 
     func route(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) async -> Route? {
         let key = Self.key(a, b)
-        if let hit = cache[key] { return hit }
+        if let hit = cache[key] {
+            touch(key)
+            return hit
+        }
         if let flying = inflight[key] { return await flying.value }
         let task = Task<Route?, Never> { await Self.fetch(a, b) }
         inflight[key] = task
@@ -29,9 +34,19 @@ final class RouteService: ObservableObject {
         inflight[key] = nil
         if let out {
             cache[key] = out
+            touch(key)
             revision += 1
         }
         return out
+    }
+
+    private func touch(_ key: String) {
+        if let i = cacheOrder.firstIndex(of: key) { cacheOrder.remove(at: i) }
+        cacheOrder.append(key)
+        while cacheOrder.count > cacheCap {
+            let oldest = cacheOrder.removeFirst()
+            cache.removeValue(forKey: oldest)
+        }
     }
 
     func cached(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) -> Route? {

@@ -53,6 +53,7 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
     }
 
     private static let imageFile = "carkeeper-wallpaper.jpg"
+    private var isRefreshing = false
 
     private static let bingIndex =
         "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=zh-CN"
@@ -127,6 +128,9 @@ final class WallpaperService: ObservableObject, @unchecked Sendable {
 
     func refresh(force: Bool) async {
         guard source.isRemote else { return }
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
         let today = Self.dayStamp()
         if !force, UserDefaults.standard.integer(forKey: Key.stamp) == today, image != nil { return }
         let kind = source

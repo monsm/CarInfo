@@ -40,10 +40,11 @@ class MemoryMonitor: ObservableObject {
 
         let bytes = Double(taskInfo.resident_size)
         let mb = bytes / 1024.0 / 1024.0
-        warningLevel = mb > 500 ? 2 : mb > 300 ? 1 : 0
+        let level = mb > 500 ? 2 : mb > 300 ? 1 : 0
 
         DispatchQueue.main.async {
             self.usedMemoryMB = mb
+            self.warningLevel = level
         }
     }
 }
