@@ -485,3 +485,47 @@ final class MessageFeedTests: XCTestCase {
         XCTAssertTrue(MessageDecoder.decode([m], readSet: ["s2"]).first!.read)
     }
 }
+
+
+final class BodyStateTests: XCTestCase {
+
+    func testNilOrEmptyControlProducesNoState() {
+        XCTAssertNil(BodyState(control: nil))
+        XCTAssertNil(BodyState(control: [:]))
+    }
+
+    func testClosedAndLockedDoorsAreOK() {
+        let state = BodyState(control: [
+            "LeftFrontDoor": 0, "LeftFrontDoorLock": 0
+        ])
+        XCTAssertEqual(state?.doorRows.count, 1)
+        XCTAssertEqual(state?.doorRows.first?.value, "已关 · 已锁")
+        XCTAssertEqual(state?.doorRows.first?.cls, "ok")
+        XCTAssertEqual(state?.summary, "全部正常")
+    }
+
+    func testOpenDoorIsAbnormal() {
+        let state = BodyState(control: ["LeftFrontDoor": 1, "LeftFrontDoorLock": 0])
+        XCTAssertEqual(state?.doorRows.first?.cls, "bad")
+        XCTAssertEqual(state?.summary, "1 项异常")
+        XCTAssertEqual(state?.cls, "bad")
+    }
+
+    func testWindowDegreeAndLampAndHood() {
+        let state = BodyState(control: [
+            "LeftAnteriorWindowDegree": 30, "LowBeam": 1, "Hood": 1
+        ])
+        XCTAssertEqual(state?.windowRows.first?.value, "开启 30°")
+        XCTAssertEqual(state?.windowRows.first?.cls, "bad")
+        XCTAssertEqual(state?.lampRows.first?.value, "亮")
+        XCTAssertEqual(state?.extraRows.first?.label, "引擎盖")
+        XCTAssertEqual(state?.extraRows.first?.cls, "bad")
+        XCTAssertEqual(state?.summary, "2 项异常")
+    }
+
+    func testOnlyLampsStillGetsSummary() {
+        let state = BodyState(control: ["HighBeam": 0])
+        XCTAssertEqual(state?.lampRows.first?.value, "灭")
+        XCTAssertEqual(state?.summary, "全部正常")
+    }
+}

@@ -55,109 +55,16 @@ struct ControlView: View {
     @State private var request: ControlRequest?
     @State private var doorPart: CarPart?
 
-    private var bodyDetail: (
-        summary: String, cls: String,
-        doorRows: [(String, String, String)],
-        windowRows: [(String, String, String)],
-        extraRows: [(String, String, String)],
-        lampRows: [(String, String)]
-    )? {
-        guard let ctrl = ciVal(store.caches, "control") else { return nil }
-        let hasCtrl = ctrl.count > 0
-        guard hasCtrl else { return nil }
-
-        func num(_ k: String) -> Int? {
-            ciNumberInt(ctrl, [k])
-        }
-        func s(_ k: String) -> String? {
-            ciString(ctrl, [k])
-        }
-
-        var doorRows: [(String, String, String)] = []
-        let doorDefs: [(String, String, String)] = [
-            ("左前门", "LeftFrontDoor", "LeftFrontDoorLock"),
-            ("右前门", "RightFrontDoor", "RightFrontDoorLock"),
-            ("左后门", "LeftRearDoor", "LeftRearDoorLock"),
-            ("右后门", "RightRearDoor", "RightRearDoorLock")
-        ]
-        for (label, doorK, lockK) in doorDefs {
-            let d = num(doorK), lk = num(lockK)
-            if d == nil && lk == nil { continue }
-            let parts: [String] = [
-                d.map { $0 == 0 ? "已关" : "开启" },
-                lk.map { $0 == 0 ? "已锁" : "未锁" }
-            ].compactMap { $0 }
-            if !parts.isEmpty {
-                let isBad = d != nil && d! != 0 || lk != nil && lk! != 0
-                doorRows.append((label, parts.joined(separator: " · "), isBad ? "bad" : "ok"))
-            }
-        }
-
-        var windowRows: [(String, String, String)] = []
-        let winDefs: [(String, String, String)] = [
-            ("左前窗", "LeftAnteriorWindowDegree", ""),
-            ("右前窗", "RightAnteriorWindowDegree", ""),
-            ("左后窗", "LeftRearWindowDegree", ""),
-            ("右后窗", "RightRearWindowDegree", "")
-        ]
-        for (label, degK, _) in winDefs {
-            let deg = num(degK)
-            if deg == nil { continue }
-            let v = deg == 0 ? "关闭" : "开启 \(deg!)°"
-            windowRows.append((label, v, deg != 0 ? "bad" : "ok"))
-        }
-
-        var lampRows: [(String, String)] = []
-        let lampDefs: [(String, String, String?)] = [
-            ("近光灯", "LowBeam", nil),
-            ("远光灯", "HighBeam", nil),
-            ("前雾灯", "FrontFoglamp", "FrontFogLight"),
-            ("后雾灯", "RearFoglamp", "RearFogLight"),
-            ("示廓灯", "PositionLamp", "PositionLight"),
-            ("左转向灯", "LeftTurnSignal", "TurnLndicatorLeft"),
-            ("右转向灯", "RightTurnSignal", "TurnLndicatorRight")
-        ]
-        for (label, k1, k2) in lampDefs {
-            let x1 = num(k1), x2 = k2.map { num($0) }
-            if x1 == nil && x2 == nil { continue }
-            let isOn = (x1 != nil && x1! != 0) || (x2 != nil && x2! != 0)
-            lampRows.append((label, isOn ? "亮" : "灭"))
-        }
-
-        var extraRows: [(String, String, String)] = []
-        if let hood = ciNumber(ctrl, ["Hood", "hood"]) {
-            let v = hood == 0 ? "关闭" : "开启"
-            extraRows.append(("引擎盖", v, hood != 0 ? "bad" : "ok"))
-        }
-        if let sunroof = ciNumber(ctrl, ["Sunroof", "sunroof"]) {
-            let v = sunroof == 0 ? "关闭" : "开启"
-            extraRows.append(("天窗", v, sunroof != 0 ? "bad" : "ok"))
-        }
-        let badDoors = doorRows.filter { $0.2 == "bad" }.count
-        let badWindows = windowRows.filter { $0.2 == "bad" }.count
-        let badExtra = extraRows.filter { $0.2 == "bad" }.count
-        let badCount = badDoors + badWindows + badExtra
-        let summary = doorRows.isEmpty && windowRows.isEmpty && lampRows.isEmpty
-            ? "--"
-            : (badCount > 0 ? "\(badCount) 项异常" : "全部正常")
-        let cls = badCount > 0 ? "bad" : "ok"
-
-        return (summary: summary, cls: cls,
-                doorRows: doorRows, windowRows: windowRows,
-                extraRows: extraRows, lampRows: lampRows)
+    private var bodyDetail: BodyState? {
+        BodyState(control: ciVal(store.caches, "control"))
     }
-    private func bodyDetailCard(
-        _ bd: (summary: String, cls: String,
-               doorRows: [(String, String, String)],
-               windowRows: [(String, String, String)],
-               extraRows: [(String, String, String)],
-               lampRows: [(String, String)])) -> some View {
+    private func bodyDetailCard(_ bd: BodyState) -> some View {
         DSExpandGroup(title: "车身状态", trailing: bd.summary, trailingCls: bd.cls) {
             if !bd.doorRows.isEmpty {
                 DSGroupRow(showsSeparator: true) { sectionLabel("车门") }
                 ForEach(Array(bd.doorRows.enumerated()), id: \.offset) { idx, r in
                     DSGroupRow(showsSeparator: idx < bd.doorRows.count - 1) {
-                        DSKeyValueRow(key: r.0, value: r.1, valueCls: r.2)
+                        DSKeyValueRow(key: r.label, value: r.value, valueCls: r.cls)
                     }
                 }
             }
@@ -165,7 +72,7 @@ struct ControlView: View {
                 DSGroupRow(showsSeparator: true) { sectionLabel("车窗") }
                 ForEach(Array(bd.windowRows.enumerated()), id: \.offset) { idx, r in
                     DSGroupRow(showsSeparator: idx < bd.windowRows.count - 1) {
-                        DSKeyValueRow(key: r.0, value: r.1, valueCls: r.2)
+                        DSKeyValueRow(key: r.label, value: r.value, valueCls: r.cls)
                     }
                 }
             }
@@ -173,7 +80,7 @@ struct ControlView: View {
                 DSGroupRow(showsSeparator: true) { sectionLabel("舱盖/天窗") }
                 ForEach(Array(bd.extraRows.enumerated()), id: \.offset) { idx, r in
                     DSGroupRow(showsSeparator: idx < bd.extraRows.count - 1) {
-                        DSKeyValueRow(key: r.0, value: r.1, valueCls: r.2)
+                        DSKeyValueRow(key: r.label, value: r.value, valueCls: r.cls)
                     }
                 }
             }
@@ -181,9 +88,9 @@ struct ControlView: View {
                 DSGroupRow(showsSeparator: false) {
                     VStack(alignment: .leading, spacing: TokensSpacing.sm) {
                         sectionLabel("灯光")
-                        let lit = bd.lampRows.filter { $0.1 == "亮" }
+                        let lit = bd.lampRows.filter { $0.value == "亮" }
                         if !lit.isEmpty {
-                            Text(lit.map { $0.0 }.joined(separator: " · "))
+                            Text(lit.map { $0.label }.joined(separator: " · "))
                                 .font(TokensTypo.footnote)
                                 .foregroundStyle(TokensPalette.warning)
                         } else {
@@ -314,24 +221,24 @@ struct ControlView: View {
     private func doorStates() -> [String] {
         guard let bd = bodyDetail else { return ["ok", "ok", "ok", "ok"] }
         return ["左前门", "右前门", "左后门", "右后门"].map { name in
-            bd.doorRows.first { $0.0 == name }?.2 ?? "ok"
+            bd.doorRows.first { $0.label == name }?.cls ?? "ok"
         }
     }
 
     private func trunkIsOpen() -> Bool {
         guard let bd = bodyDetail else { return false }
         let all = bd.doorRows + bd.windowRows + bd.extraRows
-        return all.first { $0.0.contains("后备箱") }?.2 == "bad"
+        return all.first { $0.label.contains("后备箱") }?.cls == "bad"
     }
 
     private func windowsAreOpen() -> Bool {
-        (bodyDetail?.windowRows.contains { $0.2 == "bad" }) ?? false
+        (bodyDetail?.windowRows.contains { $0.cls == "bad" }) ?? false
     }
 
     private func statusLineText() -> String {
         guard let bd = bodyDetail else { return "等待车辆上报" }
-        let bad = bd.doorRows.filter { $0.2 == "bad" }.map { $0.0 }
-            + bd.windowRows.filter { $0.2 == "bad" }.map { $0.0 }
+        let bad = bd.doorRows.filter { $0.cls == "bad" }.map { $0.label }
+            + bd.windowRows.filter { $0.cls == "bad" }.map { $0.label }
         return bad.isEmpty ? "四门已锁 · 车窗已关" : bad.joined(separator: " · ") + " 未关"
     }
 
