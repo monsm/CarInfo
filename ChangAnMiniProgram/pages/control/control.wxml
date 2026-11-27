@@ -1,6 +1,5 @@
 <view class="page ctrl {{enter ? 'ent' : ''}}">
 
-  <!-- 舞台头：车名 + 状态胶囊（半悬浮执行条压底边） -->
   <view class="glass-hero stage">
     <view class="stage-top">
       <picker mode="selector" range="{{carOptions}}" range-key="name" value="{{carIndex}}" bindchange="onCarChange">
@@ -15,7 +14,6 @@
       </view>
     </view>
 
-    <!-- 主控双盘 -->
     <view class="ct-hero">
       <view wx:for="{{hero}}" wx:key="key" class="citem">
         <view
@@ -34,7 +32,6 @@
       </view>
     </view>
 
-    <!-- 执行中：半悬浮进度条 -->
     <view class="ct-run" wx:if="{{running}}">
       <view class="run-sp"></view>
       <view class="run-m">
@@ -44,10 +41,8 @@
     </view>
   </view>
 
-  <!-- 控制台面板 -->
   <view class="console">
 
-    <!-- 01 远程指令 -->
     <view class="sec">
       <view class="sec-head">
         <view class="sec-stamp">
@@ -80,7 +75,6 @@
       </view>
     </view>
 
-    <!-- 02 车身状态 -->
     <view class="sec" wx:if="{{body.has}}">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">
@@ -131,7 +125,6 @@
       </view>
     </view>
 
-    <!-- 03 记录（时间戳列） -->
     <view class="sec" wx:if="{{history.length}}">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">
@@ -163,7 +156,6 @@
       </view>
     </view>
 
-    <!-- 备注 -->
     <view class="note" wx:if="{{!running && !history.length}}">远程控制需要车辆在线、已开通车联网服务，并输入 6 位控车码</view>
   </view>
 </view>

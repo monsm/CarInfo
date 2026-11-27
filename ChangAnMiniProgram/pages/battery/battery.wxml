@@ -1,12 +1,10 @@
 <view class="page no-tab bt">
 
-  <!-- 眉 -->
   <view class="bt-eyebrow">
     <image class="bt-ic" src="{{icons.soc}}" />
     <text class="caps muted">BATTERY &amp; CHARGE · 电池与充电</text>
   </view>
 
-  <!-- hero：SOC 光环 -->
   <view class="glass-hero bt-hero">
     <view class="bt-hero-beam"></view>
     <view class="bh-body">
@@ -16,7 +14,6 @@
         <text class="bh-pct num">%</text>
       </view>
     </view>
-    <!-- hero 底部：双格统计条（压住光环下缘） -->
     <view class="bh-foot">
       <view class="bh-stat" wx:if="{{range !== '--'}}">
         <text class="bh-stat-k caps muted">约可行驶 RANGE</text>
@@ -40,7 +37,6 @@
     <view class="bh-upd fine t-4">更新 {{updated}} · 下拉刷新</view>
   </view>
 
-  <!-- 加载 -->
   <view wx:if="{{!ready}}" class="waiting">
     <view class="spinner"></view>
     <text class="caps muted">正在读取车辆数据…</text>
@@ -48,10 +44,8 @@
 
   <block wx:if="{{ready}}">
 
-    <!-- 控制台面板 -->
     <view class="console">
 
-    <!-- 01 分析结论 -->
     <view class="sec" wx:if="{{head.title && head.title !== '--'}}">
       <view class="sec-head">
         <view class="sec-stamp">
@@ -72,7 +66,6 @@
       </view>
     </view>
 
-    <!-- 02 一致性 -->
     <view class="sec">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">
@@ -113,7 +106,6 @@
       </view>
     </view>
 
-    <!-- 03 充电会话 -->
     <view class="sec">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">
@@ -132,7 +124,6 @@
       </view>
     </view>
 
-    <!-- 04 子系统 -->
     <view class="sec" wx:if="{{subV.length || subT.length}}">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">
@@ -156,7 +147,6 @@
       </view>
     </view>
 
-    <!-- 05 动力电机 -->
     <view class="sec" wx:if="{{motors.length}}">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">
@@ -178,7 +168,6 @@
       </view>
     </view>
 
-    <!-- 06 故障码 -->
     <view class="sec">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">
@@ -206,7 +195,6 @@
       </view>
     </view>
 
-    <!-- 07 电池告警 -->
     <view class="sec" wx:if="{{alarms.length}}">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">

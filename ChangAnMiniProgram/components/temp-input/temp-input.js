@@ -1,4 +1,3 @@
-// TemperatureInputDialog 组件 —— 空调温度设置(17-33℃)
 Component({
   options: { styleIsolation: 'apply-shared' },
   properties: {

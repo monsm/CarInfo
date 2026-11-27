@@ -40,36 +40,18 @@ from _roots import assert_roots
 APP = os.path.join("CarKeeper", "CarKeeper")
 SERVICES = os.path.join("CarKeeper", "Services")
 DESIGN = os.path.join("CarKeeper", "Design")
-#  `MODELS = CarKeeper/Models`（顶层那个）随 `AppDataModel.swift` 一起删掉了
-#（2026-09-26 第三十一轮审核）。主体里的 `CarKeeper/CarKeeper/Models/` 仍在 `APP` 之下。
 
-# 这份清单曾包含 SHARED / WIDGETS / WATCH 三项 —— 那三个目录随小组件体系一起删了，
-# 而它们在这里**不会报错**：不存在的目录只是被安静跳过。
-# 于是「检查范围缩小」与「这一片没有界面文案」在输出上完全一样。
-# `_roots.swift_files` 现在把这种沉默变成立即失败。
 SCAN_DIRS = [APP, SERVICES, DESIGN]
 
-# 排障页：它的正文里「缓存」是**用户要做的动作**（那一页有「清除缓存」与它的确认句），
-# 不是我们内部实现的名词 —— 不能按「开发词」判。⚠️ 这一条的理由在 2026-09-25 第九轮
-# 变过一次：它原来叫「设计令牌页」（那一页曾挂着色板与字体样张，第 6 条已删），
-# 而**豁免本身仍然需要** —— 变了的是它为什么需要。
 EXEMPT_FILES = {
     os.path.join(APP, "Features", "Dev", "DevView.swift").replace("\\", "/"),
 }
 
 MAX_LEN = 30
 
-# ①② 判据的词表。每一条都对应真实删过的一句话，不是凭感觉列的。
-#
-# 硬禁词只有四个，且它们有一个共同点：描述的是**我们怎么拿到数据**，
-# 而不是**这辆车怎么样**。`响应`不在列：它在这里的正事是「等车辆响应」（车回话了），
-# 是界面语言；滥用它的是 HTTP，而那不该出现在界面上。
 IMPL_WORDS = ["缓存", "报文", "字段", "接口"]
 TEACH_PATTERNS = ["点下面", "点上面", "就会出现", "就可以了", "请注意", "点一下那个"]
 
-# 字面量里的插值表达式（`\(...)`）在屏幕上不是字符，量长度时先摘掉。
-# 必须按括号配平：`\(powerKW.map { String(format: "%.1f", $0) }...)` 里
-# 还有一层 `)`，按「到下一个右括号」摘会把后面的正文一起吃进去（上一版就是这样）。
 def strip_interp(s):
     out = []
     i = 0
@@ -92,7 +74,6 @@ def strip_interp(s):
     return "".join(out)
 
 
-# 日志/调试串不是界面文案：它们以 `tag:` 开头（如 `parseMessages:`），写在 NSLog 里。
 LOG_LIKE = re.compile(r"^[a-z][A-Za-z0-9_]{2,}:")
 
 CJK = re.compile(r"[\u4e00-\u9fff]")
@@ -105,8 +86,6 @@ def read(path):
 
 
 def swift_files():
-    # 先确认清单里的目录真的在。这一步看着多余，其实正是它拦住了
-    # 「删掉一个目录 → 检查范围悄悄变小 → 依旧输出 0 问题 ✅」。
     assert_roots(SCAN_DIRS)
     out = []
     for root in SCAN_DIRS:
@@ -123,11 +102,11 @@ def is_copy(s):
     """这条字面量算不算「界面文案」。"""
     if not CJK.search(s):
         return False
-    if "," in s or "|" in s:          # CSV 表头 / 正则
+    if "," in s or "|" in s:
         return False
     if s.startswith("carkeeper") or "://" in s or s.startswith("widget_") or s.startswith("watch_"):
         return False
-    if re.fullmatch(r"[A-Za-z0-9_./<> %-]+", s):   # 符号名 / 路径 / 格式串
+    if re.fullmatch(r"[A-Za-z0-9_./<> %-]+", s):
         return False
     return True
 
@@ -157,13 +136,10 @@ def main():
                 for p in TEACH_PATTERNS:
                     if p in s:
                         why.append(f"复述句式「{p}」")
-                # 长度按**屏幕上的那一行**算：摘掉插值、按行拆开（多行块只看最长的一行）。
-                # HTML 模板（导出报告）不算界面文案 —— 它不在这块屏幕上。
                 visible = strip_interp(s)
                 if LOG_LIKE.match(visible.strip()):
                     continue
                 if "<" not in visible:
-                    # 拆行：真实换行与转义的 `\n` 都算 —— 多行块只看最长的那一行
                     rows = visible.replace("\\n", "\n").split("\n")
                     for row in [r.strip() for r in rows if r.strip()]:
                         if len(row) > MAX_LEN:

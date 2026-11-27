@@ -14,7 +14,6 @@ body{background:#0E0D11;color:#EDEAE4;font-family:Inter,"PingFang SC","Microsoft
 .tn{font-variant-numeric:tabular-nums}
 .serif{font-family:"Noto Serif SC",Songti SC,serif}
 
-/* ============ 顶部控制台（吸顶） ============ */
 #bar{position:sticky;top:0;z-index:80;background:#0E0D11;border-bottom:1px solid #24232B;padding:10px 12px 12px}
 #status{font-size:11.5px;letter-spacing:.06em;color:#B8B2BC;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}
 #status b{color:#EDEAE4;font-weight:600}
@@ -34,7 +33,6 @@ body{background:#0E0D11;color:#EDEAE4;font-family:Inter,"PingFang SC","Microsoft
   background:transparent;color:#C4BFC6;cursor:pointer;font-family:inherit;white-space:nowrap}
 .chip.on{background:#EDEAE4;border-color:#EDEAE4;color:#0E0D11;font-weight:600}
 
-/* ============ 手机 ============ */
 #stage{display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 0 8px}
 .dev{width:390px;height:844px;flex:none;border-radius:44px;position:relative;overflow:hidden;
   background:var(--bg);color:var(--ink);box-shadow:0 0 0 1px #36353E,0 34px 64px -36px #000}
@@ -103,7 +101,6 @@ body{background:#0E0D11;color:#EDEAE4;font-family:Inter,"PingFang SC","Microsoft
   border-bottom:1px solid var(--ruleC)}
 .scale .lb{font-size:9px;letter-spacing:.22em;margin-top:5px;color:var(--ruleC2)}
 
-/* ============ 说明面板 ============ */
 #why{max-width:560px;margin:26px auto 0;padding:0 18px}
 #why h2{font-size:13px;letter-spacing:.22em;color:#8E8894;font-weight:500;margin:0 0 12px}
 #why .row{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-top:1px solid #24232B;
@@ -285,11 +282,6 @@ body{background:#0E0D11;color:#EDEAE4;font-family:Inter,"PingFang SC","Microsoft
 
 <script>
 "use strict";
-/* =========================================================================
-   CarKeeper · 光引擎
-   输入：车所在经纬度 + 真实时刻 + 真实天气（云量/天气码/辐照度）
-   输出：整套界面的颜色、光的方向、对比度、以及"夜行 / 日光"模式
-   ========================================================================= */
 
 var CAR = { lat: 39.9963, lon: 116.4700, tz: "Asia/Shanghai", tzOffset: 8 };
 var RAD = Math.PI / 180;
@@ -298,7 +290,6 @@ function deg(r){ return r / RAD; }
 function clamp(v,a,b){ return v < a ? a : (v > b ? b : v); }
 function lerp(a,b,t){ return a + (b - a) * t; }
 
-/* ---------- 1. 真太阳位置（NOAA 简化算法）---------- */
 function solarPos(ms, lat, lon){
   var jd = ms / 86400000 + 2440587.5;
   var T = (jd - 2451545.0) / 36525;
@@ -328,7 +319,6 @@ function solarPos(ms, lat, lon){
   return { alt: alt, az: az, decl: decl, eot: EoT };
 }
 
-/* ---------- 2. 天气码 → 人话 ---------- */
 var WMO = {0:"晴",1:"少云",2:"多云",3:"阴",45:"雾",48:"雾凇",51:"毛毛雨",53:"毛毛雨",55:"毛毛雨",
   56:"冻雨",57:"冻雨",61:"小雨",63:"中雨",65:"大雨",66:"冻雨",67:"冻雨",71:"小雪",73:"中雪",75:"大雪",
   77:"雪粒",80:"阵雨",81:"阵雨",82:"强阵雨",85:"阵雪",86:"阵雪",95:"雷暴",96:"雷暴",99:"雷暴"};
@@ -336,8 +326,6 @@ function isRain(c){ return (c>=51&&c<=67)||(c>=80&&c<=82)||c>=95; }
 function isSnow(c){ return (c>=71&&c<=77)||c===85||c===86; }
 function isFog(c){ return c===45||c===48; }
 
-/* ---------- 3. 两套调色板：夜行（深）↔ 日光（纸） ---------- */
-/* 全部由真实的"辐照度"决定混合比；色温由太阳高度角决定。 */
 var P_DARK = {
   bg:"#08070A", mapBg:"#0A0A0E", blkA:"#1A1A22", blkB:"#121218",
   roadCasing:"#07070A", roadMajor:"#252A34", roadMinor:"#202430", roadHighway:"#292F3A",
@@ -401,9 +389,6 @@ function mixc(a, b, t){
     Math.round(lerp(A[2],B[2],t)) + ")";
 }
 function tone(rgb, warm){
-  /* 色温：warm>0 往琥珀推，warm<0 往冷蓝推。
-     关键规则：染色强度随该颜色自身的明度 — 黑底几乎不染，白纸染色最明显。
-     （否则深夜会从 #08070A 被推成一团紫黑，实测就是这么错的。） */
   if (rgb.charAt(0) === "#"){ var h0 = hx(rgb); if (h0) rgb = "rgb(" + h0[0] + "," + h0[1] + "," + h0[2] + ")"; }
   var m = rgb.match(/(\d+),\s*(\d+),\s*(\d+)/);
   if (!m) return rgb;
@@ -415,28 +400,19 @@ function tone(rgb, warm){
   return "rgb(" + Math.round(clamp(r,0,255)) + "," + Math.round(clamp(g,0,255)) + "," + Math.round(clamp(b,0,255)) + ")";
 }
 
-/* ---------- 4. 光模型：真实物理 → 界面变量 ---------- */
 function lightModel(st){
   var alt = st.alt, az = st.az, R = st.rad, C = st.cloud, W = st.code;
 
-  /* 4.1 环境光：辐照度直接决定"有多少光"。
-     S 形：95–205 W/m² 之间完成切换（对应真实日落前后约半小时）。
-     早先版本用线性 L = R/300，结果 08:00 时背景 rgb(142,138,132)、文字 rgb(122,119,113) ——
-     「深色↔纸色」线性混合会经过一段灰泥，文字几乎不可读。所以：**亮度不过渡，模式直接换**。 */
   var tt = clamp((R - 95) / 110, 0, 1);
   var L = tt * tt * (3 - 2 * tt);
-  var PAPER = L >= .5;      /* 模式由环境光决定：白天是纸，夜里是深色。“光”本身仍是连续的。 */
-  /* 4.2 色温：太阳贴近地平线→琥珀；太阳在地平线下较深→冷蓝。 */
+  var PAPER = L >= .5;
   var warm = 0;
   if (alt > -3) warm = clamp(1 - Math.abs(alt) / 14, 0, 1);
   else {
-    /* 蓝调是「暮光」现象：-6° 附近最强，越往深夜越退回中性深色 */
     warm = -clamp((alt + 21) / 15, 0, 1);
   }
 
-  /* 梯度/阴影这类含 rgba 的复合字符串不能走「取第一个 rgba」的通用插值，单独算 */
   var FIXED = { grainBlend:1, sheetGrad:1, qaShadow:1, sheetShadow:1, pinShadow:1 };
-  /* 地图层染得重（它直接暴露在光里），界面层染得轻 */
   var MAPKEY = { bg:1, mapBg:1, blkA:1, blkB:1, roadCasing:1, roadMajor:1, roadMinor:1, roadHighway:1,
     water:1, waterEdge:1, parkFill:1, parkEdge:1, place:1, placeDim:1, routeHi:1, routeLo:1,
     pinDisc:1, pinInk:1, shadowC:1 };
@@ -457,10 +433,8 @@ function lightModel(st){
     : "inset 0 1px 0 rgba(255,226,180,.14), 0 -30px 60px -34px rgba(0,0,0,.85)";
   v.pinShadow = PAPER ? "0 1px 8px rgba(30,27,22,.2)" : "0 1px 8px #000, 0 0 18px rgba(0,0,0,.8)";
 
-  /* 4.3 天气：云把光变得柔和，雨把地面变湿，雪把地面变亮，雾把一切推远 */
   var cloudy = C / 100;
   var wet = isRain(W) ? 1 : 0, snow = isSnow(W) ? 1 : 0, fog = isFog(W) ? 1 : 0;
-  /* 云：降低对比（街区更贴近底色）、加一层湿气 */
   v.blkA = mixc(v.blkA, v.mapBg, cloudy * .55);
   v.blkB = mixc(v.blkB, v.mapBg, cloudy * .55);
   v.roadMajor = mixc(v.roadMajor, v.mapBg, cloudy * .30);
@@ -474,33 +448,24 @@ function lightModel(st){
   if (fog) { v.blkA = mixc(v.blkA, v.mapBg, .6); v.blkB = mixc(v.blkB, v.mapBg, .6);
              v.roadMajor = mixc(v.roadMajor, v.mapBg, .5); v.roadMinor = mixc(v.roadMinor, v.mapBg, .5); }
 
-  /* 4.4 光的方向：太阳的方位角 → 光落在哪一侧；太阳越低越"斜"（半径越大） */
-  var dayR = 340 * (1 - clamp(alt / 60, 0, 1));   /* 太阳越低越斜 → 影子越长 */
-  var nightR = 90;                                 /* 夜里没有太阳，剩下的是城市辉光 */
-  var hasSun = clamp((alt + 6) / 4, 0, 1);         /* -6° 以下视为没有太阳 */
-  /* 关键：方向性由**高度角**决定，不是亮度。
-     早先版本用亮度，结果 18:00（太阳高度 1.8°）的方向性只剩 90px —— 而恰恰日出日落
-     才是影子最长、光最有方向的时候。 */
+  var dayR = 340 * (1 - clamp(alt / 60, 0, 1));
+  var nightR = 90;
+  var hasSun = clamp((alt + 6) / 4, 0, 1);
   var radius = lerp(nightR, dayR, hasSun);
   var sunPresence = clamp((alt + 8) / 20, 0, 1);
   var sx = Math.sin(rad(az)) * radius, sy = -Math.cos(rad(az)) * radius;
   v._casterX = Math.round(sx); v._casterY = Math.round(sy);
 
-  /* 4.5 光池强度：夜里是城市辉光（冷、弱），白天是阳光（暖、强） */
   v.poolA1 = lerp(.10, .20, Math.max(sunPresence, L)) * (1 - cloudy * .55) * (1 - fog * .5);
   v.poolA2 = v.poolA1 * .7;
   v._sunPresence = sunPresence;
-  /* 只有真的没有太阳（高度角 < -6°）时，光才换成城市辉光（冷）；
-     否则日落时会被错染成冷蓝 —— 而那一刻应该是全天的琥珀。 */
   if (alt < -6) v.poolC = tone("#8FA8C8", -0.6);
 
-  /* 4.6 车灯：环境越亮越不需要（真实物理：日照下不需要开车灯） */
   var lamp = clamp(1 - R / 220, .05, 1);
   v._lamp = lamp;
   v.lampGlow = "radial-gradient(circle," + tone("rgba(255,214,160," + (0.34 * lamp).toFixed(3) + ")", warm * .4)
              + " 0%, rgba(255,190,130," + (0.10 * lamp).toFixed(3) + ") 46%, rgba(255,190,130,0) 100%)";
 
-  /* 4.7 湿气与暗角：雾/雨加重浑浊，日光下暗角退场 */
   v.haze = "radial-gradient(120% 78% at " + (62 + sx / 12).toFixed(0) + "% " + (44 + sy / 12).toFixed(0) + "%," +
            String(v.hazeWarm) + " 0%, rgba(255,190,120,0) 52%)," +
            "linear-gradient(180deg," + String(v.hazeTop) + "," +
@@ -511,7 +476,6 @@ function lightModel(st){
           "rgba(0,0,0,0) 40%, rgba(" + vr[0] + "," + vr[1] + "," + vr[2] + "," + v.vigA.toFixed(2) + ") 100%)";
   v.grainA = lerp(P_DARK.grainA * (1 + fog * .6 + wet * .3), P_LIGHT.grainA, L);
 
-  /* 4.8 命名：这一刻属于哪个"光名" */
   var name;
   if (alt >= 30) name = "白昼";
   else if (alt >= 8) name = "低角度日光";
@@ -526,7 +490,6 @@ function lightModel(st){
   return v;
 }
 
-/* ---------- 5. 应用到 DOM ---------- */
 var root = document.getElementById("sA");
 function apply(v){
   var s = root.style;
@@ -553,7 +516,6 @@ function apply(v){
   document.getElementById("pillWx").textContent = Math.round(WX.temp) + "° " + WX.desc;
   document.querySelector(".sb").firstChild.textContent = CLOCK.label;
 }
-/* 给带 alpha 的颜色也上色温，同时保住 alpha */
 function toneA(col, warm){
   var m = String(col).match(/rgba?\(([^)]+)\)/);
   if (!m) return col;
@@ -572,9 +534,8 @@ function rgbaOf(col, a){
   return m ? "rgba(" + m[1] + "," + m[2] + "," + m[3] + "," + (+a).toFixed(3) + ")" : col;
 }
 
-/* ---------- 6. 真实数据 ---------- */
 var DATA = null, WX = { temp: 12, desc: "—" }, CLOCK = { h: 12, label: "12:00", live: true };
-var OFF = {   /* 取不到网络时的离线样本（会明确标注"离线"） */
+var OFF = {
   timezone_offset: 8, isOffline: true,
   current: { time: "2026-09-21T17:45", temperature_2m: 22, weather_code: 3, cloud_cover: 60, is_day: 1 },
   hourly: { time: [], is_day: [], temperature_2m: [], cloud_cover: [], weather_code: [], shortwave_radiation: [] },
@@ -598,7 +559,6 @@ function localNow(){
   var o = {}; p.forEach(function(x){ o[x.type] = x.value; });
   return { y:+o.year, mo:+o.month, d:+o.day, h:+o.hour % 24, mi:+o.minute };
 }
-/* 本地时刻 → UTC 毫秒（Asia/Shanghai 无夏令时） */
 function localToUtcMs(y, mo, d, h, mi){ return Date.UTC(y, mo - 1, d, h - CAR.tzOffset, mi || 0); }
 
 fetch("https://api.open-meteo.com/v1/forecast?latitude=" + CAR.lat + "&longitude=" + CAR.lon +
@@ -609,7 +569,6 @@ fetch("https://api.open-meteo.com/v1/forecast?latitude=" + CAR.lat + "&longitude
   .then(function(j){ DATA = j; DATA.isOffline = false; boot(); })
   .catch(function(){ DATA = OFF; boot(); });
 
-/* ---------- 7. 状态与渲染 ---------- */
 var HOUR = 12, OVERRIDE = null, SOLAR_TODAY = [];
 function hourState(idx){
   var H = DATA.hourly;
@@ -635,7 +594,7 @@ function findHour(){
 function dayRadiation(){
   var H = DATA.hourly.shortwave_radiation || [];
   var s = 0; H.forEach(function(x){ s += (x || 0) * 3600; });
-  return s / 3600000;   /* kWh/m² */
+  return s / 3600000;
 }
 function render(){
   var st = hourState(HOUR);
@@ -674,7 +633,6 @@ function paintStrip(){
   }
   [].forEach.call(strip.children, function(b, i){
     var st = hourState(i), v = lightModel(st);
-    /* 光样 = 那一刻「光落在图上」的样子，不是底色：所以把它画成一束光 */
     b.style.background = "radial-gradient(circle at 50% 42%," + rgbaOf(v.poolC, Math.min(.85, Math.max(.12, v.poolA1 * 3.4))) +
       "," + v.mapBg + " 76%)";
     var icon = b.querySelector("i");
@@ -730,7 +688,6 @@ function boot(){
   render();
   setInterval(function(){ if (HOUR === localNow().h && !OVERRIDE) render(); }, 60000);
 }
-/* 供核验：把真太阳位置暴露出来，便于与权威日出日落对照 */
 window.LIGHT = { solarPos: solarPos, hourState: hourState, lightModel: lightModel,
   get hour(){ return HOUR; }, set hour(v){ HOUR = v; render(); }, render: render,
   localToUtcMs: localToUtcMs, findHour: findHour, dayRadiation: dayRadiation,

@@ -1,21 +1,15 @@
-// icons.js —— 图标与仪表图元（内联 SVG → data URI，无外部资源依赖）
-// 深色科技风统一使用细描边线性图标：viewBox 24，stroke-width 默认 1.7。
-// ic('lock', '#FFFFFF') → "data:image/svg+xml,..." 直接给 <image src>。
 const uri = s => 'data:image/svg+xml,' + encodeURIComponent(s);
 
 const P = {
-  // ---------- 底部导航 ----------
   navHome: '<path d="M4.4 11.2l7-6.4c.35-.32.88-.32 1.23 0l7 6.4"/><path d="M6.2 9.9v9.5c0 .6.5 1.1 1.1 1.1h2.9v-5.4h3.6v5.4h2.9c.6 0 1.1-.5 1.1-1.1V9.9"/>',
   navApps: '<rect x="3.8" y="3.8" width="6.8" height="6.8" rx="2"/><rect x="13.4" y="3.8" width="6.8" height="6.8" rx="2"/><rect x="3.8" y="13.4" width="6.8" height="6.8" rx="2"/><rect x="13.4" y="13.4" width="6.8" height="6.8" rx="2"/>',
   navMsg: '<path d="M5.2 5.6c0-.9.7-1.6 1.6-1.6h10.4c.9 0 1.6.7 1.6 1.6v8.3c0 .9-.7 1.6-1.6 1.6h-5.9l-3.9 3.3v-3.3H6.8c-.9 0-1.6-.7-1.6-1.6z"/>',
   navMine: '<circle cx="12" cy="8.1" r="3.5"/><path d="M5.2 19.7c.75-3.2 3.5-5.1 6.8-5.1s6.05 1.9 6.8 5.1"/>',
 
-  // ---------- 箭头 ----------
   chevD: '<path d="M6.2 9.3l5.8 5.8 5.8-5.8"/>',
   chevR: '<path d="M9.3 6.2l5.8 5.8-5.8 5.8"/>',
   chevU: '<path d="M6.2 14.7l5.8-5.8 5.8 5.8"/>',
 
-  // ---------- 车控指令 ----------
   lock: '<rect x="5.4" y="10.4" width="13.2" height="9.6" rx="2.2"/><path d="M8.6 10.4V8.3a3.4 3.4 0 0 1 6.8 0v2.1"/>',
   unlock: '<rect x="5.4" y="10.4" width="13.2" height="9.6" rx="2.2"/><path d="M8.6 10.4V8.3a3.4 3.4 0 0 1 6.7-1.1"/>',
   snow: '<path d="M12 3.4v17.2M5.6 7.9l12.8 8.2M18.4 7.9l-12.8 8.2"/>',
@@ -25,7 +19,6 @@ const P = {
   find: '<circle cx="12" cy="12" r="6.6"/><circle cx="12" cy="12" r="1.5"/><path d="M12 3.2v2.2M12 18.6v2.2M3.2 12h2.2M18.6 12h2.2"/>',
   refresh: '<path d="M21.1 3.4v5.6h-5.6"/><path d="M21.3 9A8.7 8.7 0 0 1 12 20.7 8.7 8.7 0 0 1 3.3 12 8.7 8.7 0 0 1 12 3.3c2.6 0 5 1.2 6.6 3.1"/>',
 
-  // ---------- 车辆状态 ----------
   car: '<path d="M8.4 7.6h7.2c1.7 0 3 1.1 3.4 2.6l.9 3.2"/><path d="M3.9 13.4h16.2v3.1c0 .6-.5 1.1-1.1 1.1h-1.8c-.6 0-1.1-.5-1.1-1.1v-.8H8.1v.8c0 .6-.5 1.1-1.1 1.1H5.2c-.6 0-1.1-.5-1.1-1.1v-3.1z"/><circle cx="7.4" cy="17.4" r="1.9"/><circle cx="16.6" cy="17.4" r="1.9"/>',
   door: '<rect x="7.4" y="4.6" width="9.2" height="14.8" rx="1.8"/><path d="M10.4 9.4v2.6"/><circle cx="12.8" cy="12.2" r=".8"/>',
   window: '<rect x="5.6" y="5.2" width="12.8" height="13.6" rx="2"/><path d="M12 5.2v13.6M5.6 11.4h12.8"/>',
@@ -38,7 +31,6 @@ const P = {
   wind: '<path d="M3.6 8.3h8.9a2.6 2.6 0 1 0-2.6-2.6"/><path d="M3.6 12.2h13.4a2.6 2.6 0 1 1-2.6 2.6"/><path d="M3.6 16.1h5.6"/>',
   clock: '<circle cx="12" cy="12" r="8.2"/><path d="M12 7.4v4.8l3.3 2"/>',
 
-  // ---------- 状态 / 通用 ----------
   checkc: '<circle cx="12" cy="12" r="8.6"/><path d="M8.4 12.3l2.5 2.5 4.7-5.4"/>',
   xc: '<circle cx="12" cy="12" r="8.6"/><path d="M9.2 9.2l5.6 5.6M14.8 9.2l-5.6 5.6"/>',
   warn: '<path d="M12 4.4l8.8 15.2H3.2z"/><path d="M12 10v4.6"/><path d="M12 17.2h.01"/>',
@@ -50,7 +42,6 @@ const P = {
   trash: '<path d="M5 7h14"/><path d="M9.4 7V5.4A1.6 1.6 0 0 1 11 3.8h2a1.6 1.6 0 0 1 1.6 1.6V7"/><path d="M6.4 7l.85 11.1a1.7 1.7 0 0 0 1.7 1.6h6.1a1.7 1.7 0 0 0 1.7-1.6L17.6 7"/><path d="M10.2 10.8v5.4M13.8 10.8v5.4"/>',
   gear: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"/>',
   bolt: '<path d="M13.2 2.8L6.2 13.4h4.3l-1.5 7.8 7.2-11h-4.6z"/>',
-  // ---------- 信息类（v7.2 增补） ----------
   soc: '<rect x="6.4" y="9.8" width="11.2" height="6" rx="1.6"/><path d="M17.6 11.8h1.8v1.9h-1.8"/><path d="M9.8 12.1l2.3 2.2 2.5-3.4"/>',
   gauge: '<path d="M4.6 15.6a8.6 8.6 0 0 1 14.8 0"/><path d="M12 15.6l3.4-4.2"/><circle cx="12" cy="15.6" r="1.2"/>',
   road: '<path d="M3.6 5.2L10 19M20.4 5.2L14 19"/><path d="M12 3.6v2M12 18.4v2"/>',
@@ -60,11 +51,9 @@ const P = {
   calendar: '<rect x="4.6" y="5.4" width="14.8" height="14.6" rx="2.2"/><path d="M4.6 10h14.8M8.8 3.4v3.6M15.2 3.4v3.6"/>',
   key: '<circle cx="8.6" cy="14.6" r="3.6"/><path d="M11.3 11.9L19.8 3.4M16 5.2l3 3M12.8 8.4l2.2 2.2"/>',
   steer: '<circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="1.8"/><path d="M12 3.6v2M12 18.4v2M3.6 12h2M18.4 12h2"/><path d="M6.6 15.4c1.9-2 3.4-3 5.4-3s3.5 1 5.4 3"/>',
-  // 罗盘指针（指北，随 heading 旋转）
   needleN: '<path d="M12 4.4v13.2"/><path d="M12 4.4l-5.6 7.6M12 4.4l5.6 7.6"/><circle cx="12" cy="21.4" r="1.7"/>'
 };
 
-// 线性图标
 function ic(name, color, sw) {
   const body = P[name];
   if (!body) return '';
@@ -73,8 +62,6 @@ function ic(name, color, sw) {
   return uri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`);
 }
 
-// 圆环进度仪表（SOC / 健康评分）
-// opts: { value: 0-100, size, sw, colors: ['#..','#..'], track, round }
 function ringURI(opts) {
   const o = opts || {};
   const size = o.size || 72;
@@ -97,15 +84,11 @@ function ringURI(opts) {
   );
 }
 
-// 迷你柱状序列（电池单体电压 / 温度探针）→ 横向细柱 SVG data URI
-// v7：渐变柱 + 基线 + 中位参考虚线 + 越界柱自动标红（视觉上是“设计过的图表”）
-// values: number[]；自动抽样到 ≤ maxBars 根，高度按最大值归一。
 function barsURI(values, opts) {
   const o = opts || {};
   const w = o.width || 640;
   const h = o.height || 64;
   const maxBars = o.maxBars || 64;
-  // 旧 color 传 alpha≈0.4 表示“温度类”低调渲染（电压亮 / 温度暗）
   const dim = /0\.4/.test(String(o.color || '0.8'));
   const raw = (values || []).map(v => { const n = Number(v); return isNaN(n) ? 0 : n; });
   if (!raw.length) return '';
@@ -143,7 +126,6 @@ function barsURI(values, opts) {
   );
 }
 
-// 去掉行首 emoji / 符号（把 texts.js 组标题转成干净文本）
 function stripLeading(t) {
   const s = String(t == null ? '' : t);
   return s.replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '').trim();

@@ -24,9 +24,6 @@ REQUIRED = {
     "Codable": [],
 }
 
-# 只保留真正支持不带实参尾随闭包的 HOF。
-# first/firstIndex/drop/prefix/suffix/max/min 多为属性（`if let x = arr.first {`），
-# removeAll 几乎总带实参，所以全部排除，避免把 if/guard 块当成闭包体。
 HOF = re.compile(
     r"\.(map|compactMap|filter|forEach|reduce|sorted|allSatisfy|contains)"
     r"\s*(\(\s*[^()]*\))?\s*\{"
@@ -71,7 +68,6 @@ def member_dups(texts):
                     dm = DECL_LINE.match(s)
                     if dm:
                         kind, nm = dm.group(1), dm.group(2)
-                        # 重载合法：函数要连参数一起比；属性与函数同名也合法（如 hash）
                         sig = ""
                         if kind == "func":
                             j = s.find("(", dm.end() - len(nm))
@@ -100,7 +96,7 @@ def member_dups(texts):
                     if t and o is not None:
                         owner[depth + 1] = o + [t.group(2)]
                     else:
-                        owner[depth + 1] = None        # 函数体/闭包/控制流：内部不是成员
+                        owner[depth + 1] = None
                 elif opens < 0:
                     for d2 in range(depth, depth + opens, -1):
                         owner.pop(d2, None)
@@ -127,9 +123,9 @@ def main():
     sdk_types -= set(KEYWORDS)
 
     members = {}
-    kind = {}            # 限定名 -> struct/enum/...
+    kind = {}
     has_init = set()
-    qualified_bodies = []   # (qualified, file, body)
+    qualified_bodies = []
     conformances = {}
     nested = []
     hof_hits = []
@@ -172,8 +168,6 @@ def main():
             qualified_bodies.append((nm, p.name, body))
 
         for m in HOF.finditer(text):
-            # `x.contains("y") { ... }` 是 if 语句块，不是尾随闭包：
-            # 只有 reduce 支持 `reduce(0) { }` 这种带实参又跟尾随闭包的形式。
             if m.group(2) and m.group(1) != "reduce":
                 continue
             brace = text.find("{", m.end() - 1)
@@ -186,7 +180,6 @@ def main():
             hof_hits.append((p.name, text[:m.start()].count("\n") + 1,
                              body.strip().replace("\n", " ")[:75]))
 
-    # ---------------------------------------------------------------- 1
     print("\n### 1) 精确遮蔽检查：父类型里用 `C.x` 而 x 不在 C 里 / 用 `C(...)` 而 C 是无 case 的 enum")
     bugs = []
     for parent, child, fname in nested:
@@ -195,11 +188,10 @@ def main():
         child_kind = kind.get(child, "")
         child_members = members.get(child, set())
         bodies = [(f, b) for q, f, b in qualified_bodies if q == parent or q.endswith("." + parent)]
-        bodies = [(f, b) for f, b in bodies if f]  # 同名的父类型（同文件/跨文件）都算
+        bodies = [(f, b) for f, b in bodies if f]
         for f, body in bodies:
             for mm in re.finditer(rf"(?<![A-Za-z0-9_.]){child}\.([a-zA-Z_]\w*)", body):
                 mem = mm.group(1)
-                # allCases 是 CaseIterable 合成成员，无需显式声明
                 if mem not in child_members and mem not in {"self", "Type", "Protocol", "allCases"}:
                     line = body[:mm.start()].count("\n") + 1
                     bugs.append(f"{f}: 在 {parent} 中 {child}.{mem} —— {child} 没有成员 {mem}")
@@ -216,7 +208,6 @@ def main():
     else:
         print("    ✅ 无")
 
-    # ---------------------------------------------------------------- 2
     print("\n### 2) 协议一致性缺少必要成员")
     missing = []
     for proto, types in sorted(conformances.items()):
@@ -234,7 +225,6 @@ def main():
     else:
         print("    ✅ 无")
 
-    # ---------------------------------------------------------------- 3
     print("\n### 3) 高阶函数闭包既无参数也无 $0")
     if hof_hits:
         for s in hof_hits:
@@ -242,7 +232,6 @@ def main():
     else:
         print("    ✅ 无")
 
-    # ---------------------------------------------------------------- 4
     print("\n### 4) 清洗保真度")
     bad = []
     for p, text in texts.items():
@@ -256,7 +245,6 @@ def main():
     if not bad:
         print("    ✅ 正常")
 
-    # ---------------------------------------------------------------- 8
     print("\n### 8) 同一命名空间里重复声明的成员（invalid redeclaration）")
     decl_members = member_dups(texts)
     for k in sorted(decl_members):

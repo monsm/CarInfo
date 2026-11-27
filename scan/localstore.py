@@ -68,40 +68,17 @@ LOGOUT_FILE = os.path.join(APP, "AppStore.swift")
 TOP_DIRS = [APP, SERVICES]
 
 HEADER = "| 键 | 它是什么 | 归属 | 退出登录清 |"
-# §6 的标题。它自称的键数也在判据里（判据 ④）—— 标题与表是同一个数字的两处。
 HEADING = "## 6. 本机持久化清单"
 
-# 退出登录的**清法**登记表：每条 = (函数名, 文件, 理由)。
-# 门禁会核对：同名函数确实被 `logout()` 调用；这个文件里**每一处**同名函数的体里
-# 出现的键都算已清（同名函数在两个类里各有一份是常态 —— `resetAll()` 就是：
-# TempKeyManager 清临时钥匙、FamilyManager 清家庭成员，各清自己那一个）。
 CLEARERS = [
     ("clear", os.path.join(APP, "Services", "HistoryStore.swift"),
      "三条曲线（soc / power / tyre）是账号的车端采样，`clear()` 一起清内存与三个键"),
-# 已删登记：`("resetAll", Services/FamilyAndKeySharing.swift, …)` —— 家庭管理与临时钥匙
-# 随用户 2026-09-25 第 7 条一起删除（连同 `carkeeper_family_members` / `carkeeper_temp_keys`
-# 两个键的归零点）。登记表里留着指向已删文件的条目，就是这一仓反复记的那种「清单失真」：
-# 门禁会在读取时直接 `FileNotFoundError`（它是这么被发现的），而不是静默放行。
     ("resetAll", os.path.join(SERVICES, "BillingAndCalendar.swift"),
      "年检记录有 `@Published` 内存副本，只删键的话同一次运行里照样看得见"),
 ]
 
-# 键往往写在**符号常量**里（`socKey` / `Self.selectedCarIdKey`），而清理处引用的是符号。
-# 所以判据得认一层间接：`static let X = "carkeeper_xxx"` 之后，X 在清理体里出现
-# 就等于那个键被清了。（写这道门的第一版没认这层间接，当场把 `HistoryStore.clear()`
-# 与 `Self.selectedCarIdKey` 那几行判成「没清」—— 六条假阳性，就是这层间接。）
-#
-# 两条收窄，都来自这道门**自己**在当天撞的两个洞（先写出错的那种）：
-#   ① 只认**名字以 `Key` 结尾**的符号。第一版认任何 `let X = "carkeeper_..."`，
-#      而 `MineView.toggleVoice()` 里有一句局部 `let key = "carkeeper_voice_enabled"`
-#      —— 于是「设备键 `carkeeper_voice_enabled` 被清了」当场误报：`logout()` 里
-#      也有个叫 `key` 的循环变量。撞的是一个泛用名。
-#   ② 跨文件引用必须带限定（`Self.x` / `类型.x`）。同一个文件里裸名照旧认
-#      （`socKey` 就在 `HistoryStore.clear()` 旁边）。
 SYMBOL_DECL = re.compile(r"(?:static\s+)?(?:let|var)\s+(\w*Key)\s*(?::[^=]+)?=\s*\"(carkeeper_[a-z0-9_]+)\"")
 
-# 「没有直接的 removeObject，而是经 setter 清」的键：值 = (证人代码片段, 理由)。
-# 门禁要求那段**证人在 `logout()` 体里真的出现**。
 SETTERS = {
     "carkeeper_parking_loc": (
         "parkingLocation = nil",
@@ -219,8 +196,6 @@ def main():
     assert_roots(TOP_DIRS)
 
     table = parse_table()
-    # 注意：变量名不要叫 `why` —— 下面 `SETTERS` 那个循环的同名局部会漏到这里来
-    #（第一版就叫 `why`，于是第四判据每次都报「对不上」，理由却是某条 setter 的注释）。
     claim, claim_why = heading_count()
     account = {k for k, (owner, _) in table.items() if owner == "账号"}
     device = {k for k, (owner, _) in table.items() if owner == "设备"}
@@ -270,7 +245,6 @@ def main():
             print("   —— 登记的清法必须真的在退出这条路上，否则它只是文档里的一句话。")
             return 1
         src = open(path, encoding="utf-8").read()
-        # 同名函数在同一文件里可能有好几处（两个类各一个），**每一处都算**
         bodies = []
         pos = 0
         while True:

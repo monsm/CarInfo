@@ -2,43 +2,25 @@ import SwiftUI
 import UIKit
 import Photos
 
-// =============================================================================
-//  车辆档案 —— v4 信息架构
-// =============================================================================
-//  ① 身份区：车牌（等宽大字）+ 车辆名 + 车型 + 新能源标记
-//     不再用彩色车牌方块 —— 车牌是文字，不是色块。
-//  ② 时效区：控车码 / 保险 / 服务 三条读数（带语义色与图标）
-//  ③ VIN：单独一行，点击复制（整车唯一的全局身份）
-//  ④ 档案分组：身份 / 配置 / 注册保险 / 服务保养 / 设备 / 扩展 / 车况报文，
-//     每行点一下即复制该字段 —— 报修、报案、投保时都要抄这些。
-//  ⑤ 维保照片：本机相册，长按可删。
-// =============================================================================
 
 struct VehicleView: View {
     private let store = AppStore.shared
-    /// 深链（`carkeeper://health`）落到「车辆」这一档时，由它把段落提示带进来。
     @EnvironmentObject private var nav: NavState
 
-    @State private var maintenancePhotos: [String] = []   // Base64 图片
+    @State private var maintenancePhotos: [String] = []
     @State private var showPhotoPicker = false
     @State private var selectedPhoto: UIImage? = nil
-    /// 档内段落：档案 / 健康 / 保养。它不是导航层级（见 `HomeSub`）。
     @State private var tab: HomeSub = .profile
 
     private var isLoading: Bool { store.carId.isEmpty }
     private var isEmpty:   Bool { !store.carId.isEmpty && store.car == nil }
 
-    // 【已删】private var lastServiceMiles: Int?
-    // 它是 `UserDefaults.string(forKey: "carkeeper_last_service_mileage")`，
-    // 而那个键是用 `set(Int, forKey:)` 写的 —— 类型不符，**永远返回 nil**，
-    // 所以「下次保养里程」那一节从来没被显示过。保养计划现在统一走 store.maintenancePlan。
 
     private var isNev: Bool {
         guard let v = ciString(store.car, ["IsNev"])?.lowercased() else { return false }
         return v == "1" || v == "true" || v == "yes" || v == "是"
     }
 
-    /// 车辆数据解析失败时的重试入口
     private func reloadVehicle() {
         Task { await store.fetchVehicleData() }
     }
@@ -72,7 +54,6 @@ struct VehicleView: View {
             loadMaintenancePhotos()
             consumeHint()
         }
-        // 从别处（搜索、Siri、深链）拨到「车辆」时，落点是哪一段由提示决定。
         .onChange(of: nav.homeSub) { _, _ in consumeHint() }
         .sheet(isPresented: $showPhotoPicker) {
             PhotoPickerSheet(selectedImage: $selectedPhoto) {
@@ -85,24 +66,11 @@ struct VehicleView: View {
         }
     }
 
-    // MARK: - 内容
 
     private func content() -> some View {
         StackPageView(accent: HomeMode.vehicle.accent, label: "车辆", cards: cards)
     }
 
-    /// 这一档的叠叠乐：巨字头 → 分段控件 → 当前那一段的卡。
-    ///
-    /// 三段（档案 / 健康 / 保养）共用**同一叠**，而不是各自一叠：
-    /// 换段时巨字头与分段控件停在原地（它们是同一张卡），下面那一叠只换一个成员 ——
-    /// 这样「换段」看起来是「下面那张卡换了」，而不是「又翻了一页」。
-    ///
-    /// **它住在这里，不住在外壳里**（2026-09-23 修）：此前分段控件与卡表住在
-    /// `VehicleHubView`，而这一段的**状态**（照片选择器、维保照片）住在本视图里 ——
-    /// 外壳只能把 `sectionCards` 当类型成员调（编译不过，CI 报
-    /// `instance member 'sectionCards' cannot be used on type 'VehicleView'`）；
-    /// 就算绕过去，那些 `@State` 也永远不会安装（视图根本没被渲染），
-    /// 「维保照片」会变成一个点了没反应的按钮。一个页面只能有一个所有者。
     @MainActor
     private var cards: [StackCard] {
         var out = HomeMode.vehicle.headCards
@@ -112,11 +80,6 @@ struct VehicleView: View {
                             label: "段落"))))
         switch tab {
         case .health:
-            // 体检与保养是两张整表，拆不开 —— 包成一张卡。
-            // 它们与「档案」的区别只是卡有多高，不是两套排版。
-            // `at:` = **这一份读数是什么时候取到的**（`check` 那一份）。
-            // 体检表本身没有时间轴，而它读的报文每 5 分钟才换一次 ——
-            // 不写出时刻，用户没法判断「这条异常是刚才的，还是上周打开 App 时留下的」。
             out.append(StackCard(id: "health", title: "体检",
                                  at: store.cacheTime("check"),
                                  content: AnyView(HealthDataView())))
@@ -129,22 +92,12 @@ struct VehicleView: View {
         return out
     }
 
-    /// 消费深链带来的段落提示。消费掉（置 nil）是必须的：否则从别的档切回来时，
-    /// 会被同一条旧提示再拉回那一段。
     private func consumeHint() {
         guard let hint = nav.homeSub, HomeSub.vehicleTabs.contains(hint) else { return }
         tab = hint
         nav.homeSub = nil
     }
 
-    /// 档案这一段的卡（**不含巨字头**，也不含分段控件 —— 那两张在 `cards` 里）。
-    ///
-    /// 只有这一处决定「档案分几张卡」。拆卡的分法是按**问题**分的 ——
-    /// 这辆车是谁（身份）、它有什么毛病（提示）、它经历过什么（档案/照片/记账），
-    /// 而不是按控件类型。
-    ///
-    /// `private` 是刻意的：它按当下这辆车的读数现算，只有本视图的 `cards` 有权调它。
-    /// 之前它是 internal，为的是让外壳也能调 —— 而那个入口正是上面那个 bug 的来源。
     @MainActor
     private var sectionCards: [StackCard] {
         guard let sum = VM.vehicleSummary(store.car, store.controlCache) else {
@@ -155,20 +108,10 @@ struct VehicleView: View {
             StackCard(id: "identity", title: "身份",
                       value: sum.plate, cls: "ok",
                       content: AnyView(identitySection(sum))),
-            //  「用车提示」那一张卡于 2026-09-27 删（用户：「能合并就合并，能删除就删除」）。
-            //  它是一台**建议引擎**（七条：电量低 / 故障 / 门窗 / 胎压 / 即将保养 / 出行 / 节能），
-            //  而每一条要说的那件事在别处都已经说了：电量低在充电页与地图那一横、故障与胎压在体检、
-            //  门窗在车控的车身卡、保养在保养页。它自己的两处也撑不住：
-            //    · 「忽略 / 全部已读」**只在本次运行内生效**（持久化 2026-09-23 就去掉了）——
-            //      重启后那些提示又回来，「忽略」就成了一个会自己忘事的按钮；
-            //    · 「一切正常」那一条是把「没发现问题」写成一枚徽章，而没发现问题时什么都不说才对。
         ]
-        // 档案里的里程与车架号来自车控报文（`control`）—— 时间戳跟的是那个源，
-        // 不是「这一页什么时候画出来的」。档案按**问题**拆开（一组一卡）：
         out.append(contentsOf: archiveGroups)
         out += [
             StackCard(id: "photos", title: "维保照片", content: AnyView(photoSection)),
-            // 里程记账：花在车上的每一笔（原「我的」里的独立页 + sheet）
             StackCard(id: "journal", title: "里程记账", content: AnyView(MileageJournalSection()))
         ]
         return out
@@ -191,16 +134,11 @@ struct VehicleView: View {
         .accessibilityElement(children: .combine)
     }
 
-    // MARK: - ① 身份区
 
     private func identitySection(_ sum: VehicleSummary) -> some View {
-        //  正文里原来还有一行 `DSSectionHeader(title: "车辆")`（用户 2026-09-24：
-        //  「全部页面检查精致度」）。卡头写着「身份」，紧接着的车牌（34pt，全页最大的字）
-        //  自己就是这一块的标题 —— 同一张卡上三个标签，读起来像没对齐的两份文案。
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                 Text(sum.plate.isEmpty ? "未绑定车牌" : sum.plate)
-                    // 车牌是**全屏最大的字**，也是这一页的标题：走 metric（等宽数字家族的定尺字）
                     .font(TokensTypo.metric(34).weight(.semibold))
                     .foregroundStyle(TokensPalette.primary)
                     .lineLimit(1)
@@ -225,7 +163,6 @@ struct VehicleView: View {
                     .padding(.top, TokensSpacing.xxs)
             }
 
-            // ② 时效读数：控车码 / 保险 / 服务
             let items = statItems(sum)
             if items.count > 1 {
                 DSStatStrip(items: items)
@@ -234,7 +171,6 @@ struct VehicleView: View {
                     .overlay(alignment: .bottom) { DSDivider() }
             }
 
-            // ③ VIN：整车唯一身份，点一下复制
             vinRow(sum)
                 .padding(.top, TokensSpacing.lg)
 
@@ -246,7 +182,6 @@ struct VehicleView: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// 控车码 / 保险 / 保养 三条时效读数（语义色由剩余天数决定）
     private func statItems(_ sum: VehicleSummary) -> [DSStatStrip.Item] {
         var items: [DSStatStrip.Item] = [
             .init("控车码", sum.pinText, cls: sum.pinCls, icon: "lock.fill")
@@ -292,11 +227,7 @@ struct VehicleView: View {
         .accessibilityLabel(Text("VIN \(sum.vin)，点击复制"))
     }
 
-    // MARK: - ④ 档案分组
 
-    /// 档案分组**逐组拆成小卡**（用户 2026-09-23：超长卡拆小卡）。
-    /// 旧版把全部组堆进一张卡：组一多（身份/配置/注册保险/服务/设备/扩展/车况）
-    /// 就超出整屏，叠叠乐里一张卡永远读不完。拆开后一组一卡，每张都可读。
     private var archiveGroups: [StackCard] {
         let gs = groups
         guard !gs.isEmpty else { return [] }
@@ -311,7 +242,6 @@ struct VehicleView: View {
         }
     }
 
-    /// 档案里的一整组（卡里不再包 `DSGroup` 的壳 —— 卡的头已经是组名了）。
     private func groupCard(_ group: Grp) -> some View {
         VStack(spacing: 0) {
             ForEach(Array(group.rows.enumerated()), id: \.element.k) { idx, r in
@@ -326,7 +256,6 @@ struct VehicleView: View {
         }
     }
 
-    // MARK: - ⑤ 维保照片
 
     private var photoSection: some View {
         DSGroup(title: "维保照片",
@@ -401,7 +330,6 @@ struct VehicleView: View {
         ToastManager.shared.show("\(label) 已复制", icon: "doc.on.doc.fill")
     }
 
-    // MARK: - 档案数据（字段与来源不变）
 
     private struct Row { let k: String; let v: String }
     private struct Grp { let name: String; let rows: [Row] }
@@ -413,8 +341,6 @@ struct VehicleView: View {
             return (v?.isEmpty ?? true) ? nil : v
         }
         func row(_ k: String, _ label: String, suffix: String = "") -> Row? {
-            // 哨兵值（"0000-00-00" / "0000-00-00\n\t\t00:00:00"）是「没有登记」，不是数据。
-            // 不加这道守卫，档案表会写出「激活时间 0000-00-00」这种零年零月。
             guard let v = VM.antiSentinel(s2(k)) else { return nil }
             return Row(k: label, v: v + suffix)
         }
@@ -430,8 +356,6 @@ struct VehicleView: View {
                      row("EngineNo", "发动机编号"), row("TenantId", "租户标识")].compactMap { $0 }
         if !basic.isEmpty { out.append(Grp(name: "车型配置", rows: basic)) }
 
-        // 保险到期单独摆一行：哨兵值意味着「小程序里没登记过」，这本身就是一条信息，
-        // 不能用“整行消失”掩盖（而参考实现（C#）是干脆不显示）。
         var ins: [Row] = [Row(k: "保险到期",
                              v: VM.antiSentinel(s2("InsuranceEndDate")) ?? "未登记（小程序里没有填）")]
         ins += [row("InsuranceCompany", "保险公司"), row("InsurancePhone", "保险电话"),
@@ -441,9 +365,6 @@ struct VehicleView: View {
         var svc = [row("MaintainSpaceMileage", "保养间隔", suffix: " km"),
                    row("LastMaintainMileage", "上次保养里程", suffix: " km"),
                    row("LastOnlineTime", "最后在线"), row("ActiveTime", "激活时间")].compactMap { $0 }
-        // #40 下次保养里程与预计费用。
-        // 数据源统一：`store.maintenancePlan`（间隔与上次保养来自服务端
-        // maintainSpaceMileage / lastMaintainMileage，缺字段才退回本机记录）。
         if let plan = store.maintenancePlan {
             let timesSince = max(0, (plan.current - plan.last) / max(1, plan.interval))
             let estPrice = timesSince >= 3 ? AppStore.majorServicePriceEstimate : AppStore.servicePriceEstimate
@@ -469,7 +390,6 @@ struct VehicleView: View {
         }
         if !extra.isEmpty { out.append(Grp(name: "扩展信息", rows: extra)) }
 
-        // 车况报文 — 来自 tbox control 缓存（对齐小程序 vehicle.js）
         let ctl = store.caches["control"] as? [String: Any]
         var ctlRows: [Row] = []
         if let ctl, let pv = ciNumber(ctl, ["protocolVer"]) {
@@ -482,13 +402,10 @@ struct VehicleView: View {
     }
 }
 
-// MARK: - #NEW-105 图片选择器 Sheet
 struct PhotoPickerSheet: View {
     @Binding var selectedImage: UIImage?
     let onConfirm: () -> Void
     @Environment(\.dismiss) private var dismiss
-    /// UIImagePickerController.delegate 是 weak 引用，必须由视图强引用持有 delegate，
-    /// 否则它会在 present 之前就被释放，选中的照片永远回不来。
     @State private var pickerDelegate: PhotoPickerDelegate? = nil
 
     var body: some View {
@@ -510,8 +427,6 @@ struct PhotoPickerSheet: View {
                 }
                 .padding(.top, TokensSpacing.sm)
             }
-            // v5：不自己铺底 —— 画布与光在 App 根部只画一次，这里再铺一层
-            //       就是一块盖住光的墙（原生主题下与原来逐像素相同：根画布就是同一个颜色）。
             .navigationTitle("添加照片")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

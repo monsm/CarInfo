@@ -1,56 +1,7 @@
 import SwiftUI
 
-// =============================================================================
-//  MapSpineView · 「现在」那一张卡（抽屉的两态 + 卡里的地址 / 副行 / 光带）
-// =============================================================================
-//
-//  与 `MapSpineReadouts.swift`、`MapQuickButtons.swift` 同一个理由 —— 关切不同：
-//  `MapSpineView` 管这一屏的骨架（六页同屏、底条、镜头、图层、手势），这里只回答
-//  「这张卡长什么样、里面的数怎么排、取不到时写什么」。
-//
-//  另一条理由更实际：`scan/lintcfg.py` 的 `file_length` 盯着最大那个文件。2026-09-25
-//  搬了**两次**，都是同一个阈值：先搬三个数的排版（骨架那一份当时 1211 行），
-//  再搬这张卡本身（加完抽屉之后它又到 1201 行）。搬的都是**一件独立的事**，
-//  界面一字未改 —— 不是把它加进排除清单，也不是把阈值抬到刚够。
-//
-//  注：下面用到的 `store` / `layer` / `layerMenu` / `drawerOpen` 因此
-//  **不是 `private`** —— `private` 的作用域是**文件**，跨文件看不见。
-//  它们在骨架里的注释写明了为什么。
-// =============================================================================
 
-// =============================================================================
-//  MapNowDrawer —— 抽屉的**连续那一半**（跟手拖出来的那一段）
-// =============================================================================
-//
-//  用户 2026-09-26 第 2 条：「抽屉太别扭了，原生有没有这种可以展开的，系统地图里面
-//  原生用的啥？你做的拖动的时候闪屏频闪」。三句分别对应三件事：
-//
-//   ① **原生用什么**（先回答，因为它决定了下面这一版的做法）：Apple 地图/查找/股市
-//      里那种「一直挂在下面、能拉高拉低」的卡是 `UISheetPresentationController`，
-//      SwiftUI 里同一台机器叫 `.sheet` + `.presentationDetents([...], selection:)`
-//      （`isPresented: .constant(true)` + `interactiveDismissDisabled()` 让它常驻，
-//      `presentationBackgroundInteraction(.enabled(upThrough:))` 让底下的地图还能用）。
-//      —— 跟手、动量、吸附、橡皮筋、VoiceOver 的收起/展开全是系统做的。
-//   ② **我们为什么不用它**（这不是取舍，是几何上装不下）：系统 sheet 永远是
-//      **窗口底部**的一张面，而这一屏底部是我们自己的入口条（全局导航）。
-//      sheet 会直接盖住它 —— 与 `MapSpineReadouts` 头注里第二代写法（那个 sheet）
-//      被删掉的是同一个理由，只是那一次盖住的是模式条。
-//   ③ **频闪的根因**（这一版真正修的）：连续量此前是 `MapSpineView` 的 `@State`，
-//      而拖动是**每帧**写它 —— 于是 `MapSpineView.body` 每帧重建一次，
-//      而那个 body 里有六页同屏、一张活地图、一条轨迹、底条……
-//      一帧一屏地重建就是用户看到的频闪。状态挪进本视图之后，
-//      一帧里重画的只有这张卡（页面、底条、地图都不再跟着动）。
-//
-//  ⚠️ 它只多收一个 `@State` 家族（`reveal` / `bodyHeight`），不多一个事实：
-//  「拉开多少」仍然只有一个出处，而「记住的那一档」仍然是骨架里那个持久化键。
-// =============================================================================
 
-/// 抽屉自己报出来的**上沿**（地图右侧那一列的锚）。
-///
-/// 用户 2026-09-26：「车位置 人位置 指南针 都紧挨着抽屉，抽屉展开时，他们也要往上移动」。
-/// 用 `PreferenceKey` 而不是再开一个 `@State`：偏好值只让**读它的那个视图**重画
-///（`.overlayPreferenceValue`），这一页里别的东西（那张活地图、六页、底条）不参与 ——
-/// 与「连续量不许住在页面上」是同一条纪律（见 `MapNowDrawer` 头注的③）。
 struct DrawerTopKey: PreferenceKey {
     static let defaultValue: [Anchor<CGRect>] = []
     static func reduce(value: inout [Anchor<CGRect>], nextValue: () -> [Anchor<CGRect>]) {
@@ -58,34 +9,20 @@ struct DrawerTopKey: PreferenceKey {
     }
 }
 
-/// 卡头拿到的那几个把手（只有 `MapNowDrawer` 会造它）。
-///
-/// 为什么不是一个闭包：卡头那份代码（`MapSpineReadouts`）要同时做四件事 ——
-/// 读连续量画拉手、点一下换端点、跟手拖动、报无障碍的收起/展开。
-/// 一个结构体把「这一件事需要的那几个入口」一次交清，比四个参数各自传递好读，
-/// 也比把那段手势搬进本文件好 —— 手势的注释与读数住在同一份文件里。
 struct DrawerHandle {
-    /// 连续量 0…1（跟手拖出来的那一段）。**唯一写点是拖动与落点。**
     let reveal: Binding<CGFloat>
-    /// 正文的自然高度（跟手时的分母；还没量到时是 0）。
     let height: CGFloat
-    /// 当前那一档（画无障碍值、算拖动的基准）。
     let open: Bool
-    /// 点一下拉手：换一个端点。
     let toggle: () -> Void
-    /// 拖动松手：落到某个端点。
     let land: (_ open: Bool) -> Void
 }
 
 struct MapNowDrawer<Head: View, Content: View>: View {
-    /// 记住的那一档（持久化在骨架里，`MapSpineView.drawerKey`）。
     @Binding var open: Bool
     private let head: (DrawerHandle) -> Head
     private let content: () -> Content
 
-    /// 拉开多少（0…1）。**只有这个视图读它** —— 这是频闪修好的地方（见头注③）。
     @State private var reveal: CGFloat = 0
-    /// 正文的自然高度（量出来的，见 `measure`）。
     @State private var bodyHeight: CGFloat = 0
 
     init(open: Binding<Bool>,
@@ -100,33 +37,6 @@ struct MapNowDrawer<Head: View, Content: View>: View {
         GlassCard(accent: HomeMode.now.accent) {
             VStack(alignment: .leading, spacing: 0) {
                 head(handle)
-                //  抽屉的正文：**它的高度就是手指走出来的那一段**
-                //（`reveal` 0…1 × 正文的自然高度）。
-                //
-                //  ⚠️ 2026-09-27（用户第 2 条：「手动慢慢拉开还是不顺滑，还是有抽动频闪」）：
-                //  这一份**从两份减到一份**。此前是「可见的那一份 + `background` 里
-                //  另建一份 `.hidden()` 的测量副本」—— 拖动是每帧写 `reveal`，
-                //  所以每帧要把**整份正文建两遍**（部件少的时候看不出，正文里有图层菜单、
-                //  两排读数与三层的正文，而拖动时它就在手指底下）。
-                //  现在量高那一份是**同一份**的 `background`（不占位、不参与排版），
-                //  一帧里只建一份。
-                //
-                //  三层各有唯一的作用，少一层就用不了：
-                //   ① `.fixedSize(vertical:)` —— 正文**不接「当前可见高度」这个提案**，
-                //      永远按自己的自然高度排版（折行稳定）。
-                //   ② `.background { measure }` —— 量到的就是这个自然高度（①之后的位置）。
-                //   ③ 那个 `frame(height: bodyHeight * reveal)` + `clipped()` ——
-                //      手指走出来的可见高度，多余的部分剪掉。
-                //
-                //  ⚠️ ①②③ 的顺序就是「不鬼畜」这件事本身（用户 2026-09-26：「还是会鬼畜」）：
-                //  此前只有 ③，于是正文拿到的提案是「当前可见高度」—— 一涨一缩之间
-                //  折行的字每帧重新换行，卡片里的内容就像在自己扭。
-                //
-                //  ⚠️ 那个 `if reveal > 0.001`（收起时干脆不建正文）也一起删了：
-                //  它省下的是「一份正文的构建」，但代价是**手指一动才建** ——
-                //  于是每一次拉开的第一帧都要现建整份正文，那一下正是「慢拖时开头一卡」。
-                //  现在正文一直在（高度 0 时被上面那个 `frame` 夹住、被 `clipped()` 剪掉，
-                //  看不见也不接事件）—— 与以前那个总是建着的测量副本是同一份成本。
                 content()
                     .fixedSize(horizontal: false, vertical: true)
                     .background(alignment: .top) { measure }
@@ -134,20 +44,14 @@ struct MapNowDrawer<Head: View, Content: View>: View {
                     .clipped()
             }
         }
-        //  把自己那条上沿报出去（地图右侧那一列贴着它、并跟着它上下动）。
         .anchorPreference(key: DrawerTopKey.self, value: .bounds) { [$0] }
-        //  记住的那一档：拉出来过就还是拉出来的。**动画不出现在这里** ——
-        //  启动那一下应该就是那个样子，不是「从收起长出来」。
         .onAppear { reveal = open ? 1 : 0 }
-        //  外部改了那一档（换图层那一下会自动拉出来、或从设置里回来时读回持久化的值）：
-        //  这里补上那一段动画。跟手那一下自己管自己的落点（`land`），走不到这里。
         .onChange(of: open) { _, want in
             guard (want ? 1 : 0) != reveal else { return }
             withAnimation(TokensMotion.settle) { reveal = want ? 1 : 0 }
         }
     }
 
-    /// 交给卡头的那几个入口（每帧重建一次，所以 `height` 与 `open` 都是当拍的）。
     private var handle: DrawerHandle {
         DrawerHandle(reveal: $reveal,
                      height: bodyHeight,
@@ -156,14 +60,6 @@ struct MapNowDrawer<Head: View, Content: View>: View {
                      land: { land($0) })
     }
 
-    /// 落到某一个端点 —— **唯一的写点**（拉手点一下、拖动松手、外部改档都归它）。
-    ///
-    /// 它**不能再守「open 与目标相同就不动」**：跟手拖到一半松手时，目标可能与
-    /// 当前档相同（拉到 40% 又放回去）—— 而那个中间位置必须归位。
-    /// 触觉不在这里：点击与拖动各有自己的手感，谁也不该替谁发。
-    ///
-    /// ⚠️ 动画取 `TokensMotion.settle`（临界阻尼，不过冲）而不是 `value`：
-    /// 系统的 sheet 落位**不会回弹**，而这里多一下回摆就是「拉开之后又抽一下」。
     private func land(_ next: Bool) {
         withAnimation(TokensMotion.settle) {
             open = next
@@ -171,25 +67,9 @@ struct MapNowDrawer<Head: View, Content: View>: View {
         }
     }
 
-    /// 量一遍正文的**自然高度** —— 跟手时的分母（手指走多少 = 拉开多少）。
-    ///
-    /// 它住在 `background` 里：背景不参与父视图的排版，所以它既不占位、
-    /// 也不出现在版面上（2026-09-27 起它量的是**正文自己那一份**，见 `body` 上面
-    /// 那一段 —— 此前这里另建了一份 `.hidden()` 的副本）。
-    ///
-    /// ⚠️ `.fixedSize(horizontal: false, vertical: true)` 是**必须的**，不是修饰：
-    /// `background` 会把「卡片当前的高度」作为提案递给背景内容 —— 而卡片的高度
-    /// 正是被量出来的那个数。不挡住提案就是**反馈环**：量到 400 → 卡片 400 →
-    /// 下一帧又拿 400 去量（内容被压着量出 400）→ …… 表现出来就是卡片在自己抖。
-    /// 写死「按自然高度量」之后，量出来的数不依赖卡片当前的形状。
-    ///
-    /// ⚠️ 它**总是**建着（不只是拉开的时候）：拉开的第一帧就有分母 ——
-    /// 否则高度会先从 0 跳到真值，跟手那一下会先闪一格。
     private var measure: some View {
         GeometryReader { g in
             Color.clear
-                //  只在真的变了才写（差值 < 0.5pt 当没变）：手势系统与布局都会
-                //  把同一个尺寸重复递几次，而每一次写都会再触发一轮布局。
                 .onAppear { bodyHeight = g.size.height }
                 .onChange(of: g.size.height) { _, h in
                     if abs(h - bodyHeight) > 0.5 { bodyHeight = h }
@@ -200,31 +80,9 @@ struct MapNowDrawer<Head: View, Content: View>: View {
 
 extension MapSpineView {
 
-    // =========================================================================
-    // MARK: 「现在」那一张卡（抽屉）
-    // =========================================================================
 
-    /// 「现在」这一档底部那张卡 —— **它现在是一个抽屉**（用户 2026-09-25 第 2 条：
-    /// 「下面的卡片不是抽屉样，不是我发的图片的参考 …… 默认只显示一横，拉出来才是全部」）。
-    ///
-    /// 收起（默认）= 拉手 + 三个数（续航 / 电量 / 车速）+ 图层胶囊；
-    /// 拉出来 = 这张卡的全部内容。两态的排版（拉手、拖动、那三个数、其余读数）
-    /// 都在 `MapSpineReadouts.swift`（与读数同一份文件），这里只有它们的外壳。
-    ///
-    /// 两件事因此从这一处消失，理由写在它们的新家：
-    ///   · 巨字续航 → 它已是收起时那三个数之一（`summaryBar`），不再摆在卡里：
-    ///     一个事实一个出处（用户 2026-09-24：「地图页的信息有很多是重复的」）；
-    ///   · 上一轮那张系统 sheet 与它那行「其余读数」入口 → 删。抽屉就是这张卡，
-    ///     同一个抽屉只有一个开法（见 `MapSpineReadouts` 头注的三代写法）。
     @ViewBuilder
     func nowCard(_ d: MapSpineData) -> some View {
-        //  ⚠️ 它此前还给 `GlassCard` 传一个 `frosted: drawerOpen`（收起不磨砂 /
-        //  拉出磨砂）—— 那一个参数随「玻璃默认更透」一起删了（用户 2026-09-26：
-        //  「玻璃就默认选更透」），现在全 App 的玻璃只有一档材质（见 `DSGlass.swift`）。
-        //
-        //  ⚠️ 2026-09-26（用户第 2 条：「你做的拖动的时候闪屏频闪」）：外壳换成
-        //  `MapNowDrawer` —— 连续量住进那个视图（理由写在它头注里）。
-        //  这里只剩「头是什么、正文是什么」两句。
         MapNowDrawer(open: $drawerOpen) { handle in
             drawerHead(d, handle: handle)
         } content: {
@@ -232,26 +90,9 @@ extension MapSpineView {
         }
     }
 
-    /// 抽屉拉出来之后的正文。**`switch` 在这里**：图层是本屏的状态（`layer`），
-    /// 而三个图层各自的正文本来就在 `MapSpineLayers.swift` 里；
-    /// `now` 那一层的一半在 `MapSpineReadouts.swift`。
-    ///
-    ///  ⚠️ 2026-09-26（用户：「下面抽屉的现在选择放到抽屉里面，外面只显示 3 个」）：
-    ///  **图层胶囊搬进来了**（它此前坐在卡头那一行、与拉手同一排）。
-    ///  于是收起时那张卡只剩「拉手 + 三个数」—— 一横，而不再多一件控件；
-    ///  要看图上看哪一层、或换一层，把抽屉拉出来。
     @ViewBuilder
     func drawerContent(_ d: MapSpineData) -> some View {
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            //  抽屉的第一行：**车的那一行**（表显里程 · 充电状态）+ 右端的图层开关。
-            //
-            //  ⚠️ 2026-09-27（用户第 1 条：「现在的选择可以和表显 充电状态 放一行」）：
-            //  这一行把两件事并成一行，而它成立的理由比「省一行」大：
-            //    · 「表显 53,766 km · 未充电」回答的是**车**的事，不是「现在这一层」的事
-            //      —— 换成出行 / 停车 / 充电三层它同样成立，所以它本来就该在抽屉的
-            //      第一行，而不是「现在」那一层正文里的第二行；
-            //    · 图层开关此前自己占一整行（它会变的那一个字就是当前层名）。
-            //  于是抽屉比上一版少一行，而少的那一行没有丢任何东西。
             HStack(alignment: .center, spacing: TokensSpacing.sm) {
                 drawerSub(d)
                 Spacer(minLength: TokensSpacing.sm)
@@ -260,7 +101,6 @@ extension MapSpineView {
             switch layer {
             case .now:
                 if d.hasLocation == false {
-                    // 没有位置时不摆一堆「--」：说清为什么
                     emptyNotice(MapSpineLayer.now.emptyNote)
                 } else {
                     nowMetrics(d)
@@ -274,15 +114,6 @@ extension MapSpineView {
         .padding(.top, TokensSpacing.lg)
     }
 
-    /// 抽屉拉出来之后卡里的正文：地址 → 副行 → 光带。
-    ///
-    ///  这里原本还有**巨字续航**（`DSBigNumber` 56pt）+ 它取不到时的空态
-    ///（`GlassCardEmpty("还没收到剩余续航")`）。两者 2026-09-25 第三轮一起搬走：
-    ///  卡收起时只剩「一横」，而那一横上是**续航 / 电量 / 车速**三个数
-    ///（`MapSpineReadouts.summaryBar`）—— 同一个数在卡里说两遍就是这一仓
-    ///  反复删的那种重复（用户 2026-09-24：「地图页的信息有很多是重复的」）。
-    ///  「车没报续航」那一支也跟着走了：现在那**一格自己写「无数据」**，
-    ///  与抽屉里其余读数是同一条写法（不摆 `--`、也不摆一块空态）。
     @ViewBuilder
     func nowMetrics(_ d: MapSpineData) -> some View {
         if !d.address.isEmpty {
@@ -292,26 +123,11 @@ extension MapSpineView {
                 .foregroundStyle(TokensPalette.primary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        // 光带 = 电量（全 App 唯一的形状，在地图上它是「车钉外面那圈弧」的展开）
-        // `showsGlow` 不再传：它以前读「当前艺术方向允不允许发光」（纸上不允许 —— 纸张没有
-        // 发光）。主题只剩原生之后那是常真，于是这一处回到 `DSLightBar` 的默认值（true），
-        // 而那个参数仍在（充电页那类地方需要不发光的光带）。
         DSLightBar(progress: Double(d.socPct) / 100,
                    height: 5,
                    tint: TokensPalette.lightBar)
     }
 
-    /// 抽屉第一行左半边：**车的那一行**（表显里程 · 充电状态）。
-    ///
-    /// 它从「现在」那一层的正文里提上来了（2026-09-27，用户：「现在的选择可以和表显
-    /// 充电状态 放一行」）—— 两件事并成一行，同时这一行变成了**四层共用**的：
-    /// 「表显 … · 未充电」说的是车，不是哪一层。
-    ///
-    /// 空段直接丢掉（不摆占位）—— 「表显 53,766 km · 未充电」里任何一个字
-    /// 取不到，那一句就不出现，而不是留一个 `--`。
-    ///
-    /// 它曾经从「电量 68%」开头 —— 那个数已经是下面读数里的「电量」那一格，
-    /// 而电量在这张卡里还有第三种说法（光带）。一个 68% 说三遍不是信息多，是没精简。
     @ViewBuilder
     func drawerSub(_ d: MapSpineData) -> some View {
         let mileage = VM.vehicleSummary(store.car, store.controlCache)?.mileage
@@ -324,8 +140,6 @@ extension MapSpineView {
         }
     }
 
-    /// 把若干片段拼成一行：空段与 `--` 直接丢掉（全站统一的做法）。
-    /// `private` 到本文件为止 —— 用它的只有上面那一处。
     private static func join(_ parts: [String?]) -> String {
         parts.compactMap { $0 }
             .filter { !$0.isEmpty && $0 != "--" }

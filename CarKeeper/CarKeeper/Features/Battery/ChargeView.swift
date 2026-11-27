@@ -1,29 +1,6 @@
 import SwiftUI
 import Charts
 
-// =============================================================================
-//  充电 —— 从零重写的一页（旧 BatteryView 已删，不在它的基础上改）
-// =============================================================================
-//
-//  旧页的问题不是排版，是**它同时是五个页面**：充电、电池健康、故障码、账本、
-//  目的地续航计算器挤在同一张纸上，谁都没有说清「这一页是干什么的」。
-//
-//  这一页只装三件事，顺序就是看的顺序：
-//    ① 充电 —— 此刻在不在充、功率多少、还要多久
-//    ② 电池 —— 车端报的电池读数：一致性（单体电压 / 温度探针）、绝缘电阻、
-//              电压采样子系统、动力电机、电池告警
-//    ③ 趋势 —— SOC 与充电功率两条曲线（本机按 5 / 1 分钟采样，服务端不提供历史）
-//
-//  不在这里的东西与它们的去处：
-//    · 故障码 → 体检（「这辆车有没有毛病」归健康报告）
-//    · 分析结论（综合评分）→ 体检
-//    · **充电账本（花了多少钱）→ 整条链路已删**（2026-09-23，用户要求）：
-//      它算的是本机积分出的度数 × 手填电价，没有任何账单接口，
-//      它带来的那条 PDF 导出、地图上的账块、搜索里的充电记录也一并去掉。
-//
-//  数据口径：所有读数都来自**刚刚那一次网络请求**（`store.caches`），
-//  没有 TTL、不落盘、失败不保留旧值 —— 取不到就显示取不到。
-// =============================================================================
 
 struct ChargeView: View {
     private let store = AppStore.shared
@@ -33,8 +10,6 @@ struct ChargeView: View {
     @State private var loadTask: Task<Void, Never>? = nil
     @State private var trendPeriod: TrendPeriod = .day
 
-    /// 趋势周期。读的是 HistoryStore 的真实采样（服务端只有「当前状态」接口），
-    /// 所以「7 天 / 30 天」看到的是**攒下来的**点，不是它去查了历史。
     enum TrendPeriod: String, CaseIterable, Identifiable {
         case day = "24 小时"
         case week = "7 天"
@@ -73,24 +48,10 @@ struct ChargeView: View {
         }
     }
 
-    // =====================================================================
-    // MARK: - 叠叠乐：这一档的卡
-    // =====================================================================
-    //
-    //  顺序就是读的顺序：**此刻 → 明细 → 电池 → 趋势 → 长途**。
-    //  此前这五项是同一张纸里的五节 —— 换档时整屏一起闪；现在它们是五张卡，
-    //  上下滑是一张一张过。
-    //
-    //  三态的责任在这里落：
-    //    · 有数据 → 卡头右侧带读数
-    //    · 无数据 → 卡片正文自己说一句真话（`GlassCardEmpty`），**不摆 `--`**
-    //    · 过期   → 卡头右侧带时间（`at`）
     @MainActor
     private var cards: [StackCard] {
         let e = VM.energy(store.caches, store.car)
         let b = batteryModel(store.caches)
-        // 「此刻 / 明细 / 电池 / 趋势」是**同一份读数**的四种读法，所以时间戳同源：
-        // 四个不同时间只会让读者以为它们不是一回事。
         let chargeAt = store.cacheTime("charge")
         return HomeMode.charge.headCards + [
             StackCard(id: "state", title: "此刻",
@@ -100,8 +61,6 @@ struct ChargeView: View {
             StackCard(id: "detail", title: "明细",
                       at: chargeAt,
                       content: AnyView(chargeDetail(b))),
-            // `at` 不是装饰：它回答「这个 68% 是什么时候的」。
-            // 没拿到过就是 nil（那会走空态），所以这里不会摆一个假时间。
             StackCard(id: "battery", title: "电池",
                       value: "\(e.socPct)%", cls: "ok",
                       at: chargeAt,
@@ -114,9 +73,7 @@ struct ChargeView: View {
         ]
     }
 
-    // MARK: - ① 充电（此刻的状态）
 
-    /// 续航那一行有没有可写的东西（三个数都没有就整行不出现 —— 见 `chargeHero` 里那条注）
     private func hasEnergyLine(_ e: EnergyModel) -> Bool {
         if e.range != "--" { return true }
         if let ttf = e.timeToFull, ttf != "--" { return true }
@@ -130,13 +87,6 @@ struct ChargeView: View {
         let power = chargePowerText
 
         return VStack(alignment: .leading, spacing: 0) {
-            //  这张卡**不再写巨字电量**（用户 2026-09-24：「全部页面检查精致度」）。
-            //  它上面那张头卡（`HomeModeHead`）的主角就是同一个数，而且更大（116pt）：
-            //  一页上两个 `68%` —— 一个当标题、一个当内容 —— 读起来是同一句说了两遍。
-            //  一个数只该有一个出处：电量归头卡，这张卡回答的是「此刻在发生什么」。
-            //
-            //  充电状态也不在这里再说一遍：它就是**卡头值**（`StackCard.value` = 充电中 / 已充满），
-            //  同一行字在卡头上方已经出现过一次。这里只留上面都没有的：告警。
             if !e.socWarn.isEmpty {
                 Text(e.socWarn)
                     .font(TokensTypo.footnote)
@@ -150,12 +100,6 @@ struct ChargeView: View {
             )
             .padding(.top, e.socWarn.isEmpty ? 0 : TokensSpacing.lg)
 
-            // 续航 / 剩余时间那一行：**知道才写**。
-            //
-            // 原来左边那格写的是 `e.range == "--" ? "续航 --" : …` —— 无数据时画
-            // 一句「续航 --」：它占着位置、又不说明任何事（README 那条「无数据就写一句
-            // 真话，不要摆 `--`」说的正是这个）。现在两边都没有就不出现整行，
-            // 而不是占一行空话（下方还有 DSStatStrip 在，不会变成空白区）。
             if hasEnergyLine(e) {
                 HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                     if e.range != "--" {
@@ -164,7 +108,6 @@ struct ChargeView: View {
                             .foregroundStyle(TokensPalette.secondary)
                     }
                     Spacer(minLength: TokensSpacing.sm)
-                    // 充电中报「还要多久」，没充时报「还能跑多久」——两者不会同时出现。
                     if let ttf = e.timeToFull, ttf != "--" {
                         Text("预计充满 \(ttf)")
                             .font(TokensTypo.footnote)
@@ -178,9 +121,6 @@ struct ChargeView: View {
                 .padding(.top, TokensSpacing.md)
             }
 
-            //  电压与电流**各占一行**（用户 2026-09-25：「电压/电流拥挤了」）：
-            //  它们原来是拼在一句里的（`398.2V / 12.4A`，12 个字符挤进约 75pt 的一格）。
-            //  都没拿到时不摆两个 `--`：一行 `--` 就已经是实话了。
             DSStatStrip(items: [
                 .init("充电功率", power),
                 .init("电池温度", e.battTemp),
@@ -193,9 +133,6 @@ struct ChargeView: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// 充电功率：唯一算法在 `VM.chargePowerKW`（`totalVoltage × totalCurrent`）。
-    /// 报文里**没有** `ChargPower` / `ChargingPower` 这两个键 —— 旧代码在「预计充满」
-    /// 那里读的就是它们，所以那个数字永远是空的。
     private var chargePowerText: String {
         guard let p = VM.chargePowerKW(ciVal(store.caches, "charge"), ciVal(store.caches, "control")),
               p > 0.1 else { return "--" }
@@ -210,7 +147,6 @@ struct ChargeView: View {
         }
     }
 
-    // MARK: - ①' 充电明细（车端报的充电字段）
 
     private func chargeDetail(_ b: BatteryModel) -> some View {
         let c = b.charging
@@ -246,7 +182,6 @@ struct ChargeView: View {
         init(_ k: String, _ v: String) { self.k = k; self.v = v }
     }
 
-    // MARK: - ② 电池（车端读数）
 
     @ViewBuilder
     private func batterySection(_ b: BatteryModel, _ e: EnergyModel) -> some View {
@@ -258,8 +193,6 @@ struct ChargeView: View {
         alarms(b)
     }
 
-    /// 电池域的结论：只取 `AN.summarize` 里电池那一域的理由。
-    /// （其余五域的结论归体检报告，避免同一句话在两页各说一遍。）
     @ViewBuilder
     private func verdict() -> some View {
         if let batt = AN.summarize(store.caches, store.car).domains.first(where: { $0.key == "battery" }),
@@ -280,8 +213,6 @@ struct ChargeView: View {
         }
     }
 
-    /// 一致性：单体电压与温度探针的逐点柱图 + 三个统计。
-    /// 没有采样数组时只写「接口未上报」，不画空图。
     @ViewBuilder
     private func consistency(_ b: BatteryModel) -> some View {
         let cellLabel = b.cellStats.map { "\($0.count) 节采样" } ?? "未上报"
@@ -334,7 +265,6 @@ struct ChargeView: View {
         }
     }
 
-    /// 有节号就写成「最低·第56节」，没有就只写「最低」—— 不拿序号猜。
     private func cellNumLabel(_ base: String, _ num: String?) -> String {
         guard let num, !num.isEmpty, num != "0", num != "--" else { return base }
         return "\(base)·第\(num)节"
@@ -429,18 +359,10 @@ struct ChargeView: View {
         }
     }
 
-    /// 把「串数 · 电压 · 电流」里真正有值的部分接成一句（空项丢掉，不留多余分隔点）。
     private func joined(_ parts: [String]) -> String {
         parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
-    /// 一个小块：名字 + 数 + 单位，三样挤在一行里（充电页用它摆电压/电流/绝缘那几块）。
-    ///
-    /// 2026-09-25（用户第 5 条：「充电页面要考虑内容放得下且不换行」）：
-    /// 三个 `Text` 此前都没有限行 —— 行车记录仪那种长名字（「单体压差」）
-    /// 或者带小数位的读数一长，这一行就折成两行，而这个块的外形是跟着行高走的，
-    /// 于是同一排三个块会**高矮不一**（一排里一个两行、两个一行）。
-    /// 现在三样都是单行：名字与单位允许缩到 0.75，数字不许缩太多（它是读数）。
     private func miniStat(_ k: String, _ v: String, _ unit: String, warn: Bool = false) -> some View {
         HStack(spacing: TokensSpacing.xs) {
             Text(k).font(TokensTypo.footnote).foregroundStyle(TokensPalette.secondary)
@@ -456,7 +378,6 @@ struct ChargeView: View {
         .background(TokensPalette.fillSubtle, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
-    // MARK: - ③ 趋势（本机采样攒出来的两条曲线）
 
     @ViewBuilder
     private func trendSection(_ e: EnergyModel) -> some View {
@@ -467,18 +388,7 @@ struct ChargeView: View {
         let socMinutes = Int(HistoryStore.socInterval / 60)
         let powerMinutes = Int(HistoryStore.powerInterval / 60)
 
-        //  正文里原来还有一行 `DSSectionHeader(title: "趋势", trailing: "车端采样")` ——
-        //  卡头已经写着「趋势」，同一张卡上再说一遍就是没做完（用户 2026-09-24）。
-        //  「车端采样」是**这份曲线的性质**（谁给了这些点），所以它搬到卡头值上，
-        //  而不是作为第二个标题留在正文里。
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            //  ⚠️ 这里曾经写着「用自己搭的分段控件、而不是系统 `Picker(.segmented)`」：
-            //  理由当时成立（2026-09-25 第 5 条：系统那一条的凹槽与滑块是它自己的灰，
-            //  铺在玻璃卡里像一块不合群的暗块）。
-            //  2026-09-26 **同一件事被推翻**（用户第 4 条：「尽可能用 ios27 的原生控件」）：
-            //  那一块灰现在的量级跟着 iOS 26/27 的玻璃化外观走，而自搭那一排要自己负责
-            //  命中区、按下反馈、拖动跟踪与无障碍（见 `DSSegmentPicker` 的文件头）。
-            //  于是这一处现在是**系统那一枚** —— 外观随系统这条代价也写在那个文件里。
             DSSegmentPicker(options: TrendPeriod.allCases.map { (value: $0, title: $0.rawValue) },
                             selection: $trendPeriod,
                             label: "趋势周期")
@@ -531,7 +441,6 @@ struct ChargeView: View {
         }
     }
 
-    // MARK: - 数据
 
     private func loadIfNeeded() {
         guard !store.carId.isEmpty else { loading = false; return }
@@ -544,7 +453,6 @@ struct ChargeView: View {
         guard !store.carId.isEmpty else { loading = false; return }
         let api = APIClient.shared
         do {
-            // 必须用 try：try? 会让 do 体永远不抛错，两个 catch 就成了死代码。
             let charge = try await api.getCharge(carId: store.carId)
             store.saveCache(["charge": charge])
             let control = try await api.getControl(carId: store.carId)

@@ -3,11 +3,9 @@ sys.stdout.reconfigure(encoding="utf-8")
 L = "D:/xm/ChangAnCarInfo/bin/Debug/changan_net_log_20260922.log"
 raw = open(L, encoding="utf-8", errors="replace").read()
 
-# 要的是**响应**报文，所以从 RES 那一行往后找（REQ 行后面第一个 body= 是别的接口的响应）
 i = raw.find("RES HTTP 200 POST https://m.iov.changan.com.cn/appserver/api/information/pageReceiverInfoByTime")
 i = raw.find("body=", i)
 start = raw.find("{", i)
-# 括号配对扫描，取出完整 JSON
 depth = 0
 in_str = False
 esc = False
@@ -30,12 +28,11 @@ print("已配对到第", end, "字符" if end else "（未闭合，文件被截�
 txt = raw[start:end] if end else raw[start:]
 obj = None
 try:
-    obj = json.loads(txt, strict=False)          # 日志里有裸控制字符
+    obj = json.loads(txt, strict=False)
 except Exception as e:
     print("整体解析失败:", str(e)[:80], "→ 退化为逐条消息扫描")
 
 if obj is None:
-    # 退一步：从 "content" : [ 起，括号配对取出第一条消息对象
     k = txt.find('"content"')
     k = txt.find("[", k)
     s2 = txt.find("{", k)

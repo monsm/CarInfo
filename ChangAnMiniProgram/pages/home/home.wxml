@@ -1,12 +1,10 @@
 <view class="page home {{enter ? 'ent' : ''}}">
 
-  <!-- 空数据提示 -->
   <view wx:if="{{!hasData}}" class="waiting">
     <view class="spinner"></view>
     <text class="caps muted">正在唤醒车辆…</text>
   </view>
 
-  <!-- ================= hero：全幅场景舞台（车为封面，数字居中压阵） ================= -->
   <view class="glass-hero stage">
     <view class="stage-top">
       <text class="greet caps muted">{{greeting}}</text>
@@ -24,7 +22,6 @@
       <text class="plate caps muted">{{carPlate}}</text>
     </view>
 
-    <!-- 场景：聚光下的车 -->
     <view class="scene">
       <image wx:if="{{heroHalo}}" class="halo" src="{{heroHalo}}" />
       <image wx:if="{{heroCar}}" class="hero-car" src="{{heroCar}}" mode="widthFix" />
@@ -36,7 +33,6 @@
       </view>
     </view>
 
-    <!-- 数字：SOC 居中巨字 + 续航副栏 -->
     <view class="digits-wrap">
       <view class="h-eyebrow">
         <text class="caps b">当前电量 SOC</text>
@@ -62,7 +58,6 @@
       </view>
     </view>
 
-    <!-- 运行快览：单行数据条 -->
     <view class="run" wx:if="{{hasData}}">
       <view class="rm" wx:for="{{metrics}}" wx:key="k">
         <view class="rk caps muted">{{item.k}}</view>
@@ -71,7 +66,6 @@
     </view>
   </view>
 
-  <!-- ================= 半悬浮快控坞（压住舞台底边） ================= -->
   <view class="qdock" wx:if="{{hasData}}">
     <view class="qd-inner">
       <view wx:for="{{qctrl}}" wx:key="key" class="qseg softpress" data-key="{{item.key}}" bindtap="onQuickCtrl">
@@ -81,10 +75,8 @@
     </view>
   </view>
 
-  <!-- ================= 控制台面板：一整块玻璃，编号分区 + 发丝拼缝 ================= -->
   <view class="console">
 
-    <!-- 01 车辆状态 -->
     <view class="sec" wx:if="{{hasData && statusRows.length}}">
       <view class="sec-head">
         <view class="sec-stamp">
@@ -109,7 +101,6 @@
       </view>
     </view>
 
-    <!-- 02 电池与动力 -->
     <view class="sec" wx:if="{{hasData && (cellRows.length || powerRows.length)}}">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">
@@ -138,7 +129,6 @@
       </view>
     </view>
 
-    <!-- 03 车身与胎压 -->
     <view class="sec" wx:if="{{hasData}}">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">
@@ -187,7 +177,6 @@
       </view>
     </view>
 
-    <!-- 04 位置（上移：一眼可读） -->
     <view class="sec" wx:if="{{hasData}}">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">
@@ -216,7 +205,6 @@
       <image wx:if="{{loc.snap}}" class="snap" src="{{loc.snap}}" mode="widthFix" binderror="onLocImgErr" />
     </view>
 
-    <!-- 05 座舱 -->
     <view class="sec" wx:if="{{hasData}}">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">
@@ -274,7 +262,6 @@
       </view>
     </view>
 
-    <!-- 页脚并入面板：更新时间 + 健康入口 -->
     <view class="sec sec-foot">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="foot">

@@ -1,9 +1,4 @@
 #!/bin/bash
-# =============================================================================
-# build.sh — 长安车管家构建脚本
-# 自动执行：swiftlint 检查 + Swift 类型检查 + xcassets 图片尺寸校验
-# 用法: ./build.sh [--fast] [--clean] [--no-lint]
-# =============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,25 +6,22 @@ PROJECT_ROOT="$SCRIPT_DIR"
 SCHEME="CarKeeper"
 XCODE_PROJ="$PROJECT_ROOT/$SCHEME.xcodeproj"
 
-# 配置
 FAST_MODE=false
 CLEAN_BUILD=false
 SKIP_LINT=false
 SWIFTLINT_OPTS=""
 
-# 颜色输出
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
 log_success() { echo -e "${GREEN}[OK]${NC} $*"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
 
-# 解析参数
 for arg in "$@"; do
     case $arg in
         --fast)
@@ -59,9 +51,6 @@ log_info "Scheme:  $SCHEME"
 log_info "Fast:    $FAST_MODE | Clean: $CLEAN_BUILD | Lint: $([ "$SKIP_LINT" = true ] && echo "SKIPPED" || echo "ENABLED")"
 echo ""
 
-# =============================================================================
-# Step 1: SwiftLint 检查
-# =============================================================================
 run_swiftlint() {
     log_info "Step 1/4: SwiftLint 检查..."
     
@@ -75,12 +64,10 @@ run_swiftlint() {
         return 0
     fi
     
-    # 检查是否存在 .swiftlint.yml 配置
     if [ ! -f "$PROJECT_ROOT/.swiftlint.yml" ]; then
         log_warn "未找到 .swiftlint.yml，使用默认配置"
     fi
     
-    # 运行 swiftlint
     local lint_output
     lint_output=$(swiftlint lint --strict $SWIFTLINT_OPTS 2>&1) || true
     
@@ -98,9 +85,6 @@ run_swiftlint() {
     fi
 }
 
-# =============================================================================
-# Step 2: Swift 类型检查
-# =============================================================================
 run_typecheck() {
     log_info "Step 2/4: Swift 类型检查..."
     
@@ -125,7 +109,6 @@ run_typecheck() {
     local build_output
     build_output=$(xcodebuild "${build_args[@]}" 2>&1) || true
     
-    # 检查编译错误
     local errors
     errors=$(echo "$build_output" | grep -E "^.*\.swift:[0-9]+:[0-9]+: error:" || true)
     
@@ -136,7 +119,6 @@ run_typecheck() {
         return 1
     fi
     
-    # 检查编译警告
     local warnings
     warnings=$(echo "$build_output" | grep -E "warning:" || true)
     if [ -n "$warnings" ]; then
@@ -149,9 +131,6 @@ run_typecheck() {
     return 0
 }
 
-# =============================================================================
-# Step 3: xcassets 图片校验
-# =============================================================================
 validate_xcassets() {
     log_info "Step 3/4: xcassets 图片尺寸校验..."
     
@@ -164,19 +143,16 @@ validate_xcassets() {
     
     local pass=true
     
-    # 检查 AppIcon
     local icon_set="$assets_dir/AppIcon.appiconset"
     if [ -f "$icon_set/Contents.json" ]; then
         log_info "检查 AppIcon..."
         
-        # 读取 Contents.json 并验证每个图片
         while IFS= read -r line; do
             if [[ "$line" =~ \"filename\" ]]; then
                 local filename=$(echo "$line" | grep -o '"[^"]*\.png"' | tr -d '"' | tr -d '"')
                 if [ -n "$filename" ]; then
                     local filepath="$icon_set/$filename"
                     if [ -f "$filepath" ]; then
-                        # 获取实际尺寸
                         local size
                         size=$(sips -g pixelWidth -g pixelHeight "$filepath" 2>/dev/null | grep -E "pixel(Width|Height)" | awk '{print $2}')
                         local width=$(echo "$size" | head -1)
@@ -207,9 +183,6 @@ validate_xcassets() {
     fi
 }
 
-# =============================================================================
-# Step 4: 设计令牌一致性检查
-# =============================================================================
 validate_design_tokens() {
     log_info "Step 4/4: 设计令牌一致性检查..."
     
@@ -221,7 +194,6 @@ validate_design_tokens() {
     
     local issues=0
     
-    # 检查时间感知配色
     if grep -q "static var ambient" "$kansei_file"; then
         log_success "  ✓ 时间感知配色: Kansei.Color.ambient"
     else
@@ -229,7 +201,6 @@ validate_design_tokens() {
         ((issues++))
     fi
     
-    # 检查呼吸动效
     if grep -q "breathe" "$kansei_file"; then
         log_success "  ✓ 呼吸动效: Kansei.Motion.breathe"
     else
@@ -237,7 +208,6 @@ validate_design_tokens() {
         ((issues++))
     fi
     
-    # 检查触觉反馈
     if grep -q "enum Haptic" "$kansei_file"; then
         log_success "  ✓ 触觉反馈: Kansei.Haptic"
     else
@@ -253,9 +223,6 @@ validate_design_tokens() {
     fi
 }
 
-# =============================================================================
-# 主流程
-# =============================================================================
 main() {
     local start_time=$(date +%s)
     

@@ -1,10 +1,3 @@
-// =============================================================================
-// 导出 — CSV/PDF（行程 / 充电 / 指令历史）
-//
-// 原为独立页面（深链 `carkeeper://export`）。批 5 并进 **保养与钱**：
-// 「带走你自己的记录」跟钱与保养是同一件事的一部分。
-// 它现在只提供内容（`ExportDataSection`），页面外壳归 `MaintenanceMoneyView`。
-// =============================================================================
 
 import SwiftUI
 import UIKit
@@ -15,9 +8,7 @@ struct ExportDataSection: View {
     @State private var isExporting = false
     @State private var exportURL: URL?
     @State private var showSuccess = false
-    /// 预览被“摊开全部”了吗（见 `previewPlan`）
     @State private var previewFull = false
-    /// 卡片量到的可用区域（`ArcStack` 写进来的真数；量不到时是 `.zero`）
     @Environment(\.cardViewport) private var cardViewport
 
     enum ExportType: String, CaseIterable {
@@ -32,15 +23,12 @@ struct ExportDataSection: View {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
                 DSSectionHeader(title: "导出")
 
-                // 选择导出类型（四个互斥选项 → 系统的分段语法）
                 DSSegmentPicker(options: ExportType.allCases.map { (value: $0, title: $0.rawValue) },
                                 selection: $exportType,
                                 label: "导出类型")
 
-                // 导出内容预览
                 previewCard
 
-                // 操作：两个格式，不是两个颜色。主操作只有一个（CSV），PDF 是次要的。
                 VStack(spacing: TokensSpacing.sm) {
                     Button(action: exportAsCSV) {
                         HStack(spacing: TokensSpacing.sm) {
@@ -72,20 +60,12 @@ struct ExportDataSection: View {
     }
 
     private var previewCard: some View {
-        // 容器统一走 DSCard（与其余 20 屏同一张卡片）；底色走令牌，不用 Color.primary 自调透明度。
         DSCard {
             VStack(alignment: .leading, spacing: TokensSpacing.sm) {
                 Text("导出预览")
                     .font(TokensTypo.caption)
                     .foregroundStyle(TokensPalette.secondary)
 
-                // 这里原本是 `ScrollView { Text(…).lineLimit(8) }.frame(height: 100)`，一个人占了
-                // 两件错：① 卡片里再套一层滚动 —— 外面那一叠就是系统 `ScrollView`，
-                // 竖向拖动会归内层，而内层拿到的又是无限高，于是它永远滚不动、却把拖动吃掉；
-                // ② 那个 100 是拍出来的高度，而这个块里真正有几行由**数据**决定
-                //（一行 CSV 在窄屏上折成几行，取决于那个时间戳字符串有多长）。
-                // 现在整块高度由行数与字号算出来：放得下就全放（内容撑高），
-                // 放不下就切在量出来的行边界上，剩下的挂在那张标准行里。
                 let plan = previewPlan
                 Text(plan.text)
                     .font(.system(.caption, design: .monospaced))
@@ -110,8 +90,6 @@ struct ExportDataSection: View {
         }
     }
 
-    /// 预览块的预算：卡片量到的可用高度减去这一块之外的东西（标题行与两处内边距）。
-    /// 宽度同理逐层减：叠叠乐左右 18（`GlassCard`）→ 这张卡自己 16（`DSCard`）→ 块内 8。
     private var previewPlan: CardFit.TextPlan {
         let text = previewLines.joined(separator: "\n")
         let width = max(0, cardViewport.width - 2 * StackSpec.Card.padH
@@ -248,7 +226,6 @@ struct ExportDataSection: View {
         let htmlURL = tempDir.appendingPathComponent("export.html")
         try? html.write(to: htmlURL, atomically: true, encoding: .utf8)
 
-        // Simple approach: return the HTML file as-is for sharing
         return htmlURL
     }
 

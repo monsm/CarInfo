@@ -55,13 +55,11 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _roots import EXISTING_ROOTS, swift_files   # noqa: E402
+from _roots import EXISTING_ROOTS, swift_files
 
-# `?` 后面（隔空白）跟这些字符时，是合法的可选链 / 类型可选。
 SAFE_NEXT = set(".,([=,)]}&|:{>?")
-# 上面是「单个字符」的放行表；下面这几个是**词**的放行表。
-SAFE_WORDS = {"in"}          # `-> String? in`：闭包返回类型可选
-SAFE_PREV_WORDS = {"try", "as", "is"}   # try? / as? / is?
+SAFE_WORDS = {"in"}
+SAFE_PREV_WORDS = {"try", "as", "is"}
 
 GLOVE = re.compile(r"([A-Za-z0-9_\)\]\"'])\?([ \t]*)(\S?)")
 
@@ -140,10 +138,6 @@ def scan_file(path):
             if nxt in SAFE_NEXT:
                 continue
             if nxt == "":
-                # `?` 在行尾（无论后面有没有留空白）：类型可选最常见
-                # （`let x: Date?`），默认放行；只有下一行的第一个非空字符是
-                # 字符串字面量时才报 —— 那个形态（`cond?` 换行接 `"文案"`）
-                # 同样不可能是合法 Swift。
                 nxt2 = ""
                 for j in range(i + 1, min(i + 4, len(code_lines))):
                     s = code_lines[j].strip()

@@ -8,20 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&family=Noto+Serif+SC:wght@300;400;600&display=swap">
 <style>
-/* ==========================================================================
-   骨架（十套完全一样，一个字都不改）
-     · 系统地图 ＝ 取景框，永远在
-     · 底部一条**能手滑的模式条** ＝ iOS 27 相机的那个特效
-     · 一个位置永不变的主按钮 ＝ 相机的快门：按钮永远在那儿，
-       按下去**干什么**由当前模式决定（这就是「真的切换不同功能」）
-
-   一个模式 = 一套完整的功能界面（找车 / 锁车 / 空调 / 充电 / 记录），
-   不是换几个数字。切换时整套界面跟着手指交叉过渡。
-
-   十套的差异 = 功能界面与地图的**十种融合方式**（不是颜色、不是换切换器）：
-     ① 底部面板   ② 底部大卡   ③ 悬浮卡     ④ 右侧栏    ⑤ 中央圆环
-     ⑥ 分屏       ⑦ 顶部抽屉   ⑧ 地图内标注  ⑨ 角落地图  ⑩ 水印
-   ========================================================================== */
 
 :root{
   --bg:#131216;--fg:#F2EFE9;--dim:#9F99A6;--dim2:#6F6A77;--line:#262530;
@@ -33,7 +19,6 @@ body{background:var(--bg);color:var(--fg);padding-bottom:80px;
   font-family:Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 
-/* ---------- 顶部索引（挑选用，不属于设计本身） ---------- */
 #idx{position:sticky;top:0;z-index:99;background:var(--bg);border-bottom:1px solid var(--line);
   display:flex;gap:6px;overflow-x:auto;padding:10px 16px;scrollbar-width:none}
 #idx::-webkit-scrollbar{display:none}
@@ -45,7 +30,6 @@ body{background:var(--bg);color:var(--fg);padding-bottom:80px;
 .chip.on{background:var(--fg);color:#131216;border-color:var(--fg)}
 .chip.on b{color:#131216}
 
-/* ---------- 说明 ---------- */
 header{max-width:1260px;margin:0 auto;padding:32px 24px 0}
 header .eb{font-size:10.5px;letter-spacing:.2em;color:var(--dim2)}
 header h1{margin:9px 0 0;font-size:28px;font-weight:250;letter-spacing:-.8px;line-height:1.28}
@@ -58,7 +42,6 @@ header .axes div{background:#1A191F;border-radius:12px;padding:12px 14px;font-si
 header .axes b{display:block;color:var(--fg);font-weight:600;margin-bottom:4px;font-size:12px}
 header .axes i{font-style:normal;color:var(--acc)}
 
-/* ---------- 板 ---------- */
 #board{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;
   scrollbar-width:none;margin-top:22px}
 #board::-webkit-scrollbar{display:none}
@@ -76,7 +59,6 @@ header .axes i{font-style:normal;color:var(--acc)}
 .meta .cap em{font-style:normal;color:#D6D0DD;font-weight:500}
 .meta .hint{margin-top:7px;font-size:11px;color:#5E5966}
 
-/* ---------- 设备 ---------- */
 .dev{width:390px;height:844px;flex:none;border-radius:46px;position:relative;overflow:hidden;
   background:var(--m-bg);color:var(--text);
   box-shadow:0 0 0 1px #3A3844,0 34px 66px -38px #000}
@@ -94,20 +76,17 @@ header .axes i{font-style:normal;color:var(--acc)}
   --ok:#0F7C52;--bad:#D7373F;--warn:#C0761A;--accent:#0A84FF;--veil:#EDECEA;
   --paper:rgba(255,255,255,.92);--hair:rgba(0,0,0,.085)}
 
-/* 地图窗口（十套唯一允许变形的固定件：它占多大，由融合方式决定） */
 .mapwin{position:absolute;inset:0;overflow:hidden}
 .bm{position:absolute;inset:0;width:100%;height:100%;display:block}
 .ovs{position:absolute;inset:0}
 .ov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;will-change:opacity}
 
-/* 状态条 */
 .sb{position:absolute;top:0;left:0;right:0;height:54px;z-index:60;display:flex;align-items:flex-end;
   justify-content:space-between;padding:0 26px 8px;font-size:12.5px;font-weight:600;
   font-variant-numeric:tabular-nums;color:var(--text)}
 .sb .ri{display:flex;align-items:center;gap:5px;opacity:.9}
 .sb svg{display:block}
 
-/* 顶部药丸（按融合方式决定要不要） */
 .huds{position:absolute;left:15px;right:15px;top:60px;z-index:40;pointer-events:none}
 .hud{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:7px;will-change:opacity}
 .pill{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:500;padding:8px 12px;
@@ -116,11 +95,9 @@ header .axes i{font-style:normal;color:var(--acc)}
 .pill i{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:none;box-shadow:0 0 7px var(--ok)}
 .pill.warn i{background:var(--bad);box-shadow:0 0 7px var(--bad)}
 
-/* 功能界面层（每套的融合方式在这里分叉） */
 .panels{position:absolute;inset:0;z-index:45;pointer-events:none}
 .pnl{position:absolute;will-change:opacity,transform}
 
-/* 通用内容件 */
 .ph{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px}
 .rows{display:flex;flex-direction:column}
 .row{display:flex;align-items:baseline;gap:10px;padding:6px 0;border-top:1px solid var(--hair)}
@@ -136,7 +113,6 @@ header .axes i{font-style:normal;color:var(--acc)}
 .hero i{font-style:normal;font-size:13px;font-weight:500;color:var(--text);opacity:.6}
 .sub{font-size:11.5px;line-height:1.5;color:var(--text);opacity:.55;margin-top:6px}
 
-/* ================= 底部手滑模式条（骨架件，十套一致） ================= */
 .stripWrap{position:absolute;left:0;right:0;bottom:0;height:84px;z-index:80;
   background:linear-gradient(to top,var(--veil) 46%,transparent 100%);
   touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
@@ -151,7 +127,6 @@ header .axes i{font-style:normal;color:var(--acc)}
   will-change:transform,opacity;cursor:pointer}
 .sItem.on{color:var(--accent)}
 
-/* 主按钮：位置永不变，功能随模式变（相机的快门） */
 .fabs{position:absolute;right:16px;bottom:96px;z-index:82;pointer-events:none}
 .fab{position:absolute;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;
   gap:6px;will-change:opacity;pointer-events:auto}
@@ -163,40 +138,29 @@ header .axes i{font-style:normal;color:var(--acc)}
 .fabLb{font-size:10.5px;font-weight:600;color:var(--text);
   text-shadow:0 1px 2px var(--veil),0 0 10px var(--veil),0 0 10px var(--veil)}
 
-/* ---------- 融合方式各自的皮 ---------- */
-/* ① 底部面板 */
 .fSheet{left:0;right:0;bottom:84px;background:var(--paper);border-top:1px solid var(--hair);
   border-radius:24px 24px 0 0;-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
   padding:12px 18px 18px;pointer-events:auto}
 .grab{width:34px;height:4px;border-radius:2px;background:var(--rule);margin:0 auto 10px}
-/* ② 底部大卡 */
 .fBig{left:14px;right:14px;bottom:96px;background:var(--paper);border:1px solid var(--hair);
   border-radius:22px;-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
   padding:16px 18px 18px;box-shadow:0 18px 40px -22px rgba(0,0,0,.5);pointer-events:auto}
-/* ③ 悬浮卡 */
 .fFloat{left:34px;right:34px;bottom:104px;background:var(--paper);border:1px solid var(--hair);
   border-radius:20px;-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
   padding:14px 16px;box-shadow:0 24px 50px -26px rgba(0,0,0,.6);pointer-events:auto}
-/* ④ 右侧栏 */
 .fSide{right:0;top:0;bottom:0;width:172px;background:var(--paper);border-left:1px solid var(--hair);
   -webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
   padding:104px 15px 0;pointer-events:auto}
-/* ⑤ 中央圆环 */
 .fRing{left:50%;width:250px;bottom:104px;margin-left:-125px;display:flex;flex-direction:column;
   align-items:center;pointer-events:auto}
 .fRing .cap{font-size:12.5px;font-weight:600;color:var(--text);
   text-shadow:0 1px 3px var(--veil),0 0 10px var(--veil),0 0 10px var(--veil);margin-bottom:8px}
-/* ⑥ 分屏 */
 .fSplit{left:0;right:0;bottom:84px;background:var(--paper);border-top:1px solid var(--hair);
   padding:14px 18px 18px;pointer-events:auto}
-/* ⑦ 顶部抽屉 */
 .fTop{left:0;right:0;top:0;background:var(--paper);border-bottom:1px solid var(--hair);
   border-radius:0 0 24px 24px;-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
   padding:66px 18px 16px;pointer-events:auto}
-/* ⑧ 地图内标注：没有面板 */
-/* ⑨ 角落地图 */
 .fFull{left:0;right:0;top:0;bottom:0;background:var(--paper);padding:280px 20px 0;pointer-events:auto}
-/* ⑩ 水印 */
 .fMark{left:0;right:0;bottom:84px;padding:0 22px 14px;pointer-events:none}
 .fMark .in{pointer-events:auto}
 .fMark .t1{font-size:15px;font-weight:600;color:#fff;letter-spacing:.01em}
@@ -208,7 +172,6 @@ header .axes i{font-style:normal;color:var(--acc)}
 .fMark .row .v{color:#fff}
 .fMark .ph{color:#fff}
 
-/* 拖拽提示（只在第一屏显示） */
 .dragHint{position:absolute;left:0;right:0;bottom:190px;text-align:center;z-index:79;
   font-size:10.5px;font-weight:500;color:var(--text);opacity:.5;pointer-events:none;
   text-shadow:0 1px 3px var(--veil),0 0 10px var(--veil)}
@@ -218,7 +181,6 @@ header .axes i{font-style:normal;color:var(--acc)}
 </head>
 <body>
 
-<!-- 系统地图底图（骨架件：地图是取景框，十套共用） -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
     <symbol id="bm" viewBox="0 0 390 844">
@@ -340,9 +302,6 @@ header .axes i{font-style:normal;color:var(--acc)}
 (function(){
 'use strict';
 
-/* ==========================================================================
-   共用元件
-   ========================================================================== */
 var C = { car:[300,360], chg:[228,232], bad:[148,232], home:[46,300],
           work:[300,120], mall:[120,560], svc:[352,700], me:[300,606] };
 
@@ -423,9 +382,6 @@ function hero(h, cls){
     '<div class="sub">' + h.lbl + '</div>';
 }
 
-/* ==========================================================================
-   五个功能 —— 内容只写一遍，十种融合方式拿去摆
-   ========================================================================== */
 var FN = [
   { n:'找车', head:'车在这儿',
     hero:{ v:'1.8', u:'km 外', lbl:'步行约 22 分 · 望京地库 B2 · 21:40 起静置' },
@@ -491,12 +447,7 @@ var FN = [
   }
 ];
 
-/* ==========================================================================
-   十种融合方式 —— 同一个功能，摆法完全不同
-   每一套：mapCss（地图占多大）· panel(fn)（功能界面摆哪儿、长什么样）
-   ========================================================================== */
 var LAY = [
-  /* ① 底部面板 —— 最标准的那一版 */
   { no:'01', nm:'底部面板 Sheet',
     th:'地图满屏，功能够薄，从底部推上来一张纸。最像原生、最省事的一版，也是其余九套的基准。',
     mech:'<b>地图</b> 满屏　<b>功能界面</b> 底部纸张（head + 三行）　<b>主按钮</b> 右下悬浮',
@@ -507,7 +458,6 @@ var LAY = [
     }
   },
 
-  /* ② 底部大卡 —— 一个巨字压住下半屏 */
   { no:'02', nm:'底部大卡 Big Card',
     th:'功能界面变成一张独立的大卡：一个巨大的数字当主角，三行数据退成脚注。下半屏是卡的，上半屏是地图的。',
     mech:'<b>地图</b> 上半屏　<b>功能界面</b> 一张独立大卡（巨字 + 脚注行）　<b>主按钮</b> 卡内右侧',
@@ -520,7 +470,6 @@ var LAY = [
     }
   },
 
-  /* ③ 悬浮卡 —— 地图看得见四周 */
   { no:'03', nm:'悬浮卡 Floating',
     th:'卡片不贴边：四周留出地图，卡像一块浮在地图上的玻璃。卡片缩到最小，只留一句结论。',
     mech:'<b>地图</b> 满屏（卡四周可见）　<b>功能界面</b> 一块悬浮玻璃卡（一句结论 + 两行）　<b>主按钮</b> 右下悬浮',
@@ -533,7 +482,6 @@ var LAY = [
     }
   },
 
-  /* ④ 右侧栏 —— 地图让出右边 */
   { no:'04', nm:'右侧栏 Side Rail',
     th:'地图往左让出右边一条，功能竖着排在右侧栏里 —— 拇指够得着，地图也没丢。',
     mech:'<b>地图</b> 左侧 55%　<b>功能界面</b> 右侧竖栏（三行 + 主按钮）　<b>主按钮</b> 栏内底部',
@@ -547,7 +495,6 @@ var LAY = [
     }
   },
 
-  /* ⑤ 中央圆环 —— 功能做成一个环 */
   { no:'05', nm:'中央圆环 Ring',
     th:'功能不是一张纸，是一个环：进度绕成一圈，数在中间。地图围着它转。',
     mech:'<b>地图</b> 满屏　<b>功能界面</b> 中央一个环（环 = 进度，数在圆心）　<b>主按钮</b> 环的右下',
@@ -569,7 +516,6 @@ var LAY = [
     }
   },
 
-  /* ⑥ 分屏 —— 硬边，上下各一半 */
   { no:'06', nm:'分屏 Split',
     th:'上半地图、下半功能，中间一条硬边。功能那一半可以放得下更多东西，是最「工作台」的一版。',
     mech:'<b>地图</b> 上半 46%　<b>功能界面</b> 下半 54%（head + 三行 + 说明）　<b>主按钮</b> 右下悬浮',
@@ -583,7 +529,6 @@ var LAY = [
     }
   },
 
-  /* ⑦ 顶部抽屉 —— 功能在上面 */
   { no:'07', nm:'顶部抽屉 Top Drawer',
     th:'倒过来：功能从顶部拉下来，地图沉到下面。前挡风支架上手机时，上半屏更近眼。',
     mech:'<b>地图</b> 下半（抽屉下方）　<b>功能界面</b> 顶部抽屉（head + 三行）　<b>主按钮</b> 右下悬浮',
@@ -600,7 +545,6 @@ var LAY = [
     }
   },
 
-  /* ⑧ 地图内标注 —— 干脆没有面板 */
   { no:'08', nm:'地图内标注 On-Map',
     th:'最激进的一版：没有面板。功能的数据直接写在地图上的那几个点上，只留一个主按钮。地图一点不被遮。',
     mech:'<b>地图</b> 满屏（一点不遮）　<b>功能界面</b> 数据画在图上（钉 + 引线 + 注释）　<b>主按钮</b> 右下悬浮',
@@ -617,7 +561,6 @@ var LAY = [
     panel:function(){ return ''; }
   },
 
-  /* ⑨ 角落地图 —— 地图缩成一格 */
   { no:'09', nm:'角落地图 Corner',
     th:'反过来：功能占满整屏，地图缩成左上角一格窗口。适合功能本身比位置更重要的时刻。',
     mech:'<b>地图</b> 左上角一格（150×200 圆角窗）　<b>功能界面</b> 整屏（巨字 + 三行）　<b>主按钮</b> 右下悬浮',
@@ -631,7 +574,6 @@ var LAY = [
     }
   },
 
-  /* ⑩ 水印 —— 地图当背景 */
   { no:'10', nm:'水印 Watermark',
     th:'地图退成全屏背景（压暗），功能以大字浮在水印上。最不像「工具」、最像「海报」的一版。',
     mech:'<b>地图</b> 满屏但压暗成水印　<b>功能界面</b> 大字浮层（巨字 + 一行 + 一行）　<b>主按钮</b> 右下悬浮',
@@ -646,12 +588,7 @@ var LAY = [
   }
 ];
 
-/* ==========================================================================
-   手滑模式条引擎 —— 十套共用这一套代码
-   拖动时：中心项放大变亮、两侧缩小淡出；地图图层按距离交叉淡入；
-           功能界面横向视差 + 交叉淡入；松手吸附到最近一格。
-   ========================================================================== */
-var W = 88;                       /* 一个模式的槽宽 */
+var W = 88;
 
 function build(d, fnAll){
   var n = fnAll.length, ov = '', hd = '', pn = '', it = '', fb = '';
@@ -722,8 +659,6 @@ function drive(dev, d, st, fnAll, onMode){
     var cur = Math.round(pos);
     if (cur !== st._cur){ st._cur = cur; if (onMode) onMode(cur); }
   }
-  /* 动画令牌：新的动画一开始，旧的循环立刻退出 ——
-     否则「点模式名」时 settle 与 slideTo 两个循环会互相抢 pos，抖一下才落位。 */
   function slideTo(target){
     var from = pos, t0 = performance.now(), dur = 300, id = ++st._anim;
     (function step(now){
@@ -756,21 +691,17 @@ function drive(dev, d, st, fnAll, onMode){
     drag = false; wrap.classList.remove('drag');
     try { wrap.releasePointerCapture(e.pointerId); } catch(err){}
     if (moved){ settle(); dragEndAt = performance.now(); }
-    else { ++st._anim; st.pos = Math.round(pos); apply(); }  /* 纯点击：交给 click 去滑 */
+    else { ++st._anim; st.pos = Math.round(pos); apply(); }
     moved = false;
   }
   wrap.addEventListener('pointerup', end);
   wrap.addEventListener('pointercancel', end);
-  /* 直接点某个模式：滑过去 */
   sit.forEach(function(el, k){
     el.addEventListener('click', function(){
-      /* 刚拖完那一下 click 是拖出来的，别当成点击；用时间戳而不是 moved ——
-         moved 在 pointerup 里已经清掉，靠它会把「拖完之后的下一次真点击」也吃掉。 */
       if (performance.now() - dragEndAt < 400) return;
       slideTo(k);
     });
   });
-  /* 桌面预览：滚轮也能切 */
   wrap.addEventListener('wheel', function(e){
     e.preventDefault();
     slideTo(Math.max(0, Math.min(n - 1, Math.round(pos) + ((e.deltaX || e.deltaY) > 0 ? 1 : -1))));
@@ -779,9 +710,6 @@ function drive(dev, d, st, fnAll, onMode){
   apply();
 }
 
-/* ==========================================================================
-   建十屏
-   ========================================================================== */
 var board = document.getElementById('board');
 var idx = document.getElementById('idx');
 var chips = [];
@@ -790,8 +718,6 @@ LAY.forEach(function(d, n){
   var sec = document.createElement('section');
   sec.className = 'slide';
 
-  /* _anim 必须初始化为 0：undefined 自增会得到 NaN，而 NaN !== NaN 恒为真，
-     那样每一个吸附动画都会在第一帧就退出（看着像「松手不吸附」）。 */
   var st = { pos: 0, _anim: 0 };
   var capEl;
 
@@ -830,7 +756,6 @@ LAY.forEach(function(d, n){
   });
 });
 
-/* —— 横向翻选 —— */
 function mark(i){
   chips.forEach(function(c, k){ c.classList.toggle('on', k === i); });
   if (chips[i] && chips[i].scrollIntoView){

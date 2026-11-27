@@ -16,7 +16,6 @@ for tk in TK:
     files += [str(p) for p in (ROOT / tk).rglob("*.swift")]
 files = sorted(set(files))
 
-# 结尾标点：合法的“返回后续行”是链式调用/运算符续行
 CONT = re.compile(r"^\s*[.).,]?\s*(\.|\)|\}|\?|:|&&|\|\||\+|,|->)")
 
 
@@ -32,7 +31,7 @@ for f in files:
         if not s.startswith("return ") and s != "return":
             continue
         if s.startswith("return") and ("//" in s or "{" in s or "}" in s or '"""' in s):
-            continue  # 注释 / 内联闭包 / 多行字符串起始
+            continue
         j = i + 1
         while j < len(lines) and lines[j].strip() == "":
             j += 1
@@ -42,9 +41,9 @@ for f in files:
         if nxt.strip().startswith("}"):
             continue
         if nxt.strip().startswith("case ") or nxt.strip().startswith("default:") or nxt.strip().startswith("@unknown default"):
-            continue  # switch 分支
+            continue
         if CONT.match(nxt) and indent_of(nxt) > indent_of(l):
-            continue  # 链式续行
+            continue
         if indent_of(nxt) <= indent_of(l) and indent_of(nxt) > 0 and not nxt.strip().startswith("//"):
             hits.append((f, i + 1, s[:70], j + 1, nxt.strip()[:60]))
 

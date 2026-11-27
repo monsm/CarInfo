@@ -1,8 +1,3 @@
-// =============================================================================
-// SplashView.swift — 启动画面
-// v4：只有一次性的入场 —— 品牌光淡入、进度条绘制。
-// 没有呼吸、没有常驻发光：界面上会动的东西必须对应一个真实状态（这里是「正在启动」）。
-// =============================================================================
 import SwiftUI
 
 struct SplashView: View {
@@ -15,11 +10,7 @@ struct SplashView: View {
 
     var body: some View {
         ZStack {
-            // 不再自铺不透明底，也不再自己画一团琥珀光晕：
-            // 画布与光在根部只画一次（Design/Theme.swift 的 AppCanvas），启动画面吃同一束光。
-            // 自己再画一个光源就是「光有两个来源」—— 而且它的方向还是编的。
             VStack(spacing: TokensSpacing.xxl) {
-                // 品牌标：入场淡入（一次性，不是常驻呼吸）
                 Image(safeSymbol: "car.side.fill", fallback: "car.side.fill")
                     .font(TokensTypo.fixed(34, weight: .light))
                     .foregroundStyle(TokensPalette.primary)
@@ -42,7 +33,6 @@ struct SplashView: View {
                         .tracking(4)
                 }
 
-                // 进度：一条正在被画出来的线 —— 它对应一个真实状态（「正在启动」）
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 1)

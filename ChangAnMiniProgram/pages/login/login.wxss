@@ -1,4 +1,3 @@
-/* ============ 登录 v15：品牌 + 车图 + 液态玻璃表单 ============ */
 .login {
   min-height: 100vh;
   box-sizing: border-box;
@@ -7,7 +6,6 @@
   flex-direction: column;
 }
 
-/* ---------- 品牌 + 车台 ---------- */
 .lg-hero { text-align: center; }
 .lg-brand { padding-top: 12rpx; position: relative; z-index: 2; }
 .lg-name {
@@ -15,7 +13,7 @@
   font-weight: 600;
   letter-spacing: 8rpx;
   color: #FFFFFF;
-  text-indent: 8rpx; /* 抵消 letter-spacing 造成的视觉右偏 */
+  text-indent: 8rpx;
 }
 .lg-en {
   margin-top: 16rpx;
@@ -23,7 +21,6 @@
   letter-spacing: 4rpx;
   color: var(--tx-3);
 }
-/* 车台：聚光从上打下 */
 .lg-stage {
   position: relative;
   margin-top: 4rpx;
@@ -50,7 +47,6 @@
   z-index: 1;
 }
 
-/* ---------- 状态 ---------- */
 .lg-status {
   text-align: center;
   min-height: 44rpx;
@@ -61,7 +57,6 @@
 .lg-status.ok { color: var(--ok); }
 .lg-status.err { color: var(--bad); text-shadow: 0 0 14rpx rgba(255, 90, 79, 0.3); }
 
-/* ---------- 表单卡片 ---------- */
 .lg-form {
   margin-top: 30rpx;
   padding: 6rpx 32rpx;
@@ -133,7 +128,6 @@
 }
 .lg-pill.off { opacity: 0.35; }
 
-/* ---------- 登录钮 ---------- */
 .lg-login { margin-top: 56rpx; }
 .lg-login .btn-primary {
   width: 100%;
@@ -149,7 +143,6 @@
   letter-spacing: 0.5rpx;
 }
 
-/* ---------- 页脚 ---------- */
 .lg-foot {
   margin-top: auto;
   text-align: center;

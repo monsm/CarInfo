@@ -2,37 +2,7 @@ import Foundation
 import CoreLocation
 import Combine
 
-// =============================================================================
-// WeatherService.swift — 天气实况：让「光」从晴空模型变成按云量折算的值
-// =============================================================================
-//
-// 为什么需要它：`SkyLight` 算得出太阳在哪，但算不出**天上有多少云**。
-// 阴天的正午和晴天的正午，太阳高度一样，光却差一大截 —— 没有云量，界面就只能
-// 一直按「假设无云」画，而界面上必须照实写「晴空模型，不是实测」。
-//
-// 数据源：**Open-Meteo**（`api.open-meteo.com`），不用密钥、不用注册。
-// 为什么不用苹果内置的 WeatherKit：
-//   WeatherKit 需要 `com.apple.developer.weatherkit` entitlement，而本项目是
-//   **未签名 / 侧载**构建（`project.yml` 里因此关掉了 CloudKit ——
-//   无 entitlement 时构造 CKContainer 会抛 ObjC 异常直接杀进程）。
-//   WeatherKit 受同一约束：拿不到 entitlement 就调不通。所以内置的用不了。
-//
-// 一件必须说清楚的事（隐私）：
-//   车的位置会随这一次请求发给 Open-Meteo。缓解措施有三条，都在代码里：
-//     ① 只发经纬度，**保留两位小数**（约 1.1 km 网格）—— 云量不需要比这更准；
-//     ② 只发 HTTPS，只发这一个域名，不带任何车辆标识 / 账号 / 设备号；
-//     ③ **不落盘**：快照只活在内存里，杀进程就没了。
-//   隐私那一节里有一条对应的披露（PrivacySection）。
-//
-// 失败时怎么办：**保持沉默但诚实** —— 快照留在 nil，界面回到晴空模型并写明
-//「无天气数据」。绝不拿默认值冒充实况。
-//
-// 命名：顶层类型，不嵌套泛用名（历史事故与理由写在 Tokens.swift 的文件头 ——
-// 它以前指向 ArtTheme.swift，那个文件 2026-09-25 随艺术主题一起删了）。
-// =============================================================================
 
-// MARK: - WMO 天气码 → 中文
-// 只有这几档；表里没有的一律照实显示「天气码 N」，不猜。
 enum WMOWeather {
     static func text(_ code: Int) -> String? {
         switch code {
@@ -56,45 +26,30 @@ enum WMOWeather {
     }
 }
 
-// MARK: - 一份天气实况
-/// 取数那一刻的天气。全部字段都是**服务端报的**，没有一处是本地推算的。
 struct SkyWeather: Equatable {
-    /// 云量 0…100（%）
     var cloudCover: Double
-    /// 当前小时降水量（mm）
     var precipitation: Double
-    /// 2 米气温（℃）
     var temperatureC: Double
-    /// WMO 天气码
     var code: Int
-    /// 取数时刻
     var fetchedAt: Date
-    /// 取数用的位置（两位小数网格）—— 用来判断车是否已经走远
     var latitude: Double
     var longitude: Double
 
-    /// 取数过了多少分钟
     func ageMinutes(at now: Date) -> Double { now.timeIntervalSince(fetchedAt) / 60 }
 
-    /// 云量的说法：天上有多少云
     var cloudText: String { "\(Int(cloudCover.rounded()))%" }
 
-    /// 降水一行：0 就说 0（不写成「无」——那是解释，不是数据）
     var precipitationText: String { String(format: "%.1f mm/h", precipitation) }
 
     var temperatureText: String { String(format: "%.1f ℃", temperatureC) }
 
-    /// 天气码的说法；表里没有就照实说是个码
     var codeText: String { WMOWeather.text(code) ?? "天气码 \(code)" }
 
-    /// 界面上引用这份数据时挂的尾巴：谁给的、什么时候取的
     func sourceText(at now: Date) -> String {
         "Open-Meteo 实况 · \(Int(ageMinutes(at: now).rounded())) 分钟前"
     }
 }
 
-// MARK: - 服务
-/// 取一份天气实况。**有 TTL、有并发护栏、不落盘**。
 @MainActor
 final class WeatherService: ObservableObject {
 
@@ -107,20 +62,12 @@ final class WeatherService: ObservableObject {
         case failed(String)
     }
 
-    /// 当前快照。nil = 没有天气数据（界面回到晴空模型并写明）。
     @Published private(set) var current: SkyWeather?
     @Published private(set) var status: Status = .idle
 
-    // 下面三条与三个纯函数都标 `nonisolated`：常量与纯函数没有需要隔离的状态，
-    // 而调用它们的地方（SkyLight 的纯计算、单元测试）本来就不在主线程上。
-    // 不标的话 Swift 5 会给出「main actor-isolated ... from a nonisolated context」
-    // 的警告（Swift 6 模式下直接是错误）。AppStore 里的两个键用的是同一写法。
 
-    /// 多久重取一次（分钟）
     nonisolated static let refreshMinutes: Double = 15
-    /// 车挪出这个距离就作废旧快照（米）
     nonisolated static let moveThresholdMeters: Double = 5_000
-    /// 唯一会收到请求的域名
     nonisolated static let host = "api.open-meteo.com"
 
     private var inFlight = false
@@ -128,11 +75,7 @@ final class WeatherService: ObservableObject {
 
     private init() {}
 
-    // -------------------------------------------------------------------------
-    // MARK: 纯函数（可测）
 
-    /// 请求 URL。经纬度**保留两位小数**（约 1.1 km）—— 云量不需要比这更准，
-    /// 而精度的每一次增加都是隐私的每一次减少。
     nonisolated static func requestURL(latitude: Double, longitude: Double) -> URL? {
         let lat = (latitude * 100).rounded() / 100
         let lon = (longitude * 100).rounded() / 100
@@ -149,7 +92,6 @@ final class WeatherService: ObservableObject {
         return comps.url
     }
 
-    /// 解析响应。字段缺一个就返回 nil —— **宁可不显示，也不显示一个编的数**。
     nonisolated static func parse(_ data: Data,
                                   latitude: Double,
                                   longitude: Double,
@@ -169,10 +111,7 @@ final class WeatherService: ObservableObject {
                           longitude: longitude)
     }
 
-    // -------------------------------------------------------------------------
-    // MARK: 取数
 
-    /// 需要时才取：TTL 内、且车没走远，就直接用现成的。
     func refreshIfNeeded(coordinate: CLLocationCoordinate2D, force: Bool = false) async {
         guard !inFlight else { return }
         let now = Date()
@@ -184,7 +123,6 @@ final class WeatherService: ObservableObject {
         await fetch(coordinate: coordinate, at: now)
     }
 
-    /// 无条件取一次（下拉刷新用）。
     func refresh(coordinate: CLLocationCoordinate2D) async {
         guard !inFlight else { return }
         await fetch(coordinate: coordinate, at: Date())
@@ -220,13 +158,10 @@ final class WeatherService: ObservableObject {
             current = parsed
             status = .ok
         } catch {
-            // 失败**不改写已有快照**（15 分钟前的那份也比没有强），也不伪装成实况。
             status = .failed(error.localizedDescription)
         }
     }
 
-    // -------------------------------------------------------------------------
-    // MARK: 小工具
 
     nonisolated static func distanceMeters(from snapshot: SkyWeather,
                                            to coordinate: CLLocationCoordinate2D) -> Double {

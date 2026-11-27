@@ -1,7 +1,5 @@
-// texts.js —— 信息文本生成：输出与桌面版各 Tab 页一致的内容（含标题行与分隔线）
 const { ci, s, num, num1, num2, num3, num0, SEP, SMALL, CHRG_STATUS, GENDER, directionText, cmdText, norm360 } = require('./fmt');
 
-// 健康报告/体检项的状态英文枚举 → 中文（真实报文 status 为 normal/fault 等英文）
 const CHECK_STATUS_CN = { normal: '正常', fault: '故障', warning: '预警', risk: '风险', abnormal: '异常', ok: '正常' };
 function checkStatus(v) {
   const k = String(v == null ? '' : v).toLowerCase();
@@ -45,7 +43,6 @@ function carText(raw) {
   L('🔑 CORE IDENTIFICATION'); L(SMALL);
   L(`车辆ID : ${c.CarId}`); L(`VIN车架号 : ${c.Vin}`); L(`车辆名称 : ${c.CarName}`);
   L(`车牌号 : ${c.PlateNumber}`); L(`是否新能源 : ${num(c.IsNev) === 1 ? '是' : '否'}`);
-  // 真实报文 pin 为 "exist"/"none" 等英文枚举，译为中文可读文案
   const pinCN = { exist: '已设置', none: '未设置' };
   L(`PIN码状态 : ${pinCN[String(c.Pin == null ? '' : c.Pin).toLowerCase()] || s(c.Pin) || '无'}`); L();
   L('📋 BASIC CONFIGURATION'); L(SMALL);
@@ -57,7 +54,7 @@ function carText(raw) {
   L(`保险公司 : ${c.InsuranceCompany}`); L(`保险电话 : ${c.InsurancePhone}`); L();
   L('👤 USER & SERVICE INFO'); L(SMALL);
   L(`用户ID : ${c.UserId}`); L(`租户ID : ${c.TenantId}`); L(`服务状态 : ${c.TserviceStatus}`);
-  L(`服务结束时间 : ${c.TserviceEndtime}`);  // 真实报文 realnameAuthStatus="AUTHED"、isCaCar/bindedJD 为布尔
+  L(`服务结束时间 : ${c.TserviceEndtime}`);
   const authCN = { authed: '已认证', unauth: '未认证', none: '未认证' };
   L(`实名认证 : ${authCN[String(c.RealnameAuthStatus == null ? '' : c.RealnameAuthStatus).toLowerCase()] || s(c.RealnameAuthStatus) || '无'}`);
   L(`是否CA车辆 : ${(c.IsCaCar === true || c.IsCaCar === 'true') ? '是' : '否'}`);
@@ -167,7 +164,6 @@ function statusText(raw) {
   L('⚙️ DRIVE MOTOR SYSTEM'); L(SMALL);
   L(`电机数量 : ${num(d.DriveMotorNum)} | 电机系统状态：${num(d.MotorSystemStatus)}`);
   L(`DC状态 : ${num(d.DcStatus)} | DCDC状态报警：${num(d.DcdcStatusAlarm)} | DCDC温度报警：${num(d.DcdcTemperatureAlarm)}`);
-  // 真实报文键为 driveMotorData（桌面版模型名 MotorData 与实际键不符，属其隐藏缺陷）
   const motors = d.DriveMotorData || d.MotorData;
   if (motors && motors.length > 0) {
     motors.forEach(motor => {
@@ -336,7 +332,6 @@ function messagesText(list) {
   return lines.join('\n');
 }
 
-// 控制任务查询结果（桌面版 控制日志）
 function controlLogText(data, pollCount, responseMsg) {
   const d = ci(data);
   lines.length = 0;

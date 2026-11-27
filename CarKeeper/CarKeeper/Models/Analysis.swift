@@ -1,24 +1,16 @@
 import Foundation
 
-// 全量数据统一分析层（对应小程序 analysis.js）。
-// 把原始报文「统一归一」后归纳为按域划分的结论：
-// 每域给出 状态(ok/warn/bad/na)、一句话结论、原因、关键指标。
-// 界面只呈现结论与原因，原始全量字段在「全量数据」页 100% 可达。
 
 enum AN {
 
     static let BAD = "bad", WARN = "warn", OK = "ok", NA = "na"
 
-    /// 距离/统计辅助
     static func stats(_ arr: [Double]) -> (min: Double, max: Double, avg: Double, count: Int)? {
-        // 不用 `arr.min()!` / `arr.max()!`：空数组上它们是 nil，而 `!` 是崩溃。
-        // `guard let` 既保住了「空就返回 nil」的原意，又不需要读者去核对前一行的守卫。
         guard let mn = arr.min(), let mx = arr.max() else { return nil }
         let avg = arr.reduce(0, +) / Double(arr.count)
         return (mn, mx, avg, arr.count)
     }
 
-    /// `BatteryVoltage` / `ProbeTemperatures` 这类「一组数」的抽取：字符串与 NSNumber 都要认。
     static func numberList(_ dict: [String: Any]?, _ key: String) -> [Double] {
         (ciPick(dict, [key]) as? [Any])?.compactMap { (v) -> Double? in
             if let s = v as? String { return Double(s) }
@@ -27,18 +19,11 @@ enum AN {
         } ?? []
     }
 
-    /// 一组数的极值 → 字符串；空数组给 "--"。
-    ///
-    /// 原写法是 `arr.isEmpty ? "--" : String(format: "%.3f", arr.min()!)`，同一个模式
-    /// 在本文件里抄了四遍、每遍带一个 `!`。`min()` / `max()` 本来就返回 Optional ——
-    /// 用 Optional 链路表达更短，也不需要读的人回头核对「上面守没守空数组」。
     static func extremeText(_ arr: [Double], digits: Int, lowest: Bool) -> String {
         let v = lowest ? arr.min() : arr.max()
         return v.map { String(format: "%.\(digits)f", $0) } ?? "--"
     }
 
-    /// 抽样上限 128：本车的电芯是 **88 节**，64 的采样步长是 2 —— 会丢掉一半电芯，
-    /// 而那张图本来就是拿来「看哪一节偏低」的。128 步长为 1，88 节完整落图。
     static func barsOf(_ arr: [Double], maxBars: Int = 128) -> [Double] {
         let step = max(1, Int(ceil(Double(arr.count) / Double(maxBars))))
         var out: [Double] = []
@@ -52,7 +37,6 @@ enum AN {
         let control = cacheObject(cache, "control")
         var domains: [DomainVerdict] = []
 
-        // 电池域
         domains.append(batteryDomain(cache))
         domains.append(chargeDomain(cache))
         domains.append(bodyDomain(cache))
@@ -79,7 +63,6 @@ enum AN {
         return Summary(overall: overall, domains: domains.filter { $0.key != "never" })
     }
 
-    // ---------- 电池 ----------
     private static func batteryDomain(_ cache: [String: Any?]) -> DomainVerdict {
         let b = batteryModel(cache)
         var d = DomainVerdict(key: "battery", label: "电池", url: "/pages/battery/battery",
@@ -114,7 +97,6 @@ enum AN {
         return d
     }
 
-    // ---------- 充电 ----------
     private static func chargeDomain(_ cache: [String: Any?]) -> DomainVerdict {
         let b = batteryModel(cache)
         let c = b.charging
@@ -135,7 +117,6 @@ enum AN {
         return d
     }
 
-    // ---------- 车身 ----------
     private static func bodyDomain(_ cache: [String: Any?]) -> DomainVerdict {
         let chips = VM.bodyStatus(cache)
         let bads = chips.filter { $0.cls == "bad" }
@@ -153,7 +134,6 @@ enum AN {
         return d
     }
 
-    // ---------- 胎压 ----------
     private static func tyreDomain(_ cache: [String: Any?]) -> DomainVerdict {
         let t = VM.tyreStatus(cache)
         var d = DomainVerdict(key: "tyre", label: "胎压", url: "",
@@ -173,7 +153,6 @@ enum AN {
         return d
     }
 
-    // ---------- 座舱 ----------
     private static func climateDomain(_ cache: [String: Any?]) -> DomainVerdict {
         let conf = VM.comfortStatus(cache)
         let hasCtrl = cacheObject(cache, "control") != nil
@@ -205,7 +184,6 @@ enum AN {
         return d
     }
 
-    // ---------- 动力 ----------
     private static func powerDomain(_ cache: [String: Any?]) -> DomainVerdict {
         let b = batteryModel(cache)
         var d = DomainVerdict(key: "power", label: "动力", url: "/pages/battery/battery",
@@ -233,7 +211,6 @@ enum AN {
         return d
     }
 
-    // ---------- 安全 ----------
     private static func safetyDomain(_ cache: [String: Any?], control: [String: Any]?, hasCtrl: Bool) -> DomainVerdict {
         let chips = VM.bodyStatus(cache)
         let bads = chips.filter { ($0.label == "制动" || $0.label == "气囊") && $0.cls == "bad" }
@@ -255,7 +232,6 @@ enum AN {
         return d
     }
 
-    // ---------- 网络 ----------
     private static func networkDomain(_ cache: [String: Any?]) -> DomainVerdict {
         let loc = VM.locStatus(cache)
         let e = VM.energy(cache, nil)
@@ -276,7 +252,6 @@ enum AN {
         return d
     }
 
-    // ---------- 服务 ----------
     private static func serviceDomain(_ cache: [String: Any?], _ carRaw: [String: Any]?) -> DomainVerdict {
         let car = carRaw
         let insDays: Int? = car.flatMap { VM.daysUntil(ciPick($0, ["InsuranceEndDate"])) }
@@ -308,7 +283,6 @@ enum AN {
     }
 }
 
-// MARK: - batteryModel（对应小程序 vm.js 的 batteryModel）
 
 func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
     let control = cacheObject(cache, "control")
@@ -320,9 +294,6 @@ func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
         guard hasCtrl, let list = ciArray(control, [listKey]) else { return [] }
         var out: [Double] = []
         for sub in list {
-            // 键是变量，所以必须走 ciPick —— 直接下标 `sub[itemKey]` 的大小写由调用方决定，
-            // 而报文的键一律小写，调用方一旦写成 "BatteryVoltage" 就永远读不到（静默空数组）。
-            // （原文这里是两个**完全相同**的分支 if/else，第二个永远不执行。）
             let arr: [Any] = ciPick(sub, [itemKey]) as? [Any] ?? []
             for v in arr {
                 let d: Double?
@@ -383,13 +354,9 @@ func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
         fault("其他", "OtherFaultCount", "OtherFaultCodes")
     ]
 
-    // 报警位表只有一份（VM.alarmFlags / VM.activeAlarms）：地图主屏的告警总灯
-    // 与这里的电池告警读的是同一张表、同一个判据（非 0 即亮）。
     let alarms: [String] = VM.activeAlarms(cache)
 
     let chgSt = VM.s(ciPick(charge, ["ChrgStatus"])) ?? ""
-    // 「3」= 没在充电（车主已确认：车静止、未插枪时也是 "3"）；
-    // `chargeStarttime`/`Stoptime`/`chargDeltMins` 因此是**上一次**充电的记录（2024-05-20）。
     let chgText: String = switch chgSt {
     case "1": "充电中"
     case "2": "即将充满"
@@ -402,9 +369,6 @@ func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
         text: chgText, cls: chgCls,
         soc: VM.n0(ciPick(charge, ["RemainPower"])) ?? "--",
         range: VM.n0(ciPick(charge, ["RemainedPowerMile"])) ?? VM.n0(ciPick(control, ["RemainedPowerMile"])) ?? "--",
-        // 功率算法只有一份（VM.chargePowerKW = U×I，见那个函数的注释）：
-        // 这里以前读 `ChargPower`/`ChargingPower`，而报文里**根本没有这两个键**，
-        // 所以电池页的功率一直是 "--"。
         power: { let p = VM.chargePowerKW(charge, control); return p == nil ? "--" : "\(Int(p!)) kW" }(),
         durMin: VM.n0(ciPick(charge, ["ChargDeltMins"])) ?? "--",
         start: VM.s(ciPick(charge, ["ChargeStarttime"])) ?? "--",

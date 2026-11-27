@@ -1,14 +1,8 @@
-// analysis.js —— 全量数据统一分析层
-// 把 control / charge / pm25 / location / check / car 等原始报文“统一归一”后，
-// 归纳为按域划分的结论（verdict）：每域给出 状态(ok/warn/bad/na)、一句话结论、
-// 原因(reasons，由哪些原始字段推导) 与 关键指标(metrics)。
-// 界面只呈现结论与原因（Tesla 式极简），原始全量字段仍在「全量数据」页 100% 可达。
 const VM = require('./vm');
 const { ci, s } = require('./fmt');
 
 const BAD = 'bad', WARN = 'warn', OK = 'ok', NA = 'na';
 
-// 日期字符串 -> 距今天数（未来正数 / 已过期负数 / 解析失败 null）
 function daysUntil(str) {
   const t = String(str == null ? '' : str).trim();
   if (!t) return null;
@@ -31,7 +25,6 @@ function summarize(cache, carRaw) {
   const domains = [];
   const add = d => { if (d) domains.push(d); };
 
-  // ---------- 电池：告警 / 一致性 / 温差 / 储能故障 ----------
   add((() => {
     const b = VM.batteryModel(caches);
     const d = { key: 'battery', label: '电池', url: '/pages/battery/battery', cls: NA, short: '--', title: '暂无数据', reasons: [], metrics: [] };
@@ -65,7 +58,6 @@ function summarize(cache, carRaw) {
     return d;
   })());
 
-  // ---------- 充电 ----------
   add((() => {
     const C = VM.batteryModel(caches).charging;
     const d = { key: 'charge', label: '充电', url: '/pages/battery/battery', cls: OK, short: '未充电', title: '未充电', reasons: [], metrics: [] };
@@ -85,7 +77,6 @@ function summarize(cache, carRaw) {
     return d;
   })());
 
-  // ---------- 车身：门 / 窗 / 后备箱 / 天窗 / 锁 ----------
   add((() => {
     const chips = VM.bodyStatus(caches);
     const bads = chips.filter(c => c.cls === 'bad');
@@ -100,7 +91,6 @@ function summarize(cache, carRaw) {
     return d;
   })());
 
-  // ---------- 胎压 ----------
   add((() => {
     const t = VM.tyreStatus(caches);
     const d = { key: 'tyre', label: '胎压', url: '', cls: t.alarmCls, short: t.alarmCls === 'bad' ? '异常' : (t.alarmCls === 'ok' ? '正常' : '--'), title: t.alarmText, reasons: [], metrics: [] };
@@ -115,7 +105,6 @@ function summarize(cache, carRaw) {
     return d;
   })());
 
-  // ---------- 座舱：空调 / PM2.5 / 温度 ----------
   add((() => {
     const conf = VM.comfortStatus(caches);
     const d = { key: 'climate', label: '座舱', url: '/pages/data/data?kind=env', cls: hasCtrl ? OK : NA, short: hasCtrl ? '正常' : '--', title: !hasCtrl ? '暂无数据' : (conf.acOn === null ? '座舱状态正常' : (conf.acOn ? '空调运行中' : '空调已关闭')), reasons: [], metrics: [] };
@@ -134,7 +123,6 @@ function summarize(cache, carRaw) {
     return d;
   })());
 
-  // ---------- 动力：电机温度 / 故障码 ----------
   add((() => {
     const b = VM.batteryModel(caches);
     const d = { key: 'power', label: '动力', url: '/pages/battery/battery', cls: NA, short: '--', title: '暂无数据', reasons: [], metrics: [] };
@@ -158,7 +146,6 @@ function summarize(cache, carRaw) {
     return d;
   })());
 
-  // ---------- 安全：制动 / 气囊 / 最高报警等级 ----------
   add((() => {
     const chips = VM.bodyStatus(caches);
     const bads = chips.filter(c => (c.label === '制动' || c.label === '气囊') && c.cls === 'bad');
@@ -178,7 +165,6 @@ function summarize(cache, carRaw) {
     return d;
   })());
 
-  // ---------- 网络：在线 / GPS ----------
   add((() => {
     const e = VM.energy(caches, null);
     const loc = VM.locStatus(caches);
@@ -192,7 +178,6 @@ function summarize(cache, carRaw) {
     return d;
   })());
 
-  // ---------- 服务：保险 / 服务到期 ----------
   add((() => {
     const car = ci(carRaw || null);
     const insDays = daysUntil(car ? car.InsuranceEndDate : null);
@@ -216,7 +201,6 @@ function summarize(cache, carRaw) {
     return d;
   })());
 
-  // ---------- 总评 ----------
   const badN = domains.filter(x => x.cls === BAD).length;
   const warnN = domains.filter(x => x.cls === WARN).length;
   let overall;

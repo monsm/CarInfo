@@ -1,6 +1,5 @@
 <view class="page no-tab health">
 
-  <!-- 无数据 -->
   <view wx:if="{{!loading && !hasData}}" class="empty">
     <view class="e-t">暂无健康报告</view>
     <view class="e-s">{{errText || '车辆可能未生成体检报告，下拉或点击重新加载'}}</view>
@@ -11,7 +10,6 @@
   </view>
 
   <block wx:if="{{hasData}}">
-    <!-- 评分 hero：聚光下的大环 -->
     <view class="glass-hero score">
       <view class="score-beam"></view>
       <view class="score-ring">
@@ -25,7 +23,6 @@
         <image class="sc-ic" src="{{icons.shield}}" />
         <text class="caps muted score-cap">综合健康评分 OVERALL</text>
       </view>
-      <!-- 状态计数：玻璃底座上的一排灯 -->
       <view class="counts">
         <view wx:for="{{counts}}" wx:key="key" class="c {{item.cls === 'ok' ? 'ok' : (item.cls === 'warn' ? 'warn' : 'bad')}} {{item.n > 0 ? 'on' : ''}}">
           {{item.key}}<text class="num"> {{item.n}}</text>
@@ -33,7 +30,6 @@
       </view>
     </view>
 
-    <!-- 控制台面板：手风琴分区 -->
     <view class="console">
       <view class="sec meta-sec" wx:if="{{time}}">
         <view class="meta-row">

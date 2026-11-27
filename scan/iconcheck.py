@@ -42,10 +42,8 @@ ROOT = os.path.join("CarKeeper", "CarKeeper", "Resources", "Assets.xcassets",
                     "AppIcon.appiconset")
 CONTENTS = os.path.join(ROOT, "Contents.json")
 APPEARANCE_KEYS = ("dark", "tinted")
-# 「满幅」的色差上限。为什么是 14 而不是 0：底是**渐变**，沿一条边向内 64px 本来就会
-# 变色（实测我们这两套底在这段距离上最多差 6），而 v1.0 那种内缩 4% 的图一量就是几十。
 EDGE_TOL = 14
-EDGE_INSET = 64         # 内侧取样点：与边缘相隔这么多像素
+EDGE_INSET = 64
 SIG = b"\x89PNG\r\n\x1a\n"
 
 
@@ -84,17 +82,17 @@ def read_png(path):
         ftype = flat[pos]
         line = bytearray(flat[pos + 1:pos + 1 + stride])
         pos += 1 + stride
-        if ftype == 1:      # Sub
+        if ftype == 1:
             for i in range(bpp, stride):
                 line[i] = (line[i] + line[i - bpp]) & 0xFF
-        elif ftype == 2:    # Up
+        elif ftype == 2:
             for i in range(stride):
                 line[i] = (line[i] + prev[i]) & 0xFF
-        elif ftype == 3:    # Average
+        elif ftype == 3:
             for i in range(stride):
                 left = line[i - bpp] if i >= bpp else 0
                 line[i] = (line[i] + ((left + prev[i]) >> 1)) & 0xFF
-        elif ftype == 4:    # Paeth
+        elif ftype == 4:
             for i in range(stride):
                 a = line[i - bpp] if i >= bpp else 0
                 b = prev[i]
@@ -179,9 +177,6 @@ def main():
             if not opaque:
                 problems.append(f"{filename}：带透明像素 —— 图标要满幅，圆角与内缩交给"
                                 f"系统遮罩（透明边被压成 RGB 之后就是黑角）")
-        # 八处采样：四角 + 四边中点。每一处把「贴边那个像素」与「同一行/列向内 64px」
-        # 相比 —— 只查四角不够：v1.0 内缩的那 4% 让顶边整行都是黑，四角之间的色差是 0，
-        # 第一版判据因此在探针里**没有报**（已实测）。
         mid_x, mid_y = w // 2, h // 2
         samples = {
             "左上角": (8, 8, 1, 0), "右上角": (w - 9, 8, -1, 0),

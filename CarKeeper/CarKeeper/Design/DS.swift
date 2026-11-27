@@ -1,59 +1,13 @@
 import SwiftUI
 import UIKit
 
-// =============================================================================
-//  DS — CarKeeper Design System v4
-// =============================================================================
-//  设计语言：iOS 原生（Apple 的机制，不是 Apple 的仿制品）
-//
-//  四条硬规则（这一版存在的唯一理由）：
-//   ① 不用卡片。内容直接落在画布上，靠「发丝分隔线」组织，分隔线内缩、不通栏。
-//      需要分组的地方，用 iOS 的 inset-grouped 表面（二级分组背景 + 12pt 圆角），
-//      它和画布同属一套系统色，因此永不会显得"卡片堆叠"。
-//   ② 排版就是层级。字号用 iOS 的真实阶梯（34/700、22/600、17/400 字距 −.41 …），
-//      不用自造的中庸字号，也不用容器（彩色底、描边、药丸）来分层。
-//   ③ 颜色只来自系统。蓝 #007AFF/#0A84FF、绿、橙、红，加上 label 的三档不透明度。
-//      界面里所有发光的东西都必须对应一个真实状态，不做装饰性彩色。
-//   ④ 玻璃只出现在「浮在内容之上」的层：导航栏、弹层、底部操作条。
-//      内容层一律不透明。
-//
-//  动效：只有两类 —— 状态变化的弹簧，以及一次性绘制（光条从 0 长到位）。
-//        没有涟漪、没有光晕、没有扫光、没有呼吸、没有粒子、没有交错入场。
-//
-//  兼容：本文件同时提供 v2 时代的全部成员名（Palette/Typo/Space/… 与 DSCard 等），
-//        但它们现在渲染的是 v4 语言。老页面无需逐个修改即可继承新观感。
-// =============================================================================
 
-//  这里原本有一段 `extension UIColor { static func dsDynamic(light:dark:) }`（动态色）。
-//  2026-09-25 删：一个读者都没有，而且是**第二套实现** —— 全 App 真正在用的是
-//  `ArtTheme.swift` 里的 `nativeDynamic(light:dark:)`（它的注释记着来历：原本由
-//  WidgetTokens 的 `Palette.dynamic` 提供，那个文件删掉后内联进去）。
-//  发现它的是 `scan/orphans.py` 判据 ②（系统类型扩展里没人读的成员）。
 
-/// 设计系统组件（DSCard / DSRow / DSTile / DSSkeleton …）。
-/// 令牌（颜色 / 字体 / 间距 / 圆角 / 动效 / 触觉）已全部合并到 `Tokens.swift`。
 enum DS {
 }
 
-//  `DSCanvas` 于 2026-09-27 删 —— 它是一个零读者的设计原语（页面画布那一层现在只有
-//  根部的 `AppCanvas`，见 `Theme.swift`；页面自己再加一层画布只会多一个“谁在铺底”的答案）。
-//  旧注释里那句「统一 20pt 页面边距」也是错的：这个类型里没有任何一行在做边距。
 
-// =============================================================================
-// MARK: - inset-grouped 表面（v4 唯一的"容器"）
-// =============================================================================
 
-/// 分组表面：iOS inset-grouped 的卡片面。**半透明**（`TokensPalette.panel`）、无描边、无阴影。
-/// 只有需要"把一组行框在一起"时才用它；单条信息直接落在画布上用发丝线分隔。
-///
-///  为什么它不是不透明的（2026-09-25）：它铺在 `GlassCard` 里面，而卡片是玻璃。
-///  一块不透明的面（`nightSurface`，深色 #1C1C1E）压在玻璃里，结果是「玻璃中间挖了一个黑洞」——
-///  用户第 5 条说的「黑颜色太突兀」就是它。现在它读 `TokensPalette.panel`（同一色值的半透明版）——
-///  那个透明度第九轮又从 0.5 收到 0.34（用户第 3 条：「我要通透」，列表尤甚）。
-/// ⚠️ `glass` 与 `hero` 两个参数已于 2026-09-25 删除：它们**存下来就没再读过**
-/// （`body` 永远填 `nightSurface`，也从不看 `hero`）。一个叫 `glass` 的参数不产生
-/// 玻璃，是这个仓库最忌讳的那种谎 —— 谁写 `DSCard(glass: true)` 都会以为拿到了材质
-/// 而其实什么都没发生。真玻璃只有一个入口：`dsGlass`（见 `Design/DSGlass.swift`）。
 struct DSCard<Content: View>: View {
     var padding: CGFloat
     var radius: CGFloat
@@ -75,14 +29,9 @@ struct DSCard<Content: View>: View {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .fill(TokensPalette.panel)
             }
-            // 「艺术方向下给卡片一条发丝描边」这一块随艺术主题删掉了（2026-09-25）：
-            // 那是「纸与墨」那套方向才有的做法，而它**只在那套主题下出现** ——
-            // 主题只剩原生之后，这里的条件是恒假，留着就是一份永远不会执行的样式。
-            // 现在全 App 的卡片只有一层底（`TokensPalette.panel`），没有描边。
     }
 }
 
-/// 可点击卡片
 struct DSCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -91,11 +40,7 @@ struct DSCardButtonStyle: ButtonStyle {
     }
 }
 
-// =============================================================================
-// MARK: - 分隔线
-// =============================================================================
 
-/// 发丝分隔线。iOS 的真值：不与屏幕等宽，内缩 16pt（与行内容左对齐）。
 struct DSDivider: View {
     var inset: CGFloat = 0
     var body: some View {
@@ -106,7 +51,6 @@ struct DSDivider: View {
     }
 }
 
-/// 行内分隔线（内缩 16，与 DSRow 的内容左对齐）
 struct DSSeparator: View {
     var inset: CGFloat = TokensHair.inset
     var body: some View {
@@ -114,19 +58,10 @@ struct DSSeparator: View {
     }
 }
 
-// =============================================================================
-// MARK: - inset-grouped 分组（v4 唯一的分组形态）
-// =============================================================================
 
-/// iOS inset-grouped 分组：**分组标题在画布上，行在分组表面上**。
-/// 这是 iOS 设置 / 健康 / 钱包的标准结构。
-/// 规则：标题不进表面（那是旧版 CardBox 的做法，头部与内容混在一层里），
-/// 　　　行与行之间用发丝线分隔，线内缩到与文字左对齐。
 struct DSGroup<Content: View>: View {
     var title: String? = nil
     var trailing: String? = nil
-    /// 不为 "na" 时，右侧那个值渲染成 `DSChip`（带语义色）而不是灰字。
-    /// 「共 3 项故障」这类话是**状态**，不是计数：状态必须带颜色，计数只是灰字。
     var trailingCls: String = "na"
     var footer: String? = nil
     var onTrailingTap: (() -> Void)? = nil
@@ -138,21 +73,7 @@ struct DSGroup<Content: View>: View {
                 DSSectionHeader(title: title, trailing: trailing,
                                 trailingCls: trailingCls, action: onTrailingTap)
             }
-            //  分组**不再自带一层底**。
-            //
-            //  2026-09-25（用户第 6 条：「指令和一键都降级到玻璃卡片上（其他子界面均降级到
-            //  玻璃卡片上，尽量少的使用多级玻璃或层，容易导致玻璃不通透）」）。
-            //  这里原来是 `RoundedRectangle.fill(TokensPalette.panel)` —— 一层半透明的扁面，
-            //  每一组都叠在卡片自己的玻璃上。于是同一张卡里就有了**两层材质**：卡是玻璃，
-            //  卡里的每一组又各是一块面色。用户看到的“不通透的灰”就是它（上一轮把它的
-            //  不透明度从 0.5 降到 0.34，治不了根：只要是**多出一层**，玻璃的折射就断了）。
-            //
-            //  现在行直接坐在卡片的玻璃上，分组僭界由三件东西说：分组标题（`DSSectionHeader`）、
-            //  行间的发丝线（`DSSeparator`）、以及卡片自己的圆角与内衬。
-            //  代价如实写在这里：分组与卡片背景之间的对比变弱了 —— 而那一层对比是**拿玻璃
-            //  换来的**，而用户这四轮反复要的就是玻璃。回退就是上面那三行（一个 `.background`）。
             VStack(spacing: 0) { content() }
-                // 裁剪掉圆角：行的按压底色是矩形，不裁会在分组四角露出方角
                 .clipShape(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous))
             if let footer {
                 Text(footer)
@@ -165,8 +86,6 @@ struct DSGroup<Content: View>: View {
     }
 }
 
-/// 分组内的一行：统一左右内缩（16pt）、最小高度 44pt、行尾一条内缩发丝线。
-/// 行的内容可以是 DSRow / DSKeyValueRow / 任意视图。
 struct DSGroupRow<Content: View>: View {
     var showsSeparator: Bool = true
     var separatorInset: CGFloat = 0
@@ -183,8 +102,6 @@ struct DSGroupRow<Content: View>: View {
     }
 }
 
-/// 原始报文行：左键右值。值走等宽数字，长值自动换行、不被键挤掉。
-/// 用于「全量数据 / 车辆档案 / 检测明细」这类逐字段结构化排版。
 struct DSKeyValueRow: View {
     var key: String
     var value: String
@@ -192,12 +109,6 @@ struct DSKeyValueRow: View {
     var mono: Bool = true
 
     var body: some View {
-        //  2026-09-25（用户第 5 条：「内容放得下且不换行（全部页面都需要逐个控件审核）」）：
-        //  这一行是**全站用得最多的一行**（车辆档案、充电明细、体检逐项、消息明细…）。
-        //  它此前允许 key 折到两行、而 value 根本不限行数：值一长（VIN、故障码串、
-        //  「3 条 · P0A80,P0A81…」）整行就变两行高，而它下面还有一条发丝线 ——
-        //  一折行看上去就像“这一行没对齐”，不是“这一行内容多”。
-        //  现在两边都是单行、**装不下就缩**（缩比行高变化便宜，也读得完）。
         HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.md) {
             Text(key)
                 .font(TokensTypo.subheadline)
@@ -211,7 +122,6 @@ struct DSKeyValueRow: View {
                 .multilineTextAlignment(.trailing)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-                // 值优先占位（不够缩时先缩 key）—— 一条读数里值才是要看的东西。
                 .layoutPriority(1)
         }
         .frame(minHeight: TokensSpacing.row)
@@ -219,34 +129,20 @@ struct DSKeyValueRow: View {
     }
 }
 
-// =============================================================================
-// MARK: - 结构与排版
-// =============================================================================
 
-/// 分组标题：iOS 的 section header（13pt、二级灰、大写、不加容器）
 struct DSSectionHeader: View {
-    /// 标题。**可以为空** —— 卡片正文里那一行就是这种情况：卡头已经给这张卡
-    /// 起过名（`GlassCardHead`），正文再写一遍就是同一个东西两个名字。
-    /// 那时候这一行只剩下右侧那个动作（「全部已读」这类），标题留空即可。
     var title: String = ""
     var trailing: String? = nil
-    /// 不为 "na" 时用 `DSChip`（一个语义圆点 + 颜色）代替灰字。
     var trailingCls: String = "na"
     var action: (() -> Void)? = nil
 
     var body: some View {
-        // 分组标题是全 App 最密集的一行字（~28 屏都在用它）。
-        // 它以前走 `TokensTypo.fixed(13)` —— 原生下返回的正是 `.system(size: 13)`，
-        // 只有艺术方向下才换成宋体；主题删掉之后那个名字底下什么都不剩，
-        // 所以这里直接写定尺字体（与原返回值逐值相同）。字距仍是 `TokensTracking.label`。
         HStack(alignment: .firstTextBaseline) {
             if !title.isEmpty {
                 Text(title.uppercased())
                     .font(TokensTypo.fixed(13))
                     .tracking(TokensTracking.label)
                     .foregroundStyle(TokensPalette.secondary)
-                    // 标题与右侧那个数挤在同一行（用户第 5 条）：先不许折，再允许缩。
-                    // 分组标题折行会把下面那一组内容整体推下去一格，而它本来只是一行小字。
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -257,8 +153,6 @@ struct DSSectionHeader: View {
                         .font(TokensTypo.footnote)
                         .foregroundStyle(TokensPalette.ambient)
                         .buttonStyle(.plain)
-                        // 命中区 44pt（HIG 最小触控目标）：文字只有 13pt 高，
-                        // 而它旁边没有任何可点区域 —— 不给高度就只能碰运气点到。（2026-09-25）
                         .frame(minHeight: TokensSpacing.row)
                         .contentShape(Rectangle())
                 } else if trailingCls != "na" {
@@ -276,7 +170,6 @@ struct DSSectionHeader: View {
     }
 }
 
-/// 巨大数字：超细字重 + 负字距（Apple 的仪器感全靠字重差，不靠颜色）
 struct DSBigNumber: View {
     var value: String
     var unit: String? = nil
@@ -284,11 +177,6 @@ struct DSBigNumber: View {
     var size: CGFloat = 96
     var tint: Color = TokensPalette.primary
     var alignment: HorizontalAlignment = .leading
-    /// 字重。默认值 = 这个原语一直以来的写法（超细 —— 「仪器感」，见 `TokensTypo.display`）。
-    /// 2026-09-25 加这一个参数的原因只有一处：地图抽屉头上那三个数压在通透玻璃上，
-    /// 用户第 3 条要求「字体加粗」（超细的字在 `clear` 玻璃上会散）。
-    /// 它必须放在最后 —— 带标签的实参在 Swift 里要按声明顺序写，
-    /// 加在中间会让**已有**的调用点全部编译不过。
     var weight: Font.Weight = .ultraLight
 
     var body: some View {
@@ -296,10 +184,6 @@ struct DSBigNumber: View {
             HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.xs) {
                 Text(value)
                     .font(TokensTypo.display(size, weight: weight))
-                    // 字距 = 按字号算的基准（字号越大越要收紧，否则数字会散开）。
-                    // 这里以前还加一项「主题的额外字距」（巨字方向靠它把超大数字
-                    // 收成一整块），随艺术主题删除；原生那一项本来就是 0，
-                    // 所以取值逐值不变。
                     .tracking(-size * 0.035)
                     .foregroundStyle(tint)
                     .contentTransition(.numericText())
@@ -321,18 +205,7 @@ struct DSBigNumber: View {
     }
 }
 
-// 【已删】`DSPageTitle`（页面大标题，艺术方向下画在内容里）。
-//（2026-09-25）它的四个使用者（诊断 / 应急 / 体检 / 保养）**全部是卡里的正文**，
-// 而它们嘴上那张卡自己已经写着名字（卡头 `GlassCardHead`）—— 于是同一屏出现两个名字
-//（「诊断」+「设计令牌」、「应急」+「紧急求助」）。卡头就是标题，正文不再交一份。
 extension View {
-    /// 页面标题：iOS 大标题留在导航栏。
-    ///
-    /// 它以前有**两种活法** —— 艺术方向下把导航栏清空、大标题搬进版面（衬线 + 疏排）。
-    /// 2026-09-25 艺术主题整份删除，于是只剩这一条；`inline: true` 保留，
-    /// 因为有些页面本来就一直用行内标题，而「逐像素等于现状」是这里的硬要求。
-    /// （艺术方向那一支的两个零件都已删：`DSPageTitle` 于同日删掉，
-    ///  `TokensSerif` 随主题一起走。）
     func dsPageTitle(_ title: String, inline: Bool = false) -> some View {
         navigationTitle(title)
             .navigationBarTitleDisplayMode(inline ? .inline : .large)
@@ -340,13 +213,9 @@ extension View {
 
 }
 
-//  `DSMetric` 于 2026-09-27 删 —— 它自己的注释就写着「兼容旧名，渲染同 DSBigNumber」：
-//  一个转发型的旧名字，全仓零读者。巨字只有 `DSBigNumber` 一个来源。
 
-/// 车灯光带 = 电量表（v4 的核心机制）。
-/// 亮起的长度就是电量百分比；`glow` 是同一束光的溢出，不是装饰。
 struct DSLightBar: View {
-    var progress: Double                       // 0...1
+    var progress: Double
     var height: CGFloat = 6
     var showsGlow: Bool = true
     var tint: LinearGradient? = nil
@@ -388,26 +257,11 @@ struct DSLightBar: View {
     }
 }
 
-/// 环形读数：一圈轨道 + 一段弧 + 中心里的东西（健康评分用）。
-///
-/// 2026-09-25 新增（用户第 2 条：「车辆页的健康布局太不 iOS，太业余了」）。
-/// 「百分比」在 iOS 上有一个通行的形态：**环**（活动 / 电量 / 健唐 App 都是它）。
-/// 而它此前是「96pt 超细巨字 + 一条线性光带 + 一排行下的方块」三件东西说同一件事，
-/// 其中超细那一支还是全 App 最细的字 —— 那几个字压在卡片上像未完成的排版，
-/// 不像一个结论。环把「分数」与「占多少」合成**同一个图形**，中心那点地方刚好够写它。
-///
-/// 三条取自系统写法的细节，都不是装饰：
-///   · 弧从**十二点**开始（`rotationEffect(-90°)`）—— 系统的表都是这么读的；
-///   · 端点**圆头**（`lineCap: .round`）—— 方头在小进度时看起来像没开始；
-///   · 球道用 `TokensPalette.track`（与光带同一条）。
-/// 缩小不到 1 的进度也照画：环的“没满”本身就是读数的一部分（这一点与光带一致）。
 struct DSRing<Content: View>: View {
-    /// 0…1（超出的部分自己夹掉，调用点不必先夹）
     var progress: Double
     var tint: Color
     var size: CGFloat = 108
     var lineWidth: CGFloat = 12
-    /// 环中心里的东西（怎么写由调用点决定：这里只保证它居中）
     @ViewBuilder var content: Content
 
     private var clamped: Double { max(0, min(1, progress)) }
@@ -427,18 +281,11 @@ struct DSRing<Content: View>: View {
     }
 }
 
-/// 三段事实条：竖向发丝线分隔的三个读数（v4 首屏用）
 struct DSStatStrip: View {
     struct Item: Identifiable {
         let id = UUID()
         var label: String
         var value: String
-        /// 第二行读数（可选）。
-        ///
-        /// 用户 2026-09-25：「充电里面的电压/电流 拥挤了」。原因不是排版，是**拼句**：
-        /// 那一格原来写的是 `398.2V / 12.4A`（一个字段、12 个字符），而一格只有约 75pt
-        /// 可写（卡内宽 322 ÷ 3 − 两侧内边 32）—— 只能靠 `minimumScaleFactor` 缩到 0.7
-        /// 才装得下，于是三个格里的数一大一小。拆成两行时每个数都是原尺寸。
         var second: String? = nil
         var cls: String = "na"
         var icon: String? = nil
@@ -455,8 +302,6 @@ struct DSStatStrip: View {
     var items: [Item]
 
     var body: some View {
-        //  顶对齐（不是默认的居中）：有一格写成两行读数时，三格的**标签**仍然在同一条
-        //  基线上，多出来的那一行只有它自己往下长。
         HStack(alignment: .top, spacing: 0) {
             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
                 if idx > 0 {
@@ -481,8 +326,6 @@ struct DSStatStrip: View {
                         .foregroundStyle(item.cls == "na" ? TokensPalette.primary : TokensPalette.statusColor(item.cls))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                    // 第二行与第一行**同一字体、同一颜色、同一对齐**（见 `Item.second`）：
-                    // 它们是同一类的两个读数，不是一个主值加一个附注。
                     if let second = item.second {
                         Text(second)
                             .font(TokensTypo.data)
@@ -501,7 +344,6 @@ struct DSStatStrip: View {
     }
 }
 
-/// 状态：一个语义圆点 + 文案（不用彩色药丸底 —— 颜色只表达状态，不表达层级）
 struct DSChip: View {
     var text: String
     var cls: String = "na"
@@ -529,11 +371,8 @@ struct DSChip: View {
     }
 }
 
-//  `DSStatRow` 于 2026-09-27 删 —— 零读者，而它与真正在用的 `DSKeyValueRow`
-//  （左标题、右数值，带 `valueCls` 语义色）是同一件事的第二个名字。
 
 
-/// 设置式行：图标 + 标题/+ 副标题 + 右侧值 + 箭头（iOS 列表的标准行）
 struct DSRow: View {
     var icon: String?
     var title: String
@@ -599,10 +438,7 @@ struct DSRowButtonStyle: ButtonStyle {
     }
 }
 
-//  `DSTile` 于 2026-09-27 删 —— 零读者的「磁贴」原语（它那一套「图标在上、标题在下」
-//  的平铺卡片是磁贴时代的版式，那批入口随磁贴一起没了；现在能点的一行是 `DSRow`）。
 
-/// 主操作按钮（一屏最多一个）：实心胶囊
 struct DSPrimaryButtonStyle: ButtonStyle {
     var tint: Color = TokensPalette.ambient
 
@@ -614,54 +450,24 @@ struct DSPrimaryButtonStyle: ButtonStyle {
             .frame(height: TokensSize.button)
             .background(Capsule().fill(tint))
             .opacity(configuration.isPressed ? 0.82 : 1)
-            //  `.scaleEffect(configuration.isPressed ? 0.985 : 1)` 2026-09-25 删除
-            //（用户第 2 条：「全部页面不需要颤抖放大特效，太耗性能」）。
-            //  它是全仓**唯一**一处「按下就缩放」—— 而按下的反馈已经由上面那行透明度
-            //  给了。多那一层的代价是真的：这一条按钮是 `maxWidth: .infinity`，
-            //  一次非整数缩放要让整条胶囊先渲染到离屏缓冲再合成。
-            //  全 App 每一个主操作按钮都在这条路上。
             .animation(TokensMotion.press, value: configuration.isPressed)
     }
 }
 
-/// 次操作按钮：iOS 的"灰色胶囊"
 struct DSSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(TokensTypo.headline)
-            // 这层底是**真玻璃**（下面那行 `dsGlassCapsule`）→ 字走 `TokensInk`：
-            // 系统会按材质调它（vibrancy），而 `Color(uiColor: .label)` 是解析死的值
-            // —— 在玻璃上它就是一层实字（见 `TokensInk` 的说明）。
             .foregroundStyle(TokensInk.primary)
             .frame(maxWidth: .infinity)
             .frame(height: TokensSize.button)
-            // 次操作 = 玻璃胶囊（iOS 26 的次级按钮就是这层材质）。
-            // 不再自己压透明度表现「按下」：玻璃的按压形态由系统演（`interactive`）。
             .dsGlassCapsule(interactive: true)
             .animation(TokensMotion.press, value: configuration.isPressed)
     }
 }
 
 
-// =============================================================================
-//  分段控件 `DSSegmented` —— **已删**（2026-09-26，用户第 4 条）
-// =============================================================================
-//
-//  它在这里立过一堆东西：自画的凹槽（`fillSubtle`）、白色滑块（`glassHighlight`）、
-//  自己算的选中态、自己加的 `.isSelected`、以及一条「字不折行 / 宁可缩」的护栏
-//  （那三条护栏连同它一起消失了 —— 段名现在由系统排）。
-//
-//  删它的理由只有一条：**系统里有一模一样的东西**。全 App 的分段选择器现在是
-//  `Design/DSSegmentPicker.swift`（`Picker` + `.pickerStyle(.segmented)`），
-//  为什么换、以及那条「外观随系统」的代价写在那里。
-//
-//  而在此之前它旁边的这一格刚发生过一件事，值得留在这里：图源那一行连换三代
-//  自造控件都没修好，真因在**别的层**（缩略图的溢出与命中，`HANDOFF.md` §37.2）。
-//  「控件写得再对，也修不了不是控件的问题。」
 
-/// 环形仪表：单色细环 + 轨道（保留给确实需要"环"的少数页面）
-/// 迷你趋势曲线（Canvas 手绘）
-/// 信息条（离线、失败、提示）：安静的提示，不用彩色块
 struct DSNotice: View {
     enum Kind { case info, warning, error, success
         var cls: String {
@@ -711,7 +517,6 @@ struct DSNotice: View {
     }
 }
 
-/// 空状态 / 错误状态（页面级）
 struct DSPlaceholder: View {
     var icon: String
     var title: String
@@ -748,7 +553,6 @@ struct DSPlaceholder: View {
     }
 }
 
-/// 加载占位（静态：加载本身由 ProgressView 表达，占位块不做动画）
 struct DSSkeleton: View {
     var height: CGFloat = 16
     var width: CGFloat? = nil
@@ -761,27 +565,9 @@ struct DSSkeleton: View {
     }
 }
 
-// =============================================================================
-// MARK: - 浮层材质（唯一允许用玻璃的地方）
-// =============================================================================
 
-/// 顶部导航栏容器（浮在内容之上 → 玻璃合法）
-/// 底部悬浮操作条（浮在内容之上 → 玻璃合法）
-// MARK: - Haptic feedback (backward compatibility alias)
-// MARK: - 分组表面（inset-grouped 表面外观）
 
-// =============================================================================
-// MARK: - 可折叠分组（DS 语言里的唯一一种「折叠」）
-// =============================================================================
 
-/// 可折叠分组：标题行在画布上，行在分组表面上，**收起时标题行与 footer 仍然可见**。
-///
-/// 它取代旧的 `ExpandingCardBox`（那是第二套容器：标题行行内 padding 与自己的一层玻璃）。
-/// 折叠本身是有用的功能（电池页的子系统 / 车控页的完整指令表默认收起），
-/// 但它必须与 `DSGroup` **长得一样** —— 折叠只改变「展开还是收起」，不改变版式语言。
-///
-/// 收起状态下的 footer 是刻意的：像「这块只列 10 条」这种规则如果只在展开后可见，
-/// 用户就永远不会去展开它。
 struct DSExpandGroup<Content: View>: View {
     var title: String
     var trailing: String? = nil
@@ -854,8 +640,6 @@ struct DSExpandGroup<Content: View>: View {
     }
 }
 
-/// 与 DSExpandGroup 相同的标题行 + 折叠交互，但**不画背景表面**。
-/// 用在「外层已有统一表面」的场景里，避免多层嵌套背景产生「框框套框框」的视觉垃圾。
 struct DSSection<Content: View>: View {
     var title: String
     var trailing: String? = nil
@@ -922,9 +706,6 @@ struct DSSection<Content: View>: View {
 struct DSSurfaceModifier: ViewModifier {
     var padding: CGFloat
     var radius: CGFloat
-    /// 要不要「更亮一点的底」。**这不是玻璃**（玻璃是 `dsGlass`）——
-    /// 2026-09-25 材质审核把它从 `glass` 改名，因为那个名字会让调用点以为拿到了材质。
-    /// 它照旧只在卡里用（规则 ②）。
     var subtle: Bool
 
     init(padding: CGFloat, radius: CGFloat, subtle: Bool) {
@@ -939,16 +720,12 @@ struct DSSurfaceModifier: ViewModifier {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    // 两档底：`subtle` = 更浅的那一档（输入框 / 未选中的底），否则是分组面。
-                    // 「分组面」这一档已从 `nightSurface`（不透明）换成 `panel`（半透明），
-                    // 理由见 `TokensPalette.panel` —— 卡里那层底不能是不透明的。
                     .fill(subtle ? TokensPalette.fillSubtle : TokensPalette.panel)
             }
     }
 }
 
 extension View {
-    /// 分组表面外观
     func dsSurface(padding: CGFloat = TokensSpacing.md,
                    radius: CGFloat = TokensRadius.medium,
                    subtle: Bool = false) -> some View {
@@ -956,15 +733,4 @@ extension View {
     }
 }
 
-// 【已删】全页「纸」外壳三件套：`dsPaperPage()` / `DSPaperPageModifier` / `DSPaperPage`
-//（2026-09-25）。它们的用法只有两个：「体检」与「保养」那两张卡的内容
-//（`HealthDataView` / `MaintenanceMoneyView`）—— 那两个视图当初是页面，后来被挂进
-// 车卡里，页面壳没拆。叠进卡里的代价是可算的，而且三样都看得见：
-//   ① 第二层 `ScrollView`：里外两层都能滚时竖直拖动归内层，而内层拿到的是无限高，
-//      它自己永远滚不动，只是把那一块区域的拖动吃掉（写这段话时叠叠乐还是自管手势，
-//      现在是系统 `ScrollView` —— 结论不变：卡里再套一层滚动，这一块就滚不动了）；
-//   ② 第二层纸面底 + 它自己的左右 16pt：叠在卡片的 18pt 上 = 内容距卡边 34pt；
-//   ③ 一行页标题（「体检与数据」）：而卡片头已经写着「体检」。
-// 拆完之后三件套零引用，所以整段删掉 —— 留着它就是「一件已经没有人用的东西」，
-// 而下一个要写页面的人会拿它当模板。
 

@@ -1,24 +1,7 @@
 import SwiftUI
 import Foundation
 
-// =============================================================================
-//  车辆消息与事件 —— 出行页的一节（原「消息」页）
-//
-//  批 7 把这一页并进「出行」：消息里最多的就是点火/熄火/控制事件，
-//  它们和行程时间轴讲的是同一件事（车何时动过、在哪里）。
-//  它现在只提供内容（`MessagesSection`），页面外壳归 `TripsEventsView`。
-// =============================================================================
-//  ① 搜索交给系统：.searchable（iOS 的消息搜索本来就长在那里）
-//  ② 筛选是「全部 / 未读」一个分段控件 + 标签胶囊，不再用两个语义不明的图标按钮
-//  ③ 列表按天分组：分组标题在画布上、行在分组表面上、行间发丝线
-//  ④ 行是邮件式排版：未读点 + 标题（未读加粗）+ 时间 + 正文两行 + 可展开明细
-//     阅读状态不再只靠颜色：未读有圆点，标题字重也不同（颜色 + 字重双通道）。
-// =============================================================================
 
-//  「一次画几天」那个常量（`messageDayStep`）已搬去 `TripsEventsView`：
-//  用户 2026-09-26「事件也采用懒加载」之后，「续多少」这个动作发生在**那一叠**上
-//  （`ArcStack.onReachBottom` → 宿主的 `loadMoreEventDays`），
-//  而这一节只负责把 `shownDays` 裁成前 N 天。
 
 struct MessagesSection: View {
     private let store = AppStore.shared
@@ -26,41 +9,21 @@ struct MessagesSection: View {
     @State private var loading = true
     @State private var expanded: Set<String> = []
     @State private var loadTask: Task<Void, Never>? = nil
-    /// 上一次拉取失败的真实原因（空状态直接展示它，而不是笼统的「暂无消息」）。
     @State private var lastError = ""
     @State private var searchText = ""
     @State private var filterTag: String? = nil
     @State private var showUnreadOnly = false
-    /// 正文长到一屏放不下、被“摊开全部”的那几条（见 `bodyPlan`）
     @State private var fullBodies: Set<String> = []
-    /// 卡片量到的可用区域（`ArcStack` 写进来的真数；量不到时是 `.zero`）
     @Environment(\.cardViewport) private var cardViewport
 
-    /// 一次画几天的消息 —— **这不是分页，是防处决**。
-    ///
-    /// 这一节的列表是普通 `VStack` + `DSGroup`，不在懒容器里，而它住在
-    /// `ArcStack` 的一张卡里（卡高必须先量出来，所以换懒容器也不会真的懒）——
-    /// 227 行于是是一次性全建出来的。真机轨迹（2026-09-24 第五轮）：
-    /// 0.97s 消息到手 → 2.01s 673 MB → 4.01s 1720 MB → 5.3s 被系统收走，
-    /// 而同一份数据在别的档上一点事都没有。用户的原话：「点到出行界面就闪退」。
-    ///
-    ///  ⚠️ 2026-09-26：它从 `@State` 变成**绑定**—— 用户要求「事件也采用懒加载」
-    /// （与行程卡同一种做法：滑到底自己续，而不是点一下「再看早 N 天」）。
-    /// 续的那个动作住在宿主（`TripsEventsView.loadMoreEventDays`），
-    /// 因为滚动到没到底只有那一叠知道（`ArcStack.onReachBottom`）。
     @Binding var shownDays: Int
 
-    // 本地已读持久化（无服务端 mark-read 接口，用 UserDefaults 记已读消息 ID）。
     private static let readKey = "changan_read_message_ids"
     private static var localRead: Set<String> {
         get { Set(UserDefaults.standard.stringArray(forKey: readKey) ?? []) }
         set { UserDefaults.standard.set(Array(newValue), forKey: readKey) }
     }
 
-    /// 没有 token 时那一句真话。**只有一个出处**：原先 `loadIfNeeded` 与 `load`
-    /// 各写了一遍（同一句话两处各写一次，改一处必漏一处），而且两遍都含实现词
-    /// 「接口」，于是 `scan/copy.py` 同一个问题报了两次 —— 一句话写两遍，错也错两遍。
-    /// 界面话只描述用户的状态（没登录）与他能做的事（去登录），不描述我们怎么取数。
     private static let needLogin = "请先登录，登录后才会收到车辆事件"
 
     private func markRead(_ id: String) {
@@ -81,34 +44,21 @@ struct MessagesSection: View {
         var read: Bool
         var tag: String
         var tagCls: String
-        /// 事件坐标（来自 `jumpParam.uriParams`）—— 有点才能「在图上看看」。
-        /// **不存**路径：车端不上传轨迹（`isPrivacyDrvingHistory: 1`）。
         var coordinate: (lat: Double, lng: Double)?
     }
 
     var body: some View {
         Group {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                // 「全部已读」原来是导航栏按钮，并入之后这一节没有自己的导航栏。
-                //
-                // ⚠️ 标题留空（用户 2026-09-25：「全局看重复内容」）：这一节原来自己写着
-                // 「车辆消息与事件」，而它栖身的那张卡叫「车的事件」—— 同一个东西两个
-                // 名字。卡头已经给它起过名，这一行只剩那个动作。
                 DSSectionHeader(trailing: items.allSatisfy { $0.read } ? nil : "全部已读",
                                 action: items.allSatisfy { $0.read } ? nil : { markAllRead() })
 
-                // 搜索原来挂在 `.searchable` 上（消息 App 的写法）。
-                // 这一节不是页面，所以搜索框回到内容里。
                 searchField
                 filterBar
 
                 if loading {
                     loadingState
                 } else if filteredItems.isEmpty {
-                    // 空状态必须说清是「哪一种空」：
-                    // 服务端真的没消息 / 网络或登录失败 / 筛掉了。
-                    // 以前这里只分「carId 空」和「非空」两支，而 carId 不该管消息
-                    // （见 loadIfNeeded 的注释）——结果把「网络失败」显示成「暂无消息」。
                     DSPlaceholder(icon: "bubble.left.and.bubble.right",
                                   title: lastError.isEmpty ? "暂无消息" : "消息获取失败",
                                   message: lastError.isEmpty ? emptyHint : lastError,
@@ -119,18 +69,10 @@ struct MessagesSection: View {
                                 trailing: group.unread > 0 ? "\(group.unread) 未读" : "\(group.items.count) 条") {
                             ForEach(Array(group.items.enumerated()), id: \.element.id) { idx, item in
                                 messageRow(item, showsSeparator: idx < group.items.count - 1)
-                                    // 这一叠是普通 `VStack`（`ArcStack`：懒容器量不到
-                                    // 叠卡的几何），所以**看得见的那几天是整段建出来的**
-                                    // —— 这正是 `shownDays` 存在的理由（一次三天，
-                                    // 往下滑再续三天）。
                             }
                         }
                     }
                     if visibleGrouped.count < filteredGrouped.count {
-                        // 最近的那几天在上面；更早的**接着往下滑就出来**。
-                        // 这里原来是一枚「再看早 N 天」的按钮 —— 用户 2026-09-26：
-                        // 「事件也采用懒加载」。往下滑本身就是「我还要看」的证据，
-                        // 而按钮把同一个意图多问了一遍（与出行页那张卡同一条修正）。
                         DSGroup {
                             DSGroupRow(showsSeparator: false) {
                                 moreDaysNote(filteredGrouped.count - visibleGrouped.count)
@@ -141,18 +83,13 @@ struct MessagesSection: View {
             }
         }
         .onAppear { loadIfNeeded() }
-        // bootstrap（冷启动预加载）是异步的：如果用户先进入出行页，
-        // carId 还是空 → loadIfNeeded 直接 return，之后 bootstrap 完成时
-        // 视图不会重新 onAppear，消息就永远空着。跟充电页一样监听 carId。
         .onChange(of: store.carId) { _, newId in
             guard !newId.isEmpty else { return }
-            // carId 变了（切车 / 首次绑定）→ 重新加载
             loadIfNeeded()
         }
         .onDisappear { loadTask?.cancel(); loadTask = nil }
     }
 
-    /// 搜索框：与全局搜索同一个图形语汇（放大镜 + 输入框），不再向导航栏要位置。
     private var searchField: some View {
         HStack(spacing: TokensSpacing.sm) {
             Image(safeSymbol: "magnifyingglass", fallback: "magnifyingglass")
@@ -177,13 +114,10 @@ struct MessagesSection: View {
         }
         .padding(.horizontal, TokensSpacing.md)
         .frame(height: TokensSpacing.row)
-        // 搜框在**卡里**：底读 `panel`（半透明分组面），不是不透明的分组底色 ——
-        // 否则它就是在玻璃卡中间那个黑洞（用户 2026-09-25 第 5 条，截图里那一条）。
         .background(RoundedRectangle(cornerRadius: TokensRadius.medium, style: .continuous)
             .fill(TokensPalette.panel))
     }
 
-    // MARK: - 筛选条（分段控件 + 标签胶囊）
 
     private var filterBar: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
@@ -239,9 +173,6 @@ struct MessagesSection: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// 空的时候要说清是**哪一种空**。「暂无消息」把三件事糊成了一句：
-    /// 服务端真的没给 / 我们没解析到 / 抓的这段区间里就是没有事件。
-    /// 最后那一种现在能说清：窗口是 `APIClient.messageDays` 天（不是「永远」）。
     private var emptyHint: String {
         if store.carId.isEmpty { return "请先绑定车辆" }
         if !searchText.isEmpty { return "没有找到匹配「\(searchText)」的消息" }
@@ -250,25 +181,16 @@ struct MessagesSection: View {
         return "近 \(APIClient.messageDays) 天没有事件"
     }
 
-    // MARK: - 消息行
 
     private func messageRow(_ item: MessageItem, showsSeparator: Bool) -> some View {
         let isOpen = expanded.contains(item.id)
         return DSGroupRow(showsSeparator: showsSeparator) {
-            // 提示由 `withHint` 挂（理由见那个函数）：此处不能与 `.accessibilityLabel`
-            // 链在一起 —— 它报过 “ambiguous use of 'accessibilityHint'”。
             withHint(Text(isOpen ? "双击收起详情" : "双击展开详情并标记已读")) {
                 rowButton(item, isOpen: isOpen)
             }
         }
     }
 
-    /// 行的按钮本体（无障碍的**标签**在这里，**提示**由调用处的 `withHint` 挂）。
-    ///
-    /// 为什么它独立成一个函数：这一条的 Label 里嵌着 `if isOpen`、三个 `let` 与
-    /// 第二个 Button，是那一批里最大的表达式 —— 整条链再同时背着 `DSGroupRow{…}`
-    /// 的泛型 `Content` 与函数的 `some View` 时，推断预算会不够（`accessibilityHint`
-    /// 就是在那时候报的歧义）。拆开之后每一步的期望类型都明确，行为一字未变。
     private func rowButton(_ item: MessageItem, isOpen: Bool) -> some View {
         Button { toggle(item) } label: {
             HStack(alignment: .top, spacing: TokensSpacing.sm) {
@@ -281,7 +203,6 @@ struct MessagesSection: View {
                 VStack(alignment: .leading, spacing: TokensSpacing.xs) {
                     HStack(alignment: .firstTextBaseline, spacing: TokensSpacing.sm) {
                         Text(item.title)
-                            // 未读靠**字重**而不是颜色（颜色已经全给了语义状态）
                             .font(TokensTypo.body.weight(item.read ? .regular : .semibold))
                             .foregroundStyle(TokensPalette.primary)
                             .lineLimit(2)
@@ -301,10 +222,6 @@ struct MessagesSection: View {
                     }
 
                     if !item.body.isEmpty {
-                        // 展开后放几行**是算出来的**：正文在这个宽度下真占几行、
-                        // 这一条除了正文还要占多少（标题行 + 明细行）、
-                        // 卡片量到的可用高度是多少 —— 三者相减得行数。
-                        // 见 `bodyPlan`：这不是「大概放得下」那种判断。
                         let bp = bodyPlan(item, open: isOpen)
                         Text(bp.text)
                             .font(TokensTypo.subheadline)
@@ -314,8 +231,6 @@ struct MessagesSection: View {
                         if bp.restLines > 0 {
                             DSCardMoreRow(rest: bp.restLines, unit: "行",
                                           screens: bp.screens, open: false) {
-                                // `_ =` 的理由同「体检」卡那两处：`insert` 有返回值，
-                                // 而 `withAnimation` 在 ViewBuilder 里的 `Result` 会因此对不上 Void。
                                 withAnimation(TokensMotion.count) { _ = fullBodies.insert(item.id) }
                             }
                         } else if isOpen, bp.truncatable, fullBodies.contains(item.id) {
@@ -331,14 +246,10 @@ struct MessagesSection: View {
                             if !item.location.isEmpty { detailRow("mappin.and.ellipse", "位置", item.location) }
                             if !item.time.isEmpty { detailRow("clock", "时间", item.time) }
                             if !item.read { detailRow("envelope.open", "状态", "已标记为已读") }
-                            // 事件自带坐标时才给这个入口：点一下把地图镜头移过去。
-                            // 这里只给「地点」，不给「路径」—— 车端不上传轨迹。
                             if let c = item.coordinate {
                                 Button {
                                     store.mapFocus = AppStore.MapFocus(lat: c.lat, lng: c.lng,
                                                                        label: item.title)
-                                    // 读单例而不是环境对象：这一节不是页面，
-                                    // 不保证环境里有 NavState（`MapSpineView` 同此约定）。
                                     NavState.shared.popToRoot()
                                     TokensHaptic.select()
                                 } label: {
@@ -365,53 +276,18 @@ struct MessagesSection: View {
         .accessibilityLabel(Text("\(item.read ? "已读" : "未读")，\(item.title)"))
     }
 
-    /// 给一个视图挂上无障碍提示（全 App 唯一那处需要包装的地方）。
-    ///
-    /// 为什么不直接链式写 `.accessibilityHint(…)`：它同时声明在 `View` 与
-    /// `ModifiedContent` 上（两者**返回类型不同**），而当 receiver 恰好是上一步
-    /// 留下的 `ModifiedContent`（`.accessibilityLabel` 的产物）时，两个候选都合法 ——
-    /// 2026-09-25 的 CI 在消息这一行上报 “ambiguous use of 'accessibilityHint'”。
-    ///
-    /// 需要说清的是：**全仓还有 27 处一模一样的「标签接提示」写法，它们都编译得过**
-    /// （见 `MapSpineReadouts` / `MapSpineView` / `MineView` …）。所以这不是语义问题，
-    /// 而是类型推断的预算问题 —— 这一行的 Label 里嵌着 `if isOpen`、三个 `let` 与
-    /// 第二个 Button，是那一批里最大的表达式。既然「同样写法别处能过」，
-    /// 就不该把它当成一条全仓规矩去改其它 27 处（每一处都在说 VoiceOver 的事）。
-    ///
-    /// 这里的固定做法：把提示交给一个**泛型函数**。`content()` 的类型是 `V: View`
-    /// （类型参数），成员查找只看它的约束 —— 候选只剩 `View` 那一个，
-    /// 无论 V 具体是什么类型（包括 ModifiedContent）都不会有歧义。
     private func withHint<V: View>(_ hint: Text, _ content: () -> V) -> some View {
         content().accessibilityHint(hint)
     }
 
-    // =========================================================================
-    // MARK: 展开后有多挤（CardFit）
-    // =========================================================================
-    //
-    //  用户 2026-09-25：「所有卡片内需要展开的都要严格计算展开后的拥挤程度，完全
-    //  根据数据来，不能猜」。消息这一节的展开量**全在正文里**：标题有 lineLimit(2)、
-    //  明细行最多五行（车牌/位置/时间/状态/地图）都是有界的，只有正文字数无界，
-    //  而这个 App 里的卡片没有内层滚动（卡住在外层的系统 `ScrollView` 里，卡里再套滚动
-    //  会让这一块的竖向拖动被内层吃掉）—— 一条 800 字的通知
-    //  展开后能把卡片变成三屏。
-    //
-    //  所以：展开时正文先按算出来的行数放，剩下的挂在 `DSCardMoreRow` 上；
-    //  那张「还有 N 行」的话里的 N 是 `总行数 − 放得下的行数`，两个都是量出来的。
 
-    /// 卡片内容的真实宽度（视口已扣除叠叠乐左右各 18，这里是卡片自己的左右 18）
     private var fitWidth: CGFloat { max(0, cardViewport.width - 2 * StackSpec.Card.padH) }
 
-    /// 正文怎么画
     private struct BodyPlan {
         var text: String
-        /// 收起时是 2（界面上本来就这么写的），展开时是 nil = 不限行数
         var lineLimit: Int?
-        /// 被卡在「还有 N 行」后面的行数（0 = 没卡）
         var restLines: Int
-        /// 这一条展开后占几屏（0 = 视口量不到）
         var screens: Double
-        /// 这一段本来就长到放不下（哪怕现在正全放着 —— 那也要能收回去）
         var truncatable: Bool
     }
 
@@ -420,8 +296,6 @@ struct MessagesSection: View {
             return BodyPlan(text: item.body, lineLimit: 2, restLines: 0,
                             screens: 0, truncatable: false)
         }
-        // 判据全在 `CardFit.plan(text:)` 里 —— 消息正文与导出预览那种长正文走的是**同一条**
-        // 规则：放得下就全放，放不下就切在量出来的行边界上。
         let plan = CardFit.plan(text: item.body, style: .subheadline, width: fitWidth,
                                 viewport: cardViewport, reserved: chromeHeight(item))
         if fullBodies.contains(item.id) {
@@ -432,17 +306,15 @@ struct MessagesSection: View {
                         screens: plan.screens, truncatable: plan.truncatable)
     }
 
-    /// 这一条**除正文之外**要占的高度：标题行（标题实际能用的宽是量出来的）
-    /// + 行自身的上下内边距 + 展开后逐条算出来的明细行。
     private func chromeHeight(_ item: MessageItem) -> CGFloat {
         let right = item.tag.isEmpty ? shortTime(item.time)
                                      : "\(item.tag) \(shortTime(item.time))"
         let rightW = CardFit.textWidth(right, style: .footnote)
         let titleW = max(0, fitWidth - rightW - TokensSize.iconColumn - TokensSpacing.sm)
         var cost = CardFit.textHeight(item.title, style: .body, width: titleW, cap: 2)
-        cost += TokensSpacing.xs                      // 标题与正文之间（VStack spacing）
-        cost += TokensSpacing.md * 2                  // 行自身的上下内边距
-        cost += TokensSpacing.xs                      // 正文与明细之间（padding(.top)）
+        cost += TokensSpacing.xs
+        cost += TokensSpacing.md * 2
+        cost += TokensSpacing.xs
         var rows = 0
         if !item.plate.isEmpty { rows += 1 }
         if !item.location.isEmpty { rows += 1 }
@@ -450,9 +322,9 @@ struct MessagesSection: View {
         if !item.read { rows += 1 }
         if rows > 0 {
             cost += CGFloat(rows) * (CardFit.Typo.footnote.lineHeight + TokensSpacing.sm)
-            cost += CGFloat(rows - 1) * TokensSpacing.sm       // 明细行之间的 spacing
+            cost += CGFloat(rows - 1) * TokensSpacing.sm
         }
-        if item.coordinate != nil { cost += TokensSpacing.md }  // 「在图上看看」那个入口
+        if item.coordinate != nil { cost += TokensSpacing.md }
         return cost
     }
 
@@ -486,7 +358,6 @@ struct MessagesSection: View {
         TokensHaptic.select()
     }
 
-    /// "2026-09-19 22:31:05" → "22:31"（列表里只需要时刻，完整时间在展开明细里）
     private func shortTime(_ t: String) -> String {
         guard let last = t.split(separator: " ").last else { return t }
         let parts = last.split(separator: ":")
@@ -494,7 +365,6 @@ struct MessagesSection: View {
         return String(last)
     }
 
-    // MARK: - 过滤与分组
 
     private var filteredItems: [MessageItem] {
         items.filter { item in
@@ -512,7 +382,6 @@ struct MessagesSection: View {
         return Array(tags).sorted()
     }
 
-    /// 按天分组（今天 / 昨天 / 前天 / M月d日 / 更早），「更早」永远排在最后
     struct DayGroup: Identifiable {
         var id: String { label }
         let label: String
@@ -521,8 +390,6 @@ struct MessagesSection: View {
         let sortKey: String
     }
 
-    /// 「往下滑，更早的接着出来」—— 与出行页那句是**同一种写法**：
-    /// 它是一句陈述（不是按钮），因为真正的续在宿主的 `onReachBottom` 里。
     private func moreDaysNote(_ rest: Int) -> some View {
         HStack(spacing: TokensSpacing.sm) {
             Image(safeSymbol: "arrow.down.circle", fallback: "arrow.down.circle")
@@ -540,8 +407,6 @@ struct MessagesSection: View {
     private var filteredGrouped: [DayGroup] {
         let map: [String: [MessageItem]] = Dictionary(grouping: filteredItems) { dayKey($0.time) }
         let all = map.map { key, its in
-            // 一天之内也是**新的在上**：`time` 是 "yyyy-MM-dd HH:mm:ss"，字符串序即时序。
-            // 不分的话顺序听服务端的（可能是正序），于是最近的一条会落在一天的最下面。
             let newestFirst = its.sorted { $0.time > $1.time }
             return DayGroup(label: dayLabel(key),
                      items: newestFirst,
@@ -562,8 +427,6 @@ struct MessagesSection: View {
         ToastManager.shared.show("已全部标为已读", icon: "checkmark.circle.fill")
     }
 
-    /// 真正交给界面去建的那些天：`filteredGrouped` 已经排成「最近的一天在最前」，
-    /// 取前 N 组就是「最近的 N 天」。
     private var visibleGrouped: [DayGroup] {
         Array(filteredGrouped.prefix(shownDays))
     }
@@ -590,7 +453,6 @@ struct MessagesSection: View {
         }
     }
 
-    // MARK: - 数据
 
     private func reload() {
         loadTask?.cancel()
@@ -599,24 +461,12 @@ struct MessagesSection: View {
     }
 
     private func loadIfNeeded() {
-        // ⚠️ 这里原来有一道 `guard !store.carId.isEmpty else { loading = false; return }`。
-        // 它是错的，而且是「消息界面永远是空的」的真正入口：
-        //   ① 消息接口的 URL 里**没有 carId**（actionType/page/limit/startTime/endTime/token）；
-        //   ② 小程序的 messages.js 只检查 token，不检查 carId —— 它进页面就 load()；
-        //   ③ 而 carId 要等 bootstrap 的 getCars 回来才有值，getCars 一失败就永远是空串。
-        // 于是只要 bootstrap 没跑完或失败过，这一节就永远停在空状态，
-        // 哪怕服务端其实返回了 55 条事件。判断加载与否只看「缓存 + TTL」。
-        // 没有 token 时**要说出来**：原先只把 loading 关掉，界面就停在「暂无消息」，
-        // 而真实情况是「请求根本没发」。这两件事在屏幕上长得一模一样 ——
-        // 用户 2026-09-24「消息接口拿不到数据」那一轮，这一支就是可能的凶手之一。
         guard !TokenStore.currentToken().isEmpty else {
             lastError = Self.needLogin
             loading = false
             return
         }
         guard loadTask == nil || loadTask!.isCancelled else { return }
-        // 先把手上这份响应渲染出来（它就是最近一次真实响应），再无条件取一次 ——
-        // 没有 TTL 那一层，也不再因为「刚取过」就跳过。
         if let last = store.caches["messages"] as? [[String: Any]], !last.isEmpty {
             apply(last)
         }
@@ -625,7 +475,6 @@ struct MessagesSection: View {
 
     @MainActor
     private func load() async {
-        // 同样不设 carId 闸（理由见 loadIfNeeded）。
         guard !TokenStore.currentToken().isEmpty else {
             lastError = Self.needLogin
             loading = false
@@ -635,26 +484,14 @@ struct MessagesSection: View {
         do {
             let list = try await APIClient.shared.getMessages()
             apply(list)
-            // 「成功，只是区间里没有事件」**不是错误**。这里原先把这句也写进 `lastError`，
-            // 于是空状态的标题显示成「消息获取失败」—— 与事实相反的一句话。
-            // 用户 2026-09-24「消息接口拿不到数据」那几次判断，就是照着这句话下的。
-            // ③（服务端给 0 条）与 ④（给了 55 条而我们解析成 0 条）的区分归
-            // 「我的 → 诊断 → 消息自检」那四个数；界面只说实话，不替服务端认错。
             lastError = ""
             if list.isEmpty {
-                // 留在日志里而不是界面上：同一个区间下次也能对上。
                 NSLog("loadMessages: 区间内 0 条（近 \(APIClient.messageDays) 天）")
             }
-            // 只缓存非空列表：空列表可能是网络抖动或权限问题，缓存它会
-            // 让后续所有访问都命中空缓存而永远不再重试。
-            // 非空列表才是「有真实消息」的确认信号。
             if !list.isEmpty {
                 store.saveCache(["messages": list])
             }
         } catch {
-            // 失败时保留已渲染的缓存内容（与小程序一致），并明确告知，而不是悄悄清空。
-            // 把真实错误留在页面上：只弹一个 2 秒的 Toast，用户回头看到的还是空页，
-            // 分不清「没消息」和「没拉到」——这正是之前反复误判的原因。
             lastError = error.localizedDescription
             NSLog("loadMessages: \(error.localizedDescription)")
             ToastManager.shared.show("消息获取失败", icon: "wifi.exclamationmark")
@@ -662,13 +499,9 @@ struct MessagesSection: View {
         loading = false
     }
 
-    /// 服务端消息行 → 界面模型。缓存与网络共用同一条映射路径，两边永远一致。
     private func apply(_ list: [[String: Any]]) {
         let readSet = Self.localRead
         items = list.enumerated().compactMap { idx, m in
-            // 幂等键用服务端的 `stubId`（`1:<uuid>:<时间戳>:<序号>`），它是为去重而生的；
-            // 退回 `id`，再退回行号。同一件事在两次拉取里必须是**同一个 id**，
-            // 否则「已读」状态与事件去重都会失效。
             let id = ciString(m, ["StubId", "stubId"])
                 ?? ciString(m, ["Id", "id"]) ?? "row-\(idx)"
             let title = ciString(m, ["Title", "title"]) ?? "车辆通知"
@@ -676,16 +509,6 @@ struct MessagesSection: View {
             let rawLoc = ciString(m, ["Content", "content"]) ?? ""
             let location = (rawLoc != body && !rawLoc.isEmpty && rawLoc != "null" && rawLoc != "无") ? rawLoc : ""
             let cat = Self.classify(title: title, content: body.isEmpty ? rawLoc : body)
-            // 未读（红点）判据用 `new`：2026-09-22 那份报文里 5 条事件全是
-            // `readStatus: 0` 而 `new: false`，车主的手机上**没有**红点 ——
-            // 说明 `readStatus` 在这套服务里并没有被用起来，`new` 才是红点的真相。
-            // 两个字段都缺时才退回旧判据（ReadStatus == 1 即已读）。
-            // 展开过的消息记入本地已读集合（服务端没有 mark-read 接口）。
-            // 已读判据以**小程序为准**：`num(it.ReadStatus) === 1`（messages.js:apply）。
-            // 2026-09-04 那份报文里 55 条全是 `readStatus: 0` 且 `new: false`，两者互相矛盾；
-            // 早前用 `new` 反推 ⇒ 全被判成「已读」⇒ 手机上永远没有红点，
-            // 而点进消息中心一条未见过的也没有，和参考实现的行为对不上。
-            // 只有报文缺 `readStatus` 时才退回 `new`。
             let serverRead: Bool
             if let rs = ciNumber(m, ["ReadStatus", "readStatus"]) {
                 serverRead = rs == 1

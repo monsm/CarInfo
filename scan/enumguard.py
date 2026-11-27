@@ -68,16 +68,9 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _roots import EXISTING_ROOTS, swift_files   # noqa: E402
+from _roots import EXISTING_ROOTS, swift_files
 
 
-# =============================================================================
-#  已核成员表
-# =============================================================================
-#  每一行都必须能回答「你是怎么知道的」。出处写 URL，取 Apple 文档 JSON 的
-#  topicSections（成员清单），不是取「印象」。
-#
-#  核对日期：2026-09-23（文档站返回的版权年份是 2026）。
 SDK_ENUM_ARGS = {
     "accessibilityAction": {
         "param": "AccessibilityActionKind",
@@ -90,8 +83,6 @@ SDK_ENUM_ARGS = {
         "members": {"lowercase", "uppercase"},
     },
     "accessibilityElement": {
-        # 带标签的那条：`.accessibilityElement(children: .contain)`。
-        # `arg` 是必填的 —— 不带标签的 `.accessibilityElement()` 根本没有实参。
         "param": "AccessibilityChildBehavior",
         "arg": "children",
         "doc": "https://developer.apple.com/documentation/swiftui/accessibilitychildbehavior",
@@ -104,8 +95,6 @@ SDK_ENUM_ARGS = {
     },
 }
 if not SDK_ENUM_ARGS:
-    # 「表是空的」= 这个检查器的范围变成了 0 —— 那和「没有这个检查器」一样，
-    # 但输出会是一行绿色的 ✅。让空表变成硬失败。
     print("❌ enumguard 的成员表是空的 —— 检查范围为零，退出码按失败处理。")
     sys.exit(1)
 
@@ -177,7 +166,6 @@ def scan_file(path):
 
     hits = []
     for name, spec in sorted(SDK_ENUM_ARGS.items()):
-        # `(` 后面（可换行）紧跟 `.成员`；表里写了 `arg` 的族要求中间夹那一个标签。
         mid = (re.escape(spec["arg"]) + r"\s*:\s*") if spec.get("arg") else ""
         pat = re.compile(r"\b" + re.escape(name) + r"\s*\(\s*" + mid +
                          r"\.([A-Za-z_][A-Za-z0-9_]*)")

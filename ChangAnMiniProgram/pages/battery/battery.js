@@ -1,6 +1,3 @@
-// battery.js —— 电池与充电 · 一级数据深潜页
-// 把原始报文里的单体电压 / 温度探针 / 子系统 / 充电会话 / 动力电机 / 故障码 / 电池告警
-// 从“纯文本”变成可视化与结构化视图（Tier B），风格与 v3 极简系统一致。
 const svc = require('../../utils/service');
 const VM = require('../../utils/vm');
 const AN = require('../../utils/analysis');
@@ -90,7 +87,6 @@ Page({
     const b = VM.batteryModel(cache);
     const e = VM.energy(cache, app.globalData.car);
 
-    // ---- 分析结论（统一分析层的电池域：告警 / 一致性 / 温差 / 储能故障） ----
     const A = AN.summarize(cache, app.globalData.car);
     const batt = A.domains.find(d => d.key === 'battery') || {};
     const head = {
@@ -99,13 +95,11 @@ Page({
       reasons: (batt.reasons || []).slice(0, 3)
     };
 
-    // ---- 柱状条：单体电压 / 温度探针 ----
     const barV = b.cellStats && b.cellStats.bars && b.cellStats.bars.length
       ? barsURI(b.cellStats.bars, { width: 640, height: 64, color: 'rgba(255,255,255,0.8)', maxBars: 64 }) : '';
     const barT = b.probeStats && b.probeStats.bars && b.probeStats.bars.length
       ? barsURI(b.probeStats.bars, { width: 640, height: 64, color: 'rgba(255,255,255,0.42)', maxBars: 64 }) : '';
 
-    // ---- 单体电压统计 ----
     let cellText = '', probeText = '', cellRows = [], tempRows = [];
     const cellStats = [], tempStats = [], cellChips = [], tempChips = [];
     if (b.cellStats) {
@@ -143,7 +137,6 @@ Page({
       tempRows.push({ k: '探针温度', v: '接口未上报（探针列表为空）', cls: '' });
     }
 
-    // ---- 充电会话（只展示真实出现过的字段，未充电时收敛为一行状态）----
     const C = b.charging;
     const chgRows = [];
     if (C.text !== '未充电') {
@@ -158,7 +151,6 @@ Page({
       .forEach(r => { if (r[1] !== '--' && r[1] !== '') chgRows.push({ k: r[0], v: r[1], cls: '' }); });
     if (!chgRows.length) chgRows.push({ k: '充电', v: '暂无充电会话数据', cls: '' });
 
-    // ---- 子系统聚合 ----
     const subV = b.subsystems.map(sub => ({
       k: sub.num === '--' ? '子系统' : '子系统 ' + sub.num,
       v: [sub.count !== '--' ? sub.count + ' 串' : '', sub.volt !== '--' ? sub.volt + ' V' : '',
@@ -171,7 +163,6 @@ Page({
         .filter(Boolean).join(' · ')
     }));
 
-    // ---- 动力电机 ----
     const motors = b.motors.map(m => {
       const rows = [];
       if (m.state !== '--') rows.push({ k: '状态', v: m.state, cls: '' });
@@ -184,7 +175,6 @@ Page({
       return { name: m.num === '--' ? '驱动电机' : '驱动电机 #' + m.num, rows };
     });
 
-    // ---- 故障码 / 电池告警 ----
     const faults = b.faults.items
       .filter(f => f.count > 0)
       .map(f => ({ k: f.name, v: f.count + ' 条', codes: f.codes }));

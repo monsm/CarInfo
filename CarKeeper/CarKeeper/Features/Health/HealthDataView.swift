@@ -1,47 +1,18 @@
 import SwiftUI
 import UIKit
 
-// =============================================================================
-//  健康报告 —— v4 信息架构
-// =============================================================================
-//  ① 评分区：一个大数字（综合评分）+ 一句结论 + 一条光条 + 三条带图标的计数
-//     没有仪表环：环和数字说的是同一件事，v4 用它只表达一次。
-//  ② 检测系统：inset-grouped 分组，逐项可展开（展开区是内凹表面 + 发丝线）
-//  ③ 检测信息：检测 ID / 数据更新 / 最近检测 / 车辆状态，ID 可一键复制
-//
-//  规则：分组标题在画布上、行在分组表面上；颜色只表达状态；玻璃不进入内容层。
-// =============================================================================
 
-/// 体检与数据 —— 车端自检的结论（评分 / 逐系统明细 / 检测信息）+ 它依据的原始字段。
-///
-/// 原为「健康报告」页（`HealthView`）。批 6 把「全量数据」吸收进来：
-/// 结论与依据同源（都是同一次 `carcheck`），分成两页只是把一句话拆成两屏。
 struct HealthDataView: View {
     private let store = AppStore.shared
     @State private var model: HealthModel?
     @State private var loading = true
     @State private var errText: String?
     @State private var expandedSystems: Set<String> = []
-    /// 被「摊开全部」的那几个分系统（分块之后要能合回去，见 `DSCardMoreRow`）
     @State private var fullyOpen: Set<String> = []
     @State private var loadTask: Task<Void, Never>? = nil
-    /// 卡片量到的可用区域（`ArcStack` 写进来的真数；量不到时是 `.zero`）
     @Environment(\.cardViewport) private var cardViewport
 
     var body: some View {
-        //  正文只提供内容 —— 页面外壳（滚动 / 纸面底 / 页标题）不在这里，
-        //  它是 `VehicleView` 里那张叫「体检」的卡（邻居 `MileageJournalSection`
-        //  / `ExportDataSection` 同一条约定：一个页面只能
-        //  有一个所有者，而这里的所有者是那张卡）。
-        //
-        //  此前这里包着 `DSPaperPage`，于是叠进卡里的是**第二层 ScrollView +
-        //  第二层纸面底 + 自己的左右内边距**：卡 18pt + 纸 16pt = 内容距卡边
-        //  34pt，比别人窄一圈；而里外两层都可滚动时，手势塌到内层（它拿到的是
-        //  无限高，永远不会滚）—— 用户 2026-09-25：「每个卡片仔细核对，
-        //  内容展开后是否拥挤」。现在只剩卡片自己那一层。
-        //
-        //  随之失效的是 `.refreshable`（它必须挂在 ScrollView 上）：读不到时
-        //  那条「重新加载」是重试入口，它本来就在。
         VStack(alignment: .leading, spacing: 0) {
             if loading {
                 loadingState
@@ -62,8 +33,6 @@ struct HealthDataView: View {
                               message: "完成一次全车检测后显示",
                               actionTitle: "重新加载") { Task { await load() } }
             }
-            // 依据：同一次 carcheck 的原文（原「全量数据」页）。
-            // 它在 if/else **之外** —— 体检报告读不到时，原始字段往往正是排错要看的东西。
             RawDataSection(kind: .check)
         }
         .onAppear {
@@ -73,7 +42,6 @@ struct HealthDataView: View {
         .onDisappear { loadTask?.cancel(); loadTask = nil }
     }
 
-    // MARK: - 加载态（安静的内容占位，不加边距 —— 画布已经统一给了 20pt）
 
     private var loadingState: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.md) {
@@ -91,21 +59,9 @@ struct HealthDataView: View {
         .accessibilityLabel(Text("正在读取健康报告"))
     }
 
-    // MARK: - ① 评分区
 
     private func scoreSection(_ m: HealthModel) -> some View {
         let tint = scoreColor(m.scorePct)
-        //  2026-09-25（用户第 2 条）重排。这一块原来是**四件东西说同一件事**：
-        //  96pt 超细巨字（分数）、一条线性光带（同一个分数的百分比）、
-        //  一行芯片与时间戳、一排行下的计数方块。而「超细巨字 + 线光带」
-        //  正是第 3 条里用户点名要加粗的那一支 —— 它在卡片上看起来像排版没做完。
-        //
-        //  现在是一枚**环**（iOS 上百分比的标准形态：活动 / 电量 / 健康都是它）：
-        //    · 分数写在环中心（半粗，不再是超细）
-        //    · 环的弧本身就是百分比 —— 巨字与光带这两件合成了一件
-        //    · 结论（verdict）从“巨字的副标题”升为右边那一块的主行
-        //    · 芯片与时间戳跟着搬进右边那一列，不再单独占一行
-        //  所以这一节从「一块数字墙」变成「一个结论 + 它的证据」。
         return VStack(alignment: .leading, spacing: 0) {
             DSSectionHeader(title: "健康评分")
 
@@ -126,7 +82,6 @@ struct HealthDataView: View {
                 .accessibilityValue(Text(m.score.isEmpty ? "没有报告" : "\(m.score) 分"))
 
                 VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-                    // 结论：全卡最该被第一眼看到的一句（它原来只是巨字下面那行小字）
                     Text(verdict(m.scorePct))
                         .font(TokensTypo.title3)
                         .foregroundStyle(TokensPalette.primary)
@@ -158,9 +113,6 @@ struct HealthDataView: View {
         .accessibilityElement(children: .contain)
     }
 
-    // MARK: - ②' 故障码（从「充电」页搬进来：车端故障是健康问题，不是电池读数）
-    /// 数据源是控制报文里的 DTC（`batteryModel(store.caches).faults`），
-    /// 与电池页读的是同一份响应 —— 只是归属换了。没有码就整节不出现。
     @ViewBuilder
     private var faultsSection: some View {
         let b = batteryModel(store.caches)
@@ -189,7 +141,6 @@ struct HealthDataView: View {
         }
     }
 
-    // MARK: - ③ 检测系统（inset-grouped，逐项可展开）
 
     private func systemsSection(_ m: HealthModel) -> some View {
         DSGroup(title: "检测系统",
@@ -201,28 +152,9 @@ struct HealthDataView: View {
         }
     }
 
-    // =========================================================================
-    // MARK: 展开后有多挤（CardFit）
-    // =========================================================================
-    //
-    //  用户 2026-09-25：「所有卡片内需要展开的都要严格计算展开后的拥挤程度，
-    //  完全根据数据来，不能猜」。这一节是全文最挤的地方：每个分系统展开后要把
-    //  它**全部**子项与故障码摊开，而子项有几条、每一条带不带检测值与说明，
-    //  全由这一次检测的数据决定 —— 从前那个「有问题就全开」的写法，遇到
-    //  三个各带八个子项的系统，一屏里会摊开 24 行。
-    //
-    //  ★ 下面每一个 Block 都对应 `systemRow` / `childRow` 里**真画出来的那一件**
-    //  （同一个 VStack spacing、同一个 lineLimit、同一条 3pt 光带）。这是 CardFit
-    //  唯一的约定：它量的是版式，版式改了要跟着改。
-    //
-    //  ⚠️ 容差：键值行自带上下 8pt 内边距，这里用 `TokensSpacing.md` 近似 ——
-    //  单行级别的 ±8pt 不改变裁决（裁决是按屏数分的），但「有没有这一行」必须准：
-    //  那才是数据。
 
-    /// 卡片内容的真实宽度（视口已扣除叠叠乐左右各 18，这里是卡片自己的左右 18）
     private var fitWidth: CGFloat { max(0, cardViewport.width - 2 * StackSpec.Card.padH) }
 
-    /// 展开后要画的一格：子项，或一个故障码
     private enum Detail: Identifiable {
         case child(HealthItem)
         case dtc(HealthItem)
@@ -239,7 +171,6 @@ struct HealthDataView: View {
         sys.children.map(Detail.child) + dtcItems(sys).map(Detail.dtc)
     }
 
-    /// 一格的**高度模型**
     private func fitRow(_ d: Detail) -> CardFit.Row {
         switch d {
         case .child(let item):
@@ -264,7 +195,6 @@ struct HealthDataView: View {
         }
     }
 
-    /// 画出来的一格 —— 与 `fitRow` 一一对应
     @ViewBuilder
     private func detailView(_ d: Detail) -> some View {
         switch d {
@@ -277,23 +207,15 @@ struct HealthDataView: View {
         }
     }
 
-    /// 一个分系统**收起**时那一行的高度（对应 `systemRow` 收起时画的东西）
     private func collapsedFitRow(_ sys: HealthSystem) -> CardFit.Row {
         var blocks: [CardFit.Block] = [.text(sys.name, .body, cap: nil)]
         if !sys.statusText.isEmpty {
             blocks.append(.gap(TokensSpacing.xs))
             blocks.append(.text(sys.statusText, .footnote, cap: nil))
         }
-        //  这里原本还有 `.gap(TokensSpacing.xs)` + `.fixed(3)`（健康度那条迷你光带）。
-        //  光带 2026-09-25 从 `systemRow` 里删了（用户第 2 条），所以它在这里也必须删 ——
-        //  `CardFit` 唯一的约定就是「它量的就是版式里真画出来的那一件」，
-        //  版式少了一条 3pt 的条而这里不少，每一个分系统的行高都会多算 7pt，
-        //  于是「展开后放不放得下」的裁决会在一个不存在的版式上做。
         return CardFit.Row(blocks, floor: TokensSpacing.row)
     }
 
-    /// 「检测系统」这一节**固定**要占的高度：节标题 + 每个分系统收起时那一行 + 分隔线。
-    /// 展开的那几块只能在这一节剩下的地方里摊开。
     private func systemsFixedHeight(_ m: HealthModel) -> CGFloat {
         var h = CardFit.textHeight("检测系统", style: .footnote, width: fitWidth) + TokensSpacing.sm
         for sys in m.systems {
@@ -314,13 +236,6 @@ struct HealthDataView: View {
                             reserved: systemsFixedHeight(m))
     }
 
-    /// 自动展开哪几个分系统：**按算出来的高度**一个个开，开到放不下为止。
-    ///
-    /// 原来这里是「有问题的全开」。现在判据是数据加真实度量：每个系统展开后要多少
-    /// 高度（`fitRow` 逐行量出来）、这一节固定占多少（`systemsFixedHeight`）、
-    /// 卡片量到的可用高度是多少。
-    ///
-    /// 量不到视口时只开**第一个** —— 不猜（宁可少开一个，也不按一个想象的屏高全摊开）。
     private func autoOpenBadSystems() {
         guard expandedSystems.isEmpty, let m = model else { return }
         let bad = m.systems.filter { $0.statusCls == "bad" }
@@ -363,14 +278,6 @@ struct HealthDataView: View {
                             .foregroundStyle(tint)
                             .lineLimit(1)
                             .minimumScaleFactor(0.85)
-                        //  『这一行原本还有一条 88pt 宽、3pt 高的迷你光带』。
-                        //  它 2026-09-25 删掉（用户第 2 条）。理由不是“小”——
-                        //  而是它与右边那个百分数是**同一个数**的两种画法，
-                        //  而在一行里并排放着时，那根 3pt 的细条看起来像下划线或分隔线，
-                        //  不像读数（用户看到的就是这一行“没做完”的样子）。
-                        //  百分数留着（它有数、有颜色），它把那一件事说完了。
-                        //  ⚠️ `collapsedFitRow` 里那两条 block（一个 gap + fixed(3)）
-                        //  跟着一起删了 —— CardFit 量的是版式，版式改了它不跟着改就会量错。
                     }
                     Spacer(minLength: TokensSpacing.sm)
                     Text("\(sys.healthPct)%")
@@ -395,13 +302,6 @@ struct HealthDataView: View {
                 let plan = planFor(sys, model: m, details: details)
                 let shown = plan.keep.map { Array(details.prefix($0)) } ?? details
                 let screens = verdictFor(details, model: m).screens
-                // 展开的明细铺在**凹进去的一层**上（卡片底 × 60%）。
-                //
-                // 为什么多一个具名局部量：`Color.opacity` 与 `ShapeStyle.opacity`
-                // 同名，而 `.background(_:)` 的参数是泛型 `S: ShapeStyle` ——
-                // 在那个上下文里两个候选都合法，2026-09-25 的 CI 报的正是
-                // “ambiguous use of 'opacity'”。把**期望类型**写成 `Color` 之后，
-                // 返回 `some ShapeStyle` 的那一支不成立，歧义消失。
                 let inset: Color = TokensPalette.nightSurface.opacity(0.6)
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(shown.enumerated()), id: \.element.id) { idx, item in
@@ -414,11 +314,6 @@ struct HealthDataView: View {
                     if plan.hidden > 0 {
                         DSGroupRow(showsSeparator: false) {
                             DSCardMoreRow(rest: plan.hidden, screens: screens, open: false) {
-                                // `_ =` 不是装饰：`Set.insert` 返回 (inserted:memberAfterInsert:)。
-                                // 在 ViewBuilder 里 `withAnimation` 的泛型 `Result` 同时收到两个
-                                // 约束（外层要 Void、闭包给出那个元组），编译器报「conflicting
-                                // arguments to generic parameter 'Result'」（2026-09-25 的 CI）。
-                                // 这里本来就是「按下就记住这一档」，值不用 —— 写出来它才成立。
                                 withAnimation(TokensMotion.count) { _ = fullyOpen.insert(sys.name) }
                             }
                         }
@@ -462,12 +357,10 @@ struct HealthDataView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// P 开头的故障码子项（#15 DTC 翻译）
     private func dtcItems(_ sys: HealthSystem) -> [HealthItem] {
         sys.children.filter { $0.name.range(of: "P\\d", options: .regularExpression) != nil }
     }
 
-    // MARK: - ③ 检测信息
 
     private func infoSection(_ m: HealthModel) -> some View {
         let hasMeta = (m.checkId?.isEmpty == false) || (m.endTime?.isEmpty == false) || !m.time.isEmpty
@@ -521,7 +414,6 @@ struct HealthDataView: View {
         }
     }
 
-    // MARK: - 语义映射
 
     private func scoreColor(_ pct: Int) -> Color {
         switch pct {
@@ -583,7 +475,6 @@ struct HealthDataView: View {
         return "checkmark.shield.fill"
     }
 
-    // MARK: - 交互
 
     private func toggle(_ name: String) {
         withAnimation(TokensMotion.count) {
@@ -593,10 +484,8 @@ struct HealthDataView: View {
         TokensHaptic.select()
     }
 
-    // MARK: - 数据
 
     private func loadIfNeeded() {
-        // 每次进入都取一次自检报告：没有 TTL 复用，也不拿上一次的响应凑合。
         loadTask = Task { await load() }
     }
 
@@ -605,7 +494,6 @@ struct HealthDataView: View {
         guard !store.carId.isEmpty else { loading = false; return }
         let api = APIClient.shared
         do {
-            // ⚠️ 必须用 try：try? 不会让下面的 catch 生效，那会让错误永远被吞掉
             let checkRaw = try await api.getCarCheck(carId: store.carId)
             store.saveCache(["check": checkRaw])
             model = VM.healthModel(store.caches["check"] as? [String: Any])

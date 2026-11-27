@@ -54,24 +54,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from _roots import assert_roots  # noqa: E402
-from extguard import mask, body_span  # noqa: E402
+from _roots import assert_roots
+from extguard import mask, body_span
 
-#  顶层的 `CarKeeper/Models` 已删（2026-09-26，`AppDataModel.swift` 整份走掉）——
-#  本清单走 `assert_roots`，对不存在的目录立即失败。
-#  它与此文件 205 行那条“同名类型”的教训直接相关：那次误报的一半就是
-#  `Models/AppDataModel.swift` 里那个 `TripRecord`，而它现在已经不在了。
 ROOTS = [
     os.path.join("CarKeeper", "CarKeeper"),
     os.path.join("CarKeeper", "Services"),
     os.path.join("CarKeeper", "Design"),
 ]
 
-# 类型声明：**允许缩进**（嵌套类型也要能认出来）。
-# 缩进必须认：`DSSwipeStrip` 里那个 `struct Item { init(id:title:) }` 是**嵌套类型**，
-# 它的 init 不属于外层。不认缩进时，那个 `init(id:title:)` 会被算成 `DSSwipeStrip` 的
-# 候选 init —— 而 `DSSwipeStrip(items:selectedID:follow:)` 用的是隐式 memberwise init
-# （本类型自己没有 init，合成照旧）—— 那就是一条**误报**（本门禁的第一条）。
 TYPE_DECL = re.compile(
     r"^[ \t]*(?:(?:@\w+(?:\([^)]*\))?)[ \t]+)*"
     r"(?:(?:public|internal|private|fileprivate|final|indirect)[ \t]+)*"
@@ -79,7 +70,6 @@ TYPE_DECL = re.compile(
     re.M,
 )
 INIT_DECL = re.compile(r"(?<![\w.])init[?!]?\s*\(")
-# 调用点：项目类型名 +（可选的简单泛型实参）+ `(`
 CALL = re.compile(r"(?<![\w.])(?P<name>[A-Z][A-Za-z0-9_]*)\s*(?:<[^<>()]*>\s*)?\(")
 
 
@@ -120,7 +110,6 @@ def param_label(param):
     has_default = "=" in split_top(p, "=")[-1] if False else bool(re.search(r"=\s*\S", p))
     head = p.split(":", 1)[0] if ":" in p else None
     if head is None:
-        # 没有冒号：可能是 `_` 或裸类型（罕见），当作无标签
         return None, has_default
     tokens = head.split()
     if not tokens:
@@ -175,7 +164,7 @@ def call_labels(text, open_paren):
 def accepts(params, labels):
     """这个 init 的参数表能接下这串标签吗。"""
     if any(lbl is None for lbl, _ in params):
-        return None  # 参数表里有不写标签的形参 —— 文本层面分不清，放弃判断
+        return None
     names = [lbl for lbl, _ in params]
     if len(labels) > len(names):
         return False
@@ -187,7 +176,6 @@ def accepts(params, labels):
         idx = names.index(lbl, pos + 1)
         pos = idx
         used.append(idx)
-    # 实参最大位置之前的**无默认值**参数一个不能缺
     last = max(used) if used else -1
     for i, (lbl, has_default) in enumerate(params):
         if i < last and not has_default and lbl not in labels:
@@ -199,14 +187,6 @@ def main():
     assert_roots(ROOTS)
     files = swift_files()
 
-    # ① 收集：类型体内声明过 init 的类型 → 它的 init 参数表
-    #
-    # 两条必须的收窄（都是被**误报**逼出来的，只报真错才算有用的门禁）：
-    #   · 嵌套类型体内的 init **不算**外层的（`DSSwipeStrip.Items` 的 init 曾把
-    #     `DSSwipeStrip(items:selectedID:follow:)` 判成“接不下”，而那个调用是合法的）；
-    #   · **同名类型多于一处的，整条跳过** —— 嵌套类型与顶层类型可以同名
-    #     （`AppStore.TripRecord` 与 `Models/AppDataModel.swift` 的 `TripRecord` 就是），
-    #     而“裸名字对应哪一个”要看调用点的上下文，文本层面无法确定 → 不判。
     inits = {}
     seen = {}
     for p in files:

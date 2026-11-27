@@ -60,16 +60,11 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCAN_DIRS = [
     "CarKeeper/CarKeeper",
     "CarKeeper/Services",
-    #  顶层 `CarKeeper/Models` 已删（2026-09-26，`AppDataModel.swift` 整份走掉）。
     "CarKeeper/Design",
 ]
 
-# ① 现在**一个 entitlements 键都不允许**。
-# 这里保留一个空字典而不是直接删掉结构：等将来真有免费账号也能用的能力要加时，
-# 应当往这里加一项并写明「为什么这一项免费账号拿得到」。
 ENTITLEMENT_ALLOWED = {}
 
-# Info.plist 里禁止的键 -> 为什么
 PLIST_BANNED = {
     "UIBackgroundModes": "后台模式（后台刷新那套代码已删）",
     "BGTaskSchedulerPermittedIdentifiers": "BGTaskScheduler（免费账号没有该能力）",
@@ -84,7 +79,6 @@ PLIST_BANNED = {
     "com.apple.developer.icloud-container-identifiers": "iCloud（已删）",
 }
 
-# 源码里禁止的 import -> 能力
 BANNED_IMPORTS = {
     "cloudkit": "iCloud/CloudKit（ADP 专属）",
     "healthkit": "HealthKit（需注册能力）",
@@ -108,7 +102,6 @@ BANNED_IMPORTS = {
     "activitykit": "实时活动已删（界面必须住在小组件扩展里，而那个扩展不存在了）",
 }
 
-# 源码里禁止的 API -> 为什么
 BANNED_APIS = {
     r"registerForRemoteNotifications": "远程推送注册（ADP 专属；本地通知才是免费的）",
     r"didRegisterForRemoteNotifications": "远程推送回调（ADP 专属）",
@@ -122,15 +115,12 @@ BANNED_APIS = {
     r"NSUbiquitousKeyValueStore": "iCloud 键值存储（已删）",
     r"requestAlwaysAuthorization": "常驻定位（需要 background location 能力）",
     r"beginBackgroundTask": "后台执行申请（在侧载 + 免费账号下拿不到时间片）",
-    # 实时活动：唯一入口是 ActivityKit 的 Activity<…>.request(...)
     r"\bActivity<[^>]*>\s*\.\s*request": "实时活动（随小组件体系整份删除）",
     r"\bActivity<[^>]*>\s*\.\s*update": "实时活动（随小组件体系整份删除）",
 }
 
 ALLOWED_TARGETS = {"CarKeeper", "CarKeeperTests"}
 
-# 已删的 target —— 单独列出来，因为它们的"错误信息"和其它白名单外的不一样：
-# 不是「付费账号才能配」，而是「免费账号下没有一条可用链路」。
 REMOVED_TARGETS = {
     "WidgetBundle": "小组件 / 实时活动的界面，读 App Group（免费账号拿不到）",
     "WatchApp": "表盘扩展，读 App Group",

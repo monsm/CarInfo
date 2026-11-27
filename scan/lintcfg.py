@@ -41,18 +41,14 @@ import sys
 
 try:
     import yaml
-except ImportError:  # pragma: no cover
+except ImportError:
     print("需要 PyYAML：pip install pyyaml")
     sys.exit(2)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG = os.path.join(ROOT, "CarKeeper", ".swiftlint.yml")
-# SwiftLint 解析 included/excluded 的基准 = 配置文件所在目录
 CONFIG_DIR = os.path.dirname(CONFIG)
 SWIFT_ROOT = os.path.join("CarKeeper", "CarKeeper")
-# 顶层还有一棵 CarKeeper/Design · Services（见 project.yml 的 sources）。
-# （顶层的 `Models` 项在 2026-09-26 去掉了：`AppDataModel.swift` 整份删除之后那个
-#  目录不存在，而这份清单是给 glob 用的 —— 不存在的目录只会静默返回空。）
 SWIFT_EXTRA_ROOTS = ["Design", "Services", "Tests"]
 
 
@@ -82,7 +78,6 @@ def file_length_lines(cfg):
     return int(fl.get("warning", 400)), int(fl.get("error", 1000))
 
 
-# ---- 花括号粗量：type_body_length / function_body_length 只做提示 ------------
 
 TYPE_KW = re.compile(r"^\s*(?:public\s+|internal\s+|private\s+|fileprivate\s+|final\s+)*"
                      r"(?:class|struct|enum|extension|protocol|actor)\s+(\w+)")
@@ -150,9 +145,9 @@ def oversized_bodies(path, type_warn, func_warn):
     """返回 [(kind, name, lines, threshold)]，按花括号跨度粗量。"""
     src = strip_code(open(path, encoding="utf-8").read())
     lines = src.split("\n")
-    open_lines = []      # (decl_line_index, kind, name)
+    open_lines = []
     hits = []
-    pending = None       # 本行/上一行刚看到的声明
+    pending = None
     for li, line in enumerate(lines):
         m = TYPE_KW.match(line)
         if m:
@@ -197,7 +192,6 @@ def main():
     print(f"排除清单 {len(excluded)} 条")
     print()
 
-    # ---- ① 每一项都必须存在 ------------------------------------------------
     missing = []
     for entry in excluded:
         resolved = os.path.normpath(os.path.join(CONFIG_DIR, entry))
@@ -215,7 +209,6 @@ def main():
     else:
         print("✅ 排除清单里的每一项都存在")
 
-    # ---- ② 超过 file_length 阈值的文件必须被排除 ---------------------------
     def is_excluded(rel_path):
         abs_file = os.path.join(ROOT, rel_path)
         for entry in excluded:
@@ -252,7 +245,6 @@ def main():
     else:
         print("✅ 超过 file_length 阈值的文件都已在排除清单里")
 
-    # ---- ③ type / function body（粗量，只提示） ----------------------------
     tcfg = cfg.get("type_body_length", {}) or {}
     fcfg = cfg.get("function_body_length", {}) or {}
     tw = int(tcfg.get("warning", 300))

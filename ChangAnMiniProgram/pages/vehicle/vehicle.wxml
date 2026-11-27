@@ -4,7 +4,6 @@
     <text class="caps muted">PROFILE · 车辆档案</text>
   </view>
 
-  <!-- 名片 -->
   <view class="glass-hero vcard">
     <view class="vc-top">
       <text class="vc-name">{{name || '未绑定车辆'}}</text>
@@ -33,7 +32,6 @@
     </view>
   </view>
 
-  <!-- 控制台面板：分组档案 -->
   <view class="console">
     <view wx:for="{{groups}}" wx:key="name" class="sec">
       <view class="sec-seam" wx:if="{{index > 0}}"><view class="seam-glint"></view></view>

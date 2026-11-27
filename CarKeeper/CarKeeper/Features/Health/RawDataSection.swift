@@ -1,23 +1,6 @@
 import SwiftUI
 
-// =============================================================================
-//  全量数据 —— v4 信息架构
-// =============================================================================
-//  这一页是「原始报文检查器」：把车端返回的字段逐条摊开，供核对与复制导出。
-//
-//  ① 分类不再是一排彩色胶囊（8 个选项塞进横向滚动条，选中态全靠颜色），
-//     而是导航栏上的一个菜单 —— iOS 处理「多个互斥视图」的标准做法。
-//  ② 每个字段块是一个 inset-grouped 分组：分组标题在画布上，字段行在表面上。
-//  ③ 「全量分析」的结论树排在最前，异常项按语义着色（异常红 / 关注橙 / 正常绿）。
-//  ④ 图表存根（充电成本饼图、Siri 洞察、雷达图）已移除：它们渲染的是灰色方块，
-//     不是数据。真实图表接入后再回到这一页。
-// =============================================================================
 
-/// 车端原始字段。
-///
-/// 原为独立页「全量数据」（`DataView`，深链 `carkeeper://data`）。批 6 并进
-/// **体检与数据** —— 体检给结论，这一节给依据（同一次 `carcheck` 的原文就在眼前）。
-/// 它现在只提供内容（`RawDataSection`），页面外壳归 `HealthDataView`。
 struct RawDataSection: View {
     private let store = AppStore.shared
 
@@ -52,8 +35,6 @@ struct RawDataSection: View {
     var body: some View {
         Group {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-                // 这一节自己带分类 / 复制 / 分享 —— 原来它们在页面导航栏里，
-                // 并入之后这一节没有自己的导航栏，控件必须落在内容里。
                 sectionBar
                 if loading {
                     loadingState
@@ -86,10 +67,6 @@ struct RawDataSection: View {
         .onDisappear { loadTask?.cancel(); loadTask = nil }
     }
 
-    /// 节标题 + 分类菜单 + 三个动作（复制 / 刷新 / 分享）。
-    ///
-    /// `DSSectionHeader` 内部自带 `Spacer`，所以它会把这几个控件推到最右侧 ——
-    /// 和它当页面导航栏标题时长得一样，只是现在它在内容里。
     private var sectionBar: some View {
         HStack(spacing: TokensSpacing.lg) {
             DSSectionHeader(title: "车端原始读数")
@@ -109,7 +86,6 @@ struct RawDataSection: View {
         .foregroundStyle(TokensPalette.ambient)
     }
 
-    // MARK: - 分类菜单（替代旧的彩色胶囊横向滚动条）
 
     private var kindMenu: some View {
         Menu {
@@ -138,7 +114,6 @@ struct RawDataSection: View {
         .accessibilityLabel(Text("数据分类：\(kind.title)"))
     }
 
-    // MARK: - 状态
 
     private var loadingState: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.md) {
@@ -163,7 +138,6 @@ struct RawDataSection: View {
         return s
     }
 
-    // MARK: - 字段块
 
     @ViewBuilder
     private func blockView(_ b: Block, isFirst: Bool) -> some View {
@@ -184,7 +158,6 @@ struct RawDataSection: View {
         }
     }
 
-    /// 全量分析的结论：一句话 + 一条补充说明，不装容器。
     private func analysisHero(_ b: Block) -> some View {
         let headline = b.rows.first(where: { $0.k == "状态" })?.v ?? ""
         let detail = b.rows.first(where: { $0.k == "说明" })?.v ?? ""
@@ -205,7 +178,6 @@ struct RawDataSection: View {
         .accessibilityElement(children: .combine)
     }
 
-    // MARK: - 语义着色
 
     private func analysisCls(_ tag: String) -> String {
         switch tag {
@@ -216,7 +188,6 @@ struct RawDataSection: View {
         }
     }
 
-    /// 原始字段的值着色：只有「故障计数 / 故障码 / 状态」这三类字段带语义。
     private func rawCls(_ key: String, _ value: String) -> String {
         let k = key.lowercased()
         let v = value.trimmingCharacters(in: .whitespaces)
@@ -233,7 +204,6 @@ struct RawDataSection: View {
         return "na"
     }
 
-    // MARK: - 动作
 
     private func reload() {
         loadTask?.cancel()
@@ -244,8 +214,6 @@ struct RawDataSection: View {
     private func loadIfNeeded() {
         guard !store.carId.isEmpty else { loading = false; return }
         guard loadTask == nil || loadTask!.isCancelled else { return }
-        // 五个源每次进入都真取一次：不再看 TTL，也不再因为「手上有值」就跳过。
-        // `.analysis` / `.user` / `.car` 不是独立数据源（由现有响应与登录态派生），不触发请求。
         switch kind {
         case .status, .charge, .location, .env, .check:
             loadTask = Task { await load() }
@@ -256,7 +224,6 @@ struct RawDataSection: View {
         }
     }
 
-    // kind 切换：先渲染手上这份响应，空则取一次
     private func onKindChange() {
         loadTask?.cancel()
         loadTask = nil
@@ -305,8 +272,6 @@ struct RawDataSection: View {
             if newBlocks.isEmpty { err = "暂无车辆档案" }
         }
 
-        // 该源这次没取到（或还没取过）就真取一次；取回来了就把「暂无…」那句撤掉。
-        // 早先这里是「缓存为空时才拉取」，而「缓存」本身正是这一轮去掉的东西。
         if kind != .analysis && kind != .user && kind != .car && !carId.isEmpty {
             await fetchMissing()
             newBlocks = reloadBlocks()
@@ -447,7 +412,6 @@ struct RawDataSection: View {
         ToastManager.shared.show("数据已复制", icon: "doc.on.doc.fill")
     }
 
-    // 导出文本（复制 / 分享共用）。
     private var shareText: String {
         var lines: [String] = ["【\(kind.title)  ·  \(VM.nowText())】"]
         for b in blocks {

@@ -49,7 +49,6 @@ import os
 import re
 import sys
 
-# 编进 target 的 Swift 源码。测试目标不在内（测试里自成作用域）。
 SCOPE_DIRS = [
     "CarKeeper/CarKeeper",
     "CarKeeper/Services",
@@ -60,11 +59,8 @@ SCOPE_DIRS = [
     "CarKeeper/WatchApp",
 ]
 
-# 白名单：{"相对路径:名字": "理由"}。留空是好事。
 ALLOWED = {}
 
-# re.M 是必须的：`^` 要能匹配每一行的行首。少了它，`^` 只在文件开头匹配 ——
-# 收集到的类型数会是 0，而检查器会「全绿」地放行一切。
 TYPE_DECL = re.compile(
     r"^[ \t]*(?:@[A-Za-z_][A-Za-z0-9_]*(?:\([^)]*\))?[ \t]+)*"
     r"(?:public[ \t]+|internal[ \t]+|private[ \t]+|fileprivate[ \t]+|final[ \t]+|"
@@ -155,7 +151,7 @@ def mask(text):
             if c != "\n":
                 out[i] = " "
             i += 1
-        else:  # 多行字符串
+        else:
             if text.startswith('"""', i):
                 for k in range(i, min(i + 3, n)):
                     out[k] = " "
@@ -269,8 +265,8 @@ def main():
         print("❌ 没扫到任何 Swift 文件（工作目录不对？）")
         return 1
 
-    owner = {}          # 静态成员名 → 所属类型集合（全项目）
-    globals_ = set()    # 顶层（任何文件）声明的名字
+    owner = {}
+    globals_ = set()
     parsed = {}
     for path in files:
         raw = read(path)
@@ -292,14 +288,9 @@ def main():
             pattern = re.compile(r"(?<![.\w])" + re.escape(name) + r"[ \t]*\(")
             for m in pattern.finditer(code):
                 off = m.start()
-                # 声明点本身不算调用（`private func sectionLabel(...)`）
                 head = code.rfind("\n", 0, off)
                 if re.search(r"\bfunc[ \t]+$", code[head + 1:off]):
                     continue
-                # 调用点是否落在「声明了该名字的类型体」内（含嵌套类型与外层类型）——
-                # 词法作用域允许裸写。BatteryView / ControlView 各自都有
-                # `private func sectionLabel(...)`，而 `sectionLabel` 同时又是
-                # 令牌类型的静态成员：这条判定就是为它们而写的（第一版会误报 9 处）。
                 enclosed = [idx for idx, (_, s, e) in enumerate(bodies) if s < off < e]
                 if any(name in in_body.get(idx, ()) for idx in enclosed):
                     continue
@@ -341,6 +332,6 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as e:      # 扫描器自己坏了也必须报红，不能静默通过
+    except Exception as e:
         print("❌ 扫描失败：%r" % (e,))
         sys.exit(1)

@@ -1,21 +1,3 @@
-// =============================================================================
-// E40 充电状态监控
-// =============================================================================
-//
-// 上一版这个文件是一个 12 行的桩：`startMonitoring()` 是空的，
-// 而且 App 只写了 `_ = ChargingStatusMonitor.shared` —— 连它都没调用过。
-//
-// 现在它由**真实的报文**驱动：`AppStore.recordHistory()` 在每次拿到车端数据后
-// 调用 `observe(soc:charging:powerKW:)`，所以这里的每一个数字都来自车，
-// 不是定时器猜出来的。它只做三件有实质意义的事：
-//   ① 记录「本次充电」的起点（SOC 与时刻）—— 车端报文里没有这两个值
-//   ② 状态跃迁时推送一条本地通知：开始充电 / 充电结束（附本次充进去多少）
-//   ③ 把当前状态公开给「开发者工具」看，避免「启动了但没人看」
-//
-// 不做什么：它**不**生成充电记录。本文件里保留的只有「开始/结束」这两件事，
-// 而**不**算出「这次充了多少度」—— 那曾由充电账本（`ChargeLedger.derive`）
-// 积分得出，而账本已随「不要本机算出的数」这一轮删除（2026-09-23）。
-// 功率采样本身还在（`HistoryStore`，充电页的趋势图读它），只是不再折成钱。
 
 import Foundation
 import UserNotifications
@@ -25,39 +7,24 @@ final class ChargingStatusMonitor: ObservableObject {
     static let shared = ChargingStatusMonitor()
     private init() {}
 
-    // MARK: 当前状态（都是最近一次报文的实况）
 
     @Published private(set) var isCharging = false
     @Published private(set) var soc = 0
     @Published private(set) var powerKW: Double = 0
 
-    /// 本次充电的起点。车端报文里没有「这次充电从多少度开始」，只能由 App 在
-    /// 跃迁的那一刻记下来 —— 所以冷启动时第一次看到「正在充电」时它是 nil。
     @Published private(set) var sessionStartSOC: Int?
     @Published private(set) var sessionStartAt: Date?
 
-    /// 最近一次状态变化（开发者工具里显示，用来回答「它到底在干活吗」）
     @Published private(set) var lastEvent: String?
     @Published private(set) var lastEventAt: Date?
 
-    /// 本机累计完成的充电次数（进程内计数，不落盘）
     private(set) var completedSessions = 0
 
-    /// 通知开关 —— **没有这个东西**（2026-09-25 地毯式审核）。
-    ///
-    /// 原来这里读 `carkeeper_charge_notify`，而全仓没有一处写它：也就是说那个
-    /// 「开关」永远只能读到默认值（开）。与其留一个没人能扳的闸，不如把事实写清楚：
-    /// 关掉充电提醒的地方是**系统设置 → 通知 → 车管家**（那是平台层面的真开关，
-    /// 与 App 内再放一个开关相比，二者只会互相打架）。
 
     private var lastCharging: Bool?
-    /// 已就「充满」提醒过一次的 SOC，避免每 30 秒重复推
     private var notifiedFullSOC = -1
 
-    // MARK: 生命周期
 
-    /// 目前没有需要常驻的资源：状态由报文驱动，没有定时器、没有后台任务。
-    /// 保留这个方法是为了「启动顺序」在壳层里读起来一致（其余监控都有 start）。
     func startMonitoring() {
         lastCharging = nil
         notifiedFullSOC = -1
@@ -67,10 +34,6 @@ final class ChargingStatusMonitor: ObservableObject {
         lastCharging = nil
     }
 
-    /// 要发通知就要先有权限。
-    ///
-    /// 只在 `.notDetermined` 时问：已经答过的用户不该被再问一遍（系统也只会弹一次，
-    /// 但重复调用会把返回值变得看不出所以然）。拒绝了的就尊重它 —— 不推通知，也不报错。
     @discardableResult
     func requestAuthorization() async -> Bool {
         let center = UNUserNotificationCenter.current()
@@ -79,20 +42,13 @@ final class ChargingStatusMonitor: ObservableObject {
         return (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
     }
 
-    // MARK: 由报文驱动的观察点
 
-    /// - Parameters:
-    ///   - soc: 当前 SOC（%）
-    ///   - charging: 车端是否在充电（`AppStore.isCharging`）
-    ///   - powerKW: 当前充电功率，取不到传 nil
     func observe(soc: Int, charging: Bool, powerKW: Double?) {
         self.isCharging = charging
         self.soc = soc
         self.powerKW = powerKW ?? 0
 
         guard let previous = lastCharging else {
-            // 首次拿到报文：只记状态，不推通知（否则每次冷启动都会收到一条
-            // 「开始充电」，而车可能已经充了两个小时）
             lastCharging = charging
             if charging {
                 sessionStartSOC = nil
@@ -103,7 +59,6 @@ final class ChargingStatusMonitor: ObservableObject {
         }
 
         guard previous != charging else {
-            // 状态没变：只在「充满」这一刻提醒一次
             if charging && soc >= 100 && notifiedFullSOC != soc {
                 notifiedFullSOC = soc
                 mark("电量已满（\(soc)%）")
@@ -133,7 +88,6 @@ final class ChargingStatusMonitor: ObservableObject {
         }
     }
 
-    // MARK: 内部
 
     private func mark(_ text: String) {
         lastEvent = text
@@ -145,8 +99,6 @@ final class ChargingStatusMonitor: ObservableObject {
         content.title = title
         content.body = body
         content.sound = .default
-        // trigger 为 nil = 立刻送达。用日历触发器会把它变成「明天 9 点」，
-        // 那就不是「充电结束提醒」了。
         let request = UNNotificationRequest(identifier: "charge_\(UUID().uuidString)",
                                            content: content,
                                            trigger: nil)
@@ -155,7 +107,6 @@ final class ChargingStatusMonitor: ObservableObject {
         }
     }
 
-    /// 开发者工具用的一行摘要
     var summary: String {
         if isCharging {
             let from = sessionStartSOC.map { "\($0)% → " } ?? ""

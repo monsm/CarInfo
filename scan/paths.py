@@ -34,23 +34,9 @@ import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SPEC = os.path.join(ROOT, "CarKeeper", "project.yml")
-SPEC_DIR = os.path.join(ROOT, "CarKeeper")   # xcodegen 以 spec 所在目录为基准
+SPEC_DIR = os.path.join(ROOT, "CarKeeper")
 WORKFLOW_DIR = os.path.join(ROOT, ".github", "workflows")
 
-# 明确「不参与 CI 编译」的 target。
-#
-# 默认值是「每个 target 都要被编到」—— 因为「写了但没人编」就是「改了等于没改，
-# 而且没有报错」。豁免只能显式给，而且必须写出理由：靠沉默蒙过去是不行的。
-# scan/ 下**故意不参与 CI 门禁**的脚本。
-#
-# 为什么需要这份名单：`workflow_checkers()` 只回答一个方向 ——
-# 「CI 点名的脚本在磁盘上存在吗」。反方向（脚本在磁盘上、CI 从不跑它）当时没有任何人管，
-# 而那个方向真的漏过：2026-09-23 写好的 `copy.py`（1668 条文案判据）忘了加进工作流的
-# `for s in ...` 循环，整整一轮里它等于不存在 —— 而那一轮的所有输出都是绿的。
-# 「没跑」和「跑了没问题」在日志上长得一模一样。
-#
-# 所以现在反过来要求：scan/ 下每个 .py（`_` 前缀的共享模块除外）必须
-# **要么出现在 CI 的检查器清单里，要么在这里写明不跑的理由**。
 CI_UNCOVERED_CHECKERS = {
     "scan/verify_eol.py": "提交前的人工比对工具，不是门禁：它逐文件对比「工作区 vs HEAD」"
                           "并把差异列出来让人判断「这些改动是不是本轮有意改的」。"
@@ -70,11 +56,8 @@ CI_UNCOVERED_TARGETS = {
                       "target 与 scheme 都保留，开发机上用 Xcode 直接跑（Product > Test）。",
 }
 
-# `- path: X` / `  path: X` —— 只此两种写法，且必须独占一行
 PATH_LINE = re.compile(r"^\s*(?:-\s+)?path:\s*(\S+)\s*$", re.M)
-# 工作流里点名的检查器
 CHECKER_CALL = re.compile(r"(?:python3?|node)\s+([A-Za-z0-9_./-]+\.(?:py|js))")
-# 工作流里的 `for s in a b c; do ... python3 scan/$s.py ... done`
 LOOP_HEAD = re.compile(r"for\s+(\w+)\s+in\s+([^;\n]+);\s*do", re.M)
 LOOP_BODY = re.compile(r"scan/\$(\w+)\.py")
 
@@ -136,7 +119,7 @@ def stray_swift(paths):
     for p in glob.glob(os.path.join(ROOT, 'CarKeeper', '**', '*.swift'), recursive=True):
         norm = os.path.normpath(p).replace(os.sep, '/')
         if '/scan/' in norm:
-            continue            # 检查器的基线副本（不是源码）
+            continue
         if norm in covered:
             continue
         stray.append(norm[len(root) + 1:] if norm.startswith(root) else norm)
@@ -184,7 +167,6 @@ def target_source_files(spec_text):
             continue
         if not in_sources:
             continue
-        # 回到 4 空格缩进的非列表键（如 settings: / dependencies:）就说明 sources 块结束
         if re.match(r'^    [A-Za-z]', l) and not l.startswith('    - '):
             in_sources = False
             continue
@@ -258,7 +240,7 @@ def workflow_build_targets(workflow_dir):
         with open(os.path.join(workflow_dir, name), encoding='utf-8') as f:
             text = strip_yaml_comments(f.read())
         for var, items in LOOP_HEAD.findall(text):
-            if var == 's':          # `for s in scan logic ...` 是检查器列表，不是 target
+            if var == 's':
                 continue
             for token in items.split():
                 token = token.strip().strip('"').strip("'")
@@ -331,7 +313,6 @@ def workflow_checkers(workflow_dir):
         for call in CHECKER_CALL.findall(text):
             if call not in out:
                 out.append(call)
-        # ② 循环写法：只有真的出现了 `scan/$var.py` 才认这组循环变量
         for var, items in LOOP_HEAD.findall(text):
             if var not in LOOP_BODY.findall(text):
                 continue
@@ -409,7 +390,6 @@ def main(argv):
     paths = declared_paths(spec)
     print(f"project.yml 声明路径 {len(paths)} 条")
     for p in paths:
-        # xcodegen 以 spec 所在目录解析相对路径
         target = p if os.path.isabs(p) else os.path.join(SPEC_DIR, p)
         ok = os.path.exists(target)
         print(("  ✅ " if ok else "  ❌ ") + p)
@@ -426,10 +406,6 @@ def main(argv):
             if not ok:
                 problems.append(f"CI 工作流调用了不存在的脚本：{c}")
 
-    # ---- 反方向：scan/ 下的脚本有没有被 CI 真的跑到 --------------------------
-    # 这一条是补的，因为上面那个方向**只查存在性**。2026-09-23 的 `copy.py` 就是从这个缝里
-    # 漏掉的：文件在、判据写好了、所有门禁都是绿的 —— 因为它根本不在那个 for 循环里。
-    # 检查范围少一项是「越改越安全」的反面，而它在输出上与「这一项没问题」完全一样。
     if spec == SPEC:
         scripts = scan_scripts()
         print(f"\nscan/ 下的检查器脚本 {len(scripts)} 个（CI 清单 {len(checkers)} 个）")
@@ -457,19 +433,8 @@ def main(argv):
                 "看不见的事实，而它的两种原因需要完全相反的修法"
                 "（侧载工具没签扩展 vs 包里根本没有扩展）")
 
-    # 工作流里 `-scheme X` 用到的名字必须在 spec 里有交代，而且规则比想象的严：
-    #
-    #   • `schemes:` **缺席**时：XcodeGen 会为每个 target 自动生成方案，
-    #     所以 `-scheme <target 名>` 是可用的。
-    #   • `schemes:` **一旦存在**：只生成其中列出的那些，其它 target 不再自动生成。
-    #
-    # 这条教训是 2026-09-22 真实踩到的：那时 `schemes:` 里只有 CarKeeperTests，
-    # 而 CI 用 `-scheme CarKeeper` —— 干净检出里根本没有这个方案
-    # （「does not contain a scheme named CarKeeper」），本地 Xcode 却会自动补一个，
-    # 所以怎么试都试不出来。**只看「是不是 target 名」是不够的**，
-    # 这正是本检查器第一版犯过的错（反向自测当场抳住了）。
     if spec == SPEC:
-        import yaml  # 工作流与 spec 都是 YAML；runner 上装了 pyyaml
+        import yaml
         with open(spec, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         declared = set(data.get("schemes") or {})
@@ -494,11 +459,6 @@ def main(argv):
                 print("  ❌ " + s)
             problems.append(f"{len(stray)} 个 Swift 文件永远不会被编译（改了等于没改）")
 
-    # ---- 文件级规则：每个 target 实际编译哪些 .swift ------------------------
-    # 三条都属于「编译器会说、但要等一整轮 macOS runner」的那一类：
-    #   ① 同一 target 内同名 → 重复符号（编译必挂）
-    #   ② 跨 target 同名但来自不同路径 → 两份副本，内容必须一字不差（防漂移）
-    #   ③ project.yml 里的每个 target 都必须被 CI 覆盖（scheme 或体检清单）
     if spec == SPEC:
         with open(spec, encoding='utf-8') as f:
             spec_text = f.read()
@@ -509,7 +469,6 @@ def main(argv):
             for t in sorted(files):
                 print(f"  · {t}: {len(files[t])} 个")
 
-            # ① 同一 target 内同名
             for t, fs in files.items():
                 byname = {}
                 for f in fs:
@@ -521,7 +480,6 @@ def main(argv):
                         problems.append(f"target {t} 里有 {len(ps)} 个同名文件 {n}"
                                         "（同一个 target 编两份 → 重复符号）")
 
-            # ② 跨 target 的两份副本必须一致
             groups = {}
             for t, fs in files.items():
                 for f in fs:
@@ -542,24 +500,18 @@ def main(argv):
                     rel = [p[len(ROOT) + 1:] if p.startswith(ROOT) else p for p in sorted(ps)]
                     print(f"  ✅ 跨 target 同名副本一致：{n} ← " + " / ".join(rel))
 
-            # ③ 每个 target 都要被 CI 编到
             with open(spec, encoding='utf-8') as f:
                 data = yaml.safe_load(f) or {}
             all_targets = set(data.get('targets') or {})
             declared_schemes = set(data.get('schemes') or {})
             used_schemes = set(workflow_schemes(WORKFLOW_DIR))
             if declared_schemes:
-                # 只算**被工作流真的用到**的 scheme：spec 里声明了但 CI 从不跑它的，
-                # 它的 target 实际上从未被编译过（2026-09-22 删掉单元测试 job 之后，
-                # `CarKeeperTests` 正好就是这种情形）。
-                # 只算 build action 的 target：test action 里写着谁，不等于谁会真的被编
                 covered = (scheme_targets(data, only=used_schemes, phases=('build',))
                            | scheme_targets(data, only=workflow_test_schemes(WORKFLOW_DIR), phases=('test',))
                            | set(workflow_build_targets(WORKFLOW_DIR)))
                 mode = (f"只看工作流引用的 scheme：{sorted(used_schemes) or '无'}"
                         f"；跑过 test 的 scheme：{sorted(workflow_test_schemes(WORKFLOW_DIR)) or '无'}")
             else:
-                # schemes: 缺席时 XcodeGen 为每个 target 自动生成方案，视为都覆盖
                 covered = set(all_targets) | set(workflow_build_targets(WORKFLOW_DIR))
                 mode = "spec 没有 schemes: → 每个 target 都有自动方案"
             if all_targets:

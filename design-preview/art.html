@@ -76,7 +76,6 @@ body{background:#111013;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
 .scale .bar{height:7px}
 .scale .lb{font-size:9px;letter-spacing:.22em;margin-top:5px}
 
-/* ============ A · 夜光 ============ */
 #sA{background:#08070A}
 #sA .pill{background:rgba(20,17,22,.66);border:1px solid rgba(255,236,205,.14);color:#F6EFE4;
   box-shadow:0 10px 24px -16px #000}
@@ -111,7 +110,6 @@ body{background:#111013;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
   background:radial-gradient(112% 76% at 62% 42%,rgba(0,0,0,0) 40%,rgba(8,4,6,.62) 100%)}
 #sA .grain{opacity:.055;mix-blend-mode:overlay}
 
-/* ============ B · 纸上 ============ */
 #sB{background:#F4EEE1;color:#1E1B16}
 #sB .pill{background:rgba(252,249,241,.8);border:1px solid rgba(30,27,22,.14);color:#1E1B16;
   box-shadow:0 8px 20px -16px rgba(0,0,0,.5)}
@@ -142,7 +140,6 @@ body{background:#111013;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
 #sB .sun{position:absolute;inset:0;z-index:4;pointer-events:none;
   background:radial-gradient(90% 60% at 78% 16%,rgba(196,142,60,.10),rgba(196,142,60,0) 62%)}
 
-/* ============ C · 巨字 ============ */
 #sC{background:#08080A}
 #sC .pill{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#EDEAE4}
 #sC .pill.g i{background:#EDEAE4}
@@ -192,7 +189,6 @@ body{background:#111013;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
     </filter>
   </defs>
 
-  <!-- A · 夜光地形（带旋角：路网斜着走） -->
   <symbol id="terrainNight" viewBox="-60 -60 510 964">
     <rect x="-60" y="-60" width="510" height="964" fill="#0A0A0E"/>
     <path d="M-60 792 C 92 758, 168 826, 266 786 C 322 762, 360 790, 450 770 L450 964 L-60 964 Z" fill="#0C1017"/>
@@ -242,7 +238,6 @@ body{background:#111013;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
     </g>
   </symbol>
 
-  <!-- B · 纸上地形 -->
   <symbol id="terrainPaper" viewBox="0 0 390 844">
     <rect width="390" height="844" fill="#F4EEE1"/>
     <path d="M-10 792 C 92 758, 168 826, 266 786 C 322 762, 360 790, 400 770 L400 856 L-10 856 Z" fill="#CBD9DC"/>
@@ -292,7 +287,6 @@ body{background:#111013;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
     </g>
   </symbol>
 
-  <!-- C · 只剩路网（地图退为底） -->
   <symbol id="terrainGrid" viewBox="0 0 390 844">
     <rect width="390" height="844" fill="#08080A"/>
     <g stroke="rgba(237,234,228,.075)" stroke-width="1" fill="none">
@@ -309,7 +303,6 @@ body{background:#111013;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
 
 <main id="board">
 
-<!-- ================= A · 夜光 ================= -->
 <section class="slide" id="pA">
   <div class="meta"><div class="no">A / 3</div><div class="nm">夜光 · 光就是秩序</div>
   <div class="de">把地图转 7°、让路网斜着走；光池、雾、暗角把城市变成夜景。
@@ -337,7 +330,6 @@ body{background:#111013;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
     <div class="vig"></div>
     <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
 
-    <!-- 车钉：光来自它 -->
     <svg class="pinWrap" style="left:222px;top:286px" width="150" height="150" viewBox="0 0 150 150">
       <circle cx="75" cy="75" r="75" fill="url(#nBloom)"/>
       <ellipse cx="88" cy="124" rx="30" ry="6" fill="rgba(0,0,0,.72)" filter="url(#soft)"/>
@@ -401,7 +393,6 @@ body{background:#111013;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
   </div>
 </section>
 
-<!-- ================= B · 纸上 ================= -->
 <section class="slide" id="pB">
   <div class="meta"><div class="no">B / 3</div><div class="nm">纸上 · 一张真的地图</div>
   <div class="de">不再发光：成为纸与墨。细线道路、淡色地块、红笔路线带刻度、大字宋体地名。
@@ -424,7 +415,6 @@ body{background:#111013;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
       color:rgba(30,27,22,.14)">望京</div>
     <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
 
-    <!-- 车：一枚印章式的圈 -->
     <svg class="pinWrap" style="left:234px;top:294px" width="132" height="132" viewBox="0 0 132 132">
       <circle cx="66" cy="66" r="58" fill="#F7F2E7" opacity=".92"/>
       <circle cx="66" cy="66" r="58" fill="none" stroke="rgba(30,27,22,.5)" stroke-width="0.9"/>
@@ -488,7 +478,6 @@ body{background:#111013;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
   </div>
 </section>
 
-<!-- ================= C · 巨字 ================= -->
 <section class="slide" id="pC">
   <div class="meta"><div class="no">C / 3</div><div class="nm">巨字 · 尺度就是艺术</div>
   <div class="de">地图退成一层极淡的网格，让一个数字和一个词占满画面。

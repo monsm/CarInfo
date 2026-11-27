@@ -1,8 +1,5 @@
-// vm.js —— 视图模型：把接口原始数据映射成页面可渲染的结构化模型
-// 语义与桌面版 / 旧 dashboard.js 严格对齐（含真实报文键的大小写、缺省处理等已实测细节）。
 const { ci, s, num, num3, directionText, norm360 } = require('./fmt');
 
-// 严格取数：属性缺失 / null / 空串视为“无数据”（避免 Number(null)===0 误显示）
 function _vnum(v) {
   if (v === null || v === undefined || v === '') return null;
   const x = Number(v);
@@ -19,7 +16,6 @@ function fmtTime(d) {
 }
 function nowText() { return fmtTime(new Date()); }
 
-/* ---------- 车辆选择器 ---------- */
 function carSel(cars, carId) {
   const list = cars || [];
   const options = list.map(c => {
@@ -31,7 +27,6 @@ function carSel(cars, carId) {
   return { options, index: idx, car: list[idx] || null, count: list.length };
 }
 
-/* ---------- 首页能量卡（SOC / 续航 / 充电 / 在线） ---------- */
 function energy(cache, car) {
   const control = ci(cache && cache.control || null);
   const charge = ci(cache && cache.charge || null);
@@ -49,14 +44,12 @@ function energy(cache, car) {
 
   const range = _dash(_n0(c(charge, x => x.RemainedPowerMile)) || _n0(c(control, x => x.RemainedPowerMile)));
   const voltAmp = hasCtrl ? `${_n1(control.TotalVoltage)}V / ${_n1(control.TotalCurrent)}A` : '--';
-  // 电池温度区间：min/max 任一缺失则整项显示 --，不拼残缺区间
   const btLo = _n0(control ? control.MinTemperatureValue : null);
   const btHi = _n0(control ? control.MaxTemperatureValue : null);
   const battTemp = hasCtrl && btLo !== null && btHi !== null ? `${btLo} ~ ${btHi}℃` : '--';
   const insulate = hasCtrl ? `${_n0(control.InsulateResistance)}Ω` : '--';
   const chargePct = _dash(_n0(c(charge, x => x.RemainPower)));
 
-  // 充电详情（充电中/即将充满时展示）
   let charging = null;
   if (chargeSt === '1' || chargeSt === '2') {
     const pow = _vnum(charge.ChargPower || charge.ChargingPower);
@@ -68,7 +61,6 @@ function energy(cache, car) {
     };
   }
 
-  // 在线状态
   let online = { text: '离线', cls: 'bad' };
   let updated = '--';
   if (control && control.LastUpdatedTime) {
@@ -90,7 +82,6 @@ function energy(cache, car) {
   };
 }
 
-/* ---------- 门窗锁状态条 ---------- */
 function bodyStatus(cache) {
   const control = ci(cache && cache.control || null);
   const hasCtrl = !!cache.control;
@@ -124,7 +115,6 @@ function bodyStatus(cache) {
   return chips;
 }
 
-/* ---------- 动力 / 电池健康 ---------- */
 function driveStatus(cache) {
   const control = ci(cache && cache.control || null);
   const hasCtrl = !!cache.control;
@@ -163,7 +153,6 @@ function driveStatus(cache) {
   };
 }
 
-/* ---------- 空调 / 座椅 / PM2.5 ---------- */
 function comfortStatus(cache) {
   const control = ci(cache && cache.control || null);
   const hasCtrl = !!cache.control;
@@ -192,7 +181,6 @@ function comfortStatus(cache) {
   };
 }
 
-/* ---------- 胎压 ---------- */
 function tyreStatus(cache) {
   const control = ci(cache && cache.control || null);
   const hasCtrl = !!cache.control;
@@ -228,7 +216,6 @@ function tyreStatus(cache) {
   };
 }
 
-/* ---------- 位置 ---------- */
 function locStatus(cache) {
   const control = ci(cache && cache.control || null);
   const loc = ci(cache && cache.location || null);
@@ -250,7 +237,6 @@ function locStatus(cache) {
   };
 }
 
-/* ---------- 健康报告 ---------- */
 function healthModel(checkRaw) {
   const d = ci(checkRaw);
   if (!d) return null;
@@ -299,7 +285,6 @@ function healthModel(checkRaw) {
   };
 }
 
-/* ---------- 用户 ---------- */
 function userModel(uRaw) {
   const u = ci(uRaw);
   if (!u) return null;
@@ -316,8 +301,6 @@ function userModel(uRaw) {
   };
 }
 
-/* ---------- 车辆档案摘要 ---------- */
-// 解析“2026-05-01 / 2026/5/1 / 20260501”类日期 → 距今天数（未来正数 / 过期负数 / 失败 null）
 function daysFrom(str) {
   const t = s(str).trim();
   if (!t) return null;
@@ -351,9 +334,6 @@ function vehicleSummary(carRaw) {
   };
 }
 
-/* ---------- 车身逐项明细（门 / 窗 / 灯） ----------
-   与 texts.js 语义一致：门=0 关、锁=0 上锁、窗开度=角度(>0 开启)、灯非 0 即点亮。
-   只展示接口真实出现的字段；聚合信息（全关/异常）由页面头部状态条承担。 */
 function bodyDetailModel(cache) {
   const control = ci(cache && cache.control || null);
   const hasCtrl = !!cache.control;
@@ -380,7 +360,6 @@ function bodyDetailModel(cache) {
     return boolRow(label, parts.join(' · '), bad);
   }).filter(Boolean);
 
-  // 前舱盖 / 后备箱 / 天窗
   const extraRows = [
     ['前舱盖', 'Hood'], ['后备箱', 'Trunk'], ['天窗', 'Sunroof']
   ].map(([label, k]) => {
@@ -404,7 +383,6 @@ function bodyDetailModel(cache) {
     return boolRow(label, v, open);
   }).filter(Boolean);
 
-  // 灯组：字段真实存在才展示，点亮的灯计入 lit 摘要
   const lampDefs = [
     ['近光灯', 'LowBeam'], ['远光灯', 'HighBeam'],
     ['前雾灯', 'FrontFoglamp', 'FrontFogLight'], ['后雾灯', 'RearFoglamp', 'RearFogLight'],
@@ -433,7 +411,6 @@ function bodyDetailModel(cache) {
   };
 }
 
-/* ---------- 电池 / 充电 / 动力 / 故障（全量数据建模） ---------- */
 function batteryModel(cache) {
   const control = ci(cache && cache.control || null);
   const charge = ci(cache && cache.charge || null);

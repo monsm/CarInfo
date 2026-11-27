@@ -61,20 +61,15 @@ from _roots import assert_roots
 APP = os.path.join("CarKeeper", "CarKeeper")
 SCAN_DIRS = [APP]
 
-# 池子的家。以文件为键，每条写明「为什么这里的构造器不能（或暂时不该）进池子」。
 ALLOWED = {
     "CarKeeper/CarKeeper/Services/DateText.swift":
         "日期文案的唯一出口：全仓的池子就在这里，`pool` 的键是 `locale|格式` 的有界集合",
 }
 
-# ② 的例外表（目前是空的）。**键是文件路径，值写明「这里的比较为什么不许把对象提出来」。**
-# 与 ① 的 ALLOWED 同一个规矩：例外必须写理由，不写就等于没同意。
 COORD_ALLOWED = {}
 
-# ① 只认这三个类型名 —— 它们都是「造一次就永远够用」的东西。
 CTOR = re.compile(r"\b(DateFormatter|NumberFormatter|ISO8601DateFormatter)\s*\(\s*\)")
 
-# ② 比较/筛选/排序闭包的开口。`(` 与 `{` 两种写法都收。
 CLOSURE = re.compile(
     r"(firstIndex|lastIndex|first|contains|allSatisfy|filter|sorted|min|max|reduce)"
     r"\s*(\(\s*)?(where\s*:)?\s*\{"
@@ -82,7 +77,6 @@ CLOSURE = re.compile(
 
 COORD = re.compile(r"\bCLLocation\s*\(")
 
-# 闭包体超过这么多行就不判（见文件头「宁可漏」那一段）。
 MAX_CLOSURE_LINES = 30
 
 

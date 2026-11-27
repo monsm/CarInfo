@@ -1,10 +1,8 @@
-/* ============ 电池与充电 v15「GLASS」：SOC hero 卡 + 分区卡片 ============ */
 .bt { padding-top: 16rpx; }
 .bt-eyebrow { padding: 18rpx 4rpx 34rpx; display: flex; align-items: center; }
 .bt-eyebrow .caps { font-size: 18rpx; letter-spacing: 2.5rpx; }
 .bt-ic { width: 28rpx; height: 28rpx; opacity: 0.75; margin-right: 16rpx; }
 
-/* hero 卡 */
 .bt-hero {
   margin: 0 0 24rpx;
   padding: 30rpx 32rpx 34rpx;
@@ -33,7 +31,6 @@
 }
 .bh-num .d1 { font-size: 128rpx; }
 .bh-pct { font-size: 42rpx; font-weight: 200; color: var(--tx-3); margin-left: 10rpx; }
-/* hero 底部：双格统计条 */
 .bh-foot {
   display: flex;
   align-items: stretch;
@@ -74,10 +71,8 @@
   animation: spin 0.8s linear infinite;
 }
 
-/* ---------- 控制台容器 ---------- */
 .console { padding: 0; }
 
-/* 分析结论 */
 .an-line { display: flex; align-items: center; padding: 18rpx 2rpx; }
 .an-dot { width: 12rpx; height: 12rpx; border-radius: 50%; margin-right: 20rpx; }
 .an-dot.ok { background: var(--ok); box-shadow: 0 0 10rpx rgba(48, 192, 95, 0.6); }
@@ -100,7 +95,6 @@
 .an-rdot.na { background: rgba(255, 255, 255, 0.2); }
 .an-rt { font-size: 22rpx; line-height: 1.78; }
 
-/* 图表区 */
 .bars { width: 100%; margin: 2rpx 0 10rpx; }
 .sec-cap { font-size: 18rpx; letter-spacing: 1.5rpx; margin-top: 34rpx; color: var(--tx-3); }
 .sec-div { height: 1rpx; background: rgba(255, 255, 255, 0.06); margin: 32rpx 0 0; }
@@ -108,7 +102,6 @@
 .motor-name { margin-top: 40rpx; }
 .sub-cap { margin-top: 32rpx; }
 
-/* 统计瓦片 */
 .bstats { display: flex; gap: 12rpx; margin: 22rpx 0 14rpx; }
 .bs {
   flex: 1;

@@ -1,34 +1,17 @@
-/* ============================================================
-   长安车管家 · 设计系统 v15「LIQUID GLASS」液态玻璃
-   ------------------------------------------------------------
-   在 v14 卡片骨架之上恢复「光影 + 液态玻璃」质感：
-   · 画布：近黑底 + 低饱和彩色光斑（青 / 蓝 / 琥珀），让玻璃有东西可糊；
-   · 表面：卡片 = 半透明深灰 + backdrop blur 高饱和 + 顶缘高光 + 双影；
-   · 层级：页头 → hero 卡 → 快捷行 → 分区卡片，24rpx 统一间距；
-   · 瓦片：卡内小块 = 白底渐变亮片（light sheen），不再纯灰平涂；
-   · 数字：克制的大数字（SOC 128rpx 上限）；发光仅留给语义色；
-   · 底部导航：悬浮液态玻璃坞（Apple 风格，blur 70rpx + 高光胶囊）。
-   1px ≈ 2rpx（375 宽屏）。
-   ============================================================ */
 page {
-  /* 色板（冷灰系） */
   --bg: #0B0D12;
   --tx: #F2F4F8;
   --tx-2: #AAB2C0;
-  /* v18：提升次要文字亮度，保证深底上 17–24rpx 小字可读 */
   --tx-3: #8A94A5;
   --tx-4: #647084;
 
-  /* 语义色（发光语义） */
   --ok: #30C05F;
   --warn: #FFB340;
   --bad: #FF5A4F;
 
-  /* 能量 accent（充电 / SOC / 进行中） */
   --acc: #4DA6FF;
   --acc-2: #3D7BFF;
 
-  /* 表面 */
   --surface: #141821;
   --surface-2: #181D27;
   --line: rgba(255, 255, 255, 0.08);
@@ -51,16 +34,14 @@ page {
   overflow-x: hidden;
 }
 
-/* ---------- 页面骨架 ---------- */
 .page {
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 24rpx 32rpx calc(178rpx + env(safe-area-inset-bottom)); /* 底部留足悬浮玻璃坞 */
+  padding: 24rpx 32rpx calc(178rpx + env(safe-area-inset-bottom));
 }
 .page.no-tab { padding-bottom: calc(64rpx + env(safe-area-inset-bottom)); }
 .px { padding-left: 32rpx; padding-right: 32rpx; }
 
-/* ---------- 卡片（液态玻璃配方：半透明 + blur + 顶缘高光 + 双层投影） ---------- */
 .glass {
   position: relative;
   background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.06) 16%, rgba(255, 255, 255, 0.03) 45%, rgba(255, 255, 255, 0.05));
@@ -76,7 +57,6 @@ page {
   backdrop-filter: blur(52rpx) saturate(1.8);
   overflow: hidden;
 }
-/* 顶部天光：玻璃高光的来源（即使 blur 不渲染也可见的质感） */
 .glass::before {
   content: '';
   position: absolute;
@@ -84,7 +64,6 @@ page {
   background: radial-gradient(50% 100% at 50% 0%, rgba(255, 255, 255, 0.11), transparent 72%);
   pointer-events: none;
 }
-/* hero 大卡：稍亮一档 + 更柔投影 */
 .glass-hero {
   position: relative;
   background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08) 16%, rgba(255, 255, 255, 0.04) 45%, rgba(255, 255, 255, 0.06));
@@ -108,7 +87,6 @@ page {
   pointer-events: none;
 }
 .glass-hero::after { content: none; }
-/* 悬浮玻璃层（弹层 / 浮层用，保留轻 blur） */
 .glass-hi {
   background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.04));
   background-color: rgba(22, 26, 34, 0.6);
@@ -121,7 +99,6 @@ page {
   backdrop-filter: blur(60rpx) saturate(1.7);
 }
 
-/* ---------- 卡内小瓦片 ---------- */
 .gcell {
   position: relative;
   overflow: hidden;
@@ -133,7 +110,6 @@ page {
 }
 .gcell::before { content: none; }
 
-/* ---------- 分区卡片（页面内 .sec 统一为卡片） ---------- */
 .sec {
   position: relative;
   background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.06) 16%, rgba(255, 255, 255, 0.03) 45%, rgba(255, 255, 255, 0.05));
@@ -166,7 +142,6 @@ page {
   margin-bottom: 0;
 }
 .sec-stamp { display: flex; align-items: center; min-width: 0; }
-/* 卡片头统一为单行标题：编号与英文副题从视觉层移除（元素保留，不影响逻辑） */
 .sec-no { display: none; }
 .sec-en { display: none; }
 .sec-tt { min-width: 0; }
@@ -176,20 +151,18 @@ page {
 .sec-side.warn { color: var(--warn); }
 .sec-side.bad { color: var(--bad); text-shadow: 0 0 14rpx rgba(255, 90, 79, 0.3); }
 .sec-side.na { color: var(--tx-4); }
-/* 分区之间的旧拼缝元素：卡片化后不再需要 */
 .sec-seam { display: none; }
 .seam-glint { display: none; }
 
-/* ---------- 通用键值行（详情页 / 明细用，宽键名自动换行不顶破对齐） ---------- */
 .row { display: flex; align-items: flex-start; padding: 26rpx 0; }
 .row + .row { border-top: 1rpx solid rgba(255, 255, 255, 0.05); }
 .row .k {
   color: var(--tx-3);
   font-size: 24rpx;
-  flex: 0 0 auto; /* 键宽随内容自适应，不再固定 232rpx 挤压长值 */
+  flex: 0 0 auto;
   max-width: 300rpx;
   line-height: 1.6;
-  padding-top: 5rpx; /* 单行时与右侧值基线对齐；多行时顶对齐 */
+  padding-top: 5rpx;
 }
 .row .k.dim { color: var(--tx-4); }
 .row .v {
@@ -197,7 +170,7 @@ page {
   text-align: right;
   flex: 1;
   min-width: 0;
-  padding-left: 28rpx; /* 与键保持呼吸间距，长键换行也不贴边 */
+  padding-left: 28rpx;
   word-break: break-all;
   line-height: 1.65;
 }
@@ -206,7 +179,6 @@ page {
 .row .go { width: 22rpx; height: 22rpx; opacity: 0.55; margin-left: 14rpx; flex-shrink: 0; }
 .glass .row { padding: 26rpx 0; }
 
-/* ---------- 小胶囊（状态 chip） ---------- */
 .pill {
   display: inline-flex;
   align-items: center;
@@ -243,7 +215,6 @@ page {
   box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.11);
 }
 
-/* ---------- 模块卡（通用容器） ---------- */
 .mod {
   padding: 30rpx 32rpx;
   margin-bottom: 24rpx;
@@ -283,7 +254,6 @@ page {
 .mod-link image { width: 20rpx; height: 20rpx; opacity: 0.6; }
 .mod-link.dim { opacity: 0.35; }
 
-/* ---------- 字号系统 ---------- */
 .num { font-variant-numeric: tabular-nums; }
 .d1 { font-size: 128rpx; font-weight: 200; line-height: 1; letter-spacing: -4rpx; font-variant-numeric: tabular-nums; }
 .d2 { font-size: 96rpx; font-weight: 200; line-height: 1; letter-spacing: -3rpx; font-variant-numeric: tabular-nums; }
@@ -296,7 +266,6 @@ page {
 .small { font-size: 24rpx; line-height: 1.7; }
 .fine { font-size: 20rpx; line-height: 1.6; }
 
-/* 细眉题 */
 .caps {
   font-size: 20rpx;
   font-weight: 500;
@@ -307,16 +276,13 @@ page {
 .caps.b { color: var(--tx-2); }
 .caps.muted { color: var(--tx-3); }
 
-/* 颜色工具 */
 .t-2 { color: var(--tx-2); } .t-3 { color: var(--tx-3); } .t-4 { color: var(--tx-4); }
 .t-ok { color: var(--ok); } .t-warn { color: var(--warn); } .t-bad { color: var(--bad); } .t-acc { color: var(--acc); }
 
-/* ---------- 分割与节奏 ---------- */
 .hairline { height: 1rpx; background: var(--line); }
 .spacer { height: 30rpx; }
 .sp8 { height: 8rpx; } .sp16 { height: 16rpx; } .sp24 { height: 24rpx; } .sp32 { height: 32rpx; } .sp48 { height: 48rpx; }
 
-/* ---------- 按钮 ---------- */
 .btn-primary {
   background: linear-gradient(180deg, #FFFFFF, #E4E9F0);
   color: #000000;
@@ -352,7 +318,6 @@ page {
 }
 .ghost-ic .ghost-ic-img { width: 32rpx; height: 32rpx; }
 
-/* 输入框基座 */
 .input {
   background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.04));
   background-color: rgba(255, 255, 255, 0.04);
@@ -368,19 +333,16 @@ page {
 }
 .ph { color: var(--tx-3); }
 
-/* 状态行 */
 .status-line { font-size: 22rpx; color: var(--tx-3); padding: 14rpx 0 24rpx; min-height: 36rpx; }
 .status-line.ok { color: var(--ok); }
 .status-line.err { color: var(--bad); }
 
-/* 空状态 */
 .empty { padding: 110rpx 40rpx; text-align: center; }
 .empty image { width: 56rpx; height: 56rpx; opacity: 0.35; margin-bottom: 26rpx; }
 .empty .e-t { font-size: 30rpx; color: var(--tx-2); }
 .empty .e-s { font-size: 24rpx; color: var(--tx-3); margin-top: 10rpx; line-height: 1.7; }
 .empty .btn-ghost { margin: 40rpx auto 0; width: 260rpx; height: 84rpx; line-height: 82rpx; font-size: 28rpx; }
 
-/* ---------- 底部弹层 ---------- */
 .sheet-mask {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -434,14 +396,12 @@ page {
 }
 .sheet .btn.ok.ready { background: #FFFFFF; color: #000000; font-weight: 600; }
 
-/* ---------- 页面入场 ---------- */
 @keyframes pageIn {
   from { opacity: 0; transform: translateY(16rpx); }
   to { opacity: 1; transform: translateY(0); }
 }
 .ent { animation: pageIn 0.28s ease-out; }
 
-/* ---------- 动效 ---------- */
 .pressable { transition: opacity 0.14s ease; }
 .pressable:active { opacity: 0.55; }
 .softpress { transition: transform 0.16s ease, opacity 0.14s ease; }
@@ -449,6 +409,5 @@ page {
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes breath { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 
-/* 通用 */
 .mono { font-family: Menlo, Consolas, "Courier New", monospace; }
 .safe-bottom { height: env(safe-area-inset-bottom); }

@@ -138,32 +138,15 @@ import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 报告范围：编进 App 主 target 的源码目录（与 scan/anorphans.py 同一套）
 SCOPE_DIRS = [
     "CarKeeper/CarKeeper",
     "CarKeeper/Services",
-    #  顶层 `CarKeeper/Models` 已删（2026-09-26）。它下面的 `os.walk` 对不存在的目录
-    #  不报错 —— 那就是这份清单最容易变成“恒为 0 的绿灯”的地方。
     "CarKeeper/Design",
 ]
 
-# 苹果 SDK 的符号名（含成员）。判据 ⑧ 的输入 —— 它只用来把「名字本来就是 SDK 的
-# 一个成员」这一种从误报里摘出去（见文件头那一段）。
 SDK_CACHE = os.path.join(PROJECT_ROOT, "scan", "sdk_cache.json")
 
 
-# 成员级声明：缩进 ≤ 4 空格，且行内有 let / var / func + 名字。
-# 为什么卡缩进：函数体里的局部量缩进 ≥ 8，把它当成「声明」会让判定立刻失真
-#（局部量被改名、成员还在，是最常见的一类假阳性）。
-#
-# 2026-09-25：修饰符表里原来只有裸词，`private(set) var image` 这种**带括号的**
-# 修饰符一个都认不出来 —— 于是把成员从 `var image` 收窄到 `private(set) var image`
-# （同一次改动里只动了可见性）会被判成「声明没了、使用还在」的编译错误。
-# 这是真漏报的反面：**假阳性**，而假阳性会让守门人学会忽略这条门。
-# 括号形式排在裸词前面只是可读性；正则回溯保证两者都能匹配。
-# 成员声明前的修饰符。拆成一个常量是为了让括号配对一个头两个大：
-# 这份名单里的 `private(set)` 自己带括号，直接摆进上面那条正则里时，
-# 人眼很难看出到底少了/多了哪一对。
 MODIFIER = (r"(?:public|internal|private|fileprivate)(?:\(set\))?"
             r"|open|final|static|class|lazy|nonisolated|weak|unowned"
             r"|override|mutating")
@@ -175,11 +158,8 @@ MEMBER_DECL = re.compile(
     re.M,
 )
 
-# 「这个字出现在这一行」用词边界；短名字（< 5）不查 —— 它们太容易撞上局部量
-#（`nav` / `row` 这类），收窄的代价是漏掉极短的成员，收益是零误报（scopeguard 同一条取舍）。
 MIN_NAME_LEN = 5
 
-# 把它当**局部量**声明的行：`let x =` / `if let x` / `for x in` / `guard var x` …
 LOCAL_BINDING = r"(?:let|var|for)\s+%s\b"
 
 
@@ -222,10 +202,6 @@ def only_argument_labels(line, name):
         return False
     for m in hits:
         before, after = line[:m.start()], line[m.end():]
-        # 标签的形状：紧跟 `:`，且它前面是 `(` / `,` **或者这一行只有缩进**
-        #（后者是多行调用的续行 —— `style:` 自己单独占一行）。
-        # 行首 + 紧跟 `:` 只可能是参数标签：真正的成员访问要么带前缀（`x.style`），
-        # 要么后面接 `=` / `.` / `(`，不会有裸 `style: ` 这种形状。
         if not re.match(r"\s*:", after):
             return False
         if re.search(r"[\(,]\s*$", before) or before.strip() == "":
@@ -249,9 +225,6 @@ def only_value_member(line, name):
     if not hits:
         return False
     for m in hits:
-        #  只看名字**前面**：必须紧跟在 `.` 后面，而且那个 `.` 的接收者是一个
-        # 小写标识符（`body.scale`）。大写开头的前缀是本仓的类型名（`TokensPalette`
-        # / `StackSpec`…）—— 那一种正是本门禁要抓的形状，不能放它走。
         before = line[:m.start()]
         if not re.search(r"(?<![A-Za-z0-9_.])[a-z_]\w*\s*\.\s*$", before):
             return False
@@ -277,16 +250,14 @@ def uses_of(name, text):
     for i, line in enumerate(body.split("\n"), start=1):
         if not hit.search(line):
             continue
-        if binding.search(line):      # 这一行是在**声明**同名局部量，不是使用
+        if binding.search(line):
             continue
-        if only_argument_labels(line, name):   # 判据 ⑥：参数标签不算使用
+        if only_argument_labels(line, name):
             continue
         out.append((i, line.strip()))
     return out
 
 
-# 类型声明（`struct` / `enum` / `class` / `actor` / `protocol`）—— 缩进不卡：
-# 嵌套类型（`StackSpec.Card`）缩进 8，而那正是本文件要认出来的东西（见判据 ⑤）。
 TYPE_DECL = re.compile(
     r"^[ \t]*(?:@[A-Za-z_][\w.]*(?:\([^)]*\))?\s+)*"
     r"(?:(?:" + MODIFIER + r")\s+)*"
@@ -294,16 +265,12 @@ TYPE_DECL = re.compile(
     re.M,
 )
 
-# 任意缩进的成员级声明（`let` / `var` / `func` / `case`）—— 只给判据 ④ 用。
-# 它是**未编译**的模板：名字得先填进去（`ANY_DECL_SRC % 名字`）。
 ANY_DECL_SRC = (
     r"^[ \t]*(?:@[A-Za-z_][\w.]*(?:\([^)]*\))?\s+)*"
     r"(?:(?:" + MODIFIER + r")\s+)*"
     r"(?:let|var|func|case)\s+%s\b"
 )
 
-# 函数签名（判据 ⑦）：`func 名字`+ 可选的泛型子句 + `(`。
-# 泛型子句的写法与 `scan.py` 的 GENERIC 一致（不带尖括号/括号），本仓就那一种。
 FUNC_SIG = re.compile(
     r"^[ \t]*(?:@[A-Za-z_][\w.]*(?:\([^)]*\))?\s+)*"
     r"(?:(?:" + MODIFIER + r")\s+)*"
@@ -311,9 +278,6 @@ FUNC_SIG = re.compile(
     re.M,
 )
 
-# 形参名：参数表里「标识符 + `:`」的每一个。**故意宽** —— 它只往「新版本声明过」
-# 那一侧加名字（宁可漏，不可噪），所以把 `in shape: S` 里的 `shape` 与默认值里
-# 可能出现的标签一起收进来也没关系；反过来（漏掉一个真形参）就是一条假阳性。
 PARAM_LABEL = re.compile(r"(?<![\w.])([a-z_]\w*)\s*:")
 
 
@@ -326,7 +290,7 @@ def param_names(text):
     body = strip_comments(text)
     names = set()
     for m in FUNC_SIG.finditer(body):
-        i = m.end() - 1                      # 签名里那个 `(`
+        i = m.end() - 1
         depth, j = 0, i
         while j < len(body):
             if body[j] == "(":
@@ -368,7 +332,6 @@ def qualified_uses_of(name, text, project_types):
         m = chain.search(line)
         if m:
             comps = re.findall(r"[A-Za-z_]\w*", m.group(1))
-            # `A.B.name` 里紧挨着名字的那一段是类型 → 那是**另一个类型**的成员，不报。
             if len(comps) >= 2 and comps[-1] in project_types:
                 continue
         if hit.search(line):
@@ -467,26 +430,18 @@ def main():
         print("本次没有变化的 Swift 文件 —— 没有「删了声明、使用还在」的名字")
         return 0
 
-    # 新版本的全部正文 —— **不只变了的那些文件**：一个名字可能在 A 里被删，
-    # 而使用它的地方在 B（`messageWeeks` 就是这样：声明在 `API.swift`、
-    # 用在 `MessagesSection.swift`）。「旧版本里声明过」与「现在还在用」本来就跨文件。
     new_texts = workspace_texts()
 
-    # 新版本全项目的成员名（含被挪到别的文件的那些）—— 见文件头的「降噪」。
-    # 它与 `new_texts` 同源（同一份工作区）。
     global_new = set()
     for text in new_texts.values():
         global_new |= member_names(text)
 
-    # 判据 ⑦ 的输入：每个文件里**函数形参**的名字（一次算好，循环里不再逐名字扫全文）。
     params_in = {rel: param_names(text) for rel, text in new_texts.items()}
 
-    # 判据 ⑤ 的输入：项目里声明过的**全部**类型名（含嵌套类型）。
     project_types = set()
     for text in new_texts.values():
         project_types |= type_names(text)
 
-    # 判据 ⑧ 的输入：SDK 的符号名。
     sdk = sdk_member_names()
 
     bad = []
@@ -495,9 +450,7 @@ def main():
         for name in sorted(old_names):
             if len(name) < MIN_NAME_LEN or name in global_new:
                 continue
-            # 判据 ④：使用处所在的文件自己声明了同名成员 → 不报。
             hits = []
-            # 判据 ④ + ⑦：本文件自己声明了同名成员 / 同名形参 → 不报。
             if not (declares_anywhere(new_texts.get(rel, ""), name)
                     or name in params_in.get(rel, set())):
                 hits += [(rel, n, t) for n, t in uses_of(name, new_texts.get(rel, ""))]
@@ -508,8 +461,6 @@ def main():
                     continue
                 for n, t in qualified_uses_of(name, text, project_types):
                     hits.append((other, n, t))
-            # 判据 ⑧：名字同时是 SDK 的成员名，而**每一条使用**都是 `小写值.name`
-            # （见文件头那一段）→ 那些使用属于某个我们叫不出类型的值。
             if name in sdk and hits and all(only_value_member(t, name) for _, _, t in hits):
                 hits = []
             if hits:

@@ -56,12 +56,9 @@ APP = os.path.join("CarKeeper", "CarKeeper")
 SCOPE_DIRS = [
     APP,
     os.path.join("CarKeeper", "Services"),
-    #  顶层 `CarKeeper/Models` 已删（2026-09-26）—— 本清单走 `assert_roots`。
     os.path.join("CarKeeper", "Design"),
 ]
 
-# 属性包装器：名单里的这些是**存储**属性的标志（extension 里放它们＝编译错）。
-# 刻意不写 `@ViewBuilder` / `@MainActor` / `@discardableResult`：它们修饰的可能是计算属性。
 WRAPPERS = (
     "State", "StateObject", "ObservedObject", "EnvironmentObject", "Environment",
     "Binding", "AppStorage", "SceneStorage", "FocusState", "GestureState",
@@ -80,10 +77,6 @@ MEMBER = re.compile(
     r"(?P<static>" + DECL_MODS + r"[ \t]+)?"
     r"(?P<kind>var|let)[ \t]+(?P<name>[A-Za-z_]\w*)"
 )
-# ⚠️ `re.M` 必须有：少了它 `^` 只在文件开头匹配，收集到的类型数是 0 ——
-# 那样这个检查器会「全绿」地放行一切（下一行的私有成员收集同样是空的）。
-# `scopeguard.py` 的头注里记过同一个坑，我这里又踩了一次（探针当场捉到：
-# 注入的跨文件私有成员一个字都没报）。
 TYPE_BODY = re.compile(
     r"^(?:" + MODS + r"[ \t]+)*(?:struct|class|enum|actor)[ \t]+([A-Za-z_]\w*)[^{]*\{",
     re.M,
@@ -115,10 +108,6 @@ def mask(text):
         nxt = text[i + 1] if i + 1 < n else ""
         if st == CODE:
             if c == "/" and nxt == "/":
-                # ⚠️ 第一根斜杠也要清掉。原来只清后续字符，于是每一行注释开头都留下一个
-                # `/`：它不干扰本文件那几条判据（它们不匹配 `/`），但它会把**任何按
-                # 实参/表达式切分的下游判据**弄脏 —— `initguard.py` 就是因为一个注释行
-                # 开头的 `/` 而认不出紧跟其后的 `labelTertiary:`（那是它的第一次误判）。
                 out[i] = " "
                 st = LINE
             elif c == "/" and nxt == "*":
@@ -144,7 +133,7 @@ def mask(text):
             if c != "\n":
                 out[i] = " "
             i += 1
-        else:  # STR
+        else:
             if c == "\\":
                 out[i] = " "
                 if i + 1 < n:
@@ -182,12 +171,10 @@ def scan_file(path, masked, priv_map):
     lines = masked.split("\n")
     raw = io.open(path, encoding="utf-8", errors="ignore").read().split("\n")
 
-    # ---- ① 嵌套 extension ----
     for i, ln in enumerate(raw, 1):
         if NESTED_EXT.match(ln):
             out.append((i, "extension 嵌在别的声明里（Swift 只允许文件层）"))
 
-    # ---- ② extension 里的实例存储属性 ----
     i = 0
     while i < len(lines):
         if re.match(r"^(?:" + MODS + r"[ \t]+)*extension[ \t]+\w", lines[i]):
@@ -196,9 +183,6 @@ def scan_file(path, masked, priv_map):
                 offset = sum(len(l) + 1 for l in lines[:i]) + brace
                 end = body_span(masked, offset)
                 end_line = masked.count("\n", 0, end)
-                # ⚠️ 初始深度就是 extension 自己那个 `{` —— 少了它，成员层会被算成 0，
-                # 而函数体里的局部变量会被算成「成员层」（第一版就是这么误报 17 处的）。
-                # 成员层 = 1；函数体 / 闭包体 = ≥2。
                 depth = lines[i].count("{") - lines[i].count("}")
                 for j in range(i, end_line + 1):
                     ln = lines[j]
@@ -221,7 +205,6 @@ def scan_file(path, masked, priv_map):
                 i = end_line
         i += 1
 
-    # ---- ③ 跨文件碰别处的 private ----
     i = 0
     while i < len(lines):
         m = re.match(r"^(?:" + MODS + r"[ \t]+)*extension[ \t]+([A-Za-z_]\w*)", lines[i])
@@ -237,7 +220,6 @@ def scan_file(path, masked, priv_map):
                     code = lines[j]
                     for nm in sorted(priv):
                         if re.search(r"(?<![\w.])" + re.escape(nm) + r"\b", code):
-                            # 本文件自己也声明过同名东西 → 那是另一个名字，放行
                             if re.search(r"\b(?:var|let|func)[ \t]+" + re.escape(nm) + r"\b", masked):
                                 continue
                             out.append((j + 1, "用了 `%s.%s` —— 它在 %s 里是私有的（`private` 的作用域是文件）"
@@ -252,7 +234,6 @@ def main():
     paths = swift_files()
     print(f"扫了 {len(paths)} 个源文件（extension 三条铁律）")
 
-    # 每个顶层类型 → （声明它的文件, 它的私有成员名）
     priv_map = {}
     for p in paths:
         masked = mask(io.open(p, encoding="utf-8", errors="ignore").read())
@@ -270,8 +251,6 @@ def main():
                 if mm and len(mm.group(1)) >= MIN_NAME:
                     got.add(mm.group(1))
             if got:
-                # 同一个名字只可能有一个顶层类型（同名＝重复声明），所以这里是并集：
-                # owner 保留**最先**收集到的那一个文件（扩展体里再声明同名类型属病态，不管）。
                 owner, priv = priv_map.get(name, (p, set()))
                 priv_map[name] = (owner, priv | got)
 

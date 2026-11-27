@@ -66,17 +66,12 @@ SCAN_DIRS = [
     os.path.join("CarKeeper", "Design"),
 ]
 
-# 唯一入口本尊。它是**唯一**能直接调系统材质的地方（其余全走 dsGlass）。
 ENTRY = os.path.join(APP, "Design", "DSGlass.swift").replace("\\", "/")
 
-# ① 直接调系统材质
 MATERIAL = re.compile(r"\.glassEffect\s*\(")
-# ② 玻璃容器（多块玻璃成一层）
 CONTAINER = re.compile(r"\bGlassEffectContainer\b")
-# ③ 玻璃之下的不透明面
 GLASS_CALL = re.compile(r"\.dsGlass(?:Capsule|Rounded)?\s*\(")
 UFLAT = re.compile(r"\.(?:fill|background)\s*\(\s*(?:TokensPalette|Color)\.\w+")
-# ④ 旧材质语言
 LEGACY = re.compile(r"\b(?:ultraThin|thin|regular|thick|ultraThick)Material\b")
 
 
@@ -123,8 +118,6 @@ def scan(paths):
     out = []
     for p in paths:
         text = io.open(p, encoding="utf-8", errors="ignore").read()
-        # 注释里提到这些名字是允许的（这一仓的注释很爱解释历史），
-        # 所以逐行剥掉 `//` 之后再判 —— 与 `spacing.py` 同一手法。
         lines = [ln.split("//")[0] for ln in text.split("\n")]
 
         if p != ENTRY:
@@ -136,7 +129,6 @@ def scan(paths):
                 if LEGACY.search(code):
                     out.append((p, i, "旧材质语言（`…Material`）—— Liquid Glass 之前的写法"))
 
-        # ③ 同一条链里，扁平面垫在玻璃底下
         for start, block in statements(text):
             joined = "\n".join(block)
             g = GLASS_CALL.search(joined)

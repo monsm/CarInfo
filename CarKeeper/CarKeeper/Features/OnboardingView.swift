@@ -1,6 +1,3 @@
-// =============================================================================
-// #NEW-113 Onboarding 引导 — 首次使用 3 页引导流程
-// =============================================================================
 
 import SwiftUI
 
@@ -39,7 +36,6 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 页面内容
             TabView(selection: $currentPage) {
                 ForEach(OnboardingPage.allCases) { page in
                     onboardingPage(page)
@@ -49,8 +45,6 @@ struct OnboardingView: View {
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
             .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
 
-            // 底部操作区：直接坐在版面上（不再是一片带边的卡）
-            // —— 引导页能做的事只有「下一步」和「跳过」，它们不需要一个容器来证明自己是一组。
             HStack {
                 Button("跳过") {
                     onboardingSeen = true
@@ -79,15 +73,11 @@ struct OnboardingView: View {
             .padding(.horizontal, TokensSpacing.page)
             .padding(.vertical, TokensSpacing.lg)
         }
-        // 旧版：整屏三色渐变（主色 + 紫 + 蓝）+ 一枚彩色发光阴影。
-        // 新版：单一画布（光在根上由真实太阳位置算），按钮用形状表达层级，不用光。
     }
 
     private func onboardingPage(_ page: OnboardingPage) -> some View {
         VStack(spacing: TokensSpacing.lg) {
-            // 图标
             ZStack {
-                // 旧版：渐变色圆 + 超大图标。新版：扁平色块（与登录页品牌标同一套语言）。
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(TokensPalette.ambient)
                     .frame(width: 96, height: 96)
@@ -96,7 +86,6 @@ struct OnboardingView: View {
                     .foregroundStyle(TokensPalette.ambient)
             }
 
-            // 标题和描述
             VStack(spacing: TokensSpacing.snug) {
                 Text(page.title)
                     .font(TokensTypo.fixed(28, weight: .semibold))
@@ -109,7 +98,6 @@ struct OnboardingView: View {
                     .padding(.horizontal, 40)
             }
 
-            // 示例内容
             if page == .connect {
                 ExampleCard(title: "示例车牌", value: "京A·12345")
             } else if page == .location {
@@ -122,8 +110,6 @@ struct OnboardingView: View {
     }
 }
 
-/// 引导页上的「例子」：一行键值（例：示例车牌 / 京A·12345）。
-/// 它用与「全量数据」同一套键值行 —— 同一个 App 里「左键右值」只该有一种写法。
 struct ExampleCard: View {
     let title: String
     let value: String

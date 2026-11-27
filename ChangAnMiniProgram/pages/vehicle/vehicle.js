@@ -1,4 +1,3 @@
-// vehicle.js —— 车辆档案 v3（极简文本档案）
 const svc = require('../../utils/service');
 const VM = require('../../utils/vm');
 const { ci, s, num } = require('../../utils/fmt');
@@ -71,7 +70,6 @@ Page({
       '租户': v.TenantId
     }, '车型配置');
 
-    // 保险 / 服务倒计时（分析结论芯片 + 档案行内备注）
     const sum = VM.vehicleSummary(app.globalData.car);
     const insD = sum ? sum.insuranceDays : null;
     const srvD = sum ? sum.serviceDays : null;
@@ -103,7 +101,6 @@ Page({
       '最后在线': v.LastOnlineTime, '激活时间': v.ActiveTime
     }, '服务与保养');
 
-    // 车况报文（tbox control 数据，日志核对：camelCase 键）
     const ctl = (app.globalData.caches && app.globalData.caches.control) || {};
     push({
       '协议版本': ctl.protocolVer != null ? `V${ctl.protocolVer}` : null,

@@ -1,6 +1,5 @@
 <view class="login">
 
-  <!-- 夜场：品牌浮标 + 大灯下的车 -->
   <view class="lg-hero">
     <view class="lg-brand">
       <view class="lg-name">长安车管家</view>
@@ -14,7 +13,6 @@
 
   <view class="lg-status {{statusCls === 'err' ? 'err' : (statusCls === 'ok' ? 'ok' : '')}}">{{statusText}}</view>
 
-  <!-- 玻璃表单块：聚焦时 rim 光增亮 -->
   <view class="lg-form glass">
     <view class="lg-row {{focusRow === 'phone' ? 'focus' : ''}}">
       <text class="lg-lab">手机号</text>

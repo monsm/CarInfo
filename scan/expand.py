@@ -66,8 +66,6 @@ def key(rel):
     return os.path.join(APP, rel).replace("\\", "/")
 
 
-# 「文件:值」→ 为什么这个高度是画出来的、不是量出来的。
-# 多一条就要多一个理由 —— 这条判据的全部价值都在这里。
 ALLOWED = {
     key("Features/Battery/ChargeView.swift") + ":96":
         "单体电压柱图（Swift Charts 没有固有高度，不写就是 0）",
@@ -83,15 +81,6 @@ ALLOWED = {
         "评分条（一条 5pt 的走线）",
     key("Features/Trips/ScoreSection.swift") + ":130":
         "分段得分折线图（Swift Charts）",
-    #  key("Features/Trips/TripsEventsView.swift") + ":132"（行程小地图缩略图）**已删**，
-    #  2026-09-25（用户：「行程卡片的高度没有被地图占满 才一半」）：那张地图不再写死高度，
-    #  它是 `minHeight: 132` + `maxHeight: .infinity`（上界不是写死的高度，本条判据本来就不管），
-    #  多出来的高度全归地图。理由不成立就得撤 —— 留着它会让下一个读的人以为那里还可以写死。
-    #  key("Design/DS.swift") + ":32"（自搭分段控件里那一枚药丸自己的高度）**已删**，
-    #  2026-09-26（用户第 4 条：「尽可能的使用 ios27 的原生控件」）：那一枚自搭控件
-    #  整份换成了系统 `Picker(.segmented)`（`Design/DSSegmentPicker.swift`），
-    #  这一仓再没有写死的 32 —— 而不成立的理由留在表里，会让下一个改这里的人
-    #  以为「它可以写死」（与上面 TripsEventsView 那一条同一条规矩）。
 }
 
 FORM = re.compile(r"\.frame\(([^()]*?)height:\s*([0-9]+(?:\.[0-9]+)?)")
@@ -138,9 +127,9 @@ def main():
                 for m in FORM.finditer(code):
                     before, value = m.group(1), m.group(2)
                     if before.rstrip().endswith(("min", "max")):
-                        continue          # minHeight / maxHeight：上下界，不是写死
+                        continue
                     if "width:" in before:
-                        continue          # 同时给了宽高 = 形状（图标 / 圆点 / 缩略图）
+                        continue
                     k = path + ":" + value
                     if k in ALLOWED:
                         used.add(k)

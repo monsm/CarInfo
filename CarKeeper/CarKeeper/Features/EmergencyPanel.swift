@@ -1,6 +1,3 @@
-// =============================================================================
-// EmergencyPanel - 紧急求助面板（SOS 联系人 + 快捷操作）
-// =============================================================================
 
 import SwiftUI
 import UIKit
@@ -12,23 +9,13 @@ struct EmergencyPanel: View {
     @State private var activeEmergency = false
 
     var body: some View {
-        //  正文只提供内容 —— 它住在「我的」那张叫「应急」的卡里（`StackCard`），
-        //  而那一叠自己就是滚动容器（`ArcStack` 头注：系统 `ScrollView`）。
-        //  三层页壳在这里全部拆掉（用户 2026-09-25：「每个卡片仔细核对，内容展开后
-        //  是否拥挤」）：① 内层 `ScrollView`（竖向拖动归它，而它拿到无限高、永远滚不动）；
-        //  ② 页边距（卡自己左右各有 18pt，再加一层水平 20pt = 38pt，全 App 最窄的一
-        //  张）；③ 页标题（卡头写「应急」，正文再写一遍「紧急求助」是同一个东西两个名字）。
         VStack(alignment: .leading, spacing: TokensSpacing.lg) {
-            // SOS 紧急呼叫
             sosButton
 
-            // 快捷操作
             quickActions
 
-            // 紧急联系人
             contactCard
 
-            // 位置共享
             locationShareCard
         }
         .alert("确认拨打", isPresented: $showConfirm) {
@@ -47,7 +34,6 @@ struct EmergencyPanel: View {
         .accessibilityLabel(Text("紧急求助面板"))
     }
 
-    // MARK: - SOS 按钮
     private var sosButton: some View {
         Button(action: { showConfirm = true }) {
             ZStack {
@@ -74,11 +60,7 @@ struct EmergencyPanel: View {
         .accessibilityHint(Text("长按拨打紧急电话"))
     }
 
-    // MARK: - 快捷操作
     private var quickActions: some View {
-        // 四个动作 = 四行（图标 + 名称 + 箭头），不是一个彩色按钮矩阵。
-        // 原来的蓝/橙/黄/青四个底色跟「状态」毫无关系 —— 它们只是四个动作，
-        // 而界面里唯一的「彩色」应该留给真的状态（这里是 SOS 的红）。
         DSGroup(title: "快捷操作") {
             DSGroupRow {
                 DSRow(icon: "car.fill", title: "远程锁车", showsChevron: true) {
@@ -103,7 +85,6 @@ struct EmergencyPanel: View {
         }
     }
 
-    // MARK: - 紧急联系人
     private var contactCard: some View {
         DSGroup(title: "紧急联系人", footer: "SOS 会拨打这个号码。") {
             DSGroupRow {
@@ -123,7 +104,6 @@ struct EmergencyPanel: View {
         }
     }
 
-    // MARK: - 位置共享
     private var locationShareCard: some View {
         DSGroup {
             DSGroupRow {
@@ -136,7 +116,6 @@ struct EmergencyPanel: View {
         }
     }
 
-    // MARK: - 紧急叠加层
     private var emergencyOverlay: some View {
         ZStack {
             TokensPalette.scrim.opacity(0.8).ignoresSafeArea()
@@ -159,15 +138,12 @@ struct EmergencyPanel: View {
                         .foregroundStyle(TokensPalette.labelOnTint)
                         .padding(.horizontal, TokensSpacing.xl)
                         .padding(.vertical, TokensSpacing.snug)
-                        // 原来是写死的「中灰」（#808080 一类）。改用令牌里的中性填充：
-                        // 取消本来就是次要动作，它在暗遮罩上比中灰更收敛，且跟随主题。
                         .background(Capsule().fill(TokensPalette.track))
                 }
             }
         }
     }
 
-    // MARK: - 操作
     private func makeCall() {
         activeEmergency = true
         showConfirm = false

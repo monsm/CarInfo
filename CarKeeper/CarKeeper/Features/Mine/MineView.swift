@@ -1,44 +1,15 @@
 import SwiftUI
 import PhotosUI
 
-// 我的：用户卡 + 车辆卡 + 常用入口 + 退出登录
 struct MineView: View {
     private let store = AppStore.shared
-    //  「检查更新」那一整套状态（`updateBusy` / `updateMsg` / `downloadPct` /
-    //  `downloadFile` / `shareItems` / `isChecking`…）与那个"关于"弹窗的 `showAboutAlert`
-    //  已删（2026-09-27 用户：「删除更新相关」）：连同 `Services/UpdateService.swift`
-    //  （检查 Release + 下载 ipa + 分发的 `ShareSheet`）与 `Services/GithubToken.swift`
-    //  （那个仓库令牌）一起走。这一页现在只剩两个真正属于它自己的开关状态：
-    //  退出确认与下拉刷新。
-    @State private var isRefreshing = false     // 下拉刷新进行中标志
-    /// 退出登录二次确认（按钮在「应用」组里）
+    @State private var isRefreshing = false
     @State private var logoutConfirm = false
-    // 这一页里的「去做某件事」全部走 `nav.openMode(...)`（拨到那一档 / 那段），
-    // 不再保留一堆从未绑定 sheet 的 @State（此前 7 个磁贴设了状态却没人监听 = 死按钮）。
     @EnvironmentObject var nav: NavState
-    /// 档内段落：设置 / 应急 / 诊断。它不是导航层级（见 `HomeSub`）。
     @State private var tab: HomeSub = .settings
-    /// 壁纸状态（相册里选的一张图，子页面铺底；用户 2026-09-24「其他页面的背景全部
-    /// 设为当前桌面的背景」）。它改的是 App 自己的背景，不是系统的（iOS 没有读
-    /// 主屏壁纸的公开 API）。未选图时铺画布（跟随深浅色），不会黑屏。
     @ObservedObject private var wallpaper = WallpaperService.shared
-    //  「显示」那一组（文字发光程度 / 玻璃通透度 / 界面实度）已整组删除：
-    //  用户 2026-09-26 第 2、3 条 —— 「完全删除文字发光和文字发光功能」与
-    //  「玻璃就默认选更透，界面实度默认 50%，删除默认对应的设置入口」。
-    //  三个键（`carkeeper_display_glow` / `carkeeper_glass_level` /
-    //  `carkeeper_glass_fill`）连它们唯一的读者 `DisplaySettings` 一起删掉：
-    //  留着键名而没有人读，是这一仓反复清理的那类「只有写者、没有读者」。
-    /// 相册选择器（PhotosPicker）：从相册选一张图铺底（本地，不依赖网络）。
     @State private var wallpaperPickItem: PhotosPickerItem?
 
-    // MARK: 生命周期
-    /// 这一档的叠叠乐：巨字头 → 分段控件 → 当前那一段的卡。
-    ///
-    /// 与「车辆」同理（也是同一天修的同一个 bug）：分段控件与卡表必须和**状态**
-    /// 住在同一个视图里。此前它们住在外壳 `MineHubView`，而这一页的 OTA 状态、
-    /// 令牌、退出确认全在这里 —— 外壳调 `MineView.sectionCards` 直接编译不过
-    ///（instance member 不能当类型成员用），而绕过去也一样是错的：
-    /// 那些 `@State` 永远不会被安装，「检查更新」会变成点了没反应的按钮。
     @MainActor
     private var cards: [StackCard] {
         var out = HomeMode.mine.headCards
@@ -58,31 +29,12 @@ struct MineView: View {
         return out
     }
 
-    /// 消费深链带来的段落提示（`carkeeper://emergency` → 「我的」档的「应急」段）。
-    /// 消费掉（置 nil）是必须的：否则从别的档切回来时会被同一条旧提示再拉回那一段。
     private func consumeHint() {
         guard let hint = nav.homeSub, HomeSub.mineTabs.contains(hint) else { return }
         tab = hint
         nav.homeSub = nil
     }
 
-    /// 「设置」这一段的卡（**不含巨字头**，也不含分段控件 —— 那两张在 `cards` 里）。
-    ///
-    /// 拆卡按问题分：我是谁（账号）、我的车（车辆）、我能改什么（设置）、
-    /// 这个 App 是什么（关于）。
-    ///
-    /// 「设置」与「检查更新」各占**一张**卡（用户 2026-09-23：超长卡拆小卡）——
-    /// 旧版把全部设置组塞进一张卡，叠叠乐里永远读不完。拆开后每屏都有得读。
-    ///
-    /// `private`：它按本页的实时状态现算，只有本视图的 `cards` 有权调它。
-    ///
-    ///  2026-09-25（用户第 7 条：「我的 去掉电车，因为有车辆入口」）：
-    ///  这里原来还有一张 `StackCard(id: "car")` —— 一张写着车名与车牌的「去看车辆」按钮。
-    ///  它已经被删。它唯一的动作是 `nav.openMode(.vehicle)`，而 车辆就是模式条上的一档
-    ///  （相隔一次拖拽）；一个只用来「跳到隔壁那一档」的入口，在底下导航就摆在屏幕上的
-    ///  界面里是纯重复 —— 而它占的是这一页第二张卡的位置（用户看到的「电车」就是它：
-    ///  车名来自服务端，不是我们写的字，全仓搜「电车」一处都搜不到）。
-    ///  它顺带展示的信息（保险剩多少天）在车辆那一档里本来就有，且更完整。
     @MainActor
     private var sectionCards: [StackCard] {
         var out: [StackCard] = [
@@ -102,7 +54,7 @@ struct MineView: View {
         .onChange(of: nav.homeSub) { _, _ in consumeHint() }
         .refreshable {
             isRefreshing = true
-            try? await Task.sleep(nanoseconds: 600_000_000)  // 0.6s 模拟刷新延迟
+            try? await Task.sleep(nanoseconds: 600_000_000)
             isRefreshing = false
         }
         .alert("退出登录", isPresented: $logoutConfirm) {
@@ -113,13 +65,11 @@ struct MineView: View {
         }
     }
 
-    // MARK: 身份卡 — Apple Profile Card
     private var profileCard: some View {
         let um = VM.userModel(store.user)
         return DSCard(padding: TokensSpacing.md, radius: TokensRadius.large) {
             VStack(alignment: .leading, spacing: TokensSpacing.lg) {
                 HStack(spacing: TokensSpacing.lg) {
-                    // 头像：系统填充色的圆底 + 首字（iOS 设置顶部的身份区做法）
                     Text(um?.avatar ?? "主")
                         .font(TokensTypo.title2.weight(.semibold))
                         .foregroundStyle(TokensPalette.secondary)
@@ -190,111 +140,30 @@ struct MineView: View {
         .accessibilityElement(children: .combine)
     }
 
-    // MARK: 车辆卡
 
-    // MARK: 设置分组（inset-grouped 行）
-    //
-    // 旧写法是 6 个 `CardBox`，每个里面再摆 2 列「Tesla 式磁贴」（一共 28 个）——
-    // 那是**第三套容器 + 第三套行**：全 App 只有这一页这么排，从别的页面走进来像换了一个 App。
-    // 后来改成 iOS 设置式的分组，但它仍然自己列了一份功能目录（车辆 / 用车两组，
-    // 与地图上那份目录逐行重复）——同一个页面两个入口，正是缝合怪的来源。
-    // 那两组已删：**功能目录只有底部模式条一份**，这一页只留设置。
     private var settingsGroups: some View {
         VStack(spacing: TokensSpacing.xl) {
-            //  这里原本有两组：「报告与共享」（共享钥匙 / 家庭管理）与
-            //  「设备与模式」（摇一摇锁车 / 省电模式 / 夜间模式 / 专注模式）。
-            //
-            //  用户 2026-09-25 第 4 与第 7 条要求删掉它们，明暗改由系统决定
-            //（「全部删除 明暗根据系统获取」）。删的不是几个开关，是四个功能：
-            //    · 共享钥匙 / 家庭管理 → `TempKeyManager` / `FamilyManager` 与两个页面
-            //    · 摇一摇锁车 → `ShakeDetector`
-            //    · 省电模式 → `PowerSavingToggle`
-            //    · 专注模式 → `FocusModeManager`
-            //    · 夜间模式 → `NightModeManager`（App 根部不再有 `.preferredColorScheme`，
-            //      nil 就是跟随系统 —— 与 iOS 其余部分一致）
-            //  只服务它们的那几个文件、启动时那几行初始化、以及它们各自的键，
-            //  一起删干净 —— 留下「代码在、没人能到」正是这个仓库一直在删的东西。
 
             DSGroup(title: "应用") {
-                // 「全局搜索」那一行已删：全局搜索从项目移除（用户 2026-09-23，
-                // 与地图右臂一起）。要找一个功能，走底部模式条 —— 那是**唯一**的目录；
-                // 搜索页本身是第二份目录，而且没有任何一条只能从它到达的功能。
-                // 「语音播报」那一行已删（用户 2026-09-25 第 7 条）。
-                // 更值得记的是它为什么删得掉：它翻转的是 `carkeeper_voice_enabled`，
-                // 而**全仓没有一个读者** —— `VoiceBroadcastManager` 这个类型早就不存在了，
-                // 车控页那枚也没有显示过（那一页的导航栏是隐藏的）。
-                // 一个只有写者、没有读者的开关，是这个仓库里最贵的一种摆设。
-                // 壁纸（非地图子页的背景图，用户 2026-09-24「其他页面的背景全部设为
-                // 当前桌面的背景」→ iOS 没有读主屏壁纸的公开 API，只能从相册选一张
-                // 本地图铺底 —— 不依赖网络，选完落盘，下次启动还在）。
-                // 它是一张小卡（不是 DSRow）：上面是缩略图，下面两个小钮（换一张 / 不铺）。
                 customRow { wallpaperRow }
-                //  「开发者工具」那一行已删（2026-09-27 用户：「删除开发者入口」）：
-                //  它就是 `nav.openMode(.mine, sub: .dev)` 这一个动作 —— 而「我的」档的
-                //  三个分段（设置 / 应急 / 诊断）本来就在上面那枚分段控件上，
-                //  这一行是同一个目的地的**第二个入口**（同一页两个入口正是这一仓
-                //  反复删掉的那种重复）。诊断那一页自己还在（它经过分段控件到达），
-                //  而它里面属于开发者的两组也一并删了（见 `DevView` 文件头）。
                 customRow(last: true) { logoutRow }
             }
 
-            // 「显示」那一节（三行观感开关）已整组删除，见页头那一段。
 
-            // 「隐私与数据」以前是一个独立浮层，现在就是这一屏里的一节。
             PrivacySection()
         }
     }
 
-    // MARK: 行的写法（与全 App 其余 20 屏同一套 DS 原语）
 
-    //  这里原有 `actionRow`（图标 + 标题 + 箭头的一行）：2026-09-27 删 —— 它唯一的
-    //  调用点是「开发者工具」那一行，而那一行本身也删了（见 `settingsGroups`）。
-    //  一个私有函数没有调用点，就是这个仓库反复删的那类东西：它下一个人看了会以为
-    //  “这一页还有一行带箭头的动作”。（`scan/orphans.py` 看不见它 —— 它的盲区就是
-    //  项目自己的普通成员，这一条只能靠人。）
 
-    /// 自定义行（开关 / 选择器 / 第三方视图）：只借用分组的内缩与分隔线
-    /// content 必须 @escaping：DSGroupRow 的 content 是存储属性闭包（会逃逸），
-    /// 包进它的非逃逸参数会在编译期直接报错（CI 上踩过）。
     private func customRow<V: View>(last: Bool = false,
                                     @ViewBuilder _ content: @escaping () -> V) -> some View {
         DSGroupRow(showsSeparator: !last) { content() }
     }
 
-    // MARK: 行内的小组件 / 退出登录（都在 settingsGroups 里用）
 
-    /// 壁纸小卡：缩略图（当前那张）+ 两个小钮（换一张 / 不铺）。
-    ///
-    /// 选图：`PhotosPicker`（系统相册，本地取，不依赖网络）→ 选中后
-    /// 异步加载 `Data` → `wallpaper.setPhoto(data)` 落盘（JPEG 0.82）并立即可见。
-    /// 换一张 = 重新选一次；不铺 = `clear()`（清图 + 删文件，回落到画布底色）。
-    ///
-    /// 为什么放在「应用」组（而不是「设备与模式」）：它改的是 **App 自己的背景**，
-    /// 不是系统的（壁纸归 SpringBoard 管，iOS 没有读它的公开 API）—— 所以与
-    /// 「夜间模式 / 省电模式」那一组（改系统的）不并列，与「语音播报」这组（改 App 行为）并列。
     private var wallpaperRow: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
-            // 图源：相册自选 / 必应每日 / Windows 聚焦。
-            // 三条里相册那条不联网；另外两条是免密钥的公开取图口，每天自动换一张。
-            //
-            //  ⚠️ 2026-09-26 第一次改：从 `Picker(.menu)` 换成自己写的 `Menu`。
-            //  起因是用户报「选了 Windows 聚焦就无法再下拉选其他了」。
-            //
-            //  ⚠️⚠️ 同一天第二次改（同一句话没修好）：用户补了更完整的复现 ——
-            //  「图源不换页面的情况下可以一直换，但是换了其他页面回来，如果上次是
-            //   windows 聚焦，那就再也点不动，重开软件都不行，只能点不铺，再重新选」。
-            //  两个事实加起来把嫌疑从**那一档**移到了**那一下弹窗**：
-            //    · 「重开软件都不行」= 状态是持久的（`source` 落盘）——所以不是某一次
-            //      手势丢了，而是「一进来就是这个样子」；
-            //    · 「只能点不铺」= 同一张卡里别的按钮还能按 ——所以不是整片被挡住。
-            //  两次换的都是**弹窗**（先是系统的 `Picker` 菜单，后是自己写的 `Menu`）。
-            //  本机没有编译器、也没有那台设备，这个机制我复现不了 —— 所以这一版
-            //  **不再依赖「弹窗能不能打开」**：三个选项直接**摆在行里**，一下就是一下
-            //  （分段控件是系统控件里对「三道门」这件事的标准答案：没有第四种东西
-            //  要弹出来，也就没有「弹不出来」这回事）。
-            //
-            //  代价写在这里：段名只能短（一行装不下三个全名），所以全名留在上面那一行
-            //  的当前值里，而「它是什么」在下面那行说明里（`note`）。
             HStack {
                 Text("背景图")
                     .font(TokensTypo.body)
@@ -305,53 +174,20 @@ struct MineView: View {
                     .foregroundStyle(TokensPalette.secondary)
             }
             .frame(minHeight: TokensSpacing.row)
-            //  ⚠️⚠️ 2026-09-26 第三次改（前两次都没修好）：用户把「聚焦那一档时点不动」
-            //  又报了一次。前两次换的都是**我们自己写的控件**（先是系统 `Picker(.menu)`、
-            //  后是自己写的 `Menu`、再是 `DSSegmented`）—— 而 `DSSegmented` 是一排
-            //  自己搭的 `Button`：它的命中区、它和滑动叠的关系、它在巨大背景图上的
-            //  排期，三件事都由我们负责。这一条已经试掉三代自造控件了。
-            //  于是换成**系统的分段控件**（`Picker` + `.pickerStyle(.segmented)`，底下
-            //  就是 UIKit 的 `UISegmentedControl`）：命中区、按下反馈、无障碍的
-            //  「可选 / 已选中」全在系统手里，每一代 iOS 都跟着平台走 ——
-            //  用户这一轮的原话：「尽可能的使用 ios27 的原生控件」。
-            //  与 `DSSegmented` 的差别只有外观（原生那一枚有自己的凹槽与滑块）——
-            //  而这一行正是全 App 最不该再拿外观换可靠性的地方。
             DSSegmentPicker(options: WallpaperSource.allCases.map { (value: $0, title: $0.segmentTitle) },
                             selection: Binding(get: { wallpaper.source },
                                                set: { pickSource($0) }),
                             label: "背景图来源")
 
-            // 缩略图：铺的就是这一张。没图（没选 / 没取到 / 点了「不铺」）画占位。
-            //
-            //  ⚠️⚠️ 2026-09-26：「聚焦那一档时图源点不动」的真正原因就在这一格里 ——
-            //  三代控件换下来都没好的原因不是控件，而是**这一张缩略图坐在控件下面一层、
-            //  却把上面那一片命中先拿走了**：
-            //    · `aspectRatio(contentMode: .fill)` 报出来的尺寸是「填满提案」的那个
-            //      尺寸，**不是**下面那个 120pt 的框：竖图（聚焦那张是 1080×1920）
-            //      铺 340×120 的框报的是 **340×604** —— 顶上多出 242pt，
-            //      正好把上面那个分段控件整条盖住；而横图（必应那张 1920×1080）
-            //      多出 35pt，只盖住控件下沿一条 —— 这就是「必应可以、聚焦不行」的差。
-            //    · 命中的是**视图自己的几何**：它是一张图，不接手势，但它仍然把命中
-            //      停在自己身上（SwiftUI 的命中测试到最前面那个可命中视图为止）。
-            //    · `clipShape` 裁的是画，不是命中 —— 所以前两代控件（系统 `Picker`、
-            //      自写 `Menu`）与 `DSSegmented` 在同一张图上都是一样的结果。
-            //  三件事一起才是修：`.frame(..., alignment: .top)` 而不是居中（图从那 120pt
-            //  的**顶部**开始画，溢出的部分一律往下、永远不再向上盖）+ `.clipped()`
-            //  + `.allowsHitTesting(false)`（缩略图不需要命中 —— 图不存在「点它」这件事）。
             Group {
                 if let img = wallpaper.image {
                     Image(uiImage: img)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        //  `.top` 而不是默认的居中：图从那 120pt 的**上沿**开始画，
-                        //  溢出的那部分一律往下 —— 竖图不再往**上**盖住上面那个控件。
                         .frame(height: 120, alignment: .top)
                         .frame(maxWidth: .infinity)
                         .clipped()
-                        //  关键的那一行：一张铺底的缩略图**不该在命中链里**。
                         .allowsHitTesting(false)
-                        //  圆角仍然是画出来的那一层（上面那个 `clipped` 是矩形裁，
-                        //  它保证溢出不会画到卡里其他地方，两件事互不替代）。
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
                     Rectangle()
@@ -367,7 +203,6 @@ struct MineView: View {
                 }
             }
 
-            // 两个小钮：相册那一档才需要「选一张」；有图时才给「不铺」。
             HStack(spacing: TokensSpacing.sm) {
                 if wallpaper.source == .photo {
                     PhotosPicker(selection: $wallpaperPickItem, matching: .images) {
@@ -376,15 +211,12 @@ struct MineView: View {
                     .buttonStyle(.plain)
                     .font(TokensTypo.footnote)
                     .foregroundStyle(TokensPalette.accent)
-                    // 三个小钮都按 HIG 的最小触控目标给足 44pt（2026-09-25）：
-                    // 它们原本只有一行 13pt 高的字，按中全靠运气。
                     .frame(minHeight: TokensSpacing.row)
                     .contentShape(Rectangle())
                 }
 
                 Spacer(minLength: 0)
 
-                // 取图失败时给一个出口：否则「取图没成功」就是一句没有下文的话。
                 if wallpaper.failed {
                     Button("重试") {
                         TokensHaptic.tap()
@@ -410,9 +242,6 @@ struct MineView: View {
                 }
             }
 
-            // 一句来源说明 + （相册档才有的）选图提示 + 取图失败时的一句人话。
-            // 深色模式下选图偏暗会把玻璃卡底下的底也拖暗：HIG 说背景色应当服务于
-            // 前景可读性，所以相册那一档多给一句。
             Text(wallpaper.source.note)
                 .font(TokensTypo.caption2)
                 .foregroundStyle(TokensPalette.tertiary)
@@ -435,9 +264,6 @@ struct MineView: View {
         }
         .padding(.horizontal, TokensSpacing.sm)
         .padding(.vertical, TokensSpacing.sm)
-        // 相册选中的是 `PhotosPickerItem`，要异步加载成 `Data` 才能存盘（项目照片
-        // 入口的既定走法，见 Theme.swift 头注）：加载完立刻交给壁纸服务，缩略图与
-        // 子页背景同时换过来。
         .onChange(of: wallpaperPickItem) { _, item in
             Task {
                 guard let item else { return }
@@ -450,19 +276,11 @@ struct MineView: View {
         }
     }
 
-    /// 选一档图源。**已经是这一档时**不是「什么都不发生」—— 那是「再取一次」。
-    ///
-    /// ⚠️ 换成原生分段控件之后，这一支**只对旧写法成立**：`UISegmentedControl`
-    /// 点已选中的那一段不会再把同一个值写回来（自己搭的那一排 `Button` 会）。
-    /// 所以「取图没成功 → 再试一次」的出口现在是缩略图下面那枚**重试**（`failed` 时
-    /// 才出现，就在同一张卡里）—— 而「不铺 → 再选」也仍然成立。
-    /// 这一支保留着不是多余的：它同时还覆盖「将来有别的入口写同一个值」。
     private func pickSource(_ s: WallpaperSource) {
         TokensHaptic.select()
         if s == wallpaper.source { wallpaper.reload() } else { wallpaper.use(s) }
     }
 
-    /// 退出登录。`logout()` 一直存在，但**没有任何按钮调它** —— 它是一段到不了的代码。
     private var logoutRow: some View {
         Button {
             logoutConfirm = true
@@ -480,28 +298,12 @@ struct MineView: View {
         .buttonStyle(.plain)
     }
 
-    //  MARK: 关于
-    //
-    //  这里原本是「检查更新」整块（一行说明 + 检查/下载两个按钮 + 进度条 + 分享安装包），
-    //  而它下面连着 `UpdateService`（查 GitHub 仓库 tag=latest 的 Release、把 ipa
-    //  下载到沙盒、用 `UIActivityViewController` 分发）与 `GithubToken`（那个仓库令牌）。
-    //  用户 2026-09-27：「删除更新相关」—— 三个文件（`Services/UpdateService.swift`、
-    //  `Services/GithubToken.swift`、以及本页这一块与它那 11 个 `@State`）一起走了。
-    //
-    //  留下来的是一个**真的属于"关于"的"关于"**：这个包是什么版本。
-    //  版本是用户报障时唯一能自报的东西，而它以前只藏在两个地方：一个**没人点得开**的
-    //  弹窗（`showAboutAlert` 全仓没有写处 —— 一个只有读者没有写者的状态）
-    //  与诊断页里。现在它在那一张卡上（诊断页那一组与「网络通道」那一行 2026-09-27 一起删，
-    //  于是全 App 只剩两处能看到版本：这一行，与「复制诊断信息」正文的抬头）。
     private var aboutCard: some View {
         DSGroup(title: "关于",
                 footer: "车况数据实时来自车辆车联网服务，仅用于本人车辆管理。") {
             DSGroupRow(showsSeparator: false) {
                 DSKeyValueRow(key: "版本", value: "\(appVersion) (\(buildNumber))", mono: false)
             }
-            //  「网络通道：直连（iOS 原生）」那一行于 2026-09-27 删（用户：「两处关于的行清理」）：
-            //  它是一句静态说明 —— 用户从这一行得不到任何可行动的信息，而它要回答的
-            //  「数据往哪儿走」在「我的 → 隐私与数据」里是有一整节在真回答的。
         }
     }
 
@@ -515,6 +317,5 @@ struct MineView: View {
 
     private func logout() {
         store.logout()
-        // RootView 监听 isLoggedIn 变化后自动切回登录页
     }
 }

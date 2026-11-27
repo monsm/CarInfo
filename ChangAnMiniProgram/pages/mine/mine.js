@@ -1,4 +1,3 @@
-// mine.js —— 我的 v3：极简 · 工程入口下沉到页脚
 const svc = require('../../utils/service');
 const VM = require('../../utils/vm');
 const C = require('../../utils/config');
@@ -31,7 +30,6 @@ Page({
   },
 
   async onShow() {
-    // tab 切换入场：每次 onShow 重放淡入上浮
     this.setData({ enter: false });
     wx.nextTick(() => this.setData({ enter: true }));
     if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 3 });

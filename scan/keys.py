@@ -47,7 +47,6 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# ---- 真实报文键集合（小写；来源：2026-09-22 抓包，360 键） ---------------------
 API_KEYS = set("""
 accpedal accel access_token activetime addrdesc address adviserid air airpurifierstatus
 airbagsystemstatus alti authenticationtype avatar batteryalarm batterychargelightstatus
@@ -124,7 +123,6 @@ status_code message bind_token new_flag expires_in devices sysuserlabelvos
 sidname cardnum isoperation sysuid sycid
 """.split())
 
-# 少数全大写 / 含下划线的键：它们的“真实写法”不是「首字母小写」，不能按规则推断
 UPPERCASE_KEYS = {"MAX_BYTE_VALUE"}
 
 
@@ -144,12 +142,9 @@ def is_violation(lit):
         return False
     return lit.lower() in API_KEYS
 
-# ci* 家族：自己折叠大小写，因此它们的**实参**键列表是合规的
 CI_FAMILY = re.compile(r"\b(?:ci[A-Za-z]*|vnumOf|vnum|ciVal)\s*\(")
 
-# ---- 显式豁免：必须写出理由，输出成 ⚠️ 而不是 ✅ -----------------------------
 EXEMPT = {
-    # 例：{"CarKeeper/xxx.swift": "为什么这里只能直接下标"},
 }
 
 SKIP_DIRS = ("scan/", "scan\\", ".git/")
@@ -166,7 +161,6 @@ def swift_files():
     return sorted(out)
 
 
-# 找到形如 `expr["Key"]` 的**下标**（不是 `call(obj, ["Key"])` 这种实参）
 SUBSCRIPT = re.compile(r'(?<![,\s(])\["([A-Za-z_][A-Za-z0-9_]*)"\]')
 ARGUMENT = re.compile(r'[,(]\s*\["([A-Za-z_][A-Za-z0-9_]*)"\]')
 

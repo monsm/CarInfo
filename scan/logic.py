@@ -105,7 +105,6 @@ def main():
         cl_offs = line_starts(cleaned)
         lines = text.split("\n")
 
-        # ---- 5) some View / AnyView 无 return
         for i, ln in enumerate(lines):
             mt = re.search(r"->\s*(some\s+[A-Za-z_][\w.]*|AnyView)\s*(\{)?\s*(//.*)?$", ln)
             mp = re.search(r":\s*(some\s+[A-Za-z_][\w.]*|AnyView)\s*\{", ln)
@@ -120,8 +119,6 @@ def main():
             head = ln.split("->")[0]
             nm = re.search(r"(?:func\s+|var\s+)([A-Za-z_]\w*)", head)
             name = nm.group(1) if nm else "?"
-            # @ViewBuilder 可能单独占一行，也可能与其它属性堆叠，
-            # 所以往上找「最近的非空行」，遇到连续的 @ 属性行就继续找。
             j, vb = i - 1, "@ViewBuilder" in ln
             while j >= 0 and not vb:
                 s = lines[j].strip()
@@ -140,20 +137,13 @@ def main():
             n, ret, words = stmts(inner)
             if ret:
                 continue
-            # 单语句 `switch`/`if` 是 SE-0380 的 if/switch 表达式，可以当隐式返回值
             if n > 1 or (n == 1 and words and words[0] in
                          {"let", "var", "guard", "for", "while", "defer"}):
                 opaque.append((p.name, i + 1, name, n, " ".join(words[:4])))
 
-        # ---- 8) @main 绑定检查
-        # @main 绑定到「下一个声明」：属性与目标之间若插入了任何类型声明
-        # （注释不算声明，挡不住），那个类型就静默接管入口 —— CI 曾报
-        # "'SceneID' ... must provide a main static function"，根因正是
-        # SceneID 被插在了 @main 和 App 结构体之间。
         for i, ln in enumerate(lines):
             if not ln.strip().startswith("@main"):
                 continue
-            # 越过紧邻的其它属性/注释/空行，落到真正的下一个声明行
             j = i + 1
             while j < len(lines) and (not lines[j].strip()
                                       or lines[j].strip().startswith(("@", "//"))
@@ -167,7 +157,6 @@ def main():
             else:
                 mains.append((p.name, i + 1, nxt[:60] or "<空>"))
 
-        # ---- 7) ViewBuilder 子视图 > 10
         for i, ln in enumerate(lines):
             m = re.search(r"(?<![A-Za-z0-9_.])([A-Z][A-Za-z0-9_]*)\s*(\([^{}]*\))?\s*\{\s*(//.*)?$", ln)
             if not m or m.group(1) not in CONTAINERS or ln.rfind("{") < 0:
@@ -179,9 +168,6 @@ def main():
             if kids > 10:
                 many.append((p.name, i + 1, m.group(1), kids))
 
-        # ---- 6) 未声明的小写标识符（文件级作用域，一遍扫完）
-        # 作用域取整个文件（比真实作用域宽松 → 少误报），仍能抓出
-        # 「声明被删/参数被删」这类重排损坏。
         local = set(re.findall(r"\b(?:let|var)\s+([a-zA-Z_]\w*)", cleaned))
         local |= set(re.findall(r"\bfor\s+([a-zA-Z_]\w*)\s+in\b", cleaned))
         local |= set(re.findall(r"\b(?:if|guard|while)\s+let\s+([a-zA-Z_]\w*)", cleaned))
@@ -223,7 +209,7 @@ def main():
                 continue
             if re.match(r"\s*:", cleaned[mm.end():mm.end() + 8]):
                 prev = cleaned[max(0, mm.start() - 1)]
-                if prev in "([,":      # 实参标签
+                if prev in "([,":
                     continue
             undecl.append((p.name, lineno(cl_offs, mm.start()), w, "file-scope"))
 
@@ -243,11 +229,6 @@ def main():
     if not undecl:
         print("    ✅ 无")
 
-    # 证据：BatteryView 的 `sections`（@ViewBuilder / 12 个子视图）在 CI 日志里
-    # 没有报错，且全日志 0 个「extra argument」类错误 —— 本 SDK 支持 >10，仅供参考。
-    # ---------------------------------------------------------------- 9
-    # 注释掉代码这件事本身合法；危险的是「两行被粘成一行」，于是
-    # `// MARK: xxx` 把紧跟其后的声明一起吃掉了 —— 那个声明就再也没被声明。
     print("\n### 9) 只出现在注释里、别处没有声明的标识符（可能是被粘行吞掉的代码）")
     declared_clean = set()
     for p in paths:

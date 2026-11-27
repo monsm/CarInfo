@@ -8,9 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=Noto+Serif+SC:wght@300;400;500;600&display=swap">
 <style>
-/* ============================================================
-   0 · 基础与色板
-   ============================================================ */
 *{box-sizing:border-box;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 html,body{margin:0;padding:0}
 body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;padding-bottom:40px}
@@ -51,9 +48,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
 .bm{position:absolute;inset:0}
 .lyr{position:absolute;inset:0;pointer-events:none;z-index:5}
 
-/* ============================================================
-   1 · 地图上的标记
-   ============================================================ */
 .pinWrap{position:absolute;z-index:15}
 .pinL{position:absolute;z-index:15;font-size:10px;letter-spacing:.14em;color:rgba(242,239,233,.74);
   text-shadow:0 1px 7px rgba(0,0,0,.95),0 0 14px rgba(0,0,0,.7);white-space:nowrap}
@@ -64,15 +58,11 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
 .pinL b{font-weight:500;letter-spacing:.06em}
 .pinL i{font-style:normal;opacity:.5;margin:0 5px}
 
-/* 比例尺 —— 真实地图的味道 */
 .scale{position:absolute;left:26px;z-index:15}
 .scale .bar{height:7px;border-left:1px solid rgba(242,239,233,.5);border-right:1px solid rgba(242,239,233,.5);
   border-bottom:1px solid rgba(242,239,233,.5)}
 .scale .lb{font-size:9px;letter-spacing:.22em;color:rgba(242,239,233,.44);margin-top:5px}
 
-/* ============================================================
-   2 · 浮层
-   ============================================================ */
 .hud{position:absolute;left:18px;right:18px;top:60px;z-index:20;display:flex;align-items:center;gap:8px}
 .hud .pill{display:flex;align-items:center;gap:9px;background:rgba(14,18,22,.72);
   border:1px solid rgba(242,239,233,.12);border-radius:999px;padding:9px 14px;font-size:11.5px;
@@ -95,7 +85,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
 #p3 .layers{bottom:320px}
 #p5 .layers{bottom:382px}
 
-/* 底部面板 —— 真实表面：顶面高光 + 内缩发丝线 */
 .sheet{position:absolute;left:0;right:0;bottom:0;z-index:25;background:#191920;
   border-radius:30px 30px 44px 44px;padding:16px 24px 34px;
   box-shadow:inset 0 1px 0 rgba(242,239,233,.07),0 -24px 56px -32px #000}
@@ -117,7 +106,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
 #p6 .sheet .row{padding:9px 0;font-size:11.5px}
 #p6 .sheet h3{font-size:19px}
 
-/* 回放时间轴 */
 .scrub{position:absolute;left:24px;right:24px;bottom:334px;z-index:20}
 .scrub .track{height:32px;position:relative}
 .scrub .line{position:absolute;left:0;right:0;top:15px;height:1px;background:rgba(242,239,233,.18)}
@@ -134,11 +122,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
 </head>
 <body>
 
-<!-- ============================================================
-     地形：一份定义，六屏共用（同一个世界，不同图层）
-     主路 x=148 / x=300 · y=232 / y=486；次路 x=88/228 · y=360/606
-     所有路线只沿这些线走
-     ============================================================ -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
     <linearGradient id="blk" x1="0" y1="0" x2="0" y2="1">
@@ -166,23 +149,19 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
   <symbol id="basemap" viewBox="0 0 390 844">
     <rect width="390" height="844" fill="#0E1216"/>
 
-    <!-- 水面 -->
     <path d="M-10 792 C 92 758, 168 826, 266 786 C 322 762, 360 790, 400 770 L400 856 L-10 856 Z" fill="url(#wtr)"/>
     <path d="M-10 792 C 92 758, 168 826, 266 786 C 322 762, 360 790, 400 770" fill="none" stroke="rgba(143,182,214,.22)" stroke-width="1"/>
 
-    <!-- 绿地 -->
     <rect x="240" y="244" width="52" height="108" rx="6" fill="#131F19"/>
     <rect x="240" y="244" width="52" height="108" rx="6" fill="url(#hatch)"/>
     <rect x="16" y="618" width="64" height="82" rx="6" fill="#131F19"/>
     <rect x="16" y="618" width="64" height="82" rx="6" fill="url(#hatch)"/>
 
-    <!-- 机场 -->
     <rect x="312" y="60" width="78" height="164" rx="8" fill="#161C21"/>
     <g stroke="rgba(242,239,233,.16)" stroke-width="2.5" stroke-dasharray="7 5">
       <path d="M330 76 V208"/><path d="M366 76 V208"/>
     </g>
 
-    <!-- 街区：更少、更大 -->
     <g fill="url(#blk)">
       <rect x="16" y="60" width="64" height="164" rx="6"/>
       <rect x="96" y="60" width="44" height="164" rx="6"/>
@@ -210,7 +189,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
       <rect x="240" y="618" width="52" height="82" rx="6"/>
     </g>
 
-    <!-- 次路：描边 + 路面 -->
     <g stroke="#070A0C" stroke-width="7" stroke-linecap="round" fill="none">
       <path d="M0 360 H390"/><path d="M0 606 H390"/><path d="M88 52 V712"/><path d="M228 52 V712"/>
     </g>
@@ -218,7 +196,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
       <path d="M0 360 H390"/><path d="M0 606 H390"/><path d="M88 52 V712"/><path d="M228 52 V712"/>
     </g>
 
-    <!-- 主路：更宽、有描边 -->
     <g stroke="#070A0C" stroke-width="10.5" stroke-linecap="round" fill="none">
       <path d="M0 232 H390"/><path d="M0 486 H390"/><path d="M148 40 V724"/><path d="M300 40 V724"/>
     </g>
@@ -229,13 +206,11 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
       <path d="M0 232 H390"/><path d="M0 486 H390"/>
     </g>
 
-    <!-- 高速：描边 + 路面 + 虚线中心线 -->
     <path d="M-10 700 C 120 670, 250 630, 400 600" stroke="#080B0E" stroke-width="14" fill="none"/>
     <path d="M-10 700 C 120 670, 250 630, 400 600" stroke="#2C353E" stroke-width="9" fill="none"/>
     <path d="M-10 700 C 120 670, 250 630, 400 600" stroke="rgba(242,239,233,.26)" stroke-width="1.2"
       stroke-dasharray="11 12" fill="none"/>
 
-    <!-- 图廓刻度 -->
     <g stroke="rgba(242,239,233,.055)" stroke-width="1">
       <path d="M40 0 V7"/><path d="M80 0 V7"/><path d="M120 0 V7"/><path d="M160 0 V7"/><path d="M200 0 V7"/>
       <path d="M240 0 V7"/><path d="M280 0 V7"/><path d="M320 0 V7"/><path d="M360 0 V7"/>
@@ -243,7 +218,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
       <path d="M0 520 H7"/><path d="M0 600 H7"/><path d="M0 680 H7"/><path d="M0 760 H7"/>
     </g>
 
-    <!-- 街区内的小地块：让城市不像格子 -->
     <g fill="#1C232A" opacity=".85">
       <rect x="24" y="72" width="22" height="30" rx="2"/>
       <rect x="52" y="106" width="20" height="26" rx="2"/>
@@ -261,10 +235,8 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
       <rect x="320" y="524" width="26" height="26" rx="2"/>
       <rect x="168" y="636" width="24" height="26" rx="2"/>
     </g>
-    <!-- 纵向路名 -->
     <text x="150" y="672" transform="rotate(-90 150 672)" font-family="'Noto Serif SC',serif" font-size="9"
       letter-spacing="5" fill="rgba(242,239,233,.2)">东 四 环</text>
-    <!-- 小地名 -->
     <g font-family="'Noto Serif SC',serif" font-size="8.5" letter-spacing="2.6" fill="rgba(242,239,233,.2)">
       <text x="96" y="140">北 苑</text>
       <text x="238" y="192">酒 仙 桥</text>
@@ -272,7 +244,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
       <text x="176" y="412">三 里 屯</text>
       <text x="216" y="526">十 里 堡</text>
     </g>
-    <!-- 地名：宋体大字距 -->
     <g font-family="'Noto Serif SC',serif" font-size="10.5" letter-spacing="3.4" fill="rgba(242,239,233,.34)">
       <text x="16" y="224">北 四 环</text>
       <text x="16" y="478">京 密 路</text>
@@ -289,7 +260,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
 
 <main id="board">
 
-<!-- ================= 01 主屏 ================= -->
 <section class="slide" id="p1">
   <div class="meta"><div class="no">01 / 06</div><div class="nm">主屏 · 车在这儿</div>
   <div class="de">打开就是地图，车钉就是首页。钉外那圈弧线 = 电量，十二道刻度是位置不是装饰。<em>其余功能全部是图层。</em></div></div>
@@ -302,7 +272,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
     </svg>
     <div class="sb">21:40<span>5G ▮▮▮▮</span></div>
 
-    <!-- 车钉 -->
     <svg class="pinWrap" style="left:246px;top:306px" width="108" height="108" viewBox="0 0 120 120">
       <circle cx="60" cy="60" r="60" fill="url(#glow)"/>
       <ellipse cx="60" cy="104" rx="24" ry="5" fill="rgba(0,0,0,.6)" filter="url(#soft)"/>
@@ -319,14 +288,12 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
       <circle cx="67" cy="69" r="4.2" fill="none" stroke="#F2EFE9" stroke-width="1.5"/>
     </svg>
 
-    <!-- 常去充电站 -->
     <svg class="pinWrap" style="left:214px;top:218px" width="28" height="28" viewBox="0 0 28 28">
       <circle cx="14" cy="14" r="11" fill="#0E1216" stroke="#6FE08B" stroke-width="1.6"/>
       <path d="M15.6 7.6 L9.6 15.2 H13.2 L12 21 L18 13.4 H14.4 Z" fill="#6FE08B"/>
     </svg>
     <div class="pinL gn" style="left:248px;top:222px">¥0.68 谷电</div>
 
-    <!-- 异常钉 -->
     <svg class="pinWrap" style="left:130px;top:214px" width="36" height="36" viewBox="0 0 36 36">
       <circle cx="18" cy="18" r="16" fill="rgba(255,90,74,.16)"/>
       <circle cx="18" cy="18" r="9" fill="#FF5A4A"/>
@@ -369,7 +336,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
   </div>
 </section>
 
-<!-- ================= 02 今天这条路 ================= -->
 <section class="slide" id="p2">
   <div class="meta"><div class="no">02 / 06</div><div class="nm">图层 · 今天这条路</div>
   <div class="de">行程不是列表，是地图上那条线。分段着色 = 能耗与评分；拖底部时间轴回放；灰虚线是上周同一天。</div></div>
@@ -421,7 +387,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
   </div>
 </section>
 
-<!-- ================= 03 充电与钱 ================= -->
 <section class="slide" id="p3">
   <div class="meta"><div class="no">03 / 06</div><div class="nm">图层 · 充电与钱</div>
   <div class="de">充电站是地图上的钉，价签直接写在钉上；热区显示钱花在哪个位置。</div></div>
@@ -473,7 +438,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
   </div>
 </section>
 
-<!-- ================= 04 车钉上的车控 ================= -->
 <section class="slide" id="p4">
   <div class="meta"><div class="no">04 / 06</div><div class="nm">车控 · 从钉子上长出来</div>
   <div class="de">不点 Tab，点车。动作围成一圈从钉子上展开 —— 控制长在对象上，不在导航里。</div></div>
@@ -514,7 +478,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
   </div>
 </section>
 
-<!-- ================= 05 异常钉 ================= -->
 <section class="slide" id="p5">
   <div class="meta"><div class="no">05 / 06</div><div class="nm">异常钉 · 它在这儿出了事</div>
   <div class="de">每个异常都钉在它发生的那一点上。你看到的不是一条通知，是一个地点。</div></div>
@@ -559,7 +522,6 @@ body{background:#141317;color:#F2EFE9;font-family:Inter,"PingFang SC","Microsoft
   </div>
 </section>
 
-<!-- ================= 06 全覆盖 ================= -->
 <section class="slide" id="p6">
   <div class="meta"><div class="no">06 / 06</div><div class="nm">全部功能 · 它的地方</div>
   <div class="de">现有 16 个深潜页 + 25 个服务，全部落到地图上的位置。<em>不是把功能塞进地图，是功能本来就有地方。</em></div></div>

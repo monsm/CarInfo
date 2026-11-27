@@ -1,4 +1,3 @@
-// home.js —— 首页 · v3：焦点电量 + 极简数据
 const svc = require('../../utils/service');
 const VM = require('../../utils/vm');
 const AN = require('../../utils/analysis');
@@ -66,7 +65,6 @@ Page({
   },
 
   async onShow() {
-    // tab 切换入场：每次 onShow 重放淡入上浮
     this.setData({ enter: false });
     wx.nextTick(() => this.setData({ enter: true }));
     if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 0 });
@@ -147,7 +145,6 @@ Page({
     this.setData({ statusText: msg || '', statusCls: cls || '' });
   },
 
-  // ---------- 渲染 ----------
   renderAll() {
     const cache = app.globalData.caches;
     const car = app.globalData.car;
@@ -156,7 +153,6 @@ Page({
     const e = VM.energy(cache, car);
     const hasData = !!cache.control;
 
-    // ---------- v7：hero 状态行 / 时段问候 ----------
     const now = new Date();
     const hh = now.getHours();
     const gd = hh < 5 ? '夜深了' : hh < 11 ? '早上好' : hh < 13 ? '中午好' : hh < 18 ? '下午好' : '晚上好';
@@ -175,7 +171,6 @@ Page({
     const socNum = Math.max(0, Math.min(100, parseInt(String(e.soc || '0').replace(/[^\d]/g, ''), 10) || 0));
     const heroCar = carSideURI({ charge: !!e.charging });
 
-    // 指标
     const d = VM.driveStatus(cache);
     const metrics = [
       { k: '车速', v: d.speed, u: 'km/h' },
@@ -185,12 +180,10 @@ Page({
     const tyre = VM.tyreStatus(cache);
     const loc = VM.locStatus(cache);
 
-    // ---------- 智能摘要（全量数据统一归纳：结论 + 原因，原始字段不铺开） ----------
     const summary = AN.summarize(cache, car);
 
     const heroHalo = hasData ? haloURI({ pct: socNum, size: 345 }) : '';
 
-    // ---------- 车辆状态（唯一状态列表：磁贴 / 关注 / 全绿横幅三合一，去重） ----------
     const domains = (summary && summary.domains) || [];
     const ST_ICON = { battery: 'soc', charge: 'bolt', tyre: 'tyre', climate: 'wind', body: 'lock', safety: 'shield' };
     const ST_ORDER = ['battery', 'charge', 'tyre', 'climate', 'body', 'safety'];
@@ -213,7 +206,6 @@ Page({
       };
     });
 
-    // ---------- 电池一致性（首页细柱预览 + 压差/温差，详见电池页） ----------
     const b = VM.batteryModel(cache);
     let barV = '';
     const cellRows = [];
@@ -231,7 +223,6 @@ Page({
       cellRows.push({ k: '温差', v: Number(dt).toFixed(1) + ' ℃', cls: alarmSet['温差过大'] ? 'bad' : 'ok' });
     }
 
-    // ---------- 动力（一行速览；逐台电机详情在电池页） ----------
     const powerRows = [];
     if (b.motors.length) {
       const m = b.motors[0];
@@ -245,14 +236,12 @@ Page({
       if (tParts.length) powerRows.push({ k: '电机温度', v: tParts.join(' · ') });
     }
 
-    // ---------- 车身逐项明细（门 / 窗 / 灯，默认收起） ----------
     const bd = VM.bodyDetailModel(cache);
     const bodyRows = bd.doorRows.concat(bd.extraRows).concat(bd.windowRows).map(r => ({ label: r.k, text: r.v, cls: r.cls }));
     if (bd.lampRows.length) {
       bodyRows.push({ label: '灯光', text: bd.lit.length ? bd.lit.join('、') : '全部关闭', cls: 'ok' });
     }
 
-    // ---------- 快控圆钮行（直达车控 tab） ----------
     const qctrl = [
       { key: 'lock', label: '锁车', icon: ic('lock', '#E8EAEE', 1.9) },
       { key: 'unlock', label: '解锁', icon: ic('unlock', '#E8EAEE', 1.9) },
@@ -287,7 +276,6 @@ Page({
   },
 
   onQuickCtrl(e) {
-    // 快控钮：充电直达电池页；其余跳到车控 tab，由 control 页承接后续（PIN / 温度弹层）
     const key = e.currentTarget.dataset.key;
     wx.vibrateShort && wx.vibrateShort({ type: 'light' });
     if (key === 'charge') {
@@ -307,7 +295,6 @@ Page({
     wx.navigateTo({ url: '/pages/battery/battery' });
   },
 
-  // 状态行点击：异常先讲原因，正常直达对应页；胎压原地滚动到俯视图
   onDomainTap(e) {
     const key = e.currentTarget.dataset.key;
     const item = (this.data.statusRows || []).find(r => r.key === key);
@@ -331,7 +318,6 @@ Page({
     if (item.url) wx.navigateTo({ url: item.url });
   },
 
-  // ---------- 刷新 ----------
   async runFullRefresh(showOk) {
     if (this.busyFull) return;
     const carId = app.globalData.carId;
@@ -363,11 +349,10 @@ Page({
         app.saveCache({ location: loc });
         this.renderAll();
       }
-    } catch (e) { /* 静默 */ }
+    } catch (e) {  }
     finally { this.busyQuick = false; }
   },
 
-  // ---------- 动作 ----------
   openMap() {
     const { loc } = this.data;
     if (!loc || loc.lat === '--' || loc.lng === '--') {

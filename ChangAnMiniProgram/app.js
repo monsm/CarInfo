@@ -1,4 +1,3 @@
-// app.js —— 长安车管家（ChangAnCarInfo 微信小程序移植版）
 const TOKEN_KEY = 'car_token_config';
 const CACHE_KEY = 'car_data_cache';
 const C = require('./utils/config');
@@ -7,9 +6,9 @@ App({
   globalData: {
     isLoggedIn: false,
     phone: '',
-    cars: [],           // 车辆列表 CarInfo[]
-    carId: '',          // 当前选中车辆 ID
-    car: null,          // 当前选中车辆信息
+    cars: [],
+    carId: '',
+    car: null,
     user: null,
     caches: {
       charge: null,
@@ -23,7 +22,6 @@ App({
   },
 
   onLaunch() {
-    // 云函数模式：初始化云开发（USE_CLOUD=false 时跳过，不影响直连调试）
     if (C.USE_CLOUD && wx.cloud) {
       wx.cloud.init({ env: C.CLOUD_ENV || undefined, traceUser: true });
     }

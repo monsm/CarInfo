@@ -1,7 +1,5 @@
 import Foundation
 
-// 纯 Swift MD5：输出与桌面版一致的大写十六进制。
-// 输入为 UTF-8 字符串，按标准 MD5 分块（512-bit）处理。
 enum MD5 {
     static func hash(_ input: String) -> String {
         let msg = input.data(using: .utf8) ?? Data()
@@ -10,20 +8,17 @@ enum MD5 {
 
     static func hash(data: Data) -> String {
         let n = data.count
-        // 分块补齐：n % 64 != 56 则补到下一个 64 边界
         var padded = Data()
         padded.append(data)
         padded.append(0x80)
         while padded.count % 64 != 56 {
             padded.append(0)
         }
-        // 64-bit 小端长度（长度 = 原始数据字节数 * 8，按 8 字节小端逐字节追加：LSB 在前）
         let bitLen = UInt64(n) * 8
         for i in 0..<8 {
             padded.append(UInt8(truncatingIfNeeded: bitLen >> UInt64(i) * 8))
         }
 
-        // 初始常量
         var a0: UInt32 = 0x67452301, b0: UInt32 = 0xefcdab89, c0: UInt32 = 0x98badcfe, d0: UInt32 = 0x10325476
         let K: [UInt32] = (0..<64).map { i in
             UInt32((abs(sin(Double(i + 1))) * 0x100000000).rounded(.down))
@@ -70,7 +65,6 @@ enum MD5 {
         }
 
         let digest = [a0, b0, c0, d0]
-        // 小端输出
         var out = ""
         for w in digest {
             out += String(format: "%02x", w & 0xff)

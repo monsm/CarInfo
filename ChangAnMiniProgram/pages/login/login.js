@@ -1,4 +1,3 @@
-// login.js —— 登录（手机号 + 图形验证码 + 短信验证码）· v7 场景入场
 const svc = require('../../utils/service');
 const { loginSceneURI } = require('../../utils/scene');
 const app = getApp();
@@ -40,7 +39,6 @@ Page({
   onPicCodeInput(e) { this.setData({ picCode: e.detail.value }); },
   onSmsCodeInput(e) { this.setData({ smsCode: e.detail.value }); },
 
-  // 聚焦行发丝线增亮
   onFocus(e) { this.setData({ focusRow: e.currentTarget.dataset.f || '' }); },
   onBlur(e) {
     this.setData({ focusRow: '' });

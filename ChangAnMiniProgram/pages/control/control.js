@@ -1,4 +1,3 @@
-// control.js —— 车控 v3：锁车/解锁 + 极简指令列表 + 安静执行反馈
 const svc = require('../../utils/service');
 const VM = require('../../utils/vm');
 const { ic } = require('../../utils/icons');
@@ -60,11 +59,9 @@ Page({
   },
 
   onShow() {
-    // tab 切换入场：每次 onShow 重放淡入上浮
     this.setData({ enter: false });
     wx.nextTick(() => this.setData({ enter: true }));
     if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 1 });
-    // 若上次停留在弹层上被切走，回来时确保导航坞状态正确
     if (!this.data.showPin && !this.data.showTemp) this.showBar();
     if (!svc.getTokenCfg()) { wx.reLaunch({ url: '/pages/login/login' }); return; }
     this.visible = true;
@@ -73,9 +70,7 @@ Page({
     } else {
       this.syncCarSel();
     }
-    // 车身状态矩阵（与首页/详情同源建模：门/舱盖/窗/灯）
     this.renderBody();
-    // 首页快控圆钮带来的意图：空调→温度弹层，锁/解锁→控车码弹层
     const qk = app.globalData.pendingQuickCtrl;
     if (qk && !this.data.busy && !this.running && app.globalData.carId) {
       app.globalData.pendingQuickCtrl = null;
@@ -131,7 +126,6 @@ Page({
     this.setData({ body: bd });
   },
 
-  // ---------- 指令入口 ----------
   onCmd(e) {
     if (this.data.busy || this.data.running) return;
     if (!svc.getTokenCfg()) { wx.reLaunch({ url: '/pages/login/login' }); return; }
@@ -142,10 +136,6 @@ Page({
     else this.openPin();
   },
 
-  // 弹层打开时隐藏底部导航坞（自定义 tab bar 在原生层，page 的 z-index 压不住它），
-  // 所有弹层统一走 open/close，保证每次打开都 hide、每次关闭都 show。
-  // 注意：custom:true 下绝不能调 wx.showTabBar/wx.hideTabBar —— showTabBar 会把
-  // 原生 tabBar 复显出来，与自定义玻璃坞叠成两组导航（点一次车控就复现）。
   hideBar() {
     try { if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ hidden: true }); } catch (e) {}
   },
@@ -284,7 +274,6 @@ Page({
       icon: item.cls === 'ok' ? 'success' : 'none',
       duration: 2000
     });
-    // 指令完成后静默回刷车辆状态
     if (app.globalData.carId) {
       svc.getControl(app.globalData.carId).then(ctrl => {
         if (ctrl) app.saveCache({ control: ctrl });

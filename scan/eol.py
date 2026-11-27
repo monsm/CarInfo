@@ -62,7 +62,7 @@ def literals(b):
 
 def classify(b):
     dbl = len(re.findall(rb"\r\r\n", b))
-    lone = len(re.findall(rb"\r(?!(?:\r?\n))", b))      # 行中间/字面量里的裸 CR
+    lone = len(re.findall(rb"\r(?!(?:\r?\n))", b))
     crlf = len(re.findall(rb"\r\n", b))
     bad_lit = literals(b)
     return dbl, lone, crlf, bad_lit
@@ -82,7 +82,6 @@ def main():
         dbl, lone, crlf, bad_lit = classify(b)
         if bad_lit:
             crit.append((p, bad_lit[:5]))
-        # 排除 `\r\r\n` 里第一个 CR 之后的孤 CR：逐个核对更精确
         stripped = b.replace(b"\r\r\n", b"\n").replace(b"\r\n", b"\n")
         lone_real = len(re.findall(rb"\r", stripped))
         if lone_real:

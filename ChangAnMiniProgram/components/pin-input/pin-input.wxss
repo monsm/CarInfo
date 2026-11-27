@@ -1,5 +1,3 @@
-/* 控车码弹层 —— 单块玻璃底部弹片：遮罩不模糊，弹片整体一块玻璃（仅 1 处 backdrop-filter），
-   顶/身/按钮同底色，杜绝分段接缝。 */
 .sh-mask {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -35,7 +33,6 @@
 .sh-title { font-size: 36rpx; font-weight: 600; text-align: center; color: #FFFFFF; letter-spacing: -0.5rpx; }
 .sh-sub { font-size: 21rpx; color: #8A93A3; text-align: center; margin: 10rpx 0 30rpx; }
 
-/* 六位圆角方块 */
 .pi-boxes { display: flex; justify-content: space-between; }
 .pi-box {
   width: 88rpx; height: 100rpx;
@@ -50,7 +47,6 @@
 .pi-box.filled { background: rgba(255, 255, 255, 0.13); border-color: rgba(255, 255, 255, 0.4); }
 .pi-box.active { border-color: #5AC8FA; box-shadow: 0 0 0 6rpx rgba(90, 200, 250, 0.12); }
 
-/* 3×4 扁平方键 */
 .pi-keys { display: flex; flex-wrap: wrap; margin-top: 30rpx; }
 .pi-key {
   width: 33.3333%; height: 104rpx;
@@ -82,7 +78,6 @@
 }
 .pi-key:active .pi-kdel { background-color: rgba(255, 255, 255, 0.12); }
 
-/* 底部按钮 */
 .sh-btns { display: flex; gap: 22rpx; margin-top: 30rpx; }
 .sh-btn {
   flex: 1; height: 96rpx; line-height: 96rpx;

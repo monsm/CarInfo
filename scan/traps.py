@@ -48,8 +48,6 @@ import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 报告范围 = 编进 App / 扩展 target 的 Swift 源码。测试目标不在内：
-# 测试里 `date(from:)!` 是把一个**写死的字面量**变 Date，失败即测试本身的错。
 SCOPE_DIRS = [
     "CarKeeper/CarKeeper",
     "CarKeeper/Services",
@@ -60,18 +58,13 @@ SCOPE_DIRS = [
     "CarKeeper/WatchApp",
 ]
 
-# 白名单：{ "相对路径:行内容关键词": "理由" }
 ALLOWED = {
-    # 目前没有需要豁免的。留空是好事。
 }
 
 HASH_VALUE = re.compile(r"\.hashValue\b")
-# 同一行里既有日期构造、又用 `!` 结尾（或是 `)!` 形式）
 DATE_API = re.compile(r"date\(byAdding:|date\(from:|startOfDay\(|startOfMonth\(")
 FORCE_UNWRAP_TAIL = re.compile(r"\)![\s,\]]*$|\)!\s*$")
-# ②' 任何调用结果的强解包：`)` 紧跟 `!`，后面是行尾 / 逗号 / 右括号 / 收尾括号
 CALL_UNWRAP = re.compile(r"\)\s*!\s*(?:[,)\]}]|$)")
-# ②'' 空集合上必为 nil 的取值后强解包（`arr.isEmpty ? … : arr.min()!` 也在内）
 COLLECTION_UNWRAP = re.compile(r"\.(?:first|last|min|max)\s*!")
 TRY_BANG = re.compile(r"\btry!")
 AS_BANG = re.compile(r"\bas!\s*[A-Za-z_\[]")

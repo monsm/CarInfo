@@ -1,4 +1,3 @@
-// md5.js —— 纯 JS MD5 实现，输出与桌面版一致的大写十六进制
 'use strict';
 
 function utf8Encode(str) {

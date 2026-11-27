@@ -1,6 +1,5 @@
 <view class="page mine {{enter ? 'ent' : ''}}">
 
-  <!-- 身份条 -->
   <view class="glass u-row">
     <view class="u-head">
       <view class="avatar">{{user.avatar || '车'}}</view>
@@ -14,7 +13,6 @@
     </view>
   </view>
 
-  <!-- 我的车辆（场景大卡） -->
   <view class="glass glass-hero my-car">
     <view class="hero-beam"></view>
     <view class="mc-name-row">
@@ -43,10 +41,8 @@
     <view class="switch-car softpress">切换车辆 · 共 {{carCount}} 辆</view>
   </picker>
 
-  <!-- 控制台面板：横向图标轨 + 工程入口 -->
   <view class="console">
 
-    <!-- 01 常用：横向图标轨 -->
     <view class="sec">
       <view class="sec-head">
         <view class="sec-stamp">
@@ -81,7 +77,6 @@
       </view>
     </view>
 
-    <!-- 02 工程与账户 -->
     <view class="sec">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">

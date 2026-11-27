@@ -57,19 +57,14 @@ import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 报告范围：编进 App 主 target 的源码目录
 SCOPE_DIRS = [
     "CarKeeper/CarKeeper",
     "CarKeeper/Services",
-    #  `CarKeeper/Models`（顶层）随 `AppDataModel.swift` 于 2026-09-26 删除，
-    #  所以从这里去掉；下面的 `Shared` / `HealthKit` 是同一种历史（已删的目录，
-    #  靠 `isdir` 守卫静默跳过），留着它们不是本轮要处理的事。
     "CarKeeper/Design",
     "CarKeeper/Shared",
     "CarKeeper/HealthKit",
 ]
 
-# 入口 / 系统发现类的标记：这些文件不需要被别的文件提到
 ENTRY_MARKERS = [
     "@main",
     "PreviewProvider",
@@ -80,18 +75,9 @@ ENTRY_MARKERS = [
     "UIWindowSceneDelegate",
 ]
 
-# 白名单：{ 相对路径: 理由 }
-# 规则：只有「确实不该被代码引用」才允许进白名单。
 WHITELIST = {
     "CarKeeper/CarKeeper/Features/SiriShortcuts.swift":
         "AppIntent 由系统按定义发现（Siri/快捷指令），代码里不需要引用 —— 见该文件头部说明",
-    #  `InkGlow.swift` 那一条已删（2026-09-26）：整个文件随「完全删除文字发光和
-    #  文字发光功能」删掉了 —— 白名单里留着一个不存在的文件名，下一个人会以为
-    #  那一套还在。
-    #  `DSGlass.swift` 那一条也一起删：它此前豁免的理由是「文件里只剩一个类型
-    #  `DSGlassVariant`，而它只作为参数类型出现」—— 那个类型随「玻璃默认更透」
-    #  删了（材质固定 `.clear`，不再有变体参数），于是这个文件现在**一个类型都没有**，
-    #  四条 `View` 扩展方法各有读者，判据 ① 在这里无事可判。
 }
 
 TOP_TYPE_RE = re.compile(
@@ -99,29 +85,8 @@ TOP_TYPE_RE = re.compile(
     re.M,
 )
 
-# =============================================================================
-#  判据 ②：**扩展在系统类型上的成员，有没有读者**
-# =============================================================================
-#
-#  为什么需要它：判据 ① 只认**顶层类型**（`TOP_TYPE_RE`），于是
-#  `private extension Double { func clamped(to:) }` 这一类完全在盲区里 ——
-#  2026-09-25 那个 `clamped` 就是这样活下来的：它唯一的使用点（宿主自己算档位
-#  的那一段，见 `DSSwipeStrip.RowDrag`）删掉之后，声明还在，31 条门禁一条都没说话，
-#  是人工过 diff 时看到的。而「声明在、没有读者」正是这个仓库反复吃亏的那一类。
-#
-#  判据：`extension X` 里 `X` **不是**项目自己声明的类型（= 系统 / 外部类型），
-#  而它某个成员的名字在**全仓**除了声明以外一次都没出现过 —— 那就是没有读者。
-#
-#  收窄（宁愿漏，不可噪）：
-#    · 名字短于 6 个字符不看（`==`、`id` 这类撞名太多，数读者会数出假阳性）；
-#    · 只数「名字出现过」，不看它用在哪儿 —— 这是**保守**方向：
-#      名字在注释里出现一次也算有人读，于是宁可漏报；
-#    · `DerivedData/` 里的生成文件不参与统计（它们不是读者）。
-#
-#  为什么长在 orphans 里：它就是这个文件的题目 —— 「写了却没人用」。
 EXT_MIN_NAME = 6
 
-# 例外：{ "文件:类型.成员": 理由 }。只有「确实不需要被代码引用」才允许进来。
 EXT_WHITELIST: dict[str, str] = {}
 
 TYPE_DECL_RE = re.compile(
@@ -153,7 +118,6 @@ def extension_member_orphans(texts):
         for m in EXT_BLOCK_RE.finditer(text):
             raw = m.group(1)
             typ = raw.split(".")[-1]
-            # 项目自己的类型（含嵌套写法）不看：它们由判据 ① 与编译器管。
             if typ in project_types:
                 continue
             brace = text.find("{", m.end())
@@ -183,29 +147,6 @@ def extension_member_orphans(texts):
     return hits
 
 
-# =============================================================================
-#  判据 ③：**顶层 View 从来没有被构造过**（2026-09-27 加）
-# =============================================================================
-#
-#  为什么需要它：判据 ① 是**按文件**判的 —— 它把「这个文件里的顶层类型名」当成一
-#  张名单，只要名单里**任何一个**名字在别的文件出现过，整个文件就算「有人引用」。
-#  于是一份文件里只要有一样东西是活的，同文件里零读者的类型就全搭了便车：
-#  2026-09-27 的月报（`MonthlyReportSection` / `MonthlyReportCard`：行驶统计 + 驾驶评分
-#  + 生成 HTML 再分享，约 170 行）正是这样活了很久：**零入口、零读者**，而 34 条门禁
-#  一条都没说话（`Theme.swift` 里 `SafeSymbol` / `AppCanvas` 是活的，那个文件就放行了）
-#  —— 发现它靠的是一次性脚本。
-#
-#  判据：顶层 `struct` 声明了 `: View`，而**整个仓库**（含它自己的文件）里
-#  一次都没有出现「构造它 / 把它当类型用」的形状：
-#      Name( · Name< · <Name> 或 <Name, · Name.self
-#  → 报红。
-#
-#  只挑 `: View` 是故意的：这是「能被人看见的东西」的判据，也是误报最少的一条。
-#    · `enum`（命名空间）/ `PreferenceKey` 那类 struct / 模型不参与；
-#    · 交给系统发现的（`@main` / `AppIntent` / `_Previews`）由 `ENTRY_MARKERS`
-#      与 `_Previews` 后缀挡掉；
-#    · ⚠️ 保守方向与判据 ①② 一样：**注释里出现一次 `Foo()` 也算有人构造**（宁漏不噪）。
-#  确实不需要被代码构造的（系统按注册发现等）→ 写进 VIEW_WHITELIST 并说明理由。
 VIEW_MIN_NAME = 6
 VIEW_DECL_RE = re.compile(
     r"^(?:public |internal |private |fileprivate |final |open )*struct\s+([A-Za-z_][A-Za-z0-9_]*)"
@@ -233,9 +174,9 @@ def view_orphans(texts, in_scope):
             if key in VIEW_WHITELIST:
                 continue
             pat = re.compile(
-                r"\b" + re.escape(name) + r"\s*[\(<]"                       # 构造 / 显式泛型
-                r"|<\s*" + re.escape(name) + r"\s*(?:,|>)"                  # 当类型参数
-                r"|\b" + re.escape(name) + r"\.self\b"                      # 当类型用
+                r"\b" + re.escape(name) + r"\s*[\(<]"
+                r"|<\s*" + re.escape(name) + r"\s*(?:,|>)"
+                r"|\b" + re.escape(name) + r"\.self\b"
             )
             if not any(pat.search(t) for t in readable.values()):
                 hits.append((path, name))
@@ -258,8 +199,6 @@ def main():
             in_scope += all_swift_files(d)
     in_scope = sorted(set(in_scope))
 
-    # 引用计数要跨**所有** Swift 文件（含扩展 target 与测试）：
-    # 只被 Widget 引用的类型不是孤儿。
     everything = sorted(set(all_swift_files("CarKeeper")))
     texts = {}
     for p in everything:
@@ -283,7 +222,6 @@ def main():
         if any(marker in text for marker in ENTRY_MARKERS):
             continue
         names = {m.group(2) for m in TOP_TYPE_RE.finditer(text)}
-        # 只当真名前 5 个字符以上（单字母/缩写容易和其它东西撞名）
         names = {n for n in names if len(n) >= 6}
         if not names:
             continue
@@ -319,7 +257,6 @@ def main():
 
     print("\n✅ 无『孤儿页面』（每个写了页面的文件都有地方能到达它）")
 
-    # ---- 判据 ②：系统类型扩展里没有读者的成员 ----------------------------
     ext_hits = extension_member_orphans(texts)
     hard_ext = [h for h in ext_hits if h[0] not in EXT_WHITELIST]
     if hard_ext:
@@ -333,7 +270,6 @@ def main():
         return 1
     print(f"\n✅ 系统类型扩展里的成员都有读者（例外表 {len(EXT_WHITELIST)} 条）")
 
-    # ---- 判据 ③：顶层 View 全仓没有被构造过 ------------------------------
     view_hits = view_orphans(texts, in_scope)
     hard_view = [h for h in view_hits if f"{h[0]}:{h[1]}" not in VIEW_WHITELIST]
     if hard_view:

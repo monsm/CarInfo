@@ -1,4 +1,3 @@
-// health.js —— 健康报告 v3
 const svc = require('../../utils/service');
 const VM = require('../../utils/vm');
 const { ic } = require('../../utils/icons');

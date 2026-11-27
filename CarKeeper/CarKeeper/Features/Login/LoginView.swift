@@ -3,28 +3,6 @@ import UIKit
 import Combine
 import LocalAuthentication
 
-// =============================================================================
-// LoginView.swift — 登录（所有人看到的第一屏）
-// =============================================================================
-//
-// 版面：与全 App 同一套语言 —— 画布 + 发丝线 + 字号层级，表单是 inset-grouped 分组。
-//   • **不自己铺底**：旧版这里套了一层 `DSCanvas`（不透明的页面底色），而光在
-//     App 根部只画一次 —— 那层底把光整个挡在门外，于是登录页成了全 App 唯一
-//     「没有光」的一屏。原生主题本来就没有光，所以去掉它不影响原生。
-//   • 表单是 **inset-grouped 分组**（iOS 设置 / 钱包的做法）：不再在卡片里再挖一层
-//     填充输入框（那是两层容器说同一件事）。
-//   • 一屏只有一个实心胶囊：登录。
-//
-// 逻辑：**这六个动作函数此前全是空壳** ——
-//     `private func performLogin() { /* 保持原有逻辑 */ }`
-//   也就是说登录按钮点了什么都不会发生（从 b3af51e 起被删掉，注释却还写着
-//   「保持原有逻辑」）。这里按 b3af51e 的历史版本恢复，并保持与 APIClient /
-//   AppStore 现有签名一致（`smsSend(phone:picCode:)` / `login(phone:smsCode:picCode:)`）。
-//
-// 顺带修掉一个一直没生效的东西：倒计时原先用 `Timer.publish(...).autoconnect()`
-//   写成**计算属性** —— 每次视图求值都会新建一个定时器并重建订阅，倒计时因此
-//   时灵时不灵。改成 Task 循环，取消时机明确（离开页面即取消）。
-// =============================================================================
 
 struct LoginView: View {
     @State private var phone: String = ""
@@ -77,12 +55,7 @@ struct LoginView: View {
         }
     }
 
-    // =========================================================================
-    // MARK: 品牌
-    // =========================================================================
 
-    /// 品牌区：衬线大字 + 疏排小字 + 一条发丝线。
-    /// 没有图标砖、没有渐变、没有阴影 —— 第一屏的分量靠字号差，不靠装饰。
     private var brand: some View {
         VStack(alignment: .leading, spacing: TokensSpacing.sm) {
             Text("长安车管家")
@@ -103,9 +76,6 @@ struct LoginView: View {
         }
     }
 
-    // =========================================================================
-    // MARK: 凭据（inset-grouped 分组）
-    // =========================================================================
 
     private var creditionalsGroup: some View {
         DSGroup(title: "登录信息") {
@@ -118,8 +88,6 @@ struct LoginView: View {
                             .font(TokensTypo.subtitle)
                             .foregroundStyle(TokensPalette.primary)
                             .onChange(of: phone) { _, new in
-                                // 协议里的手机号固定 11 位：多打的字直接不要
-                                // （旧写法 `String(phone.prefix(11))` 同样只截断）
                                 if new.count > 11 { phone = String(new.prefix(11)) }
                             }
                     }
@@ -175,7 +143,6 @@ struct LoginView: View {
         .disabled(busy)
     }
 
-    /// 一行输入 = 小标签 + 输入框（标签在上，值在下；不做内嵌填充框）
     private func fieldColumn<Content: View>(_ label: String,
                                             @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: TokensSpacing.xxs) {
@@ -187,7 +154,6 @@ struct LoginView: View {
         .frame(minHeight: TokensSpacing.row, alignment: .center)
     }
 
-    /// 图形验证码。点一下换一张（服务端每次请求都出新图）。
     @ViewBuilder
     private var captchaView: some View {
         if let data = captchaData, let captcha = UIImage(data: data) {
@@ -198,7 +164,6 @@ struct LoginView: View {
                 .onTapGesture { loadCaptcha() }
                 .accessibilityLabel(Text("图形验证码，点一下换一张"))
         } else {
-            // 还没拿到图（或取图失败）：**说清状态**，不放一个假装是验证码的灰块
             Button { loadCaptcha() } label: {
                 Text(phone.isEmpty ? "先填手机号" : "取图失败 · 重试")
                     .font(TokensTypo.caption)
@@ -214,11 +179,7 @@ struct LoginView: View {
         }
     }
 
-    // =========================================================================
-    // MARK: 操作
-    // =========================================================================
 
-    /// 一屏唯一的实心胶囊 = 登录；其余都是次操作。
     private var actions: some View {
         VStack(spacing: TokensSpacing.md) {
             Button { performLogin() } label: {
@@ -240,7 +201,6 @@ struct LoginView: View {
             }
 
             if !canSubmit {
-                // 说清为什么按钮是灰的，而不是让用户猜
                 Text(loginBlocker())
                     .font(TokensTypo.caption)
                     .foregroundStyle(TokensPalette.tertiary)
@@ -265,16 +225,12 @@ struct LoginView: View {
         }
     }
 
-    // =========================================================================
-    // MARK: - 逻辑（按 b3af51e 的历史版本恢复）
-    // =========================================================================
 
     private func showStatus(_ msg: String, isErr: Bool) {
         statusText = msg
         statusErr = isErr
     }
 
-    /// 倒计时用 Task 循环：取消时机明确，不会像计算属性里的 Timer 那样每次求值重建订阅。
     private func startCountdown() {
         countdown = 60
         smsBtnDisabled = true
@@ -291,7 +247,6 @@ struct LoginView: View {
         }
     }
 
-    /// 取图形验证码（服务端按手机号出图）
     private func loadCaptcha() {
         let trimmed = phone.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -302,8 +257,6 @@ struct LoginView: View {
         }
     }
 
-    /// 发短信验证码。返回「无记录」时必须刷新图形验证码 —— 那是服务端的语义，
-    /// 不是失败：直接重试会一直撞同一堵墙。
     private func sendSMS() {
         let trimmed = phone.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !picCode.isEmpty else {
@@ -325,7 +278,6 @@ struct LoginView: View {
         }
     }
 
-    /// 登录：成功后写入令牌状态并 bootstrap（与旧版一致）
     private func performLogin() {
         let trimmedPhone = phone.trimmingCharacters(in: .whitespaces)
         guard !trimmedPhone.isEmpty, !smsCode.isEmpty, !picCode.isEmpty else {
@@ -356,8 +308,6 @@ struct LoginView: View {
         }
     }
 
-    /// 生物识别只证明「是本人」—— 它**不换新令牌**：进去之后能不能拉到数据，
-    /// 仍由本机已存的令牌决定（令牌失效时会在数据层拿不到东西，不会假装成功）。
     private func biometricLogin() async {
         biometricAuthPending = true
         let success = await AppStore.shared.authenticateWithBiometrics(reason: "验证身份以登录账号")

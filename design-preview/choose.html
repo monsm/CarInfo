@@ -8,9 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=Noto+Serif+SC:wght@300;400;600&display=swap">
 <style>
-/* ============================================================
-   基础：纸
-   ============================================================ */
 *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
 html,body{margin:0;padding:0}
 body{
@@ -26,9 +23,6 @@ body::before{
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
 }
 
-/* ============================================================
-   选单头（给用户看的导航，不属于设计本身）
-   ============================================================ */
 .pick{position:relative;z-index:1;max-width:760px;margin:0 auto 26px}
 .pick h1{font-size:15px;font-weight:600;letter-spacing:.01em;margin:0 0 6px}
 .pick p{font-size:12.5px;line-height:1.7;color:#5C574E;margin:0 0 14px}
@@ -39,9 +33,6 @@ body::before{
 }
 .pick .keys span i{font-style:normal;opacity:.55;margin-left:5px;font-weight:400}
 
-/* ============================================================
-   设备框 + 缩放到面板宽度
-   ============================================================ */
 .stage{position:relative;z-index:1;max-width:760px;margin:0 auto}
 .block{margin:0 0 46px}
 .block > h2{
@@ -59,7 +50,6 @@ body::before{
 @media (max-width:440px){ .device{zoom:.80} }
 @media (max-width:325px){ .device{zoom:.70} }
 
-/* 状态条 */
 .statusbar{
   position:absolute;top:0;left:0;right:0;height:54px;z-index:9;
   display:flex;align-items:flex-end;justify-content:space-between;
@@ -68,16 +58,12 @@ body::before{
 }
 .statusbar .glyph{letter-spacing:.06em;font-size:11px;opacity:.75}
 
-/* 纸张质感（每屏一层细颗粒） */
 .device::after{
   content:"";position:absolute;inset:0;pointer-events:none;z-index:20;
   opacity:.045;mix-blend-mode:multiply;border-radius:44px;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.7'/%3E%3C/svg%3E");
 }
 
-/* ============================================================
-   照片（用图层模拟，真机上换成你自己的照片）
-   ============================================================ */
 .ph{position:relative;overflow:hidden;background:#111}
 .ph .b0,.ph .b1,.ph .b2,.ph .b3{position:absolute;border-radius:50%}
 .ph .ground{position:absolute;left:-6%;right:-6%;bottom:0}
@@ -87,7 +73,6 @@ body::before{
 .ph .grain{position:absolute;inset:0;opacity:.17;mix-blend-mode:overlay;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='130'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='130' height='130' filter='url(%23n)' opacity='0.7'/%3E%3C/svg%3E")}
 
-/* 深夜 21:40 — 唯一的光是地库灯与车灯 */
 .pl-night{background:linear-gradient(180deg,#0B0E14 0%,#141922 46%,#1B2029 62%,#0A0C10 100%)}
 .pl-night .b0{width:120px;height:120px;left:-24px;top:16%;background:radial-gradient(circle,rgba(255,196,120,.85),rgba(255,196,120,0) 68%);filter:blur(14px)}
 .pl-night .b1{width:70px;height:70px;right:8%;top:30%;background:radial-gradient(circle,rgba(255,225,190,.55),rgba(255,225,190,0) 70%);filter:blur(16px)}
@@ -95,28 +80,24 @@ body::before{
 .pl-night .ground{height:38%;background:linear-gradient(180deg,rgba(22,26,34,.2),#080A0D 60%)}
 .pl-night .car{width:150px;height:44px;right:14%;bottom:23%;background:linear-gradient(180deg,#2A3038,#101318);filter:blur(1.4px)}
 
-/* 破晓 07:42 */
 .pl-dawn{background:linear-gradient(180deg,#2E3C56 0%,#6C7392 34%,#C79A8E 54%,#8A7480 70%,#3A3540 100%)}
 .pl-dawn .b0{width:150px;height:150px;right:-30px;top:22%;background:radial-gradient(circle,rgba(255,214,174,.72),rgba(255,214,174,0) 66%);filter:blur(20px)}
 .pl-dawn .b1{width:90px;height:90px;left:6%;top:44%;background:radial-gradient(circle,rgba(255,240,225,.4),rgba(255,240,225,0) 70%);filter:blur(18px)}
 .pl-dawn .ground{height:32%;background:linear-gradient(180deg,rgba(58,53,64,.28),#26232B 70%)}
 .pl-dawn .car{width:140px;height:40px;left:16%;bottom:20%;background:linear-gradient(180deg,#3A3540,#1B1920);filter:blur(1.6px)}
 
-/* 清晨 08:20 */
 .pl-morn{background:linear-gradient(180deg,#93A8BF 0%,#BBC7D4 40%,#D6D9DA 60%,#9A9B99 100%)}
 .pl-morn .b0{width:180px;height:180px;left:4%;top:8%;background:radial-gradient(circle,rgba(255,255,255,.75),rgba(255,255,255,0) 66%);filter:blur(24px)}
 .pl-morn .b1{width:110px;height:110px;right:12%;top:34%;background:radial-gradient(circle,rgba(255,247,230,.5),rgba(255,247,230,0) 70%);filter:blur(20px)}
 .pl-morn .ground{height:34%;background:linear-gradient(180deg,rgba(120,122,124,.35),#6E7073 78%)}
 .pl-morn .car{width:156px;height:46px;right:12%;bottom:21%;background:linear-gradient(180deg,#5A5F66,#2C3036);filter:blur(1.3px)}
 
-/* 正午 12:10 */
 .pl-noon{background:linear-gradient(180deg,#C6D3DE 0%,#E2E7EA 44%,#EDE9E2 58%,#B9B4AB 100%)}
 .pl-noon .b0{width:220px;height:220px;left:50%;top:2%;transform:translateX(-50%);background:radial-gradient(circle,rgba(255,255,255,.9),rgba(255,255,255,0) 62%);filter:blur(28px)}
 .pl-noon .b1{width:120px;height:120px;right:4%;top:40%;background:radial-gradient(circle,rgba(255,240,214,.45),rgba(255,240,214,0) 70%);filter:blur(22px)}
 .pl-noon .ground{height:36%;background:linear-gradient(180deg,rgba(180,175,166,.4),#A39E95 80%)}
 .pl-noon .car{width:150px;height:44px;left:18%;bottom:22%;background:linear-gradient(180deg,#8D8A85,#4E4C4A);filter:blur(1.5px)}
 
-/* 黄昏 18:05 */
 .pl-dusk{background:linear-gradient(180deg,#221C33 0%,#5A3350 30%,#B3543F 52%,#E8843C 66%,#4A2A28 100%)}
 .pl-dusk .b0{width:230px;height:230px;right:-40px;top:40%;background:radial-gradient(circle,rgba(255,168,86,.85),rgba(255,168,86,0) 62%);filter:blur(22px)}
 .pl-dusk .b1{width:100px;height:100px;left:10%;top:24%;background:radial-gradient(circle,rgba(216,180,220,.4),rgba(216,180,220,0) 70%);filter:blur(20px)}
@@ -124,7 +105,6 @@ body::before{
 .pl-dusk .ground{height:30%;background:linear-gradient(180deg,rgba(58,34,32,.4),#20161A 72%)}
 .pl-dusk .car{width:162px;height:48px;left:12%;bottom:18%;background:linear-gradient(180deg,#2A1A20,#100B0E);filter:blur(1.4px)}
 
-/* 入夜 18:52 */
 .pl-eve{background:linear-gradient(180deg,#111528 0%,#28304F 34%,#5A5480 54%,#2A2A3C 72%,#0D0F18 100%)}
 .pl-eve .b0{width:130px;height:130px;left:-20px;top:38%;background:radial-gradient(circle,rgba(255,180,120,.6),rgba(255,180,120,0) 68%);filter:blur(18px)}
 .pl-eve .b1{width:80px;height:80px;right:14%;top:44%;background:radial-gradient(circle,rgba(255,86,70,.55),rgba(255,86,70,0) 70%);filter:blur(18px)}
@@ -132,9 +112,6 @@ body::before{
 .pl-eve .ground{height:34%;background:linear-gradient(180deg,rgba(26,28,40,.4),#0B0C12 74%)}
 .pl-eve .car{width:150px;height:44px;right:16%;bottom:22%;background:linear-gradient(180deg,#232634,#0C0D13);filter:blur(1.4px)}
 
-/* ============================================================
-   画册排版基元
-   ============================================================ */
 .serif{font-family:"Noto Serif SC",Songti SC,serif}
 .tnum{font-variant-numeric:tabular-nums}
 .rule{height:1px;background:rgba(20,20,18,.16)}
@@ -142,9 +119,6 @@ body::before{
 .plateNo{font-size:10px;letter-spacing:.14em;color:#8A8378;text-transform:uppercase;font-weight:500}
 .folio{font-size:11px;letter-spacing:.08em;color:#8A8378;font-variant-numeric:tabular-nums}
 
-/* ============================================================
-   A · 跨页
-   ============================================================ */
 #A .spread{position:absolute;inset:0;display:flex;padding-top:54px}
 #A .pg{width:50%;padding:16px 20px 22px;display:flex;flex-direction:column}
 #A .pgL{border-right:1px solid rgba(20,20,18,.11)}
@@ -163,9 +137,6 @@ body::before{
 #A .pgR .cap{margin-top:12px}
 #A .folioRow{position:absolute;left:20px;right:20px;bottom:26px;display:flex;justify-content:space-between}
 
-/* ============================================================
-   B · 印样
-   ============================================================ */
 #B .sheetWrap{position:absolute;inset:0;padding:66px 22px 0;display:flex;flex-direction:column}
 #B .sheetHead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px}
 #B .sheetHead .l{font-size:15px;font-weight:600;letter-spacing:.16em}
@@ -183,9 +154,6 @@ body::before{
 #B .sheetFoot .cap{max-width:280px}
 #B .sheetFoot .cap b{color:#D8382C;font-weight:500}
 
-/* ============================================================
-   C · 胶片条
-   ============================================================ */
 #C .filmWrap{position:absolute;inset:0;padding:66px 0 0;display:flex;flex-direction:column}
 #C .filmHead{padding:0 24px;display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px}
 #C .filmHead .l{font-size:15px;font-weight:600;letter-spacing:.16em}
@@ -210,9 +178,6 @@ body::before{
 #C .cur .t{font-size:19px;font-weight:500;letter-spacing:.01em;font-variant-numeric:tabular-nums;margin-bottom:5px}
 #C .cur .cap{max-width:300px}
 
-/* ============================================================
-   D · 单页大图
-   ============================================================ */
 #D .hero{position:absolute;left:0;right:0;top:0;height:610px}
 #D .heroCap{position:absolute;left:30px;right:30px;top:566px;color:#F3EFE8;
   text-shadow:0 1px 14px rgba(0,0,0,.55)}
@@ -227,9 +192,6 @@ body::before{
 #D .dot.on{background:#C0392B;width:16px;border-radius:3px}
 #D .dnav .folio{margin-left:auto}
 
-/* ============================================================
-   E · 长卷
-   ============================================================ */
 #E .scrollWrap{position:absolute;inset:0;padding:66px 22px 0;display:flex;flex-direction:column}
 #E .sHead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
 #E .sHead .l{font-size:15px;font-weight:600;letter-spacing:.16em}
@@ -275,7 +237,6 @@ body::before{
 
 <main class="stage">
 
-<!-- ================= A · 跨页 ================= -->
 <section class="block" id="A">
   <h2>A · 跨页</h2>
   <p class="why">像翻开一本画册：左页是今天的<b>目录</b>，右页是<b>当前这一张</b>。你永远同时看到「今天有什么」和「正在看什么」。</p>
@@ -310,7 +271,6 @@ body::before{
   </div>
 </section>
 
-<!-- ================= B · 印样 ================= -->
 <section class="block" id="B">
   <h2>B · 印样</h2>
   <p class="why">摄影师先看<b>一整天的接触印样</b>，再用红笔圈出要放大的那几张。今天一眼看完，<b>值得看的只有两处</b>。</p>
@@ -348,7 +308,6 @@ body::before{
   </div>
 </section>
 
-<!-- ================= C · 胶片条 ================= -->
 <section class="block" id="C">
   <h2>C · 胶片条</h2>
   <p class="why">今天是一条可以横向拉的<b>胶片</b>，底下那条细线就是<b>一天 24 小时</b>；红点是你现在的位置，不是装饰。</p>
@@ -394,7 +353,6 @@ body::before{
   </div>
 </section>
 
-<!-- ================= D · 单页大图 ================= -->
 <section class="block" id="D">
   <h2>D · 单页大图</h2>
   <p class="why">一屏<b>只放一张</b>，图占到底，说明压在图上。左右翻页。最像画册、也最考验照片 —— <b>需要你有自己的照片</b>。</p>
@@ -425,7 +383,6 @@ body::before{
   </div>
 </section>
 
-<!-- ================= E · 长卷 ================= -->
 <section class="block" id="E">
   <h2>E · 长卷</h2>
   <p class="why">时间<b>从上往下流</b>，每条事件紧跟着它那一刻的照片。最像"读"而不是"看"，也最接近你选的「今天这条时间线」。</p>

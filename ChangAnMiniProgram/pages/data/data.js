@@ -1,5 +1,3 @@
-// data.js —— 全量数据页：把 texts.js 生成的逐字段文本结构化为“组 + 键值行”的专业排版
-// 覆盖 kind：status / charge / location / env / user / car / check / analysis（全量分析）
 const svc = require('../../utils/service');
 const T = require('../../utils/texts');
 const AN = require('../../utils/analysis');
@@ -22,7 +20,6 @@ const EMPTY_TXT = {
   analysis: '暂无分析数据（请先刷新车况）'
 };
 
-// 解析 texts.js 的纯文本 → [{ h, rows:[{k,v}] }]
 function parseText(text) {
   const blocks = [];
   let cur = null;
@@ -31,9 +28,7 @@ function parseText(text) {
     const t = line.replace(/\r/g, '');
     if (!t.trim()) return;
     const trimmed = t.trim();
-    // 分隔装饰线
     if (/^[═─━]+$/.test(trimmed)) return;
-    // 是否 “键 : 值”（texts 输出固定用中文全角冒号前的空格分割）
     const idx = trimmed.indexOf(' : ');
     if (idx > 0) {
       const k = trimmed.slice(0, idx).trim();
@@ -42,7 +37,6 @@ function parseText(text) {
       cur.rows.push({ k, v });
       return;
     }
-    // 否则视为新组标题（去掉 emoji 等前缀装饰）
     cur = { h: stripLeading(trimmed), rows: [] };
     blocks.push(cur);
   });
@@ -96,7 +90,6 @@ Page({
     }
   },
 
-  // 全量分析：统一分析层输出的“结论树”（总评 → 各域结论 → 原因 → 关键指标）
   analysisBlocks() {
     const A = AN.summarize(app.globalData.caches, app.globalData.car);
     const blocks = [];
@@ -165,7 +158,6 @@ Page({
         }
         if (this.meta.cacheKey !== 'user') app.saveCache({ [this.meta.cacheKey]: raw });
       } else {
-        // user/car：从全局缓存取，必要时拉取
         if (this.kind === 'user') {
           raw = app.globalData.user || await svc.getUser();
           app.globalData.user = raw;

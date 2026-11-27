@@ -1,4 +1,3 @@
-/* ============ 开发者工具 v15：分区卡片 ============ */
 .dev { padding-top: 16rpx; }
 .dev-eyebrow { padding: 18rpx 4rpx 34rpx; }
 .dev-eyebrow .caps { font-size: 18rpx; letter-spacing: 2.5rpx; }
@@ -6,7 +5,6 @@
 .mod-link { display: flex; align-items: center; gap: 10rpx; font-size: 21rpx; color: var(--tx-3); }
 .mod-link text { font-size: 21rpx; }
 
-/* ---------- 分区卡片 ---------- */
 .sec { position: relative; }
 .sec-seam { display: none; }
 .seam-glint { display: none; }

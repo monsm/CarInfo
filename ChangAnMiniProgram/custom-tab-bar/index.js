@@ -1,4 +1,3 @@
-// custom-tab-bar —— 深色自定义底部导航
 const { ic } = require('../utils/icons');
 
 const ACTIVE = '#FFFFFF';

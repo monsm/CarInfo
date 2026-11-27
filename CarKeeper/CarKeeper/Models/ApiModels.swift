@@ -1,11 +1,6 @@
 import Foundation
 
-// MARK: - Case-insensitive decoding
-//
-// 长安服务端返回的键大小写不固定（桌面版靠 .NET 的 PropertyNameCaseInsensitive 兜底），
-// 这里用一个「先解码成 [String: Any] 再按 ciPick 取值」的宽松策略，避免 Codable 默认键策略不匹配。
 
-/// 大小写不敏感取键：等价于小程序的 ciPick。dict 为 nil 时返回 nil。
 func ciPick(_ dict: [String: Any]?, _ names: [String]) -> Any? {
     guard let dict, !dict.isEmpty else { return nil }
     var lower: [String: Any] = [:]
@@ -69,10 +64,6 @@ func ciObject(_ dict: [String: Any]?, _ names: [String]) -> [String: Any]? {
     return v as? [String: Any]
 }
 
-/// 剥壳：部分接口把真正的实体包在「单元素数组」或「单键包装对象」里
-/// （如 CarLocationResp / data / result）。
-/// ⚠️ 直接 `as? [String: Any]` 失败时会被调用处的 `try?` 静默吞掉，
-/// 表现为「接口其实有数据，但缓存里永远是 nil，界面上整块空白」。
 func unwrapEntity(_ any: Any?) -> [String: Any]? {
     if let arr = any as? [Any] { return arr.compactMap { $0 as? [String: Any] }.first }
     guard let dict = any as? [String: Any] else { return nil }
@@ -84,26 +75,19 @@ func unwrapEntity(_ any: Any?) -> [String: Any]? {
     return dict
 }
 
-// MARK: - 缓存桥接
-// 缓存值是 [String: Any?]，取值后需要转成 [String: Any] 才能用 ci* 助手。
 
-/// 从缓存字典里取某个键并转成对象。
 func ciVal(_ cache: [String: Any?], _ key: String) -> [String: Any]? {
     (cache[key]) as? [String: Any]
 }
-/// 从对象里取嵌套对象（用于 Air 等）。
 func nestedObject(_ o: [String: Any]?, _ key: String) -> [String: Any]? {
     guard let o else { return nil }
     return (o[key]) as? [String: Any]
 }
 
-/// 从缓存字典 [String: Any?] 里取某个键并转成 [String: Any]（用于 analysis / batteryModel 等
-/// 直接操作缓存的地方，避免把 [String: Any?] 强转成 [String: Any] 失败）。
 func cacheObject(_ cache: [String: Any?], _ key: String) -> [String: Any]? {
     (cache[key]) as? [String: Any]
 }
 
-/// 把 JSON 顶层对象（或字段）解析为 [String: Any]，供页面使用。
 func jsonToAny(_ text: String) -> [String: Any]? {
     guard let data = text.data(using: .utf8),
           let any = try? JSONSerialization.jsonObject(with: data, options: [.allowFragments])
@@ -120,7 +104,6 @@ func jsonArray(_ text: String) -> [[String: Any]]? {
     return nil
 }
 
-// MARK: - Token 持久化
 
 struct TokenConfig: Codable {
     var accessToken: String
@@ -129,7 +112,6 @@ struct TokenConfig: Codable {
     var updateTime: String?
 }
 
-// MARK: - 页面模型（原始报文 → 可渲染结构）
 
 
 struct EnergyModel {
@@ -142,8 +124,6 @@ struct EnergyModel {
     var chargeCls: String
     var chargePct: String
     var charging: ChargingSession?
-    /// 总电压与总电流：**两个读数、两个字段**（用户 2026-09-25：「电压/电流拥挤了」）。
-    /// 拼成一句（`398.2V / 12.4A`）要占那一排的三分之一宽，只能靠缩字号挤进去。
     var volt: String
     var amp: String
     var battTemp: String
@@ -151,13 +131,8 @@ struct EnergyModel {
     var online: OnlineState
     var updated: String
     var carName: String
-    // #1 充电倒计时（充电中时显示还需多久充满）
     var timeToFull: String? = nil
-    // #2 SOC耗尽预测（未充电时显示预计剩余行驶时间）
     var timeToEmpty: String? = nil
-    //  #23 百公里能耗（kWh/100km）的字段已删（2026-09-27）：它从来不是车端报的，
-    //  而是「socPct ÷ 续航 × 15」估出来的，唯一的读者是地图抽屉里那一格 ——
-    //  用户这一轮把那格删了（「地图页抽屉去掉平均功耗」），于是整条链一起走。
 }
 
 struct ChargingSession {
@@ -165,20 +140,17 @@ struct ChargingSession {
     var end: String
     var durMin: String
     var power: String
-    // #1 计算出的充满倒计时
     var timeToFull: String? = nil
 }
 
-// #15 DTC故障码字典（常见故障码 → 中文描述）
 struct DTCFault {
     let code: String
     let description: String
-    let severity: String  // "info" / "warn" / "bad"
+    let severity: String
 }
 
 enum DTCDictionary {
     static let faults: [DTCFault] = [
-        // 动力系统
         DTCFault(code: "P0AAA", description: "电机控制器故障", severity: "bad"),
         DTCFault(code: "P0A01", description: "电机控制器内部温度过高", severity: "warn"),
         DTCFault(code: "P0A0A", description: "电机控制器直流母线过流", severity: "bad"),
@@ -186,7 +158,6 @@ enum DTCDictionary {
         DTCFault(code: "P0A0C", description: "电机控制器直流母线欠压", severity: "bad"),
         DTCFault(code: "P0A0D", description: "电机控制器直流母线预充电失败", severity: "bad"),
         DTCFault(code: "P0A10", description: "电机控制器绝缘电阻过低", severity: "bad"),
-        // 储能系统
         DTCFault(code: "P0A14", description: "电池管理系统通信故障", severity: "bad"),
         DTCFault(code: "P0A15", description: "电池管理系统温度传感器故障", severity: "warn"),
         DTCFault(code: "P0A17", description: "电池单体电压不一致超限", severity: "warn"),
@@ -195,7 +166,6 @@ enum DTCDictionary {
         DTCFault(code: "P0A20", description: "电池加热系统故障", severity: "warn"),
         DTCFault(code: "P0A21", description: "电池冷却系统故障", severity: "warn"),
         DTCFault(code: "P0A22", description: "电池充电超时", severity: "warn"),
-        // 发动机系统
         DTCFault(code: "P0300", description: "随机/多缸检测不到点火", severity: "bad"),
         DTCFault(code: "P0301", description: "1 缸检测不到点火", severity: "bad"),
         DTCFault(code: "P0302", description: "2 缸检测不到点火", severity: "bad"),
@@ -205,12 +175,10 @@ enum DTCDictionary {
         DTCFault(code: "P0420", description: "催化转化器效率低于阈值", severity: "warn"),
         DTCFault(code: "P0440", description: "燃油蒸发系统控制回路故障", severity: "warn"),
         DTCFault(code: "P0446", description: "燃油蒸发系统通风控制回路故障", severity: "info"),
-        // 制动系统
         DTCFault(code: "C0035", description: "左前轮速传感器电路故障", severity: "bad"),
         DTCFault(code: "C0040", description: "右前轮速传感器电路故障", severity: "bad"),
         DTCFault(code: "C0110", description: "制动压力传感器电路故障", severity: "warn"),
         DTCFault(code: "C0200", description: "制动踏板位置传感器电路故障", severity: "warn"),
-        // 通用
         DTCFault(code: "U0100", description: "与 ECM/PCM 通信丢失", severity: "bad"),
         DTCFault(code: "U0101", description: "与 TCM 通信丢失", severity: "warn"),
         DTCFault(code: "U0121", description: "与 ABS 模块通信丢失", severity: "warn"),
@@ -310,7 +278,6 @@ struct HealthSystem: Identifiable {
     let statusText: String
     let children: [HealthItem]
     var open: Bool
-    /// 计算健康百分比：ok=100, warn=60, bad=20，按子项加权平均
     var healthPct: Int {
         guard !children.isEmpty else { return statusCls == "ok" ? 100 : (statusCls == "warn" ? 60 : 20) }
         let scores = children.map { $0.statusCls == "ok" ? 100 : ($0.statusCls == "warn" ? 60 : 20) }
@@ -336,11 +303,8 @@ struct HealthModel {
     var counts: [CountPill]
     var systems: [HealthSystem]
     var id: String?
-    /// 检测ID（CheckHistoryId）
     var checkId: String?
-    /// 数据更新时间（CarDataUpdateTime）
     var endTime: String?
-    /// 车辆状态（Status: normal/fault 等）
     var vehicleStatus: String?
 }
 
@@ -350,8 +314,6 @@ struct CountPill: Identifiable {
     let n: String
     let cls: String
 
-    /// 状态图标（cls: ok / warn / bad）——
-    /// 三强健度卡片以前只靠颜色区分，现在补上对应图标
     var iconName: String {
         switch cls {
         case "ok": return "checkmark.circle.fill"
@@ -387,10 +349,8 @@ struct VehicleSummary {
     var insuranceDays: Int?
     var serviceEnd: String
     var serviceDays: Int?
-    // #16 维保提醒
     var serviceReminder: String? = nil
-    // #40 维保价格估算
-    var mileage: Int? = nil  // 当前里程
+    var mileage: Int? = nil
 }
 
 struct FaultItem: Identifiable {
@@ -404,8 +364,6 @@ struct BatteryModel {
     var hasCtrl: Bool
     var hasChg: Bool
     var cellStats: CellStats?
-    /// 最低 / 最高那一节的**节号**（`minVoltageBatteryNum` / `maxVoltageBatteryNum`）。
-    /// 只有极值不够用：88 节里知道「最低 3.800 V」不等于知道「哪一节低」。
     var cellMinNum: String?
     var cellMaxNum: String?
     var probeStats: CellStats?
@@ -471,7 +429,6 @@ struct ChargeDetail {
     var timeToFull: String? = nil
 }
 
-// MARK: - 统一分析层（8 域 verdict + overall）
 
 struct DomainVerdict: Identifiable {
     var id: String { key }

@@ -1,7 +1,5 @@
-/* ============ 全量数据 v15：工具条 + 分区卡片 ============ */
 .data-page { padding-top: 16rpx; }
 
-/* ---------- 分区卡片 ---------- */
 .sec { position: relative; }
 .sec-seam { display: none; }
 .seam-glint { display: none; }

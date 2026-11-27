@@ -1,7 +1,5 @@
-/* ============ 健康报告 v15：评分 hero 卡 + 分区卡片（手风琴） ============ */
 .health { padding-top: 16rpx; }
 
-/* ---------- 分区卡片 ---------- */
 .sec { position: relative; }
 .sec-seam { display: none; }
 .seam-glint { display: none; }
@@ -25,7 +23,6 @@
 .meta-row .caps { font-size: 18rpx; letter-spacing: 2rpx; }
 .meta-row .fine { font-size: 20rpx; }
 
-/* 评分 hero 卡 */
 .score {
   margin: 0 0 24rpx;
   padding: 40rpx 32rpx 44rpx;
@@ -57,7 +54,6 @@
 .sc-ic { width: 28rpx; height: 28rpx; opacity: 1; margin-right: 16rpx; }
 .score-cap { font-size: 18rpx; letter-spacing: 2.5rpx; }
 
-/* 状态计数 */
 .counts {
   display: flex; justify-content: center; gap: 16rpx;
   margin-top: 38rpx;
@@ -92,7 +88,6 @@
 
 .last-check { display: none; }
 
-/* 系统折叠（面板内手风琴） */
 .sys-head { display: none; }
 .sh-side { display: flex; align-items: center; }
 .sh-st.ok { color: var(--ok); }

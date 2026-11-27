@@ -23,16 +23,13 @@ ROOT = pathlib.Path('.')
 if '--root' in sys.argv:
     ROOT = pathlib.Path(sys.argv[sys.argv.index('--root') + 1])
 
-# project.yml 在 CarKeeper/ 下（不是仓库根）—— 这是 xcodegen 的工作目录
 YML = ROOT / 'CarKeeper' / 'project.yml'
 
-# 不参与扫描的目录：构建产物与检查器自身
 SKIP_DIRS = {'scan', 'DerivedData', '.git', '.selftest'}
 
 problems = []
 
 
-# ---------------------------------------------------------------- 常量与场景声明
 
 def swift_files():
     """仓库内所有 Swift 文件。跳过目录按「相对 ROOT 的第一段」判定 ——
@@ -46,16 +43,13 @@ def swift_files():
     return sorted(out)
 
 
-# SceneID 之类的场景标识常量：enum SceneID { static let detail = "detail" }
 consts = {}
 for f in swift_files():
     text = f.read_text(encoding='utf-8', errors='replace')
     for block in re.findall(r'enum\s+SceneID\s*\{(.*?)\n\}', text, re.S):
         consts.update(dict(re.findall(r'static\s+let\s+(\w+)\s*=\s*"([^"]*)"', block)))
 
-# 场景声明：WindowGroup(id: X) / Window(id: X)
 scenes = []
-# 打开调用：openWindow(id: X)
 opens = []
 
 
@@ -98,7 +92,6 @@ for path, lineno, val, certain in opens:
                         f'（现有：{sorted(declared_ids) or "无"}）→ 点击不会有任何反应')
 
 
-# ---------------------------------------------------------------- Info.plist 多场景声明
 
 def yaml_props():
     if not YML.is_file():
@@ -124,7 +117,6 @@ if props is not None:
     multi = manifest.get('UIApplicationSupportsMultipleScenes') if isinstance(manifest, dict) else None
     full_screen = props.get('UIRequiresFullScreen')
 else:
-    # 无 pyyaml / 解析失败时的文本兜底
     source = f'{YML}（文本兜底）'
     text = YML.read_text(encoding='utf-8') if YML.is_file() else ''
     block = re.search(r'UIApplicationSceneManifest:\s*\n((?:[ \t]+.*\n)+)', text)
@@ -146,7 +138,6 @@ if full_screen:
                     f'与该键配套的多窗口目标冲突，且已于 iOS 26.0 被弃用（TN3192）')
 
 
-# ---------------------------------------------------------------- 报告
 
 print(f'扫描 {len(swift_files())} 个 Swift 文件')
 print(f'场景声明 {len(scenes)} 处' + (f'（{sorted(declared_ids)}）' if scenes else '（无）'))

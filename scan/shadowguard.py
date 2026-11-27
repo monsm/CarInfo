@@ -18,34 +18,22 @@ from _roots import swift_files
 STRICT = "--strict" in sys.argv
 ARGV = [a for a in sys.argv[1:] if not a.startswith("--")]
 
-# 源码根目录，逐项必须存在（见 `_roots.py` 的说明）。
-# （顶层的 `CarKeeper/Models` 于 2026-09-26 随 `AppDataModel.swift` 一起删 ——
-#  本清单走 `swift_files`，对不存在的目录是立即失败。）
 TK = ["CarKeeper/CarKeeper", "CarKeeper/Services",
       "CarKeeper/Design", "CarKeeper/Tests"]
 
-# 已核实的「现存」SDK / 标准库类型名 —— 嵌套同名 = 真遮蔽（默认即报错）。
-# 核实方式：Apple 文档 JSON 端点存在性（例：/documentation/swiftui/link.json 200）。
-# 注：Shadow（SwiftUI）与 Mark（Charts）经核实 **不存在**，故不在此列。
 SDK_NAMES = {
-    # SwiftUI
     "Color", "Font", "Text", "Image", "Label", "Link", "Button", "Toggle", "Slider", "Picker",
     "Spacer", "Divider", "Group", "Section", "Rectangle", "Circle", "Capsule", "Ellipse",
     "Animation", "Shape", "Path", "Angle", "Material", "Gradient", "Environment", "Edge",
     "Alignment", "Axis", "View", "Scene", "App", "Transition", "EdgeInsets", "ImageRenderer",
     "CornerRadius", "ProgressView", "ContentUnavailableView", "Marker", "TabView", "NavigationStack",
-    # Foundation / Swift
     "Date", "Data", "URL", "Error", "Result", "IndexSet", "Calendar", "Locale", "Notification",
     "Timer", "Measurement", "Decimal", "Progress",
-    # 2026-09 新增：曾真实存在的遮蔽 —— Theme 里嵌套过 `enum Duration`（已随令牌合并删除）
-    # 核实：/documentation/swift/duration.json → HTTP 200，struct（iOS 16+）
     "Duration",
-    # Charts / MapKit
     "Annotation", "ShadowStyle", "AxisMarks", "RuleMark", "BarMark", "PointMark", "LineMark",
     "AreaMark", "SectorMark",
 }
 
-# 未来可能撞名的通用词：仅 `--strict` 时一并报出（当前仓库有 Theme.Radius / WT.Radius 等）。
 FUTURE_RISK = {
     "Spacing", "Radius", "Motion", "Haptic", "Shadow", "Mark", "Style", "Size",
     "Content", "Overlay", "Insets", "Trait", "Appearance", "Index",
@@ -68,7 +56,7 @@ def scan_file(f):
     out = []
     lines = strip_literals(Path(f).read_text(encoding="utf-8")).split("\n")
     depth = 0
-    stack = []  # [(名字, 其 body 的起始 brace 深度)]
+    stack = []
     for i, l in enumerate(lines):
         while stack and depth < stack[-1][1]:
             stack.pop()

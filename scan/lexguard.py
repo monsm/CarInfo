@@ -43,8 +43,6 @@ from pathlib import Path
 
 from _roots import swift_files
 
-# 源码根目录，逐项必须存在（见 `_roots.py` 的说明）。
-#  顶层 `CarKeeper/Models` 已删（2026-09-26）—— 本清单走 `swift_files`，对不存在的目录立即失败。
 TK = ["CarKeeper/CarKeeper", "CarKeeper/Services",
       "CarKeeper/Design", "CarKeeper/Tests"]
 
@@ -52,12 +50,12 @@ TK = ["CarKeeper/CarKeeper", "CarKeeper/Services",
 def is_cjk(ch):
     o = ord(ch)
     return (
-        0x3000 <= o <= 0x303F      # 、。「」〈〉《》
-        or 0x4E00 <= o <= 0x9FFF   # 汉字
-        or 0xFF00 <= o <= 0xFFEF   # 全角 ：（）？！，
-        or 0x2010 <= o <= 0x2027   # – — ‘ ’ “ ” … † ‡
-        or 0x2460 <= o <= 0x24FF   # ① ② ③
-        or 0x2190 <= o <= 0x21FF   # ← → ↑ ↓
+        0x3000 <= o <= 0x303F
+        or 0x4E00 <= o <= 0x9FFF
+        or 0xFF00 <= o <= 0xFFEF
+        or 0x2010 <= o <= 0x2027
+        or 0x2460 <= o <= 0x24FF
+        or 0x2190 <= o <= 0x21FF
     )
 
 
@@ -71,7 +69,7 @@ def scan(path):
     src = Path(path).read_text(encoding="utf-8")
     i, n, line = 0, len(src), 1
     state = "code"
-    stack = []                       # 每项: ("string"|"ml_string"|"interp", 深度或 None)
+    stack = []
     bad = []
 
     def close_frame():
@@ -102,22 +100,20 @@ def scan(path):
             elif state == "string":
                 bad.append((line, f"字符串在行内未闭合 → {snippet(i)}"))
                 state = "code"
-                # 行内未闭合：把这一层栈丢掉，避免后面全乱
                 while stack and stack[-1][0] == "string":
                     stack.pop()
             line += 1
             i += 1
             continue
 
-        # ---------- 字符串里 ----------
         if state in ("string", "ml_string"):
             if state == "string" and ch == "\\":
-                if nxt == "(":                       # 进入插值
+                if nxt == "(":
                     stack.append(("interp", 1))
                     state = "code"
                     i += 2
                     continue
-                i += 2                                # 普通转义
+                i += 2
                 continue
             if state == "ml_string" and src[i:i + 2] == "\\(":
                 stack.append(("interp", 1))
@@ -135,7 +131,6 @@ def scan(path):
             i += 1
             continue
 
-        # ---------- 注释里 ----------
         if state == "line_comment":
             i += 1
             continue
@@ -147,8 +142,7 @@ def scan(path):
             i += 1
             continue
 
-        # ---------- 代码位置（顶层 or 插值内）----------
-        inside_string = False                # 走到这里就说明不在字符串里
+        inside_string = False
         if ch == "/" and nxt == "/":
             state = "line_comment"
             i += 2
@@ -174,7 +168,7 @@ def scan(path):
             continue
         if ch == ")" and stack and stack[-1][0] == "interp":
             depth = stack[-1][1] - 1
-            if depth == 0:                   # 插值结束，弹回字符串
+            if depth == 0:
                 close_frame()
             else:
                 stack[-1] = ("interp", depth)
@@ -192,13 +186,6 @@ def scan(path):
     return bad
 
 
-# ---------------------------------------------------------------------------
-# 孤儿属性行：整行恰好是一个声明属性，而它后面再没有声明 —— 编译必报错。
-# 判据刻意收窄到「整行 = 属性名」以避免假阳性：`@objc private func x()`
-# 这种同行写法不算；只有批量删除声明块时才会留下这种光秃秃的行。
-# 属性后面允许再跟一行属性（如 @Model 下一行是 @available），
-# 但链条的末端必须见到真正的声明关键字。
-# ---------------------------------------------------------------------------
 ORPHAN_ATTRS = {"@Model", "@main", "@objc", "@objcMembers", "@discardableResult",
                 "@IBAction", "@IBOutlet", "@NSManaged"}
 DECL_KEYWORDS = ("class ", "struct ", "enum ", "actor ", "func ", "extension ",
@@ -214,7 +201,6 @@ def orphan_attrs(path):
         t = raw.strip()
         if t not in ORPHAN_ATTRS:
             continue
-        # 向后找第一个非空、非注释行
         j = i + 1
         while j < len(lines) and (not lines[j].strip() or lines[j].strip().startswith(("//", "/*", "*"))):
             j += 1

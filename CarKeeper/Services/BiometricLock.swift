@@ -1,13 +1,8 @@
-// =============================================================================
-// N13 敏感页面 FaceID 二次验证
-// N14 远程锁定（App 后台超时自动隐藏）
-// =============================================================================
 
 import SwiftUI
 import LocalAuthentication
 import UIKit
 
-// MARK: - N13 敏感页面 FaceID 二次验证
 struct BiometricLockOverlay: View {
     @Binding var isAuthenticated: Bool
     @State private var errorMessage: String?
@@ -18,7 +13,6 @@ struct BiometricLockOverlay: View {
             TokensPalette.scrim.opacity(0.6)
                 .ignoresSafeArea()
 
-            // 卡片与按钮全部回到 DS：这是全 App 唯一的验证浮层，它不该是第四套外观。
             DSCard(padding: TokensSpacing.lg, radius: TokensRadius.large) {
                 VStack(spacing: TokensSpacing.lg) {
                     Image(systemName: "faceid")
@@ -72,7 +66,6 @@ struct BiometricLockOverlay: View {
     }
 }
 
-// MARK: - N14 远程锁定（后台超时自动隐藏）
 class RemoteLockManager: ObservableObject {
     static let shared = RemoteLockManager()
 

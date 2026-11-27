@@ -1,9 +1,7 @@
-/* ============ 车辆档案 v15：名片卡 + 分区卡片 ============ */
 .veh { padding-top: 16rpx; }
 .veh-eyebrow { padding: 18rpx 4rpx 34rpx; }
 .veh-eyebrow .caps { font-size: 18rpx; letter-spacing: 2.5rpx; }
 
-/* 名片卡 */
 .vcard {
   margin: 0 0 24rpx;
   padding: 34rpx 32rpx 32rpx;
@@ -61,7 +59,6 @@
 
 .v-mono { font-size: 21rpx; }
 
-/* ---------- 分区卡片 ---------- */
 .sec { position: relative; }
 .sec-seam { display: none; }
 .seam-glint { display: none; }

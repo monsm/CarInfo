@@ -49,7 +49,6 @@ MAP_SPINE = os.path.join(APP, "Features", "Map", "MapSpineView.swift")
 MODE_HEAD = os.path.join(APP, "Features", "Map", "HomeModeHead.swift")
 APP_ENTRY = os.path.join(APP, "CarKeeperApp.swift")
 
-# 深链别名：它们指向的页面与某个档位是同一个，所以同样不准被 push
 ALIASES = {"dashboard", "score", "parking"}
 
 SCAN_DIRS = [
@@ -105,13 +104,6 @@ def main():
     spine = read(MAP_SPINE)
     head = read(MODE_HEAD)
 
-    # 档位名：只从 `enum HomeMode { … }` 这一块里读（`case now` 这一行；
-    # switch 里的 `case .now:` 不会命中，因为行尾有冒号）。
-    #
-    # ⚠️ 不能直接扫整个文件：同一个文件里还有 `enum HomeSub`（档内段落：
-    #    档案/健康/保养、设置/应急/诊断），它的 case 也是 4 空格缩进 —— 扫全文会把
-    #    它们当成档位，报出 6 条「档位没有对应页面」的假问题（2026-09-23 实际发生过）。
-    #    换个说法：门禁要读的是**那个枚举**，不是一个文件。
     home_enum = block_of(home, "enum HomeMode")
     modes = re.findall(r"^\s{4}case\s+(\w+)\s*$", home_enum, re.M)
     if not modes:
@@ -120,7 +112,6 @@ def main():
 
     problems = []
 
-    # ---- ② 档位 ↔ 页面 ----
     page_body = block_of(spine, "private func pageContent(_ mode: HomeMode)")
     page_cases = set(re.findall(r"case\s+\.(\w+)\s*:", page_body))
     for m in modes:
@@ -130,7 +121,6 @@ def main():
     for c in sorted(page_cases - set(modes)):
         problems.append(f"② pageContent 里的 `.{c}` 不是一个档位（HomeMode 里没有它）")
 
-    # ---- ③ 档位 ↔ 02 的卡头（恰好一处：巨字）----
     for m in modes:
         n = len(re.findall(r"case\s+\.%s\s*:" % re.escape(m), head))
         if n == 0:
@@ -140,7 +130,6 @@ def main():
             problems.append(f"③ 档位 `{m}` 在 HomeModeHead 里出现了 {n} 次"
                             f"（同一档只该有一处表述：卡头巨字；依据在下面每一张卡里）")
 
-    # ---- ① 属于某一档的深链不准被 push（哪里都不行，深链也走 openMode）----
     banned = set(modes) | ALIASES
     pushes = []
     for f in swift_files():
@@ -152,7 +141,6 @@ def main():
         problems.append(f"① {f}:{line} 直接 push 了 `.{name}` —— 它属于某一档，"
                         f"应当用 `nav.openMode(.{name})` 拨模式条（深链也一样）")
 
-    # ---- ③' path 只准在 NavState / App 入口里被改写 ----
     for f in swift_files():
         if f.replace("\\", "/") == APP_ENTRY.replace("\\", "/"):
             continue

@@ -1,4 +1,3 @@
-// dev.js —— 开发者工具 v3（工程入口，隐藏在主流程之外）
 const svc = require('../../utils/service');
 const C = require('../../utils/config');
 const { ic } = require('../../utils/icons');

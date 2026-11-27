@@ -1,6 +1,3 @@
-// pin-input —— 6 位控车码输入（液态玻璃弹层 + 内置数字键盘）
-// 修复：不再使用隐藏 input 唤起系统键盘（系统键盘会与底部弹层重叠，
-// 且 Android 上行为不稳定），改为弹层内自绘 3×4 数字键盘——彻底无重叠。
 Component({
   options: { styleIsolation: 'apply-shared' },
   properties: {
@@ -13,7 +10,6 @@ Component({
   },
   observers: {
     show(v) {
-      // 每次打开重置，避免上次输入残留
       this.clearAuto();
       this.setData({ pin: '', boxes: ['', '', '', '', '', ''] });
     }
@@ -31,7 +27,7 @@ Component({
     haptic(heavy) {
       try {
         wx.vibrateShort({ type: heavy ? 'heavy' : 'light' });
-      } catch (e) { /* 低版本忽略 */ }
+      } catch (e) {  }
     },
     onKey(e) {
       const k = e.currentTarget.dataset.k;
@@ -41,7 +37,6 @@ Component({
       const pin = (this.data.pin + k).replace(/\D/g, '').slice(0, 6);
       this.setData({ pin, boxes: this.renderBoxes(pin) });
       this.haptic(false);
-      // 输满 6 位自动执行（350ms 内仍可回退）
       if (pin.length === 6) {
         this._autoT = setTimeout(() => this.onConfirm(), 350);
       }

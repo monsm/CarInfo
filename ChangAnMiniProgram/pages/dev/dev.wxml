@@ -6,7 +6,6 @@
 
   <view class="console">
 
-    <!-- 01 网络通道 -->
     <view class="sec">
       <view class="sec-head">
         <view class="sec-stamp">
@@ -28,7 +27,6 @@
       </view>
     </view>
 
-    <!-- 02 请求 / 响应日志 -->
     <view class="sec">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">
@@ -61,7 +59,6 @@
       </view>
     </view>
 
-    <!-- 03 排查指引 -->
     <view class="sec">
       <view class="sec-seam"><view class="seam-glint"></view></view>
       <view class="sec-head">

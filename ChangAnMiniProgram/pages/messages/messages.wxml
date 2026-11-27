@@ -13,19 +13,16 @@
     </view>
   </view>
 
-  <!-- 骨架 -->
   <view wx:if="{{loading}}" class="glass mod skel">
     <view class="sk-row"><view class="sk-l w80"></view><view class="sk-t"></view></view>
     <view class="sk-row"><view class="sk-l w60"></view><view class="sk-t"></view></view>
     <view class="sk-row"><view class="sk-l w75"></view><view class="sk-t"></view></view>
   </view>
 
-  <!-- 收件箱：日期戳侧栏 + 行式条目（控制台面板） -->
   <view wx:elif="{{groups.length}}" class="console">
     <view wx:for="{{groups}}" wx:key="key" wx:for-item="g" wx:for-index="gi" class="group">
       <view class="sec-seam" wx:if="{{gi > 0}}"><view class="seam-glint"></view></view>
 
-      <!-- 日期戳侧栏 -->
       <view class="date-rail">
         <view class="date-stamp">
           <text class="ds-line"></text>
@@ -57,7 +54,6 @@
           </view>
           <view class="i-content" wx:if="{{item.body}}">{{item.body}}</view>
           <view class="i-none" wx:elif="{{!item.location}}">暂无正文内容</view>
-          <!-- 展开：完整正文（不再省略）+ 地点 / 时间 -->
           <view class="i-exp" wx:if="{{item.open}}">
             <view class="i-exp-row" wx:if="{{item.location}}">
               <text class="i-exp-k">地点</text>
@@ -74,7 +70,6 @@
     </view>
   </view>
 
-  <!-- 空状态：月光下的停驻 -->
   <view wx:else class="empty moon-empty">
     <image class="empty-scene" src="{{emptyScene}}" mode="widthFix" />
     <view class="e-t">暂无消息</view>

@@ -1,12 +1,5 @@
-// scene.js —— v7「夜航」场景美术：纯内联 SVG → data URI（零外部资源）
-// v7.2：车身比例重绘（低鼻 fastback：轮距靠前后、座舱后移、玻璃屋带高光、
-// 后视镜 / 门缝 / 前后灯 / 轮辐细节），显示尺寸由 WXSS 控制。
 const uri = s => 'data:image/svg+xml,' + encodeURIComponent(s);
 
-/* 侧视 EV —— v9「TESLA」：Model S 风格溜背轿跑
-   低趴长车头 / 封闭前脸 / 贯穿式前后灯带 / 隐藏式门把手 / 低风阻涡轮轮毂
-   opts: { charge?: bool 充电时能量线增亮 + 车底辉光 + 充电口灯效, accent?: '#5AC8FA' }
-   viewBox 0 0 560 240 —— 车体 x 76..532，rocker y=196，轮底 y=234 */
 function carSideURI(opts) {
   const o = opts || {};
   const acc = o.accent || '#5AC8FA';
@@ -15,13 +8,11 @@ function carSideURI(opts) {
        <ellipse cx="300" cy="230" rx="100" ry="4" fill="${acc}" opacity="0.16"/>`
     : '';
   const accStroke = o.charge ? 'opacity="0.95" stroke-width="2"' : 'opacity="0.5" stroke-width="1.5"';
-  // 充电口（左后翼子板，Model S 位）：充电时呼吸光斑
   const portGlow = o.charge
     ? `<circle cx="106" cy="150" r="8" fill="${acc}" opacity="0.22"/>
        <circle cx="106" cy="150" r="3.4" fill="${acc}" opacity="0.95"/>`
     : `<circle cx="106" cy="150" r="3" fill="rgba(210,226,255,0.35)"/>`;
 
-  // 低风阻涡轮轮毂：5 根弯曲辐条（aero turbine），按角度计算而非贴死图形
   function wheel(cx, cy, R) {
     const rim = R * 0.66;
     const blades = [];
@@ -44,7 +35,6 @@ function carSideURI(opts) {
     </g>`;
   }
 
-  // 前/后轮中心（面朝右）：长轴距、短悬，Model S 比例
   const rearX = 148, frontX = 416, wy = 198, WR = 36;
   const archR = WR + 8;
 
@@ -143,9 +133,6 @@ ${wheel(frontX, wy, WR)}
   );
 }
 
-/* 俯视车（胎压卡底图），viewBox 0 0 560 280，车头朝左
-   轮位（viewBox 坐标，即覆盖层徽标中心）：FL(155,90) FR(155,190) RL(405,90) RR(405,190)
-   覆盖层换算（display 560rpx 宽）：left = x - 74，top = y - 46（徽标 148×92rpx） */
 function carTopURI() {
   return uri(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 280">
@@ -196,8 +183,6 @@ function carTopURI() {
   );
 }
 
-/* SOC 光环：粗圆环（径向呼吸光），按 pct 画进度弧
-   opts: { pct: 0-100, size?: 300, sw?: 46 } */
 function haloURI(opts) {
   const o = opts || {};
   const size = o.size || 300;
@@ -221,8 +206,6 @@ function haloURI(opts) {
   );
 }
 
-/* 空态插画：月光下的停驻（月晕 + 星 + 一封未读的信 + 车灯下的车）
-   消息页空状态用 —— 干巴巴的文字换成有氛围的画面。 */
 function nightEmptyURI() {
   return uri(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 440">
@@ -303,8 +286,6 @@ function nightEmptyURI() {
   );
 }
 
-/* 登录页夜场：大灯开启的驻车 —— 品牌感的第一帧
-   viewBox 0 0 750 470：车体 x 120..620，基线 y=430，轮心 y=432 */
 function loginSceneURI() {
   return uri(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 470">

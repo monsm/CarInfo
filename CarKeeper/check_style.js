@@ -1,4 +1,3 @@
-// check_style.js — 检查 Swift 文件格式
 const fs = require('fs');
 const path = require('path');
 
