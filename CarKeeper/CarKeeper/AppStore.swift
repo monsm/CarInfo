@@ -22,6 +22,16 @@ final class AppStore: @unchecked Sendable {
         "control": nil, "check": nil, "messages": nil
     ]
 
+    typealias HistoryEntry = AppDomain.HistoryEntry
+    typealias EnergyRecord = AppDomain.EnergyRecord
+    typealias TripRecord = AppDomain.TripRecord
+    typealias ParkingPoint = AppDomain.ParkingPoint
+    typealias ParkingRecord = AppDomain.ParkingRecord
+    typealias MapFocus = AppDomain.MapFocus
+    typealias NetworkStatus = AppDomain.NetworkStatus
+
+    typealias OpenTrip = AppDomain.TripTracker.Open
+
     private var cacheTimes: [String: Date] = [:]
 
     func cacheTime(_ key: String) -> Date? { cacheTimes[key] }
@@ -32,46 +42,14 @@ final class AppStore: @unchecked Sendable {
     private var lastPostedLng = Double.nan
 
     var commandHistory: [HistoryEntry] = []
-    struct HistoryEntry: Identifiable {
-        let id = UUID()
-        let cmd: String
-        let name: String
-        let startedAt: Date
-        let finishedAt: Date?
-        let success: Bool
-        let confirmed: Bool
-        let duration: TimeInterval
-
-        var statusColor: Color {
-            if !confirmed { return TokensPalette.warning }
-            return success ? TokensPalette.success : TokensPalette.error
-        }
-        var iconName: String {
-            if !confirmed { return "questionmark.circle.fill" }
-            return success ? "checkmark.circle.fill" : "xmark.circle.fill"
-        }
-        var resultText: String {
-            if !confirmed { return "未确认" }
-            return success ? "成功" : "失败"
-        }
-        var statusCls: String {
-            if !confirmed { return "na" }
-            return success ? "ok" : "bad"
-        }
-        var durationText: String {
-            guard duration > 0 else { return "--" }
-            if duration < 60 { return String(format: "%.1fs", duration) }
-            return "\(Int(duration / 60))min"
-        }
-    }
 
     func addCommandHistory(cmd: String, name: String, success: Bool,
                            duration: TimeInterval, confirmed: Bool = true) {
-        commandHistory.insert(HistoryEntry(cmd: cmd, name: name,
-                                          startedAt: Date().advanced(by: -duration),
-                                          finishedAt: Date(), success: success,
-                                          confirmed: confirmed, duration: duration), at: 0)
-        if commandHistory.count > 50 { commandHistory = Array(commandHistory.prefix(50)) }
+        let entry = HistoryEntry(cmd: cmd, name: name,
+                                 startedAt: Date().advanced(by: -duration),
+                                 finishedAt: Date(), success: success,
+                                 confirmed: confirmed, duration: duration)
+        commandHistory = CommandHistoryTracker.insert(entry, into: commandHistory)
     }
 
     nonisolated static let lastServiceMileageKey = "carkeeper_last_service_mileage"
@@ -89,37 +67,10 @@ final class AppStore: @unchecked Sendable {
     nonisolated static let servicePriceEstimate: Int = 800
     static let majorServicePriceEstimate: Int = 2500
 
-    struct EnergyRecord: Identifiable {
-        let id = UUID()
-        let timestamp: Date
-        let soc: Int
-        let range: Int
-    }
     var energyHistory: [EnergyRecord] = []
 
-    struct TripRecord: Identifiable {
-        let id = UUID()
-        let startTime: Date
-        let endTime: Date?
-        let startLocation: CLLocation?
-        let endLocation: CLLocation?
-        let distanceKm: Double
-        var durationText: String {
-            let dur = (endTime?.timeIntervalSince(startTime) ?? 0) / 60
-            return dur > 0 ? "\(Int(dur))min" : "--"
-        }
-        let startSoc: Int
-        let endSoc: Int
-        let avgEfficiency: Double?
-        let kmPerPercent: Double?
-
-        var startAddr: String = ""
-        var endAddr: String = ""
-    }
     var tripHistory: [TripRecord] = []
-    private var currentTrip: (startTime: Date, startSoc: Int,
-                              startLocation: CLLocation?, startMileage: Int?,
-                              startAddr: String)? = nil
+    private var currentTrip: OpenTrip? = nil
 
     var parkingLocation: CLLocation? {
         get { if let data = UserDefaults.standard.data(forKey: "carkeeper_parking_loc"), let loc = try? NSKeyedUnarchiver.unarchivedObject(ofClass: CLLocation.self, from: data) { return loc } else { return nil } }
@@ -141,12 +92,6 @@ final class AppStore: @unchecked Sendable {
 
     var isOfflineMode: Bool = false
 
-    struct MapFocus: Equatable, Identifiable {
-        let lat: Double
-        let lng: Double
-        let label: String
-        var id: String { "\(lat),\(lng)" }
-    }
     var mapFocus: MapFocus? = nil
 
 
@@ -158,12 +103,6 @@ final class AppStore: @unchecked Sendable {
         if energyHistory.count > 20 { energyHistory = Array(energyHistory.suffix(20)) }
     }
 
-    struct ParkingPoint: Codable {
-        let lat: Double
-        let lng: Double
-        let time: Date
-        let address: String
-    }
     nonisolated static let parkingPointsKey = "carkeeper_parking_points"
 
     var parkingPoints: [ParkingPoint] {
@@ -185,11 +124,7 @@ final class AppStore: @unchecked Sendable {
         lastParkingTime = time ?? Date()
         guard let c = location?.coordinate else { return }
         var points = parkingPoints
-        if let last = points.last {
-            let d = CLLocation(latitude: last.lat, longitude: last.lng)
-                .distance(from: CLLocation(latitude: c.latitude, longitude: c.longitude))
-            if d < 120 { return }
-        }
+        if ParkingTracker.shouldSkip(last: points.last, new: c) { return }
         points.append(ParkingPoint(lat: c.latitude, lng: c.longitude,
                                    time: time ?? Date(), address: address))
         parkingPoints = points
@@ -198,8 +133,8 @@ final class AppStore: @unchecked Sendable {
     func startTrip(_ location: CLLocation? = nil, soc: Int? = nil,
                    at time: Date? = nil, mileage: Int? = nil, addr: String = "") {
         let currentSoc = soc ?? (energyHistory.last?.soc ?? 0)
-        currentTrip = (startTime: time ?? Date(), startSoc: currentSoc,
-                       startLocation: location, startMileage: mileage, startAddr: addr)
+        currentTrip = OpenTrip(startTime: time ?? Date(), startSoc: currentSoc,
+                               startLocation: location, startMileage: mileage, startAddr: addr)
         DriveTrace.shared.begin()
     }
 
@@ -208,22 +143,9 @@ final class AppStore: @unchecked Sendable {
                  endAddr: String = "") -> TripRecord? {
         guard let trip = currentTrip else { return nil }
         let endSoc = endSoc ?? (energyHistory.last?.soc ?? 0)
-        let socUsed = trip.startSoc - endSoc
-        let kmPerPercent: Double? = (socUsed > 0 && distanceKm > 0)
-            ? distanceKm / Double(socUsed) : nil
-        let record = TripRecord(
-            startTime: trip.startTime,
-            endTime: time ?? Date(),
-            startLocation: trip.startLocation,
-            endLocation: endLocation,
-            distanceKm: distanceKm,
-            startSoc: trip.startSoc,
-            endSoc: endSoc,
-            avgEfficiency: nil,
-            kmPerPercent: kmPerPercent,
-            startAddr: trip.startAddr,
-            endAddr: endAddr
-        )
+        let record = TripTracker.makeRecord(trip, distanceKm: distanceKm, endSoc: endSoc,
+                                            endLocation: endLocation, at: time ?? Date(),
+                                            endAddr: endAddr)
         tripHistory.insert(record, at: 0)
         if tripHistory.count > 50 { tripHistory = Array(tripHistory.prefix(50)) }
         currentTrip = nil
@@ -272,12 +194,7 @@ final class AppStore: @unchecked Sendable {
             if e.ignition {
                 startTrip(e.loc, soc: soc, at: e.at, mileage: mileage, addr: e.addr)
             } else {
-                let km: Double
-                if let start = currentTrip?.startMileage, let end = mileage, end >= start {
-                    km = Double(end - start)
-                } else {
-                    km = 0
-                }
+                let km = TripTracker.tripKm(open: currentTrip, endMileage: mileage)
                 _ = endTrip(distanceKm: km, endSoc: soc, endLocation: e.loc, at: e.at,
                             endAddr: e.addr)
                 saveParkingLocation(e.loc, at: e.at, address: e.addr)
@@ -292,53 +209,16 @@ final class AppStore: @unchecked Sendable {
         if isOfflineMode { return .offline }
         return lastMissedSources.isEmpty ? .online : .weak
     }
-    enum NetworkStatus: String {
-        case online = "在线"
-        case weak = "弱网"
-        case offline = "离线"
-    }
 
 
 
-    private static let pinKeychainService = "com.carkeeper.pin"
-    private static let pinKeychainAccount = "car_pin"
     private static let biometricSetupKey = "carkeeper_biometric_setup"
 
-    func savePin(_ pin: String) {
-        guard let pinData = pin.data(using: .utf8) else { return }
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Self.pinKeychainService,
-            kSecAttrAccount as String: Self.pinKeychainAccount,
-            kSecValueData as String: pinData,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        ]
-        SecItemDelete(query as CFDictionary)
-        SecItemAdd(query as CFDictionary, nil)
-    }
+    func savePin(_ pin: String) { PinStore.save(pin) }
 
-    func readPin() -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Self.pinKeychainService,
-            kSecAttrAccount as String: Self.pinKeychainAccount,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: 1
-        ]
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
-    }
+    func readPin() -> String? { PinStore.read() }
 
-    func deletePin() {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Self.pinKeychainService,
-            kSecAttrAccount as String: Self.pinKeychainAccount
-        ]
-        SecItemDelete(query as CFDictionary)
-    }
+    func deletePin() { PinStore.delete() }
 
     var hasBiometricSetup: Bool {
         get { UserDefaults.standard.bool(forKey: Self.biometricSetupKey) }
@@ -677,12 +557,6 @@ final class AppStore: @unchecked Sendable {
         return CLLocation(latitude: lat, longitude: lng)
     }
 
-    struct ParkingRecord: Identifiable {
-        let id = UUID()
-        let location: CLLocation
-        let time: Date
-        let address: String
-    }
     var parkingHistory: [ParkingRecord] {
         parkingPoints.map {
             ParkingRecord(location: CLLocation(latitude: $0.lat, longitude: $0.lng),

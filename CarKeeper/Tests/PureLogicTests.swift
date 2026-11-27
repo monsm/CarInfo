@@ -529,3 +529,57 @@ final class BodyStateTests: XCTestCase {
         XCTAssertEqual(state?.summary, "全部正常")
     }
 }
+
+
+final class AppDomainTests: XCTestCase {
+
+    func testTripRecordComputesKmPerPercent() {
+        let open = TripTracker.Open(startTime: Date(timeIntervalSince1970: 0),
+                                    startSoc: 80, startLocation: nil,
+                                    startMileage: 1000, startAddr: "A")
+        let record = TripTracker.makeRecord(open, distanceKm: 60, endSoc: 60,
+                                            endLocation: nil, at: Date(timeIntervalSince1970: 3600),
+                                            endAddr: "B")
+        XCTAssertEqual(record.kmPerPercent, 3.0, accuracy: 0.0001)
+        XCTAssertEqual(record.distanceKm, 60)
+        XCTAssertEqual(record.startAddr, "A")
+        XCTAssertEqual(record.endAddr, "B")
+    }
+
+    func testTripRecordLeavesKmPerPercentNilWhenSocDidNotDrop() {
+        let open = TripTracker.Open(startTime: Date(), startSoc: 50,
+                                    startLocation: nil, startMileage: nil, startAddr: "")
+        let record = TripTracker.makeRecord(open, distanceKm: 10, endSoc: 50,
+                                            endLocation: nil, at: Date(), endAddr: "")
+        XCTAssertNil(record.kmPerPercent)
+    }
+
+    func testTripKmFallsBackToZero() {
+        let open = TripTracker.Open(startTime: Date(), startSoc: 50,
+                                    startLocation: nil, startMileage: 2000, startAddr: "")
+        XCTAssertEqual(TripTracker.tripKm(open: open, endMileage: 2030), 30)
+        XCTAssertEqual(TripTracker.tripKm(open: open, endMileage: 1990), 0)
+        XCTAssertEqual(TripTracker.tripKm(open: nil, endMileage: 2030), 0)
+    }
+
+    func testParkingDedupeWithin120m() {
+        let last = ParkingPoint(lat: 30.0, lng: 114.0, time: Date(), address: "")
+        XCTAssertTrue(ParkingTracker.shouldSkip(last: last,
+                                                new: CLLocationCoordinate2D(latitude: 30.0005, longitude: 114.0)))
+        XCTAssertFalse(ParkingTracker.shouldSkip(last: last,
+                                                 new: CLLocationCoordinate2D(latitude: 30.02, longitude: 114.0)))
+        XCTAssertFalse(ParkingTracker.shouldSkip(last: nil,
+                                                 new: CLLocationCoordinate2D(latitude: 30.0, longitude: 114.0)))
+    }
+
+    func testCommandHistoryKeepsNewestAndCaps() {
+        var list: [HistoryEntry] = []
+        for i in 0..<60 {
+            let e = HistoryEntry(cmd: "c", name: "n\(i)", startedAt: Date(),
+                                 finishedAt: Date(), success: true, confirmed: true, duration: 1)
+            list = CommandHistoryTracker.insert(e, into: list)
+        }
+        XCTAssertEqual(list.count, CommandHistoryTracker.cap)
+        XCTAssertEqual(list.first?.name, "n59")
+    }
+}
