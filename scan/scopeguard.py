@@ -49,15 +49,9 @@ import os
 import re
 import sys
 
-SCOPE_DIRS = [
-    "CarKeeper/CarKeeper",
-    "CarKeeper/Services",
-    "CarKeeper/Models",
-    "CarKeeper/Design",
-    "CarKeeper/Shared",
-    "CarKeeper/Widgets",
-    "CarKeeper/WatchApp",
-]
+from _roots import EXISTING_ROOTS
+
+SCOPE_DIRS = [r for r in EXISTING_ROOTS if not r.endswith("/Tests")]
 
 ALLOWED = {}
 

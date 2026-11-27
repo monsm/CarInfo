@@ -56,35 +56,9 @@ warning_threshold: 100
 # 错误阈值
 error_threshold: 50
 
-# 自定义规则
-custom_rules:
-  # 禁止直接使用颜色值，必须使用 Kansei 命名空间
-  kansei_color_usage:
-    name: "Kansei Color Usage"
-    regex: 'Color\(red: [0-9.]+, green: [0-9.]+, blue: [0-9.]+)'
-    message: "请使用 Kansei.Color.* 命名空间代替硬编码颜色值"
-    severity: warning
-  
-  # 禁止直接使用 DS.Palette（应用迁移到新设计系统）
-  old_palette_usage:
-    name: "Old Palette Usage"
-    regex: 'DS\.Palette\.'
-    message: "请使用 Kansei.Color.* 替代 DS.Palette.*"
-    severity: warning
-  
-  # 禁止直接使用 Theme 命名空间（应用迁移到新设计系统）
-  old_theme_usage:
-    name: "Old Theme Usage"
-    regex: '\.background\(Theme\.'
-    message: "请使用 Kansei.Color.* 替代 Theme.*"
-    severity: warning
-  
-  # 禁止使用旧背景修饰符
-  old_background_modifier:
-    name: "Old Background Modifier"
-    regex: '\.(pageBackground|dsCanvas)\(\)'
-    message: "请使用 .background(Kansei.Color.background)"
-    severity: warning
+# 自定义规则：原先四条都指向已删除的 Kansei / DS.Palette / Theme 命名空间，
+# SwiftLint 不跑 CI，留着只会让人以为代码里还有那些东西。现已全部删除；
+# 颜色与令牌的约束由 scan/design.py 在 CI 上执行。
 
 # 排除清单 —— **故意是空的**。
 #

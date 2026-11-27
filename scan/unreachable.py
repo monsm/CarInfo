@@ -9,7 +9,10 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(".")
-TK = ["CarKeeper/", "Services/", "Shared/", "Widgets/", "WatchApp/", "HealthKit/", "Models/", "Design/"]
+from _roots import assert_roots
+
+TK = ["CarKeeper/"]
+assert_roots(TK)
 
 files = []
 for tk in TK:

@@ -52,7 +52,7 @@ log_info "Fast:    $FAST_MODE | Clean: $CLEAN_BUILD | Lint: $([ "$SKIP_LINT" = t
 echo ""
 
 run_swiftlint() {
-    log_info "Step 1/4: SwiftLint 检查..."
+    log_info "Step 1/3: SwiftLint 检查..."
     
     if [ "$SKIP_LINT" = true ]; then
         log_warn "SwiftLint 检查已跳过"
@@ -86,7 +86,7 @@ run_swiftlint() {
 }
 
 run_typecheck() {
-    log_info "Step 2/4: Swift 类型检查..."
+    log_info "Step 2/3: Swift 类型检查..."
     
     if ! command -v xcodebuild &> /dev/null; then
         log_error "未安装 Xcode 命令行工具"
@@ -132,7 +132,7 @@ run_typecheck() {
 }
 
 validate_xcassets() {
-    log_info "Step 3/4: xcassets 图片尺寸校验..."
+    log_info "Step 3/3: xcassets 图片尺寸校验..."
     
     local assets_dir="$PROJECT_ROOT/$SCHEME/Resources/Assets.xcassets"
     
@@ -183,53 +183,12 @@ validate_xcassets() {
     fi
 }
 
-validate_design_tokens() {
-    log_info "Step 4/4: 设计令牌一致性检查..."
-    
-    local kansei_file="$PROJECT_ROOT/$SCHEME/Design/Kansei.swift"
-    if [ ! -f "$kansei_file" ]; then
-        log_warn "未找到 Kansei.swift"
-        return 0
-    fi
-    
-    local issues=0
-    
-    if grep -q "static var ambient" "$kansei_file"; then
-        log_success "  ✓ 时间感知配色: Kansei.Color.ambient"
-    else
-        log_error "  ✗ 缺少时间感知配色定义"
-        ((issues++))
-    fi
-    
-    if grep -q "breathe" "$kansei_file"; then
-        log_success "  ✓ 呼吸动效: Kansei.Motion.breathe"
-    else
-        log_error "  ✗ 缺少呼吸动效定义"
-        ((issues++))
-    fi
-    
-    if grep -q "enum Haptic" "$kansei_file"; then
-        log_success "  ✓ 触觉反馈: Kansei.Haptic"
-    else
-        log_error "  ✗ 缺少触觉反馈定义"
-        ((issues++))
-    fi
-    
-    if [ "$issues" -eq 0 ]; then
-        log_success "设计令牌一致性检查通过"
-    else
-        log_error "发现 $issues 个设计令牌问题"
-        return 1
-    fi
-}
-
 main() {
     local start_time=$(date +%s)
     
     run_swiftlint
     run_typecheck
     validate_xcassets
-    validate_design_tokens
     
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))
