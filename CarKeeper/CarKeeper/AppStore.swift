@@ -297,6 +297,7 @@ final class AppStore: @unchecked Sendable {
                     await fetchVehicleData()
                 }
             }
+            Task { await InsuranceManager.shared.syncReminders() }
             return .success
         } catch {
             let apiErr = error as? APIError
@@ -481,6 +482,8 @@ final class AppStore: @unchecked Sendable {
         bootstrapTask = nil
         RefreshLoop.shared.stop()
         KeepAwake.shared.stop()
+        MaintenanceReminderScheduler.shared.clearAllReminders()
+        InsuranceReminderScheduler.shared.clearAllReminders()
         TokenStore.clear()
         UserDefaults.standard.removeObject(forKey: cacheStorageKey)
         UserDefaults.standard.removeObject(forKey: Self.selectedCarIdKey)

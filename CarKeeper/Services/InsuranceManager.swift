@@ -34,7 +34,12 @@ class InsuranceManager {
         var list = policies
         list.append(policy)
         savePolicies(list)
+        Task { await syncReminders() }
     }
 
+    func syncReminders() async {
+        let next = policies.map(\.endDate).filter { $0 > Date() }.min()
+        await InsuranceReminderScheduler.shared.scheduleInsuranceReminder(insuranceEndDate: next)
+    }
 }
 

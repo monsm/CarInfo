@@ -11,24 +11,6 @@ class MaintenanceReminderScheduler {
 
     private init() {}
 
-    func requestNotificationPermission() async -> Bool {
-        let center = UNUserNotificationCenter.current()
-        let settings = await center.notificationSettings()
-
-        guard settings.authorizationStatus == .notDetermined else {
-            return settings.authorizationStatus == .authorized
-        }
-
-        do {
-            try await center.requestAuthorization(options: [.alert, .sound, .badge])
-            return true
-        } catch {
-            RawLogStore.shared.logError(method: "NOTIFY", url: "maintenance",
-                                        message: "申请通知授权失败：\(error)")
-            return false
-        }
-    }
-
     func scheduleMaintenanceReminder(lastServiceMileage: Int,
                                      currentMileage: Int,
                                      interval: Int = AppStore.defaultServiceInterval) async {
@@ -54,7 +36,7 @@ class MaintenanceReminderScheduler {
 
         let trigger = UNCalendarNotificationTrigger(
             dateMatching: DateComponents(hour: 9, minute: 0),
-            repeats: true
+            repeats: false
         )
         try? await center.add(UNNotificationRequest(identifier: requestId,
                                                    content: content,
