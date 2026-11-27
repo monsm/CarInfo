@@ -70,8 +70,9 @@ final class WeatherService: ObservableObject {
     nonisolated static let moveThresholdMeters: Double = 5_000
     nonisolated static let host = "api.open-meteo.com"
 
-    private var inFlight = false
-    private var lastAttempt: Date?
+    private var inFlightTask: Task<Void, Never>?
+    private var lastSuccess: Date?
+    private var lastFailure: Date?
 
     private init() {}
 
@@ -113,28 +114,39 @@ final class WeatherService: ObservableObject {
 
 
     func refreshIfNeeded(coordinate: CLLocationCoordinate2D, force: Bool = false) async {
-        guard !inFlight else { return }
-        let now = Date()
-        if !force, let snapshot = current, let last = lastAttempt,
-           now.timeIntervalSince(last) < Self.refreshMinutes * 60,
-           Self.distanceMeters(from: snapshot, to: coordinate) < Self.moveThresholdMeters {
+        if let task = inFlightTask {
+            await task.value
             return
         }
-        await fetch(coordinate: coordinate, at: now)
+        let now = Date()
+        if !force {
+            if let lastFailure, now.timeIntervalSince(lastFailure) < 60 { return }
+            if let snapshot = current, let last = lastSuccess,
+               now.timeIntervalSince(last) < Self.refreshMinutes * 60,
+               Self.distanceMeters(from: snapshot, to: coordinate) < Self.moveThresholdMeters {
+                return
+            }
+        }
+        await runFetch(coordinate: coordinate, at: now)
     }
 
     func refresh(coordinate: CLLocationCoordinate2D) async {
-        guard !inFlight else { return }
-        await fetch(coordinate: coordinate, at: Date())
+        if let task = inFlightTask {
+            await task.value
+            return
+        }
+        await runFetch(coordinate: coordinate, at: Date())
+    }
+
+    private func runFetch(coordinate: CLLocationCoordinate2D, at now: Date) async {
+        let task = Task { await self.fetch(coordinate: coordinate, at: now) }
+        inFlightTask = task
+        await task.value
+        inFlightTask = nil
     }
 
     private func fetch(coordinate: CLLocationCoordinate2D, at now: Date) async {
-        inFlight = true
         status = .loading
-        defer {
-            inFlight = false
-            lastAttempt = Date()
-        }
         guard let url = Self.requestURL(latitude: coordinate.latitude,
                                         longitude: coordinate.longitude) else {
             status = .failed("坐标无效")
@@ -153,12 +165,16 @@ final class WeatherService: ObservableObject {
                                           longitude: coordinate.longitude,
                                           at: Date()) else {
                 status = .failed("取不到天气")
+                lastFailure = Date()
                 return
             }
             current = parsed
             status = .ok
+            lastSuccess = Date()
+            lastFailure = nil
         } catch {
             status = .failed(error.localizedDescription)
+            lastFailure = Date()
         }
     }
 
