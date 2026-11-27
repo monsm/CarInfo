@@ -253,8 +253,11 @@ final class AppStore: @unchecked Sendable {
 
     var isCharging: Bool {
         guard let charge = caches["charge"] as? [String: Any] else { return false }
-        let status = ciString(charge, ["ChrgStatus"]) ?? ""
-        return status == "1" || status == "2"
+        return ChargingState(raw: ciString(charge, ["ChrgStatus"])).isCharging
+    }
+
+    var carFeatures: CarFeatures? {
+        CarFeatures(funCode: car.flatMap { ciPick($0, ["funCode", "FunCode"]) })
     }
 
     enum BootstrapOutcome: Equatable {

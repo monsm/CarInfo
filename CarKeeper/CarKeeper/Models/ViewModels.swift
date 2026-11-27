@@ -148,14 +148,9 @@ enum VM {
             ?? "--"
         let socNum = Double(socStr) ?? 0
         let socPct = max(0, min(100, Int(socNum)))
-        let chargeSt = s(ciPick(charge, ["ChrgStatus"])) ?? ""
-        var chargeText = "未充电", chargeCls = "idle"
-        switch chargeSt {
-        case "1": chargeText = "充电中"; chargeCls = "ok"
-        case "2": chargeText = "即将充满"; chargeCls = "ok"
-        case "3": chargeText = "未在充电"; chargeCls = "idle"
-        default: break
-        }
+        let chargeState = ChargingState(raw: s(ciPick(charge, ["ChrgStatus"])))
+        let chargeText = chargeState.text
+        let chargeCls = chargeState.cls
 
         let range = vnumOf(charge, ["RemainedPowerMile"]).map { String(Int($0.rounded())) }
             ?? vnumOf(control, ["RemainedPowerMile"]).map { String(Int($0.rounded())) }
@@ -168,7 +163,7 @@ enum VM {
         let insulate = hasCtrl ? "\(n0(ciPick(control, ["InsulateResistance"])) ?? "--") Ω" : "--"
 
         var charging: ChargingSession?
-        if chargeSt == "1" || chargeSt == "2" {
+        if chargeState.isCharging {
             let pow = chargePowerKW(charge, control)
             charging = ChargingSession(
                 start: dash(ciPick(charge, ["ChargeStarttime"])) ?? "--",
@@ -203,7 +198,7 @@ enum VM {
         }
 
         var timeToFull: String? = nil
-        if chargeSt == "1" || chargeSt == "2" {
+        if chargeState.isCharging {
             if let powerKw = chargePowerKW(charge, control), powerKw > 0.1, socPct < 100 {
                 let minutes = Int(Double(100 - socPct) / powerKw * 60)
                 if minutes > 0 {

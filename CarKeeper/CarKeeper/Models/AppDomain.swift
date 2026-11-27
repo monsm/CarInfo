@@ -234,3 +234,84 @@ enum TripBuilder {
             .distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude)) / 1000
     }
 }
+
+struct CarFeatures {
+    private let groups: [String: [String: Int]]
+
+    init?(funCode: Any?) {
+        let obj: [String: Any]?
+        if let text = funCode as? String {
+            obj = jsonToAny(text)
+        } else {
+            obj = funCode as? [String: Any]
+        }
+        guard let obj, !obj.isEmpty else { return nil }
+        var out: [String: [String: Int]] = [:]
+        Self.flatten(obj, prefix: "", into: &out)
+        guard !out.isEmpty else { return nil }
+        groups = out
+    }
+
+    private static func flatten(_ obj: [String: Any], prefix: String,
+                                into out: inout [String: [String: Int]]) {
+        var flags: [String: Int] = [:]
+        for (key, value) in obj {
+            if let dict = value as? [String: Any] {
+                let child = prefix.isEmpty ? key : prefix + "/" + key
+                flatten(dict, prefix: child, into: &out)
+            } else if let n = ciNumber(obj, [key]) {
+                flags[key] = Int(n)
+            }
+        }
+        if !flags.isEmpty {
+            var merged = out[prefix] ?? [:]
+            for (k, v) in flags where merged[k] == nil { merged[k] = v }
+            out[prefix] = merged
+        }
+    }
+
+    func value(_ key: String, in group: String? = nil) -> Int? {
+        if let group { return groups[group]?[key] }
+        if let top = groups[""]?[key] { return top }
+        for (_, flags) in groups where flags[key] != nil { return flags[key] }
+        return nil
+    }
+
+    func isOn(_ key: String, in group: String? = nil) -> Bool? {
+        value(key, in: group).map { $0 != 0 }
+    }
+}
+
+enum ChargingState {
+    case charging
+    case nearlyFull
+    case notCharging
+    case unknown
+
+    init(raw: String?) {
+        switch (raw ?? "").trimmingCharacters(in: .whitespaces) {
+        case "1": self = .charging
+        case "2": self = .nearlyFull
+        case "3": self = .notCharging
+        default: self = .unknown
+        }
+    }
+
+    var isCharging: Bool { self == .charging || self == .nearlyFull }
+
+    var text: String {
+        switch self {
+        case .charging: return "充电中"
+        case .nearlyFull: return "即将充满"
+        case .notCharging: return "未在充电"
+        case .unknown: return "未充电"
+        }
+    }
+
+    var cls: String {
+        switch self {
+        case .charging, .nearlyFull: return "ok"
+        case .notCharging, .unknown: return "idle"
+        }
+    }
+}

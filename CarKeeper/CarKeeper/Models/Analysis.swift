@@ -366,14 +366,9 @@ func batteryModel(_ cache: [String: Any?]) -> BatteryModel {
 
     let alarms: [String] = VM.activeAlarms(cache)
 
-    let chgSt = VM.s(ciPick(charge, ["ChrgStatus"])) ?? ""
-    let chgText: String = switch chgSt {
-    case "1": "充电中"
-    case "2": "即将充满"
-    case "3": "未在充电"
-    default: "未充电"
-    }
-    let chgCls = (["1", "2"].contains(chgSt)) ? "ok" : ""
+    let chgState = ChargingState(raw: VM.s(ciPick(charge, ["ChrgStatus"])))
+    let chgText = chgState.text
+    let chgCls = chgState.isCharging ? "ok" : ""
 
     let charging = ChargeDetail(
         text: chgText, cls: chgCls,

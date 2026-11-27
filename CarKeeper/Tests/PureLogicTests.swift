@@ -729,3 +729,38 @@ final class TripBuilderEdgeTests: XCTestCase {
         XCTAssertEqual(MessageGrouping.dayLabel(key, now: now), "今天")
     }
 }
+
+
+final class CarFeaturesTests: XCTestCase {
+
+    func testParsesJSONStringAndNestedGroups() {
+        let json = "{\"control/remoteBaseControl\":{\"#Statelock\":1,\"#airBtn\":0},"
+            + "\"home/newIndex\":{\"#battery\":1,"
+            + "\"batteryChargeDischargeP13\":{\"#chargeDischargeInfo\":0}}}"
+        let f = CarFeatures(funCode: json)
+        XCTAssertEqual(f?.isOn("#Statelock", in: "control/remoteBaseControl"), true)
+        XCTAssertEqual(f?.isOn("#airBtn", in: "control/remoteBaseControl"), false)
+        XCTAssertEqual(f?.isOn("#battery"), true)
+        XCTAssertEqual(f?.isOn("#chargeDischargeInfo",
+                               in: "home/newIndex/batteryChargeDischargeP13"), false)
+        XCTAssertNil(f?.isOn("#missing"))
+    }
+
+    func testAcceptsDictionaryAndRejectsEmpty() {
+        XCTAssertNotNil(CarFeatures(funCode: ["g": ["#a": 1]]))
+        XCTAssertNil(CarFeatures(funCode: nil))
+        XCTAssertNil(CarFeatures(funCode: ""))
+        XCTAssertNil(CarFeatures(funCode: [String: Any]()))
+    }
+
+    func testChargingStateMapping() {
+        XCTAssertTrue(ChargingState(raw: "1").isCharging)
+        XCTAssertTrue(ChargingState(raw: "2").isCharging)
+        XCTAssertFalse(ChargingState(raw: "3").isCharging)
+        XCTAssertFalse(ChargingState(raw: nil).isCharging)
+        XCTAssertEqual(ChargingState(raw: "3").text, "未在充电")
+        XCTAssertEqual(ChargingState(raw: nil).text, "未充电")
+        XCTAssertEqual(ChargingState(raw: "1").cls, "ok")
+        XCTAssertEqual(ChargingState(raw: "3").cls, "idle")
+    }
+}
