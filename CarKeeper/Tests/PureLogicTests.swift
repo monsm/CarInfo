@@ -425,3 +425,63 @@ final class DriveScoreTests: XCTestCase {
         XCTAssertNil(s.grade)
     }
 }
+
+
+final class MessageFeedTests: XCTestCase {
+
+    func testClassifierTags() {
+        XCTAssertEqual(MessageClassifier.classify(title: "电池故障", content: "").tag, "报警")
+        XCTAssertEqual(MessageClassifier.classify(title: "车辆熄火", content: "开始充电").tag, "充电")
+        XCTAssertEqual(MessageClassifier.classify(title: "位置更新", content: "").tag, "定位")
+        XCTAssertEqual(MessageClassifier.classify(title: "普通通知", content: "").tag, "")
+    }
+
+    func testResolveBodySkipsNullAndEmpty() {
+        let m: [String: Any] = ["content": "null", "detail": "无", "description": "真实内容"]
+        XCTAssertEqual(MessageClassifier.resolveBody(m), "真实内容")
+        XCTAssertEqual(MessageClassifier.resolveBody([:]), "")
+    }
+
+    func testDayKeyParsesBothSeparators() {
+        XCTAssertEqual(MessageGrouping.dayKey("2026-09-22 07:08:25"), "2026-09-22")
+        XCTAssertEqual(MessageGrouping.dayKey("2026/9/2 01:02:03"), "2026/9/2")
+        XCTAssertEqual(MessageGrouping.dayKey("没有日期"), "")
+    }
+
+    func testGroupsSortNewestFirstAndPutEarlierLast() {
+        let items = [
+            MessageItem(id: "a", title: "", body: "", location: "", time: "2026-09-20 10:00:00",
+                        plate: "", read: false, tag: "", tagCls: "", coordinate: nil),
+            MessageItem(id: "b", title: "", body: "", location: "", time: "2026-09-22 10:00:00",
+                        plate: "", read: true, tag: "", tagCls: "", coordinate: nil),
+            MessageItem(id: "c", title: "", body: "", location: "", time: "",
+                        plate: "", read: false, tag: "", tagCls: "", coordinate: nil)
+        ]
+        let groups = MessageGrouping.groups(items)
+        XCTAssertEqual(groups.map(\.label).last, "更早")
+        XCTAssertEqual(groups.last?.items.map(\.id), ["c"])
+        XCTAssertEqual(groups.first?.items.map(\.id), ["b"])
+        XCTAssertEqual(groups.first?.unread, 0)
+    }
+
+    func testDecodePrefersReceiverPlateAndReadsStatus() {
+        let m: [String: Any] = [
+            "stubId": "s1", "title": "T", "content": "C",
+            "createdAt": "2026-09-22 07:08:25",
+            "realReceiverId": "id-1", "receiverPlate": "京A*****",
+            "readStatus": 1
+        ]
+        let items = MessageDecoder.decode([m], readSet: [])
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(items[0].id, "s1")
+        XCTAssertEqual(items[0].plate, "京A*****")
+        XCTAssertTrue(items[0].read)
+    }
+
+    func testDecodeTreatsNewFlagAsUnread() {
+        let m: [String: Any] = ["stubId": "s2", "title": "T", "content": "C",
+                                "createdAt": "2026-09-22 07:08:25", "new": true]
+        XCTAssertFalse(MessageDecoder.decode([m], readSet: []).first!.read)
+        XCTAssertTrue(MessageDecoder.decode([m], readSet: ["s2"]).first!.read)
+    }
+}
